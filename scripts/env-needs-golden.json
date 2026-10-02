@@ -1,0 +1,1624 @@
+{
+  "brand:naked-brand": {
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "brand:newsflash-brand": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "brand:playground-omega": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [
+        "GOOGLE_ANALYTICS_SECRET_BACKEND",
+        "RECAPTCHA_SECRET_KEY"
+      ],
+      "full": [],
+      "generated": [
+        "GOOGLE_ANALYTICS_SECRET_BACKEND",
+        "RECAPTCHA_SECRET_KEY"
+      ]
+    },
+    "config.formatKeys@desktop": {
+      "linux.appimage": [],
+      "linux.deb": [],
+      "linux.snap": [],
+      "mac.dmg": [],
+      "windows.nsis": []
+    },
+    "config.formatKeys@extension": {
+      "chrome.store": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "chrome.zip": [],
+      "edge.store": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "edge.zip": [],
+      "firefox.store": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "firefox.zip": []
+    },
+    "desktop.assertBakeRules@desktop": {
+      "empty": [
+        "GOOGLE_ANALYTICS_SECRET_DESKTOP"
+      ],
+      "full": [],
+      "generated": [
+        "GOOGLE_ANALYTICS_SECRET_DESKTOP"
+      ]
+    },
+    "desktop.assertShipKeys@desktop": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "RECAPTCHA_SECRET_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": [
+        "RECAPTCHA_SECRET_KEY"
+      ]
+    },
+    "devkit.missingRequiredSecrets@desktop": {
+      "empty": [
+        "APPLE_API_ISSUER",
+        "APPLE_API_KEY",
+        "APPLE_API_KEY_ID",
+        "APPLE_TEAM_ID",
+        "CSC_KEY_PASSWORD",
+        "CSC_LINK"
+      ],
+      "full": [],
+      "generated": [
+        "APPLE_API_ISSUER",
+        "APPLE_API_KEY",
+        "APPLE_API_KEY_ID",
+        "APPLE_TEAM_ID",
+        "CSC_KEY_PASSWORD",
+        "CSC_LINK"
+      ]
+    },
+    "devkit.missingRequiredSecrets@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingShipKeys@desktop": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingShipKeys@extension": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "extension.assertBakeRules@extension": {
+      "empty": [
+        "GOOGLE_ANALYTICS_SECRET_EXTENSION"
+      ],
+      "full": [],
+      "generated": [
+        "GOOGLE_ANALYTICS_SECRET_EXTENSION"
+      ]
+    },
+    "extension.storeLanes@extension": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN",
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID",
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "advertising": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "analytics": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "domain": [
+          "CLOUDFLARE_TOKEN",
+          "NAMECHEAP_API_KEY",
+          "NAMECHEAP_USERNAME"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "advertising": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "analytics": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "domain": [
+          "CLOUDFLARE_TOKEN",
+          "NAMECHEAP_API_KEY",
+          "NAMECHEAP_USERNAME"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "brand:sandbox-brand": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:demo-project": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:desktop-azure": {
+    "config.formatKeys@desktop": {
+      "linux.appimage": [],
+      "linux.deb": [],
+      "linux.snap": [],
+      "mac.dmg": [],
+      "windows.nsis": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ]
+    },
+    "desktop.assertBakeRules@desktop": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "desktop.assertShipKeys@desktop": {
+      "empty": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ],
+      "full": [],
+      "generated": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ]
+    },
+    "devkit.missingRequiredSecrets@desktop": {
+      "empty": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ],
+      "full": [],
+      "generated": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ]
+    },
+    "devkit.missingShipKeys@desktop": {
+      "empty": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ],
+      "full": [],
+      "generated": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ],
+      "full": [],
+      "generated": [
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_TENANT_ID",
+        "AZURE_TRUSTED_SIGNING_ENDPOINT"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:desktop-snap": {
+    "config.formatKeys@desktop": {
+      "linux.appimage": [],
+      "linux.deb": [],
+      "linux.snap": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ],
+      "mac.dmg": [],
+      "windows.nsis": []
+    },
+    "desktop.assertBakeRules@desktop": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "desktop.assertShipKeys@desktop": {
+      "empty": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ],
+      "full": [],
+      "generated": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ]
+    },
+    "devkit.missingRequiredSecrets@desktop": {
+      "empty": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ],
+      "full": [],
+      "generated": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ]
+    },
+    "devkit.missingShipKeys@desktop": {
+      "empty": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ],
+      "full": [],
+      "generated": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ],
+      "full": [],
+      "generated": [
+        "SNAPCRAFT_STORE_CREDENTIALS"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "certificates": [
+          "APPLE_API_ISSUER",
+          "APPLE_API_KEY_ID",
+          "APPLE_TEAM_ID"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:extension-chrome": {
+    "config.formatKeys@extension": {
+      "chrome.store": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "chrome.zip": [],
+      "edge.store": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "edge.zip": [],
+      "firefox.store": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "firefox.zip": []
+    },
+    "devkit.missingRequiredSecrets@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingShipKeys@extension": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ]
+    },
+    "extension.assertBakeRules@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "extension.storeLanes@extension": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "full": [],
+      "generated": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:extension-edge": {
+    "config.formatKeys@extension": {
+      "chrome.store": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "chrome.zip": [],
+      "edge.store": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "edge.zip": [],
+      "firefox.store": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "firefox.zip": []
+    },
+    "devkit.missingRequiredSecrets@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingShipKeys@extension": {
+      "empty": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "full": [],
+      "generated": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ]
+    },
+    "extension.assertBakeRules@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "extension.storeLanes@extension": {
+      "empty": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "full": [],
+      "generated": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "full": [],
+      "generated": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:extension-firefox": {
+    "config.formatKeys@extension": {
+      "chrome.store": [
+        "CHROME_CLIENT_ID",
+        "CHROME_CLIENT_SECRET",
+        "CHROME_REFRESH_TOKEN"
+      ],
+      "chrome.zip": [],
+      "edge.store": [
+        "EDGE_API_KEY",
+        "EDGE_CLIENT_ID"
+      ],
+      "edge.zip": [],
+      "firefox.store": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "firefox.zip": []
+    },
+    "devkit.missingRequiredSecrets@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingShipKeys@extension": {
+      "empty": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "extension.assertBakeRules@extension": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "extension.storeLanes@extension": {
+      "empty": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "manager.publishing.keys": {
+      "empty": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ],
+      "full": [],
+      "generated": [
+        "FIREFOX_API_KEY",
+        "FIREFOX_API_SECRET"
+      ]
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:no-backend": {
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:real-project": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:recaptcha-off": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:recaptcha-site-key": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [
+        "RECAPTCHA_SECRET_KEY"
+      ],
+      "full": [],
+      "generated": [
+        "RECAPTCHA_SECRET_KEY"
+      ]
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "RECAPTCHA_SECRET_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": [
+        "RECAPTCHA_SECRET_KEY"
+      ]
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:sentry-dsn": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  },
+  "synthetic:sentry-no-dsn": {
+    "backend.assertRequired@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "backend.assertRules@backend": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@backend": {
+      "empty": [
+        "OMEGA_ADMIN_KEY",
+        "OMEGA_NAMESPACE",
+        "OMEGA_WEBHOOK_KEY",
+        "UNSUBSCRIBE_HMAC_KEY"
+      ],
+      "full": [],
+      "generated": []
+    },
+    "devkit.missingRequiredSecrets@web": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.publishing.keys": {
+      "empty": [],
+      "full": [],
+      "generated": []
+    },
+    "manager.runPreflight": {
+      "empty": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "full": {},
+      "generated": {
+        "campaigns": [
+          "SENDGRID_API_KEY"
+        ],
+        "captcha": [
+          "RECAPTCHA_SECRET_KEY"
+        ],
+        "cloud": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ],
+        "edge": [
+          "CLOUDFLARE_TOKEN"
+        ],
+        "monitoring": [
+          "SENTRY_AUTH_TOKEN"
+        ],
+        "newsletter": [
+          "BEEHIIV_API_KEY"
+        ],
+        "search": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      }
+    }
+  }
+}

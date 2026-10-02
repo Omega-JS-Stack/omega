@@ -22,14 +22,16 @@ const { test, before } = require('node:test');
 // that ONE input instead of a loose `options.environment`, and a fixture build
 // with no verb above it is a development build, which is what it always was.
 const { setEnvironment } = require('@omega.js/config/environment');
+const { MINT_BRIDGE } = require('@omega.js/config');
 const { buildSite } = require('../src/build.js');
-const { resolveStaticDirs, copyStaticAssets } = require('../src/static-assets.js');
+const { resolveStaticDirs, copyStaticAssets, assertMintedAssets } = require('../src/static-assets.js');
 
 const PKG = path.resolve(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
 const SITE = path.join(__dirname, 'fixtures', 'contract-site');
 const OUT = path.join(PKG, '.omega', 'static-gaps');
 const siteData = JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8'));
+const MINT_MESSAGE = 'No minted logo set for a brand that has logo sources. Run: npx omega manage --service=assets, then deploy again.';
 
 let brandRoot; // fake brand tree with a minted .omega/assets set
 
@@ -42,6 +44,44 @@ function mint(segments, content) {
   const file = path.join(brandRoot, ...segments);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content);
+}
+
+/**
+ * A fresh brand root holding the given brand-root relative files.
+ * @param {string[]} files
+ * @returns {string} The brand root.
+ */
+function brandTree(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-brand-'));
+  for (const relative of files) {
+    fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+    fs.writeFileSync(path.join(root, relative), 'fixture');
+  }
+  return root;
+}
+
+/**
+ * One classy build of the contract fixture, no site.meta, into `outDir`.
+ * @param {string} outDir
+ * @param {object[]} staticDirs
+ */
+async function buildFixture(outDir, staticDirs) {
+  await buildSite({
+    consumerDir: SITE,
+    siteData: {
+      ...siteData,
+      meta: undefined, // the live playground shape: no meta key anywhere
+      theme: { id: 'classy' },
+      brand: {
+        ...siteData.brand,
+        images: { social: 'https://contract.test/assets/images/brand/social.png' },
+      },
+    },
+    outDir,
+    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+    skipPurge: true,
+    staticDirs,
+  });
 }
 
 before(async () => {
@@ -71,25 +111,10 @@ before(async () => {
   mint(['consumer-assets', 'fonts', 'unreferenced.woff2'], 'pruned-face-must-not-return');
 
   setEnvironment('development');
-  await buildSite({
-    consumerDir: SITE,
-    siteData: {
-      ...siteData,
-      meta: undefined, // the live playground shape: no meta key anywhere
-      theme: { id: 'classy' },
-      brand: {
-        ...siteData.brand,
-        images: { social: 'https://contract.test/assets/images/brand/social.png' },
-      },
-    },
-    outDir: OUT,
-    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-    skipPurge: true,
-    staticDirs: resolveStaticDirs({
-      brandRoot,
-      assetsDir: path.join(brandRoot, 'consumer-assets'),
-    }),
-  });
+  await buildFixture(OUT, resolveStaticDirs({
+    brandRoot,
+    assetsDir: path.join(brandRoot, 'consumer-assets'),
+  }));
 });
 
 test('resolveStaticDirs: core images first, mint bridge next, consumer layer last, missing sources dropped', () => {
@@ -194,4 +219,70 @@ test('head wires the minted set: webmanifest link + og:image brand fallback', ()
   assert.ok(!html.includes('/manifest.json'), 'the old never-emitted /manifest.json link is gone');
   assert.ok(!html.includes('browserconfig.xml') && !html.includes('safari-pinned-tab'), 'legacy favicon tags dropped (mint never produces them)');
   assert.ok(html.includes('property="og:image" content="https://contract.test/assets/images/brand/social.png"'), 'og:image falls back to brand.images.social');
+});
+
+// ─── The minted set reaches every build ───
+
+test('the static phase bridges the shared MINT_BRIDGE list to the same four site paths', () => {
+  const sitePaths = [
+    'assets/images/favicon',
+    'assets/images/brand/brandmark.svg',
+    'assets/images/brand/brandmark.png',
+    'assets/images/brand/social.png',
+  ];
+  assert.deepStrictEqual(MINT_BRIDGE.map((entry) => entry.dest), sitePaths, 'the one list lives in @omega.js/config');
+
+  const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
+  assert.deepStrictEqual(dirs.filter((entry) => sitePaths.includes(entry.dest)), [
+    { src: path.join(brandRoot, '.omega', 'assets', 'favicon'), dest: 'assets/images/favicon' },
+    { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), dest: 'assets/images/brand/brandmark.svg' },
+    { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-512.png'), dest: 'assets/images/brand/brandmark.png' },
+    { src: path.join(brandRoot, '.omega', 'assets', 'social', 'brandmark', 'color-1024.png'), dest: 'assets/images/brand/social.png' },
+  ]);
+  for (const sitePath of sitePaths) {
+    assert.ok(fs.existsSync(path.join(OUT, sitePath)), `${sitePath} shipped`);
+  }
+});
+
+test('a CI build of a brand with logo sources and no minted favicon set throws the one line', () => {
+  const noMint = brandTree(['assets/logo/brandmark.svg']);
+  const logoOnly = brandTree(['assets/logo/brandmark.svg', '.omega/assets/logo/brandmark/color-512.png']);
+  // A favicon folder without site.webmanifest is not the set the page head needs
+  const noManifest = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico']);
+
+  for (const [root, env] of [
+    [noMint, { GITHUB_ACTIONS: 'true' }],
+    [noMint, { CI: 'true' }],
+    [logoOnly, { GITHUB_ACTIONS: 'true' }],
+    [noManifest, { GITHUB_ACTIONS: 'true' }],
+  ]) {
+    assert.throws(() => assertMintedAssets({ brandRoot: root, env }), (error) => {
+      assert.ok(error.message.includes(MINT_MESSAGE), `the message names the fix: ${error.message}`);
+      assert.ok(!error.message.includes('\n'), 'one line');
+      return true;
+    });
+  }
+});
+
+test('a CI build with no logo sources, and a local build with no mint, are both clean', () => {
+  const env = { GITHUB_ACTIONS: 'true' };
+  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/fonts/brand.ttf']), env }), 'no logo sources');
+  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/wordmark.svg']), env }), 'a wordmark is not the mint source');
+  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/brandmark.svg']), env: {} }), 'a local build');
+  const minted = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico', '.omega/assets/favicon/site.webmanifest']);
+  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: minted, env }), 'a CI build that has its minted set');
+});
+
+test('the head carries the favicon and manifest links with a minted set, and neither without one', async () => {
+  const minted = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
+  assert.match(minted, /<link rel="icon"[^>]*href="[^"]*\/assets\/images\/favicon\//, 'favicon links');
+  assert.match(minted, /<link rel="manifest"[^>]*href="[^"]*\/assets\/images\/favicon\/site\.webmanifest/, 'manifest link');
+
+  const bare = brandTree([]);
+  const outDir = path.join(PKG, '.omega', 'static-no-mint');
+  await buildFixture(outDir, resolveStaticDirs({ brandRoot: bare, assetsDir: path.join(bare, 'assets') }));
+
+  const none = fs.readFileSync(path.join(outDir, 'about.html'), 'utf8');
+  assert.doesNotMatch(none, /rel="(?:shortcut )?icon"|rel="apple-touch-icon"/, 'no favicon links');
+  assert.doesNotMatch(none, /rel="manifest"/, 'no manifest link');
 });

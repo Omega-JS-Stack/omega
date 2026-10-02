@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `docs/backend/index.md` is the guide (identity, architecture, the CLI table, file conventions). The per-subsystem meat lives in `docs/backend/*.md`: routes, schemas, firestore, test-framework, common-mistakes, environment-detection, logging, payment-system, email-system, usage-rate-limiting, auth-hooks, mcp, verts. Cross-framework contracts live in `docs/shared/`.
-- **Working in a consumer project** — read `node_modules/@omega.js/manager/docs/backend/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega command.
+- **Working in a consumer project**: read `node_modules/@omega.js/manager/docs/backend/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega verb but a read-only one.
 
 ## Non-negotiables
 

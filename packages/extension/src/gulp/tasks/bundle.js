@@ -41,9 +41,8 @@ const version = require('wonderful-version');
 const { bundle, formatBytes } = require('@omega.js/devkit/bundle');
 const { emptyModulesPlugin } = require('@omega.js/devkit/empty-modules-plugin');
 const { resolveThemeId } = require('../../lib/theme.js');
-const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, envPorts, clientConfig, targetNameFromDir } = require('@omega.js/config');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, envPorts, clientConfig, targetNameFromDir, missingEnvKeys } = require('@omega.js/config');
 const { bakeKeys } = require('@omega.js/config/env-delivery');
-const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const buildJsonKit = require('@omega.js/devkit/build-json');
 
@@ -402,15 +401,15 @@ function assertBakeRules(config, env, options) {
   const buildMode = options.build === undefined ? build.isBuildMode() : options.build;
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
-  const violations = checkEnvRules(config, env, { target: 'extension' })
-    .filter((violation) => violation.rule === 'requiredWhen');
-  if (violations.length === 0) return;
+  // A `build` owes only what it bakes: @omega.js/config's one answer
+  const missing = missingEnvKeys(config, env, { target: 'extension', verb: 'build' });
+  if (missing.length === 0) return;
 
   // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_EXTENSION, not the
   // GOOGLE_ANALYTICS_SECRET it is delivered as): that is the name a human puts
   // in the brand .env and in the repo's Actions secrets.
-  const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
-  const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
+  const named = missing.map((row) => row.text).join(', ');
+  const message = `${missing.length} env ${missing.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
     + 'Set it in the brand .env (and as a repo Actions secret for a CI publish — `omega deploy` pushes them), then build again.';
 
   if (buildMode) {

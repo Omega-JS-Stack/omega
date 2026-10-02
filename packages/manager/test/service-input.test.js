@@ -16,7 +16,7 @@ const path = require('node:path');
 
 const { ENV_SCHEMA, envFileGroups, generatedEnvKeys, envSchemaEntry, isMachineLocal } = require('@omega.js/config/env-schema');
 const { FORMATS } = require('@omega.js/config');
-const { REQUIRES, SERVICE_ORDER, serviceInputSpec } = require('../src/config.js');
+const { REQUIRES, SERVICE_ORDER, OPERATIONS, serviceInputSpec } = require('../src/config.js');
 const { requestServiceInput } = require('../src/lib/service-input.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
@@ -234,17 +234,60 @@ test('service-input: an empty paste skips this run (no writeback, no export)', a
   }
 });
 
-test('service-input: entry-level `when` drops inputs this brand does not need', async () => {
-  cleanup(VAR, VAR2);
-  const gate = await requestServiceInput(
-    { brandRoot: '/nope', brandConfig: { registrar: 'other' }, options: {} },
-    fakeSpec([
-      { name: VAR },
-      { name: VAR2, when: (config) => config.registrar === 'namecheap' },
-    ]),
-  );
+// ─── what a real service asks for: the one function's answer ─────────────────
 
-  assert.deepEqual(gate.missingEnv, [VAR]);
+const REAL_BRAND = {
+  brand: { id: 'b', name: 'B' },
+  cloud: { provider: 'firebase', config: { projectId: 'b-live' } },
+  targets: { web: { type: 'web' }, backend: { type: 'backend' } },
+};
+const ASKED_KEYS = ['RECAPTCHA_SECRET_KEY', 'CLOUDFLARE_TOKEN', 'NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'];
+
+/**
+ * A headless ask of one real service, with the asked keys absent from the env.
+ * @param {string} service - The REQUIRES service.
+ * @param {object} brandConfig - The brand config.
+ * @returns {Promise<object|null>} The gate.
+ */
+async function askHeadless(service, brandConfig) {
+  const saved = Object.fromEntries(ASKED_KEYS.map((key) => [key, process.env[key]]));
+  cleanup(...ASKED_KEYS);
+  try {
+    const captured = captureLog(() => requestServiceInput({ brandRoot: '/nope', brandConfig, options: {} }, serviceInputSpec(service)));
+    return await captured.result;
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value !== undefined) process.env[key] = value;
+    }
+  }
+}
+
+test('service-input: captcha asks for its secret while reCAPTCHA is on, and never once it is off', async () => {
+  const gate = await askHeadless('captcha', REAL_BRAND);
+  assert.equal(gate.skip, true);
+  assert.deepEqual(gate.missingEnv, ['RECAPTCHA_SECRET_KEY']);
+
+  const off = await askHeadless('captcha', { ...REAL_BRAND, captcha: { providers: { recaptcha: { enabled: false } } } });
+  assert.equal(off.skip, true);
+  assert.match(off.reason, /captcha\.providers\.recaptcha\.enabled/);
+});
+
+test('service-input: the domain asks for the namecheap pair only when namecheap is the registrar', async () => {
+  const namecheap = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { namecheap: {} } } });
+  assert.deepEqual([...namecheap.missingEnv].sort(), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
+
+  const squarespace = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { squarespace: {} } } });
+  assert.deepEqual(squarespace.missingEnv, ['CLOUDFLARE_TOKEN']);
+});
+
+test('service-input: a real service with its key present proceeds, nothing asked', async () => {
+  process.env.RECAPTCHA_SECRET_KEY = 'already-set';
+  try {
+    const gate = await requestServiceInput({ brandRoot: '/nope', brandConfig: REAL_BRAND, options: {} }, serviceInputSpec('captcha'));
+    assert.equal(gate, null);
+  } finally {
+    cleanup('RECAPTCHA_SECRET_KEY');
+  }
 });
 
 // ─── the mint lane (generated keys) ──────────────────────────────────────────
@@ -420,48 +463,64 @@ function serviceInputKeys() {
       || text.includes(`process.env[${JSON.stringify(entry.name)}]`)));
 }
 
-test('sweep: every credential a service actually reads is declared in the REQUIRES registry', () => {
-  const keys = serviceInputKeys();
-  // The derivation must not quietly collapse to nothing
-  assert.ok(keys.length > 10, `expected the manager to read many credentials, found ${keys.length}`);
-
-  const undeclared = keys
-    .filter((entry) => !(REQUIRES[entry.owner]?.env || []).some((input) => input.name === entry.name))
-    .map((entry) => `${entry.owner}: ${entry.name}`);
-
-  assert.deepEqual(undeclared, [], 'declare these in src/config.js REQUIRES so the shared setup contract can ask for them');
-});
-
-test('sweep: every GENERATED key a service reads is declared in THAT service\'s REQUIRES entry', () => {
-  // The mint lane's half of the registry contract (#635). A generated key has
-  // nobody to paste it, so a service that reads one must declare it — that
-  // declaration is the only thing that makes the setup contract mint it before
-  // the service's operations run. Derived, not listed: the service names come
-  // from the source tree, the key names from the env schema.
-  const servicesDir = path.join(SRC_DIR, 'services');
-  const generated = Object.keys(generatedEnvKeys());
-
-  const undeclared = [];
-  for (const service of fs.readdirSync(servicesDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
-    const sources = sourceFiles(path.join(servicesDir, service.name));
-
-    for (const name of generated) {
-      // A literal read is what binds the service to the key; env-keys' own
-      // `process.env[name]` walk over the whole set is not one service's need
-      const reads = sources.some(([, text]) => text.includes(`process.env.${name}`)
-        || text.includes(`process.env[${JSON.stringify(name)}]`));
-      if (!reads) {
-        continue;
-      }
-
-      const declared = (REQUIRES[service.name]?.env || []).some((input) => input.name === name);
-      if (!declared) {
-        undeclared.push(`${service.name}: ${name}`);
+/**
+ * Every key the format table names: a ship credential, asked through the table.
+ * @returns {Set<string>} The key names.
+ */
+function shipKeys() {
+  const keys = new Set();
+  for (const platforms of Object.values(FORMATS)) {
+    for (const formats of Object.values(platforms)) {
+      for (const spec of Object.values(formats)) {
+        for (const key of spec.requires) keys.add(key);
       }
     }
   }
 
-  assert.deepEqual(undeclared, [], 'declare these in src/config.js REQUIRES so the setup contract mints them before the service runs');
+  return keys;
+}
+
+test('sweep: every credential a service actually reads says in the env schema when it is asked', () => {
+  const keys = serviceInputKeys();
+  // The derivation must not quietly collapse to nothing
+  assert.ok(keys.length > 10, `expected the manager to read many credentials, found ${keys.length}`);
+
+  // A ship credential is asked through the format table, its one home
+  const ship = shipKeys();
+  const unasked = keys
+    .filter((entry) => typeof entry.askedWhen !== 'function' && !ship.has(entry.name))
+    .map((entry) => `${entry.owner}: ${entry.name}`);
+
+  assert.deepEqual(unasked, [], 'give these an askedWhen in @omega.js/config env-schema.js so manage can ask for them');
+});
+
+test('sweep: every GENERATED key a service reads is minted by the workspace before that service runs', () => {
+  // A generated key has nobody to paste it, so it must exist before a service
+  // reads it. The workspace's env-keys op mints every missing one on each
+  // manage, and the workspace walks first. Derived, not listed: the service
+  // names come from the source tree, the key names from the env schema.
+  assert.ok(OPERATIONS.workspace.some((operation) => operation.name === 'env-keys'), 'the workspace mints the generated keys');
+  const workspaceAt = SERVICE_ORDER.indexOf('workspace');
+
+  const servicesDir = path.join(SRC_DIR, 'services');
+  const generated = Object.keys(generatedEnvKeys());
+
+  const early = [];
+  for (const service of fs.readdirSync(servicesDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+    if (service.name === 'workspace') continue;
+    const sources = sourceFiles(path.join(servicesDir, service.name));
+
+    for (const name of generated) {
+      // A literal read is what binds the service to the key
+      const reads = sources.some(([, text]) => text.includes(`process.env.${name}`)
+        || text.includes(`process.env[${JSON.stringify(name)}]`));
+      if (reads && SERVICE_ORDER.indexOf(service.name) <= workspaceAt) {
+        early.push(`${service.name}: ${name}`);
+      }
+    }
+  }
+
+  assert.deepEqual(early, [], 'these services read a generated key before the workspace could mint it');
 });
 
 test('sweep: the mint has exactly ONE home', () => {
@@ -478,40 +537,12 @@ test('sweep: the mint has exactly ONE home', () => {
   assert.deepEqual(homes, ['lib/env-secret.js'], 'the mint is mintGeneratedKey — never a second copy');
 });
 
-test('sweep: the human half of every input comes from the env SCHEMA, not the registry (#867)', () => {
-  // One home for what a key is and where it is minted. The registry keeps the
-  // manager's own fields; a label/url/hint typed here again is the drift that
-  // left every desktop signing key and every store key with a mint page in
-  // NEITHER place.
-  const inRegistry = [];
-  for (const [service, declaration] of Object.entries(REQUIRES)) {
-    for (const input of declaration.env) {
-      for (const field of ['label', 'url', 'hint']) {
-        if (field in input) inRegistry.push(`${service}.${input.name}.${field}`);
-      }
-    }
-  }
-  assert.deepEqual(inRegistry, [], 'move these into the matching env-schema.js entry');
-
-  // ...and every name the registry declares HAS a schema entry to fill from
-  const unknown = [];
-  for (const [service, declaration] of Object.entries(REQUIRES)) {
-    for (const input of declaration.env) {
-      if (!ENV_SCHEMA.some((entry) => entry.name === input.name)) unknown.push(`${service}: ${input.name}`);
-    }
-  }
-  assert.deepEqual(unknown, [], 'declare these in @omega.js/config env-schema.js');
-});
-
 test('sweep: every pasted key says what it is and where to get it (#867)', () => {
-  // The walk opens a gate with the label and walks to the url; a prompted key
+  // The walk opens a gate with the label and walks to the url; a pasted key
   // with neither is a prompt that says "paste CHROME_REFRESH_TOKEN" and stops.
   // `url: null` is a legitimate answer (no page mints this value), and it owes
   // a hint that says where the value does come from.
-  const prompted = Object.values(REQUIRES)
-    .flatMap((declaration) => declaration.env)
-    .filter((input) => input.prompted)
-    .map((input) => envSchemaEntry(input.name));
+  const prompted = ENV_SCHEMA.filter((entry) => entry.askedWhen && !entry.generated);
 
   assert.ok(prompted.length > 10, `expected many pasted keys, found ${prompted.length}`);
 
@@ -527,16 +558,7 @@ test('sweep: every ship credential a format needs is askable (#867)', () => {
   // The format table names the keys a platform cannot ship without. Each one
   // needs its mint page in the schema, or the publish that refuses on it has
   // nowhere to send the developer.
-  const shipKeys = new Set();
-  for (const platforms of Object.values(FORMATS)) {
-    for (const formats of Object.values(platforms)) {
-      for (const spec of Object.values(formats)) {
-        for (const key of spec.requires) shipKeys.add(key);
-      }
-    }
-  }
-
-  const unaskable = [...shipKeys]
+  const unaskable = [...shipKeys()]
     .map((key) => envSchemaEntry(key))
     .filter((entry) => !entry.label || (!entry.url && !entry.hint))
     .map((entry) => entry.name);
@@ -552,7 +574,6 @@ test('sweep: every REQUIRES entry can run the three-outcome gate', () => {
     const spec = serviceInputSpec(service);
     assert.equal(spec.service, service);
     assert.equal(spec.disablePath, declaration.disablePath);
-    assert.ok(spec.inputs.length > 0, `REQUIRES.${service} declares no inputs`);
   }
 });
 

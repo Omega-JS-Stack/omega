@@ -1,5 +1,5 @@
 const uuid = require('uuid');
-const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
+const { envPort, CLASSIC_PORTS, isDemoProject } = require('@omega.js/config');
 const { isCountedFeature, isPacedFeature, dayShare } = require('@omega.js/account/features');
 const { LANE_ACCOUNTS } = require('./lane-accounts.js');
 
@@ -2557,7 +2557,7 @@ function sessionsDatabase(admin) {
   }
 
   const port = envPort('database') || CLASSIC_PORTS.database;
-  const namespace = projectId.startsWith('demo-') ? projectId : `${projectId}-default-rtdb`;
+  const namespace = isDemoProject(projectId) ? projectId : `${projectId}-default-rtdb`;
 
   return admin.app().database(`http://127.0.0.1:${port}/?ns=${namespace}`);
 }

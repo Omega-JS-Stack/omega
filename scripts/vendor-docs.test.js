@@ -1,8 +1,8 @@
 /**
  * Shipped-docs structure test: @omega.js/manager, the package every brand
- * installs, carries the whole docs tree, the one-line AGENTS.md that imports
- * its map, the Claude plugin and the package-root marketplace. No other
- * publishable ships docs.
+ * installs, carries the whole docs tree and the one-line AGENTS.md that imports
+ * its map, and no copy of the Claude plugin: a machine gets that from GitHub.
+ * No other publishable ships docs.
  *
  * Each package is REALLY packed (`npm pack` into a temp dir, running its own
  * prepare and so the devkit vendor lane) and the tarball listing is asserted.
@@ -17,7 +17,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const { HOST_PACKAGE, PLUGIN_DIR, MARKETPLACE_FILE, MAP_FILE } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
+const { HOST_PACKAGE, MAP_FILE } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
 const { PUBLISHABLES } = require('./release-check.js');
 
 // One pack per package is the expensive part: pack once, share the listing.
@@ -63,18 +63,13 @@ test('vendor-docs: the manager ships AGENTS.md and the map it imports, inside th
   assert.deepEqual(missing, [], 'every doc ships at the same path');
 });
 
-test('vendor-docs: the manager also ships the Claude plugin and its marketplace', () => {
+test('case 13: the packed manager holds no claude-plugin/ and no .claude-plugin/, and still holds docs/', () => {
   const files = packedFiles(HOST_PACKAGE);
 
-  assert.ok(files.includes('.claude-plugin/marketplace.json'), 'the package-root marketplace must ship');
-  assert.ok(files.includes('claude-plugin/.claude-plugin/plugin.json'), 'the plugin manifest must ship');
-  assert.ok(files.some((file) => file.startsWith('claude-plugin/skills/') && file.endsWith('SKILL.md')), 'the plugin skills must ship');
-  assert.ok(files.some((file) => file.startsWith('claude-plugin/hooks/')), 'the plugin hooks must ship');
-
-  // The declaration addresses a launcher inside the plugin, which
-  // node-resolves @omega.js/mcp-router from the install around it.
-  assert.ok(files.includes('claude-plugin/.mcp.json'), 'the vendored plugin must carry the MCP server declaration');
-  assert.ok(files.includes('claude-plugin/mcp-router-launch.js'), 'the launcher it names must ship with it');
+  assert.deepEqual(files.filter((file) => file.startsWith('claude-plugin/')), [], 'no vendored plugin');
+  assert.deepEqual(files.filter((file) => file.startsWith('.claude-plugin/')), [], 'no package-root marketplace');
+  assert.ok(files.includes('docs/omega.md'), 'the docs tree still ships');
+  assert.ok(files.filter((file) => file.startsWith('docs/')).length > 10, 'the whole docs tree, not a stub');
 });
 
 for (const short of PUBLISHABLES.filter((name) => name !== HOST_PACKAGE)) {
@@ -85,9 +80,7 @@ for (const short of PUBLISHABLES.filter((name) => name !== HOST_PACKAGE)) {
 
 test('vendor-docs: everything the lane writes is generated: gitignored, never a committed file', () => {
   packedFiles(HOST_PACKAGE);
-  const paths = [path.join('docs'), PLUGIN_DIR, MARKETPLACE_FILE].map((entry) => `packages/${HOST_PACKAGE}/${entry}`);
-
-  const status = spawnSync('git', ['status', '--porcelain', '--', ...paths], { cwd: ROOT, encoding: 'utf8' });
+  const status = spawnSync('git', ['status', '--porcelain', '--', `packages/${HOST_PACKAGE}/docs`], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(status.status, 0, `git status failed: ${status.stderr}`);
-  assert.equal(status.stdout.trim(), '', 'vendored docs/plugin output must be gitignored and never a committed file');
+  assert.equal(status.stdout.trim(), '', 'vendored docs must be gitignored and never a committed file');
 });

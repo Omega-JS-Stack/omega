@@ -9,7 +9,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { REQUIRES, SERVICE_ORDER, OPERATIONS, serviceInputSpec } = require('../src/config.js');
+const { missingEnvKeys } = require('@omega.js/config');
+const { REQUIRES, SERVICE_ORDER, OPERATIONS, serviceInputs, serviceInputSpec } = require('../src/config.js');
 const { run } = require('../src/services/ai/index.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
@@ -32,7 +33,10 @@ function stubBrowser() {
   return { opened, restore: () => { promptModule.openInBrowser = real; } };
 }
 
-function context(brandRoot, brandConfig = {}, options = {}) {
+// Both keys are asked only of a brand with a backend, the one target reading both
+const BACKEND_BRAND = { targets: { backend: { type: 'backend' } } };
+
+function context(brandRoot, brandConfig = BACKEND_BRAND, options = {}) {
   return {
     brandId: 'b',
     brandRoot,
@@ -44,12 +48,13 @@ function context(brandRoot, brandConfig = {}, options = {}) {
 
 test('ai: the registry declares both provider keys as OPTIONAL inputs', () => {
   const declaration = REQUIRES.ai;
+  const inputs = serviceInputs('ai');
 
   assert.equal(declaration.label, 'AI providers');
   assert.equal(declaration.disablePath, 'ai.enabled');
-  assert.deepEqual(declaration.env.map((entry) => entry.name), KEYS);
+  assert.deepEqual(inputs.map((entry) => entry.name), KEYS);
 
-  for (const entry of declaration.env) {
+  for (const entry of inputs) {
     assert.equal(entry.prompted, true, `${entry.name} is collected mid-run on a TTY`);
     assert.equal(entry.gates, false, `${entry.name} is optional — preflight never gates on it`);
   }
@@ -61,9 +66,13 @@ test('ai: the registry declares both provider keys as OPTIONAL inputs', () => {
     assert.ok(input.hint, `${input.name} says what to make there`);
   }
 
-  // The when clause mirrors the service's own gate — absence means ask
-  assert.equal(declaration.when({}), true);
-  assert.equal(declaration.when({ ai: { enabled: false } }), false);
+  // The ask mirrors the service's own gate: absence means ask
+  const asked = (config) => missingEnvKeys({ ...config, targets: { backend: { type: 'backend' } } }, {}, { verb: 'manage' })
+    .filter((row) => row.service === 'ai')
+    .map((row) => row.key)
+    .sort();
+  assert.deepEqual(asked({}), [...KEYS].sort());
+  assert.deepEqual(asked({ ai: { enabled: false } }), []);
 
   assert.ok(SERVICE_ORDER.includes('ai'), 'the walk runs it');
   assert.deepEqual(serviceInputSpec('ai').inputs.map((entry) => entry.name), KEYS);
@@ -124,7 +133,7 @@ test('ai: PROVIDE → both keys land in the brand .env and export for this run',
 test('ai: DISABLE → ai.enabled: false lands in omega.json5 and nothing asks again', async () => {
   cleanup();
   const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  // keep me\n  ai: {},\n}\n');
-  const brandConfig = { brand: { id: 'b' }, ai: {} };
+  const brandConfig = { brand: { id: 'b' }, ai: {}, ...BACKEND_BRAND };
 
   const tty = openTtyPrompt();
   try {
@@ -168,7 +177,7 @@ test('ai: a non-interactive run never prompts — it names the keys and moves on
   const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
 
   try {
-    const result = await run(context(brandRoot, {}, { dryRun: true }));
+    const result = await run(context(brandRoot, BACKEND_BRAND, { dryRun: true }));
     assert.equal(result.status, 'skipped');
     assert.deepEqual(result.missingEnv, KEYS);
     assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);

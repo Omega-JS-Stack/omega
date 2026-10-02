@@ -53,12 +53,10 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    // The shared setup contract (#608) for the GOOGLE half only, and only
-    // once the brand has DECLARED it wants GA4 (a configured propertyId — the
-    // same gate REQUIRES.analytics.when reads): the pixel tokens are optional
-    // beside it and each pixel operation asks for its own in place
-    // (lib/pixel-token.js), so a pixel-only brand is never asked for a Google
-    // credential it has no use for.
+    // The GOOGLE half only, once the brand wants GA4 (a propertyId, the same
+    // rule the key's askedWhen states); each pixel operation asks for its own
+    // token in place (lib/pixel-token.js), so a pixel-only brand is never asked
+    // for a Google credential it has no use for.
     if (!context.analyticsApi && analytics.providers?.google?.propertyId) {
       await requestServiceInput(context, serviceInputSpec('analytics', {
         names: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],

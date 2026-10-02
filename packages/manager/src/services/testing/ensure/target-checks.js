@@ -6,7 +6,8 @@
  *
  * Checks by target:
  *   web      → package.json, dist/index.html, installed framework vs npm
- *              latest, homepage fetch
+ *              latest, homepage fetch, then the live favicon and brandmark
+ *              for a brand with logo sources
  *   backend  → package.json, firebase.json, staged dist/ (build output),
  *              installed framework vs npm latest, API health + deployed
  *              version (skipped for shared Firebase projects)
@@ -32,6 +33,7 @@ const {
   checkFrameworkVersion,
   checkWorkingTree,
   checkHomepage,
+  checkBrandAssets,
   checkApiHealth,
   checkGitHubActions,
 } = require('../lib/checks.js');
@@ -61,7 +63,10 @@ module.exports = async (context) => {
     checkFrameworkVersion(recorder, entry, ctx);
 
     if (entry.target === 'web') {
-      await checkHomepage(recorder, entry, ctx);
+      const live = await checkHomepage(recorder, entry, ctx);
+      if (live || ctx.dryRun) {
+        await checkBrandAssets(recorder, entry, ctx);
+      }
     }
 
     if (entry.target === 'backend') {

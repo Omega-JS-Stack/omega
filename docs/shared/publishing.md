@@ -1,7 +1,7 @@
 # Publishing — the runbook
 
 > The publish-proving checkpoint's script, run for real on 2026-09-09: the seven
-> publishables are on the registry ([#25](https://github.com/Omega-JS-Stack/omega/issues/25)) at 0.50.0, the
+> publishables are on the registry ([#25](https://github.com/Omega-JS-Stack/omega/issues/25)) at 0.54.1, the
 > monorepo's own number (0.1.0 went out first that night and is deprecated: the family
 > carries ONE version, the root package.json's, by ruling 2026-09-10),
 > each with `publishConfig.access: public`, and published is the new normal. The unlatch
@@ -18,14 +18,14 @@ which is the SSOT: the vendor tool throws on a dist reference to any `@omega.js`
 package not on that list, so read the count from there rather than from this page.
 
 `@omega.js/mcp-router` joined the set (Ian 2026-07-30, [#144](https://github.com/Omega-JS-Stack/omega/issues/144)):
-the manager's vendored Claude plugin declares the router, so the router has to be
-installable beside it — a real dependency, never vendored. It ships no docs (only
-the manager does), and its `exports` map has the siblings' shape, so the plugin's
-launcher resolves the router's bin as `@omega.js/mcp-router/cli`.
+the Claude plugin declares the router, and its launcher resolves it from the open
+brand, where the manager installs it as a real dependency, never vendored. It ships
+no docs (only the manager does), and its `exports` map has the siblings' shape, so
+the launcher resolves the router's bin as `@omega.js/mcp-router/cli`.
 
 Registry-real internal ranges (everything else is workspace `*`): `@omega.js/client`
 in backend/web/desktop/extension; `@omega.js/backend` and `@omega.js/mcp-router` in
-manager — the EXACT family version (0.50.0 today), not carets, because the family is
+manager: the EXACT family version (0.54.1 today), not carets, because the family is
 lockstep (below).
 
 ## Lockstep — the family ships ONE version ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
@@ -34,12 +34,16 @@ A release is bumped by hand, in its own `chore(release): <x.y.z>` commit. That c
 
 - moves the root `CHANGELOG.md` `[Unreleased]` entries under the new version;
 - sets the root `package.json` and the seven publishables to that version;
+- sets the Claude plugin manifest, `agent-plugins/claude/.claude-plugin/plugin.json`, to that version;
 - sets the exact internal ranges (above) to the same number.
 
-Packages with no code change republish anyway. `release-check.js`'s
-`checkLockstepVersions` fails when any publishable's version differs from the
-root's; `scripts/release-lockstep.test.js` proves it, and release-check prints
-it as `one version across the family`. `PUBLISHABLES` in that script is the one
+Packages with no code change republish anyway. The plugin's version is what moves
+every machine's installed copy: Claude Code ignores a new commit under the same
+version, so the plugin follows releases, never commits ([agent-docs.md](agent-docs.md#the-omega-plugin-reaches-every-machine-from-the-right-place)).
+`release-check.js`'s `checkLockstepVersions` fails when any publishable's version,
+or the plugin manifest's, differs from the root's, naming each one;
+`scripts/release-lockstep.test.js` proves it, and release-check prints it as
+`one version across the family`. `PUBLISHABLES` in that script is the one
 list of what publishes.
 
 Why, in two sentences: ONE number for the family means a brand can never
@@ -60,11 +64,9 @@ Every publishable's prepare `after` hook runs the devkit vendor lane, which
 ships two payloads: the private packages' MODULES into `dist/vendor/`
 (`tools/vendor.js`), and, for `@omega.js/manager` only, the DOCS
 (`tools/vendor-docs.js`): the whole top-level `docs/` tree as `docs/`, links
-that leave it retargeted, plus `claude-plugin/` and
-`.claude-plugin/marketplace.json`, the plugin a consumer brand enables from its
-node_modules, `.mcp.json` included (its launcher resolves `@omega.js/mcp-router`
-from the install). The manager's one-line `AGENTS.md` is tracked and ships
-beside them. All of the vendored output is generated and gitignored;
+that leave it retargeted. No package carries the Claude plugin: a machine
+fetches it from GitHub. The manager's one-line `AGENTS.md` is tracked and ships
+beside the docs. All of the vendored output is generated and gitignored;
 `node --test scripts/vendor-docs.test.js` packs every publishable for real and
 asserts the tarball listings, docs in the manager and nowhere else. A vendor
 failure ABORTS the prepare: every publishable sets `preparePackage.hooks.afterBlocking: true`

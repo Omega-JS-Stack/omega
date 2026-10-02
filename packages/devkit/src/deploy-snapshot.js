@@ -32,7 +32,10 @@
  *
  * What rides is what the brand's own ignore rules allow: tracked files plus
  * untracked-not-ignored ones, which is exactly how the staged `omega_modules/`
- * tarballs and the regenerated lockfile reach the runner.
+ * tarballs and the regenerated lockfile reach the runner. The one exception is
+ * the minted identity set the web build bridges into the site (@omega.js/config's
+ * MINT_BRIDGE): it lives under the ignored `.omega/`, so its sources that exist
+ * are force-added, and nothing else under `.omega/` travels.
  *
  * The COMPANY layer rides the same way, resolved here and generated as one file
  * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): the machine that
@@ -57,7 +60,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { setTimeout: delay } = require('node:timers/promises');
 const jetpack = require('fs-jetpack');
-const { resolveCompany, COMPANY_RESOLVED_FILE } = require('@omega.js/config');
+const { resolveCompany, COMPANY_RESOLVED_FILE, mintBridgeSources } = require('@omega.js/config');
 const { gitAuthEnv, scrubToken } = require('./git-auth.js');
 const { composedWorkflowOwner } = require('./ci-workflows.js');
 
@@ -149,6 +152,13 @@ function pushSnapshot(options) {
       git('read-tree', 'HEAD');
     }
     git('add', '-A', '--', '.');
+
+    // The runner cannot mint (no image tooling, no fonts), so the set the web
+    // build bridges rides by force from under the ignored `.omega/`.
+    const minted = mintBridgeSources(brandRoot);
+    if (minted.length) {
+      git('add', '-f', '--', ...minted);
+    }
 
     const tree = git('write-tree').trim();
     const brandTree = prefix ? subtreeOf(git, tree, prefix) : tree;

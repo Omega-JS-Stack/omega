@@ -10,7 +10,7 @@ Ian's durable rulings, migrated verbatim from PROGRESS.md's Rulings lane when th
 - Ian 2026-07-20: mirrored-implementation rule — same feature, same shape, every framework (cp242 deploys enforced it)
 - Ian 2026-07-20: local-omega-in-production is a SUPPORTED feature — deploys auto-detect linked local frameworks and take local-artifact lanes
 - Ian 2026-07-18: "still use local … until we are fully locked on all decisions that may result in breaking changes" — the local era (file: specs) holds until then
-- Ian 2026-07-19: 0.x until live publishes are proven; 1.0.0 is a later deliberate graduation; zero npm publishes + zero GH releases until GO (old names ship from legacy repos)
+- Ian 2026-07-19: the seven publishables are on npm at ONE family version (old names ship from the legacy repos); a release is the hand bump in its own `chore(release): <x.y.z>` commit, any 0.x number publishes when Ian wants it, and 1.0.0 never publishes without his explicit word ([publishing.md](publishing.md))
 - Ian 2026-07-12: website target = GH Pages ALWAYS; Firebase hosting is the backend/api surface only; GH Pages DNS defaults correct as-is
 - Ian 2026-07-12: FA Pro = local folder route via OMEGA_FONTAWESOME_ROOT (no npm token); skins design within solid/regular/brands
 - Ian 2026-07-11/12: playground = live test infra (Blaze/break/delete); payment+adjacent gated; deploys sparing + named; other brands deploy ONLY on explicit ask

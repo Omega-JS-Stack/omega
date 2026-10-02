@@ -13,6 +13,7 @@
     "./npm-registry": "./src/npm-registry.js",
     "./reads": "./src/reads.js",
     "./attach-log-file": "./src/attach-log-file.js",
+    "./ci": "./src/ci.js",
     "./stop-signals": "./src/stop-signals.js",
     "./bare-requires": "./src/bare-requires.js",
     "./translation-include": "./src/translation-include.js",

@@ -37,7 +37,6 @@
  */
 
 const { ENV_SCHEMA } = require('./env-schema.js');
-const { requiredWhenHolds } = require('./env-rules.js');
 
 // What each target can ship to, in the order it offers them. The FIRST platform
 // entry's first format is what a bare `/download/<platform>` leads with.
@@ -57,7 +56,7 @@ const PLATFORMS = {
  */
 function windowsSigningKeys() {
   return ENV_SCHEMA
-    .filter((entry) => typeof entry.requiredWhen === 'string' && entry.requiredWhen.startsWith('platforms.windows.signing.'))
+    .filter((entry) => entry.requiredWhen && String(entry.requiredWhen.path).startsWith('platforms.windows.signing.'))
     .map((entry) => entry.name);
 }
 
@@ -68,7 +67,7 @@ function windowsSigningKeys() {
  */
 function windowsCloudProviderKeys(provider) {
   const gate = `platforms.windows.signing.cloud.provider=${provider}`;
-  return ENV_SCHEMA.filter((entry) => entry.requiredWhen === gate).map((entry) => entry.name);
+  return ENV_SCHEMA.filter((entry) => entry.requiredWhen && entry.requiredWhen.text === gate).map((entry) => entry.name);
 }
 
 // Every format each platform ships, in offer order. `requires` names env keys
@@ -147,7 +146,7 @@ function formatKeys(target, platform, format, config) {
     ? spec.requires.filter((key) => {
       const entry = ENV_SCHEMA.find((candidate) => candidate.name === key);
       // No gate declared = the format needs it whenever the format ships
-      return !entry?.requiredWhen || requiredWhenHolds(config, entry.requiredWhen);
+      return !entry?.requiredWhen || entry.requiredWhen(config);
     })
     : [...spec.requires];
 

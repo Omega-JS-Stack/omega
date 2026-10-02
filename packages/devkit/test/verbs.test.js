@@ -11,7 +11,7 @@ const path = require('path');
 const { VERBS, TARGET_ORDER, SCOPES, FANOUTS, tokensOf, findVerb } = require('../src/verbs.js');
 
 const PACKAGES = path.join(__dirname, '..', '..');
-const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun'];
+const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun', 'readOnly'];
 
 /**
  * A router CLI's alias table, read from its source: the object literal after
@@ -68,6 +68,7 @@ test('verbs: every row carries every field, each with an allowed value', () => {
     // The one order constant, by reference: a per-row copy is the drift this table exists to stop
     assert.equal(entry.order, entry.fanout === 'each' ? TARGET_ORDER : null, `${entry.name}.order`);
     assert.equal(typeof entry.dryRun, 'boolean', `${entry.name}.dryRun`);
+    assert.equal(typeof entry.readOnly, 'boolean', `${entry.name}.readOnly`);
   }
 });
 
@@ -109,6 +110,20 @@ test('verbs: every owner a row names really answers that verb', () => {
       assert.ok(entry.name in CLIS[owner], `${owner} is listed as owning "${entry.name}" but its CLI has no such verb`);
     }
   }
+});
+
+test('verbs: status is contextless, the manager\'s alone, and runs once natively', () => {
+  const row = findVerb('status');
+  assert.ok(row, 'the status row exists');
+  assert.deepEqual(
+    { scope: row.scope, owners: row.owners, fanout: row.fanout },
+    { scope: 'contextless', owners: ['@omega.js/manager'], fanout: 'root' },
+  );
+});
+
+test('verbs: status says on its row that it reads only, and a verb that writes says it does not', () => {
+  assert.equal(findVerb('status').readOnly, true);
+  for (const name of ['onboard', 'manage', 'deploy']) assert.equal(findVerb(name).readOnly, false, name);
 });
 
 test('verbs: the dispatcher derives its contextless and box sets from the registry', () => {

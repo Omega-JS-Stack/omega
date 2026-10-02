@@ -29,7 +29,6 @@
  * store/chrome exports.
  */
 const { join } = require('node:path');
-const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { input } = require('@omega.js/devkit/prompt');
@@ -37,6 +36,7 @@ const { withSpinner } = require('@omega.js/devkit/flows');
 const { resolveLogoAuth, generateBrandmark, MRLOGO_URL } = require('./lib/brandmark-api.js');
 const { resolveResetKinds, resetAssetsCache } = require('./lib/reset.js');
 const { canPrompt } = require('../../lib/run-gates.js');
+const { MINT_ROOT, LOGO_SOURCES_DIR, BRANDMARK_SOURCE, hasLogoSources } = require('@omega.js/config');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -47,15 +47,15 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'assets.enabled = false' };
     }
 
-    const logoDir = join(context.brandRoot, 'assets', 'logo');
-    const brandmarkPath = join(logoDir, 'brandmark.svg');
+    const logoDir = join(context.brandRoot, LOGO_SOURCES_DIR);
+    const brandmarkPath = join(context.brandRoot, BRANDMARK_SOURCE);
 
     // The brandmark is the root of every derived asset — when the brand has
     // none and MrLogo credentials resolve (the product-service ladder:
     // operator SA → api key → pasted ID token; setting a credential IS the
     // consent to spend the API call), generate it. Interactive runs ask for
     // optional art direction. Dry runs never mint.
-    if (!jetpack.exists(brandmarkPath)) {
+    if (!hasLogoSources(context.brandRoot)) {
       if (!context.options?.dryRun) {
         try {
           const auth = await resolveLogoAuth({
@@ -78,12 +78,12 @@ module.exports.run = createServiceRunner({
         }
       }
 
-      if (!jetpack.exists(brandmarkPath)) {
-        return { skip: true, reason: `no assets/logo/brandmark.svg in the brand repo (add the brand's logo source, set MRLOGO_SERVICE_ACCOUNT / MRLOGO_API_KEY / LOGO_API_ID_TOKEN in the brand .env for AI generation, or make one at ${MRLOGO_URL})` };
+      if (!hasLogoSources(context.brandRoot)) {
+        return { skip: true, reason: `no ${BRANDMARK_SOURCE} in the brand repo (add the brand's logo source, set MRLOGO_SERVICE_ACCOUNT / MRLOGO_API_KEY / LOGO_API_ID_TOKEN in the brand .env for AI generation, or make one at ${MRLOGO_URL})` };
       }
     }
 
-    const outDir = join(context.brandRoot, '.omega', 'assets');
+    const outDir = join(context.brandRoot, MINT_ROOT);
 
     // The force refresh (#214): clear the asked kinds before the operations
     // run, so the mtime gate below sees them missing and rebuilds them. Loud
@@ -93,7 +93,7 @@ module.exports.run = createServiceRunner({
     if (resetKinds.length > 0) {
       const dryRun = context.options?.dryRun || false;
       const { removed } = resetAssetsCache({ outDir, kinds: resetKinds, dryRun });
-      const what = `${chalk.bold(resetKinds.join(' + '))} ${chalk.dim(`(${removed.length} path${removed.length === 1 ? '' : 's'} under .omega/assets/)`)}`;
+      const what = `${chalk.bold(resetKinds.join(' + '))} ${chalk.dim(`(${removed.length} path${removed.length === 1 ? '' : 's'} under ${MINT_ROOT}/)`)}`;
 
       console.log(dryRun
         ? `    ${chalk.yellow('[DRY RUN]')} Would reset ${what}`

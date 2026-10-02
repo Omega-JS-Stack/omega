@@ -39,6 +39,9 @@ const { loadConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, back
 const { DEFAULTS, templateObject } = require('../config.js');
 const { customTargetNames } = require('./custom-target.js');
 
+// The code on discovery's refusal of the old `apps/` folder shape, for a caller that reads the shape
+const APPS_SHAPE = 'OMEGA_APPS_SHAPE';
+
 /**
  * Read a target's raw omega.json5 (no merge, no validation) purely to see which
  * targets it declares. Discovery must never throw — validation is the
@@ -70,7 +73,7 @@ function readDeclaredTargets(targetPath) {
  * @returns {Array<{ name, dir, path, target, projectType, declaredTargets }>} -
  *   One entry per target directory; `target` is null when unmapped (workspace
  *   warns), and `projectType` rides the backend entry only (#584).
- * @throws {Error} when the brand is still on the pre-#443 `apps/` shape
+ * @throws {Error} when the brand is still on the old `apps/` shape (its `code` is APPS_SHAPE)
  */
 function discoverTargets(brandRoot) {
   // The brand file's own raw view, read here (never through loadBrand, which
@@ -99,10 +102,10 @@ function discoverTargets(brandRoot) {
   const targetsDir = path.join(brandRoot, 'targets');
   if (!fs.existsSync(targetsDir)) {
     if (fs.existsSync(path.join(brandRoot, 'apps'))) {
-      throw new Error(
+      throw Object.assign(new Error(
         `${brandRoot} still carries apps/ instead of targets/ (#443) — `
         + 'run `npx omega manage --migration=targets-rename --execute` once, then `npm install`.',
-      );
+      ), { code: APPS_SHAPE });
     }
 
     return [];
@@ -173,6 +176,8 @@ function discoverTargets(brandRoot) {
  *   composes ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): a
  *   lane producing a PRODUCTION artifact names it, and everything else reads
  *   the running environment.
+ * @param {boolean} [options.record] - `false` skips the machine registry line
+ *   loadConfig writes (a read-only caller).
  * @returns {{ root, id, config, configError, configErrors, enabledTargets, targets, files }}
  */
 function loadBrand(brandRoot, options = {}) {
@@ -180,7 +185,7 @@ function loadBrand(brandRoot, options = {}) {
   let configError = null;
 
   try {
-    loaded = loadConfig(brandRoot, undefined, { defaults: DEFAULTS, environment: options.environment });
+    loaded = loadConfig(brandRoot, undefined, { defaults: DEFAULTS, environment: options.environment, record: options.record });
   } catch (error) {
     configError = error.message;
   }
@@ -228,4 +233,4 @@ function absoluteBrandImage(brandConfig, key) {
   return base ? `${base}${value.startsWith('/') ? '' : '/'}${value}` : null;
 }
 
-module.exports = { resolveBrandRoot, loadBrand, discoverTargets, absoluteBrandImage };
+module.exports = { resolveBrandRoot, loadBrand, discoverTargets, absoluteBrandImage, APPS_SHAPE };

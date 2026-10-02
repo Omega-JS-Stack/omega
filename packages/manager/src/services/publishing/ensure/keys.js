@@ -11,11 +11,12 @@
  * Names only: a value never reaches the log.
  */
 const chalk = require('chalk').default;
-const { missingShipKeys, shipKeyRefusal } = require('@omega.js/devkit/ship-plan');
+const { missingEnvKeys } = require('@omega.js/config');
+const { shipKeyRefusal } = require('@omega.js/devkit/ship-plan');
 
 module.exports = (context) => {
   const plan = context.shipping.flatMap((target) => target.formats);
-  const missing = missingShipKeys(plan);
+  const missing = missingEnvKeys(context.brandConfig, process.env, { verb: 'publish' });
 
   if (missing.length > 0) {
     return {

@@ -18,6 +18,11 @@ const { spawnSync } = require('node:child_process');
 // The machine registry is per-machine state: this file's fixtures record into a temp home.
 require('@omega.js/devkit/test/temp-home');
 
+const { VERBS } = require('@omega.js/devkit/verbs');
+const { createMachine } = require('./lib/fake-claude.js');
+const { activate: activateGh } = require('./lib/fake-gh.js');
+const { snapshot } = require('./lib/tree-snapshot.js');
+
 const PKG = path.join(__dirname, '..');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8'));
 
@@ -39,10 +44,10 @@ function runBin(name, args, cwd) {
  * @param {string} name - Bin file name under bin/.
  * @param {string[]} args - CLI arguments.
  * @param {string} cwd - Working directory the dispatcher resolves from.
+ * @param {object} [env] - The child's env; by default this one with the freshness heal held off.
  * @returns {{ status: number, stdout: string, stderr: string }}
  */
-function spawnBin(name, args, cwd) {
-  const env = Object.assign({}, process.env, { OMEGA_SKIP_FRESHNESS: '1' });
+function spawnBin(name, args, cwd, env = Object.assign({}, process.env, { OMEGA_SKIP_FRESHNESS: '1' })) {
   return spawnSync(process.execPath, [path.join(PKG, 'bin', name), ...args], {
     cwd,
     encoding: 'utf8',
@@ -219,6 +224,88 @@ test('bin: at the brand root, `omega migrate` runs the manager\'s ONE verb: a re
   assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'no framework CLI started: the leg runs in-process');
   assert.match(stdout.trimEnd().split('\n').pop(), /docs\/shared\/breaking-changes\.md/, 'the report ends on the register line');
   assert.equal(fs.readFileSync(path.join(scratch, 'config', 'omega.json5'), 'utf8'), before, 'a report writes nothing');
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+test('#1031 case 10: `omega status` typed inside a target is the manager\'s, reporting from the brand root', () => {
+  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-status-');
+
+  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], targetDir);
+
+  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
+  assert.doesNotMatch(stderr, /refusing|runs at the brand root/, stderr);
+  const report = JSON.parse(stdout);
+  assert.equal(report.brandRoot, scratch);
+  assert.ok(JSON.stringify(report.inTarget).includes('"site"'), `inTarget names the target: ${stdout}`);
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+test('#1031 status reads only: no boot prelude and no freshness heal runs, so the origin, the brand and stdout stay clean', () => {
+  // An origin the heal would move, a gh that answers with the move, and the manager linked to this checkout
+  const { scratch } = stageBrandWithTarget('omega-manager-bin-status-prelude-');
+  const origin = 'https://github.com/old-owner/acme-omega.git';
+  const git = (...args) => spawnSync('git', ['-C', scratch, ...args], { encoding: 'utf8' }).stdout.trim();
+  git('init', '-q');
+  git('remote', 'add', 'origin', origin);
+  const ghDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-moved-gh-'));
+  const ghLog = path.join(ghDir, 'calls.log');
+  fs.writeFileSync(path.join(ghDir, 'gh'), `#!/bin/sh\necho "$@" >> "${ghLog}"\necho '{"full_name":"moved-owner/acme-omega"}'\n`, { mode: 0o755 });
+  const env = { ...process.env, PATH: [ghDir, process.env.PATH].join(path.delimiter) };
+  delete env.OMEGA_SKIP_FRESHNESS;
+  const before = snapshot(scratch);
+
+  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch, env);
+
+  assert.doesNotThrow(() => JSON.parse(stdout), `stdout is one JSON object:\n${stdout}\n${stderr}`);
+  assert.equal(git('remote', 'get-url', 'origin'), origin, 'the origin heal never ran');
+  assert.equal(fs.existsSync(ghLog), false, 'gh was never asked');
+  assert.deepEqual(snapshot(scratch), before, 'no file under the brand changed');
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+  fs.rmSync(ghDir, { recursive: true, force: true });
+});
+
+test('#1031 case 10: `omega status` typed in a folder with no brand is the manager\'s', () => {
+  const scratch = fs.realpathSync(scratchRepo('omega-manager-bin-status-nobrand-'));
+  fs.writeFileSync(path.join(scratch, 'notes.txt'), 'not a brand\n');
+
+  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch);
+
+  assert.match(stderr, /running @omega\.js\/manager/);
+  assert.equal(JSON.parse(stdout).state, 'unrelated', stdout);
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+test('#1031 case 10: `omega onboard` typed inside a target is the manager\'s', (t) => {
+  // A fake claude and gh, so the wizard's machine checks never reach the real ones
+  t.after(createMachine({
+    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+    installed: { 'omega@omega': MANIFEST.version },
+    published: MANIFEST.version,
+  }).activate());
+  activateGh();
+  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-onboard-');
+
+  const { status, stdout, stderr } = spawnBin('omega', ['onboard', '--dry-run'], targetDir);
+
+  assert.equal(status, 0, `${stdout}\n${stderr}`);
+  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
+  assert.match(stdout, /Onboarding/, 'the manager\'s wizard answered');
+  assert.match(stdout, /Dry run/, 'and wrote nothing');
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+test('help: every verb the manager owns in the verb table is in its help list', () => {
+  const scratch = scratchRepo('omega-manager-bin-help-');
+  const { stdout } = runBin('omega', ['help'], scratch);
+
+  const owned = VERBS.filter((row) => row.owners.includes('@omega.js/manager') && row.name !== 'help');
+  const unlisted = owned.map((row) => row.name).filter((name) => !new RegExp(`omega ${name}\\b`).test(stdout));
+  assert.deepEqual(unlisted, [], `verbs the help list leaves out:\n${stdout}`);
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });

@@ -4,8 +4,8 @@
  * (`domain.email.providers.<id>`). Every rule keyed on a provider name reads it.
  *
  * registrar: `api` the client that sets nameservers (null = manual guidance),
- * `nameserverUrl` the dashboard page the zone flow opens, `envKeys` the
- * credentials the api needs. mailbox: `mx` its records, `mxDomain` the domain
+ * `nameserverUrl` the dashboard page the zone flow opens (the credentials
+ * each registrar needs are the env schema's `askedWhen`). mailbox: `mx` its records, `mxDomain` the domain
  * any MX of its points into, `spf` its SPF include, `label` its MX comment,
  * `routing` whether the edge service's Email Routing forwards its mail.
  * Presence picks a provider (chosenProvider); no entry means nothing chosen.
@@ -18,12 +18,10 @@ const DOMAIN_PROVIDERS = {
     namecheap: {
       api: NamecheapAPI,
       nameserverUrl: (domain) => `https://ap.www.namecheap.com/domains/domaincontrolpanel/${domain}/domain`,
-      envKeys: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'],
     },
     squarespace: {
       api: null,
       nameserverUrl: (domain) => `https://account.squarespace.com/domains/managed/${domain}/dns/domain-nameservers`,
-      envKeys: [],
     },
   },
   mailbox: {

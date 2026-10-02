@@ -11,8 +11,8 @@ const path = require('path');
 const { execute } = require('node-powertools');
 const { amoMetadata } = require('./utils/amo.js');
 const { listingId, listingConfigPath } = require('../../lib/listings.js');
-const { FORMATS } = require('@omega.js/config');
-const { shipPlan, missingShipKeys, shipKeyRefusal, listingManualStep } = require('@omega.js/devkit/ship-plan');
+const { FORMATS, missingEnvKeys } = require('@omega.js/config');
+const { shipPlan, shipKeyRefusal, listingManualStep } = require('@omega.js/devkit/ship-plan');
 
 // Load package
 const project = build.getPackage('project');
@@ -154,8 +154,11 @@ function storeLanes(options) {
     .filter((entry) => entry.kind === 'store')
     .filter((entry) => !options.browsers || options.browsers.includes(entry.platform));
 
-  // The config's OWN requirements first: a half set publishes nothing (#891)
-  const missing = missingShipKeys(stores, env);
+  // The config's OWN requirements first: a half set publishes nothing. Each row
+  // names the store that needs it, so a `--browser` run owes only its stores'.
+  const chosen = new Set(stores.map((store) => store.path));
+  const missing = missingEnvKeys(config, env, { target: 'extension', verb: 'publish' })
+    .filter((row) => chosen.has(row.path));
   if (missing.length > 0) {
     throw new Error(shipKeyRefusal(missing));
   }

@@ -2,7 +2,7 @@
 
 One directory per skill, holding a `SKILL.md`. The directory name and the frontmatter `name` must match exactly, and both are BARE — no namespace. The plugin supplies the namespace, so `skills/web` surfaces in a session as `omega:web`.
 
-The roster follows the packages a session works in: `main` (the hub) plus `web`, `backend`, `desktop`, `extension`, `client`, and `manager` — plus `browser`, which is not a package router but the usage pattern for the plugin's one MCP declaration, the `@omega.js/mcp-router` endpoint.
+The roster follows the packages a session works in: `main` (the hub) plus `web`, `backend`, `desktop`, `extension`, `client`, and `manager`, plus `browser`, which is not a package router but the usage pattern for the plugin's one MCP declaration, the `@omega.js/mcp-router` endpoint, and `init`, which starts a brand from an empty folder (or reports the one a folder holds) by reading `omega status --json`.
 
 Four more are checklists rather than routers, and the quality hook fires them on the surfaces they own (the table is in the plugin README):
 

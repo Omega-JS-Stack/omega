@@ -18,20 +18,20 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, one family vers
 - **This file is the one map, and every agent entry imports it.** Knowledge lives in `docs/`, never in an AGENTS.md.
   - In the monorepo, the root `AGENTS.md` opens with an import of this file, then adds the rules for working on omega itself.
   - `@omega.js/manager` ships this whole docs tree plus a one-line `AGENTS.md` importing this file. Every project root's `AGENTS.md`, a brand's or one framework used alone, imports `@node_modules/@omega.js/manager/AGENTS.md` in its Default section (its own notes sit under the Custom marker), so its agent reaches this map in two imports across three files.
-  - A locally linked brand's manager docs are synced from the monorepo before every omega command, so it reads the live map; a published install reads the copy that matches its version. Contract: [shared/agent-docs.md](shared/agent-docs.md).
+  - A locally linked brand's manager docs are synced from the monorepo before every omega verb but a read-only one, so it reads the live map; a published install reads the copy that matches its version. Contract: [shared/agent-docs.md](shared/agent-docs.md).
   - Brand-root knowledge (the target table, the verbs, the brand hard rules, upstream-first) lives in [manager/brand.md](manager/brand.md).
   - The supported shape (a brand monorepo, versus one framework used alone): [shared/agent-docs.md § Supported shape](shared/agent-docs.md#supported-shape).
 - **Loading is deterministic, not preloaded.** The omega Claude plugin's hooks detect where the chat is working (a `packages/<framework>/` tree in the monorepo, or a target's tree in a brand) and inject the relevant docs then. Nobody reads guides "just in case".
 
 ## The Claude plugin
 
-The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the repo-root marketplace manifest `.claude-plugin/marketplace.json`). It serves both audiences: developing this monorepo, and every consumer working on a brand built from these frameworks.
+The monorepo ships a Claude Code plugin (`agent-plugins/claude/`). It serves both audiences: developing this monorepo, and every consumer working on a brand built from these frameworks.
 
 - It is the ONLY home of the `omega:*` skills and of the hooks that do the deterministic loading above. Folder and frontmatter names stay plain (`web`, `backend`, …); Claude Code namespaces them `omega:<skill>` from the plugin manifest's `"name": "omega"`.
-- Install is AUTOMATIC (Ian 2026-07-27): the repo's committed `.claude/settings.json` registers the marketplace and enables the plugin. Claude Code asks one trust question on first open, then it loads every session.
-- Consumer brands get the same deal: the plugin is vendored into `@omega.js/manager` at prepare time and the workspace service writes the brand's `.claude/settings.json` to enable it from `./node_modules/@omega.js/manager` ([shared/agent-docs.md](shared/agent-docs.md)).
+- It reaches a machine under two marketplace names that never share a record. The published copy is `omega` (`omega@omega`), fetched from GitHub through the repo-root manifest `.claude-plugin/marketplace.json`. The local copy is `omega-local` (`omega@omega-local`), declared by the second manifest `.claude-plugin/marketplace.local.json` and read in place. Every settings file that turns one on turns the other off.
+- Consumers get the published copy: onboarding offers the machine-wide install, and the workspace service writes every brand's committed `.claude/settings.json` to name it. Omega developers get the local copy: this repo's committed `.claude/settings.json` names it, a linked brand's private `.claude/settings.local.json` names it, and `omega i local` makes it the machine default. The plugin manifest carries the family version, so installed copies move at each release. The contract: [shared/agent-docs.md](shared/agent-docs.md).
 - It declares exactly ONE MCP server, in `agent-plugins/claude/.mcp.json`: the `@omega.js/mcp-router` endpoint that lazily proxies the browser, electron, and extension upstreams ([mcp-router/index.md](mcp-router/index.md)), and no other native MCP declarations, anywhere.
-- A directory-source marketplace is read LIVE from its path, so an enabled plugin serves the CURRENT files: `/reload-plugins` picks up edits mid-session, and `claude --plugin-dir ./agent-plugins/claude` is only for same-session iteration and edge cases, not for freshness. The contract: [shared/agent-docs.md](shared/agent-docs.md).
+- The local copy is read LIVE from the checkout, so an edit loads at the next session start: `/reload-plugins` picks it up mid-session, and `claude --plugin-dir ./agent-plugins/claude` is only for same-session iteration and edge cases, not for freshness.
 
 ## The map: packages
 
@@ -72,7 +72,8 @@ The in-repo brands and the playground project are test-only forever; nothing in 
 Every framework AND `@omega.js/manager` ship `omega` + `omg` + `mgr`, all the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`).
 
 - The nearest package.json walking up from cwd names the framework, and THAT framework's CLI runs via its `./cli` export, so npm's arbitrary hoist-winner in a brand monorepo is always correct.
-- A verb runs in a TARGET of an owner framework (brand target, standalone project). Framework source (`packages/*`) is never one, so a verb there refuses printing the root form, like a manager-only verb in a target. At a root `--target=` picks: `npx omega test --target=web framework:`. One verb table: devkit's `verbs.js` ([#985](https://github.com/Omega-JS-Stack/omega/issues/985)).
+- A verb runs in a TARGET of an owner framework (brand target, standalone project). Framework source (`packages/*`) is never one, so a verb there refuses printing the root form, like a brand-wide manager verb in a target. At a root `--target=` picks: `npx omega test --target=web framework:`. One verb table: devkit's `verbs.js` ([#985](https://github.com/Omega-JS-Stack/omega/issues/985)).
+- A verb that needs no brand and that only the manager owns (`status`, `onboard`) runs the manager wherever it is typed, inside a target included. `npx omega status` names what a folder is, what it lacks and the next command, and writes nothing ([manager/index.md](manager/index.md)).
 - No target context (fresh dir) → `@omega.js/manager` when installed, else the HOST package's CLI, each with a stderr note. The contextless verbs are the manager's own, so `npx omega onboard` in a fresh clone reaches it whichever framework won npm's `.bin/omega` link ([#908](https://github.com/Omega-JS-Stack/omega/issues/908)).
 - Those three are the WHOLE bin set: the per-framework `omega-<framework>` bins are gone ([#877](https://github.com/Omega-JS-Stack/omega/issues/877)), so a human types only `omega` (`npx omega` at a root, `--target=<name>` picking) and a generated CI workflow runs the framework's own `bin/omega` FILE by path. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 - Legacy to OMEGA is ONE brand-root verb, `omega migrate` (a report; `--execute` converts the config, then every target); OMEGA to newer OMEGA is by hand, a dated entry in [shared/breaking-changes.md](shared/breaking-changes.md), the file its report ends on ([#885](https://github.com/Omega-JS-Stack/omega/issues/885)).
@@ -96,7 +97,7 @@ Single config format everywhere: shared sections (brand, cloud, analytics, payme
 - [testing.md](shared/testing.md): the tiered verification pipeline (unit → corpus → e2e → verts → journey)
 - [deploys.md](shared/deploys.md): the deliberate `omega deploy` verb on every target (no push triggers, ever). **A brand deploy never needs a publish** (Ian 2026-09-12): the snapshot lane packs every `file:`-linked `@omega.js/*` package into tarballs that ride the pushed mirror, so the runner installs the framework code as it sits in this working tree
 - [updates.md](shared/updates.md): the `omega update` dependency-update contract
-- [publishing.md](shared/publishing.md): the publish proving-checkpoint runbook (gated, not yet run)
+- [publishing.md](shared/publishing.md): the publish runbook and the lockstep release (run: the seven publishables are on npm at 0.54.1)
 - [icons.md](shared/icons.md): the one Font Awesome mechanism on every surface
 - [logging.md](shared/logging.md): the one log-tag contract (`[@omega.js/<package>:<module>]`) and its guard
 - [theming.md](shared/theming.md): the `--omega-*` design-system contract, shell chrome, motion

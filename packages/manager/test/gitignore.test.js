@@ -5,6 +5,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -15,6 +16,7 @@ const gitignoreOp = require('../src/services/workspace/ensure/gitignore.js');
 const DEFAULT = '# ========== Default Values ==========';
 const CUSTOM = '# ========== Custom Values ==========';
 const EM_DASH = String.fromCharCode(0x2014);
+const PRIVATE_SETTINGS = '.claude/settings.local.json';
 
 function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-gitignore-'));
@@ -57,8 +59,37 @@ test('gitignore: the brand template is the marked file: every framework entry un
   const contents = renderBrandGitignore();
   assert.equal(contents.split('\n')[0], DEFAULT);
   assert.ok(contents.endsWith(`\n\n${CUSTOM}\n`), 'the Custom section is only its marker line');
-  assert.deepEqual(halves(contents), { entries: ['node_modules/', 'dist/', '.omega/', 'logs/', 'test/e2e/.logs/', '.env', '.env.*', '.DS_Store'], custom: '' });
+  const { entries, custom } = halves(contents);
+  assert.deepEqual(entries.filter((entry) => entry !== PRIVATE_SETTINGS), ['node_modules/', 'dist/', '.omega/', 'logs/', 'test/e2e/.logs/', '.env', '.env.*', '.DS_Store']);
+  assert.equal(custom, '');
   assert.equal(contents.includes(EM_DASH), false, 'no em dash');
+});
+
+test('case 7: a scaffolded brand\'s .gitignore lists .claude/settings.local.json, and git ignores the file', () => {
+  const { entries } = halves(renderBrandGitignore());
+  assert.equal(entries.filter((entry) => entry === PRIVATE_SETTINGS).length, 1, 'listed once, in the Default section');
+
+  // The private file names a path on one machine: git must never pick it up
+  const root = tmpdir();
+  spawnSync('git', ['init', '-q', root]);
+  fs.writeFileSync(path.join(root, '.gitignore'), renderBrandGitignore());
+  fs.mkdirSync(path.join(root, '.claude'));
+  fs.writeFileSync(path.join(root, PRIVATE_SETTINGS), '{}\n');
+  fs.writeFileSync(path.join(root, '.claude', 'settings.json'), '{}\n');
+
+  assert.equal(spawnSync('git', ['-C', root, 'check-ignore', '-q', PRIVATE_SETTINGS]).status, 0, 'the private file is ignored');
+  assert.equal(spawnSync('git', ['-C', root, 'check-ignore', '-q', '.claude/settings.json']).status, 1, 'the committed file is not');
+});
+
+test('case 7: a brand scaffolded before the private file heals the entry into its Default section', () => {
+  const root = tmpdir();
+  const before = `${DEFAULT}\nnode_modules/\ndist/\n.omega/\nlogs/\ntest/e2e/.logs/\n.env\n.env.*\n.DS_Store\n\n${CUSTOM}\nmine/\n`;
+  fs.writeFileSync(path.join(root, '.gitignore'), before);
+
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'healed');
+  const { entries, custom } = halves(readGitignore(root));
+  assert.ok(entries.includes(PRIVATE_SETTINGS));
+  assert.equal(custom, 'mine/\n');
 });
 
 test('gitignore: the company template is the marked file with the unshareable half', () => {

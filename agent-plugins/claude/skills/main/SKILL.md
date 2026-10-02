@@ -6,7 +6,7 @@ user-invocable: true
 
 # OMEGA — the hub
 
-The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `brands/`, one family version bumped by hand. Start at the map, `docs/omega.md` (the repo-root `AGENTS.md` imports it and adds the hard rules: the legacy manager repos are read-only, and nothing publishes until the proving checkpoint). This skill orients; every fact belongs to a guide below.
+The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `brands/`, one family version bumped by hand. Start at the map, `docs/omega.md` (the repo-root `AGENTS.md` imports it and adds the hard rules: the legacy manager repos are read-only, and the seven publishables ship at one family version on Ian's word). This skill orients; every fact belongs to a guide below.
 
 ## The roster
 

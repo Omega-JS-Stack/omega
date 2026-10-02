@@ -1319,6 +1319,8 @@ function providerFlowContext(brandRoot) {
     brandConfig: {
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
       payment: { providers: { stripe: { updateAccountInfo: true } } },
+      // A payment secret is the backend's: a brand with no backend is never asked for one
+      targets: { backend: { type: 'backend' } },
     },
   };
 }
@@ -1405,7 +1407,7 @@ function coinbaseFlowContext(brandRoot) {
     options: {},
     brandConfig: {
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-      payment: { providers: { coinbase: { enabled: true } } },
+      payment: { providers: { coinbase: { enabled: true } } }, targets: { backend: { type: 'backend' } },
     },
   };
 }
@@ -1484,21 +1486,19 @@ test('provider-setup: coinbase Disable writes payment.providers.coinbase.enabled
 test('payment: a brand with crypto OFF is never asked for a Coinbase key', async () => {
   // `enabled` is the whole switch, so an absent or false one means the brand has
   // no use for the key — asking would be a prompt for a credential nothing reads.
-  const { REQUIRES } = require('../src/config.js');
-  const input = REQUIRES.payment.env.find((entry) => entry.name === 'COINBASE_COMMERCE_API_KEY');
+  const { serviceInputs } = require('../src/config.js');
+  const { missingEnvKeys } = require('@omega.js/config');
+  const input = serviceInputs('payment').find((entry) => entry.name === 'COINBASE_COMMERCE_API_KEY');
 
-  assert.ok(input, 'the key is declared in the REQUIRES registry, or the setup contract cannot ask for it');
+  assert.ok(input, 'the key is one of the payment service\'s inputs, or the setup contract cannot ask for it');
   assert.equal(input.gates, false, 'an optional input: a missing crypto key never gates the payment service');
   assert.equal(input.disablePath, 'payment.providers.coinbase.enabled', 'Disable lands on the switch the schema declares');
 
-  for (const providers of [{}, { coinbase: {} }, { coinbase: { enabled: false } }, { coinbase: false }]) {
-    assert.equal(
-      input.when({ payment: { providers } }), false,
-      `not asked when crypto is off: ${JSON.stringify(providers)}`,
-    );
-  }
+  const asked = (providers) => missingEnvKeys({ payment: { providers }, targets: { backend: { type: 'backend' } } }, {}, { verb: 'manage' })
+    .some((row) => row.key === 'COINBASE_COMMERCE_API_KEY' && row.service === 'payment');
+  for (const providers of [{}, { coinbase: {} }, { coinbase: { enabled: false } }, { coinbase: false }]) assert.equal(asked(providers), false, `not asked when crypto is off: ${JSON.stringify(providers)}`);
 
-  assert.equal(input.when({ payment: { providers: { coinbase: { enabled: true } } } }), true, 'asked when it is on');
+  assert.equal(asked({ coinbase: { enabled: true } }), true, 'asked when it is on');
 });
 
 test('provider-setup: non-interactive returns false without touching anything', async () => {

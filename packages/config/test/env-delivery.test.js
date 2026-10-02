@@ -15,7 +15,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  workflowSecretKeys, renderSecretsBlock, bakeKeys, bakeSourceKeys, publishSecretKeys,
+  workflowSecretKeys, renderSecretsBlock, bakeKeys, publishSecretKeys,
   envFileKeys, renderEnvFileKeys, artifactEnvValues,
   WORKFLOW_OWNED_KEYS, DELIVERY_MODES, deliveredKeys,
 } = require('../src/index.js');
@@ -308,17 +308,6 @@ test('the license key rides the runner env and NEVER an artifact (#320)', () => 
     { OMEGA_ADMIN_KEY: 'admin' },
     'and the stage strips it out of the composed values',
   );
-});
-
-test('bakeSourceKeys: the brand-level name a human sets, for the guard that names it (#891)', () => {
-  // The bake reads GOOGLE_ANALYTICS_SECRET; the human sets
-  // GOOGLE_ANALYTICS_SECRET_DESKTOP, and the guard has to say the second one.
-  assert.deepEqual(bakeKeys('desktop'), ['GOOGLE_ANALYTICS_SECRET']);
-  assert.deepEqual(bakeSourceKeys('desktop'), ['GOOGLE_ANALYTICS_SECRET_DESKTOP']);
-
-  // A CI-delivered signing credential is not a baked key: the bake guard has no
-  // business refusing a build over a secret only the runner ever reads.
-  assert.equal(bakeSourceKeys('desktop').includes('CSC_LINK'), false);
 });
 
 // ─── The composed half: match families and custom keys (#835, #876) ───

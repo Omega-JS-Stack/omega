@@ -30,6 +30,7 @@ const { envLayerFiles, ENV_ENVIRONMENTS, resolveCompany } = require('@omega.js/c
 const { resolvePackageDir } = require('@omega.js/devkit/local');
 
 const { runCommand } = require('../../../lib/run-command.js');
+const { npmInstall } = require('../../../lib/npm-install.js');
 const { fingerprintTarget } = require('../lib/fingerprint.js');
 const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
 
@@ -116,7 +117,7 @@ module.exports = async ({ brandRoot, targets, options }) => {
     installSteps.push({ phase: 'install', success: true, skipped: true, dryRun: true });
   } else {
     console.log(`      ${chalk.dim('→')} npm install ${chalk.dim(`(missing: ${missing.join(', ')})`)}`);
-    const result = await runCommand('npm', ['install', '--no-audit', '--no-fund'], brandRoot);
+    const result = await npmInstall(brandRoot);
     installSteps.push({ phase: 'install', ...result });
     if (!result.success) {
       failed = true;

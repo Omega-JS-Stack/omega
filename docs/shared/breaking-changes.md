@@ -28,6 +28,19 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-01: the omega plugin comes from GitHub, never from the manager package ([#1028](https://github.com/Omega-JS-Stack/omega/issues/1028))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A brand's committed `.claude/settings.json` | The `omega` marketplace as a `directory` source at `./node_modules/@omega.js/manager`, `omega@omega` on | The `omega` marketplace as the GitHub source `Omega-JS-Stack/omega` (sparse: `.claude-plugin`, `agent-plugins/claude`) with `autoUpdate`, `omega@omega` on and `omega@omega-local` off ([agent-docs.md](agent-docs.md#the-omega-plugin-reaches-every-machine-from-the-right-place)) | None: the next `npx omega manage` or `npm start` heals the file. Commit the change it makes |
+| What the `@omega.js/manager` tarball carries | `claude-plugin/` and `.claude-plugin/marketplace.json`, so a brand's sessions loaded the plugin from `node_modules` | Neither: the package ships `AGENTS.md`, `bin/`, `dist/` and `docs/` only, and a machine installs the plugin from GitHub | Once per machine, accept the onboarding offer, or run `claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega`. Any hand-written path into `node_modules/@omega.js/manager/claude-plugin/` no longer resolves |
+
+## 2026-10-01: onboard picks the website alone by default ([#1030](https://github.com/Omega-JS-Stack/omega/issues/1030))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `omega onboard`'s default targets | The website and the backend: Enter, or a run with no `--targets`, wrote both | The website alone; `--targets=none` writes a brand with no target, and a rerun inside a brand adds the targets it lacks | None for an existing brand. A script that runs `omega onboard` and expects a backend passes `--targets=web,backend`; the same rerun inside a brand adds the backend it lacks |
+
 ## 2026-09-30: the registrar and mailbox provider sets are closed ([#1015](https://github.com/Omega-JS-Stack/omega/issues/1015))
 
 | Contract | Old form | New form | Manual migration step |
@@ -83,7 +96,7 @@ Every framework-written file holding framework lines and your lines speaks the o
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|
-| Where a verb runs | Every verb refused below a root; only a child carrying the `OMEGA_ROOT_DISPATCH` env marker ran there | Inside a target, a verb its framework owns runs in place (`npm test`, `npm start`, `npx omega build`); a brand-wide verb, one only the manager owns, refuses there and prints `cd <brandRoot> && npx omega <verb>`. Framework source (`packages/*`) is never a target and still refuses every verb. The marker is gone: nothing sets or reads it | Drop `OMEGA_ROOT_DISPATCH` from any script or hand-written workflow; the generated workflows lose it on the next verb |
+| Where a verb runs | Every verb refused below a root; only a child carrying the `OMEGA_ROOT_DISPATCH` env marker ran there | Inside a target, a verb its framework owns runs in place (`npm test`, `npm start`, `npx omega build`); a brand-wide verb, one only the manager owns, refuses there and prints `cd <brandRoot> && npx omega <verb>`, except a verb that needs no brand (`status`, `onboard`), which runs the manager there. Framework source (`packages/*`) is never a target and still refuses every verb. The marker is gone: nothing sets or reads it | Drop `OMEGA_ROOT_DISPATCH` from any script or hand-written workflow; the generated workflows lose it on the next verb |
 | The brand-root fan-out | A framework target ran its framework's bin by path; a custom target, and a custom-server backend's `deploy` / `test`, ran `npm run <verb>` with no flags | Every target runs its own `npm run <verb>`. Only the framework's own script, exactly `omega <verb>`, hears the brand's flags and scope after `--` (a deploy's `--snapshot=<sha>` included); a brand-owned script (a custom target's, a custom-server backend's) runs bare, and under `--dry-run` it stops at the plan | None |
 | A framework target's scripts | Each framework's hand-typed `projectScripts` | One `"<verb>": "omega <verb>"` per fan-out verb (`fanout: 'each'`) the framework owns, derived from the verb table, with the scripts the table cannot derive merged over them | None to write them: every verb and the manage walk do. The walk never deletes a key, so delete the ones no framework writes any more by hand: `publish` and `release` from a desktop target (`npx omega publish` / `release --target=<name>` at the brand root replace them) |
 | A single-target command at the brand root (`firestore:set`, `emulators`, `launch`, ...) | The picked target's framework bin | Unchanged: the picked target's framework CLI with the argv as typed, never a script; on a custom target it steps aside in one line instead of refusing | None |

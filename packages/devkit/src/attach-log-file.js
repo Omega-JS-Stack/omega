@@ -40,6 +40,7 @@
 const fs = require('fs');
 const path = require('path');
 const Logger = require('./logger');
+const { isCI } = require('./ci');
 
 // Variables
 const logger = new Logger('attach-log-file');
@@ -48,11 +49,6 @@ const NOOP_DETACH = function () {};
 
 function stripAnsi(value) {
   return String(value).replace(ANSI_PATTERN, '');
-}
-
-// Same predicate the rest of the repo uses for "a runner is driving this".
-function isCI(env) {
-  return env.GITHUB_ACTIONS === 'true' || env.CI === 'true';
 }
 
 // Factory — each call returns an independent tee with its own closure state.

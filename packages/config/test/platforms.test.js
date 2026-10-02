@@ -131,14 +131,30 @@ test('each store names its own developer keys, and snap names its login', () => 
   assert.deepStrictEqual(FORMATS.extension.chrome.zip.requires, []);
 });
 
+const signing = (value) => ({ platforms: { windows: { signing: value } } });
+const SIGNING_CONFIGS = {
+  'self-hosted': signing({ strategy: 'self-hosted' }),
+  ...Object.fromEntries(WINDOWS_CLOUD_PROVIDERS.map((provider) => [provider, signing({ strategy: 'cloud', cloud: { provider } })])),
+};
+
+/**
+ * The signing configs a key's requiredWhen holds on.
+ * @param {object} entry - An env schema entry.
+ * @returns {string[]} The strategy or cloud provider names.
+ */
+const gatedOn = (entry) => Object.entries(SIGNING_CONFIGS)
+  .filter(([, config]) => typeof entry.requiredWhen === 'function' && entry.requiredWhen(config))
+  .map(([name]) => name);
+
 test('the Windows signing keys come FROM the schema\'s own gates, never a second list', () => {
   const nsis = FORMATS.desktop.windows.nsis.requires;
   assert.ok(nsis.includes('WIN_EV_TOKEN_PATH'));
   assert.ok(nsis.includes('AZURE_TENANT_ID'));
-  // Every one of them is a key the schema gates on platforms.windows.signing.*
+  // Every one of them is a key the schema gates on exactly one Windows signing choice
   for (const key of nsis) {
     const entry = ENV_SCHEMA.find((candidate) => candidate.name === key);
-    assert.match(entry.requiredWhen, /^platforms\.windows\.signing\./, key);
+    assert.equal(gatedOn(entry).length, 1, key);
+    assert.equal(entry.requiredWhen({}), false, `${key}: a config that says nothing owes nothing`);
   }
   // SIGNTOOL_PATH is the runner's own path, gated by nothing, so it is never a ship key
   assert.ok(!nsis.includes('SIGNTOOL_PATH'));
@@ -165,19 +181,17 @@ test('formatKeys with a config keeps only the keys that config actually owes', (
 });
 
 test('the Windows signing strategies and cloud providers are the ones the env schema gates on', () => {
-  // Every value a signing key is gated on is a declared one, so no credential hangs off a name nothing offers
-  const gated = (prefix) => [...new Set(ENV_SCHEMA
-    .filter((entry) => typeof entry.requiredWhen === 'string' && entry.requiredWhen.startsWith(prefix))
-    .map((entry) => entry.requiredWhen.slice(prefix.length)))];
-  for (const strategy of gated('platforms.windows.signing.strategy=')) assert.ok(WINDOWS_SIGNING_STRATEGIES.includes(strategy), strategy);
-  assert.deepStrictEqual(gated('platforms.windows.signing.cloud.provider='), WINDOWS_CLOUD_PROVIDERS);
+  // Every declared choice owes credentials, and every signing key hangs off a declared choice
+  const gated = new Set(ENV_SCHEMA.flatMap(gatedOn));
+  assert.deepStrictEqual([...gated].sort(), Object.keys(SIGNING_CONFIGS).sort());
+  assert.ok(WINDOWS_SIGNING_STRATEGIES.includes('self-hosted'));
   assert.ok(WINDOWS_SIGNING_STRATEGIES.includes('cloud'));
 });
 
 test('a cloud provider\'s keys are exactly the env schema entries gated on it', () => {
   for (const provider of WINDOWS_CLOUD_PROVIDERS) {
     const expected = ENV_SCHEMA
-      .filter((entry) => entry.requiredWhen === `platforms.windows.signing.cloud.provider=${provider}`)
+      .filter((entry) => gatedOn(entry).includes(provider))
       .map((entry) => entry.name);
     assert.ok(expected.length > 0, provider);
     assert.deepStrictEqual(windowsCloudProviderKeys(provider), expected, provider);

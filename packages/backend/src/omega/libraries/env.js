@@ -25,9 +25,8 @@
  *
  * Values are never printed. Errors name the KEY and the fix.
  */
-const { envSchemaEntry, requiredEnvKeys } = require('@omega.js/config');
+const { envSchemaEntry, missingEnvKeys, missingConfigKeys } = require('@omega.js/config');
 const { getEnvironment } = require('@omega.js/config/environment');
-const { checkEnvRules } = require('@omega.js/config/env-rules');
 
 /** How a missing key gets fixed, by who is supposed to provide it. */
 function remedy(entry) {
@@ -99,7 +98,8 @@ function require_(name) {
  * @throws {Error} MissingEnvKeysError (code 500) listing every missing key.
  */
 function assertRequired(target = 'backend') {
-  const missing = requiredEnvKeys(target).filter((name) => !get(name));
+  // An empty config makes no key mandatory, so it answers what EVERY brand owes
+  const missing = missingEnvKeys({}, process.env, { target, verb: 'start' }).map((row) => row.key);
   if (missing.length === 0) { return; }
 
   const lines = missing.map((name) => `  - ${name}: ${envSchemaEntry(name).description}`);
@@ -114,43 +114,31 @@ function assertRequired(target = 'backend') {
 }
 
 /**
- * Validate every key this brand's OWN config made mandatory — the schema's
- * `requiredWhen` rules ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)).
- *
- * `assertRequired` above covers the keys OMEGA needs no matter what a brand
- * configures. This is the other half: a config path that is set makes its key
- * mandatory (a GA4 Measurement ID with no Measurement Protocol secret sends no
- * events; a reCAPTCHA site key with no secret half 403s every protected POST).
- * The rule is declared once in the env schema and evaluated by ONE checker
- * shared with the manager's manage-time pass — this reader only decides what a
- * violation costs, which the caller in index.js resolves: production refuses,
- * everything else warns and continues.
- *
- * Violations name the BRAND-LEVEL key (GOOGLE_ANALYTICS_SECRET_BACKEND, not
- * the GOOGLE_ANALYTICS_SECRET it is delivered as), because that is the name a
- * human puts in the brand .env.
- *
+ * Validate every key this brand's OWN config made mandatory (the schema's
+ * `requiredWhen`, answered by @omega.js/config's missingEnvKeys): a GA4 id with
+ * no Measurement Protocol secret sends no events, a reCAPTCHA site key with no
+ * secret half 403s every protected POST. The caller in index.js decides the
+ * cost: production refuses, everything else warns. Misses name the BRAND-LEVEL
+ * key (GOOGLE_ANALYTICS_SECRET_BACKEND), the name a human puts in the .env.
  * @param {object} config - The resolved omega.json5 config.
  * @param {string} [target] - The target whose rules to check.
  * @throws {Error} MissingConditionalEnvKeysError (code 500) naming every key
  *   and the config path that made it mandatory.
  */
 function assertRules(config, target = 'backend') {
-  // The checker answers for BOTH schema rules; the unconditional `required`
-  // half is assertRequired's above, and reporting a key twice in one boot
-  // would just be noise.
-  const violations = checkEnvRules(config, process.env, { target })
-    .filter((violation) => violation.rule === 'requiredWhen');
-  if (violations.length === 0) { return; }
+  // What every brand owes is assertRequired's above, and reporting a key twice
+  // in one boot would just be noise: this is what THIS config adds.
+  const missing = missingConfigKeys(config, process.env, { target, verb: 'start' });
+  if (missing.length === 0) { return; }
 
-  const named = violations.map(({ key, path }) => (path ? `${key} (required by ${path})` : key)).join(', ');
+  const named = missing.map((row) => row.text).join(', ');
   const error = new Error(
-    `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the .env cascade: ${named}. `
-    + `${remedy(envSchemaEntry(violations[0].key))}`,
+    `${missing.length} env ${missing.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the .env cascade: ${named}. `
+    + `${remedy(envSchemaEntry(missing[0].key))}`,
   );
   error.name = 'MissingConditionalEnvKeysError';
   error.code = 500;
-  error.keys = violations.map((violation) => violation.key);
+  error.keys = missing.map((row) => row.key);
   throw error;
 }
 

@@ -7,10 +7,11 @@
 ## HARD RULES
 
 1. 🚫 **The legacy repos are READ-ONLY.** Never modify `omega-manager`, `backend-manager`, `ultimate-jekyll-manager`, `browser-extension-manager`, `electron-manager`, `mobile-app-manager`, `web-manager`, `jekyll-uj-powertools`, or any consumer brand repo. They are reference/history and keep serving production. All work happens HERE.
-2. **Every package here is `@omega.js/*`-named; zero npm publishes until Ian finalizes versions.** Old-name releases ship from the LEGACY repos; the monorepo's `pre-*-rename` tags are the backup lane.
+2. **Every package here is `@omega.js/*`-named, and the seven publishables are on npm at ONE family version.** Old-name releases ship from the LEGACY repos; the monorepo's `pre-*-rename` tags are the backup lane.
+   - A release is the hand bump in its own `chore(release): <x.y.z>` commit; any 0.x number publishes when Ian wants it, and 1.0.0 never publishes without his explicit word ([docs/shared/publishing.md](docs/shared/publishing.md)).
 3. **Publish policy — internal by default**: private shared packages (`account`, `analytics`, `config`, `devkit`, `monitoring`, `template-kit`) are vendored into published frameworks at prepare time and never publish.
-   - Published = frameworks + `@omega.js/manager` + `@omega.js/client` (a real runtime dependency of backend/desktop/extension — never vendored) + `@omega.js/mcp-router` (a real runtime dependency of manager, so the vendored plugin's MCP declaration resolves inside the install — Ian 2026-07-30).
-   - All seven publishables carry a mechanical `private: true` latch until the proving checkpoint ([docs/shared/publishing.md](docs/shared/publishing.md)) unlatches them.
+   - Published = frameworks + `@omega.js/manager` + `@omega.js/client` (a real runtime dependency of backend/desktop/extension, never vendored) + `@omega.js/mcp-router` (a real runtime dependency of manager, so the Claude plugin's MCP launcher resolves it from the open brand; Ian 2026-07-30).
+   - The seven publishables carry no `private` latch and publish with `publishConfig.access: public`; the six private internals keep `private: true` forever ([docs/shared/publishing.md](docs/shared/publishing.md)).
 4. **MAM is parked.** No `packages/mobile`, no mobile work — slot reserved only.
 5. **Preserve semantics, replace plumbing.** Blueprints/default-pages, FILE_MAP scaffolding semantics, `mgr i local`, prepare-watch, the frontend↔backend contract, and the disperse model must keep working exactly as consumers expect.
 6. **Every extraction/normalization step is gated**: golden-master where applicable, package test suites, cross-stack e2e, canary consumer.

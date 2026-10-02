@@ -1,20 +1,11 @@
 /**
- * The ship plan ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)):
- * what a brand's declaration says a target ships, what each shipped format is
- * still missing, and the ONE wording both are reported in.
- *
- * @omega.js/config's platforms.js owns WHAT each format is and needs (the
- * format table). This owns the two questions every lane asks of that table and
- * the sentences the answers are printed in, so its three readers say the same
- * thing in the same words:
- *
- *   - the manage walk's `publishing` service, which collects what is missing;
- *   - the desktop publish, which refuses before it builds;
- *   - the extension publish, which refuses on a missing credential and prints
- *     the manual step for a listing only a human can create.
- *
- * Values are never read here, only NAMES: whether a key has a value is the
- * whole question, and an empty string is absent (the .env cascade's own rule).
+ * The ship plan:
+ * what a brand's declaration says a target ships, and the ONE wording a
+ * missing ship credential and a missing listing are reported in, so the manage
+ * walk's `publishing` service, the desktop publish and the extension publish
+ * say the same thing in the same words. @omega.js/config's platforms.js owns
+ * what each format is and needs; which keys a brand still owes is its
+ * missingEnvKeys for `publish`. Values are never read here, only names.
  */
 
 const { enabledFormats, formatKeys, FORMATS } = require('@omega.js/config');
@@ -53,38 +44,16 @@ function shipPlan(config, target) {
 }
 
 /**
- * The keys a plan needs that the environment does not answer.
- *
- * @param {Array<object>} plan - A shipPlan.
- * @param {object} [env] - Env map (default: process.env).
- * @returns {Array<{ key: string, path: string, label: string }>} One entry per
- *   empty key, in declaration order; `path` is what requires it.
- */
-function missingShipKeys(plan, env) {
-  const values = env || process.env;
-  const missing = [];
-
-  for (const entry of plan) {
-    for (const key of entry.requires) {
-      if (values[key]) continue;
-      missing.push({ key, path: entry.path, label: entry.label || entry.format });
-    }
-  }
-
-  return missing;
-}
-
-/**
  * The refusal a missing ship credential earns: ONE line shape per key,
- * `<KEY> (required by <path>): <the fix>`, the same shape push-secrets prints
- * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)), so the two
- * rungs of the same story read alike.
+ * `<KEY> (required by <path>): <the fix>`, the same shape push-secrets prints,
+ * so the two rungs of the same story read alike.
  *
- * @param {Array<{ key, path, label }>} missing - missingShipKeys' return.
+ * @param {Array<{ text, label }>} missing - @omega.js/config's missingEnvKeys
+ *   rows for `publish`: each names its key, the format that needs it, its label.
  * @returns {string} The message (callers throw it, or return it as an error).
  */
 function shipKeyRefusal(missing) {
-  const lines = missing.map(({ key, path, label }) => `  ${key} (required by ${path}): `
+  const lines = missing.map(({ text, label }) => `  ${text}: `
     + `${label} cannot publish without it. Run \`${PUBLISHING_WALK}\` (it asks for the key and writes the brand .env), then re-run.`);
 
   return `${missing.length} ship credential(s) this brand's declaration requires are empty in the .env cascade (company/brand/target).\n${lines.join('\n')}`;
@@ -109,4 +78,4 @@ function listingManualStep({ label, console: consoleUrl, path, asset }) {
   return `${label} has no listing id yet: create the listing at ${consoleUrl}${upload}, then set ${path} in config/omega.json5 and re-run.`;
 }
 
-module.exports = { shipPlan, missingShipKeys, shipKeyRefusal, listingManualStep, PUBLISHING_WALK };
+module.exports = { shipPlan, shipKeyRefusal, listingManualStep, PUBLISHING_WALK };

@@ -276,26 +276,6 @@ function bakeKeys(target, { schema = ENV_SCHEMA } = {}) {
 }
 
 /**
- * The SOURCE names of a target's baked keys: the brand-level name a human sets
- * (`GOOGLE_ANALYTICS_SECRET_DESKTOP`), not the `deliverAs` name the build reads
- * it under. The bake GUARD names keys at the level a human can fix them, and it
- * must not judge a target on keys it never bakes
- * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891): the desktop's
- * other rules are CI-delivered signing credentials, which the deploy lane owns).
- *
- * @param {string} target - Target name.
- * @param {object} [options]
- * @param {object[]} [options.schema] - Env schema entries.
- * @returns {string[]} Brand-level env var names, sorted.
- */
-function bakeSourceKeys(target, { schema = ENV_SCHEMA } = {}) {
-  return schema
-    .filter((entry) => entry.name && !entry.machineLocal && entry.delivery && entry.delivery[target] === 'bake')
-    .map((entry) => entry.name)
-    .sort();
-}
-
-/**
  * The repo Actions secrets a push-secrets publisher sends for a target: the
  * same set the workflow consumes (a secret CI never reads has no business in
  * the repo, and a key the workflow injects must exist as one). Workflow-owned
@@ -360,7 +340,6 @@ module.exports = {
   envFileKeys,
   artifactEnvValues,
   bakeKeys,
-  bakeSourceKeys,
   publishSecretKeys,
   renderSecretsBlock,
   renderEnvFileKeys,

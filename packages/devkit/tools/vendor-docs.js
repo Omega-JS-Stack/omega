@@ -1,7 +1,7 @@
 // Vendors the monorepo's top-level docs/ into @omega.js/manager at prepare
 // time, the one package every brand installs, so brand agents read docs that
-// match the installed version. The tree ships whole, links that leave it are
-// retargeted, and the Claude plugin plus its marketplace ride along.
+// match the installed version. The tree ships whole and links that leave it
+// are retargeted. The Claude plugin ships from GitHub, never inside a package.
 // Runs from tools/vendor.js's prepare hook; the manager's workspace step calls
 // syncDocs too, to keep a locally linked manager's copy current.
 
@@ -13,17 +13,11 @@ const Logger = require('../src/logger');
 
 const logger = new Logger('devkit-vendor-docs');
 
-// The one package that ships docs and the plugin.
+// The one package that ships docs.
 const HOST_PACKAGE = 'manager';
 const DOCS_DIR = 'docs';
 // The map every agent entry imports, inside the docs tree.
 const MAP_FILE = path.join(DOCS_DIR, 'omega.md');
-
-// The Claude plugin: source in the monorepo, destination inside the manager
-// package, and the marketplace that points at it there.
-const PLUGIN_SOURCE = 'agent-plugins/claude';
-const PLUGIN_DIR = 'claude-plugin';
-const MARKETPLACE_FILE = path.join('.claude-plugin', 'marketplace.json');
 
 const LINK = /\[([^\]]+)\]\(([^)\s]+)\)/g;
 // A web URL, an anchor, a site path (`/pricing`) or a build alias (`@post/a.jpg`).
@@ -36,8 +30,7 @@ const NOT_A_PATH = /^([a-z][a-z0-9+.-]*:|#|\/|@)/i;
  * | In the monorepo | Shipped as |
  * |---|---|
  * | `packages/<pkg>/<rest>` | the sibling package in the installed `@omega.js` scope |
- * | `agent-plugins/claude/<rest>` | the plugin copy inside the manager |
- * | anything else (`brands/`, root files) | the link text alone |
+ * | anything else (`agent-plugins/`, `brands/`, root files) | the link text alone |
  *
  * A sibling that isn't installed or never publishes leaves a dead relative
  * link, which beats a monorepo path that resolves nowhere. A locally linked
@@ -63,15 +56,10 @@ function rewriteDocLinks(contents, relativeFile) {
     if (resolved === DOCS_DIR || resolved.startsWith(`${DOCS_DIR}/`)) {
       return link;
     }
-    let shipped = null;
-    if (resolved.startsWith('packages/')) {
-      shipped = resolved.slice('packages/'.length);
-    } else if (resolved === PLUGIN_SOURCE || resolved.startsWith(`${PLUGIN_SOURCE}/`)) {
-      shipped = path.posix.join(HOST_PACKAGE, PLUGIN_DIR, resolved.slice(PLUGIN_SOURCE.length));
-    }
-    if (shipped === null) {
+    if (!resolved.startsWith('packages/')) {
       return text;
     }
+    const shipped = resolved.slice('packages/'.length);
     return `[${text}](${path.posix.relative(shippedDir, shipped)}${anchor})`;
   });
 }
@@ -138,13 +126,12 @@ function syncDocs({ monorepoRoot, packageDir, dryRun = false }) {
 }
 
 /**
- * Vendor the docs and the Claude plugin into @omega.js/manager. Any other
- * package is a no-op.
+ * Vendor the docs into @omega.js/manager. Any other package is a no-op.
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - The package root (defaults to process.cwd())
  * @param {string} [options.monorepoRoot] - Monorepo root (test seam; resolved otherwise)
- * @returns {{ docs: string[], removed: string[], plugin: boolean }}
+ * @returns {{ docs: string[], removed: string[] }}
  */
 function vendorDocs(options) {
   options = options || {};
@@ -155,28 +142,15 @@ function vendorDocs(options) {
     throw new Error(`[devkit vendor-docs] No package.json found in ${cwd}`);
   }
   if (hostPackage.name !== `@omega.js/${HOST_PACKAGE}`) {
-    return { docs: [], removed: [], plugin: false };
+    return { docs: [], removed: [] };
   }
 
   const monorepoRoot = options.monorepoRoot ? path.resolve(options.monorepoRoot) : resolveMonorepoRoot();
   const { written, removed } = syncDocs({ monorepoRoot, packageDir: cwd });
 
-  // The plugin, whole: its hooks, skills and `.mcp.json` address themselves
-  // through CLAUDE_PLUGIN_ROOT, so nothing in the shipped copy reaches outside it.
-  jetpack.remove(path.join(cwd, PLUGIN_DIR));
-  jetpack.copy(path.join(monorepoRoot, PLUGIN_SOURCE), path.join(cwd, PLUGIN_DIR));
+  logger.log(`Vendored docs/ (${written.length} written, ${removed.length} removed) into ${hostPackage.name}`);
 
-  // The root marketplace stays the SSOT for name/owner/description; only the
-  // source moves, from the monorepo path to the in-package one.
-  const marketplace = jetpack.read(path.join(monorepoRoot, MARKETPLACE_FILE), 'json');
-  marketplace.plugins = marketplace.plugins.map((entry) => (entry.source === `./${PLUGIN_SOURCE}`
-    ? { ...entry, source: `./${PLUGIN_DIR}` }
-    : entry));
-  jetpack.write(path.join(cwd, MARKETPLACE_FILE), `${JSON.stringify(marketplace, null, 2)}\n`);
-
-  logger.log(`Vendored docs/ (${written.length} written, ${removed.length} removed) + the Claude plugin into ${hostPackage.name}`);
-
-  return { docs: written, removed, plugin: true };
+  return { docs: written, removed };
 }
 
 module.exports = vendorDocs;
@@ -184,5 +158,3 @@ module.exports.syncDocs = syncDocs;
 module.exports.rewriteDocLinks = rewriteDocLinks;
 module.exports.HOST_PACKAGE = HOST_PACKAGE;
 module.exports.MAP_FILE = MAP_FILE;
-module.exports.PLUGIN_DIR = PLUGIN_DIR;
-module.exports.MARKETPLACE_FILE = MARKETPLACE_FILE;

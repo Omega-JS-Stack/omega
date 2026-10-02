@@ -37,7 +37,7 @@ In the monorepo the root `AGENTS.md` opens with the same `docs/omega.md` import,
 
 ## Maintenance
 
-ONE builder writes every project-root `AGENTS.md`: devkit's `agents-md` (`packages/devkit/src/agents-md.js`), the lowest package the manager and all four frameworks already depend on. It has two callers. The manage cycle's `workspace` service (`agents` op: `packages/manager/src/services/workspace/ensure/agents.js`) owns a brand root's `AGENTS.md` and the retired link. Each framework's scaffold, which every verb runs through its ensure-target, gives a standalone project root the same file and keeps a brand target free of one. Devkit's `docs-sync` boot prelude (`packages/devkit/src/preludes/docs-sync.js`) runs before every verb on all five CLIs and owns a linked manager's docs:
+ONE builder writes every project-root `AGENTS.md`: devkit's `agents-md` (`packages/devkit/src/agents-md.js`), the lowest package the manager and all four frameworks already depend on. It has two callers. The manage cycle's `workspace` service (`agents` op: `packages/manager/src/services/workspace/ensure/agents.js`) owns a brand root's `AGENTS.md` and the retired link. Each framework's scaffold, which every verb runs through its ensure-target, gives a standalone project root the same file and keeps a brand target free of one. Devkit's `docs-sync` boot prelude (`packages/devkit/src/preludes/docs-sync.js`) runs before every omega verb but a read-only one on all five CLIs and owns a linked manager's docs:
 
 | State found | Action |
 |---|---|
@@ -47,7 +47,7 @@ ONE builder writes every project-root `AGENTS.md`: devkit's `agents-md` (`packag
 | Any unmarked `AGENTS.md`: the import-on-line-1 shape (with its generated `# <name>: project notes` or `# <name>: brand notes` heading), a hand-written file (one quoting the markers inline included: a marker counts only as a whole line), or the retired per-framework template (the `#` `Default Values` / `Custom Values` markers) | Converged on the next verb, loudly: every import line, the generated heading, the retired template's framework section and its shipped boilerplate go; every other line lands under the Custom marker, in order |
 | An `AGENTS.md` in a brand target | Removed, loudly, when it holds nothing the consumer wrote (the builder's skeleton or an old template's boilerplate); kept with a move-it-to-the-brand-root warning when it carries notes |
 | The retired `node_modules/@omega.js/AGENTS.md` symlink in the scope | Removed |
-| A locally linked manager (its real path is `packages/manager` in a monorepo checkout) | Before every verb: its `docs/` synced from the monorepo's `docs/`, writing only the files that changed, so a linked brand reads the live map |
+| A locally linked manager (its real path is `packages/manager` in a monorepo checkout) | Before every omega verb but a read-only one: its `docs/` synced from the monorepo's `docs/`, writing only the files that changed, so a linked brand reads the live map |
 | A published manager | Left alone: it ships the docs of its own version |
 
 Pinned by `packages/devkit/test/agents-md.test.js` (path resolution, the retired link and import, the marked shape, create/heal/converge from every older shape/idempotence, content preservation, the brand-target sweep, the scaffold step), `packages/manager/test/agents-md.test.js` (the manager's one-line AGENTS.md and its files entry, the workspace op, the two-import chain (three files) on a linked fixture brand, no `CLAUDE.md` written or read), each framework's scaffold suite (backend `test/boot/defaults-scaffold.test.js`, desktop and extension `src/test/suites/build/defaults-scaffold.test.js`, web `packages/web/test/cli.test.js`: a standalone scaffold writes the builder's file, an old template converges, a brand target gets none; web's `test/ensure-target.test.js` sees the builder's warning reach the verb), and `packages/devkit/test/prelude-docs-sync.test.js` (the local docs sync).
@@ -59,32 +59,57 @@ A brand has no monorepo to point at, so the prepare lane ships the knowledge INS
 | Monorepo source | Shipped as | Notes |
 |---|---|---|
 | `docs/` (the whole tree) | `manager/docs/` | Same shape, so every link inside the tree keeps working |
-| `agent-plugins/claude/` | `manager/claude-plugin/` + `manager/.claude-plugin/marketplace.json` | The plugin every brand enables (see below). `.mcp.json` ships WITH it: it launches `mcp-router-launch.js` inside the plugin, which node-resolves `@omega.js/mcp-router` from the install around it |
+
+The Claude plugin does not ride in any package: a machine fetches it from GitHub ([below](#the-omega-plugin-reaches-every-machine-from-the-right-place)).
 
 The manager's own `AGENTS.md` is tracked, not generated: one line importing `docs/omega.md`.
 
-Links that leave `docs/` are retargeted on the way in (`rewriteDocLinks`): a `packages/<pkg>/...` link points at the sibling package in the installed `@omega.js` scope, an `agent-plugins/claude/...` link at the plugin copy inside the manager, and anything else (`brands/...`, root files) keeps its words and loses the link. A sibling that never publishes (`devkit`) or isn't installed leaves a dead relative link. A locally linked manager sits in `packages/`, so the same links land on the live sources.
+Links that leave `docs/` are retargeted on the way in (`rewriteDocLinks`): a `packages/<pkg>/...` link points at the sibling package in the installed `@omega.js` scope, and anything else (`agent-plugins/...`, `brands/...`, root files) keeps its words and loses the link. A sibling that never publishes (`devkit`) or isn't installed leaves a dead relative link. A locally linked manager sits in `packages/`, so the same links land on the live sources.
 
 Everything written is GENERATED: gitignored, and `syncDocs` writes only a file whose content changed and removes any file the source no longer has. Pinned by `packages/devkit/test/vendor-docs.test.js` (fixture monorepo) plus `scripts/vendor-docs.test.js`, which packs every publishable for real and reads the tarball listings.
 
-Version-matched by construction: the docs in `node_modules/@omega.js/manager/docs/` are the docs of the version installed there.
+Version-matched by construction: the docs in `node_modules/@omega.js/manager/docs/` are the docs of the version installed there. The plugin is not: it follows releases on its own, below.
 
-## Brands enable the plugin from their installed manager ([#62](https://github.com/Omega-JS-Stack/omega/issues/62))
+## The omega plugin reaches every machine from the right place
 
-The plugin rides in `@omega.js/manager` because that is the package every brand installs. The workspace service's `claude-settings` op writes/heals the brand's committed `.claude/settings.json`:
+Claude Code keeps ONE source record per marketplace name for the whole machine, and a session starts on whatever record the last project left. So the plugin has two names that never share a record:
 
-```json
-{
-  "extraKnownMarketplaces": { "omega": { "source": { "source": "directory", "path": "./node_modules/@omega.js/manager" } } },
-  "enabledPlugins": { "omega@omega": true }
-}
-```
+| Name | Plugin id | Source | Who loads it |
+|---|---|---|---|
+| `omega` | `omega@omega` | GitHub `Omega-JS-Stack/omega`, a sparse checkout of `.claude-plugin` and `agent-plugins/claude` | every consumer, every live brand |
+| `omega-local` | `omega@omega-local` | a monorepo checkout's second manifest, `.claude-plugin/marketplace.local.json`, read in place | this monorepo, every linked brand, and an omega developer's empty folder |
 
-Committed, so every collaborator's session in that brand loads the omega skills and hooks — a directory marketplace is read LIVE from that path, so `npm update` moves the plugin with the package. The op only fires on a PUBLISHED install: `node_modules/@omega.js/manager` must carry the vendored `.claude-plugin/marketplace.json` **and** be a real directory. A locally linked brand's manager is a SYMLINK into the monorepo — whose `packages/manager` grows that same generated marketplace on every prepare — so the link itself is the local-era signal and the step skips; the developer's own user-scope install covers those sessions. The brand file NEVER points at a monorepo path — it would be machine-specific.
+**Every settings file that turns one copy on turns the other off.** With both on, a session loads either copy from run to run.
+
+- **A brand's committed `.claude/settings.json` names the published copy**, the same for every brand and every clone. The workspace service's `claude-settings` op writes and heals it on every manage and every `npm start`, a linked brand included:
+
+  ```json
+  {
+    "extraKnownMarketplaces": {
+      "omega": {
+        "source": { "source": "github", "repo": "Omega-JS-Stack/omega", "sparsePaths": [".claude-plugin", "agent-plugins/claude"] },
+        "autoUpdate": true
+      }
+    },
+    "enabledPlugins": { "omega@omega": true, "omega@omega-local": false }
+  }
+  ```
+
+- **A linked brand gets a private file.** While the brand is linked to a monorepo checkout (devkit's `resolveLinkedMonorepo`, the one answer to that question), the same op puts the local name into the gitignored `.claude/settings.local.json`: `omega-local` as a `file` source at that checkout's `.claude-plugin/marketplace.local.json`, local on, published off. When the brand is not linked, those keys leave the file, and a file left empty is removed. `omega i local` and `omega i live` run the op too, so the swap needs no other step.
+- **This monorepo's committed settings name `omega-local`** by a relative path, local on and published off, so the monorepo never fights a live brand for the `omega` record.
+- **The published copy is installed machine-wide.** A brand's settings alone do not load it at session start, so one helper (`packages/manager/src/lib/claude-machine.js`) registers `omega` from GitHub (moving a record that points anywhere else) and installs `omega@omega` for the user. Onboarding offers it in a terminal, default yes; a run with no terminal skips the offer, and declining changes nothing else. `omega manage` prints one line while it is not installed: `Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega`.
+- **An omega developer's machine defaults to the local copy.** `omega i local` first moves an `omega` record that points anywhere but GitHub (a folder, from before the two names) onto GitHub, the same move the workspace op makes, so one name never has two sources. It then registers `omega-local` through the CLI (`claude plugin marketplace add <checkout>/.claude-plugin/marketplace.local.json`, skipped when the record already points there), since a session does not load a `file` source the settings alone declare. Last it writes the user settings file (`settings.json` in `CLAUDE_CONFIG_DIR`, else `~/.claude`) in the same shape a linked brand's private file carries: `omega-local` on, `omega@omega` off. Every other key in that file is kept, a file that does not parse is never overwritten, and a failing `claude` is a warning, never a failed verb. An empty folder then loads the local copy, and a live brand still loads the published one, because its committed settings say so.
+- **The plugin follows releases, not commits.** `agent-plugins/claude/.claude-plugin/plugin.json` carries the family version, and the release check holds the two together ([publishing.md](publishing.md)). Claude Code ignores a new commit under the same version, so a machine moves at the next ship. `omega manage` runs `claude plugin marketplace update omega` and `claude plugin update omega@omega` when the installed copy is older than the brand's OMEGA; interactive sessions also update in the background through `autoUpdate`.
+- **Every call into Claude Code goes through the `claude` CLI**, and with no `claude` on the machine the helper does nothing, writes nothing, and reports no error.
+- **The plugin keeps working with older brands.** A brand on an older OMEGA loads the newest published plugin, so a hook that reads a framework's installed layout fails open when the layout is not there ([the plugin README](../../agent-plugins/claude/README.md)).
+
+Every step that reaches Claude Code takes its runner injected (`claudeExec` in the workspace op's context, in `runOnboard`'s and the install verb's options), the real `claude` by default, and the journey and corpus lanes point `CLAUDE_CONFIG_DIR` at a throwaway folder, so no test reaches the developer's own config.
+
+Pinned by `packages/manager/test/claude-settings.test.js` (both files, every verdict), `packages/manager/test/claude-machine.test.js` (the machine helper on an injected `exec`), and the `npm run test:plugin` lane, which runs real Claude Code in a throwaway config folder and checks which copy each session loads ([testing.md](testing.md)).
 
 Once loaded, the plugin's hooks make the chain BINDING in that brand: the inject hook discovers every target the brand declares and asks for each one's skill plus this map as required reading, and the gate hook refuses a write under `targets/<t>/` or to `config/omega.json5` until the skill owning that surface has been invoked. Mechanics and the surface table: [the plugin README](../../agent-plugins/claude/README.md).
 
-The gate reads the same way for a human's chat and for an agent that has no Skill tool, through two lanes and no others ([#760](https://github.com/Omega-JS-Stack/omega/issues/760)). In the main chat, invoking the skill IS the record. A subagent that writes its files through Bash reads the guide its brief names and then runs the one sanctioned command, `agent-plugins/claude/hooks/gate/mark.sh <skill>` here (in a brand: `node_modules/@omega.js/manager/claude-plugin/hooks/gate/mark.sh`), which writes the marker the hook would have written. A hand-written marker is a process breach, not a shortcut. Both lanes, and the flags: [the plugin README](../../agent-plugins/claude/README.md).
+The gate reads the same way for a human's chat and for an agent that has no Skill tool, through two lanes and no others ([#760](https://github.com/Omega-JS-Stack/omega/issues/760)). In the main chat, invoking the skill IS the record. A subagent that writes its files through Bash reads the guide its brief names and then runs the one sanctioned command, `agent-plugins/claude/hooks/gate/mark.sh <skill>` here (in a brand: the same script under the loaded plugin's root, the full path the inject hook prints), which writes the marker the hook would have written. A hand-written marker is a process breach, not a shortcut. Both lanes, and the flags: [the plugin README](../../agent-plugins/claude/README.md).
 
 Reading the chain is one half; acting on it is the other. The guard hook holds the other half in the same brand: a `Write|Edit` to a framework-owned file is refused with the upstream-first message ([#452](https://github.com/Omega-JS-Stack/omega/issues/452)). Generated and vendored files — `node_modules/`, any `dist/`, a generated header, the OMEGA-managed `database.rules.json` — are hard-refused and name the real source to edit; a SHADOW COPY, a brand file whose path mirrors a file the installed framework ships through its override layer (read from `node_modules/@omega.js/<framework>/`, never a hardcoded list), is refused with the two exits: file the framework issue, or declare the override with `omega:consumer-override: <reason>` in the file's first five lines (`omega customize` writes that marker itself, so a materialized file passes as it lands). Only the override MECHANISM is guarded: a brand's pages are content and its documented entry files are its own, so neither is ever refused. The monorepo is exempt and everything unrecognized fails open. The lookup-root table and the class rules: [the plugin README](../../agent-plugins/claude/README.md).
 

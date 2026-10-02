@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `docs/web/index.md` is the guide (identity, module map, CLI, conventions). Its deep references: `docs/web/sections.md`, `docs/web/omega-sections-spec.md`, `docs/web/template-kit.md`, `docs/web/ads-system.md`, `docs/web/classy-v2/DIRECTION.md`. Cross-framework contracts live in `docs/shared/` (config, theming, icons, translation, testing, deploys, updates, local-dev). Long-form package detail is `packages/web/README.md`.
-- **Working in a consumer project** — read `node_modules/@omega.js/manager/docs/web/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega command.
+- **Working in a consumer project**: read `node_modules/@omega.js/manager/docs/web/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega verb but a read-only one.
 - **The framework ships shared browser modules.** Before hand-rolling a chart, a diagram, tooltips, an icon in JS, or reCAPTCHA on a form, read `docs/web/libs.md`: it inventories `core/js/libs/` and the `__main_assets__/js/libs/<name>.js` import idiom that reaches it from any layer, consumer page modules included.
 - **`@omega.js/client` comes with it.** The web runtime instance extends the client's base class on every page, so any task touching auth, Firestore, subscriptions, notifications, or `data-omega-bind` is client work too: `docs/client/index.md` and the `omega:client` skill.
 

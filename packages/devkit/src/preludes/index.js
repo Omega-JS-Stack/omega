@@ -1,6 +1,5 @@
 /**
- * runPreludes: the BOOT PRELUDE list every verb passes through
- * ([#890](https://github.com/Omega-JS-Stack/omega/issues/890)).
+ * runPreludes: the BOOT PRELUDE list every verb but a read-only one passes through.
  *
  * One seam already sits above every verb on all five CLIs: the `freshnessBoot`
  * call that heals a stale locally-linked dist before anything runs. Anything
@@ -27,6 +26,8 @@
  * runs the preludes again, and every prelude being idempotent, the second pass
  * is a local read that finds its work already done.
  */
+
+const { isReadOnlyVerb } = require('../verbs.js');
 
 // The list. Order is the boot order.
 const PRELUDES = [
@@ -82,6 +83,8 @@ function targetsVerb(prelude, verb) {
 function runPreludes(options = {}) {
   const preludes = options.preludes || PRELUDES;
   const verb = normalizeVerb(options.verb);
+  // A verb the verb table marks readOnly leaves every file as it was, and a prelude may write or print
+  if (isReadOnlyVerb(verb)) return { ran: [] };
   const targetDir = options.targetDir || process.cwd();
   const brandRoot = options.brandRoot === undefined ? resolveBrandRoot(targetDir) : options.brandRoot;
 

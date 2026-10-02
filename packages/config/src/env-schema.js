@@ -29,8 +29,10 @@
  *     delivery:    { backend: 'env' },      // HOW it reaches each target
  *     publicAtRest: true,                  // …and, for a bake, that anyone who
  *                                          // unpacks the app may read it
- *     requiredWhen: 'analytics.providers.google.id', // the config path that
- *                                          // makes it mandatory
+ *     requiredWhen: holds('analytics.providers.google.id'), // when the
+ *                                          // config depends on it (env-when.js)
+ *     askedWhen:   asks({ captcha: onUnlessOff('…enabled') }), // per service, when
+ *                                          // `omega manage` asks for it
  *     machineLocal: true,                  // a developer-machine value (a local
  *                                          // path): never published to CI
  *     label:       'Snap Store credentials', // the human name an ask opens with
@@ -111,91 +113,41 @@
  * block, bake list and push-secrets set derives from these declarations, so a
  * new key is one entry here and nothing else.
  *
- * `requiredWhen:` is the CONDITIONAL requirement
- * ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): a dotted
- * omega.json5 path whose truthy value makes the key mandatory (a GA4
- * Measurement ID with no Measurement Protocol secret ships a build that sends
- * no events, silently). One-directional and PRESENCE ONLY — never a check on
- * the value's shape. checkEnvRules (env-rules.js) is the ONE evaluator of it
- * and of `required`; consumers decide the severity.
+ * `requiredWhen:` and `askedWhen:` are the two "when" facts, each written with
+ * the named rules of env-when.js. `requiredWhen` is one rule: the brand's
+ * config now depends on the key, so a deploy, a bake or a production start
+ * refuses without it. `askedWhen` (`asks`) maps each manager service that asks
+ * for the key to the rule that turns the ask on; the person may skip it. They differ
+ * on purpose: the Sentry token is asked before a Sentry project exists,
+ * because the manager creates the project with it. The keys a ship format
+ * needs are neither: the format table in platforms.js is their one home.
+ * missingEnvKeys (env-needs.js) is the ONE reader of all three.
  */
 const { randomBytes, randomUUID } = require('node:crypto');
+const { holds, onUnlessOff, chosen, hasTarget, realProject, all, asks } = require('./env-when.js');
+const { ENV_GROUPS, envFileGroups } = require('./env-groups.js');
 
 // The three ways a key reaches a target (#627) — see the header.
 const DELIVERY_MODES = ['env', 'ci', 'bake'];
 
-// One entry per .env section, in canonical file order — the manager's
-// canonical-order lane renders from this list. `comment` is the boxed header,
-// `notes` are the plain comment lines under it, `file: false` marks a group
-// that is schema-only (see the header).
-const ENV_GROUPS = [
-  // The license leads the file: it is the one key a human pastes before anything
-  // else runs, so it is the first line a brand owner reads (#320, Ian 2026-09-09).
-  {
-    id: 'license',
-    comment: 'OMEGA license — your omegajs.dev account API key; a keyless brand runs with payments gated and omega attribution shown',
-  },
-  {
-    id: 'omega',
-    comment: 'Omega keys (auto-generated — minted at scaffold, and by manage when absent; rotate by replacing the value)',
-    notes: [
-      'Admin key: grants admin on your backend. Webhook key: authenticates third-party',
-      'webhook deliveries. Namespace: the brand UUID namespace for deterministic ids.',
-      'Unsubscribe key: signs the unsubscribe link in every email the backend sends.',
-    ],
-  },
-  { id: 'github', comment: 'GitHub (repo + seo services) — `gh auth login` works instead of a token' },
-  { id: 'cloudflare', comment: 'Cloudflare (edge service + every DNS-writing flow) — API token with Zone edit' },
-  { id: 'namecheap', comment: 'Namecheap registrar (domain service)' },
-  { id: 'google-oauth', comment: 'Google OAuth client (cloud, analytics, search, advertising services)' },
-  { id: 'captcha', comment: "Classic reCAPTCHA SECRET key - the brand's own, from its GCP reCAPTCHA console (captcha service); the public site key is config, captcha.providers.recaptcha.siteKey" },
-  {
-    id: 'pixels',
-    comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)',
-    notes: [
-      'One token per platform: it CREATES the pixel on the ad account',
-      '(analytics.providers.{meta,tiktok}.accountId) and signs the conversions it sends.',
-      'Meta: a Business Manager system-user token with ads_management — an interactive',
-      '`omega manage` walks you to the page, pastes it in here, and discovers the ad',
-      'account itself. TikTok: set its advertiser id in config first.',
-    ],
-  },
-  { id: 'monitoring', comment: 'Error monitoring (monitoring service, Sentry provider) — a personal auth token with project+team write scopes' },
-  { id: 'email-marketing', comment: 'Email marketing (campaigns + newsletter services: SendGrid + Beehiiv)' },
-  { id: 'payment', comment: 'Payment providers (payment service; public halves live in omega.json5)' },
-  { id: 'service-accounts', comment: 'Operator service accounts (forms/chat/email/server/assets services) — paths to service-account JSON files' },
-  { id: 'apple', comment: 'Apple signing (certificates service — desktop/mobile targets)' },
-  {
-    id: 'desktop-publishing',
-    comment: 'Windows signing + Snap Store publishing (desktop target) — the Apple half is its own section above',
-    notes: [
-      'Windows: the EV token PIN, the cert thumbprint path and signtool, read by the',
-      'windows-sign CI job. Linux: the snapcraft credentials blob (`snapcraft export-login -`).',
-    ],
-  },
-  {
-    id: 'extension-stores',
-    comment: 'Extension store API credentials (extension target: Chrome Web Store, Firefox Add-ons, Edge Add-ons); each store\'s own listing id is config, targets.<name>.listings.<browser>.id',
-  },
-  { id: 'fontawesome', comment: 'Font Awesome Pro (icons) — path to the local Pro package dir' },
-  { id: 'backend-services', comment: 'Backend service keys (composed into targets/backend/dist/.env by the env composer)' },
-  // No `testing` group: #819 retired the two test-lane credentials and a suite
-  // asks a brand for none, so the bucket went with them (see ENV_SCHEMA).
-  {
-    id: 'machine',
-    comment: 'Auto-generated and persisted on the first real run — machine-owned, leave unset',
-    notes: [
-      'The GA4 Measurement Protocol secrets are per target (the analytics service resolves',
-      "one per stream; the composer delivers each target its own GOOGLE_ANALYTICS_SECRET), and the",
-      'VAPID private key is the half the Firebase console only ever shows you once.',
-    ],
-  },
-  {
-    id: 'runtime',
-    file: false,
-    comment: 'Resolved at runtime, never hand-written into a brand .env',
-  },
-];
+// The asks several keys share, each stated once. A key only the backend reads
+// is asked only of a brand that has one; a registrar must be chosen before
+// the domain service asks anything.
+const BACKEND = hasTarget('backend');
+const DOMAIN_ON = all(onUnlessOff('domain.enabled'), chosen('domain.providers'));
+// A demo project is local only, so the cloud service never asks there; the
+// other Google services ask on their own switches
+const GOOGLE_ASKS = asks({
+  cloud: all(onUnlessOff('cloud.enabled'), realProject()),
+  analytics: all(onUnlessOff('analytics.enabled'), holds('analytics.providers.google.propertyId')),
+  search: onUnlessOff('search.providers.searchConsole.enabled'),
+  advertising: holds('advertising.providers.adsense.client'),
+});
+const CAMPAIGNS_ON = all(onUnlessOff('marketing.campaigns.enabled'), chosen('marketing.campaigns.providers', 'sendgrid'));
+const NEWSLETTER_ON = all(onUnlessOff('marketing.newsletter.enabled'), chosen('marketing.newsletter.providers', 'beehiiv'));
+const APPLE_ASK = asks({ certificates: all(onUnlessOff('certificates.enabled'), hasTarget('desktop', 'mobile')) });
+const APPLE_SIGNING = holds('certificates.providers.apple');
+const GA4_STREAM = holds('analytics.providers.google.id');
 
 const ENV_SCHEMA = [
   // ── omega — the keys OMEGA mints for itself ──────────────────────────────
@@ -278,6 +230,7 @@ const ENV_SCHEMA = [
     group:       'cloudflare',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ edge: onUnlessOff('edge.providers.cloudflare.enabled'), domain: DOMAIN_ON }),
     delivery:    { web: 'ci', backend: 'env' },
     label:       'Cloudflare API token',
     url:         'https://dash.cloudflare.com/profile/api-tokens',
@@ -291,6 +244,7 @@ const ENV_SCHEMA = [
     group:       'namecheap',
     secret:      false,
     required:    false,
+    askedWhen:   asks({ domain: all(DOMAIN_ON, chosen('domain.providers', 'namecheap')) }),
     label:       'Namecheap account username',
     url:         'https://ap.www.namecheap.com/settings/tools/apiaccess/',
     hint:        'The account the domain is registered under (the same page enables API access)',
@@ -303,6 +257,7 @@ const ENV_SCHEMA = [
     group:       'namecheap',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ domain: all(DOMAIN_ON, chosen('domain.providers', 'namecheap')) }),
     label:       'Namecheap API key',
     url:         'https://ap.www.namecheap.com/settings/tools/apiaccess/',
     hint:        'Toggle API Access on, then whitelist this machine\'s IP on the same page',
@@ -315,6 +270,7 @@ const ENV_SCHEMA = [
     group:       'google-oauth',
     secret:      false,
     required:    false,
+    askedWhen:   GOOGLE_ASKS,
     label:       'Google OAuth client ID',
     url:         'https://console.cloud.google.com/apis/credentials',
     hint:        'A Desktop-app OAuth client: the one Google identity every service shares',
@@ -327,6 +283,7 @@ const ENV_SCHEMA = [
     group:       'google-oauth',
     secret:      true,
     required:    false,
+    askedWhen:   GOOGLE_ASKS,
     label:       'Google OAuth client secret',
     url:         'https://console.cloud.google.com/apis/credentials',
     description: 'Secret half of GOOGLE_CLIENT_ID.',
@@ -338,7 +295,8 @@ const ENV_SCHEMA = [
     group:       'captcha',
     secret:      true,
     required:    false,
-    requiredWhen: 'captcha.providers.recaptcha.siteKey',
+    requiredWhen: holds('captcha.providers.recaptcha.siteKey'),
+    askedWhen:   asks({ captcha: all(BACKEND, onUnlessOff('captcha.providers.recaptcha.enabled')) }),
     delivery:    { backend: 'env' },
     label:       'reCAPTCHA secret key',
     url:         'https://console.cloud.google.com/security/recaptcha',
@@ -362,6 +320,7 @@ const ENV_SCHEMA = [
     group:       'pixels',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ analytics: all(BACKEND, onUnlessOff('analytics.enabled'), onUnlessOff('analytics.providers.meta')) }),
     delivery:    { backend: 'env' },
     label:       'Meta Pixel access token',
     url:         'https://business.facebook.com/settings/system-users',
@@ -375,6 +334,7 @@ const ENV_SCHEMA = [
     group:       'pixels',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ analytics: all(BACKEND, onUnlessOff('analytics.enabled'), onUnlessOff('analytics.providers.tiktok')) }),
     delivery:    { backend: 'env' },
     label:       'TikTok Events API access token',
     url:         null,
@@ -388,7 +348,8 @@ const ENV_SCHEMA = [
     group:       'monitoring',
     secret:      true,
     required:    false,
-    requiredWhen: 'monitoring.providers.sentry.dsn',
+    requiredWhen: holds('monitoring.providers.sentry.dsn'),
+    askedWhen:   asks({ monitoring: all(onUnlessOff('monitoring.enabled'), chosen('monitoring.providers', 'sentry')) }),
     label:       'Sentry personal auth token',
     url:         'https://sentry.io/settings/account/api/auth-tokens/',
     hint:        'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write (organization tokens cannot create projects)',
@@ -401,6 +362,7 @@ const ENV_SCHEMA = [
     group:       'email-marketing',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ campaigns: all(BACKEND, CAMPAIGNS_ON) }),
     delivery:    { backend: 'env' },
     label:       'SendGrid API key',
     url:         'https://app.sendgrid.com/settings/api_keys',
@@ -413,6 +375,7 @@ const ENV_SCHEMA = [
     group:       'email-marketing',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ newsletter: all(BACKEND, NEWSLETTER_ON) }),
     delivery:    { backend: 'env' },
     label:       'Beehiiv API key',
     url:         'https://app.beehiiv.com/settings/workspace/api',
@@ -425,6 +388,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ payment: all(BACKEND, onUnlessOff('payment.enabled'), onUnlessOff('payment.providers.stripe')) }),
     delivery:    { backend: 'env' },
     label:       'Stripe secret key',
     url:         'https://dashboard.stripe.com/apikeys',
@@ -438,6 +402,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ payment: all(BACKEND, onUnlessOff('payment.enabled'), onUnlessOff('payment.providers.paypal')) }),
     delivery:    { backend: 'env' },
     label:       'PayPal client secret',
     url:         'https://developer.paypal.com/dashboard/applications',
@@ -451,6 +416,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ payment: all(BACKEND, onUnlessOff('payment.enabled'), onUnlessOff('payment.providers.chargebee')) }),
     delivery:    { backend: 'env' },
     label:       'Chargebee API key',
     url:         'https://app.chargebee.com/',
@@ -464,6 +430,9 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    // The key is the whole credential, so only an explicit ON asks; its own
+    // switch is named too, because that is what Disable turns off
+    askedWhen:   asks({ payment: all(BACKEND, onUnlessOff('payment.enabled'), onUnlessOff('payment.providers.coinbase.enabled'), holds('payment.providers.coinbase.enabled')) }),
     delivery:    { backend: 'env' },
     label:       'Coinbase Commerce API key',
     url:         'https://commerce.coinbase.com/settings/security',
@@ -477,6 +446,7 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ forms: onUnlessOff('forms.providers.slapform.enabled') }),
     label:       'Slapform\'s service-account JSON path',
     url:         null,
     hint:        'Operator-only: the Slapform project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
@@ -489,6 +459,7 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ chat: onUnlessOff('inbound.chat.providers.chatsy.enabled') }),
     label:       'Chatsy\'s service-account JSON path',
     url:         null,
     hint:        'Operator-only: the Chatsy project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
@@ -501,6 +472,7 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ email: onUnlessOff('inbound.email.providers.replyify.enabled') }),
     label:       'Replyify\'s service-account JSON path',
     url:         null,
     hint:        'Operator-only: the Replyify project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
@@ -513,6 +485,7 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ server: onUnlessOff('server.enabled') }),
     label:       'the company server\'s service-account JSON path',
     url:         null,
     hint:        'Operator-only: the company server project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
@@ -537,7 +510,8 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
+    askedWhen:   APPLE_ASK,
     delivery:    { desktop: 'ci' },
     label:       'App Store Connect issuer ID',
     url:         'https://appstoreconnect.apple.com/access/api',
@@ -551,7 +525,8 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
+    askedWhen:   APPLE_ASK,
     delivery:    { desktop: 'ci' },
     label:       'App Store Connect API key ID',
     url:         'https://appstoreconnect.apple.com/access/api',
@@ -565,7 +540,8 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
+    askedWhen:   APPLE_ASK,
     delivery:    { desktop: 'ci' },
     label:       'Apple Developer team ID',
     url:         'https://developer.apple.com/account',
@@ -579,7 +555,7 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
     delivery:    { desktop: 'ci' },
     description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with; unset, the build derives it from a delivered config/certs/developer-id-application.p12, then falls back to the Keychain. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
@@ -590,7 +566,7 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
     delivery:    { desktop: 'ci' },
     description: 'Path to the App Store Connect API key (.p8) notarization uses; unset, the build derives it from a delivered config/certs/AuthKey_<APPLE_API_KEY_ID>.p8. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
@@ -603,7 +579,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      false,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.strategy=self-hosted',
+    requiredWhen: chosen('platforms.windows.signing.strategy', 'self-hosted'),
     delivery:    { desktop: 'ci' },
     label:       'Windows EV certificate thumbprint',
     url:         null,
@@ -617,7 +593,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.strategy=self-hosted',
+    requiredWhen: chosen('platforms.windows.signing.strategy', 'self-hosted'),
     delivery:    { desktop: 'ci' },
     label:       'Windows EV token PIN',
     url:         null,
@@ -647,7 +623,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'azure'),
     delivery:    { desktop: 'ci' },
     label:       'Azure Trusted Signing tenant ID',
     url:         'https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/Overview',
@@ -661,7 +637,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'azure'),
     delivery:    { desktop: 'ci' },
     label:       'Azure app registration client ID',
     url:         'https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
@@ -675,7 +651,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'azure'),
     delivery:    { desktop: 'ci' },
     label:       'Azure app registration client secret',
     url:         'https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
@@ -689,7 +665,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'azure'),
     delivery:    { desktop: 'ci' },
     label:       'Azure Trusted Signing endpoint',
     url:         'https://portal.azure.com/#view/HubsExtension/BrowseResource/resourceType/Microsoft.CodeSigning%2FcodeSigningAccounts',
@@ -703,7 +679,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'sslcom'),
     delivery:    { desktop: 'ci' },
     label:       'SSL.com eSigner account',
     url:         'https://www.ssl.com/login/',
@@ -717,7 +693,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'sslcom'),
     delivery:    { desktop: 'ci' },
     label:       'SSL.com eSigner password',
     url:         'https://www.ssl.com/login/',
@@ -731,7 +707,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'sslcom'),
     delivery:    { desktop: 'ci' },
     label:       'SSL.com eSigner credential ID',
     url:         'https://www.ssl.com/login/',
@@ -745,7 +721,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=digicert',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'digicert'),
     delivery:    { desktop: 'ci' },
     label:       'DigiCert KeyLocker API key',
     url:         'https://one.digicert.com/signingmanager/keypairs',
@@ -759,7 +735,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.windows.signing.cloud.provider=digicert',
+    requiredWhen: chosen('platforms.windows.signing.cloud.provider', 'digicert'),
     delivery:    { desktop: 'ci' },
     label:       'DigiCert KeyLocker keypair alias',
     url:         'https://one.digicert.com/signingmanager/keypairs',
@@ -773,7 +749,7 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.linux.formats.snap',
+    requiredWhen: holds('platforms.linux.formats.snap'),
     delivery:    { desktop: 'ci' },
     label:       'Snap Store credentials',
     url:         'https://snapcraft.io/account',
@@ -901,6 +877,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ ai: onUnlessOff('ai.enabled') }),
     delivery:    { web: 'env', backend: 'env', extension: 'env' },
     label:       'OpenAI API key',
     url:         'https://platform.openai.com/api-keys',
@@ -914,6 +891,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
+    askedWhen:   asks({ ai: all(BACKEND, onUnlessOff('ai.enabled')) }),
     delivery:    { backend: 'env' },
     label:       'Anthropic API key',
     url:         'https://console.anthropic.com/settings/keys',
@@ -968,7 +946,7 @@ const ENV_SCHEMA = [
     group:       'machine',
     secret:      true,
     required:    false,
-    requiredWhen: 'certificates.providers.apple',
+    requiredWhen: APPLE_SIGNING,
     delivery:    { desktop: 'ci' },
     description: "Password of the desktop signing certificate the certificates service created; electron-builder reads it at package time. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.",
   },
@@ -988,7 +966,7 @@ const ENV_SCHEMA = [
     group:       'machine',
     secret:      true,
     required:    false,
-    requiredWhen: 'analytics.providers.google.id',
+    requiredWhen: GA4_STREAM,
     delivery:    { web: 'ci' },
     deliverAs:   'GOOGLE_ANALYTICS_SECRET',
     description: "Measurement Protocol secret of the web target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
@@ -1000,7 +978,7 @@ const ENV_SCHEMA = [
     group:       'machine',
     secret:      true,
     required:    false,
-    requiredWhen: 'analytics.providers.google.id',
+    requiredWhen: GA4_STREAM,
     delivery:    { backend: 'env' },
     deliverAs:   'GOOGLE_ANALYTICS_SECRET',
     description: "Measurement Protocol secret of the backend target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
@@ -1013,7 +991,7 @@ const ENV_SCHEMA = [
     secret:      true,
     publicAtRest: true,
     required:    false,
-    requiredWhen: 'analytics.providers.google.id',
+    requiredWhen: GA4_STREAM,
     delivery:    { desktop: 'bake' },
     deliverAs:   'GOOGLE_ANALYTICS_SECRET',
     description: "Measurement Protocol secret of the desktop target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
@@ -1026,7 +1004,7 @@ const ENV_SCHEMA = [
     secret:      true,
     publicAtRest: true,
     required:    false,
-    requiredWhen: 'analytics.providers.google.id',
+    requiredWhen: GA4_STREAM,
     delivery:    { extension: 'bake' },
     deliverAs:   'GOOGLE_ANALYTICS_SECRET',
     description: "Measurement Protocol secret of the extension target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
@@ -1082,11 +1060,6 @@ const ENV_SCHEMA = [
     description: "Developer tooling credential (`claude setup-token`) the claude-code AI provider falls back to — deliberately never composed into a brand's target .env.",
   },
 ];
-
-/** The groups that render into a real .env file, in canonical file order. */
-function envFileGroups() {
-  return ENV_GROUPS.filter((group) => group.file !== false);
-}
 
 /**
  * The entry that governs a name — an exact match first, then the dynamic

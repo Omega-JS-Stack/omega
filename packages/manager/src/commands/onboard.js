@@ -1,12 +1,13 @@
 /**
- * `omega-manager onboard [id]` — create (or converge) a brand monorepo.
+ * `omega onboard [id]`: create (or converge) a brand monorepo.
  *
- * Flags: --id/--name/--url/--description/--tagline/--contactName (plus the
- * optional --contactImage/--contactUrl)/--targets=web,backend pre-answer the
- * wizard (prompts only fill the gaps in a TTY; non-interactive runs derive
- * the rest from the id — the contact person is never derived). --dry-run
- * prints the file plan without writing or prompting; --manage/--no-manage
- * forces the manage handoff instead of asking.
+ * Flags pre-answer the wizard: --id/--name/--url/--description/--tagline,
+ * --contactName (plus --contactImage/--contactUrl), --targets=web,backend (or
+ * `none`), --org=<GitHub owner>, --company=<company brand id>,
+ * --admins=a@x.com,b@x.com. Prompts fill the gaps in a TTY; without one
+ * the rest derives. --dry-run prints the file plan without writing or
+ * prompting; --manage/--no-manage forces the manage handoff, and --no-dev
+ * stops a first run before its install and dev stack.
  */
 const { runOnboard } = require('../onboard.js');
 
@@ -21,11 +22,16 @@ module.exports = async (options) => {
     contactImage: options.contactImage,
     contactUrl: options.contactUrl,
     targets: options.targets,
+    org: options.org,
+    company: options.company,
+    admins: options.admins,
     dryRun: options.dryRun,
     manage: options.manage,
+    dev: options.dev,
   });
 
-  if (!report.valid || (report.manageExitCode != null && report.manageExitCode !== 0)) {
+  const failed = (code) => code != null && code !== 0;
+  if (!report.valid || report.installed === false || failed(report.manageExitCode) || failed(report.devExitCode)) {
     process.exitCode = 1;
   }
 };

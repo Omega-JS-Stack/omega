@@ -297,9 +297,10 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No domain.providers registrar configured → clean skip
   assert.equal(report.results.domain.status, 'skipped');
   assert.match(report.results.domain.reason, /domain\.providers/);
-  // No cloud.config.projectId configured → clean skip
+  // No project id means "not yet chosen", so cloud still asks for its Google
+  // client keys; none in the environment → clean skip naming them
   assert.equal(report.results.cloud.status, 'skipped');
-  assert.match(report.results.cloud.reason, /cloud\.config\.projectId/);
+  assert.match(report.results.cloud.reason, /GOOGLE_CLIENT_ID/);
   // No reCAPTCHA secret in the environment → clean skip (the site key is
   // config now, #893, so the env skip names the secret half alone)
   assert.equal(report.results.captcha.status, 'skipped');
@@ -346,10 +347,11 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Web-only fixture → no desktop/mobile target to sign for
   assert.equal(report.results.certificates.status, 'skipped');
   assert.match(report.results.certificates.reason, /no desktop or mobile target/);
-  // No AI provider keys in the environment and no TTY to paste them → clean
-  // skip naming both (#639; neither key gates the run — they are optional)
+  // No OpenAI key in the environment and no TTY to paste it → clean skip
+  // naming it alone: the Anthropic key is asked only with a backend target
   assert.equal(report.results.ai.status, 'skipped');
-  assert.match(report.results.ai.reason, /OPENAI_API_KEY, ANTHROPIC_API_KEY/);
+  assert.match(report.results.ai.reason, /OPENAI_API_KEY/);
+  assert.doesNotMatch(report.results.ai.reason, /ANTHROPIC_API_KEY/);
   // No parasite SEO content configured → clean skip with sidecar guidance
   assert.equal(report.results.seo.status, 'skipped');
   assert.match(report.results.seo.reason, /no SEO content configured/);

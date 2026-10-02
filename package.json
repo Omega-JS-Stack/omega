@@ -23,6 +23,7 @@
     "test:auth": "node scripts/lane.js test:auth \"node scripts/e2e-auth-token.js\"",
     "test:flows": "node scripts/lane.js test:flows \"node scripts/e2e-flows.js\"",
     "test:journey": "node scripts/lane.js test:journey \"node scripts/e2e-journey.js\"",
+    "test:plugin": "node scripts/lane.js test:plugin \"node scripts/e2e-plugin.js\"",
     "release:check": "node scripts/release-check.js"
   },
   "devDependencies": {

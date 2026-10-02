@@ -1,60 +1,31 @@
 /**
- * The ONE setup contract every service asks its inputs through (#608, Ian
- * 2026-08-25) — the env-side twin of config-flow's resolveConfigValue, and the
- * successor to cp114's two-outcome ensureEnvSecrets.
- *
- * When a service runs and an input it needs is missing, it asks RIGHT THEN,
- * with the same three outcomes everywhere:
- *
- *   Provide             — the Enter-gated open of the exact page that mints
- *                         the value, a masked paste, persisted to the brand
- *                         .env (lib/env-secret.js) and exported for THIS run,
- *                         so a fresh brand configures itself mid-walk.
- *   Skip for now        — this run steps aside; the next one asks again.
- *   Disable permanently — `<service>.enabled: false` lands in omega.json5
- *                         (the tri-state opt-out, #33) and nothing ever asks
- *                         again until the line is deleted.
- *
- * Non-interactive runs (CI, a piped `omega dev` boot, `--dry-run`) NEVER
- * prompt: the missing keys print as a loud skip line and ride back as the
- * machine-readable `missingEnv` list the run summary's 🔑 section aggregates.
- *
- * One class of input is never PASTED: a key OMEGA mints for ITSELF (the env
- * schema's `generated:` set) has nobody to ask, so it is minted in place and
- * never appears in `missingEnv` (#635). When it is the only thing missing no
- * gate opens at all, headless runs included; when a pasted key is missing
- * beside it the gate runs FIRST and the mint happens only past it, so
- * "Disable permanently" never leaves a minted secret behind.
- *
- * WHAT each service needs is the REQUIRES registry's to say (src/config.js —
- * one home, checked up front by lib/preflight.js and asked for here through
- * `serviceInputSpec(name)`); the env schema (@omega.js/config, #581) is what
- * says which of those keys OMEGA mints for itself and which a human acquires,
- * and the sweep test holds the registry to it.
- *
- * Values are never printed — names, labels and mint URLs only.
+ * The ONE setup contract every service asks its inputs through, the
+ * env-side twin of config-flow's resolveConfigValue. A missing input is asked
+ * for RIGHT THEN with three outcomes: Provide (Enter opens the page that mints
+ * it, a masked paste lands in the brand .env and this run), Skip for now, or
+ * Disable permanently (the tri-state `false` lands in omega.json5). A run that
+ * cannot prompt prints a loud skip and returns the `missingEnv` list the 🔑
+ * summary aggregates. A key OMEGA mints is minted, never asked, and only past
+ * the gate. WHICH inputs this brand owes is @omega.js/config's missingEnvKeys
+ * for `manage`, the answer preflight checks too; `serviceInputSpec(name)`
+ * supplies the manager's half. Values are never printed, names only.
  */
 const chalk = require('chalk').default;
 
-const { generatedEnvKeys } = require('@omega.js/config');
+const { generatedEnvKeys, serviceAskedKeys } = require('@omega.js/config');
+const { REQUIRES, serviceInputs } = require('../config.js');
 const { canPrompt, dryRunPlan } = require('./run-gates.js');
 const { writeEnvValue, mintGeneratedKey } = require('./env-secret.js');
 const { confirmSetup, readTriState } = require('./config-flow.js');
 
 /**
  * Ask for a service's missing inputs, with the three-outcome gate.
- *
  * @param {object} context - Service context ({ brandRoot, brandConfig, brandId, options }).
- * @param {object} spec - The input spec (serviceInputSpec(name) builds one from
- *   the REQUIRES registry):
- *   @param {string} spec.service - Service name (names the rerun hint).
- *   @param {string} spec.label - Human name the gate opens with ("Cloudflare").
- *   @param {string} spec.disablePath - Where "Disable permanently" writes `false`.
- *   @param {string[]} [spec.instructions] - Guidance lines shown before the gate.
- *   @param {boolean} [spec.gate] - false = the caller already ran the gate.
- *   @param {Array<{ name, label?, url?, hint?, when? }>} spec.inputs - The env
- *     vars the service needs; `when(brandConfig)` drops the ones this brand
- *     doesn't, `url` is the page that mints one, `hint` says what to make there.
+ * @param {object} spec - serviceInputSpec(name)'s spec: `service`, `label`,
+ *   `disablePath`, `instructions?`, `gate?` (false = the caller ran it),
+ *   `narrowed?` (the caller named its inputs, each a key it is about to use,
+ *   so one this brand does not owe skips the service) and `inputs`
+ *   ([{ name, label?, url?, hint?, gates? }]).
  * @param {object} [deps] - Test seam: { prompt } overrides devkit/prompt members.
  * @returns {Promise<object|null>} null to proceed, or the setup skip shape
  *   ({ skip, reason, missingEnv, disabled? }).
@@ -62,9 +33,8 @@ const { confirmSetup, readTriState } = require('./config-flow.js');
 async function requestServiceInput(context, spec, deps = {}) {
   const { brandConfig = {}, options = {} } = context;
 
-  const wanted = spec.inputs.filter((input) => !input.when || input.when(brandConfig));
-  const missing = wanted.filter((input) => !process.env[input.name]);
-  if (missing.length === 0) {
+  const absent = spec.inputs.filter((input) => !process.env[input.name]);
+  if (absent.length === 0) {
     return null;
   }
 
@@ -75,16 +45,39 @@ async function requestServiceInput(context, spec, deps = {}) {
     return {
       skip: true,
       reason: `${spec.disablePath} is disabled — delete the line in omega.json5 to be asked again`,
-      missingEnv: missing.map((input) => input.name),
+      missingEnv: absent.map((input) => input.name),
       disabled: true,
     };
   }
 
-  // A key OMEGA mints for itself (the env schema's `generated:` set, #581) is
-  // MINTED, not pasted: there is nobody to ask for it, so it never joins the
-  // 🔑 "add these to your .env" list — the two kinds of missing input split
-  // here and are handled apart (#635).
+  // Which of its inputs this brand owes is the one answer's, for the keys the
+  // schema governs for this service. Any other input, and a key OMEGA mints
+  // (minting asks nobody), is wanted whenever it is absent.
   const generated = generatedEnvKeys();
+  const governed = new Set(REQUIRES[spec.service] ? serviceInputs(spec.service).map((input) => input.name) : []);
+  const owed = serviceAskedKeys(brandConfig, spec.service);
+  const missing = absent.filter((input) => !governed.has(input.name) || owed.has(input.name) || generated[input.name]);
+
+  // A named key this brand does not owe, or a service none of whose gating
+  // keys it owes (no target reads them, or the feature is off): nothing to
+  // ask and nothing to run with. An unnamed optional input simply drops.
+  const unowed = spec.narrowed
+    ? absent.filter((input) => !missing.includes(input))
+    : spec.inputs.filter((input) => governed.has(input.name) && input.gates !== false);
+  if (unowed.length > 0 && unowed.every((input) => !owed.has(input.name))) {
+    return {
+      skip: true,
+      reason: `${spec.label}: this brand's config needs no ${unowed.map((input) => input.name).join(', ')}`,
+      missingEnv: [],
+    };
+  }
+
+  if (missing.length === 0) {
+    return null;
+  }
+
+  // A key OMEGA mints is MINTED, not pasted: there is nobody to ask for it, so
+  // it never joins the 🔑 "add these to your .env" list.
   const mintable = missing.filter((input) => generated[input.name]);
   const pending = missing.filter((input) => !generated[input.name]);
 

@@ -1,3 +1,5 @@
+const { isDemoProject } = require('@omega.js/config');
+
 /**
  * Base class for all setup tests
  * Each test should extend this class and implement the `run()` method
@@ -14,7 +16,7 @@ class BaseTest {
    * @returns {boolean}
    */
   get isDemoProject() {
-    return String(this.self.projectId || '').startsWith('demo-');
+    return isDemoProject(this.self.projectId);
   }
 
   /**

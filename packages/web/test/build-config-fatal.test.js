@@ -18,9 +18,13 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 
+// Every temp consumer's config load records its brand: keep that off the real ~/.omega
+require('@omega.js/devkit/test/temp-home');
+
 const build = require('../src/commands/build.js');
 
 const PKG = path.resolve(__dirname, '..');
+const MINT_MESSAGE = 'No minted logo set for a brand that has logo sources. Run: npx omega manage --service=assets, then deploy again.';
 
 // A temp consumer whose config carries ONE retired key (payment.processors was
 // renamed to payment.providers in #428) — the rest of the tree is a valid
@@ -80,6 +84,36 @@ test('bin: `omega build` exits non-zero on a fatal config finding (real process,
   assert.match(output, /payment\.processors\.stripe is not a key the schema declares/, 'the finding is printed');
   assert.notStrictEqual(run.status, 0, 'CI and scripted callers must read the run as a failure');
   assert.strictEqual(fs.existsSync(path.join(root, 'dist')), false, 'a refused build writes no output');
+});
+
+// The minted-asset gate: on a CI runner, a brand with a brandmark source and
+// no minted favicon set stops the real build command with one line.
+test('build: a CI build with a brandmark source and no minted favicon set refuses with the one line', async (t) => {
+  const root = consumer(t, {
+    'config/omega.json5': `{
+  brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com' },
+  targets: { web: { type: 'web' } },
+}`,
+    'assets/logo/brandmark.svg': '<svg xmlns="http://www.w3.org/2000/svg"/>',
+    'targets/web/package.json': JSON.stringify({ name: 'fixture-web', private: true, dependencies: { '@omega.js/web': '*' } }),
+  });
+  const previous = process.cwd();
+  process.chdir(path.join(root, 'targets', 'web'));
+  t.after(() => process.chdir(previous));
+
+  const saved = process.env.GITHUB_ACTIONS;
+  process.env.GITHUB_ACTIONS = 'true';
+  t.after(() => {
+    if (saved === undefined) delete process.env.GITHUB_ACTIONS;
+    else process.env.GITHUB_ACTIONS = saved;
+  });
+
+  await assert.rejects(build({ logFile: false }), (error) => {
+    assert.ok(error.message.includes(MINT_MESSAGE), `the message names the fix: ${error.message}`);
+    assert.ok(!error.message.includes('\n'), 'one line');
+    return true;
+  });
+  assert.strictEqual(fs.existsSync(path.join(root, 'targets', 'web', 'dist')), false, 'a refused build writes no output');
 });
 
 /**

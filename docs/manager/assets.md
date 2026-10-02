@@ -9,6 +9,16 @@ it — because it is local file work the target legs consume.
 **Sources** are committed brand collateral in the brand repo: `assets/logo/*.svg` and
 `assets/templates/*.psd`. **Derived files** land in the gitignored `.omega/assets/`.
 
+**What a deployed site gets.** A web build copies a small part of the derived set into the
+site: the favicon set, the brandmark (`color-x.svg` and `color-512.png`) and the social image
+(`color-1024.png`). That list is `@omega.js/config`'s `MINT_BRIDGE`. The deploy snapshot
+force-adds those files to the pushed mirror, since the CI runner never runs this service
+([docs/shared/deploys.md](../shared/deploys.md), "What rides along"). So mint first, then
+deploy: a CI build of a brand with `assets/logo/brandmark.svg` and no minted favicon set
+(no `site.webmanifest` in it) stops with
+`Run: npx omega manage --service=assets, then deploy again.` That brandmark check is
+`@omega.js/config`'s `hasLogoSources`, the same one this service asks before it runs.
+
 ## What it reconciles
 
 | Operation | What it does |

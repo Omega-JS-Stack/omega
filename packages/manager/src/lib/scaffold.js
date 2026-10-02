@@ -1,28 +1,14 @@
 /**
- * Brand-monorepo scaffolding — the file plan the onboard wizard writes.
- *
- * buildScaffoldPlan() turns the wizard's answers into the plan-§0 skeleton:
- * config/omega.json5, root package.json (targets/* workspaces), .gitignore, the
- * .env credential stub, README.md, and a minimal package.json per enabled
- * target's own dir. applyScaffoldPlan() writes it with fill-missing
- * semantics: existing files are NEVER touched, so onboarding is idempotent
- * and re-running it into a partial brand only fills the gaps.
- *
- * Target package.jsons carry their framework dep, so install → setup works
- * without hand-editing; each framework's own setup still owns the consumer
- * INTERIOR (scripts, config, scaffolded files). The backend's framework is a
- * RUNTIME dependency (it rides the staged dist/package.json — src/dist
- * pillar); every other target declares its framework as a devDependency
- * (build-time only).
- *
- * Every `@omega.js/*` spec is an EXACT PIN at the manager's own version
- * (#794): the family ships lockstep, one number for the whole set, so a
- * brand can never install a backend from one release beside a client from
- * another. A caret (or the old `*`) let one target float ahead alone on an
- * `npm update`; pinned, only `omega update` at the brand root moves it,
- * and it moves every target together. The local era is untouched — an
- * existing `file:` spec is never rewritten, because applyScaffoldPlan()
- * leaves every file that already exists exactly as it is.
+ * Brand-monorepo scaffolding: the file plan the onboard wizard writes.
+ * buildScaffoldPlan() turns the answers into config/omega.json5, the root
+ * package.json (targets/* workspaces), .gitignore, the .env stubs, README.md
+ * and a package.json per target; applyScaffoldPlan() writes it fill-missing,
+ * so a rerun only fills gaps. A target's package.json carries its framework
+ * (a dependency for the backend, a devDependency elsewhere), and each
+ * framework's setup owns the interior. Every `@omega.js/*` spec is an exact
+ * pin at the manager's own version: the family ships lockstep, so only
+ * `omega update` moves it, every target together. An existing `file:` spec
+ * is never rewritten, since an existing file is never touched.
  */
 
 const path = require('node:path');
@@ -42,6 +28,7 @@ const { generatedEnvKeys } = require('@omega.js/config');
 const { MANAGE_SCRIPT } = require('./package-scripts.js');
 // The marked .gitignore the workspace service heals every manage
 const { renderBrandGitignore } = require('./gitignore.js');
+const { TEMPLATE_URL, carriesTemplateMarker } = require('./template-marker.js');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the target manifest's `dependencies`
@@ -52,6 +39,26 @@ const RUNTIME_DEP_TARGETS = ['backend'];
 // version, read at run time (#794). The family releases lockstep, so the
 // manager's number IS the family's number; nothing here keeps a copy of it.
 const FAMILY_VERSION = require('../../package.json').version;
+
+// The brand-level keys a target type needs beyond its own entry. A fresh
+// scaffold writes them into the config; a rerun that adds the type writes the
+// ones the brand lacks.
+const TARGET_SEEDS = {
+  // demo-* ids are EMULATOR-ONLY: the emulator boots before any real project exists
+  backend: (answers) => ({ 'cloud.provider': 'firebase', 'cloud.config.projectId': `demo-${answers.id}` }),
+  // The reverse-DNS prefix every Bundle ID mints under
+  desktop: (answers) => (answers.bundleIdPrefix ? { 'certificates.providers.apple.bundleIdPrefix': answers.bundleIdPrefix } : {}),
+};
+
+/**
+ * The brand-level keys the answers' targets need, as config dot-paths.
+ *
+ * @param {Object} answers - { id, bundleIdPrefix, targets: [{ name, type }] }
+ * @returns {Object<string, *>} Dot-path to value
+ */
+function targetSeeds(answers) {
+  return Object.assign({}, ...answers.targets.map((entry) => TARGET_SEEDS[entry.type]?.(answers) ?? {}));
+}
 
 /**
  * Render the brand-level config/omega.json5 (fresh brands only — an existing
@@ -113,6 +120,17 @@ function renderOmegaConfig(answers) {
     );
   }
 
+  // The GitHub owner the wizard settled on. Unanswered writes nothing: the
+  // repo service skips until `repo.org` is set by hand.
+  if (answers.repo) {
+    lines.push(
+      '  // Where the brand\'s repos live: <brand.id>-omega and the rest, under this',
+      '  // GitHub owner (an org or a user).',
+      `  repo: { org: ${JSON.stringify(answers.repo.org)} },`,
+      '',
+    );
+  }
+
   lines.push(
     '  // Social handles (platform: "handle"): each entry lights its footer icon, its JSON-LD sameAs entry, and a /<platform> shortlink.',
     '  socials: {},',
@@ -152,15 +170,16 @@ function renderOmegaConfig(answers) {
   // Backend brands get a bootable cloud project out of the box: demo-* ids
   // are the emulator-only convention (never touch live Firebase), so the
   // emulator boots before any real project exists (dogfood friction #3).
-  if (answers.targets.some((entry) => entry.type === 'backend')) {
+  const seeds = targetSeeds(answers);
+  if (seeds['cloud.config.projectId']) {
     lines.push(
       '  // Cloud project (backend target). demo-* ids are EMULATOR-ONLY: the',
       '  // emulators boot against this immediately; swap in a real Firebase project',
       '  // id at launch (the cloud service can create one).',
       '  cloud: {',
-      '    provider: "firebase",',
+      `    provider: ${JSON.stringify(seeds['cloud.provider'])},`,
       '    config: {',
-      `      projectId: ${JSON.stringify(`demo-${answers.id}`)},`,
+      `      projectId: ${JSON.stringify(seeds['cloud.config.projectId'])},`,
       '    },',
       '  },',
       '',
@@ -194,7 +213,7 @@ function renderOmegaConfig(answers) {
 
   // App-signing brands get their reverse-DNS bundle prefix derived at
   // onboarding (parent company's domain when one exists, else the brand's)
-  if (answers.targets.some((entry) => entry.type === 'desktop') && answers.bundleIdPrefix) {
+  if (seeds['certificates.providers.apple.bundleIdPrefix']) {
     lines.push(
       '  // Apple signing (certificates service): reverse-DNS prefix derived from',
       '  // the company/brand domain at onboarding. Bundle IDs mint as',
@@ -202,7 +221,7 @@ function renderOmegaConfig(answers) {
       '  certificates: {',
       '    providers: {',
       '      apple: {',
-      `        bundleIdPrefix: ${JSON.stringify(answers.bundleIdPrefix)},`,
+      `        bundleIdPrefix: ${JSON.stringify(seeds['certificates.providers.apple.bundleIdPrefix'])},`,
       '      },',
       '    },',
       '  },',
@@ -303,7 +322,7 @@ function renderReadme(answers) {
       const framework = TARGET_FRAMEWORKS[entry.type];
       return `- \`targets/${entry.name}/\`: the ${entry.name} target${framework ? ` (framework: \`${framework}\`)` : ''}`;
     })
-    .join('\n');
+    .join('\n') || '- `targets/`: none yet (`npx omega onboard --targets=web` adds one)';
 
   return `# ${answers.name}
 
@@ -323,12 +342,13 @@ ${targetList}
 
 ## Next steps
 
-1. \`npm install\`: each target declares its framework (workspace link in a
-   monorepo; before a publish, \`npx omega i local\` here links the whole brand).
-2. Fill in \`.env\` as the brand adopts external services.
-3. \`npm run manage\`: reconcile everything; rerun any time.
-4. \`npm start\` (\`npx omega dev\`): boot the local stack; each target's verbs
-   scaffold its consumer interior on first run.
+1. \`npm install\`: every target gets its framework through the workspaces.
+2. \`npm start\` (\`npx omega dev\`): boot the local stack. A project made from
+   the [brand template](${TEMPLATE_URL}) runs both on its first \`npm start\`.
+3. Fill in \`.env\` as the brand adopts external services.
+4. \`npm run manage\`: reconcile everything; rerun any time.
+5. Add a target later: \`npx omega onboard --targets=web,backend\` adds the ones
+   this brand lacks and changes nothing else.
 `;
 }
 
@@ -380,21 +400,26 @@ function buildScaffoldPlan(answers) {
 /**
  * Write a scaffold plan with fill-missing semantics: files that already
  * exist are never touched (rerunning onboard converges instead of clobbering).
+ * The one exception is a file carrying the template marker, which the
+ * generated file replaces.
  *
  * @param {string} brandRoot - Absolute brand root to scaffold into
  * @param {Array<{ path, contents }>} plan - From buildScaffoldPlan()
- * @param {Object} [options] - { dryRun } — plan only, zero writes
- * @returns {{ created: string[], kept: string[], planned: string[] }}
+ * @param {Object} [options] - { dryRun }: plan only, zero writes
+ * @returns {{ created: string[], kept: string[], replaced: string[], planned: string[] }}
  */
 function applyScaffoldPlan(brandRoot, plan, { dryRun = false } = {}) {
   const created = [];
   const kept = [];
+  const replaced = [];
   const planned = [];
 
   for (const file of plan) {
     const destination = path.join(brandRoot, file.path);
+    const exists = jetpack.exists(destination);
+    const takeover = exists && carriesTemplateMarker(destination);
 
-    if (jetpack.exists(destination)) {
+    if (exists && !takeover) {
       kept.push(file.path);
       continue;
     }
@@ -405,26 +430,29 @@ function applyScaffoldPlan(brandRoot, plan, { dryRun = false } = {}) {
     }
 
     jetpack.write(destination, file.contents);
-    created.push(file.path);
+    (takeover ? replaced : created).push(file.path);
   }
 
-  return { created, kept, planned };
+  return { created, kept, replaced, planned };
 }
 
 /**
- * Print what a plan did — the one rendering of created/kept/planned, shared
- * by every scaffolding verb (onboard's brand plan, company init's).
+ * Print what a plan did: the one rendering of created/kept/replaced/planned,
+ * shared by every scaffolding verb (onboard's brand plan, company init's).
  */
-function printPlanResults({ created, kept, planned }) {
+function printPlanResults({ created, kept, replaced, planned }) {
   for (const file of planned) {
     console.log(`  ${chalk.dim('⊘')} would create ${chalk.cyan(file)}`);
   }
   for (const file of created) {
     console.log(`  ${chalk.green('✓')} created ${chalk.cyan(file)}`);
   }
+  for (const file of replaced) {
+    console.log(`  ${chalk.green('✓')} replaced ${chalk.cyan(file)} ${chalk.dim('(the template\'s copy)')}`);
+  }
   for (const file of kept) {
     console.log(`  ${chalk.dim('•')} kept ${chalk.dim(file)} ${chalk.dim('(exists)')}`);
   }
 }
 
-module.exports = { buildScaffoldPlan, applyScaffoldPlan, printPlanResults };
+module.exports = { buildScaffoldPlan, applyScaffoldPlan, printPlanResults, targetSeeds };

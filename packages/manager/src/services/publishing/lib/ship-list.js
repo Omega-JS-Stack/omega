@@ -8,8 +8,9 @@
  * declaration, so a brand that drops a store is never asked for its keys and a
  * store added to the table is asked for the moment it exists.
  *
- * Two readers: the REQUIRES registry (src/config.js), whose per-input `when`
- * is this list, and the publishing service itself.
+ * Two readers: serviceInputs (src/config.js), which lists what the publishing
+ * service CAN ask for, and the publishing service itself. Which keys a brand
+ * owes is @omega.js/config's missingEnvKeys.
  */
 
 const { FORMATS } = require('@omega.js/config');
@@ -20,9 +21,8 @@ const { shipPlan } = require('@omega.js/devkit/ship-plan');
 const SHIP_TARGETS = ['desktop', 'extension'];
 
 /**
- * Every credential ANY format can require, in table order. The registry's
- * static input list (a REQUIRES entry names its keys up front; `when` is what
- * narrows them per brand).
+ * Every credential ANY format can require, in table order: the static list of
+ * what the publishing service can ask for (missingEnvKeys narrows it per brand).
  *
  * @returns {string[]} Key names, deduped.
  */
@@ -68,24 +68,4 @@ function shipTargets(brandConfig) {
   return shipping;
 }
 
-/**
- * Every ship credential THIS brand owes, across its targets.
- *
- * @param {object} brandConfig - The brand's config.
- * @returns {string[]} Key names, deduped, in declaration order.
- */
-function brandShipKeys(brandConfig) {
-  const keys = [];
-
-  for (const target of shipTargets(brandConfig)) {
-    for (const entry of target.formats) {
-      for (const key of entry.requires) {
-        if (!keys.includes(key)) keys.push(key);
-      }
-    }
-  }
-
-  return keys;
-}
-
-module.exports = { SHIP_TARGETS, shipCredentials, shipTargets, brandShipKeys };
+module.exports = { SHIP_TARGETS, shipCredentials, shipTargets };

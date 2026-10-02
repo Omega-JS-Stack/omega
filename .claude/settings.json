@@ -1,14 +1,15 @@
 {
   "extraKnownMarketplaces": {
-    "omega": {
+    "omega-local": {
       "source": {
-        "source": "directory",
-        "path": "./"
+        "source": "file",
+        "path": "./.claude-plugin/marketplace.local.json"
       }
     }
   },
   "enabledPlugins": {
-    "omega@omega": true
+    "omega@omega-local": true,
+    "omega@omega": false
   },
   "permissions": {
     "allow": [

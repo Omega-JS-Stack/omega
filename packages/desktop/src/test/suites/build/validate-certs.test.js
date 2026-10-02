@@ -140,15 +140,13 @@ module.exports = defineCases({
       name: 'each cloud provider requires exactly the env schema\'s keys for it, and an unknown provider is refused',
       run: (ctx) => {
         const { ENV_SCHEMA } = require('@omega.js/config/env-schema');
-        const gate = 'platforms.windows.signing.cloud.provider=';
-        const providers = [...new Set(ENV_SCHEMA
-          .filter((entry) => typeof entry.requiredWhen === 'string' && entry.requiredWhen.startsWith(gate))
-          .map((entry) => entry.requiredWhen.slice(gate.length)))];
+        const { WINDOWS_CLOUD_PROVIDERS: providers } = require('@omega.js/config');
         ctx.expect(providers.length).toBeGreaterThan(0);
 
         for (const provider of providers) {
           const config = { platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider } } } } };
-          const keys = ENV_SCHEMA.filter((entry) => entry.requiredWhen === `${gate}${provider}`).map((entry) => entry.name);
+          const keys = ENV_SCHEMA.filter((entry) => typeof entry.requiredWhen === 'function' && entry.requiredWhen(config)).map((entry) => entry.name);
+          ctx.expect(keys.length).toBeGreaterThan(0);
 
           const bare = [];
           withEnv(Object.fromEntries(keys.map((key) => [key, undefined])), () => validateCerts.checkWindows(bare, 'cloud', config));

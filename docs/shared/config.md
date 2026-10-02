@@ -27,16 +27,16 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 {
   // SHARED sections — identical spelling in every project type.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
-  brand:          { id, name, url, description, tagline, type, font, color, contact: { email, phone, person: {…}, carbonCopy: […] }, address: {…}, images: {…} },   // #524: type = the schema.org type the JSON-LD stamps ('Organization' unset), font = the display face the assets service renders the wordmark from. contact.person = the human who signs "personal" email (name, firstName, image, url, urlText), ASKED for by `omega onboard` ([#770](https://github.com/Omega-JS-Stack/omega/issues/770)) since nothing can derive a human name: the wizard prompt writes name + the optional image/url, `--contactName`/`--contactImage`/`--contactUrl` answer it non-interactively, and an unanswered brand gets no key at all; contact.carbonCopy = audit BCCs
-  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, consentAudience, apiSubdomain, organizationId, billingAccount, oauthRedirectsConfigured },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design. shared: true limits the manage cycle to the per-brand operations AND skips the backend deploy whole (#882, deploys.md)
+  brand:          { id, name, url, description, tagline, type, font, color, contact: { email, phone, person: {…}, carbonCopy: […] }, address: {…}, images: {…} },   // #524: type = the schema.org type the JSON-LD stamps ('Organization' unset), font = the display face the assets service renders the wordmark from. contact.person = the human who signs "personal" email (name, firstName, image, url, urlText), ASKED for by `omega onboard` ([#770](https://github.com/Omega-JS-Stack/omega/issues/770)) with the git user name (`git config user.name`) as the default: the wizard prompt writes name + the optional image/url, `--contactName`/`--contactImage`/`--contactUrl` answer it non-interactively, a run with no terminal and no flag takes the git user name, and nothing is written only when there is no git user name; contact.carbonCopy = audit BCCs
+  cloud:          { enabled, provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, consentAudience, apiSubdomain, organizationId, billingAccount, oauthRedirectsConfigured },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design. shared: true limits the manage cycle to the per-brand operations AND skips the backend deploy whole (#882, deploys.md)
   repo:           { provider: 'github', org },   // ONE block (#883): where the brand hosts its SOURCE. Presence enables the repo service, `provider` defaults to `github`, and `org` is the only typed value: every repo name derives from `<brand.id>-<role>` and visibility is the brand root package.json's `private` field, so neither is configurable here
   edge:           { providers: { cloudflare: { enabled, zone, dns, settings, rules, cacheRules, speedTest, workers } } },   // rules.redirect: the ORDERED dynamic-redirect ruleset — [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }], `expression`/`targetUrl` in Cloudflare's own filter language. The ONE home for a TEMPLATED redirect, whose destination is computed from the request path (#466); the manager's edge service reconciles them by `name` (docs/manager/edge.md)
-  captcha:        { providers: { recaptcha: { project, siteKey, domainsConfirmed: [] } } },   // domainsConfirmed: machine-written — the classic key's domain list has no API, so the captcha service records the owner's confirmation here and stops asking
+  captcha:        { providers: { recaptcha: { enabled, project, siteKey, domainsConfirmed: [] } } },   // domainsConfirmed: machine-written. The classic key's domain list has no API, so the captcha service records the owner's confirmation here and stops asking
   search:         { providers: { searchConsole: { enabled, submitSitemap, sitemapPaths, gaLinked } } },   // #546: each `enabled` is the service's own switch, default ON — false skips that whole service. gaLinked: machine-written — the Search Console ↔ GA association has no API, so the confirmation is the record
   forms:          { providers: { slapform: { enabled, formId, templateFormId, updateFormInfo, plan } } },
   inbound:        { chat:  { providers: { chatsy:   { enabled, agentId, accountId, templateAgentId, updateAgentInfo, plan, sponsorshipsUrl, settings } } },
                     email: { providers: { replyify: { enabled, agentId, templateAgentId, updateAgentInfo, plan, discount } } } },
-  analytics:      { providers: { google: { id, propertyId, accountId }, meta: { id, accountId }, tiktok: { id, accountId, appId } } },   // #524: the pixel/measurement id is the RUNTIME value; propertyId/accountId are the platform ids the manager reconciles against (never secrets — tokens stay in .env). tiktok.appId: the DEVELOPER APP the token mint authorizes through (#448/#635) — public config; the app secret is pasted once and never saved
+  analytics:      { enabled, providers: { google: { id, propertyId, accountId }, meta: { id, accountId }, tiktok: { id, accountId, appId } } },   // #524: the pixel/measurement id is the RUNTIME value; propertyId/accountId are the platform ids the manager reconciles against (never secrets: tokens stay in .env). tiktok.appId: the DEVELOPER APP the token mint authorizes through (#448/#635): public config; the app secret is pasted once and never saved
   advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } }, fallback, tags: [] },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec). #527: `client` is the ONE adsense switch — its presence drives the managed account, the ad units and the ads.txt record together (no `units`, no `enabled`). Role-level: `fallback: 'inhouse'` is the lane a provider miss falls through to (false/absent ends at the built-in promo), `tags` are the brand's contextual targeting tags
   payment:        { currency, providers: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // currency: the ISO 4217 code every price in `products` is quoted in, default `USD` (#850). One currency per brand, named by the pricing page's JSON-LD, the checkout and the backend's order history alike; the successor to the retired `targets.web.currency`. #642: coinbase (Coinbase Commerce, crypto, one-time purchases only) is the one provider switched by an explicit `enabled`, default OFF: its whole credential is the secret COINBASE_COMMERCE_API_KEY, so there is no public datum to gate on. winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle; see below
   monitoring:     { enabled, providers: { sentry: { org, dsn, environment, sampleRate, tracesSampleRate, replaysSessionSampleRate, replaysOnErrorSampleRate, scrubEmail, attachScreenshot, bundlePatterns: [] } } },   // #425: the monitor is a KEY under `providers`. dsn presence IS the runtime enable signal; environment unset = the host's gate names it; scrubEmail defaults true (email OFF), attachScreenshot is desktop-only, bundlePatterns + the two replay rates browser-only (replay defaults to 0 — opt-in, #485). docs/shared/monitoring.md
@@ -50,7 +50,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // `targets.backend` to hold them (presence there would enable the target). A
   // `targets.backend.<same key>` block still overrides any of them.
   company:        { id: '<parent brand.id>' | 'self', webhooks: true },   // #677: the ONE key joining a brand to its company, OUTSIDE `brand`. `id` and `webhooks` are the only typed keys; the loader FILLS the same key with { id, name, url, images: { wordmark }, webhooks } from the parent's own config, and a brand with no company resolves to its own name/url under a null id, so no reader carries a fallback. `webhooks: false` says the provider ACCOUNT (SendGrid Event Webhook, Beehiiv webhook) is somebody else's and the walk never repoints its one webhook. See "The company" below
-  domain:         { providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips
+  domain:         { enabled, providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips
   certificates:   { enabled, providers: { apple: { bundleIdPrefix, capabilities: [], profiles: [], certificates: [] } } },   // Apple signing for desktop/mobile targets. bundleIdPrefix is the brand's own answer ('com.mycompany' + brand.id composes the bundle id); the credentials live in .env (APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID)
   reviews:        { enabled, sites: [] },
   marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: docs/backend/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
@@ -595,7 +595,8 @@ own list derives from it, so a new key is **one entry**, never four edits.
   secret:      true,                   // never printed, never in omega.json5
   required:    true,                   // absent = the backend refuses to boot
   delivery:    { backend: 'env' },     // per target, HOW the value gets there
-  requiredWhen: 'captcha.providers…',  // non-empty when this config path is truthy
+  requiredWhen: holds('captcha.providers.recaptcha.siteKey'), // the config now depends on it
+  askedWhen:   asks({ captcha: onUnlessOff('captcha.providers.recaptcha.enabled') }), // per asking service
   publicAtRest: true,                  // sanctions a 'bake' (readable in the artifact)
   machineLocal: true,                  // this machine's fact — never published to CI
   label:       'Snap Store credentials',       // the human name an ask opens with
@@ -610,8 +611,9 @@ own list derives from it, so a new key is **one entry**, never four edits.
   registry used to carry a second copy per service, which is how every desktop signing key
   and every extension store key ended up with a mint page in NEITHER place: no service
   declared them, so nobody could be asked for them. `serviceInputSpec` fills each ask from
-  here now, and the registry keeps only its own fields (which service asks, whether the ask
-  is interactive, where Disable writes `false`). `url: null` is a deliberate statement that
+  here now, and the registry keeps only its own fields (the reason shown, the gate's label,
+  where Disable writes `false`, whether the ask is pasted mid-run, whether it gates, the
+  Google scopes): no key name and no "when". `url: null` is a deliberate statement that
   no page mints the value, and such an entry owes a `hint` saying where it does come from.
   The sweep test (`packages/manager/test/service-input.test.js`) holds the line: no
   label/url/hint in the registry, a label on every pasted key, and a url (or an explicit
@@ -696,19 +698,63 @@ own list derives from it, so a new key is **one entry**, never four edits.
 - **`machineLocal: true` marks this machine's own facts** (`OMEGA_FONTAWESOME_ROOT`):
   composed locally like any key, but filtered out of every rendered block and every
   published secret set — a laptop path has no business in CI.
-- **`requiredWhen: '<config path>'` is the conditional presence rule**
-  ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): when the resolved config
-  path is truthy, the key must be non-empty. Presence only, never a value-shape check,
-  and one-directional. One checker, `checkEnvRules()` in `@omega.js/config/env-rules`,
-  answers it for every consumer: the backend boot (production refuses, development warns
-  once), the desktop and extension build bakes (build mode throws, development warns),
-  and the manager's manage walk (warns per enabled target, never fails). A TARGET-LESS
-  entry (`targets: []` — a SERVICE's own key, like `SENTRY_AUTH_TOKEN`) is owed when its
-  path is truthy in the brand root **or in ANY enabled target's resolved config**
-  ([#683](https://github.com/Omega-JS-Stack/omega/issues/683)): the service writes its
-  values where the target lives — monitoring lands one Sentry DSN per surface and leaves
-  the shared slot null — so a root-only read never fired on the shape brands carry.
-  Violations name the BRAND-level key — the one a human sets in the brand `.env`.
+- **Two "when" facts, two questions.** `requiredWhen` says the brand's config now
+  depends on the key, so a deploy, a bake or a production start refuses without it.
+  `askedWhen` says the feature is on, so `omega manage` asks for the key, and the person
+  may skip. They differ on purpose: the Sentry token is ASKED once Sentry is the chosen
+  monitor, because the manager creates the Sentry project with it, and REQUIRED only once
+  the config holds that project's DSN. Presence only, never a value-shape check, and
+  one-directional.
+- **Both are written with the named rules of `src/env-when.js`**, so the key list reads as
+  plain statements and no caller writes a test of its own:
+
+  | Rule | Holds when |
+  |---|---|
+  | `holds(path)` | the config path holds a value |
+  | `onUnlessOff(path)` | the switch is not `false`, at the path or any section above it: absent means on |
+  | `chosen(path, name)` | the provider is the chosen one: a `providers` map picks by presence, a plain value by equality (`chosen('platforms.windows.signing.cloud.provider', 'azure')`) |
+  | `hasTarget(...types)` | the brand declares a target of one of those types |
+  | `realProject()` | `cloud.config.projectId` is not a `demo-` id: a demo project is local only, so the cloud service asks for nothing there. No id yet is "not chosen", not demo: the cloud service asks for the Google client so it can pick one |
+  | `all(...rules)`, `any(...rules)` | every rule, or one of them |
+  | `asks({ service: rule })` | the shape of an `askedWhen`: any service asks; `.services` keeps each service's own rule |
+
+- **`askedWhen` maps each asking service to its rule** (`asks({ edge: …, domain: … })` for the
+  Cloudflare token), because one key can serve several services. Only the cloud service's
+  ask of the Google client needs `realProject()`; analytics, search and advertising ask on
+  their own switches. A key only the backend
+  reads is asked only of a brand with a backend target. A key whose ask honours a switch
+  narrower than its service's (one payment provider, one pixel platform) is optional, and
+  Disable turns off that narrower switch.
+- **The ship keys are neither.** What a store or signing format needs is the format table in
+  `src/platforms.js` (see the shipping declaration above), never a second copy on each key.
+- **`missingEnvKeys(config, env, { target, verb })` (`src/env-needs.js`) is the ONE answer to
+  "which keys is this brand missing".** It returns `[{ key, need, service, path, text }]`,
+  where `need` is `required`, `asked` or `ship`, `path` is what requires the key (the
+  config statement, or the declared format for a ship key; null for a key every brand
+  owes), `text` is the one line a refusal names it by (`KEY (required by <path>)`), and a
+  ship row also carries its format's `label`. Every caller decides only what a miss costs.
+  Two helpers beside it: `missingConfigKeys` (what THIS config adds beyond what every
+  brand owes) and `serviceAskedKeys(config, service)` (the keys `manage` asks of one
+  service, as a set):
+
+  | Verb (`ENV_VERBS`) | Answers | Who calls it |
+  |---|---|---|
+  | `onboard`, `dev`, `start` | `required` | the backend boot (production refuses, development warns) |
+  | `build` | `required`, only the keys a target BAKES | the desktop and extension bakes (build mode throws, development warns) |
+  | `deploy` | `required`, only the keys DELIVERED to the target | the deploy's secrets precheck (refuses), the manage walk's `env-rules` op (warns), desktop `validate-certs` |
+  | `manage`, `status` | `asked`, one row per asking service, plus the ship keys the declared formats need (asked by `publishing`) | the manage preflight, every service's setup gate |
+  | `publish` | `ship`, from the format table | the desktop and extension publishes, the manager's `publishing` service |
+
+  A key read only by targets the brand lacks is never required, and a key present under its
+  delivery name (`GOOGLE_ANALYTICS_SECRET` for `GOOGLE_ANALYTICS_SECRET_BACKEND`) counts as
+  present. The manage walk's `env-rules` op judges each enabled target's resolved config,
+  and judges a TARGET-LESS key (`SENTRY_AUTH_TOKEN`) against the brand root and every
+  target view, since the monitoring service lands one DSN per surface. Misses name the
+  BRAND-level key, the one a human sets in the brand `.env`.
+- **The four Disable switches without a provider block are declared**: `cloud.enabled`,
+  `domain.enabled`, `analytics.enabled` and `captcha.providers.recaptcha.enabled`. Each is
+  what its service's gate writes `false` to; absence means on, and no default is
+  materialized.
 - **Nothing is CLEARED, because nothing is written into a hand file**
   ([#636](https://github.com/Omega-JS-Stack/omega/issues/636),
   [#678](https://github.com/Omega-JS-Stack/omega/issues/678)): the composed artifact is
@@ -770,10 +816,10 @@ Who derives from it:
 | `@omega.js/manager` `lib/env-order.js` (the brand and company `.env` marker template) | `envFileGroups()` + `envKeysByGroup()`: the groups of the `Default Values` section, their comments, their keys |
 | `@omega.js/config` `composeTargetEnv()` (the delivery composition every verb runs) | `ENV_SCHEMA` + `envFileGroups()`: a DECLARED brand key rides down when its entry claims it (by `name` or by `match`), its `targets` include the target, and its group renders into a file; a key no entry knows at all is the consumer's own and rides down to every target ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)); `deliverAs` is applied on arrival, and each layer's `.env.<environment>` overlay composes above its own base (#586) |
 | `@omega.js/config` `envKeysForTarget(target)` (the rendering lane's list) | `ENV_SCHEMA` + `envFileGroups()` — the NAMED keys a target reads, which placeholders a brand `.env` carries |
-| `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `requiredEnvKeys('backend')` for the boot guard, and `getEnvironment()` re-exported under its own name ([docs/backend/index.md](../backend/index.md)) |
+| `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `missingEnvKeys(…, { verb: 'start' })` for the boot guard, and `getEnvironment()` re-exported under its own name ([docs/backend/index.md](../backend/index.md)) |
 | `@omega.js/manager` `lib/scaffold.js` (the onboard stub) + `lib/gitignore.js` (the brand `.gitignore` template and its heal) | `ENV_ENVIRONMENTS`: one empty `.env.<environment>` per name, and the `.env.*` ignore |
 | `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest`, plus the target's COMPOSED production values for the keys the schema cannot name (`match` families and custom keys, #835/#876): each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, backend's composed `deploy.yml` renders both its secrets block and the KEY LIST its node `.env` writer reads out of the runner env ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and all secret publishers send exactly its set |
-| `@omega.js/config` `env-rules.js` (the one presence checker) | `required` + `requiredWhen` — the violations the backend boot, the desktop/extension bakes, and the manager's manage walk act on, each at its own severity |
+| `@omega.js/config` `env-needs.js` (`missingEnvKeys`, the one answer) | `targets` + `delivery` + `deliverAs` + `required` + `requiredWhen` + `askedWhen`, and the format table for the ship keys: what every verb's caller acts on, each at its own severity |
 
 ## The environment (`src/environment.js`), #817
 
@@ -2047,9 +2093,17 @@ const {
   resolveEnvChain,     // (startDir) → { local, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip
   resolveCompany,      // (brandRoot) → { id, name, url, images, root, dir, file(relPath), config }: the ONE company resolver (#677)
-  recordBrand,         // ({ id, root, name, url }) → wrote?: the machine registry line every loadConfig refreshes
+  recordBrand,         // ({ id, root, name, url }) → wrote?: the machine registry line every loadConfig refreshes, unless it is passed `record: false` (`omega status`)
   readRegistry,        // () → { <brand.id>: { root, name, url, updatedAt } }: ~/.omega/brands.json (OMEGA_HOME moves it)
   COMPANY_RESOLVED_FILE, // 'config/company-resolved.json5': the generated layer a deploy hands a runner
+  // The mint bridge (mint-bridge.js): the minted identity files a site ships, read by the web build and the deploy snapshot
+  MINT_ROOT,           // '.omega/assets': where the manager's assets service mints, brand-root relative
+  LOGO_SOURCES_DIR,    // 'assets/logo': the committed logo sources
+  BRANDMARK_SOURCE,    // 'assets/logo/brandmark.svg': the one source the whole mint derives from
+  MINT_BRIDGE,         // [{ src, dest }]: brand-root relative source to site path, the four files a site ships
+  FAVICON_DEST, BRANDMARK_SVG_DEST, BRANDMARK_PNG_DEST, // the bridge's site paths read by name
+  mintBridgeSources,   // (brandRoot) → the bridge sources that exist, brand-root relative, in bridge order
+  hasLogoSources,      // (brandRoot) → whether BRANDMARK_SOURCE exists: the question the mint asks before it runs
   resolveHook,         // (startRoot, 'account/password') → hook file | null (brand → company)
   loadHook,            // (startRoot, hookPath) → { fn, file } | null — broken hooks THROW
   validateConfig,      // (config, { target, decorated }?) → { errors, warnings }; an undeclared path is an error (strict, #859); `decorated` declares a baked config's build facts

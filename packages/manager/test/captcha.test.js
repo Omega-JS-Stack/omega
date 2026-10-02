@@ -32,7 +32,8 @@ function brandConfig({ url = `https://${DOMAIN}`, siteKey = SITE_KEY } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     captcha: { providers: { recaptcha } },
-    targets: { web: { type: 'web' } },
+    // The secret half is the backend's: a brand with no backend is never asked for it
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
   };
 }
 
@@ -362,10 +363,10 @@ test('site-key: interactive run opens the console and stamps the confirmed domai
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { REQUIRES, serviceInputSpec } = require('../src/config.js');
+const { REQUIRES, serviceInputs, serviceInputSpec } = require('../src/config.js');
 
 test("requires: RECAPTCHA_* walkthrough mints at the GCP reCAPTCHA console (the brand's own project)", () => {
-  const env = REQUIRES.captcha.env;
+  const env = serviceInputs('captcha');
   // The SITE key left the env registry with #893: it is config now, asked for
   // through the config flow, so the only credential here is the secret half
   assert.deepEqual(env.map((e) => e.name), ['RECAPTCHA_SECRET_KEY']);
@@ -383,7 +384,7 @@ test("requires: RECAPTCHA_* walkthrough mints at the GCP reCAPTCHA console (the 
 test('requires/defaults: no ITW or hardcoded key value anywhere in the recaptcha registry', () => {
   // The paste flow must be the only path to a key — no default value exists
   assert.equal(DEFAULTS.captcha.providers.recaptcha.project, null);
-  const serialized = JSON.stringify({ defaults: DEFAULTS.captcha.providers.recaptcha, requires: { why: REQUIRES.captcha.why, env: REQUIRES.captcha.env } });
+  const serialized = JSON.stringify({ defaults: DEFAULTS.captcha.providers.recaptcha, requires: { why: REQUIRES.captcha.why, env: serviceInputs('captcha') } });
   assert.doesNotMatch(serialized, /itw/i);
   assert.doesNotMatch(serialized, /6L[0-9A-Za-z_-]{38}/); // a real site-key literal
 });

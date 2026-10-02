@@ -1,0 +1,14 @@
+{
+  "name": "omega-local",
+  "owner": {
+    "name": "ITW Creative Works",
+    "url": "https://github.com/ITW-Creative-Works"
+  },
+  "plugins": [
+    {
+      "name": "omega",
+      "source": "./agent-plugins/claude",
+      "description": "OMEGA framework knowledge for Claude, read live from this checkout: skills for the @omega.js packages, shipped beside the code they describe."
+    }
+  ]
+}

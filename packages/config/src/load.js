@@ -470,6 +470,8 @@ function companyFacts(hostRoot, config) {
  *   ambient answer is the composing machine's and a build from a terminal
  *   resolves `development`. Omitted (a dev boot, a deployed runtime) = the
  *   running environment, envEnvironment().
+ * @param {boolean} [options.record] - `false` skips the brand's line in the
+ *   machine registry, for a caller that writes nothing (`omega status`).
  * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, name: string|null, files: { local: string, brand: string|null, company: string|null } }}
  *   `enabled` = whether the resolved NAME is listed under `targets` (null when
  *   no target was requested); schema `errors` are returned, not thrown; only
@@ -623,12 +625,14 @@ function loadConfig(projectDir, target, options) {
   // Every brand run writes its own line in the machine registry, which is what
   // makes a sibling brand's `company: { id }` resolvable here without anyone
   // maintaining a map (#677). Never fails the load.
-  recordBrand({
-    id: config.brand && config.brand.id,
-    root: companyHostRoot(projectDir),
-    name: config.brand && config.brand.name,
-    url: config.brand && config.brand.url,
-  });
+  if (options.record !== false) {
+    recordBrand({
+      id: config.brand && config.brand.id,
+      root: companyHostRoot(projectDir),
+      name: config.brand && config.brand.name,
+      url: config.brand && config.brand.url,
+    });
+  }
 
   return { config, errors, warnings, enabled, name, files: { local: localPath, brand: brandPath, company: companyPath } };
 }

@@ -5,6 +5,7 @@ const powertools = require('node-powertools');
 const WatchCommand = require('./watch');
 const { createChildLog } = require('../utils/attach-log-file');
 const { refuseWhenCustom } = require('../utils/project-type');
+const { isDemoProject } = require('@omega.js/config');
 
 class ServeCommand extends BaseCommand {
   async execute() {
@@ -107,7 +108,7 @@ class ServeCommand extends BaseCommand {
     // at the hosting EMULATOR for the full surface.
     const { resolveProjectId } = require('./firebase-init');
     const serveProjectId = resolveProjectId(projectDir);
-    if (String(serveProjectId || '').startsWith('demo-')) {
+    if (isDemoProject(serveProjectId)) {
       this.log(chalk.yellow(`  ⚠ ${serveProjectId} is a demo-* (emulator-only) project — the hosting upstream will 403 here.`));
       this.log(chalk.yellow(`    Use ${chalk.cyan('omega emulator')} for demo-* hosting (its hosting emulator serves it fine).\n`));
     }

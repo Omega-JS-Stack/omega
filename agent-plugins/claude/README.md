@@ -8,16 +8,27 @@ A skill kept anywhere else is a hand-maintained pointer into a repo that moves o
 
 ## Install
 
-In this monorepo, install is automatic: the committed `.claude/settings.json` registers the repo-root marketplace (`.claude-plugin/marketplace.json`, relative path) and enables `omega@omega` — Claude Code asks one trust question on first open, then the plugin loads every session. For any other checkout, the manual form:
+The plugin reaches a machine under two marketplace names that never share a record, because Claude Code keeps one source record per name for the whole machine:
 
-```sh
-claude plugin marketplace add <path-to-this-monorepo-checkout>
-claude plugin install omega@omega
-```
+| Name | Plugin id | Declared by | Source |
+|---|---|---|---|
+| `omega` | `omega@omega` | `.claude-plugin/marketplace.json` | GitHub `Omega-JS-Stack/omega`, a sparse checkout of `.claude-plugin` and `agent-plugins/claude` |
+| `omega-local` | `omega@omega-local` | `.claude-plugin/marketplace.local.json` | this checkout, read in place as a `file` source |
 
-Plugins load at startup, so a new (or restarted) session — or `/reload-plugins` — is what puts a change into effect. Installed plugins are cache copies; live plugin development runs `claude --plugin-dir ./agent-plugins/claude` instead.
+Every settings file that turns one copy on turns the other off: with both on, a session loads either copy from run to run.
 
-A marketplace added from a local path is read in place — nothing is cloned, so living in a monorepo costs a local install nothing. Installing from GitHub is what makes repo size matter, and the marketplace entry switches to the `git-subdir` source for that: a url plus `"path": "agent-plugins/claude"`, which Claude Code fetches with a sparse partial clone rather than pulling the whole monorepo. Make that change when the plugin is first installed from a remote, not before — the relative `./agent-plugins/claude` source is the right one while every install is local.
+- **A consumer** gets the published copy. `omega onboard` offers the machine-wide install in a terminal, and `omega manage` prints the two commands while it is missing:
+
+  ```sh
+  claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega
+  ```
+
+  Every brand's committed `.claude/settings.json` names `omega@omega` too, so a collaborator's session in that brand loads the same copy.
+- **An omega developer** gets the local copy. This monorepo's committed `.claude/settings.json` names `omega@omega-local` (Claude Code asks one trust question on first open), a linked brand's private `.claude/settings.local.json` names it, and `omega i local` makes it the machine default for the user. A live brand still loads the published copy, because its committed settings say so.
+
+The local copy loads in place, so an edit here is live at the next session start, or mid-session with `/reload-plugins`; `claude --plugin-dir ./agent-plugins/claude` is only for same-session iteration. The published copy follows releases: `plugin.json`'s `version` is the family version, the release check holds the two together, and `omega manage` runs `claude plugin marketplace update omega` and `claude plugin update omega@omega` when the installed copy is older than the brand's OMEGA. The whole contract: [docs/shared/agent-docs.md](../../docs/shared/agent-docs.md#the-omega-plugin-reaches-every-machine-from-the-right-place).
+
+**The plugin must keep working with older brands.** A brand on an older OMEGA loads the newest published plugin, so a hook never assumes the installed framework's layout: when what it reads is not there, it allows the action. The guard hook below is the one hook that reads an installed framework's layout, and it fails open on a missing one; `scripts/agent-plugins-guard.test.js` holds that.
 
 ## Layout
 
@@ -26,6 +37,7 @@ agent-plugins/
 └── claude/
     ├── .claude-plugin/plugin.json   the manifest
     ├── .mcp.json                    the one MCP declaration — the @omega.js/mcp-router endpoint
+    ├── mcp-router-launch.js         the launcher it names: the router from this folder, then the open project, else an empty tool list
     ├── README.md                    this file
     ├── hooks/                       hooks.json, the inject/gate/guard/npx/shape/quality hooks, and lib/ (the shared scope guard, skill map, and gate-marker naming)
     └── skills/                      the skills, one directory each (see skills/README.md)
@@ -84,7 +96,7 @@ Everything else is free: docs, scripts, the plugin's own files, a brand's root f
 
 On `PostToolUse` (matcher `Skill`) the hook records every skill the session invoked, in either spelling — the namespaced `omega:web` or the bare `web` the plugin namespaces. On `PreToolUse` (`Write|Edit`) an unrecorded surface exits 2 with the skill to invoke, so the model is told what to do rather than what it did wrong. Markers live under `TMPDIR/omega-gate`, keyed on the session id.
 
-**Two lanes record the read, and only two.** In the main chat the agent has a Skill tool, so invoking `omega:web` records itself and nothing else is needed. An agent with NO Skill tool (the workkit worker class writes its files through Bash, which a `Write|Edit` matcher never sees) reads the guide its brief names, then runs the ONE sanctioned command: `hooks/gate/mark.sh omega:web` (either spelling the Skill event takes, `omega:web` or bare `web`), which writes the same marker through the same lib (`hooks/lib/omega-gate.sh`) and prints the path it wrote. The script lives at `agent-plugins/claude/hooks/gate/mark.sh` in this monorepo and at `node_modules/@omega.js/manager/claude-plugin/hooks/gate/mark.sh` in a brand on a published install. It takes the session id from `--session <id>` when given (explicit beats ambient), else from `$CLAUDE_SESSION_ID`, else `$CLAUDE_CODE_SESSION_ID`; with none it exits 1 with its usage. Writing a marker by hand, or running `mark.sh` before reading the guide, is a process breach rather than a third lane: the gate is a reading contract, not a lock to pick, and the verifier checks that the worker's report names the guide it read. The gate itself stays a MAIN-CHAT guard on purpose: it does not try to match the paths a heredoc, `sed`, or a python one-liner targets, because best-effort path parsing misses more than it catches ([#760](https://github.com/Omega-JS-Stack/omega/issues/760)).
+**Two lanes record the read, and only two.** In the main chat the agent has a Skill tool, so invoking `omega:web` records itself and nothing else is needed. An agent with NO Skill tool (the workkit worker class writes its files through Bash, which a `Write|Edit` matcher never sees) reads the guide its brief names, then runs the ONE sanctioned command: `hooks/gate/mark.sh omega:web` (either spelling the Skill event takes, `omega:web` or bare `web`), which writes the same marker through the same lib (`hooks/lib/omega-gate.sh`) and prints the path it wrote. The script lives at `agent-plugins/claude/hooks/gate/mark.sh` in this monorepo, and under the loaded plugin's root anywhere else (the inject hook prints its full path). It takes the session id from `--session <id>` when given (explicit beats ambient), else from `$CLAUDE_SESSION_ID`, else `$CLAUDE_CODE_SESSION_ID`; with none it exits 1 with its usage. Writing a marker by hand, or running `mark.sh` before reading the guide, is a process breach rather than a third lane: the gate is a reading contract, not a lock to pick, and the verifier checks that the worker's report names the guide it read. The gate itself stays a MAIN-CHAT guard on purpose: it does not try to match the paths a heredoc, `sed`, or a python one-liner targets, because best-effort path parsing misses more than it catches ([#760](https://github.com/Omega-JS-Stack/omega/issues/760)).
 
 The gate and the inject hook read ONE table: `hooks/lib/omega-skills.sh`, which owns the framework → skill map, the brand walk, the JSON5 target-key scan, and the surface lookup — so the hook that ASKS for a skill and the hook that REFUSES an edit without it agree on the map itself. They can still ask different questions of it: inject reads the config's target keys too, while the gate resolves a target from its own manifest alone, so a target declared in `omega.json5` before its directory exists is asked for and not gated. That is fail-open by design — the gate refuses only what it can positively identify. Fail-open throughout: no `jq`, an unreadable manifest or config, an unusable marker directory, and the gate lets the write through. Covered by `scripts/agent-plugins-gate.test.js`.
 
@@ -161,6 +173,6 @@ On `PostToolUse` (Write|Edit) a match names its skills once per session per skil
 
 ## What is here, and what is not built yet
 
-Thirteen skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), `browser` (driving the MCP router's Chrome upstreams), the four quality checklists (`seo`, `accessibility`, `brandcheck`, `analytics`) the quality hook fires on the surfaces they own, and `theme` (the cascade's own checklist), which the GATE fires on the theme surfaces in the table above rather than the quality hook. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
+Fourteen skills: `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), `browser` (driving the MCP router's Chrome upstreams), `init` (starts a brand from an empty folder, or reports the one a folder holds, through `omega status --json`), the four quality checklists (`seo`, `accessibility`, `brandcheck`, `analytics`) the quality hook fires on the surfaces they own, and `theme` (the cascade's own checklist), which the GATE fires on the theme surfaces in the table above rather than the quality hook. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
 
 **The staleness mechanism.** This is the point of the move, not a bonus. Whatever ships needs something that fails when a skill names an export, a path, a config key, or a CLI command the code no longer has. A test in this repo is the strongest form; a generated section is next; a review trigger tied to a release is the floor. A plugin that goes stale quietly has only relocated the problem.

@@ -364,6 +364,12 @@ const SHARED_SCHEMA = [
     enum:        ['firebase'],
     description: "App/cloud platform provider. Only 'firebase' today; the discriminator exists so a second provider slots in without a key rename.",
   },
+  {
+    path:        'cloud.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The cloud service's switch: `false` is the permanent opt-out the manage gate's Disable lands, and nothing asks for the Google OAuth client on the cloud service's behalf again. Absence means on, and no default is materialized.",
+  },
   ...CLOUD_CONFIG_RULES,
   {
     path:        'cloud.messaging.vapidKey',
@@ -418,6 +424,12 @@ const SHARED_SCHEMA = [
   },
 
   // ── analytics ────────────────────────────────────────────────────────────
+  {
+    path:        'analytics.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The analytics service's switch: `false` is the permanent opt-out the manage gate's Disable lands, and the GA4 and pixel keys are never asked for again. Absence means on, and no default is materialized. Dropping one pixel platform is `analytics.providers.<meta|tiktok>: false`, never this switch.",
+  },
   {
     path:        'analytics.providers.google.id',
     type:        'string',
@@ -789,12 +801,24 @@ const SHARED_SCHEMA = [
   },
 
   // ── domain (two roles: registrar + mailbox; provider-keyed) ────────────────
+  {
+    path:        'domain.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The domain service's switch: `false` is the permanent opt-out the manage gate's Disable lands, and the registrar credentials are never asked for again. Absence means on, and no default is materialized.",
+  },
   ...DOMAIN_RULES,
 
   // ── edge (role: CDN/DNS edge; provider-discriminated) ────────────────────
   ...EDGE_RULES,
 
   // ── captcha (role: bot defense; provider-discriminated) ──────────────────
+  {
+    path:        'captcha.providers.recaptcha.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The reCAPTCHA provider's switch: `false` is the permanent opt-out the manage gate's Disable lands, and RECAPTCHA_SECRET_KEY is never asked for again. Absence means on, and no default is materialized.",
+  },
   {
     path:        'captcha.providers.recaptcha.project',
     type:        'string',

@@ -586,14 +586,14 @@ class TestCommand extends BaseCommand {
    * Emulator-only values, gitignored like the service account, never committed.
    */
   ensureFixtureEnv(fixture) {
-    const { requiredEnvKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
+    const { missingEnvKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
     const envPath = path.join(fixture, '.env');
     const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
     const present = require('dotenv').parse(existing);
 
-    const values = Object.fromEntries(requiredEnvKeys('backend')
-      .filter((name) => !present[name])
-      .map((name) => [name, process.env[name] || `fixture-${name.toLowerCase().replace(/_/g, '-')}`]));
+    // An empty config makes no key mandatory, so it answers what EVERY brand owes
+    const values = Object.fromEntries(missingEnvKeys({}, present, { target: 'backend', verb: 'start' })
+      .map(({ key }) => [key, process.env[key] || `fixture-${key.toLowerCase().replace(/_/g, '-')}`]));
 
     if (Object.keys(values).length === 0) {
       return;

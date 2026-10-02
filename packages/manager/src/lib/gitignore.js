@@ -9,6 +9,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER } = require('@omega.js/devkit/merge-line-files');
+const { LOCAL_SETTINGS_FILE } = require('./claude-settings.js');
 
 const BRAND_LINES = [
   '# Dependencies',
@@ -27,6 +28,9 @@ const BRAND_LINES = [
   '# Secrets',
   '.env',
   '.env.*',
+  '',
+  '# Claude Code settings for this machine alone (a linked brand\'s local omega plugin)',
+  LOCAL_SETTINGS_FILE,
   '',
   '# OS',
   '.DS_Store',

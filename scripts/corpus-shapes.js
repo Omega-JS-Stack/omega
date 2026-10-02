@@ -27,18 +27,24 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// Machine state (the brand registry, Claude Code's config) lives in a temp
+// home for this run, before onboard is loaded.
+require('@omega.js/devkit/test/temp-home');
+
 const MONOREPO_ROOT = path.join(__dirname, '..');
 const { runOnboard } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'onboard.js'));
+const { DEFAULT_TARGETS } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'lib', 'default-targets.js'));
 const { configureOmega, loadSiteData } = require('@omega.js/web');
 const { setEnvironment } = require('@omega.js/config/environment');
 
-// One row per brand shape. targets: null = the non-interactive derivation
-// default (web+backend). theme flips the seeded config. post drops a real
-// _posts entry before the build. twoWeb adds a SECOND named web target and
-// proves the sweep across siblings (structure, per-target compose, port
-// offsets, deploy-record keys, both builds).
-// themeOverride drops a consumer-local tier-2 theme over the seeded one and
-// proves the cascade through a REAL production build (proveThemeOverride).
+// One row per brand shape. targets: null takes the onboard default (the
+// website alone); theme flips the seeded config; post drops a real _posts
+// entry before the build.
+
+// twoWeb adds a SECOND named web target and proves the sweep across siblings
+// (structure, per-target compose, port offsets, deploy-record keys, both
+// builds). themeOverride drops a consumer-local tier-2 theme over the seeded
+// one and proves the cascade through a REAL production build (proveThemeOverride).
 const CELLS = [
   { id: 'shape-web-only', targets: 'web' },
   { id: 'shape-default-derivation', targets: null },
@@ -79,7 +85,7 @@ function deriveName(id) {
 }
 
 function expectedTargets(cell) {
-  return cell.targets ? cell.targets.split(',') : ['web', 'backend'];
+  return cell.targets ? cell.targets.split(',') : DEFAULT_TARGETS;
 }
 
 /** Flip the seeded theme id in the cell's config (scaffold seeds classy). */

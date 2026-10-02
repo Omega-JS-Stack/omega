@@ -43,7 +43,7 @@
  * `omega deploy --no-secrets`).
  *
  * A key the SCHEMA says this target's config requires (`required` /
- * `requiredWhen`, @omega.js/config's env-rules) and the cascade resolves EMPTY
+ * `requiredWhen`, @omega.js/config's missingEnvKeys) and the cascade resolves EMPTY
  * stops the publish outright ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
  * the run that reads those secrets is the one that signs a release, and half a
  * signing set on a runner is a green build nobody can install. Nothing is
@@ -73,10 +73,10 @@
  * sends nothing. The refusal still THROWS in a dry run: a plan that cannot be
  * made is loud.
  */
-const { composeTargetEnv, loadConfig, sourceRepo } = require('@omega.js/config');
+const { composeTargetEnv, loadConfig, sourceRepo, missingEnvKeys } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
-const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { publishActionsSecrets } = require('./actions-secrets.js');
+const { isCI } = require('./ci.js');
 const { assertOriginMatches } = require('./git-remote.js');
 const { findBrandRoot } = require('./local.js');
 const { targetSeams } = require('./target-seams.js');
@@ -159,23 +159,16 @@ function collectTargetSecrets(options) {
 }
 
 /**
- * The keys this target's own config REQUIRES that the cascade cannot value.
- *
- * The rules are the schema's, evaluated by the ONE checker (#626) against the
- * target's resolved config and its COMPOSED env, narrowed to the keys this
- * publisher would send: a required key CI never reads is not the publish's
- * business, and a rule nobody delivers cannot be fixed by pushing anything.
- *
- * The bind's derivations run FIRST (`deriveValues`), because a key the brand
- * never typed but the dispersed files answer is not missing, and a key the
- * derivation could not value carries that seam's own fix line
- * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)).
- *
+ * The keys this target's config REQUIRES that the cascade cannot value:
+ * @omega.js/config's missingEnvKeys for `deploy`, which owes only the keys
+ * delivered to this target, judged on its COMPOSED env. The bind's
+ * derivations run FIRST, so a key the dispersed files answer is not missing
+ * and one they could not value carries that seam's fix line.
  * @param {object} options
  * @param {string} options.targetDir - The target root.
  * @param {string} options.target - Target name.
  * @param {function} [options.deriveValues] - The derive seam (see collectTargetSecrets).
- * @returns {Array<{ key: string, rule: string, path: string|null, fix: string|null }>}
+ * @returns {Array<{ key, path, text, fix }>} The rows' `path` and `text`, plus the seam's fix.
  */
 function missingRequiredSecrets(options) {
   const { targetDir, target } = options;
@@ -196,11 +189,9 @@ function missingRequiredSecrets(options) {
   }
 
   const { values, fixes } = composeValues({ targetDir, target, deriveValues });
-  const delivered = new Set(publishSecretKeys(target, { values }));
 
-  return checkEnvRules(config, values, { target })
-    .filter((violation) => delivered.has(violation.key))
-    .map((violation) => ({ ...violation, fix: fixes[violation.key] || null }));
+  return missingEnvKeys(config, values, { target, verb: 'deploy' })
+    .map(({ key, path, text }) => ({ key, path, text, fix: fixes[key] || null }));
 }
 
 /**
@@ -253,7 +244,7 @@ function publishTargetSecrets(options) {
 
   // CI runs the generated workflow as its build/publish step — the secrets
   // already exist there and the runner token can't write them.
-  if (env.GITHUB_ACTIONS === 'true' || env.CI === 'true') {
+  if (isCI(env)) {
     logger.log('Skipping secret publication — CI already has the repo secrets');
     return { skipped: 'ci' };
   }
@@ -270,10 +261,10 @@ function publishTargetSecrets(options) {
     // <the fix>`. A key a bind can DERIVE names the producer that delivers the
     // file (`omega manage --service certificates`, then disperse) instead of
     // asking for a path to paste; everything else names the .env to set.
-    const lines = missing.map(({ key, path, fix }) => {
+    const lines = missing.map(({ text, fix }) => {
       const detail = fix || `set it in the ${target} target's .env or the brand's, then re-run.`;
 
-      return `  ${key}${path ? ` (required by ${path})` : ''}: ${detail}`;
+      return `  ${text}: ${detail}`;
     });
     throw new Error(
       `${missing.length} secret(s) this brand's config requires are empty in the .env cascade (company/brand/target). `

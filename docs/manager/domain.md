@@ -33,8 +33,10 @@ with no TTY — reports warned with the rerun message.
 
 Both sets are exactly the rows of ONE registry, `packages/manager/src/services/domain/lib/providers.js`,
 the one place a registrar or mailbox provider is added. A registrar entry carries its API
-client (`api`, null for manual), its dashboard nameserver page (`nameserverUrl`) and its
-credentials (`envKeys`); a mailbox entry carries its MX records and match domain (`mx`,
+client (`api`, null for manual) and its dashboard nameserver page (`nameserverUrl`). Its
+credentials are not here: each key's `askedWhen` in the env schema says which registrar
+asks for it (`chosen('domain.providers', 'namecheap')`), and the domain service asks for
+what `missingEnvKeys` says it owes ([config.md](../shared/config.md)); a mailbox entry carries its MX records and match domain (`mx`,
 `mxDomain`), its SPF include (`spf`), its MX comment (`label`) and whether Email Routing
 forwards its mail (`routing`). The config schema declares one row per entry
 (`packages/config/src/schema-domain.js`) and `test/domain-providers.test.js` holds the two

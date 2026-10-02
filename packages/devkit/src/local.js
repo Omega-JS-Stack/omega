@@ -28,6 +28,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const { createRequire } = require('module');
 const { safeInstall } = require('./safe-install');
+const { isReadOnlyVerb } = require('./verbs');
 const Logger = require('./logger');
 
 // Constants
@@ -1882,11 +1883,16 @@ let freshnessBootRan = false;
  * watch down the entry heals instead (#398) and re-execs like any other — and a
  * heal that FAILS ('heal-failed') is the same loud stop for the same reason:
  * with no watch coming, the stale dist is not something to fall back onto. Every
- * other outcome returns the HOST's result and the boot continues.
+ * other outcome returns the HOST's result and the boot continues. A verb the
+ * verb table marks `readOnly` (the first argument as typed) skips the check:
+ * a heal writes a dist and prints, and that verb leaves every file as it was.
  * @param {object} options - Same as ensureFreshLocalDist (packageName = the host).
  * @returns {{status: string, by?: string, packageName: string, dir?: string}}
  */
 function freshnessBoot(options) {
+  if (isReadOnlyVerb(process.argv[2])) {
+    return { status: 'read-only', packageName: options.packageName };
+  }
   if (freshnessBootRan) {
     return { status: 'already-checked', packageName: options.packageName };
   }

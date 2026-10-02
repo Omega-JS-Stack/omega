@@ -29,10 +29,11 @@ const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, over
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
-const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, bakeSourceKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
-const { checkEnvRules } = require('./env-rules.js');
+const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
+const { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, missingConfigKeys, serviceAskedKeys } = require('./env-needs.js');
 const { resolveCompany, recordBrand, readRegistry, registryFile, COMPANY_DIR, COMPANY_RESOLVED_FILE, COMPANY_SELF } = require('./company.js');
-const { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues } = require('./edit.js');
+const { MINT_ROOT, LOGO_SOURCES_DIR, BRANDMARK_SOURCE, MINT_BRIDGE, FAVICON_DEST, BRANDMARK_SVG_DEST, BRANDMARK_PNG_DEST, mintBridgeSources, hasLogoSources } = require('./mint-bridge.js');
+const { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues, getAtPath } = require('./edit.js');
 const { schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath } = require('./defaults.js');
 const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js');
 const { resolveSeedMode } = require('./seed.js');
@@ -130,14 +131,17 @@ module.exports = {
   envFileKeys,
   artifactEnvValues,
   bakeKeys,
-  bakeSourceKeys,
   publishSecretKeys,
   renderSecretsBlock,
   renderEnvFileKeys,
 
-  // The env presence checker (#626) — the ONE evaluator of `required` and
-  // `requiredWhen`; every consumer calls it, none keeps its own if
-  checkEnvRules,
+  // The ONE answer to "which env keys is this brand missing", by config, verb
+  // and target: every verb calls it, none keeps a list or a test of its own
+  ENV_VERBS,
+  SHIP_SERVICE,
+  missingEnvKeys,
+  missingConfigKeys,
+  serviceAskedKeys,
 
   // The ONE company resolver (#677): `company: { id }` in, the company's public
   // facts plus its tree on this machine out. The config chain, the .env chain,
@@ -155,6 +159,19 @@ module.exports = {
   // company tree to resolve from
   COMPANY_RESOLVED_FILE,
 
+  // The ONE list of minted identity files a site ships: the web build copies
+  // it and the deploy snapshot carries it, so the runner builds what the
+  // laptop built
+  MINT_ROOT,
+  LOGO_SOURCES_DIR,
+  BRANDMARK_SOURCE,
+  MINT_BRIDGE,
+  FAVICON_DEST,
+  BRANDMARK_SVG_DEST,
+  BRANDMARK_PNG_DEST,
+  mintBridgeSources,
+  hasLogoSources,
+
   // Writeback (comment-preserving edits + canonical top-level key order)
   applyConfigEdits,
   writeConfigValues,
@@ -162,6 +179,7 @@ module.exports = {
   applyConfigRemovals,
   removeConfigValues,
   removeConfigFileValues,
+  getAtPath,
   applyCanonicalOrder,
   CANONICAL_TOP_LEVEL_ORDER,
 

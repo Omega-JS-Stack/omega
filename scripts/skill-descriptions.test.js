@@ -107,6 +107,15 @@ test('skills: every SKILL.md carries a description', () => {
   assert.deepEqual(missing, [], `SKILL.md files with no frontmatter description: ${missing.join(', ')}`);
 });
 
+test('skills: omega:init ships, and its description is one sentence', () => {
+  const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
+  assert.ok(fs.existsSync(file), 'agent-plugins/claude/skills/init/SKILL.md exists');
+
+  const description = readDescription(fs.readFileSync(file, 'utf8')) || '';
+  assert.match(description, /[.!?]$/, `one sentence ends the description: ${description}`);
+  assert.doesNotMatch(description, /[.!?]\s/, `no second sentence starts inside it: ${description}`);
+});
+
 test(`skills: no description exceeds ${MAX_DESCRIPTION} characters`, () => {
   const over = [];
 

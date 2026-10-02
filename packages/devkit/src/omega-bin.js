@@ -3,7 +3,8 @@
  * bin. npm links one arbitrary winner of those bins, so this resolves the ROOT that owns
  * the cwd (a brand root, a standalone target, the monorepo root) and runs THAT root's CLI.
  * Below a root, a verb runs in place only inside a target of one of its owner frameworks;
- * any other verb refuses and prints the root form. Stdlib plus its data
+ * any other verb refuses and prints the root form. A verb that needs no brand and that
+ * only the manager owns runs the manager wherever it is typed. Stdlib plus its data
  * siblings (verbs.js, target-picker.js): it is vendored into every framework dist.
  * The contract: docs/devkit/index.md.
  */
@@ -51,6 +52,13 @@ const CONTEXTLESS_VERBS = new Set(VERBS.filter((entry) => entry.scope === 'conte
 // ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)).
 const BOX_VERBS = new Set(VERBS.filter((entry) => entry.scope === 'box').map((entry) => entry.name));
 const DESKTOP = '@omega.js/desktop';
+
+// The contextless verbs only the manager answers, every spelling (onboard,
+// status): no framework CLI knows them, so they run the manager wherever they
+// are typed, inside a target included.
+const MANAGER_VERBS = new Set(VERBS
+  .filter((entry) => entry.scope === 'contextless' && entry.owners.every((owner) => owner === MANAGER))
+  .flatMap(tokensOf));
 
 /**
  * The signing-box verb this invocation selects, or null. The ONE reading of
@@ -369,6 +377,16 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
     if (cwd !== root.dir && !ownsInPlace(target, verb)) refuseOutsideRoot(verb, argv, root, row);
   }
 
+  // Inside a brand or a target, a manager-only verb skips the target's own
+  // framework, which does not know it; the no-context branch below prefers the manager too
+  if (target && target.kind !== 'monorepo' && MANAGER_VERBS.has(verb)) {
+    const manager = tryResolveCli(MANAGER, cwd);
+    if (manager.cliPath) return require(manager.cliPath).run();
+    if (hostName === MANAGER) return hostRun();
+    console.error(`omega: "${verb}" is ${MANAGER}'s, which is not installed from ${cwd}. Run npm install at the project root, then run it again.`);
+    process.exit(1);
+  }
+
   // No context — the bootstrap case (a verb run in a fresh directory has
   // no framework dep yet, by definition). Run the INSTALLED @omega.js/manager
   // when one resolves, else the HOST framework's CLI exactly like the
@@ -392,7 +410,7 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
     }
     if (verb && !CONTEXTLESS_VERBS.has(verb)) {
       console.error(`omega: refusing to run "${verb}" — ${process.cwd()} is not inside an OMEGA target (no framework dependency and no config/omega.json5 above it). Nothing was scaffolded.`);
-      console.error('Run it from a root (a brand root or a standalone target), or `npx omega onboard` to create one here. Without a target, only onboard (create, new), help, version, cwd and logs run; the signing box\'s runner and sign-windows run through @omega.js/desktop.');
+      console.error('Run it from a root (a brand root or a standalone target), or `npx omega onboard` to create one here. Without a target, only onboard (create, new), status, help, version, cwd and logs run; the signing box\'s runner and sign-windows run through @omega.js/desktop.');
       process.exit(1);
     }
 

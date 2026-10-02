@@ -14,13 +14,15 @@ const jetpack = require('fs-jetpack');
 
 const { runService } = require('../src/manage.js');
 const { loadBrand } = require('../src/lib/brand.js');
+const { createMachine } = require('./lib/fake-claude.js');
 
 const SANDBOX = path.join(__dirname, '..', '..', '..', 'brands', 'sandbox-brand');
 
 /**
  * The sandbox's tracked shape the workspace service reads (never its .env or
- * key files), plus a PUBLISHED manager install and the retired scope link so the agents op
- * and the Claude settings have work, and the drift the other writing ops heal.
+ * key files), plus a manager install and the retired scope link so the agents
+ * op has work, and the drift the other writing ops heal. The brand has no
+ * .claude/ at all, so the Claude settings have work too.
  */
 function stageBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-workspace-dry-run-'));
@@ -33,8 +35,7 @@ function stageBrand() {
   }
   jetpack.copy(path.join(SANDBOX, 'targets', 'backend', 'config'), path.join(root, 'targets', 'backend', 'config'));
 
-  const manager = path.join(root, 'node_modules', '@omega.js', 'manager');
-  jetpack.write(path.join(manager, '.claude-plugin', 'marketplace.json'), { name: 'omega', plugins: [] });
+  jetpack.write(path.join(root, 'node_modules', '@omega.js', 'manager', 'package.json'), { name: '@omega.js/manager', version: '1.0.0' });
   // The retired scope link, so the agents op has a removal to plan.
   fs.symlinkSync(path.join(root, 'nowhere.md'), path.join(root, 'node_modules', '@omega.js', 'AGENTS.md'));
 
@@ -67,13 +68,20 @@ function treeHash(root) {
   return entries;
 }
 
-test('#971: a dry-run workspace walk plans every write and leaves the brand tree byte-identical', async () => {
+test('#971: a dry-run workspace walk plans every write and leaves the brand tree byte-identical', async (t) => {
+  // A machine whose plugin is behind: a real walk would update it, a dry run changes nothing
+  const machine = createMachine({
+    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+    installed: { 'omega@omega': '0.0.1' },
+  });
+  t.after(machine.activate());
   const root = stageBrand();
   const before = treeHash(root);
 
   const result = await runService('workspace', loadBrand(root), { dryRun: true });
 
   assert.deepEqual(treeHash(root), before);
+  assert.deepEqual(machine.mutations(), [], 'the machine is never changed by a dry run');
   assert.notEqual(result.status, 'error', `the walk reached every op: ${result.error}`);
 
   // Each op had real work, so an identical tree means it was skipped
@@ -81,7 +89,7 @@ test('#971: a dry-run workspace walk plans every write and leaves the brand tree
   assert.ok(output.defaults.planned.length > 0);
   assert.equal(output.gitignore.brand, 'planned');
   assert.deepEqual([output.link, output.agents], ['planned', 'planned']);
-  assert.equal(output.claudeSettings, 'planned');
+  assert.match(JSON.stringify(output.claudeSettings), /planned/);
   assert.equal(output.scripts, 'planned');
   assert.equal(output.envOrder.brand, 'planned');
 });

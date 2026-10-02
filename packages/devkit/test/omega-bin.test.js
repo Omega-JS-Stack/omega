@@ -216,6 +216,14 @@ test('run(): no target context and no manager installed falls back to the HOST C
   assert.doesNotMatch(note, /running @omega\.js\/manager/);
 });
 
+/** A fake @omega.js/manager installed under `root`, whose CLI's run() is `body`. */
+function installManager(root, body) {
+  const dir = path.join(root, 'node_modules', '@omega.js', 'manager');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } }));
+  fs.writeFileSync(path.join(dir, 'cli.js'), `module.exports = { run() { ${body} } };`);
+}
+
 /**
  * A targetless cwd with a fake @omega.js/manager installed above it: the fresh
  * brand-template clone after `npm i --save-dev @omega.js/manager`, where the
@@ -228,17 +236,8 @@ function stageInstalledManager() {
   const workDir = path.join(scratch, 'clone');
   fs.mkdirSync(workDir);
 
-  const mgrDir = path.join(scratch, 'node_modules', '@omega.js', 'manager');
-  fs.mkdirSync(mgrDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(mgrDir, 'package.json'),
-    JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } })
-  );
   const marker = path.join(scratch, 'marker.txt');
-  fs.writeFileSync(
-    path.join(mgrDir, 'cli.js'),
-    `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, 'manager-dispatched'); } };`
-  );
+  installManager(scratch, `require('fs').writeFileSync(${JSON.stringify(marker)}, 'manager-dispatched');`);
 
   return { workDir, marker };
 }
@@ -476,7 +475,7 @@ test('run(): the refusal lists every verb that still runs, onboard aliases inclu
   const { invoke } = stageTargetless();
   const out = invoke(['deploy']);
 
-  assert.match(out.stderr, /only onboard \(create, new\), help, version, cwd and logs run/);
+  assert.deepEqual(['onboard (create, new)', 'help', 'version', 'cwd', 'logs', 'status'].filter((verb) => !(out.stderr.match(/only (.+) run/) || ['', ''])[1].includes(verb)), [], out.stderr);
 });
 
 test('run(): every mutating verb spelling is refused — positional and flag-style alias (#699)', () => {
@@ -490,7 +489,7 @@ test('run(): every mutating verb spelling is refused — positional and flag-sty
 
 test('run(): the bootstrap and read-only verbs still dispatch with no target context (#276)', () => {
   const { invoke } = stageTargetless();
-  for (const args of [[], ['onboard'], ['new'], ['help'], ['--help'], ['deploy', '--help'], ['version'], ['-v'], ['cwd'], ['logs']]) {
+  for (const args of [[], ['onboard'], ['new'], ['status'], ['help'], ['--help'], ['deploy', '--help'], ['version'], ['-v'], ['cwd'], ['logs']]) {
     const out = invoke(args);
     assert.equal(out.status, 0, `${args.join(' ') || '(bare)'} must still run: ${out.stderr}`);
     assert.ok(out.stdout.includes('HOST-RAN'), `${args.join(' ') || '(bare)'} reaches the host CLI`);
@@ -510,24 +509,12 @@ test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-brand-'));
   const brandRoot = path.join(scratch, 'my-brand');
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
-  fs.writeFileSync(
-    path.join(brandRoot, 'package.json'),
-    JSON.stringify({ name: 'my-brand', private: true, workspaces: ['targets/*'] })
-  );
+  fs.writeFileSync(path.join(brandRoot, 'package.json'), JSON.stringify({ name: 'my-brand', private: true, workspaces: ['targets/*'] }));
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "my-brand" } }\n');
 
   // Fake installed manager at the brand root (resolution walks up from there).
-  const mgrDir = path.join(brandRoot, 'node_modules', '@omega.js', 'manager');
-  fs.mkdirSync(mgrDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(mgrDir, 'package.json'),
-    JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } })
-  );
   const marker = path.join(scratch, 'marker.txt');
-  fs.writeFileSync(
-    path.join(mgrDir, 'cli.js'),
-    `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, 'brand-dispatched'); } };`
-  );
+  installManager(brandRoot, `require('fs').writeFileSync(${JSON.stringify(marker)}, 'brand-dispatched');`);
 
   const cwd0 = process.cwd();
   process.chdir(brandRoot);
@@ -542,6 +529,17 @@ test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
     process.chdir(cwd0);
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'brand-dispatched');
+});
+
+test('run(): a verb only the manager owns that needs no brand runs the manager inside a target, and exits 1 naming the install with none', () => {
+  const { scratch, brandRoot, targetDir } = stageBrandTarget();
+  const none = invokeBin({ scratch, hostName: '@omega.js/web', cwd: targetDir, args: ['status'] });
+  assert.ok(none.status === 1 && !none.stdout.includes('HOST-RAN') && /@omega\.js\/manager/.test(none.stderr) && /project root/.test(none.stderr), `no manager: ${none.status} ${none.stdout}${none.stderr}`);
+  installManager(brandRoot, "console.log('MANAGER-RAN');");
+  for (const args of [['status'], ['status', '--json'], ['onboard', '--id=acme']]) {
+    const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: targetDir, args });
+    assert.ok(out.status === 0 && out.stdout.includes('MANAGER-RAN') && !out.stdout.includes('HOST-RAN'), `${args.join(' ')} in a target: ${out.stdout}${out.stderr}`);
+  }
 });
 
 // ─── A verb runs wherever one of its owners is; brand-wide verbs refuse below the root ───
@@ -653,10 +651,7 @@ test('run(): `dev` runs in place in a backend, desktop and extension target, and
     assert.ok(out.stdout.includes('HOST-RAN'), `${framework} ran its own dev in place`);
   }
 
-  const managerDir = path.join(brandRoot, 'node_modules', '@omega.js', 'manager');
-  fs.mkdirSync(managerDir, { recursive: true });
-  fs.writeFileSync(path.join(managerDir, 'package.json'), JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } }));
-  fs.writeFileSync(path.join(managerDir, 'cli.js'), 'module.exports = { run() { console.log(\'MANAGER-RAN\'); } };');
+  installManager(brandRoot, "console.log('MANAGER-RAN');");
   const root = invokeBin({ scratch, hostName: '@omega.js/backend', cwd: brandRoot, args: ['dev'] });
   assert.equal(root.status, 0, root.stderr);
   assert.ok(root.stdout.includes('MANAGER-RAN'), root.stdout);

@@ -6,7 +6,8 @@
  * consumer's own src/assets layer, copied LAST so consumer files win
  * collisions. Entries whose source doesn't exist are skipped, so a brand
  * with no minted assets builds clean. buildSite runs the copies as its
- * 'static' phase.
+ * 'static' phase. The bridge list is @omega.js/config's MINT_BRIDGE, the
+ * same one the deploy snapshot carries to the runner.
  *
  * The consumer layer is the WHOLE src/assets tree, not just images (#295):
  * audio, video, downloadable documents — a page that references
@@ -18,6 +19,8 @@
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { isCI } = require('@omega.js/devkit/ci');
+const { MINT_BRIDGE, FAVICON_DEST, BRANDMARK_SVG_DEST, hasLogoSources } = require('@omega.js/config');
 const { PATHS } = require('./paths.js');
 
 // The ASSET PIPELINE owns these src/assets children — it reads them as layer
@@ -27,19 +30,9 @@ const { PATHS } = require('./paths.js');
 // copy would drop unbundled sources beside the bundles and undo the font prune.
 const PIPELINE_LANES = new Set(['js', 'css', 'fonts']);
 
-// The bridged VECTOR brandmark's site path — named because two lanes address
-// it: the mint bridge below writes it, and brandmarkSvgUrl reports it.
-const BRANDMARK_SVG_DEST = 'assets/images/brand/brandmark.svg';
-
-// <brandRoot>/.omega/assets → site paths. This is the mint contract:
-// head.html's favicon links + brand.images.{brandmark,social} config URLs
-// resolve against these destinations.
-const MINT_BRIDGE = [
-  { src: ['favicon'], dest: 'assets/images/favicon' },
-  { src: ['logo', 'brandmark', 'color-x.svg'], dest: BRANDMARK_SVG_DEST },
-  { src: ['logo', 'brandmark', 'color-512.png'], dest: 'assets/images/brand/brandmark.png' },
-  { src: ['social', 'brandmark', 'color-1024.png'], dest: 'assets/images/brand/social.png' },
-];
+// A CI build of a brand with logo sources and no minted set would ship a site
+// with no logo, favicon or social image, and pass green.
+const NO_MINT_MESSAGE = 'No minted logo set for a brand that has logo sources. Run: npx omega manage --service=assets, then deploy again.';
 
 /**
  * Resolve the ordered static copy list for a consumer build: minted brand
@@ -60,9 +53,8 @@ function resolveStaticDirs(options) {
   entries.push({ src: path.join(options.coreDir || PATHS.core, 'images'), dest: 'assets/images/core' });
 
   if (options.brandRoot) {
-    const mintRoot = path.join(options.brandRoot, '.omega', 'assets');
     for (const { src, dest } of MINT_BRIDGE) {
-      entries.push({ src: path.join(mintRoot, ...src), dest });
+      entries.push({ src: path.join(options.brandRoot, src), dest });
     }
   }
 
@@ -90,8 +82,18 @@ function resolveStaticDirs(options) {
  */
 function hasFaviconSet(staticDirs) {
   return (staticDirs || []).some(({ src, dest }) =>
-    (dest === 'assets/images/favicon' && jetpack.exists(path.join(src, 'site.webmanifest')) === 'file')
-    || (dest === 'assets/images' && jetpack.exists(path.join(src, 'favicon', 'site.webmanifest')) === 'file'));
+    (dest === FAVICON_DEST && isFaviconSet(src))
+    || (dest === 'assets/images' && isFaviconSet(path.join(src, 'favicon'))));
+}
+
+/**
+ * Whether one favicon folder holds a set the head can link. The head's links
+ * hang on site.webmanifest, so a folder without it is no set at all.
+ * @param {string} dir - a favicon folder
+ * @returns {boolean}
+ */
+function isFaviconSet(dir) {
+  return jetpack.exists(path.join(dir, 'site.webmanifest')) === 'file';
 }
 
 /**
@@ -151,4 +153,22 @@ function mirrorRootFavicon(outDir) {
   return true;
 }
 
-module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet, brandmarkSvgUrl };
+/**
+ * Refuse a CI build that would ship no logo: the brand has the logo source the
+ * mint needs, but the favicon set the head links never reached the runner.
+ * A local build, and a brand with no logo sources, pass untouched.
+ * @param {object} options
+ * @param {string|null} options.brandRoot - brand monorepo root
+ * @param {object} options.env - the environment the CI check reads
+ * @throws {Error} The one line that names the fix.
+ */
+function assertMintedAssets({ brandRoot, env }) {
+  if (!brandRoot || !isCI(env) || !hasLogoSources(brandRoot)) return;
+
+  const favicon = MINT_BRIDGE.find(({ dest }) => dest === FAVICON_DEST);
+  if (isFaviconSet(path.join(brandRoot, favicon.src))) return;
+
+  throw new Error(NO_MINT_MESSAGE);
+}
+
+module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet, brandmarkSvgUrl, assertMintedAssets };

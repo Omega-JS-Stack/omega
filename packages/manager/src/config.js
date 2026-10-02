@@ -33,9 +33,8 @@
  * the provider is a value.
  */
 
-const { isDemoProject, chosenProvider, schemaDefaults, deepMerge, hasTargetOfType, envSchemaEntry } = require('@omega.js/config');
-const { DOMAIN_PROVIDERS, resolveRegistrar } = require('./services/domain/lib/providers.js');
-const { shipCredentials, brandShipKeys } = require('./services/publishing/lib/ship-list.js');
+const { schemaDefaults, deepMerge, envSchemaEntry, ENV_SCHEMA, generatedEnvKeys, SHIP_SERVICE } = require('@omega.js/config');
+const { shipCredentials } = require('./services/publishing/lib/ship-list.js');
 
 // Framework package per target — used by the testing service to compare each
 // target's installed framework against the npm latest. Names flip to their
@@ -462,7 +461,7 @@ const OPERATIONS = {
     { name: 'gitignore', ensure: true },  // brand + company .gitignore marker sections (state and secrets never committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` + deploy exists; target scripts fill from framework projectScripts (#675)
     { name: 'agents', ensure: true },     // AGENTS.md manager import; the retired scope link removed
-    { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
+    { name: 'claude-settings', ensure: true }, // The two .claude settings files name the published or local omega plugin; the machine install is checked
     { name: 'workflows', ensure: true },  // Composed .github/workflows/<target>-*.yml for targets the config no longer enables are removed (#636)
     { name: 'env-keys', ensure: true },   // Brand-generated keys (the OMEGA_* trio + UNSUBSCRIBE_HMAC_KEY) minted into the brand .env when the cascade has none (#569)
     { name: 'env-order', ensure: true },  // Brand/company .env converged onto its Default/Custom marker sections
@@ -659,79 +658,23 @@ const OPERATIONS = {
 };
 
 // =============================================================================
-// REQUIRES - Per-service inputs (env var names + Google scopes)
+// REQUIRES - the manager's own half of each service's setup gate
 // =============================================================================
-// The declarative half of the setup contract (#608, cp114 before it): every
-// service that needs a credential or a one-time authorization declares it
-// HERE, next to its operations — ONE home, read by both halves:
-//   - lib/preflight.js checks the whole enabled set before any service runs and
-//     prints one consolidated fix walkthrough (cp236's 403-diagnostics tone)
-//     instead of N mid-run skips;
-//   - lib/service-input.js asks for what is still missing when the service
-//     actually runs, through the uniform Provide / Skip / Disable gate.
-// Every env NAME therefore lives exactly once. WHICH keys OMEGA mints for
-// itself and which a human acquires is the env schema's to say
-// (@omega.js/config, #581) — the sweep test (test/service-input.test.js) holds
-// this registry to it: every acquired key the manager actually reads must be
-// declared here.
-//
-// Shape per service — requires: { env, scopes } plus the gates around them:
-//   why    - one line: what the requirement buys (the walkthrough's "needed")
-//   label  - the human name the setup gate opens with ("Cloudflare")
-//   disablePath - where "Disable permanently" writes `false` (the tri-state
-//            opt-out, #33). Mirrors the key the service's own setup gate reads.
-//   when   - (brandConfig) => bool: whether the service would run at all for
-//            this brand. Mirrors ONLY the service setup's own config gate —
-//            keep the two in lockstep. Absent = always applies.
-//   env    - [{ name, prompted?, when?, gates?, disablePath? }]: the
-//            MANAGER-side half of each input. What the key IS and where a human
-//            mints it (`label`, `url`, `hint`) lives in the env schema
-//            (@omega.js/config, #867) and serviceInputSpec fills it in from
-//            there: a second copy here is how the desktop signing keys and the
-//            extension store keys ended up with a mint page in neither place.
-//            prompted: true = an interactive run collects the value mid-run
-//            (the paste flow), so preflight lets the service run on a TTY.
-//            Entry-level `when` = the entry only applies for some configs
-//            (registrar-specific creds). `gates: false` = OPTIONAL input: the
-//            service runs without it (a second payment provider, an
-//            operator-tier service account, one of two pixel platforms), so
-//            preflight never gates on it and the operation that needs it asks
-//            in place. Entry-level `disablePath` narrows the opt-out to the
-//            provider that owns the key.
-//            Values are NEVER read here — names only.
-//   scopes - the Google OAuth scopes this service's API calls actually hit
-//            (each a member of google-auth's GOOGLE_SCOPES union — every
-//            consent grants the union, so these only ever miss against a
-//            pre-union or stale token store). Checked against the token
-//            store's granted-scopes record — what IS knowable before a
-//            call; the live grant is proven at call time (the google-auth
-//            403 diagnostics are the backstop).
-// Services NOT listed need no credential of their own (repo authorizes through
-// `gh auth login`; the local services touch nothing external).
 
-// The shared Google OAuth app credentials — the ONE identity every Google
-// service authorizes (google-auth.js). Declared once, referenced per service.
-const GOOGLE_ENV = [
-  { name: 'GOOGLE_CLIENT_ID' },
-  { name: 'GOOGLE_CLIENT_SECRET' },
-];
-
-// The key every webhook route compares — OMEGA's OWN (`generated:` in the env
-// schema), so the setup contract MINTS it rather than asking (#635). Declared
-// by each service whose webhook operations build a forwarder URL from it, so
-// one that runs before the workspace service did still has it. `gates: false`:
-// nothing to acquire means nothing for preflight to gate on.
-const WEBHOOK_KEY_ENV = { name: 'OMEGA_WEBHOOK_KEY', gates: false };
-
+/**
+ * WHICH keys a service asks for, and WHEN, is the env schema's (`askedWhen`,
+ * and the format table for ship keys); missingEnvKeys answers it. A row holds
+ * the manager's fields only: `why`, `label`, `disablePath` (where "Disable
+ * permanently" writes `false`), `prompted` (a TTY run pastes mid-run),
+ * `gates: false` (every input optional: preflight never gates) and `scopes`.
+ * A key OMEGA mints, or one with a narrower switch of its own, never gates.
+ */
 const REQUIRES = {
   edge: {
     why: 'reconciles the zone, DNS records, rulesets, and settings via the Cloudflare API',
     label: 'Cloudflare',
     disablePath: 'edge.providers.cloudflare.enabled',
-    when: (config) => config.edge?.providers?.cloudflare?.enabled !== false,
-    env: [
-      { name: 'CLOUDFLARE_TOKEN', prompted: true },
-    ],
+    prompted: true,
     scopes: [],
   },
 
@@ -739,14 +682,7 @@ const REQUIRES = {
     why: 'points the registrar nameservers at the Cloudflare zone',
     label: 'Domain registrar',
     disablePath: 'domain.enabled',
-    when: (config) => config.domain?.enabled !== false && Boolean(resolveRegistrar(config)),
-    env: [
-      { name: 'CLOUDFLARE_TOKEN', prompted: true },
-      // Each registrar's own credentials, asked only when it is the brand's
-      ...Object.entries(DOMAIN_PROVIDERS.registrar).flatMap(([id, { envKeys }]) => envKeys.map((name) => (
-        { name, prompted: true, when: (config) => resolveRegistrar(config) === id }
-      ))),
-    ],
+    prompted: true,
     scopes: [],
   },
 
@@ -754,15 +690,6 @@ const REQUIRES = {
     why: 'reconciles the Firebase/GCP project (billing, APIs, hosting, auth, data stores) via Google APIs',
     label: 'Google Cloud',
     disablePath: 'cloud.enabled',
-    when: (config) => {
-      if (config.cloud?.enabled === false) return false;
-      // No projectId yet → the interactive selection flow is the fix, not a
-      // secret; demo-* projects have no real cloud to reconcile. ONE home
-      // (#23): cloud.config.projectId, never a second key.
-      const projectId = config.cloud?.config?.projectId;
-      return Boolean(projectId) && !isDemoProject(projectId);
-    },
-    env: GOOGLE_ENV,
     scopes: [
       'https://www.googleapis.com/auth/firebase',
       'https://www.googleapis.com/auth/cloud-platform',
@@ -775,45 +702,16 @@ const REQUIRES = {
     why: "proves the brand's own classic reCAPTCHA keys are valid (siteverify)",
     label: 'reCAPTCHA',
     disablePath: 'captcha.providers.recaptcha.enabled',
-    when: (config) => config.captcha?.providers?.recaptcha?.enabled !== false,
-    env: [
-      // De-ITW (Ian 2026-07-21): the key is the brand's OWN, minted in the
-      // brand's own GCP project — the walkthrough points at the GCP reCAPTCHA
-      // console, never a company-shared key.
-      // Only the SECRET half is an env key (#893): the public site key is
-      // config (captcha.providers.recaptcha.siteKey), asked for by the service
-      // through the config flow and landed in omega.json5.
-      { name: 'RECAPTCHA_SECRET_KEY', prompted: true },
-    ],
+    prompted: true,
     scopes: [],
   },
 
+  // The pixel tokens beside GA4 each carry their own switch, so they never
+  // gate the GA4 half: the pixel operations ask for them in place.
   analytics: {
     why: 'reconciles GA4 streams and the Firebase link via the GA Admin API',
     label: 'Google Analytics',
     disablePath: 'analytics.enabled',
-    when: (config) => config.analytics?.enabled !== false && Boolean(config.analytics?.providers?.google?.propertyId),
-    // The pixel platforms are OPTIONAL beside GA4 (`gates: false`): a brand may
-    // run one, both, or neither, and their absence must never gate the GA4 half
-    // — the pixel operations ask for them in place (services/analytics/lib/
-    // pixel-token.js), each disabling only its own provider.
-    env: [
-      ...GOOGLE_ENV,
-      {
-        name: 'META_ACCESS_TOKEN',
-        prompted: true,
-        gates: false,
-        disablePath: 'analytics.providers.meta',
-        when: (config) => config.analytics?.providers?.meta !== false,
-      },
-      {
-        name: 'TIKTOK_ACCESS_TOKEN',
-        prompted: true,
-        gates: false,
-        disablePath: 'analytics.providers.tiktok',
-        when: (config) => config.analytics?.providers?.tiktok !== false,
-      },
-    ],
     scopes: ['https://www.googleapis.com/auth/analytics.edit'],
   },
 
@@ -821,8 +719,6 @@ const REQUIRES = {
     why: 'creates/verifies the sc-domain property and submits sitemaps via the Search Console API',
     label: 'Search Console',
     disablePath: 'search.providers.searchConsole.enabled',
-    when: (config) => config.search?.providers?.searchConsole?.enabled !== false,
-    env: GOOGLE_ENV,
     scopes: [
       'https://www.googleapis.com/auth/webmasters',
       'https://www.googleapis.com/auth/siteverification',
@@ -832,13 +728,9 @@ const REQUIRES = {
   advertising: {
     why: 'verifies the domain is present + approved in the AdSense account (read-only API)',
     label: 'AdSense',
-    // Disable must NOT land `client: false` — client is schema-typed as a
-    // string. It opts the PROVIDER out instead, and since #527 there is no
-    // second `enabled` switch to land it on.
+    // Disable must NOT land `client: false`: client is schema-typed as a
+    // string, so it opts the PROVIDER out instead.
     disablePath: 'advertising.providers.adsense',
-    // The client id is the ONE adsense switch (#527) — no second gate.
-    when: (config) => Boolean(config.advertising?.providers?.adsense?.client),
-    env: GOOGLE_ENV,
     scopes: ['https://www.googleapis.com/auth/adsense.readonly'],
   },
 
@@ -846,14 +738,7 @@ const REQUIRES = {
     why: 'creates one Sentry project per enabled target and lands the DSNs',
     label: 'Sentry',
     disablePath: 'monitoring.enabled',
-    when: (config) => config.monitoring?.enabled !== false
-      && chosenProvider(config.monitoring?.providers) === 'sentry',
-    env: [
-      {
-        name: 'SENTRY_AUTH_TOKEN',
-        prompted: true,
-      },
-    ],
+    prompted: true,
     scopes: [],
   },
 
@@ -861,12 +746,7 @@ const REQUIRES = {
     why: 'reconciles domain auth, link branding, the sender, the list, unsubscribe groups, fields, segments, and the event webhook via the SendGrid API',
     label: 'SendGrid',
     disablePath: 'marketing.campaigns.enabled',
-    when: (config) => config.marketing?.campaigns?.enabled !== false
-      && chosenProvider(config.marketing?.campaigns?.providers) === 'sendgrid',
-    env: [
-      { name: 'SENDGRID_API_KEY', prompted: true },
-      WEBHOOK_KEY_ENV,
-    ],
+    prompted: true,
     scopes: [],
   },
 
@@ -874,12 +754,7 @@ const REQUIRES = {
     why: 'verifies publication access, fields, segments, and the webhook via the Beehiiv API',
     label: 'Beehiiv',
     disablePath: 'marketing.newsletter.enabled',
-    when: (config) => config.marketing?.newsletter?.enabled !== false
-      && chosenProvider(config.marketing?.newsletter?.providers) === 'beehiiv',
-    env: [
-      { name: 'BEEHIIV_API_KEY', prompted: true },
-      WEBHOOK_KEY_ENV,
-    ],
+    prompted: true,
     scopes: [],
   },
 
@@ -887,102 +762,41 @@ const REQUIRES = {
     why: 'reconciles Apple signing certs, bundle IDs, and provisioning profiles via App Store Connect',
     label: 'Apple signing',
     disablePath: 'certificates.enabled',
-    when: (config) => config.certificates?.enabled !== false
-      && (hasTargetOfType(config, 'desktop') || hasTargetOfType(config, 'mobile')),
-    env: [
-      { name: 'APPLE_API_ISSUER', prompted: true },
-      { name: 'APPLE_API_KEY_ID', prompted: true },
-      { name: 'APPLE_TEAM_ID', prompted: true },
-    ],
+    prompted: true,
     scopes: [],
   },
 
-  // Every SHIP credential the brand's own declaration asks for (#867). The
-  // names are DERIVED from @omega.js/config's format table and each one's
-  // `when` is that brand's declaration, so a brand that drops a store is never
-  // asked for its keys and a store added to the table is asked for at once.
-  // All OPTIONAL (`gates: false`): a brand mid-setup must never be gated out of
-  // a whole manage run by a store it has not registered yet. The service is
-  // what refuses, at the moment a shipped format has no credential to ship with.
+  // A brand mid-setup must never be gated out of a whole manage run by a store
+  // it has not registered yet: the service refuses at the moment a shipped
+  // format has no credential to ship with.
   publishing: {
     why: 'collects the store API keys, the snap login and the Windows signing set the declared formats need, plus the per-listing store ids',
     label: 'Publishing',
     disablePath: 'publishing.enabled',
-    when: (config) => config.publishing?.enabled !== false
-      && (hasTargetOfType(config, 'desktop') || hasTargetOfType(config, 'extension')),
-    env: shipCredentials().map((name) => ({
-      name,
-      prompted: true,
-      gates: false,
-      when: (config) => brandShipKeys(config).includes(name),
-    })),
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
-  // Per-provider credentials, every one OPTIONAL (`gates: false`): the payment
-  // service runs on whichever provider IS configured, so a missing Stripe key
-  // must never gate a PayPal brand. Each entry disables only its own provider.
+  // The payment service runs on whichever provider IS configured, so a
+  // missing Stripe key must never gate a PayPal brand.
   payment: {
     why: 'reconciles products, prices, and webhooks on the brand payment providers',
     label: 'Payments',
     disablePath: 'payment.enabled',
-    when: (config) => config.payment?.enabled !== false,
-    env: [
-      {
-        name: 'STRIPE_SECRET_KEY',
-        prompted: true,
-        gates: false,
-        disablePath: 'payment.providers.stripe',
-        when: (config) => config.payment?.providers?.stripe !== false,
-      },
-      {
-        name: 'PAYPAL_CLIENT_SECRET',
-        prompted: true,
-        gates: false,
-        disablePath: 'payment.providers.paypal',
-        when: (config) => config.payment?.providers?.paypal !== false,
-      },
-      {
-        name: 'CHARGEBEE_API_KEY',
-        prompted: true,
-        gates: false,
-        disablePath: 'payment.providers.chargebee',
-        when: (config) => config.payment?.providers?.chargebee !== false,
-      },
-      {
-        // The crypto provider ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
-        // Two things make it the odd one out, both for the same reason — the API
-        // key is its ENTIRE credential, with no public half to live in
-        // omega.json5:
-        //   - `when` demands an explicit ON, where the siblings ask unless
-        //     switched off. `payment.providers.coinbase.enabled` is the whole
-        //     switch, so an absent one means the brand has no use for the key.
-        //   - `disablePath` is that same `enabled`, not the provider block: the
-        //     schema declares `enabled`, and the checkout reads it.
-        name: 'COINBASE_COMMERCE_API_KEY',
-        prompted: true,
-        gates: false,
-        disablePath: 'payment.providers.coinbase.enabled',
-        when: (config) => config.payment?.providers?.coinbase?.enabled === true,
-      },
-      WEBHOOK_KEY_ENV,
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
-  // Operator-tier credentials (`gates: false`): the product lives in ITS OWN
-  // Firebase project, so only that product's operator holds the service
-  // account. Every other brand's clean skip is the sanctioned outcome, which
-  // is why these never gate a run — the service asks the operator in place.
+  // Operator-tier credentials: the product lives in ITS OWN Firebase project,
+  // so every other brand's clean skip is the sanctioned outcome.
   forms: {
     why: "manages the brand's Slapform contact form and its owner account (Slapform operator only)",
     label: 'Slapform operator access',
     disablePath: 'forms.providers.slapform.enabled',
-    when: (config) => config.forms?.providers?.slapform !== false
-      && config.forms?.providers?.slapform?.enabled !== false,
-    env: [
-      { name: 'SLAPFORM_SERVICE_ACCOUNT', prompted: true, gates: false },
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
@@ -990,11 +804,8 @@ const REQUIRES = {
     why: "manages the brand's Chatsy agent, knowledge, and owner account (Chatsy operator only)",
     label: 'Chatsy operator access',
     disablePath: 'inbound.chat.providers.chatsy.enabled',
-    when: (config) => config.inbound?.chat?.providers?.chatsy !== false
-      && config.inbound?.chat?.providers?.chatsy?.enabled !== false,
-    env: [
-      { name: 'CHATSY_SERVICE_ACCOUNT', prompted: true, gates: false },
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
@@ -1002,36 +813,19 @@ const REQUIRES = {
     why: "manages the brand's Replyify agent, filter, and owner account (Replyify operator only)",
     label: 'Replyify operator access',
     disablePath: 'inbound.email.providers.replyify.enabled',
-    when: (config) => config.inbound?.email?.providers?.replyify !== false
-      && config.inbound?.email?.providers?.replyify?.enabled !== false,
-    env: [
-      { name: 'REPLYIFY_SERVICE_ACCOUNT', prompted: true, gates: false },
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
-  // ONE key per provider (#639): the OMEGA_-prefixed twins are gone, so the
-  // bare name is the only home and a company-wide key is simply the COMPANY
-  // layer of the .env cascade. Both are OPTIONAL (`gates: false`) — a brand
-  // that calls neither provider must never be gated on a key it will not use,
-  // and the ai service asks for them in place.
+  // A brand that calls neither AI provider must never be gated on a key it
+  // will not use; the ai service asks for them in place.
   ai: {
     why: 'lets the backend call OpenAI/Anthropic (contact inference, content + newsletter generation)',
     label: 'AI providers',
     disablePath: 'ai.enabled',
-    when: (config) => config.ai?.enabled !== false,
-    env: [
-      {
-        name: 'OPENAI_API_KEY',
-        prompted: true,
-        gates: false,
-      },
-      {
-        name: 'ANTHROPIC_API_KEY',
-        prompted: true,
-        gates: false,
-      },
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 
@@ -1039,33 +833,53 @@ const REQUIRES = {
     why: "keeps the brand's registry entry on the company server's Firestore (company-server operators only)",
     label: 'Company server access',
     disablePath: 'server.enabled',
-    when: (config) => config.server !== false && config.server?.enabled !== false,
-    env: [
-      { name: 'SERVER_SERVICE_ACCOUNT', prompted: true, gates: false },
-    ],
+    prompted: true,
+    gates: false,
     scopes: [],
   },
 };
 
 /**
- * Join each registry input to its env-schema entry (#867): the ONE place the
- * manager's half of an input meets the human half, so the preflight
- * walkthrough, the interactive gate and the non-interactive skip all say the
- * same label, open the same page and print the same hint.
+ * Every key a service CAN ask for, with the manager's half of each ask: the
+ * schema keys whose `askedWhen` names the service, plus the format table's
+ * keys for the publishing service. Which of them THIS brand owes is
+ * missingEnvKeys' answer, never this list's.
  *
- * A name the schema does not know is a programmer error, not a silent
- * unlabelled prompt: nothing can say what the key is for or where it comes
- * from, which is the whole point of the schema owning it. The one caller that
- * passes `strict: false` is preflight, whose doctrine is absorb-never-crash: it
- * PRINTS a walkthrough, and a walk must not die over a description. In this
- * repo that fallback is unreachable anyway, because the sweep test holds every
- * declared name to the schema.
- *
+ * @param {string} service - Service name (a REQUIRES key).
+ * @param {object} [declaration] - Its REQUIRES row (default: the registry's).
+ * @returns {Array<{ name: string, prompted?: true, gates?: false, disablePath?: string }>}
+ */
+function serviceInputs(service, declaration = REQUIRES[service]) {
+  const generated = generatedEnvKeys();
+  const asks = ENV_SCHEMA
+    .filter((entry) => entry.name && entry.askedWhen && entry.askedWhen.services[service])
+    .map((entry) => ({ name: entry.name, rule: entry.askedWhen.services[service] }));
+  const ship = service === SHIP_SERVICE ? shipCredentials().map((name) => ({ name, rule: null })) : [];
+
+  return [...asks, ...ship].map(({ name, rule }) => {
+    // The narrowest switch the ask honours: a provider's own, below the row's
+    const own = rule ? rule.switches[rule.switches.length - 1] : undefined;
+    const perProvider = Boolean(own) && own !== declaration.disablePath;
+    const optional = declaration.gates === false || Boolean(generated[name]) || perProvider;
+
+    return {
+      name,
+      ...(declaration.prompted && !generated[name] ? { prompted: true } : {}),
+      ...(optional ? { gates: false } : {}),
+      ...(perProvider ? { disablePath: own } : {}),
+    };
+  });
+}
+
+/**
+ * Join each input to its env-schema entry: the ONE place the manager's
+ * half of an input meets the human half, so the preflight walkthrough, the
+ * interactive gate and the non-interactive skip say the same label, open the
+ * same page and print the same hint. An unknown name is a programmer error;
+ * preflight alone passes `strict: false` (absorb, never crash).
  * @param {string} service - Service name (for the error).
- * @param {object[]} inputs - REQUIRES env entries.
- * @param {object} [options]
- * @param {boolean} [options.strict] - false = an unknown key keeps whatever it
- *   carries instead of throwing (default true).
+ * @param {object[]} inputs - serviceInputs entries.
+ * @param {object} [options] - `{ strict }`: false keeps an unknown key as it is.
  * @returns {object[]} The same entries, each with label + optional url/hint.
  * @throws {Error} When an input names a key the env schema does not declare.
  */
@@ -1074,7 +888,7 @@ function describeServiceInputs(service, inputs, { strict = true } = {}) {
     const schema = envSchemaEntry(entry.name);
     if (!schema) {
       if (strict) {
-        throw new Error(`REQUIRES.${service} declares ${entry.name}, which the env schema does not: add it to @omega.js/config's env-schema.js (it owns what a key is and where it is minted)`);
+        throw new Error(`REQUIRES.${service} asks for ${entry.name}, which the env schema does not declare: add it to @omega.js/config's env-schema.js (it owns what a key is and where it is minted)`);
       }
 
       return { ...entry, label: entry.label || entry.name };
@@ -1090,32 +904,33 @@ function describeServiceInputs(service, inputs, { strict = true } = {}) {
 }
 
 /**
- * Build the setup-contract spec for a service (#608) — what
- * lib/service-input.js asks for. The registry is the SSOT; this is its
- * accessor, so no call site re-spells an env name, a mint URL, or an opt-out
- * path.
+ * Build the setup-contract spec for a service: what
+ * lib/service-input.js asks for. No call site re-spells an env name, a mint
+ * URL, or an opt-out path.
  *
  * @param {string} service - Service name (a REQUIRES key).
- * @param {object} [options]
- * @param {string[]} [options.names] - Narrow to these input names (a
- *   per-provider ask: just the Stripe key, just the Meta token).
- * @param {string} [options.label] - Override the gate's human name (the
- *   PROVIDER's name, when the ask is per-provider).
- * @param {string} [options.disablePath] - Override where Disable lands `false`
- *   (defaults to the narrowed entry's own path, then the service's).
- * @param {string[]} [options.instructions] - Guidance lines shown before the gate.
- * @param {boolean} [options.gate] - false = the caller already ran the gate.
- * @returns {object} The spec requestServiceInput takes.
+ * @param {object} [options] - `names` narrows to those inputs (a per-provider
+ *   ask), `label` and `disablePath` override the gate's (the narrowed input's
+ *   own switch wins over the service's), `instructions` are shown before the
+ *   gate, and `gate: false` says the caller already ran it.
+ * @returns {object} The spec requestServiceInput takes; `narrowed` says the
+ *   caller named its inputs, so each is a key it is about to use.
  */
 function serviceInputSpec(service, options = {}) {
   const declaration = REQUIRES[service];
   if (!declaration) {
-    throw new Error(`No REQUIRES entry for service "${service}" — declare its inputs in src/config.js`);
+    throw new Error(`No REQUIRES entry for service "${service}": declare its gate in src/config.js`);
   }
 
+  // Any service may name a key OMEGA mints (the webhook key): minting it before
+  // the service uses it asks nobody
+  const generated = Object.keys(generatedEnvKeys())
+    .filter((name) => options.names && options.names.includes(name))
+    .map((name) => ({ name, gates: false }));
+  const all = [...serviceInputs(service, declaration), ...generated];
   const inputs = describeServiceInputs(service, options.names
-    ? declaration.env.filter((entry) => options.names.includes(entry.name))
-    : declaration.env);
+    ? all.filter((entry) => options.names.includes(entry.name))
+    : all);
 
   // A single narrowed input carrying its own opt-out path owns the gate: the
   // ask is about THAT provider, so Disable must not switch off the service.
@@ -1127,6 +942,7 @@ function serviceInputSpec(service, options = {}) {
     disablePath: options.disablePath || ownPath || declaration.disablePath,
     instructions: options.instructions,
     ...(options.gate === false ? { gate: false } : {}),
+    ...(options.names ? { narrowed: true } : {}),
     inputs,
   };
 }
@@ -1174,6 +990,7 @@ module.exports = {
   BOOT_SERVICES,
   OPERATIONS,
   REQUIRES,
+  serviceInputs,
   describeServiceInputs,
   serviceInputSpec,
   templateObject,

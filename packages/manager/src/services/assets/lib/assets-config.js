@@ -12,6 +12,8 @@
  * - combomark: Icon + text combined
  */
 
+const { LOGO_SOURCES_DIR, BRANDMARK_SOURCE } = require('@omega.js/config');
+
 const BRANDMARK_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024, 2048];
 const WIDE_LOGO_SIZES = [128, 256, 512, 1024, 2048];
 
@@ -22,19 +24,19 @@ const WIDE_LOGO_SIZES = [128, 256, 512, 1024, 2048];
  */
 const PROCESSING_RULES = {
   brandmark: {
-    source: 'assets/logo/brandmark.svg',
+    source: BRANDMARK_SOURCE,
     outputDir: 'logo/brandmark',
     square: true,
     sizes: BRANDMARK_SIZES,
   },
   wordmark: {
-    source: 'assets/logo/wordmark.svg',
+    source: `${LOGO_SOURCES_DIR}/wordmark.svg`,
     outputDir: 'logo/wordmark',
     square: false,
     sizes: WIDE_LOGO_SIZES,
   },
   combomark: {
-    source: 'assets/logo/combomark.svg',
+    source: `${LOGO_SOURCES_DIR}/combomark.svg`,
     outputDir: 'logo/combomark',
     square: false,
     sizes: WIDE_LOGO_SIZES,

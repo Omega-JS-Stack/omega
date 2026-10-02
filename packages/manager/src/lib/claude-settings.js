@@ -1,128 +1,217 @@
 /**
- * Brand Claude settings ([#62](https://github.com/Omega-JS-Stack/omega/issues/62)):
- * a brand's committed `.claude/settings.json` registers the omega marketplace
- * that the INSTALLED `@omega.js/manager` package carries (the plugin is
- * vendored into it at prepare time) and enables the plugin, so every session
- * in that brand — anyone's, on any machine — loads the omega skills and hooks.
- *
- * Gated on a PUBLISHED install: the manager package must carry the vendored
- * `.claude-plugin/marketplace.json` AND be a real installed directory. In the
- * local era the brand's `@omega.js/manager` is a SYMLINK into the monorepo —
- * whose packages/manager carries that same generated marketplace — so the
- * link itself is the signal, and this is a silent no-op —
- * the developer's own user-scope install serves those sessions, and the brand
- * file must never point at a machine-specific monorepo path.
- *
- * Non-clobbering: only the two omega keys are ever written; every other
- * setting in the file is preserved, and an already-correct file is not
- * rewritten.
+ * Brand Claude settings: which copy of the omega plugin a brand session loads.
+ * `omega` is the published copy, from GitHub with a sparse checkout; the
+ * committed `.claude/settings.json` turns it on and the local copy off.
+ * `omega-local` is a linked monorepo's copy, read in place; while the brand is
+ * linked to a checkout, the private `.claude/settings.local.json` turns it on and
+ * the published copy off, and those keys leave again when the brand goes live.
+ * Every file that turns one copy on turns the other off, since both on loads
+ * either copy from run to run. Only the omega keys are written, a correct
+ * file is not rewritten, and a file that does not parse is never overwritten.
  */
-const fs = require('node:fs');
 const { join } = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const jetpack = require('fs-jetpack');
+const { resolveLinkedMonorepo } = require('@omega.js/devkit/local');
 
-const SETTINGS_FILE = join('.claude', 'settings.json');
+// Posix spellings: the .gitignore line reads LOCAL_SETTINGS_FILE as is.
+const SETTINGS_FILE = '.claude/settings.json';
+const LOCAL_SETTINGS_FILE = '.claude/settings.local.json';
 const MARKETPLACE_KEY = 'extraKnownMarketplaces';
 const PLUGIN_KEY = 'enabledPlugins';
 const MARKETPLACE_NAME = 'omega';
-const PLUGIN_ID = 'omega@omega';
-// Brand-root-relative on purpose: portable to every machine and every clone.
-const MANAGER_PATH = './node_modules/@omega.js/manager';
-const MANAGER_DIR = join('node_modules', '@omega.js', 'manager');
-const VENDORED_MARKETPLACE = join(MANAGER_DIR, '.claude-plugin', 'marketplace.json');
+const LOCAL_MARKETPLACE_NAME = 'omega-local';
+const PLUGIN_ID = `omega@${MARKETPLACE_NAME}`;
+const LOCAL_PLUGIN_ID = `omega@${LOCAL_MARKETPLACE_NAME}`;
+const PLUGIN_REPO = 'Omega-JS-Stack/omega';
+// The published manifest and the plugin folder: all a machine needs to fetch.
+const SPARSE_PATHS = ['.claude-plugin', 'agent-plugins/claude'];
+const LOCAL_MANIFEST = join('.claude-plugin', 'marketplace.local.json');
 
 /**
- * The marketplace entry a brand's settings must carry.
+ * The marketplace entry a brand's committed settings carry: the published copy.
  *
  * @returns {object} - The `extraKnownMarketplaces.omega` value
  */
 function marketplaceEntry() {
-  return { source: { source: 'directory', path: MANAGER_PATH } };
+  return {
+    source: { source: 'github', repo: PLUGIN_REPO, sparsePaths: [...SPARSE_PATHS] },
+    autoUpdate: true,
+  };
 }
 
 /**
- * Does this brand have a PUBLISHED manager install (one carrying the vendored
- * plugin marketplace)?
+ * The marketplace entry that names the local copy of one monorepo checkout.
  *
- * A LOCALLY LINKED manager never counts, whatever it carries: the monorepo's
- * own packages/manager grows the vendored marketplace on every prepare/pack,
- * and `omega i local` symlinks the brand at it — so the file resolves through
- * the link and the marketplace check alone would write settings pointing at
- * one developer's machine. The symlink IS the local era.
- *
- * @param {string} brandRoot - Absolute brand monorepo root
- * @returns {boolean}
+ * @param {string} monorepoRoot - Absolute monorepo root
+ * @returns {object} - The `extraKnownMarketplaces['omega-local']` value
  */
-function hasVendoredPlugin(brandRoot) {
-  let stats;
-  try {
-    stats = fs.lstatSync(join(brandRoot, MANAGER_DIR));
-  } catch {
-    return false; // nothing installed yet
-  }
-  if (stats.isSymbolicLink()) {
-    return false;
-  }
-
-  return jetpack.exists(join(brandRoot, VENDORED_MARKETPLACE)) === 'file';
+function localMarketplaceEntry(monorepoRoot) {
+  return { source: { source: 'file', path: join(monorepoRoot, LOCAL_MANIFEST) } };
 }
 
 /**
- * Ensure the brand's `.claude/settings.json` registers and enables the omega
- * plugin from its installed manager package.
+ * Read a JSON settings file.
  *
- * @param {string} brandRoot - Absolute brand monorepo root
- * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
- * @returns {'skipped'|'present'|'created'|'healed'|'invalid'} - What happened
+ * @param {string} file - Absolute path
+ * @returns {{ exists: boolean, settings: object|null }} - settings is null when the text is not JSON
  */
-function ensureClaudeSettings(brandRoot, { dryRun = false } = {}) {
-  if (!hasVendoredPlugin(brandRoot)) {
-    return 'skipped';
-  }
-
-  const file = join(brandRoot, SETTINGS_FILE);
+function readSettings(file) {
   const raw = jetpack.read(file);
+  if (raw === undefined) {
+    return { exists: false, settings: {} };
+  }
+  try {
+    return { exists: true, settings: JSON.parse(raw) };
+  } catch {
+    // A consumer's own malformed file: an expected external condition, and
+    // never ours to overwrite. The caller reports it.
+    return { exists: true, settings: null };
+  }
+}
 
-  let settings = {};
-  if (raw !== undefined) {
-    try {
-      settings = JSON.parse(raw);
-    } catch (error) {
-      // A consumer's own malformed file — expected external condition, and
-      // never ours to overwrite. The caller warns.
-      return 'invalid';
+function writeSettings(file, settings) {
+  jetpack.write(file, `${JSON.stringify(settings, null, 2)}\n`);
+}
+
+/**
+ * The settings with one copy declared and on, and the other copy off.
+ *
+ * @param {object} settings - The parsed file
+ * @param {{ name: string, entry: object, on: string, off: string }} copy
+ * @returns {object} - A new object; every other key kept
+ */
+function withCopy(settings, { name, entry, on, off }) {
+  return {
+    ...settings,
+    [MARKETPLACE_KEY]: { ...(settings[MARKETPLACE_KEY] || {}), [name]: entry },
+    [PLUGIN_KEY]: { ...(settings[PLUGIN_KEY] || {}), [on]: true, [off]: false },
+  };
+}
+
+/**
+ * The published copy on, the local copy off.
+ *
+ * @param {object} settings - The parsed file
+ * @returns {object}
+ */
+function withPublished(settings) {
+  return withCopy(settings, { name: MARKETPLACE_NAME, entry: marketplaceEntry(), on: PLUGIN_ID, off: LOCAL_PLUGIN_ID });
+}
+
+/**
+ * The local copy of one checkout on, the published copy off.
+ *
+ * @param {object} settings - The parsed file
+ * @param {string} monorepoRoot - Absolute monorepo root
+ * @returns {object}
+ */
+function withLocal(settings, monorepoRoot) {
+  return withCopy(settings, { name: LOCAL_MARKETPLACE_NAME, entry: localMarketplaceEntry(monorepoRoot), on: LOCAL_PLUGIN_ID, off: PLUGIN_ID });
+}
+
+/**
+ * The settings with the local keys taken out, and each object they leave
+ * empty dropped.
+ *
+ * @param {object} settings - The parsed file
+ * @returns {object}
+ */
+function withoutLocal(settings) {
+  const marketplaces = { ...(settings[MARKETPLACE_KEY] || {}) };
+  const plugins = { ...(settings[PLUGIN_KEY] || {}) };
+  delete marketplaces[LOCAL_MARKETPLACE_NAME];
+  delete plugins[LOCAL_PLUGIN_ID];
+  delete plugins[PLUGIN_ID];
+
+  const next = { ...settings, [MARKETPLACE_KEY]: marketplaces, [PLUGIN_KEY]: plugins };
+  for (const key of [MARKETPLACE_KEY, PLUGIN_KEY]) {
+    if (Object.keys(next[key]).length === 0) {
+      delete next[key];
     }
   }
+  return next;
+}
 
-  const marketplaces = settings[MARKETPLACE_KEY] || {};
-  const plugins = settings[PLUGIN_KEY] || {};
-  if (isDeepStrictEqual(marketplaces[MARKETPLACE_NAME], marketplaceEntry()) && plugins[PLUGIN_ID] === true) {
+/**
+ * The committed file names the published copy.
+ *
+ * @returns {'created'|'healed'|'present'|'invalid'}
+ */
+function ensureCommitted(brandRoot, dryRun) {
+  const file = join(brandRoot, SETTINGS_FILE);
+  const { exists, settings } = readSettings(file);
+  if (settings === null) {
+    return 'invalid';
+  }
+
+  const next = withPublished(settings);
+  if (exists && isDeepStrictEqual(next, settings)) {
     return 'present';
   }
-
-  const updated = {
-    ...settings,
-    [MARKETPLACE_KEY]: { ...marketplaces, [MARKETPLACE_NAME]: marketplaceEntry() },
-    [PLUGIN_KEY]: { ...plugins, [PLUGIN_ID]: true },
-  };
   if (!dryRun) {
-    jetpack.write(file, `${JSON.stringify(updated, null, 2)}\n`);
+    writeSettings(file, next);
+  }
+  return exists ? 'healed' : 'created';
+}
+
+/**
+ * The private file names the local copy while the brand is linked, and
+ * carries no omega key once it is not. A file left empty is removed.
+ *
+ * @returns {'written'|'removed'|'present'|'absent'|'invalid'}
+ */
+function ensureLocal(brandRoot, dryRun) {
+  const file = join(brandRoot, LOCAL_SETTINGS_FILE);
+  const { exists, settings } = readSettings(file);
+  if (settings === null) {
+    return 'invalid';
   }
 
-  return raw === undefined ? 'created' : 'healed';
+  const monorepoRoot = resolveLinkedMonorepo(brandRoot);
+  const next = monorepoRoot ? withLocal(settings, monorepoRoot) : withoutLocal(settings);
+  if (isDeepStrictEqual(next, settings)) {
+    return monorepoRoot ? 'present' : 'absent';
+  }
+  if (!dryRun) {
+    if (Object.keys(next).length === 0) {
+      jetpack.remove(file);
+    } else {
+      writeSettings(file, next);
+    }
+  }
+  return monorepoRoot ? 'written' : 'removed';
+}
+
+/**
+ * Ensure both brand settings files name the right copy of the omega plugin.
+ *
+ * @param {string} brandRoot - Absolute brand monorepo root
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdicts, nothing written
+ * @returns {{ committed: 'created'|'healed'|'present'|'invalid', local: 'written'|'removed'|'present'|'absent'|'invalid' }}
+ */
+function ensureClaudeSettings(brandRoot, { dryRun = false } = {}) {
+  return {
+    committed: ensureCommitted(brandRoot, dryRun),
+    local: ensureLocal(brandRoot, dryRun),
+  };
 }
 
 module.exports = {
   SETTINGS_FILE,
+  LOCAL_SETTINGS_FILE,
   MARKETPLACE_KEY,
   PLUGIN_KEY,
   MARKETPLACE_NAME,
+  LOCAL_MARKETPLACE_NAME,
   PLUGIN_ID,
-  MANAGER_PATH,
-  MANAGER_DIR,
-  VENDORED_MARKETPLACE,
+  LOCAL_PLUGIN_ID,
+  PLUGIN_REPO,
+  SPARSE_PATHS,
+  LOCAL_MANIFEST,
   marketplaceEntry,
-  hasVendoredPlugin,
+  readSettings,
+  writeSettings,
+  withLocal,
   ensureClaudeSettings,
 };

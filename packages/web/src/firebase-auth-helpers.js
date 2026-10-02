@@ -22,6 +22,7 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { isDemoProject } = require('@omega.js/config');
 
 // The two PAGE files land as .html and their extensionless names are never
 // emitted: GitHub Pages serves a literal extensionless FILE as
@@ -143,7 +144,7 @@ async function fetchFirebaseAuthHelpers(options) {
     logger.log('firebase-auth: no cloud.config.projectId — helper files skipped');
     return { skipped: 'no-project' };
   }
-  if (projectId.startsWith('demo-')) {
+  if (isDemoProject(projectId)) {
     logger.log(`firebase-auth: offline project ${projectId} — helper files skipped`);
     return { skipped: 'demo-project' };
   }

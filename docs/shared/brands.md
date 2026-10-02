@@ -51,8 +51,8 @@ Id `omega`, name "OMEGA", url omegajs.dev (LIVE: GitHub Pages + Cloudflare), cla
 Ian 2026-07-18: "still use local … until we are fully locked on all decisions that may result in breaking changes."
 
 - Every `@omega.js/*` dep in the real brand is a committed relative `file:` spec into THIS monorepo.
-- Versions re-reset to 0.1.0 (cp238, supersedes cp228 — Ian: 0.x until live publishes are proven; 1.0.0 is a later deliberate graduation), so the first publish flips them to `^0.1.0` seamlessly.
-- All seven publishables carry a mechanical `private: true` latch until the proving checkpoint unlatches them ([docs/shared/publishing.md](publishing.md) is the runbook).
+- Every package carries ONE family version, bumped by hand at each release; the seven publishables are on npm at that version, and 1.0.0 never publishes without Ian's explicit word ([publishing.md](publishing.md)).
+- The seven publishables carry no `private` latch and publish with `publishConfig.access: public`; the six private internals keep `private: true` forever ([docs/shared/publishing.md](publishing.md)).
 
 ## The line that never moves
 

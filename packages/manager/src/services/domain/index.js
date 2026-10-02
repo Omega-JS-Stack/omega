@@ -14,6 +14,7 @@
  * Missing credentials → the service skips with guidance.
  */
 const chalk = require('chalk').default;
+const { serviceAskedKeys, envSchemaEntry } = require('@omega.js/config');
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
@@ -40,22 +41,23 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    // The zone lookup needs Cloudflare even for manual registrars — the
-    // required nameserver values come from the zone
-    // The input descriptors live in the REQUIRES registry (one home): the
-    // Cloudflare token is unconditional, the namecheap credentials are
-    // registrar-specific (their entry-level `when` drops them for the rest)
-    if (!context.cloudflareApi) {
-      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: ['CLOUDFLARE_TOKEN'] }));
+    // What this brand's domain service owes (the env schema's askedWhen) splits
+    // by owner: the edge's Cloudflare token, which the zone lookup needs even
+    // for a manual registrar, and the chosen registrar's own credentials
+    const owed = [...serviceAskedKeys(context.brandConfig, 'domain')];
+    const registrarKeys = owed.filter((key) => envSchemaEntry(key).owner === 'domain');
+    const zoneKeys = owed.filter((key) => !registrarKeys.includes(key));
+
+    if (zoneKeys.length > 0 && !context.cloudflareApi) {
+      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: zoneKeys }));
+      if (gate) return gate;
+    }
+    if (registrarKeys.length > 0 && !context.registrarApi) {
+      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: registrarKeys }));
       if (gate) return gate;
     }
 
-    // provider is user config: a registrar outside the registry is manual
-    const { api: RegistrarAPI = null, envKeys = [] } = DOMAIN_PROVIDERS.registrar[provider] || {};
-    if (envKeys.length > 0 && !context.registrarApi) {
-      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: envKeys }));
-      if (gate) return gate;
-    }
+    const { api: RegistrarAPI = null } = DOMAIN_PROVIDERS.registrar[provider] || {};
 
     console.log(`    Provider: ${chalk.cyan(provider)}${RegistrarAPI ? '' : chalk.dim(' (manual)')}`);
 

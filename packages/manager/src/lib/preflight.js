@@ -1,39 +1,22 @@
 /**
- * Preflight — the REQUIRES registry check run before any service. Collects
- * the enabled services' declared REQUIRED inputs (env var names + Google OAuth
- * scopes, src/config.js REQUIRES; an entry marked `gates: false` is optional
- * and belongs to the mid-run ask, not here), checks what IS knowable up front —
- * process.env presence (names only, values never printed) and the token
- * store's granted-scopes record — and prints ONE consolidated fix
- * walkthrough (cp236's 403-diagnostics tone: what's missing, which service,
- * why, the exact fix, then the rerun verb) instead of N mid-run skips.
- *
- * Verdicts per failing service (Ian's ruling — absorb, never crash):
- *   run   - interactive and the run itself collects the fix (the cp114
- *           setup-contract paste flow / the Google consent flow) — the
- *           service proceeds and asks.
- *   skip  - the fix needs the operator (non-interactive, or an env var no
- *           flow collects) — the service skips with the walkthrough printed
- *           and the cycle continues; the skip carries the machine-readable
- *           missingEnv list the run summary's 🔑 section aggregates.
- *   error - --strict: every preflight failure fails hard instead.
- *
- * The scope leg's boundary: the token store records what the last consent
- * GRANTED — that is what's knowable before a call. The live grant is only
- * proven at call time; the google-auth 403 diagnostics are the backstop.
- *
- * The file's OTHER gate is assertFamilyVersions (#794), the lockstep check:
- * same place in the run (before any service, from `runManage` and `omega dev`
- * alike) and the opposite verdict — a mixed @omega.js family is REFUSED, not
- * absorbed, because every service below it would reconcile on top of two
- * copies of the runtime.
+ * Preflight, run before any service: the gating env keys @omega.js/config's
+ * missingEnvKeys says `manage` asks of each service (names only, never values)
+ * and the Google scopes its REQUIRES row lists against the token store's
+ * granted record, printed as ONE fix walkthrough instead of N mid-run skips.
+ * Verdicts per failing service (absorb, never crash): `run` when interactive
+ * and the run collects the fix itself, `skip` when it needs the operator (the
+ * skip carries the missingEnv list the 🔑 summary aggregates), `error` under
+ * --strict. The file's OTHER gate is assertFamilyVersions: a mixed
+ * @omega.js family is REFUSED, because every service below it would reconcile
+ * on top of two copies of the runtime.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk').default;
 const { resolvePackageDir } = require('@omega.js/devkit/local');
 
-const { REQUIRES, TARGET_FRAMEWORKS, describeServiceInputs } = require('../config.js');
+const { serviceAskedKeys } = require('@omega.js/config');
+const { REQUIRES, TARGET_FRAMEWORKS, serviceInputs, describeServiceInputs } = require('../config.js');
 const { canPrompt } = require('./run-gates.js');
 const { googleTokenStorePath } = require('./google-auth.js');
 
@@ -80,28 +63,27 @@ function readTokenStore(brandRoot) {
  * Check one service's declaration against the environment + token store.
  *
  * @param {string} serviceName - Service being checked
- * @param {object} declaration - REQUIRES entry ({ why, when?, env, scopes })
- * @param {object} brandConfig - Merged brand config (gates the when clauses)
+ * @param {object} declaration - REQUIRES row ({ why, scopes, prompted?, gates? })
+ * @param {object} brandConfig - Merged brand config
  * @param {object} tokenStore - readTokenStore() result
  * @returns {object|null} Finding ({ service, why, missingEnv, missingScopes,
  *   noConsent }) or null when the service's requirements are met (or don't
  *   apply to this brand)
  */
 function checkService(serviceName, declaration, brandConfig, tokenStore) {
-  if (declaration.when && !declaration.when(brandConfig)) {
+  // `gates: false` inputs are OPTIONAL: the service runs without them, so their
+  // absence is not a preflight finding; the operation asks for one in place.
+  // describeServiceInputs joins each to its env-schema entry, so the walk
+  // prints the label, mint page and hint the interactive gate would show.
+  const owed = serviceAskedKeys(brandConfig, serviceName);
+  const envEntries = describeServiceInputs(serviceName, serviceInputs(serviceName, declaration), { strict: false })
+    .filter((entry) => entry.gates !== false && owed.has(entry.name));
+
+  // No gating key owed = the service does not apply to this brand
+  if (envEntries.length === 0) {
     return null;
   }
 
-  // `gates: false` entries are OPTIONAL inputs (#608): the service runs
-  // without them, so their absence is not a preflight finding — the operation
-  // that needs one asks for it in place, through the shared setup contract.
-  //
-  // The inputs go through describeServiceInputs, the ONE place a registry entry
-  // is joined to its env-schema entry (#867), so this walkthrough prints the
-  // same label, mint page and hint the interactive gate would show.
-  const envEntries = describeServiceInputs(serviceName, declaration.env, { strict: false })
-    .filter((entry) => entry.gates !== false)
-    .filter((entry) => !entry.when || entry.when(brandConfig));
   const missingEnv = envEntries.filter((entry) => !process.env[entry.name]);
 
   const requiredScopes = declaration.scopes || [];

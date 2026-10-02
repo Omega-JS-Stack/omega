@@ -1,36 +1,21 @@
 /**
- * The standing wizard-journey e2e — the full consumer story, outside the
- * monorepo, as one repeatable lane (cp195; the scripted form of cp194's
- * hand rehearsal):
+ * The standing wizard-journey e2e: the whole consumer story OUTSIDE the monorepo.
+ * Birth clones the brand template and runs the REAL onboard (flags mode) in it;
+ * link is one `omega i local` at the brand root; boot is `omega dev` plus a
+ * homepage probe; manage runs headless, judged by its run file. Spec-driven,
+ * heavy by design: unmet preconditions (network, java) SKIP unless { strict }.
+ * Install legs keep the machine env; runtime legs run credential-scrubbed.
  *
- *   birth   → the REAL onboard wizard (flags mode) in a temp dir OUTSIDE
- *             the monorepo — where hoist-luck can't save anything
- *   link    → `omega i local` at the brand root (tree-wide file: flip +
- *             ONE brand-root install; also links @omega.js/manager at the
- *             brand root so brand-level verbs exist at all)
- *   boot    → `omega dev` at the brand root (web + backend emulator, N7
- *             ports), probe the rendered homepage over the announced URL
- *   manage  → headless creds-scrubbed manage; scorecard from the run file
- *             (.omega/runs/*.json): update must succeed, no service may
- *             error except the allowed set (testing probes the live URL of
- *             a never-deployed brand — designed to fail pre-first-deploy)
- *
- * Spec-driven ({ id, url, targets, expect }) so a corpus of brand shapes
- * can reuse it. Heavy by design — real registry installs, real builds —
- * so preconditions (network, java) SKIP the run cleanly when unmet unless
- * { strict }. Install-machinery legs (onboard/link) inherit the
- * machine env; runtime legs (dev boot, manage) run with credential-shaped
- * vars scrubbed — the journey must never reach a real cloud.
- *
- * Layering: this module spawns framework/manager BINS by path and never
- * requires @omega.js/manager (the manager depends on devkit, not the
- * reverse).
+ * Layering: bins are spawned by path and @omega.js/manager is never required
+ * (the manager depends on devkit), save the manager's template marker source and
+ * template fixture, read by path at run time to judge the clone.
  */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
+const { isDeepStrictEqual } = require('node:util');
 const { spawn, spawnSync } = require('node:child_process');
 const { afterExit } = require('./boot-child.js');
 const { createStepsLog } = require('./steps-log.js');
@@ -40,6 +25,7 @@ const { resolvePackageRealDir } = require('../local.js');
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real target builds dominate; a warm rerun finishes far inside them.
 const TIMEOUTS = {
+  clone: 120000,
   onboard: 120000,
   link: 1800000,
   bootReady: 420000,
@@ -80,25 +66,34 @@ function scrubCredentialEnv(env) {
   return scrubbed;
 }
 
-/**
- * Journey preconditions — the run needs the npm registry (framework dep
- * trees install for real) and java (the Firestore/Database emulators).
- *
- * @returns {Promise<{ ok: boolean, missing: string[] }>}
- */
-async function checkPreconditions() {
-  const missing = [];
-
-  const online = await new Promise((resolve) => {
-    const request = https.get('https://registry.npmjs.org/-/ping', { timeout: 8000 }, (response) => {
+/** Whether an https URL answers at all (any status), within 8s. */
+function reachable(url) {
+  return new Promise((resolve) => {
+    const request = https.get(url, { timeout: 8000 }, (response) => {
       response.resume();
       resolve(response.statusCode > 0);
     });
     request.on('timeout', () => { request.destroy(); resolve(false); });
     request.on('error', () => resolve(false));
   });
-  if (!online) {
+}
+
+/**
+ * Journey preconditions: the npm registry (framework dep trees install for
+ * real), the brand template's host (the brand is born from a clone) and
+ * java (the Firestore/Database emulators).
+ *
+ * @param {string} templateUrl - The brand template repo the birth step clones
+ * @returns {Promise<{ ok: boolean, missing: string[] }>}
+ */
+async function checkPreconditions(templateUrl) {
+  const missing = [];
+
+  if (!await reachable('https://registry.npmjs.org/-/ping')) {
     missing.push('npm registry unreachable (network)');
+  }
+  if (!await reachable(templateUrl)) {
+    missing.push(`brand template unreachable (network): ${templateUrl}`);
   }
 
   const java = spawnSync('java', ['-version'], { stdio: 'ignore' });
@@ -300,7 +295,12 @@ class JourneyRun {
 
   childEnv(extra, { scrub = false } = {}) {
     const base = scrub ? scrubCredentialEnv(process.env) : { ...process.env };
-    return { ...base, OMEGA_MONOREPO: this.monorepoRoot, ...extra };
+    // A throwaway Claude Code config: the plugin steps of onboard, `i local`
+    // and manage never reach the developer's own.
+    // The runtime legs also get an empty gh config: gh signed out, never the machine's login.
+    const claudeConfig = path.join(this.tempRoot, 'claude');
+    const ghConfig = scrub ? { GH_CONFIG_DIR: path.join(this.tempRoot, 'gh') } : {};
+    return { ...base, OMEGA_MONOREPO: this.monorepoRoot, CLAUDE_CONFIG_DIR: claudeConfig, ...ghConfig, ...extra };
   }
 }
 
@@ -352,7 +352,7 @@ function emulatorOrphans() {
  *
  * @param {Object} options
  * @param {string} options.monorepoRoot - The omega monorepo (framework source)
- * @param {Object} options.spec - { id, url, targets: string[], expect: { brandName, themeId } }
+ * @param {Object} options.spec - { id, origin, url, targets: string[], expect: { brandName, themeId } }; origin is the clone's own repo URL
  * @param {string} options.logDir - Where stage logs land (created; survives the run)
  * @param {boolean} [options.keep] - Keep the temp brand even on success
  * @param {boolean} [options.strict] - Unmet preconditions fail instead of skip
@@ -367,8 +367,14 @@ async function runJourney(options) {
   run.log(`\nWizard journey — brand ${spec.id} (${spec.targets.join(', ')}) OUTSIDE the monorepo`);
   run.log(`  logs: ${run.logDir}\n`);
 
+  // The manager's own template answers, read by path (the layering note's exception)
+  const managerDir = path.join(run.monorepoRoot, 'packages', 'manager');
+  const { TEMPLATE_URL, carriesTemplateMarker } = require(path.join(managerDir, 'src', 'lib', 'template-marker.js'));
+  const { TEMPLATE_PACKAGE } = require(path.join(managerDir, 'test', 'lib', 'brand-template.js'));
+  const TEMPLATE_FILES = ['package.json', 'README.md'];
+
   // Preconditions — skip cleanly (not red) when the machine can't run this
-  const preconditions = await checkPreconditions();
+  const preconditions = await checkPreconditions(TEMPLATE_URL);
   if (!preconditions.ok) {
     const reason = `preconditions unmet: ${preconditions.missing.join('; ')}`;
     if (!options.strict) {
@@ -382,24 +388,52 @@ async function runJourney(options) {
 
   let failed = false;
   try {
-    // ── Birth — the real wizard, flags mode, in-place ─────────────────────
-    await run.step(`onboard scaffolds ${spec.id}`, async () => {
+    // ── Birth: a real clone of the brand template, then the real wizard ───
+    await run.step('the brand template clones as a "Use this template" copy', async () => {
+      if (!spec.origin) {
+        throw new Error('spec.origin is required: the repo a "Use this template" copy has as its origin');
+      }
       run.tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'omega-journey-'));
       run.brandRoot = path.join(run.tempRoot, spec.id);
-      fs.mkdirSync(run.brandRoot);
 
-      // cli-run.js self-executes when spawned as main (the omega-manager bin
-      // was retired; #148).
-      const managerBin = path.join(run.monorepoRoot, 'packages', 'manager', 'dist', 'cli-run.js');
+      await run.runToExit('clone', 'git', ['clone', '--depth', '1', TEMPLATE_URL, run.brandRoot],
+        { cwd: run.tempRoot, env: run.childEnv(), timeout: TIMEOUTS.clone });
+      // A user's copy has their own repo as origin; it is never fetched
+      await run.runToExit('origin', 'git', ['remote', 'set-url', 'origin', spec.origin],
+        { cwd: run.brandRoot, env: run.childEnv(), timeout: TIMEOUTS.clone });
+
+      const pkg = JSON.parse(fs.readFileSync(path.join(run.brandRoot, 'package.json'), 'utf8'));
+      if (!isDeepStrictEqual(pkg, TEMPLATE_PACKAGE)) {
+        throw new Error(`the template's package.json drifted from TEMPLATE_PACKAGE (packages/manager/test/lib/brand-template.js): ${JSON.stringify(pkg)}`);
+      }
+      const unmarked = TEMPLATE_FILES.filter((file) => !carriesTemplateMarker(path.join(run.brandRoot, file)));
+      if (unmarked.length > 0) {
+        throw new Error(`the clone's ${unmarked.join(' and ')} carry no template marker`);
+      }
+      return `${TEMPLATE_URL} → ${run.brandRoot}, origin ${spec.origin}`;
+    });
+
+    await run.step(`onboard replaces the template with ${spec.id}`, async () => {
+      // The local manager by path, never the template's `npm start`: its npm install
+      // fetches the published manager. --no-dev leaves install and boot to the legs below.
+      const managerBin = path.join(managerDir, 'dist', 'cli-run.js');
       await run.runToExit('onboard', process.execPath, [
         managerBin, 'onboard',
-        `--id=${spec.id}`, `--url=${spec.url}`, `--targets=${spec.targets.join(',')}`,
+        `--id=${spec.id}`, `--url=${spec.url}`, `--targets=${spec.targets.join(',')}`, '--no-dev',
       ], { cwd: run.brandRoot, env: run.childEnv(), timeout: TIMEOUTS.onboard });
 
       for (const file of ['config/omega.json5', 'package.json', '.env', '.gitignore']) {
         if (!fs.existsSync(path.join(run.brandRoot, file))) {
           throw new Error(`scaffold missing ${file}`);
         }
+      }
+      const marked = TEMPLATE_FILES.filter((file) => carriesTemplateMarker(path.join(run.brandRoot, file)));
+      if (marked.length > 0) {
+        throw new Error(`the first run left the template's ${marked.join(' and ')} in place`);
+      }
+      const pkg = JSON.parse(fs.readFileSync(path.join(run.brandRoot, 'package.json'), 'utf8'));
+      if (pkg.name !== spec.id || pkg.omega?.template !== undefined) {
+        throw new Error(`package.json is not the generated brand manifest (name ${pkg.name}, omega ${JSON.stringify(pkg.omega)})`);
       }
       return run.brandRoot;
     });

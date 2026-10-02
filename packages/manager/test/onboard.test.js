@@ -12,6 +12,8 @@ const os = require('node:os');
 const path = require('node:path');
 const JSON5 = require('json5');
 
+// Before the source loads: no real npm install, dev stack or GitHub call
+const { driveWizard, emptyGitConfig } = require('./lib/onboard-seams.js');
 const { recordBrand } = require('@omega.js/config');
 
 // The machine registry is per-machine state: this file's fixtures write into a
@@ -22,9 +24,19 @@ require('@omega.js/devkit/test/temp-home');
 const { runOnboard, deriveId, deriveName, deriveUrl } = require('../src/onboard.js');
 const { runManage } = require('../src/manage.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
+const { createMachine } = require('./lib/fake-claude.js');
 
 // Every scaffolded @omega.js/* spec is this exact number (#794)
 const MANAGER_VERSION = require('../package.json').version;
+
+// Onboarding and manage reach for `claude`. File-wide that is a fake machine
+// that already has the plugin, so no wizard below meets the install offer and
+// nothing here touches the real ~/.claude; the offer's own tests swap in theirs.
+createMachine({
+  marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+  installed: { 'omega@omega': MANAGER_VERSION },
+  published: MANAGER_VERSION,
+}).activate();
 
 // Fixture brands must never reach a real external account via shell-exported
 // credentials — every service must skip in the manage pins and the handoff
@@ -278,17 +290,16 @@ test('non-interactive: everything derives from the directory name', async () => 
   assert.equal(config.brand.name, 'Sweet Saucy');
   assert.equal(config.brand.url, 'https://sweetsaucy.com');
   assert.equal(config.brand.contact.email, 'support@sweetsaucy.com');
-  // A contact PERSON is never invented (#770): no --contactName, no key —
-  // the manage walk's own gate (#694) is what catches the gap later
-  assert.ok(!('person' in config.brand.contact));
   // Optional fields stay OUT of the config instead of landing as empty strings
   assert.ok(!('description' in config.brand));
   assert.ok(!('tagline' in config.brand));
-  // Target default: the classic web + backend pair
-  assert.deepEqual(Object.keys(config.targets), ['web', 'backend']);
+  // Target default: the website alone
+  assert.deepEqual(Object.keys(config.targets), ['web']);
 });
 
-test('non-interactive: underivable id is a clear error, bad flag values throw', async () => {
+test('non-interactive: underivable id is a clear error, bad flag values throw', async (t) => {
+  // No git user name anywhere, so nothing fills the contact person in
+  emptyGitConfig(t);
   const parent = tempDir();
   const root = path.join(parent, '№∆');
   fs.mkdirSync(root);
@@ -297,7 +308,7 @@ test('non-interactive: underivable id is a clear error, bad flag values throw', 
   await assert.rejects(() => runOnboard(root, { id: 'Bad_Id', manage: false }), /Invalid brand id/);
   await assert.rejects(() => runOnboard(root, { id: 'ok', url: 'ftp://x', manage: false }), /Invalid brand url/);
   await assert.rejects(() => runOnboard(root, { id: 'ok', targets: 'web,gopher', manage: false }), /Unknown target\(s\): gopher/);
-  // A contact flag with nobody to belong to fails loudly instead of vanishing (#770)
+  // A contact flag with nobody to belong to fails loudly instead of vanishing
   await assert.rejects(() => runOnboard(root, { id: 'ok', contactImage: 'https://x/y.jpg', manage: false }), /need a --contactName/);
   // A bare --contactName parses to boolean true; that is not a name
   await assert.rejects(() => runOnboard(root, { id: 'ok', contactName: true, manage: false }), /Invalid --contactName/);
@@ -324,7 +335,7 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     await tty.answer('Contact person (', 'Jane Doe, CEO\r');
     await tty.answer('Contact person headshot URL', '\r');    // empty → omitted
     await tty.answer('Contact person link URL', '\r');        // empty → omitted
-    await tty.answer('Targets (', '\r');                      // accept checked defaults: web + backend
+    await tty.answer('Targets (', '\r');                      // accept the checked default: web
     await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
     await tty.answer('Run manage now?', 'n\r');
 
@@ -343,7 +354,7 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     // The person signs the personal sends (#770); the skipped optionals stay
     // out of the config rather than landing as empty strings
     assert.deepEqual(config.brand.contact, { email: 'support@wizardbrand.com', person: { name: 'Jane Doe, CEO' } });
-    assert.deepEqual(Object.keys(config.targets), ['web', 'backend']);
+    assert.deepEqual(Object.keys(config.targets), ['web']);
     // Inherited account list stays unwritten — the source layer keeps owning it
     assert.ok(!('account' in config));
     // A blank company answer is the standalone brand: no key at all (#677)
@@ -567,8 +578,10 @@ test('company: the wizard asks ONE field, and the answer lands as the top-level 
   // The signing prefix comes from the COMPANY's domain, not the brand's
   assert.equal(config.certificates?.providers?.apple?.bundleIdPrefix, undefined, 'no signing target, no prefix written');
 
-  // Onboarding the same brand again converges and keeps the answer
-  const again = await runOnboard(root, { manage: false });
+  // Onboarding the same brand again converges and keeps the answer; Enter keeps the current targets
+  const rerun = runOnboard(root, { manage: false });
+  await tty.answer('Targets (', '\r');
+  const again = await rerun;
   assert.equal(again.mode, 'resume');
   assert.equal(again.created.length, 0);
   assert.deepEqual(readConfig(root).company, { id: 'fixture-co' });
@@ -636,4 +649,59 @@ test('manage handoff: --manage spawns the real CLI in the new brand', async () =
   assert.equal(runs.length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'runs', runs[0]), 'utf8'));
   assert.equal(run.brandId, 'handoff-brand');
+});
+
+// ─── The Claude plugin offer ─────────────────────────────────────────────────
+
+// `Claude` in an answer list is the install offer
+const OFFER_FLAGS = { name: 'Offer Brand', url: 'https://offerbrand.com', targets: 'web', manage: false };
+const WIZARD_ANSWERS = {
+  'Company brand id': '\r',
+  'Brand description': '\r',
+  'Brand tagline': '\r',
+  'Contact person (': 'Jane Doe\r',
+  'Contact person headshot URL': '\r',
+  'Contact person link URL': '\r',
+  'Keep this account list?': '\r',
+};
+
+test('case 16: in a terminal with claude and no plugin, onboarding offers the install, and yes installs it for the user', async (t) => {
+  const machine = createMachine({ published: MANAGER_VERSION });
+  t.after(machine.activate());
+  const tty = openTtyPrompt();
+  t.after(() => tty.close());
+
+  const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-yes', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'y\r' });
+
+  assert.equal(report.valid, true);
+  assert.ok(asked.includes('Claude'), 'the install was offered');
+  const { records, installed, settings } = machine.state();
+  assert.deepEqual([records.omega.source.source, records.omega.source.repo], ['github', 'Omega-JS-Stack/omega']);
+  assert.equal(installed['omega@omega'][0].scope, 'user');
+  assert.equal(settings.enabledPlugins['omega@omega'], true);
+});
+
+test('case 16: no to the offer changes nothing on the machine', async (t) => {
+  const machine = createMachine({ published: MANAGER_VERSION });
+  t.after(machine.activate());
+  const tty = openTtyPrompt();
+  t.after(() => tty.close());
+
+  const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-no', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'n\r' });
+
+  assert.equal(report.valid, true);
+  assert.ok(asked.includes('Claude'), 'the install was offered');
+  assert.deepEqual(machine.mutations(), []);
+  assert.deepEqual(machine.state(), { records: {}, settings: {}, installed: {} });
+});
+
+test('case 16: with no terminal, onboarding does not ask and installs nothing', async (t) => {
+  const machine = createMachine({ published: MANAGER_VERSION });
+  t.after(machine.activate());
+
+  const report = await runOnboard(tempDir(), { id: 'offer-headless', ...OFFER_FLAGS });
+
+  assert.equal(report.valid, true);
+  assert.deepEqual(machine.mutations(), []);
+  assert.deepEqual(machine.state().installed, {});
 });

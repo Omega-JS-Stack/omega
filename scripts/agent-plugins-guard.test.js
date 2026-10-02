@@ -209,6 +209,35 @@ test('guard: OMEGA_CONSUMER_OVERRIDE=1 skips class 2 and never class 1', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('case 15: a brand whose installed framework lacks the layout the guard reads is let through', () => {
+  // An older OMEGA: the packages are installed, but with none of the core/,
+  // themes/, templates/ or dist/omega/ trees the shadow lookup reads.
+  const dir = brand({
+    targets: {
+      web: { name: 'old-web', dependencies: { '@omega.js/web': '^0.1.0' } },
+      backend: { name: 'old-backend', dependencies: { '@omega.js/backend': '^0.1.0' } },
+    },
+  });
+  install(dir, 'web', { 'package.json': '{ "name": "@omega.js/web", "version": "0.1.0" }\n', 'src/index.js': '// an older shape\n' });
+  install(dir, 'backend', { 'package.json': '{ "name": "@omega.js/backend", "version": "0.1.0" }\n', 'src/index.js': '// an older shape\n' });
+
+  for (const rel of [
+    'targets/web/src/_includes/core/head.html',
+    'targets/web/src/_layouts/blueprint/index.html',
+    'targets/web/src/assets/css/base/_type.scss',
+    'targets/backend/firestore.framework.rules',
+    'targets/backend/src/routes/general/email/post.js',
+  ]) {
+    const result = guard(write(dir, rel, 'a hand-written file\n'));
+    assert.equal(result.status, 0, `${rel} was refused on a layout the guard cannot read: ${result.stderr}`);
+  }
+
+  // No install at all reads the same: nothing to mirror, nothing refused
+  fs.rmSync(path.join(dir, 'node_modules'), { recursive: true, force: true });
+  assert.equal(guard(path.join(dir, 'targets/web/src/_includes/core/head.html')).status, 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('guard: plain brand files and the brand\'s own rules source are free', () => {
   const dir = guardBrand();
   const free = [

@@ -20,7 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
-const { sourceRepo, targetUrl } = require('@omega.js/config');
+const { sourceRepo, targetUrl, hasLogoSources, BRANDMARK_PNG_DEST } = require('@omega.js/config');
 const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
 const { resolvePackageRealDir } = require('@omega.js/devkit/local');
 
@@ -31,6 +31,10 @@ const MAX_FILES_SHOWN = 10;
 // mounts its routes under /omega (packages/backend route prefix)
 const API_SUBDOMAIN = 'api';
 const API_HEALTH_PATH = '/omega/health';
+
+// The identity files a deployed site serves from the brand's minted set: the
+// root favicon browsers probe with no link tag, and the bridged raster brandmark.
+const BRAND_ASSET_PATHS = ['/favicon.ico', `/${BRANDMARK_PNG_DEST}`];
 
 const FETCH_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -296,6 +300,7 @@ function checkWorkingTree(recorder, ctx) {
  * url, else the name AS a subdomain of the brand host (#588), else the brand
  * url for a target named for its type. Deploy records key per name too, so a
  * never-deployed admin target nudges without failing a live web.
+ * @returns {Promise<boolean>} Whether the site answered live.
  */
 async function checkHomepage(recorder, entry, ctx) {
   const url = targetUrl(ctx.brandConfig, entry.name);
@@ -303,12 +308,12 @@ async function checkHomepage(recorder, entry, ctx) {
 
   if (!url) {
     recorder.warn(name, 'no brand.url configured — cannot check');
-    return;
+    return false;
   }
 
   if (ctx.dryRun) {
     recorder.would(`fetch ${url}`);
-    return;
+    return false;
   }
 
   // No deploy record → a live miss means "not deployed yet", not an outage
@@ -328,6 +333,38 @@ async function checkHomepage(recorder, entry, ctx) {
     recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${url})`);
   } else {
     recorder.fail(name, `${url} → ${error || response.status}`);
+  }
+
+  return live;
+}
+
+/**
+ * Brand-asset check: a deployed site whose brand has logo sources serves its
+ * minted identity, so a snapshot that left the set behind fails here naming the
+ * URL instead of shipping a site with no logo. Runs once the homepage is live;
+ * a dry run lists the probes.
+ */
+async function checkBrandAssets(recorder, entry, ctx) {
+  if (!hasLogoSources(ctx.brandRoot)) return;
+
+  const base = targetUrl(ctx.brandConfig, entry.name);
+  if (!base) return;
+
+  for (const assetPath of BRAND_ASSET_PATHS) {
+    const url = `${base.replace(/\/+$/, '')}${assetPath}`;
+    const name = `${entry.name}: ${assetPath}`;
+
+    if (ctx.dryRun) {
+      recorder.would(`fetch ${url}`);
+      continue;
+    }
+
+    const { response, duration, error } = await fetchWithRetry(ctx, url);
+    if (!error && response.status >= 200 && response.status < 400) {
+      recorder.pass(name, `${url} → ${response.status} (${duration}ms)`);
+    } else {
+      recorder.fail(name, `${url} → ${error || response.status}`);
+    }
   }
 }
 
@@ -454,6 +491,7 @@ module.exports = {
   checkFrameworkVersion,
   checkWorkingTree,
   checkHomepage,
+  checkBrandAssets,
   checkApiHealth,
   checkGitHubActions,
 };

@@ -1,6 +1,7 @@
 /**
- * agent-plugins tests: the marketplace at the repo root, the plugin manifest
- * it points at, the shape of every skill the plugin ships, and its MCP declaration.
+ * agent-plugins tests: the two marketplace manifests at the repo root (the
+ * published `omega` and the local `omega-local`, one plugin folder), the plugin
+ * manifest they point at, the shape of every skill the plugin ships, and its MCP declaration.
  * Each hook has its own agent-plugins-<hook>.test.js beside this one.
  * Run: node --test scripts/agent-plugins.test.js
  */
@@ -12,6 +13,7 @@ const path = require('path');
 const { ROOT, readJson } = require('./agent-plugins-fixtures');
 
 const MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.json');
+const LOCAL_MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.local.json');
 
 // The skill's own frontmatter block, read without a YAML parser: the contract
 // is two flat scalar keys, so a line scan is the whole job.
@@ -33,8 +35,16 @@ test('marketplace: parses, names its owner, and lists at least one plugin', () =
   assert.ok(Array.isArray(marketplace.plugins) && marketplace.plugins.length > 0);
 });
 
+test('marketplace: the local manifest names omega-local and lists the same plugin folder', () => {
+  const local = readJson(LOCAL_MARKETPLACE);
+  assert.equal(local.name, 'omega-local');
+  assert.ok(local.owner && local.owner.name, 'owner.name is required');
+  assert.deepEqual(local.plugins.map((entry) => [entry.name, entry.source]), [['omega', './agent-plugins/claude']]);
+  assert.deepEqual(readJson(MARKETPLACE).plugins.map((entry) => [entry.name, entry.source]), [['omega', './agent-plugins/claude']]);
+});
+
 test('marketplace: every source resolves to a directory holding a manifest', () => {
-  for (const entry of readJson(MARKETPLACE).plugins) {
+  for (const entry of [...readJson(MARKETPLACE).plugins, ...readJson(LOCAL_MARKETPLACE).plugins]) {
     assert.ok(entry.name, 'a plugin entry needs a name');
     assert.ok(entry.source.startsWith('./'), `${entry.name}: source must be repo-relative`);
 
@@ -51,22 +61,29 @@ test('marketplace: every source resolves to a directory holding a manifest', () 
   }
 });
 
-test('settings: the repo registers its own marketplace and enables the plugin every session', () => {
+test('settings: the monorepo turns on the local copy by its own name and turns the published one off', () => {
   const settings = readJson(path.join(ROOT, '.claude', 'settings.json'));
-  const marketplace = readJson(MARKETPLACE);
 
   assert.deepEqual(
-    settings.extraKnownMarketplaces[marketplace.name].source,
-    { source: 'directory', path: './' },
-    'the repo IS the marketplace directory — no cache copy, no absolute path'
+    settings.extraKnownMarketplaces['omega-local'].source,
+    { source: 'file', path: './.claude-plugin/marketplace.local.json' },
+    'the repo IS the local copy: its own manifest, by a relative path',
   );
+  assert.equal(settings.enabledPlugins['omega@omega-local'], true);
+  assert.equal(settings.enabledPlugins['omega@omega'], false, 'both on at once loads either copy');
+  assert.equal(settings.extraKnownMarketplaces.omega, undefined, 'the monorepo never declares the published name, or it would fight every live brand for its record');
+});
 
-  // A brand's committed settings say the same two things about its INSTALLED
-  // manager package ([#62]) — same plugin id, so the two can never drift.
-  const { PLUGIN_ID, MARKETPLACE_NAME } = require(path.join(ROOT, 'packages', 'manager', 'src', 'lib', 'claude-settings.js'));
-  assert.equal(MARKETPLACE_NAME, marketplace.name);
-  assert.equal(PLUGIN_ID, `${marketplace.plugins[0].name}@${marketplace.name}`);
-  assert.equal(settings.enabledPlugins[PLUGIN_ID], true);
+test('settings: the brand writer speaks the same names the manifests declare', () => {
+  const names = require(path.join(ROOT, 'packages', 'manager', 'src', 'lib', 'claude-settings.js'));
+  const published = readJson(MARKETPLACE);
+  const local = readJson(LOCAL_MARKETPLACE);
+
+  assert.equal(names.MARKETPLACE_NAME, published.name);
+  assert.equal(names.LOCAL_MARKETPLACE_NAME, local.name);
+  assert.equal(names.PLUGIN_ID, `${published.plugins[0].name}@${published.name}`);
+  assert.equal(names.LOCAL_PLUGIN_ID, `${local.plugins[0].name}@${local.name}`);
+  assert.ok(fs.existsSync(path.join(ROOT, names.LOCAL_MANIFEST)), `${names.LOCAL_MANIFEST} is a file in this repo`);
 });
 
 test('skills: each one is bare-named, matches its directory, and describes itself', () => {

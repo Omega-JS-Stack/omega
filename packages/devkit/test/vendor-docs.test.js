@@ -1,7 +1,7 @@
 // Unit tests for tools/vendor-docs.js, the prepare-time docs lane: the
 // monorepo's whole docs/ tree lands in @omega.js/manager (and nowhere else)
-// with its outbound links retargeted, beside the Claude plugin and a
-// package-root marketplace. syncDocs writes only what changed.
+// with its outbound links retargeted. The Claude plugin never ships in the
+// manager: it reaches a machine from GitHub. syncDocs writes only what changed.
 //
 // Fixtures build a miniature monorepo under packages/devkit/.temp/ (gitignored)
 // and vendor from it via the monorepoRoot seam, never the real docs tree.
@@ -68,7 +68,7 @@ test('vendor-docs: only the manager carries docs; any other package is a no-op',
   const { root, web } = makeFixture('vendor-docs-other');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  assert.deepEqual(vendorDocs({ cwd: web, monorepoRoot: root }), { docs: [], removed: [], plugin: false });
+  assert.deepEqual(vendorDocs({ cwd: web, monorepoRoot: root }), { docs: [], removed: [] });
   assert.equal(fs.existsSync(path.join(web, 'docs')), false);
 });
 
@@ -95,7 +95,7 @@ test('vendor-docs: links inside docs keep their shape, links out of it are retar
   assert.match(map, /\]\(shared\/config\.md\)/, 'a link inside docs is untouched');
   assert.match(map, /\]\(web\/index\.md#top\)/, 'its anchor too');
   assert.match(map, /\]\(\.\.\/\.\.\/account\/src\)/, 'a package source link reaches the sibling in the scope');
-  assert.match(map, /\]\(\.\.\/claude-plugin\/skills\/main\/SKILL\.md\)/, 'a plugin link reaches the copy inside the manager');
+  assert.match(map, /^Plugin: main skill$/m, 'the plugin does not ship, so a link into it keeps its words only');
   assert.match(map, /^Brand: sandbox$/m, 'a link with no shipped target keeps its words only');
   assert.match(map, /\]\(https:\/\/github\.com\/Omega-JS-Stack\/omega\)/, 'a web link is untouched');
   assert.match(map, /\]\(#below\)/, 'a same-page anchor is untouched');
@@ -147,19 +147,15 @@ test('syncDocs: a missing docs source fails loudly', (t) => {
   assert.throws(() => vendorDocs({ cwd: manager, monorepoRoot: root }), /Missing docs source/);
 });
 
-test('vendor-docs: the manager also carries the plugin and a package-root marketplace', (t) => {
+test('vendor-docs: the manager carries no plugin and no marketplace, though the monorepo has both', (t) => {
   const { root, manager } = makeFixture('vendor-docs-plugin');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  assert.equal(vendorDocs({ cwd: manager, monorepoRoot: root }).plugin, true);
-  assert.ok(fs.existsSync(path.join(manager, 'claude-plugin', '.claude-plugin', 'plugin.json')), 'the plugin manifest ships');
-  assert.ok(fs.existsSync(path.join(manager, 'claude-plugin', 'skills', 'main', 'SKILL.md')), 'the skills ship with it');
-  assert.ok(fs.existsSync(path.join(manager, 'claude-plugin', 'mcp-router-launch.js')), 'the launcher ships with the plugin');
-  const mcp = JSON.parse(read(manager, 'claude-plugin', '.mcp.json'));
-  assert.deepEqual(mcp.mcpServers['mcp-router'].args, ['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js']);
+  vendorDocs({ cwd: manager, monorepoRoot: root });
 
-  const marketplace = JSON.parse(read(manager, '.claude-plugin', 'marketplace.json'));
-  assert.equal(marketplace.name, 'omega', 'the root marketplace is the SSOT for name/owner');
-  assert.equal(marketplace.plugins[0].source, './claude-plugin', 'the source points inside the package');
-  assert.ok(!JSON.stringify(marketplace).includes('..'), 'a marketplace source can never escape the package');
+  assert.equal(fs.existsSync(path.join(manager, 'claude-plugin')), false);
+  assert.equal(fs.existsSync(path.join(manager, '.claude-plugin')), false);
+  for (const gone of ['PLUGIN_SOURCE', 'PLUGIN_DIR', 'MARKETPLACE_FILE']) {
+    assert.equal(vendorDocs[gone], undefined, `${gone} named the vendored plugin, which is gone`);
+  }
 });

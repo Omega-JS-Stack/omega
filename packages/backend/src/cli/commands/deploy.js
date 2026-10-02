@@ -18,6 +18,7 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
 const { stageLocalPackages } = require('@omega.js/devkit/pack-local');
+const { isCI } = require('@omega.js/devkit/ci');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { refuseWhenCustom } = require('../utils/project-type');
@@ -310,7 +311,7 @@ class DeployCommand extends BaseCommand {
       // itself, so a listing that fails is a broken deploy: every HTTP function
       // answers 403 at the IAM level until someone guesses why. The run goes
       // red and says so ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
-      if (process.env.CI || process.env.GITHUB_ACTIONS) {
+      if (isCI(process.env)) {
         throw new Error(`Could not list HTTP functions to make them publicly invocable (gcloud: ${e.message}). The functions deployed, but every HTTP function answers 403 until an allUsers invoker binding exists.`);
       }
       return;

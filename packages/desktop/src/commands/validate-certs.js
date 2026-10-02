@@ -36,8 +36,7 @@ const jetpack = require('fs-jetpack');
 const { execute } = require('node-powertools');
 const { certificateExpiry, EXPIRY_WARN_DAYS } = require('@omega.js/devkit/certs');
 const { signingPathCandidates } = require('@omega.js/devkit/signing-env');
-const { requiredWhenHolds } = require('@omega.js/config/env-rules');
-const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS, windowsCloudProviderKeys } = require('@omega.js/config');
+const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS, windowsCloudProviderKeys, missingEnvKeys } = require('@omega.js/config');
 
 const build = require('../build.js');
 const logger = build.logger('validate-certs');
@@ -102,13 +101,11 @@ async function checkMac(issues, config, options = {}) {
   const projectRoot = process.cwd();
   const execFn = options.execFn || execute;
 
-  // The gate the env schema already uses for the whole mac set (its
-  // `requiredWhen`): a brand that DECLARES Apple signing owes these
-  // credentials, so a missing one is an error on the leg that signs (#891). A
-  // brand that declares none is simply unsigned, and every finding here is a
-  // note instead, the Keychain rung included.
-  const declaresApple = requiredWhenHolds(config || {}, 'certificates.providers.apple');
-  const signs = declaresApple ? 'error' : 'warn';
+  // A missing key a deploy of this config owes is an error on the leg that
+  // signs; one it does not owe (no Apple signing declared) is simply unsigned,
+  // so its finding is a note instead
+  const owed = new Set(missingEnvKeys(config || {}, process.env, { target: 'desktop', verb: 'deploy' }).map((row) => row.key));
+  const severity = (key) => (owed.has(key) ? 'error' : 'warn');
 
   // 1. Developer ID Application .p12. The boot derived CSC_LINK from the
   // signing tree when the tree holds one, so an unset key here means the tree
@@ -117,7 +114,7 @@ async function checkMac(issues, config, options = {}) {
   if (cscLink) {
     checkSigningCert(issues, cscLink, projectRoot);
   } else {
-    issues.push({ severity: signs, message: `CSC_LINK is not set${treeNote(projectRoot, 'CSC_LINK')}, so this build cannot be signed for macOS. Run \`omega manage --service certificates\` to produce the signing material.` });
+    issues.push({ severity: severity('CSC_LINK'), message: `CSC_LINK is not set${treeNote(projectRoot, 'CSC_LINK')}, so this build cannot be signed for macOS. Run \`omega manage --service certificates\` to produce the signing material.` });
   }
 
   // 2. Notarization API key (.p8): derived from the same tree, judged the same
@@ -126,7 +123,7 @@ async function checkMac(issues, config, options = {}) {
   if (apiKeyEnv) {
     checkNotarizationKey(issues, apiKeyEnv, projectRoot);
   } else {
-    issues.push({ severity: signs, message: `APPLE_API_KEY is not set${treeNote(projectRoot, 'APPLE_API_KEY')}, so this build cannot be notarized. Set APPLE_API_KEY_ID in the .env and run \`omega manage --service certificates\` to produce the key.` });
+    issues.push({ severity: severity('APPLE_API_KEY'), message: `APPLE_API_KEY is not set${treeNote(projectRoot, 'APPLE_API_KEY')}, so this build cannot be notarized. Set APPLE_API_KEY_ID in the .env and run \`omega manage --service certificates\` to produce the key.` });
   }
 
   // 3. Apple Team ID format check
@@ -146,7 +143,7 @@ async function checkMac(issues, config, options = {}) {
       const out = await execFn('security find-identity -v -p codesigning', { log: false });
       const identities = String(out || '');
       if (!identities.includes('Developer ID Application')) {
-        issues.push({ severity: signs, message: 'No "Developer ID Application" identity in the macOS Keychain, so a local signed build has nothing to sign with. Run `omega manage --service certificates` (it imports the .p12) or import it via Keychain Access.' });
+        issues.push({ severity: severity('CSC_LINK'), message: 'No "Developer ID Application" identity in the macOS Keychain, so a local signed build has nothing to sign with. Run `omega manage --service certificates` (it imports the .p12) or import it via Keychain Access.' });
       } else {
         logger.log(logger.format.green('✓ Keychain has Developer ID Application identity.'));
       }

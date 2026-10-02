@@ -18,7 +18,7 @@ const { setEnvironment } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
-const { resolveStaticDirs } = require('../static-assets.js');
+const { resolveStaticDirs, assertMintedAssets } = require('../static-assets.js');
 const { resolveClientEntry } = require('../paths.js');
 const { translateSite } = require('../translate/index.js');
 const { fetchFirebaseAuthHelpers } = require('../firebase-auth-helpers.js');
@@ -98,6 +98,10 @@ module.exports = async function (options) {
   // ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)).
   const siteData = loadSiteData(paths.root, { environment: 'production' });
   const brandRoot = findBrandRoot(paths.root);
+
+  // A runner gets the minted set only through the deploy snapshot, so a CI
+  // build without it would ship a site with no logo: stop before building.
+  assertMintedAssets({ brandRoot, env: process.env });
 
   const emptyCatalog = catalogWarning(siteData.payment);
   if (emptyCatalog) {

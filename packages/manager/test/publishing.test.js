@@ -22,7 +22,8 @@ const path = require('node:path');
 const { setPromptStreams } = require('@omega.js/devkit/prompt');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 
-const { REQUIRES, SERVICE_ORDER, OPERATIONS, serviceInputSpec } = require('../src/config.js');
+const { missingEnvKeys } = require('@omega.js/config');
+const { REQUIRES, SERVICE_ORDER, OPERATIONS, serviceInputs, serviceInputSpec } = require('../src/config.js');
 const { run } = require('../src/services/publishing/index.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
@@ -88,12 +89,13 @@ function edgeOnlyBrand() {
 
 test('publishing: the registry declares every ship credential the format table names', () => {
   const declaration = REQUIRES.publishing;
+  const inputs = serviceInputs('publishing');
 
   assert.equal(declaration.label, 'Publishing');
   assert.equal(declaration.disablePath, 'publishing.enabled');
-  assert.deepEqual(declaration.env.map((entry) => entry.name).sort(), [...SHIP_KEYS].sort());
+  assert.deepEqual(inputs.map((entry) => entry.name).sort(), [...SHIP_KEYS].sort());
 
-  for (const entry of declaration.env) {
+  for (const entry of inputs) {
     assert.equal(entry.prompted, true, `${entry.name} is collected mid-run on a TTY`);
     assert.equal(entry.gates, false, `${entry.name} is optional: preflight never gates a walk on a ship credential`);
   }
@@ -111,23 +113,27 @@ test('publishing: the registry declares every ship credential the format table n
 });
 
 test('publishing: the ask list follows the brand DECLARATION, not a typed list', () => {
-  const declaration = REQUIRES.publishing;
-  const asked = (config) => declaration.env.filter((entry) => entry.when(config)).map((entry) => entry.name);
+  // What manage asks the publishing service for, from the one function
+  const asked = (config) => missingEnvKeys(config, {}, { verb: 'manage' })
+    .filter((row) => row.service === 'publishing')
+    .map((row) => row.key)
+    .sort();
+  const sorted = (keys) => [...keys].sort();
 
   // No desktop and no extension target: nothing to ship, nothing to ask
   assert.deepEqual(asked({ targets: { web: { type: 'web' } } }), []);
 
   // An undeclared extension ships all three stores, so it owes all seven keys
-  assert.deepEqual(asked({ targets: { extension: { type: 'extension' } } }), [
+  assert.deepEqual(asked({ targets: { extension: { type: 'extension' } } }), sorted([
     'CHROME_CLIENT_ID', 'CHROME_CLIENT_SECRET', 'CHROME_REFRESH_TOKEN',
     'FIREFOX_API_KEY', 'FIREFOX_API_SECRET',
     'EDGE_CLIENT_ID', 'EDGE_API_KEY',
-  ]);
+  ]));
 
   // Dropping a store drops its keys with it
   assert.deepEqual(
     asked({ targets: { extension: { type: 'extension', platforms: { chrome: { formats: { store: false } }, edge: false } } } }),
-    ['FIREFOX_API_KEY', 'FIREFOX_API_SECRET'],
+    sorted(['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']),
   );
 
   // A desktop brand owes the snap login only where it DECLARES the snap, and
@@ -135,13 +141,13 @@ test('publishing: the ask list follows the brand DECLARATION, not a typed list',
   assert.deepEqual(asked({ targets: { desktop: { type: 'desktop' } } }), []);
   assert.deepEqual(
     asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: { signing: { strategy: 'self-hosted' } } } } } }),
-    ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS'],
+    sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS']),
   );
 
-  // Two targets in one brand: the union, in schema order
+  // Two targets in one brand: the union
   assert.deepEqual(
     asked({ targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false } }, desktop: { type: 'desktop', platforms: { linux: { formats: { snap: true } } } } } }),
-    ['SNAPCRAFT_STORE_CREDENTIALS', 'EDGE_CLIENT_ID', 'EDGE_API_KEY'],
+    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']),
   );
 });
 

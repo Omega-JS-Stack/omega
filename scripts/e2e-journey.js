@@ -3,10 +3,10 @@
  * tail of root `npm test` (Ian 2026-07-17: part of the greater sequence so
  * it gets regular coverage).
  *
- * Births a four-target brand OUTSIDE the monorepo through the real onboard
- * wizard, links it, boots web + backend, probes the
- * homepage, and finishes with a headless creds-scrubbed manage — the cp194
- * rehearsal as a repeatable lane. Mechanics: @omega.js/devkit/test/journey-harness.
+ * Births a four-target brand OUTSIDE the monorepo from a real clone of the
+ * brand template, set up by the real onboard wizard, links it, boots web +
+ * backend, probes the homepage, and finishes with a headless creds-scrubbed
+ * manage. Mechanics: @omega.js/devkit/test/journey-harness.
  *
  * Knobs:
  *   OMEGA_SKIP_JOURNEY=1    skip entirely (offline work, quick sequences)
@@ -19,19 +19,19 @@ const { runJourney } = require('@omega.js/devkit/test/journey-harness');
 
 const MONOREPO_ROOT = path.join(__dirname, '..');
 
-// The full consumer shape: every framework target, classy defaults. The
-// .invalid URL (RFC 2606) guarantees the never-deployed live probe can never
-// false-pass on someone else's real domain. Since cp196 a never-deployed
-// brand's live checks nudge (warn), so no service may error on a virgin brand,
-// with ONE designed exception: `publishing` refuses a declared store format
-// whose developer keys a headless run cannot collect (#867), and this lane
-// runs creds-scrubbed on purpose. Every other service must stay green.
+// The full consumer shape: every framework target, classy defaults. The .invalid
+// URL (RFC 2606) keeps the live probe off anyone's real domain. No service may error
+// on a virgin brand but the allowed set: `publishing` refuses a declared store format
+// whose keys a headless run cannot collect, and `repo` (below).
 const SPEC = {
   id: 'journey-brand',
+  origin: 'https://github.com/journey-org/journey-brand-omega.git',
   url: 'https://journey-brand.invalid',
   targets: ['web', 'backend', 'desktop', 'extension'],
   expect: { brandName: 'Journey Brand', themeId: 'classy' },
-  allowedServiceErrors: ['publishing'],
+  // The runtime legs run gh signed out on purpose, and the repo service
+  // reports a signed-out gh as an error today (to become a skip, like a missing key).
+  allowedServiceErrors: ['publishing', 'repo'],
 };
 
 async function main() {

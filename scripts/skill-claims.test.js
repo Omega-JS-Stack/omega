@@ -258,6 +258,22 @@ test('surface: the repo answers with skills, packages, and CLI verbs', () => {
   assert.ok(surface.verbs.has('deploy'), 'no framework CLI dispatches deploy');
 });
 
+// The init skill drives a brand root: its npm scripts and config paths are a standing brand's
+const BRAND_ROOT = path.join(BRANDS_DIR, 'playground-omega');
+
+test('init: every npm script and brand config path the skill names exists at a brand root', () => {
+  const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
+  assert.ok(fs.existsSync(file), 'the init skill ships');
+  const source = fs.readFileSync(file, 'utf8');
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(BRAND_ROOT, 'package.json'), 'utf8'));
+
+  const named = [...source.matchAll(/`npm (?:run ([a-z][\w:-]*)|(start|test)\b)/g)].map((match) => match[1] || match[2]);
+  assert.deepEqual([...new Set(named)].filter((script) => !(script in scripts)), [], 'npm scripts a brand root lacks');
+
+  const paths = matchAll(source, /`(config\/[^`\s]+)`/g, 1).filter((token) => !isPlaceholder(token));
+  assert.deepEqual(paths.filter((rel) => !fs.existsSync(path.join(BRAND_ROOT, rel))), [], 'config paths a brand root lacks');
+});
+
 test('skills: every claim in every SKILL.md holds against the live repo', () => {
   const surface = liveSurface();
   const violations = [];

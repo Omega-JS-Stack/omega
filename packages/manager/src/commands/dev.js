@@ -37,7 +37,8 @@ const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // Local
 const { runManage } = require('../manage.js');
-const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
+const { resolveBrandRoot, loadBrand, discoverTargets } = require('../lib/brand.js');
+const { NO_TARGETS_LINE } = require('../lib/default-targets.js');
 const { assertFamilyVersions } = require('../lib/preflight.js');
 const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
@@ -167,6 +168,13 @@ module.exports = async (options = {}) => {
   if (!brandRoot) {
     console.error(chalk.red('✖ omega dev: no brand root found (looked for config/omega.json5 walking up from here)'));
     process.exit(1);
+  }
+
+  // A brand may declare no targets at all: nothing to boot is a clean answer
+  const brand = loadBrand(brandRoot);
+  if (!brand.configError && brand.enabledTargets.length === 0) {
+    console.log(NO_TARGETS_LINE);
+    return;
   }
 
   // Tee the brand-level fan-out — the boot manage cycle AND every leg's

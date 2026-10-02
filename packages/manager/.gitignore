@@ -1,5 +1,2 @@
 # Vendored at prepare time by the devkit docs lane (tools/vendor-docs.js)
 /docs/
-# The Claude plugin and its marketplace, vendored for brands
-/claude-plugin/
-/.claude-plugin/

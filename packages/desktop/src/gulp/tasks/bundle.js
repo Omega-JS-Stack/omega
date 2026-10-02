@@ -20,9 +20,8 @@ const logger = build.logger('bundle');
 const path = require('path');
 const glob = require('glob').globSync;
 const jetpack = require('fs-jetpack');
-const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, readSiblingOrigin, envPorts, targetNameFromDir } = require('@omega.js/config');
-const { bakeKeys, bakeSourceKeys } = require('@omega.js/config/env-delivery');
-const { checkEnvRules } = require('@omega.js/config/env-rules');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, readSiblingOrigin, envPorts, targetNameFromDir, missingEnvKeys } = require('@omega.js/config');
+const { bakeKeys } = require('@omega.js/config/env-delivery');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const { bundle, formatBytes } = require('@omega.js/devkit/bundle');
 const buildJsonKit = require('@omega.js/devkit/build-json');
@@ -275,8 +274,6 @@ function buildJsonBanner(buildJson) {
 // GOOGLE_ANALYTICS_SECRET read this replaced was one of three hand-kept lists
 // for one concern. A new baked key is one schema entry and nothing here.
 const BAKED_KEYS = bakeKeys('desktop');
-// The same set at the level a HUMAN sets it: what the bake guard judges (#891)
-const BAKED_SOURCE_KEYS = bakeSourceKeys('desktop');
 
 /**
  * The schema's presence rules at the BAKE seam
@@ -309,15 +306,15 @@ function assertBakeRules(config, env, options) {
   const mode = options.mode || build.getMode();
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
-  const violations = checkEnvRules(config, env, { target: 'desktop' })
-    .filter((violation) => violation.rule === 'requiredWhen' && BAKED_SOURCE_KEYS.includes(violation.key));
-  if (violations.length === 0) return;
+  // A `build` owes only what it bakes: @omega.js/config's one answer
+  const missing = missingEnvKeys(config, env, { target: 'desktop', verb: 'build' });
+  if (missing.length === 0) return;
 
   // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_DESKTOP, not the
   // GOOGLE_ANALYTICS_SECRET it is delivered as): that is the name a human puts
   // in the brand .env and in the repo's Actions secrets.
-  const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
-  const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
+  const named = missing.map((row) => row.text).join(', ');
+  const message = `${missing.length} env ${missing.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
     + 'Set it in the brand .env (a CI build reads it as a repo Actions secret, which `omega deploy`\'s precheck pushes), then build again.';
 
   if (mode.build || mode.publish) {

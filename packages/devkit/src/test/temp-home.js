@@ -20,6 +20,10 @@ const path = require('node:path');
 process.env.OMEGA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-test-home-'));
 const OMEGA_HOME = process.env.OMEGA_HOME;
 
+// Claude Code's config folder is machine state too: a verb that checks the
+// omega plugin must never read or change the developer's real one.
+process.env.CLAUDE_CONFIG_DIR = path.join(OMEGA_HOME, 'claude');
+
 process.on('exit', () => fs.rmSync(OMEGA_HOME, { recursive: true, force: true }));
 
 module.exports = { OMEGA_HOME };

@@ -1,19 +1,13 @@
 /**
- * `omega onboard` — the brand-creation wizard: collect the brand's
- * identity (flags win, prompts fill the gaps in a TTY, derivation covers the
- * rest), scaffold the plan-§0 brand-monorepo skeleton, prove the config
- * loads, then optionally hand off to manage.
- *
- * Context-sensitive on where it runs, mirroring manage:
- *   inside an existing brand   → resume: no wizard, answers come from the
- *                                brand's own config, only MISSING files fill in
- *   anywhere else              → in-place: the cwd becomes the brand root
- *                                (the "Use this template" story — clone, onboard)
- *
- * Non-interactive runs derive everything derivable from --id (name, url,
- * email) and use the web+backend target default; only a missing, underivable
- * id is an error. --dry-run never prompts and never writes — it prints the
- * file plan. Scaffolding never overwrites: rerunning onboard converges.
+ * `omega onboard`: the brand-creation wizard. Flags win, prompts fill the
+ * gaps in a TTY, derivation covers the rest, and the scaffold proves the
+ * config loads. Where it runs decides the mode:
+ *   - inside a brand: resume. Answers come from its config, missing files
+ *     fill in, and a target pick adds the targets the brand lacks.
+ *   - in a brand-template folder: first run. The template's marked files give
+ *     way, then install and the dev stack (`--no-dev` stops first).
+ *   - anywhere else: the cwd becomes the brand root.
+ * Scaffolding never overwrites a file a person wrote, so a rerun converges.
  */
 
 const path = require('node:path');
@@ -22,21 +16,45 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { input, checkbox, confirm } = require('@omega.js/devkit/prompt');
-const { TARGETS, targetEntries, resolveCompany, deriveBundleIdPrefix } = require('@omega.js/config');
+const { readOrigin } = require('@omega.js/devkit/git-remote');
+const { TARGETS, targetEntries, resolveCompany, deriveBundleIdPrefix, sourceRepo, repoDrift, getAtPath } = require('@omega.js/config');
 
 const { TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
-const { askCompanyId } = require('./lib/company-question.js');
-const { buildScaffoldPlan, applyScaffoldPlan, printPlanResults } = require('./lib/scaffold.js');
+const { askCompanyId, validateCompanyId } = require('./lib/company-question.js');
+const { buildScaffoldPlan, applyScaffoldPlan, printPlanResults, targetSeeds } = require('./lib/scaffold.js');
+const { isTemplateCopy } = require('./lib/template-marker.js');
+const { askOwner } = require('./lib/github-owners.js');
+const { writeBrandConfig } = require('./lib/config-write.js');
+const { npmInstall } = require('./lib/npm-install.js');
+const { DEFAULT_TARGETS, NO_TARGETS, NO_TARGETS_LINE } = require('./lib/default-targets.js');
 const { canPrompt } = require('./lib/run-gates.js');
 const { convertLegacyOAuthSecret } = require('./lib/legacy-oauth.js');
+const { runClaude, machinePluginState, ensureMachinePlugin } = require('./lib/claude-machine.js');
+const { PLUGIN_ID } = require('./lib/claude-settings.js');
 
 // New-brand ids are a conservative subset of the schema's brand.id pattern —
 // always dir-, repo-, and URL-scheme-safe.
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const ID_HINT = 'lowercase letters, numbers, dashes; starts with a letter';
 
-const DEFAULT_TARGETS = ['web', 'backend'];
+// The one rule an account email meets, asked or passed as --admins
+const isAdminEmail = (value) => value.trim().includes('@');
+
+/**
+ * The bundle-id prefix a brand derives: reverse-DNS of its COMPANY's domain
+ * when it names one, else its own. The fresh wizard and a rerun both read it,
+ * and the config gets it only for targets that sign apps.
+ *
+ * @param {{ url?: string }} company - The resolved company
+ * @param {string} url - The brand's own url
+ * @returns {string} The prefix
+ */
+const bundleIdPrefixFor = (company, url) => deriveBundleIdPrefix(company.url || url);
+
+const removalLine = (name) => `Removing a target is by hand: delete targets/${name} and its entry in config/omega.json5.`;
+
+const mismatchLine = (repo, expected) => `Your repo is named ${repo}. OMEGA expects ${expected}. Rename it: gh repo rename ${expected}`;
 
 /**
  * The wizard picks TYPES; the scaffold writes NAMES (#886). A fresh brand
@@ -61,6 +79,28 @@ function deriveId(dirName) {
     .replace(/^[^a-z]+|-+$/g, '');
 
   return ID_PATTERN.test(id) ? id : null;
+}
+
+/**
+ * The brand id a repo name implies: the manage step expects the source repo
+ * to be `<brand id>-omega`, so the suffix comes off ('acme-omega' → 'acme').
+ *
+ * @param {string} name - A repo or folder name
+ * @returns {string|null} A valid brand id, or null when nothing valid survives
+ */
+function idFromRepoName(name) {
+  return deriveId(String(name).replace(/-omega$/i, ''));
+}
+
+/**
+ * The git user name, the contact person's default.
+ *
+ * @param {string} cwd - Where git runs
+ * @returns {string|null} `git config user.name`, or null when unset
+ */
+function gitUserName(cwd) {
+  const result = spawnSync('git', ['config', 'user.name'], { cwd, encoding: 'utf8' });
+  return (result.status === 0 && result.stdout.trim()) || null;
 }
 
 /** 'acme-demo' → 'Acme Demo' */
@@ -105,22 +145,44 @@ function buildPerson({ name, image, url }) {
 }
 
 /**
- * Normalize a --targets flag value ('web,backend' or array) and validate
- * every entry against the canonical target list.
+ * Normalize a --targets flag value ('web,backend', `none`, or an array) and
+ * validate every entry against the canonical target list.
  */
 function parseTargetsFlag(value) {
   const targets = Array.isArray(value) ? value : String(value).split(',');
   const cleaned = targets.map((t) => t.trim()).filter(Boolean);
 
+  if (cleaned.length === 1 && cleaned[0] === NO_TARGETS) {
+    return [];
+  }
+
   const unknown = cleaned.filter((t) => !TARGETS.includes(t));
   if (unknown.length > 0) {
-    throw new Error(`Unknown target(s): ${unknown.join(', ')} — valid targets: ${TARGETS.join(', ')}`);
+    throw new Error(`Unknown target(s): ${unknown.join(', ')}. Valid targets: ${TARGETS.join(', ')}, or ${NO_TARGETS}`);
   }
   if (cleaned.length === 0) {
-    throw new Error(`--targets needs at least one of: ${TARGETS.join(', ')}`);
+    throw new Error(`--targets needs a list of: ${TARGETS.join(', ')}, or ${NO_TARGETS}`);
   }
 
   return cleaned;
+}
+
+/**
+ * The target checkbox: every target type, the given ones checked. An empty
+ * pick is a brand with no targets.
+ *
+ * @param {string[]} checked - The types checked to start with
+ * @returns {Promise<string[]>} The picked types
+ */
+function pickTargets(checked) {
+  return checkbox({
+    message: 'Targets (key presence in omega.json5 = enabled):',
+    choices: TARGETS.map((target) => ({
+      name: `${target}: targets/${target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved: MAM overhaul pending)'}`,
+      value: target,
+      checked: checked.includes(target),
+    })),
+  });
 }
 
 /**
@@ -140,13 +202,34 @@ function inheritedAdmins(company) {
 }
 
 /**
- * The accounts step: show the list the brand inherits and let the owner
- * keep it (nothing written — the source layer keeps owning it) or define
- * the brand's own, which lands as account.admins in its omega.json5.
+ * The --admins flag ('a@x.com,b@x.com', or an array) as the brand's own
+ * account list, each managed as the wizard's defaults manage one.
+ *
+ * @param {string|string[]} value - The flag value
+ * @returns {Array<{ email: string, account: boolean, marketing: boolean }>} The entries
+ */
+function parseAdminsFlag(value) {
+  const emails = (Array.isArray(value) ? value : String(value).split(',')).map((email) => String(email).trim()).filter(Boolean);
+  const invalid = emails.filter((email) => !isAdminEmail(email));
+  if (emails.length === 0 || invalid.length > 0) {
+    throw new Error(`Invalid --admins${invalid.length > 0 ? ` (${invalid.join(', ')})` : ''}: pass account emails, comma-separated (--admins=a@acme.com,b@acme.com)`);
+  }
+
+  return emails.map((email) => ({ email, account: true, marketing: true }));
+}
+
+/**
+ * The accounts step: the --admins flag, else show the list the brand
+ * inherits and let the owner keep it (nothing written: the source layer
+ * keeps owning it) or define the brand's own, which lands as account.admins
+ * in its omega.json5.
  *
  * @returns {Array|null} Customized entries, or null to inherit
  */
-async function collectAccountAdmins(inherited, interactive) {
+async function collectAccountAdmins(inherited, interactive, flag) {
+  if (flag != null) {
+    return parseAdminsFlag(flag);
+  }
   if (!interactive) {
     return null;
   }
@@ -171,7 +254,7 @@ async function collectAccountAdmins(inherited, interactive) {
     const email = (await input({
       message: `Account email (${'{domain}'} = brand domain):`,
       ...(entries.length === 0 ? { default: 'support@{domain}' } : {}),
-      validate: (value) => (value.trim().includes('@') ? true : 'Must be an email address'),
+      validate: (value) => (isAdminEmail(value) ? true : 'Must be an email address'),
     })).trim();
     const account = await confirm({ message: 'Manage the Firebase Auth account (create + admin role + top plan)?', default: true });
     const marketing = await confirm({ message: 'Sync the contact to marketing providers?', default: true });
@@ -183,11 +266,13 @@ async function collectAccountAdmins(inherited, interactive) {
 
 /**
  * Collect the wizard answers for a FRESH brand: flags win, prompts fill the
- * gaps interactively, derivation covers the rest. `defaultId` comes from the
- * in-place directory name; `brandRoot` is where the brand will live, which is
- * what the company answer resolves against.
+ * gaps interactively, derivation covers the rest. `brandRoot` is where the
+ * brand will live, which is what the company answer resolves against, and
+ * `origin` is its readOrigin() answer: the id and owner defaults come from it.
  */
-async function collectAnswers(options, defaultId, interactive, brandRoot = null) {
+async function collectAnswers(options, interactive, brandRoot, origin) {
+  const defaultId = idFromRepoName(origin.repo || path.basename(brandRoot));
+
   // id — the only field with no universal derivation
   let id = options.id ?? null;
   if (id != null && !ID_PATTERN.test(String(id))) {
@@ -204,8 +289,13 @@ async function collectAnswers(options, defaultId, interactive, brandRoot = null)
     } else if (defaultId) {
       id = defaultId;
     } else {
-      throw new Error('Brand id required — pass --id=<id> (or run in an interactive terminal)');
+      throw new Error('Brand id required: pass --id=<id> (or run in an interactive terminal)');
     }
+  }
+  // The origin judged against the source repo this id derives under its owner
+  const derived = origin.slug ? { brand: { id }, repo: { org: origin.owner } } : null;
+  if (derived && repoDrift(origin.slug, derived)) {
+    console.log(`${chalk.yellow('⚠')} ${mismatchLine(origin.repo, sourceRepo(derived).name)}`);
   }
 
   // name / url — derivable from the id
@@ -239,7 +329,13 @@ async function collectAnswers(options, defaultId, interactive, brandRoot = null)
   // standalone brand. Everything the company owns (config layer, .env, hooks,
   // signing tree) follows from it; nothing else is asked or written.
   let companyId = null;
-  if (interactive) {
+  if (options.company != null) {
+    const verdict = validateCompanyId(options.company);
+    if (verdict !== true) {
+      throw new Error(`Invalid --company ${JSON.stringify(String(options.company))}: ${verdict}`);
+    }
+    companyId = String(options.company).trim();
+  } else if (interactive) {
     companyId = await askCompanyId();
   }
 
@@ -261,23 +357,25 @@ async function collectAnswers(options, defaultId, interactive, brandRoot = null)
     tagline = (await input({ message: 'Brand tagline (optional, ~3 words):' })).trim();
   }
 
-  // contact person — the human who signs the personal sends. The support
-  // email derives from the url; a NAME cannot, so the wizard asks for it and
-  // requires an answer, while a non-interactive run without --contactName
-  // writes no person at all rather than inventing one (#770). The headshot
+  // contact person: the human who signs the personal sends. The support email
+  // derives from the url; the name defaults to the git user name, and with
+  // neither a run writes no person rather than inventing one. The headshot
   // and the link are optional garnish on the same signoff.
   let contactName = options.contactName ?? null;
   if (contactName != null && (typeof contactName !== 'string' || !contactName.trim())) {
-    throw new Error('Invalid --contactName — pass the person\'s name (--contactName="Jane Doe")');
+    throw new Error('Invalid --contactName: pass the person\'s name (--contactName="Jane Doe")');
   }
-  if (contactName == null && !interactive && (options.contactImage != null || options.contactUrl != null)) {
-    throw new Error('--contactImage/--contactUrl need a --contactName to belong to — nothing would be written');
+  if (contactName == null) {
+    const gitName = gitUserName(brandRoot);
+    contactName = interactive
+      ? (await input({
+        message: 'Contact person (signs the personal emails: welcome, nudges, checkups):',
+        ...(gitName ? { default: gitName } : {}),
+      })).trim()
+      : gitName;
   }
-  if (contactName == null && interactive) {
-    contactName = await input({
-      message: 'Contact person (signs the personal emails: welcome, nudges, checkups):',
-      validate: (value) => (value.trim().length > 0 ? true : 'Required'),
-    });
+  if (!contactName && (options.contactImage != null || options.contactUrl != null)) {
+    throw new Error('--contactImage/--contactUrl need a --contactName to belong to: nothing would be written');
   }
 
   let contactImage = options.contactImage ?? null;
@@ -290,25 +388,17 @@ async function collectAnswers(options, defaultId, interactive, brandRoot = null)
     contactUrl = await input({ message: 'Contact person link URL (optional):' });
   }
 
-  // targets — checkbox in a TTY, web+backend otherwise
+  // targets: the flag, else the checkbox in a TTY, else the default
   let targetTypes = options.targets != null ? parseTargetsFlag(options.targets) : null;
   if (!targetTypes) {
-    targetTypes = interactive
-      ? await checkbox({
-        message: 'Targets (key presence in omega.json5 = enabled):',
-        choices: TARGETS.map((target) => ({
-          name: `${target}: targets/${target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved: MAM overhaul pending)'}`,
-          value: target,
-          checked: DEFAULT_TARGETS.includes(target),
-        })),
-        validate: (selection) => (selection.length > 0 ? true : 'Select at least one target'),
-      })
-      : DEFAULT_TARGETS;
+    targetTypes = interactive ? await pickTargets(DEFAULT_TARGETS) : DEFAULT_TARGETS;
   }
+
+  const org = await resolveOwner(options, interactive, id, origin);
 
   // accounts — inherit by default (null writes nothing); customizing lands
   // the brand's own account.admins
-  const accountAdmins = await collectAccountAdmins(inheritedAdmins(company), interactive);
+  const accountAdmins = await collectAccountAdmins(inheritedAdmins(company), interactive, options.admins);
 
   return {
     id,
@@ -320,20 +410,39 @@ async function collectAnswers(options, defaultId, interactive, brandRoot = null)
     email: deriveEmail(url),
     person: buildPerson({ name: contactName, image: contactImage, url: contactUrl }),
     targets: targetEntriesFromTypes(targetTypes),
+    repo: org ? { org } : null,
     accountAdmins,
-    // Bundle-id prefix: reverse-DNS of the COMPANY's domain when the brand
-    // names one, else the brand's own (seeded into config only for targets
-    // that sign apps)
-    bundleIdPrefix: deriveBundleIdPrefix(company.url || url),
+    bundleIdPrefix: bundleIdPrefixFor(company, url),
   };
+}
+
+/**
+ * The GitHub owner of the brand's repos: the --org flag, else the question in
+ * a TTY (the origin's owner as its default), else the origin's owner.
+ *
+ * @returns {Promise<string|null>} The owner, or null to write no `repo` block
+ */
+async function resolveOwner(options, interactive, brandId, origin) {
+  if (options.org != null) {
+    if (typeof options.org !== 'string' || !options.org.trim()) {
+      throw new Error('Invalid --org: pass the GitHub owner (--org=acme)');
+    }
+    return options.org.trim();
+  }
+  if (!interactive) {
+    return origin.owner || null;
+  }
+  return askOwner({ brandId, defaultOwner: origin.owner || null, exec: options.ghExec });
 }
 
 /**
  * Answers for an EXISTING brand (resume): no wizard — the brand's own config
  * is the source, and the scaffold only fills missing files around it.
+ *
+ * @param {object} brand - The loadBrand() answer
+ * @returns {Object} The answers the scaffold plan takes
  */
-function answersFromBrand(brandRoot) {
-  const brand = loadBrand(brandRoot);
+function answersFromBrand(brand) {
   if (brand.configError) {
     throw new Error(`This brand's config/omega.json5 does not load: ${brand.configError}`);
   }
@@ -356,8 +465,10 @@ function answersFromBrand(brandRoot) {
     person: brand.config.brand?.contact?.person || null,
     // The brand's own declarations, name AND type: a target named `admin`
     // scaffolds targets/admin around whichever framework it declares (#886)
-    targets: brand.enabledTargets.length > 0 ? targetEntries(brand.config) : targetEntriesFromTypes(DEFAULT_TARGETS),
-    bundleIdPrefix: brand.config.certificates?.providers?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
+    // A brand with none keeps none: a rerun never writes default targets.
+    targets: targetEntries(brand.config),
+    // The loaded config's `company` is always resolved: a standalone brand's is its own name and url
+    bundleIdPrefix: brand.config.certificates?.providers?.apple?.bundleIdPrefix || bundleIdPrefixFor(brand.config.company, url),
   };
 }
 
@@ -394,40 +505,151 @@ function ensureGitRepo(brandRoot, brandName) {
   return { initialized: true, committed: commit.status === 0 };
 }
 
-/** Run manage in the new brand exactly as a user would — a real child process. */
-function spawnManage(brandRoot) {
+/**
+ * Run one manager verb in the brand exactly as a user would: a real child
+ * process, waited on.
+ *
+ * @param {string} brandRoot - Where the verb runs
+ * @param {string} verb - The verb (`manage`, `dev`)
+ * @returns {Promise<number>} The child's exit code
+ */
+function spawnVerb(brandRoot, verb) {
   return new Promise((resolve) => {
-    // cli-run.js self-executes when spawned as main — spawning it directly
-    // deliberately bypasses the bin's dispatcher (#276): this child must run
-    // THIS manager, never re-dispatch on the child's cwd. The verb is
-    // explicit (#229): a bare invocation prints help and walks nothing.
+    // cli-run.js runs as main: spawning it directly bypasses the bin's
+    // dispatcher, so this child runs THIS manager and never re-dispatches on
+    // the child's cwd. The verb is explicit: a bare run prints help.
     const entry = path.join(__dirname, 'cli-run.js');
-    const child = spawn(process.execPath, [entry, 'manage'], { cwd: brandRoot, stdio: 'inherit' });
+    const child = spawn(process.execPath, [entry, verb], { cwd: brandRoot, stdio: 'inherit' });
     child.on('close', (code) => resolve(code ?? 1));
     child.on('error', () => resolve(1));
   });
+}
+
+/** Run manage in the new brand. */
+function spawnManage(brandRoot) {
+  return spawnVerb(brandRoot, 'manage');
+}
+
+/**
+ * Boot the new brand's dev stack (`omega dev`) and wait on it: the first
+ * run's handover, so the person ends on a running site.
+ *
+ * @param {string} brandRoot - The brand root
+ * @returns {Promise<number>} The dev stack's exit code
+ */
+function spawnDev(brandRoot) {
+  return spawnVerb(brandRoot, 'dev');
+}
+
+/**
+ * Install the brand's dependencies at its root; every target's framework
+ * arrives through the workspaces.
+ *
+ * @param {string} brandRoot - The brand root
+ * @returns {Promise<boolean>} Whether `npm install` succeeded
+ */
+async function installDeps(brandRoot) {
+  console.log('');
+  console.log(`${chalk.dim('→')} Installing dependencies ${chalk.dim('(npm install)')}`);
+  const result = await npmInstall(brandRoot);
+  if (!result.success) {
+    console.log(`${chalk.red('✗')} npm install failed ${chalk.dim(`(${result.error}); fix it, then run npm install and npm start`)}`);
+  }
+  return result.success;
+}
+
+/**
+ * A rerun's target pick: the --targets flag, else the checkbox in a TTY with
+ * the brand's targets checked. A type the brand lacks gets its config entry
+ * (nothing else in the file changes); a type left out removes nothing.
+ *
+ * @returns {Promise<Array<{ name: string, type: string }>>} The added entries
+ */
+async function addTargets(brandRoot, answers, options, interactive) {
+  const current = answers.targets.map((entry) => entry.type);
+  let picked = current;
+  if (options.targets != null) {
+    picked = parseTargetsFlag(options.targets);
+  } else if (interactive) {
+    picked = await pickTargets(current);
+  }
+
+  // Only the types a pick can name: a custom target is never "unchecked"
+  for (const entry of answers.targets.filter((item) => TARGETS.includes(item.type) && !picked.includes(item.type))) {
+    console.log(`${chalk.yellow('⚠')} ${removalLine(entry.name)}`);
+  }
+
+  const added = targetEntriesFromTypes(picked.filter((type) => !current.includes(type)));
+  const taken = added.find((entry) => answers.targets.some((item) => item.name === entry.name));
+  if (taken) {
+    throw new Error(`targets.${taken.name} is already another type's name: add the ${taken.type} target to config/omega.json5 by hand under a free name`);
+  }
+  if (added.length > 0) {
+    // Each new target also gets the brand-level keys a fresh scaffold would
+    // write for it, where the brand (company layer included) has none yet
+    const { config } = loadBrand(brandRoot);
+    const has = (dotPath) => getAtPath(config, dotPath) != null;
+    const seeds = Object.entries(targetSeeds({ ...answers, targets: added })).filter(([dotPath]) => !has(dotPath));
+    writeBrandConfig({ brandRoot, options }, {
+      ...Object.fromEntries(added.map((entry) => [`targets.${entry.name}`, { type: entry.type }])),
+      ...Object.fromEntries(seeds),
+    });
+  }
+
+  return added;
+}
+
+/**
+ * Offer the published omega Claude plugin for the whole machine when Claude
+ * Code is here without it. Only in a terminal; declining changes nothing, and
+ * a failing `claude` is the machine's problem, never the onboarding's.
+ *
+ * @param {boolean} interactive - A terminal can answer
+ * @param {Function} exec - The `claude` runner
+ * @returns {Promise<'installed'|'declined'|null>} - null when nothing was asked
+ */
+async function offerClaudePlugin(interactive, exec) {
+  if (!interactive) {
+    return null;
+  }
+
+  try {
+    const state = machinePluginState({ exec });
+    if (!state.claude || state.version) {
+      return null;
+    }
+    console.log('');
+    if (!await confirm({ message: `Install the omega Claude plugin for this machine (${PLUGIN_ID})?`, default: true })) {
+      return 'declined';
+    }
+    ensureMachinePlugin({ exec });
+    console.log(`${chalk.green('✓')} Claude plugin installed ${chalk.dim(`(${PLUGIN_ID}, every Claude Code session on this machine)`)}`);
+    return 'installed';
+  } catch (error) {
+    console.log(`${chalk.yellow('⚠')} Claude plugin not installed ${chalk.dim(`(${error.message.split('\n')[0]})`)}`);
+    return null;
+  }
 }
 
 function printNextSteps(answers) {
   console.log('');
   console.log(chalk.bold('Next steps'));
 
-  const frameworks = answers.targets
-    .filter((entry) => TARGET_FRAMEWORKS[entry.type])
-    .map((entry) => `${TARGET_FRAMEWORKS[entry.type]} → targets/${entry.name}`);
-  if (frameworks.length > 0) {
-    console.log(`  1. Install each target's framework and run its setup: ${frameworks.join(', ')}`);
-  }
-  console.log(`  ${frameworks.length > 0 ? 2 : 1}. Fill in .env as the brand adopts external services (the stub lists every key)`);
-  console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npm run manage')} to reconcile everything — rerun any time`);
+  const steps = [
+    `${chalk.cyan('npm install')}: every target gets its framework`,
+    answers.targets.length > 0 ? `${chalk.cyan('npm start')}: boot the local stack` : NO_TARGETS_LINE,
+    'Fill in .env as the brand adopts external services (the stub lists every key)',
+    `${chalk.cyan('npm run manage')}: reconcile everything; rerun any time`,
+  ];
+  steps.forEach((step, index) => console.log(`  ${index + 1}. ${step}`));
 }
 
 /**
  * Main onboard runner.
  *
  * @param {string} cwd - Where the command ran
- * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, dryRun, manage }
- * @returns {Object} - { brandRoot, mode, created, kept, planned, valid, manageExitCode }
+ * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, org, company, admins, dryRun, manage, dev, claudeExec and ghExec (the `claude` and `gh` runners; tests inject them) }
+ * @returns {Object} - { brandRoot, mode, firstRun, created, kept, replaced, planned, valid, added, installed, manageExitCode, devExitCode }
  */
 async function runOnboard(cwd, options = {}) {
   console.log(chalk.bold.cyan('OMEGA Manager — Onboarding'));
@@ -435,20 +657,24 @@ async function runOnboard(cwd, options = {}) {
 
   const interactive = canPrompt(options);
   const existing = resolveBrandRoot(cwd);
+  const firstRun = isTemplateCopy(cwd);
 
   // Resolve the brand root + answers per context
   let brandRoot;
   let answers;
   let mode;
+  let added = [];
 
   if (existing) {
     brandRoot = existing;
     console.log(`${chalk.dim('→')} Existing brand: ${chalk.cyan(brandRoot)} — filling missing files only`);
-    answers = answersFromBrand(brandRoot);
+    answers = answersFromBrand(loadBrand(brandRoot));
+    added = await addTargets(brandRoot, answers, options, interactive);
+    answers.targets.push(...added);
     mode = 'resume';
   } else {
     brandRoot = cwd;
-    answers = await collectAnswers(options, deriveId(path.basename(cwd)), interactive, brandRoot);
+    answers = await collectAnswers(options, interactive, brandRoot, readOrigin({ dir: brandRoot }));
     mode = 'fresh';
   }
 
@@ -465,7 +691,7 @@ async function runOnboard(cwd, options = {}) {
   if (options.dryRun) {
     console.log('');
     console.log(chalk.dim('⊘ Dry run — nothing written'));
-    return { brandRoot, mode, ...results, valid: true };
+    return { brandRoot, mode, firstRun, ...results, valid: true, added, devExitCode: null };
   }
 
   // Port-time conversion: a carried legacy oauth.json becomes the canonical
@@ -482,7 +708,7 @@ async function runOnboard(cwd, options = {}) {
   const valid = !brand.configError && brand.configErrors.length === 0;
   console.log('');
   if (valid) {
-    console.log(`${chalk.green('✓')} Config loads and validates ${chalk.dim(`(targets: ${brand.enabledTargets.join(', ')})`)}`);
+    console.log(`${chalk.green('✓')} Config loads and validates ${chalk.dim(`(targets: ${brand.enabledTargets.join(', ') || NO_TARGETS})`)}`);
   } else {
     console.log(`${chalk.red('✗')} Config problem: ${brand.configError || brand.configErrors.join('; ')}`);
   }
@@ -495,12 +721,34 @@ async function runOnboard(cwd, options = {}) {
     console.log(`${chalk.dim('•')} git ${chalk.dim(`(${git.reason})`)}`);
   }
 
-  printNextSteps(answers);
+  // A first run hands over to the dev stack; every other run prints the way on
+  const handover = firstRun && valid && options.dev !== false;
+  if (!handover) {
+    printNextSteps(answers);
+  }
+
+  const claudePlugin = await offerClaudePlugin(interactive, options.claudeExec || runClaude);
+
+  let installed = null;
+  if (handover || (added.length > 0 && options.dev !== false)) {
+    installed = await installDeps(brandRoot);
+  }
+
+  let devExitCode = null;
+  if (handover && installed && answers.targets.length === 0) {
+    console.log('');
+    console.log(NO_TARGETS_LINE);
+  } else if (handover && installed) {
+    console.log('');
+    console.log(`${chalk.dim('→')} Starting the dev stack ${chalk.dim('(npm start runs it from now on)')}`);
+    console.log(chalk.dim('━'.repeat(70)));
+    devExitCode = await spawnDev(brandRoot);
+  }
 
   // Manage handoff — never in a dry run, never implicitly without a TTY
   let manageExitCode = null;
   const runNow = options.manage
-    ?? (interactive && valid
+    ?? (!firstRun && interactive && valid
       ? await confirm({ message: 'Run manage now?', default: true })
       : false);
 
@@ -511,7 +759,16 @@ async function runOnboard(cwd, options = {}) {
     manageExitCode = await spawnManage(brandRoot);
   }
 
-  return { brandRoot, mode, ...results, valid, git, legacyOAuth, manageExitCode };
+  return { brandRoot, mode, firstRun, ...results, valid, git, legacyOAuth, claudePlugin, added, installed, manageExitCode, devExitCode };
 }
 
-module.exports = { runOnboard, deriveId, deriveName, deriveUrl };
+module.exports = {
+  runOnboard,
+  answersFromBrand,
+  deriveId,
+  deriveName,
+  deriveUrl,
+  idFromRepoName,
+  gitUserName,
+  spawnDev,
+};

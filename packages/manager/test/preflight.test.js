@@ -1,9 +1,8 @@
-// Tests for src/lib/preflight.js + the REQUIRES registry — the per-service
-// requires: { env, scopes } gate run before any service: declaration
-// when-gates (service and entry level), env presence (names only — values
-// NEVER printed), scope checks against the token store's granted-scopes
-// record, the run/skip/strict verdicts, the cp236-tone walkthrough content,
-// and the runManage wiring (skip-and-continue vs --strict hard failure).
+// Tests for src/lib/preflight.js: the gate run before any service. The keys a
+// service is missing come from @omega.js/config's one function (names only,
+// values NEVER printed); the scopes come from the REQUIRES registry, checked
+// against the token store's granted-scopes record. Plus the run/skip/strict
+// verdicts, the walkthrough content, and the runManage wiring.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -20,7 +19,7 @@ require('@omega.js/devkit/test/temp-home');
 const { resolveCompany } = require('@omega.js/config');
 
 const { REQUIRES, SERVICE_ORDER } = require('../src/config.js');
-const { runPreflight, checkService, readTokenStore, assertFamilyVersions } = require('../src/lib/preflight.js');
+const { runPreflight, readTokenStore } = require('../src/lib/preflight.js');
 const { runManage } = require('../src/manage.js');
 const { googleTokenStorePath } = require('../src/lib/google-auth.js');
 
@@ -39,11 +38,10 @@ delete process.env.APPLE_API_ISSUER;
 delete process.env.APPLE_API_KEY_ID;
 delete process.env.APPLE_TEAM_ID;
 
-const VAR_SET = 'OMEGA_TEST_PREFLIGHT_SET';
-const VAR_MISSING = 'OMEGA_TEST_PREFLIGHT_MISSING';
 const SECRET_VALUE = 'super-secret-preflight-value-never-printed';
 
-const EMPTY_STORE = { exists: false, scopes: [], accountEmail: null, storePath: '/nope/.omega/auth/google-tokens.json' };
+// The Google OAuth client is a cloud key, asked only once the project is a real one
+const REAL_PROJECT = { cloud: { provider: 'firebase', config: { projectId: 'preflight-live' } } };
 
 function withStreams(isTTY, fn) {
   const input = new PassThrough();
@@ -94,90 +92,106 @@ function stageTokenStore(tokens) {
   return root;
 }
 
-// ─── checkService: when-gates + env + scopes ────────────────────────────────
+// ─── what each service is found missing ─────────────────────────────────────
+//
+// Real services on real configs: what a service needs and when lives in the
+// env schema, and preflight asks the one function for the verb `manage`.
 
-test('preflight: service when-gate false → no finding (disabled edge)', () => {
-  const finding = checkService('edge', REQUIRES.edge, { edge: { providers: { cloudflare: { enabled: false } } } }, EMPTY_STORE);
-  assert.equal(finding, null);
+/**
+ * One preflight run, its printed lines captured.
+ * @param {string[]} services - The services to check.
+ * @param {object} brandConfig - The brand config.
+ * @param {object} [run] - { isTTY, brandRoot, company, options }.
+ * @returns {{ findings: object[], gates: object, log: string }}
+ */
+function preflight(services, brandConfig, { isTTY = false, brandRoot = stageTokenStore(null), company, options = {} } = {}) {
+  let result;
+  const log = captureLog(() => {
+    result = withStreams(isTTY, () => runPreflight({ services, brandConfig, brandRoot, company, options }));
+  });
+  return { ...result, log };
+}
+
+test('preflight: edge turned off, no finding', () => {
+  const { findings, gates } = preflight(['edge'], { edge: { providers: { cloudflare: { enabled: false } } } });
+  assert.equal(findings.length, 0);
+  assert.equal(gates.edge, undefined);
 });
 
-// #527 — the advertising gate is the client id alone: the `enabled` key it
+// The advertising gate is the client id alone. The `enabled` key it
 // used to read beside it is deleted, so a config still carrying it must not
 // silence the preflight ask for the account the service still manages.
-test('preflight: the advertising when-gate is client presence, not a second switch (#527)', () => {
-  const withClient = { advertising: { providers: { adsense: { client: 'ca-pub-1', enabled: false } } } };
-  const finding = checkService('advertising', REQUIRES.advertising, withClient, EMPTY_STORE);
-  assert.ok(finding, 'a configured client id asks for its credentials');
-  assert.deepEqual(finding.missingEnv.map((entry) => entry.name), ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
+test('preflight: the advertising ask is client presence, not a second switch (#527)', () => {
+  const withClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: { client: 'ca-pub-1', enabled: false } } } });
+  assert.ok(withClient.gates.advertising, 'a configured client id asks for its credentials');
+  assert.deepEqual([...withClient.gates.advertising.missingEnv].sort(), ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
 
-  const noClient = { advertising: { providers: { adsense: {} } } };
-  assert.equal(checkService('advertising', REQUIRES.advertising, noClient, EMPTY_STORE), null, 'no client id, nothing to ask for');
+  const noClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: {} } } });
+  assert.equal(noClient.gates.advertising, undefined, 'no client id, nothing to ask for');
 });
 
-test('preflight: missing env → finding naming the exact vars', () => {
-  const finding = checkService('edge', REQUIRES.edge, {}, EMPTY_STORE);
-  assert.ok(finding);
-  assert.deepEqual(finding.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN']);
-  assert.equal(finding.missingScopes.length, 0);
-  assert.equal(finding.noConsent, false);
+test('preflight: missing env, a finding naming the exact vars', () => {
+  const { gates } = preflight(['edge'], {});
+  assert.deepEqual(gates.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
+  assert.equal(gates.edge.needsInteractive, undefined, 'a missing secret is no consent gap');
 });
 
-test('preflight: env present → no finding', () => {
+test('preflight: env present, no finding', () => {
   process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
   try {
-    assert.equal(checkService('edge', REQUIRES.edge, {}, EMPTY_STORE), null);
+    const { findings, gates } = preflight(['edge'], {});
+    assert.equal(findings.length, 0);
+    assert.deepEqual(gates, {});
   } finally {
     delete process.env.CLOUDFLARE_TOKEN;
   }
 });
 
-test('preflight: entry-level when — namecheap creds only for namecheap brands', () => {
-  const squarespace = checkService('domain', REQUIRES.domain, { domain: { providers: { squarespace: {} } } }, EMPTY_STORE);
-  assert.deepEqual(squarespace.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN']);
+test('preflight: namecheap creds only for namecheap brands', () => {
+  const squarespace = preflight(['domain'], { domain: { providers: { squarespace: {} } } });
+  assert.deepEqual(squarespace.gates.domain.missingEnv, ['CLOUDFLARE_TOKEN']);
 
-  const namecheap = checkService('domain', REQUIRES.domain, { domain: { providers: { namecheap: {} } } }, EMPTY_STORE);
-  assert.deepEqual(namecheap.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY']);
+  const namecheap = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
+  assert.deepEqual([...namecheap.gates.domain.missingEnv].sort(), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
 
-  // No provider chosen → the service skips itself; preflight stays quiet
-  assert.equal(checkService('domain', REQUIRES.domain, {}, EMPTY_STORE), null);
+  // No provider chosen: the service skips itself and preflight stays quiet
+  assert.equal(preflight(['domain'], {}).gates.domain, undefined);
 });
 
-test('preflight: scopes — no token store → noConsent', () => {
+test('preflight: scopes, no token store is a consent gap with no missing env', () => {
   process.env.GOOGLE_CLIENT_ID = 'id';
   process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
   try {
-    const finding = checkService('search', REQUIRES.search, {}, EMPTY_STORE);
-    assert.ok(finding);
-    assert.equal(finding.noConsent, true);
-    assert.equal(finding.missingEnv.length, 0);
+    const { gates } = preflight(['search'], REAL_PROJECT);
+    assert.match(gates.search.needsInteractive, /Google consent/);
+    assert.deepEqual(gates.search.missingEnv, []);
   } finally {
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
   }
 });
 
-test('preflight: scopes — store missing a required scope → missingScopes; sufficient → clean', () => {
+test('preflight: scopes, a store missing a required scope names it, a sufficient one is clean', () => {
   process.env.GOOGLE_CLIENT_ID = 'id';
   process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
   try {
-    const partial = {
-      exists: true,
-      scopes: ['https://www.googleapis.com/auth/webmasters'],
-      accountEmail: 'ops@example.test',
-      storePath: '/x/google-tokens.json',
-    };
-    const finding = checkService('search', REQUIRES.search, {}, partial);
-    assert.deepEqual(finding.missingScopes, ['https://www.googleapis.com/auth/siteverification']);
+    const partial = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
+    const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: partial });
+    assert.match(narrow.gates.search.needsInteractive, /siteverification/);
 
-    const full = { ...partial, scopes: [...partial.scopes, 'https://www.googleapis.com/auth/siteverification'] };
-    assert.equal(checkService('search', REQUIRES.search, {}, full), null);
+    const full = stageTokenStore({
+      access_token: 'tok',
+      scopes: ['https://www.googleapis.com/auth/webmasters', 'https://www.googleapis.com/auth/siteverification'],
+      account_email: 'ops@example.test',
+    });
+    assert.deepEqual(preflight(['search'], REAL_PROJECT, { brandRoot: full }).gates, {});
   } finally {
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
   }
 });
 
-test('preflight: readTokenStore — real store round-trip + pre-tracking store grants nothing', () => {
+test('preflight: readTokenStore, a real store round-trips and a pre-tracking store grants nothing', () => {
   const root = stageTokenStore({ access_token: 'tok', scopes: ['a', 'b'], account_email: 'me@example.test' });
   const store = readTokenStore(root);
   assert.equal(store.exists, true);
@@ -192,164 +206,90 @@ test('preflight: readTokenStore — real store round-trip + pre-tracking store g
 
 // ─── runPreflight: verdicts ─────────────────────────────────────────────────
 
-const PROMPTED_REQUIRES = {
-  fake: {
-    why: 'talks to the fake API',
-    env: [{ name: VAR_MISSING, label: 'Fake API key', url: 'https://example.test/keys', prompted: true }],
-    scopes: [],
-  },
-};
+test('preflight verdicts: non-interactive missing env, skip with missingEnv', () => {
+  const { gates, log } = preflight(['edge'], {});
 
-const UNPROMPTED_REQUIRES = {
-  fake: {
-    why: 'talks to the fake API',
-    env: [{ name: VAR_MISSING, label: 'Fake API key' }],
-    scopes: [],
-  },
-};
-
-test('preflight verdicts: non-interactive missing env → skip with missingEnv', () => {
-  const root = stageTokenStore(null);
-  const { gates } = withStreams(false, () => {
-    let result;
-    const log = captureLog(() => {
-      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: {} }, { requires: PROMPTED_REQUIRES });
-    });
-    assert.match(log, /Preflight/);
-    return result;
-  });
-
-  assert.equal(gates.fake.action, 'skip');
-  assert.match(gates.fake.reason, new RegExp(VAR_MISSING));
-  assert.match(gates.fake.reason, /^preflight: /);
-  assert.deepEqual(gates.fake.missingEnv, [VAR_MISSING]);
+  assert.match(log, /Preflight/);
+  assert.equal(gates.edge.action, 'skip');
+  assert.match(gates.edge.reason, /CLOUDFLARE_TOKEN/);
+  assert.match(gates.edge.reason, /^preflight: /);
+  assert.deepEqual(gates.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
 });
 
-test('preflight verdicts: interactive + prompted entries → run (the paste flow fixes it mid-run)', () => {
-  const root = stageTokenStore(null);
-  const { gates } = withStreams(true, () => {
-    let result;
-    captureLog(() => {
-      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: {} }, { requires: PROMPTED_REQUIRES });
-    });
-    return result;
-  });
-  assert.equal(gates.fake.action, 'run');
+test('preflight verdicts: interactive and a pasted key, run (the paste flow fixes it mid-run)', () => {
+  assert.equal(preflight(['edge'], {}, { isTTY: true }).gates.edge.action, 'run');
 });
 
-test('preflight verdicts: interactive but unprompted entry → still skip (no flow collects it)', () => {
-  const root = stageTokenStore(null);
-  const { gates } = withStreams(true, () => {
-    let result;
-    captureLog(() => {
-      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: {} }, { requires: UNPROMPTED_REQUIRES });
-    });
-    return result;
-  });
-  assert.equal(gates.fake.action, 'skip');
+test('preflight verdicts: interactive but a key nobody pastes, still skip (no flow collects it)', () => {
+  // The Google OAuth client is set up by hand in the Cloud console, never pasted mid-run
+  assert.equal(preflight(['search'], REAL_PROJECT, { isTTY: true }).gates.search.action, 'skip');
 });
 
-test('preflight verdicts: --strict → error, even interactive', () => {
-  const root = stageTokenStore(null);
-  const { gates } = withStreams(true, () => {
-    let result;
-    captureLog(() => {
-      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: { strict: true } }, { requires: PROMPTED_REQUIRES });
-    });
-    return result;
-  });
-  assert.equal(gates.fake.action, 'error');
+test('preflight verdicts: --strict is an error, even interactive', () => {
+  assert.equal(preflight(['edge'], {}, { isTTY: true, options: { strict: true } }).gates.edge.action, 'error');
 });
 
 test('preflight verdicts: a consent/scope gap carries the ⚑ pending marker; a missing-secret gap does not (#228)', () => {
-  const requires = {
-    consenty: { why: 'needs Google', env: [], scopes: ['https://www.googleapis.com/auth/webmasters'] },
-    envy: { why: 'needs a key', env: [{ name: VAR_MISSING, prompted: true }], scopes: [] },
-  };
+  process.env.GOOGLE_CLIENT_ID = 'id';
+  process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
+  try {
+    const { gates } = preflight(['search', 'edge'], REAL_PROJECT);
 
-  const noStore = stageTokenStore(null);
-  const { gates } = withStreams(false, () => {
-    let result;
-    captureLog(() => {
-      result = runPreflight({ services: ['consenty', 'envy'], brandConfig: {}, brandRoot: noStore, options: {} }, { requires });
-    });
-    return result;
-  });
+    assert.match(gates.search.needsInteractive, /Google consent/,
+      'the summary ⚑ section reads this field; without it the skip is a nameless count');
+    assert.equal(gates.edge.needsInteractive, undefined,
+      'a missing secret already rides the 🔑 section; double-listing is noise');
 
-  assert.match(gates.consenty.needsInteractive, /Google consent/,
-    'the summary ⚑ section reads this field — without it the skip is a nameless count');
-  assert.equal(gates.envy.needsInteractive, undefined,
-    'a missing secret already rides the 🔑 section; double-listing is noise');
-
-  // A store that exists but lacks the scope is the same pending human step
-  const narrowStore = stageTokenStore({
-    access_token: 'a',
-    refresh_token: 'r',
-    scopes: ['https://www.googleapis.com/auth/firebase'],
-  });
-  const narrow = withStreams(false, () => {
-    let result;
-    captureLog(() => {
-      result = runPreflight({ services: ['consenty'], brandConfig: {}, brandRoot: narrowStore, options: {} }, { requires });
-    });
-    return result;
-  });
-
-  assert.match(narrow.gates.consenty.needsInteractive, /webmasters/, 'and it names the scopes to re-consent');
+    // A store that exists but lacks the scope is the same pending human step
+    const narrowStore = stageTokenStore({ access_token: 'a', refresh_token: 'r', scopes: ['https://www.googleapis.com/auth/firebase'] });
+    const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: narrowStore });
+    assert.match(narrow.gates.search.needsInteractive, /webmasters/, 'and it names the scopes to re-consent');
+  } finally {
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
+  }
 });
 
-test('preflight verdicts: nothing missing → no gates, nothing printed', () => {
-  process.env[VAR_SET] = SECRET_VALUE;
+test('preflight verdicts: nothing missing, no gates and nothing printed', () => {
+  process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
   try {
-    const root = stageTokenStore(null);
-    const requires = { fake: { env: [{ name: VAR_SET, prompted: true }], scopes: [] } };
-    const log = captureLog(() => {
-      const { findings, gates } = withStreams(false, () => runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: {} }, { requires }));
-      assert.equal(findings.length, 0);
-      assert.deepEqual(gates, {});
-    });
+    const { findings, gates, log } = preflight(['edge'], {});
+    assert.equal(findings.length, 0);
+    assert.deepEqual(gates, {});
     assert.equal(log, '');
   } finally {
-    delete process.env[VAR_SET];
+    delete process.env.CLOUDFLARE_TOKEN;
   }
 });
 
 // ─── Walkthrough content (cp236 tone) ───────────────────────────────────────
 
-test('preflight walkthrough: what/which/why/fix/rerun — and env VALUES never appear', () => {
-  process.env[VAR_SET] = SECRET_VALUE;
+test('preflight walkthrough: what/which/why/fix/rerun', () => {
+  const { log } = preflight(['edge'], {});
+
+  assert.match(log, /Preflight/);                                            // the consolidated header
+  assert.match(log, /edge/);                                                 // which service
+  assert.match(log, /reconciles the zone, DNS records/);                     // why it matters
+  assert.match(log, /CLOUDFLARE_TOKEN=<value>/);                             // the exact .env line
+  assert.match(log, /https:\/\/dash\.cloudflare\.com\/profile\/api-tokens/); // where the value comes from
+  assert.match(log, /Create a token with Zone edit/);                        // the hint
+  assert.match(log, /npm run manage -- --service=edge/);                     // the rerun verb
+});
+
+test('preflight walkthrough: a present var is not nagged, and env VALUES never appear', () => {
+  process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
   try {
-    const root = stageTokenStore(null);
-    const requires = {
-      fake: {
-        why: 'talks to the fake API',
-        env: [
-          { name: VAR_SET, prompted: true },
-          { name: VAR_MISSING, label: 'Fake API key', url: 'https://example.test/keys', hint: 'Create a read-write key', prompted: true },
-        ],
-        scopes: [],
-      },
-    };
+    const { log } = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
 
-    const log = captureLog(() => {
-      withStreams(false, () => runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, options: {} }, { requires }));
-    });
-
-    assert.match(log, /Preflight/);                        // the consolidated header
-    assert.match(log, /fake/);                             // which service
-    assert.match(log, /talks to the fake API/);            // why it matters
-    assert.match(log, new RegExp(`${VAR_MISSING}=<value>`)); // the exact .env line
-    assert.match(log, /https:\/\/example\.test\/keys/);    // where the value comes from
-    assert.match(log, /Create a read-write key/);          // the hint
-    assert.match(log, new RegExp(`npm run manage -- --service=fake`)); // the rerun verb
-    assert.ok(!log.includes(VAR_SET));                     // present vars aren't nagged
-    assert.ok(!log.includes(SECRET_VALUE));                // values NEVER print
+    assert.match(log, /NAMECHEAP_API_KEY=<value>/);
+    assert.ok(!log.includes('CLOUDFLARE_TOKEN=<value>'), 'present vars are not nagged');
+    assert.ok(!log.includes(SECRET_VALUE), 'values NEVER print');
   } finally {
-    delete process.env[VAR_SET];
+    delete process.env.CLOUDFLARE_TOKEN;
   }
 });
 
-// A brand of a company, both real on disk (#910): the parent carries the
+// A brand of a company, both real on disk: the parent carries the
 // shared `company/` tree, whose `.env` is the tier every sub-brand inherits,
 // and the machine registry is how the child's `company: { id }` resolves.
 function stageCompanyBrand({ envFile = true } = {}) {
@@ -382,20 +322,15 @@ test('preflight walkthrough: a company brand is sent to the COMPANY .env (#910)'
   const company = resolveCompany(root);
   assert.equal(company.id, 'parent-brand', 'the fixture resolves a company');
 
-  let result;
-  const log = captureLog(() => {
-    withStreams(false, () => {
-      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company, options: {} }, { requires: UNPROMPTED_REQUIRES });
-    });
-  });
+  const { gates, log } = preflight(['edge'], {}, { brandRoot: root, company });
 
-  // One shape for every REQUIRES entry the walkthrough prints: the key belongs
-  // in the company file each sub-brand inherits, and the brand file is the
+  // One shape for every service the walkthrough prints: the key belongs in
+  // the company file each sub-brand inherits, and the brand file is the
   // override, not the home.
-  assert.match(log, new RegExp(`${VAR_MISSING}=<value>`));
+  assert.match(log, /CLOUDFLARE_TOKEN=<value>/);
   assert.ok(log.includes(companyEnv), `the fix line names the company .env: ${log}`);
   assert.match(log, /brand \.env overrides it/);
-  assert.ok(result.gates.fake.reason.includes(companyEnv), `the skip reason says it too: ${result.gates.fake.reason}`);
+  assert.ok(gates.edge.reason.includes(companyEnv), `the skip reason says it too: ${gates.edge.reason}`);
 });
 
 test('preflight walkthrough: the company .env is named even before it exists (#910)', () => {
@@ -403,11 +338,7 @@ test('preflight walkthrough: the company .env is named even before it exists (#9
   // the key belongs in, so the line names the path rather than falling back.
   const { root, companyEnv } = stageCompanyBrand({ envFile: false });
 
-  const log = captureLog(() => {
-    withStreams(false, () => {
-      runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company: resolveCompany(root), options: {} }, { requires: UNPROMPTED_REQUIRES });
-    });
-  });
+  const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
 
   assert.ok(log.includes(companyEnv), `the fix line names the file to create: ${log}`);
 });
@@ -415,9 +346,7 @@ test('preflight walkthrough: the company .env is named even before it exists (#9
 test('preflight walkthrough: a standalone brand keeps the brand .env line (#910)', () => {
   const root = stageTokenStore(null);
 
-  const log = captureLog(() => {
-    withStreams(false, () => runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company: resolveCompany(root), options: {} }, { requires: UNPROMPTED_REQUIRES }));
-  });
+  const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
 
   assert.match(log, /to the brand \.env/);
   assert.ok(!log.includes('company'), `no company, no company line: ${log}`);
@@ -429,9 +358,7 @@ test('preflight walkthrough: scope gap names the acting identity + both remedies
   try {
     const root = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
 
-    const log = captureLog(() => {
-      withStreams(false, () => runPreflight({ services: ['search'], brandConfig: {}, brandRoot: root, options: {} }));
-    });
+    const { log } = preflight(['search'], REAL_PROJECT, { brandRoot: root });
 
     assert.match(log, /search/);
     assert.match(log, /scope:siteverification/);           // what's missing, short form
@@ -448,12 +375,9 @@ test('preflight walkthrough: scope gap names the acting identity + both remedies
 
 // ─── Registry sanity ────────────────────────────────────────────────────────
 
-test('preflight registry: every REQUIRES key is a real service, env entries are name-shaped', () => {
+test('preflight registry: every REQUIRES key is a real service, and its scopes are Google scopes', () => {
   for (const [serviceName, declaration] of Object.entries(REQUIRES)) {
     assert.ok(SERVICE_ORDER.includes(serviceName), `${serviceName} is not in SERVICE_ORDER`);
-    for (const entry of declaration.env || []) {
-      assert.match(entry.name, /^[A-Z][A-Z0-9_]+$/, `${serviceName} env entry ${entry.name}`);
-    }
     for (const scope of declaration.scopes || []) {
       assert.match(scope, /^https:\/\/www\.googleapis\.com\/auth\//, `${serviceName} scope ${scope}`);
     }
@@ -462,7 +386,7 @@ test('preflight registry: every REQUIRES key is a real service, env entries are 
 
 // ─── runManage wiring ───────────────────────────────────────────────────────
 
-function stageBrand() {
+function stageBrand({ projectId } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-preflight-brand-'));
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
     name: 'preflight-brand',
@@ -470,12 +394,13 @@ function stageBrand() {
     workspaces: ['targets/*'],
   }, null, 2));
   fs.mkdirSync(path.join(root, 'config'));
+  const cloud = projectId ? `\n  cloud: { provider: 'firebase', config: { projectId: '${projectId}' } },` : '';
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: {
     id: 'preflight-brand',
     name: 'Preflight Brand',
     url: 'https://preflight-brand.test',
-  },
+  },${cloud}
   targets: {
     web: { type: 'web' },
   },
@@ -518,7 +443,7 @@ test('runManage: --strict turns the preflight failure into a hard error', async 
 });
 
 test('runManage: a consent-gated preflight skip is NAMED in the ⚑ pending list, with its rerun hint (#228)', async () => {
-  const root = stageBrand();
+  const root = stageBrand({ projectId: 'preflight-live' });
 
   const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search' })));
 
@@ -538,190 +463,4 @@ test('runManage: the cycle continues past preflight skips (absorb, never crash)'
   // …while later services still ran — the loop never stopped
   assert.ok(report.results.testing, 'testing service should still have run');
   assert.ok(report.results.workspace, 'workspace service should still have run');
-});
-
-// ─── The lockstep boot check (#794) ─────────────────────────────────────────
-
-const MANAGER_VERSION = require('../package.json').version;
-
-/**
- * Stage a brand with installed @omega.js packages: `installs` maps a target
- * dir to { framework, version, client?, clientAt? } — clientAt 'nested' puts
- * the client under the framework's own node_modules (where npm nests a
- * second copy), 'root' hoists it to the brand root (where npm normally
- * lands it in a workspace tree).
- */
-function stageInstalledBrand(installs, { spec = null } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-'));
-  const targets = [];
-
-  const writePkg = (dir, contents) => {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(contents, null, 2));
-  };
-
-  for (const [dir, install] of Object.entries(installs)) {
-    const targetPath = path.join(root, 'targets', dir);
-    const framework = `@omega.js/${install.framework}`;
-    writePkg(targetPath, {
-      name: `lockstep-${dir}`,
-      private: true,
-      devDependencies: { [framework]: spec || install.spec || MANAGER_VERSION },
-    });
-    targets.push({ name: dir, dir: `targets/${dir}`, path: targetPath, target: install.target });
-
-    if (install.version) {
-      writePkg(path.join(targetPath, 'node_modules', framework), { name: framework, version: install.version });
-    }
-    if (install.client) {
-      const clientHome = install.clientAt === 'nested'
-        ? path.join(targetPath, 'node_modules', framework, 'node_modules', '@omega.js', 'client')
-        : path.join(root, 'node_modules', '@omega.js', 'client');
-      writePkg(clientHome, { name: '@omega.js/client', version: install.client });
-    }
-  }
-
-  return { root, targets };
-}
-
-test('lockstep boot check: every installed package on the family version passes', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: MANAGER_VERSION, client: MANAGER_VERSION },
-    backend: { target: 'backend', framework: 'backend', version: MANAGER_VERSION, client: MANAGER_VERSION, clientAt: 'nested' },
-  });
-
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.checked.map((entry) => entry.dir).sort(), ['backend', 'web']);
-  // The client is found wherever npm put it — hoisted at the root, or nested
-  assert.deepEqual(report.checked.map((entry) => `${entry.dir}:${entry.packages.length}`).sort(), ['backend:2', 'web:2']);
-});
-
-test('lockstep boot check: one target behind REFUSES, naming the target, both versions and the fix', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
-    backend: { target: 'backend', framework: 'backend', version: '0.0.9', client: '0.0.9', clientAt: 'nested' },
-  });
-
-  assert.throws(
-    () => assertFamilyVersions({ brandRoot: root, targets }),
-    (error) => {
-      assert.match(error.message, /backend/, 'names the drifted target');
-      assert.match(error.message, /@omega\.js\/backend 0\.0\.9/, 'names the installed version');
-      assert.match(error.message, /@omega\.js\/client 0\.0\.9/, 'names every drifted package under that target');
-      assert.match(error.message, new RegExp(MANAGER_VERSION.replace(/\./g, '\\.')), 'names the manager\'s version');
-      assert.equal(error.refusal, true, 'a refusal prints its message alone — no stack (#706)');
-      assert.match(error.message, /fix: run `omega update` at the brand root/, 'names the verb that installs, bare');
-      assert.ok(!error.message.includes('--apply'), 'no retired switch in the fix');
-      assert.ok(!error.message.includes('web'), 'a target that matches is not listed');
-      return true;
-    },
-  );
-});
-
-test('lockstep boot check: a `file:` spec is exempt — the local era is the monorepo\'s version by construction', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: '9.9.9', client: '9.9.9', clientAt: 'nested' },
-  }, { spec: 'file:../../../omega/packages/web' });
-
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.exempt.map((entry) => entry.dir), ['web']);
-});
-
-test('lockstep boot check: a target with no install yet is skipped, not a mismatch', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web' },
-  });
-
-  const log = captureLog(() => {
-    const report = assertFamilyVersions({ brandRoot: root, targets });
-    assert.deepEqual(report.mismatched, []);
-    assert.deepEqual(report.skipped.map((entry) => entry.dir), ['web']);
-  });
-
-  assert.match(log, /web/, 'the skip is a line, never silence');
-  assert.match(log, /@omega\.js\/web/);
-});
-
-test('lockstep boot check: a custom target has no framework to compare', () => {
-  const { root } = stageInstalledBrand({});
-  const targets = [{ name: 'worker', dir: 'targets/worker', path: path.join(root, 'targets', 'worker'), target: null, custom: true }];
-
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.checked, []);
-  assert.deepEqual(report.skipped, []);
-});
-
-test('lockstep boot check: an installed manifest that cannot be read is a REFUSAL naming the file (#794)', () => {
-  for (const [label, contents] of [['unparseable', '{ not json'], ['versionless', JSON.stringify({ name: '@omega.js/web' })]]) {
-    const { root, targets } = stageInstalledBrand({
-      web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
-    });
-    const manifest = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web', 'package.json');
-    fs.writeFileSync(manifest, contents);
-
-    assert.throws(
-      () => assertFamilyVersions({ brandRoot: root, targets }),
-      (error) => {
-        assert.equal(error.refusal, true);
-        assert.match(error.message, /cannot be read/);
-        assert.ok(error.message.includes(manifest), `${label}: the refusal names the file`);
-        assert.match(error.message, /npm install/, 'the fix is a reinstall');
-        return true;
-      },
-      `a ${label} manifest must never pass as "no version, no problem"`,
-    );
-  }
-});
-
-test('lockstep boot check: the framework hoisted at the BRAND ROOT is found by the climb', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-hoist-'));
-  const targetPath = path.join(root, 'targets', 'web');
-  fs.mkdirSync(targetPath, { recursive: true });
-  fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'hoisted-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
-  }));
-  // npm's normal placement in a workspace tree: nothing under the target
-  const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(hoisted, { recursive: true });
-  fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
-
-  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
-
-  assert.throws(
-    () => assertFamilyVersions({ brandRoot: root, targets }),
-    (error) => {
-      assert.match(error.message, /@omega\.js\/web 0\.0\.7/, 'the hoisted copy IS the installed copy');
-      return true;
-    },
-  );
-});
-
-test('lockstep boot check: a target-local copy WINS over the hoisted one — nearest, climbing', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-nearest-'));
-  const targetPath = path.join(root, 'targets', 'web');
-  fs.mkdirSync(targetPath, { recursive: true });
-  fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'nearest-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
-  }));
-
-  const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(hoisted, { recursive: true });
-  fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
-
-  // The nested copy npm writes when the ranges stop overlapping — what this
-  // target actually loads, so it is what the gate must judge
-  const local = path.join(targetPath, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(local, { recursive: true });
-  fs.writeFileSync(path.join(local, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: MANAGER_VERSION }));
-
-  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.mismatched, [], 'the target-local copy matches, so the stale hoisted one is not what runs here');
-  assert.deepEqual(report.checked[0].packages, [{ name: '@omega.js/web', version: MANAGER_VERSION }]);
 });

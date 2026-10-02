@@ -95,6 +95,12 @@ test('every entry carries the full rule shape', () => {
     if (entry.required) {
       assert.ok('generated' in entry || 'default' in entry, `${where}: a required key needs a generator or a default`);
     }
+    // Both "when" facts are written with the named rules, so each is a function of the config
+    for (const field of ['requiredWhen', 'askedWhen']) {
+      if (field in entry) {
+        assert.equal(typeof entry[field], 'function', `${where}: ${field} is a rule from env-when.js`);
+      }
+    }
   }
 });
 
@@ -393,47 +399,101 @@ test('the nine Windows cloud-signing keys the desktop workflow injects are decla
   assert.ok(added.every((name) => envKeysByGroup()['desktop-publishing'].includes(name)));
 });
 
-test('requiredWhen names a config path, one direction only', () => {
+// ─── The two "when" facts ───
+
+const APPLE = { certificates: { providers: { apple: { bundleIdPrefix: 'com.acme' } } } };
+const signing = (value) => ({ platforms: { windows: { signing: value } } });
+const cloudSigning = (provider) => signing({ strategy: 'cloud', cloud: { provider } });
+const GA_ID = { analytics: { providers: { google: { id: 'G-ACME123' } } } };
+
+// Each ruled key, a config its rule holds on, and one beside it that it does
+// not hold on: the rule's meaning is pinned, never its written form.
+const REQUIRED_WHEN = {
+  RECAPTCHA_SECRET_KEY: [{ captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } }, { captcha: { providers: { recaptcha: {} } } }],
+  SENTRY_AUTH_TOKEN: [{ monitoring: { providers: { sentry: { dsn: 'https://public@o0.ingest.sentry.io/0' } } } }, { monitoring: { providers: { sentry: { org: 'acme' } } } }],
+  // The signing sets: a brand that declares Apple signing owes the mac set,
+  // and each Windows strategy owes ITS credentials and no other's
+  APPLE_API_ISSUER: [APPLE, {}],
+  APPLE_API_KEY_ID: [APPLE, {}],
+  APPLE_TEAM_ID: [APPLE, {}],
+  CSC_LINK: [APPLE, {}],
+  APPLE_API_KEY: [APPLE, {}],
+  CSC_KEY_PASSWORD: [APPLE, {}],
+  WIN_EV_TOKEN_PATH: [signing({ strategy: 'self-hosted' }), cloudSigning('azure')],
+  WIN_CSC_KEY_PASSWORD: [signing({ strategy: 'self-hosted' }), cloudSigning('azure')],
+  AZURE_TENANT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
+  AZURE_CLIENT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
+  AZURE_CLIENT_SECRET: [cloudSigning('azure'), cloudSigning('sslcom')],
+  AZURE_TRUSTED_SIGNING_ENDPOINT: [cloudSigning('azure'), cloudSigning('sslcom')],
+  SSLCOM_USERNAME: [cloudSigning('sslcom'), cloudSigning('digicert')],
+  SSLCOM_PASSWORD: [cloudSigning('sslcom'), cloudSigning('digicert')],
+  SSLCOM_CREDENTIAL_ID: [cloudSigning('sslcom'), cloudSigning('digicert')],
+  DIGICERT_API_KEY: [cloudSigning('digicert'), cloudSigning('azure')],
+  DIGICERT_KEYPAIR_ALIAS: [cloudSigning('digicert'), cloudSigning('azure')],
+  SNAPCRAFT_STORE_CREDENTIALS: [{ platforms: { linux: { formats: { snap: {} } } } }, { platforms: { linux: { formats: { snap: false } } } }],
+  GOOGLE_ANALYTICS_SECRET_WEB: [GA_ID, { analytics: { providers: { google: {} } } }],
+  GOOGLE_ANALYTICS_SECRET_BACKEND: [GA_ID, { analytics: { providers: { google: {} } } }],
+  GOOGLE_ANALYTICS_SECRET_DESKTOP: [GA_ID, { analytics: { providers: { google: {} } } }],
+  GOOGLE_ANALYTICS_SECRET_EXTENSION: [GA_ID, { analytics: { providers: { google: {} } } }],
+};
+
+test('requiredWhen: exactly the 24 keys a config can make required, each on its own setting', () => {
   const ruled = ENV_SCHEMA.filter((entry) => entry.requiredWhen);
 
-  assert.deepEqual(ruled.map((entry) => [entry.name, entry.requiredWhen]), [
-    ['RECAPTCHA_SECRET_KEY', 'captcha.providers.recaptcha.siteKey'],
-    ['SENTRY_AUTH_TOKEN', 'monitoring.providers.sentry.dsn'],
-    // The signing sets (#891): a brand that declares Apple signing owes the mac
-    // set, and each Windows strategy owes ITS credentials and no other's
-    ['APPLE_API_ISSUER', 'certificates.providers.apple'],
-    ['APPLE_API_KEY_ID', 'certificates.providers.apple'],
-    ['APPLE_TEAM_ID', 'certificates.providers.apple'],
-    ['CSC_LINK', 'certificates.providers.apple'],
-    ['APPLE_API_KEY', 'certificates.providers.apple'],
-    ['WIN_EV_TOKEN_PATH', 'platforms.windows.signing.strategy=self-hosted'],
-    ['WIN_CSC_KEY_PASSWORD', 'platforms.windows.signing.strategy=self-hosted'],
-    ['AZURE_TENANT_ID', 'platforms.windows.signing.cloud.provider=azure'],
-    ['AZURE_CLIENT_ID', 'platforms.windows.signing.cloud.provider=azure'],
-    ['AZURE_CLIENT_SECRET', 'platforms.windows.signing.cloud.provider=azure'],
-    ['AZURE_TRUSTED_SIGNING_ENDPOINT', 'platforms.windows.signing.cloud.provider=azure'],
-    ['SSLCOM_USERNAME', 'platforms.windows.signing.cloud.provider=sslcom'],
-    ['SSLCOM_PASSWORD', 'platforms.windows.signing.cloud.provider=sslcom'],
-    ['SSLCOM_CREDENTIAL_ID', 'platforms.windows.signing.cloud.provider=sslcom'],
-    ['DIGICERT_API_KEY', 'platforms.windows.signing.cloud.provider=digicert'],
-    ['DIGICERT_KEYPAIR_ALIAS', 'platforms.windows.signing.cloud.provider=digicert'],
-    ['SNAPCRAFT_STORE_CREDENTIALS', 'platforms.linux.formats.snap'],
-    ['CSC_KEY_PASSWORD', 'certificates.providers.apple'],
-    ['GOOGLE_ANALYTICS_SECRET_WEB', 'analytics.providers.google.id'],
-    ['GOOGLE_ANALYTICS_SECRET_BACKEND', 'analytics.providers.google.id'],
-    ['GOOGLE_ANALYTICS_SECRET_DESKTOP', 'analytics.providers.google.id'],
-    ['GOOGLE_ANALYTICS_SECRET_EXTENSION', 'analytics.providers.google.id'],
-  ]);
-
-  // The parked mobile target carries NO rule (#627 review, B1): MAM has no
-  // mint, no delivery and no target, so a rule on its key could only warn —
-  // forever, for every GA-configured brand, with nothing a human could do.
-  assert.equal(envSchemaEntry('GOOGLE_ANALYTICS_SECRET_MOBILE').requiredWhen, undefined);
+  assert.deepEqual(ruled.map((entry) => entry.name).sort(), Object.keys(REQUIRED_WHEN).sort());
 
   for (const entry of ruled) {
-    // A dotted config path, optionally PINNED to one value (#891): an enum's
-    // value is what decides which credentials exist.
-    assert.match(entry.requiredWhen, /^[a-z][A-Za-z0-9.]+(=[a-z-]+)?$/, `${entry.name}: a dotted config path`);
+    const [holding, beside] = REQUIRED_WHEN[entry.name];
+    assert.equal(entry.requiredWhen(holding), true, `${entry.name}: holds on its setting`);
+    assert.equal(entry.requiredWhen(beside), false, `${entry.name}: does not hold beside it`);
+    assert.equal(entry.requiredWhen({}), false, `${entry.name}: one direction only, a config that says nothing owes nothing`);
     assert.equal(entry.required, false, `${entry.name}: a conditional requirement is never an unconditional one`);
   }
+
+  // The parked mobile target carries NO rule: MAM has no mint, no delivery
+  // and no target, so a rule on its key could only warn, forever.
+  assert.equal(envSchemaEntry('GOOGLE_ANALYTICS_SECRET_MOBILE').requiredWhen, undefined);
+});
+
+test('askedWhen: exactly the keys manage asks a person for, moved in from the manager', () => {
+  const asked = ENV_SCHEMA.filter((entry) => entry.askedWhen).map((entry) => entry.name);
+
+  // The ship-format keys are not here: their one home is the format table
+  assert.deepEqual(asked.sort(), [
+    'ANTHROPIC_API_KEY',
+    'APPLE_API_ISSUER', 'APPLE_API_KEY_ID', 'APPLE_TEAM_ID',
+    'BEEHIIV_API_KEY',
+    'CHARGEBEE_API_KEY',
+    'CHATSY_SERVICE_ACCOUNT',
+    'CLOUDFLARE_TOKEN',
+    'COINBASE_COMMERCE_API_KEY',
+    'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
+    'META_ACCESS_TOKEN',
+    'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME',
+    'OPENAI_API_KEY',
+    'PAYPAL_CLIENT_SECRET',
+    'RECAPTCHA_SECRET_KEY',
+    'REPLYIFY_SERVICE_ACCOUNT',
+    'SENDGRID_API_KEY',
+    'SENTRY_AUTH_TOKEN',
+    'SERVER_SERVICE_ACCOUNT',
+    'SLAPFORM_SERVICE_ACCOUNT',
+    'STRIPE_SECRET_KEY',
+    'TIKTOK_ACCESS_TOKEN',
+  ]);
+});
+
+test('askedWhen and requiredWhen differ on purpose: the Sentry token is asked before it is required', () => {
+  const entry = envSchemaEntry('SENTRY_AUTH_TOKEN');
+  const chosen = { monitoring: { providers: { sentry: { org: 'acme' } } } };
+
+  // The manager uses the token to create the project the DSN comes from
+  assert.equal(entry.askedWhen(chosen), true);
+  assert.equal(entry.requiredWhen(chosen), false);
+  assert.equal(entry.askedWhen({}), false, 'no Sentry chosen, nothing to ask');
+
+  // reCAPTCHA is asked unless turned off, and required once its site key is set
+  const recaptcha = envSchemaEntry('RECAPTCHA_SECRET_KEY');
+  assert.equal(recaptcha.askedWhen({ targets: { backend: { type: 'backend' } } }), true);
+  assert.equal(recaptcha.askedWhen({ captcha: { providers: { recaptcha: { enabled: false } } }, targets: { backend: { type: 'backend' } } }), false);
 });

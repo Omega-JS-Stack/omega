@@ -1,13 +1,15 @@
 /**
- * ship-plan tests ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)):
+ * ship-plan tests:
  * the one derivation every publish lane and the manage walk read. What a
- * brand's declaration ships, what each format still owes, and the ONE wording
- * a missing ship credential or a missing listing id is reported in.
+ * brand's declaration ships, the keys it still owes (missingEnvKeys for
+ * `publish`), and the ONE wording a missing ship credential or a missing
+ * listing id is reported in.
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { shipPlan, missingShipKeys, shipKeyRefusal, listingManualStep } = require('../src/ship-plan.js');
+const { missingEnvKeys } = require('@omega.js/config');
+const { shipPlan, shipKeyRefusal, listingManualStep } = require('../src/ship-plan.js');
 
 test('ship-plan: an undeclared extension ships every format, each carrying its own requirements', () => {
   const plan = shipPlan({}, 'extension');
@@ -26,7 +28,7 @@ test('ship-plan: an undeclared extension ships every format, each carrying its o
   assert.match(chromeStore.console, /^https:\/\//);
 
   // The firefox listing is never asked for: AMO takes the manifest's gecko id,
-  // and the publish that creates the listing writes it back (#893)
+  // and the publish that creates the listing writes it back
   assert.deepEqual(plan.find((entry) => entry.platform === 'firefox' && entry.format === 'store').listing, []);
 });
 
@@ -66,24 +68,27 @@ test('ship-plan: the windows signing set narrows to the CONFIGURED strategy', ()
   assert.deepEqual(shipPlan({}, 'desktop').find((entry) => entry.format === 'nsis').requires, []);
 });
 
-test('ship-plan: missingShipKeys names every empty key with the declaration that requires it', () => {
-  const plan = shipPlan({}, 'extension');
-  const missing = missingShipKeys(plan, { CHROME_CLIENT_ID: 'id', CHROME_CLIENT_SECRET: 'secret', CHROME_REFRESH_TOKEN: 'token', FIREFOX_API_KEY: 'key', FIREFOX_API_SECRET: 'secret' });
+test('ship-plan: the publish rows name every empty key the plan requires, with its declaration and store', () => {
+  const env = { CHROME_CLIENT_ID: 'id', CHROME_CLIENT_SECRET: 'secret', CHROME_REFRESH_TOKEN: 'token', FIREFOX_API_KEY: 'key', FIREFOX_API_SECRET: 'secret' };
+  const missing = missingEnvKeys({}, env, { target: 'extension', verb: 'publish' });
 
-  assert.deepEqual(missing, [
+  assert.deepEqual(missing.map(({ key, path, label }) => ({ key, path, label })), [
     { key: 'EDGE_CLIENT_ID', path: 'platforms.edge.formats.store', label: 'Microsoft Edge Add-ons' },
     { key: 'EDGE_API_KEY', path: 'platforms.edge.formats.store', label: 'Microsoft Edge Add-ons' },
   ]);
 
   // An empty string is absent, the same rule the .env cascade applies
-  assert.equal(missingShipKeys(plan, { CHROME_CLIENT_ID: '' }).some((entry) => entry.key === 'CHROME_CLIENT_ID'), true);
+  const blank = missingEnvKeys({}, { CHROME_CLIENT_ID: '' }, { target: 'extension', verb: 'publish' });
+  assert.equal(blank.some((entry) => entry.key === 'CHROME_CLIENT_ID'), true);
 });
 
-test('ship-plan: the refusal names each key, its declaration, and the ONE walk that collects it', () => {
-  const message = shipKeyRefusal([{ key: 'EDGE_API_KEY', path: 'platforms.edge.formats.store', label: 'Microsoft Edge Add-ons' }]);
+test('ship-plan: the refusal names each key, its declaration, its store, and the ONE walk that collects it', () => {
+  const missing = missingEnvKeys({ platforms: { chrome: false, firefox: false } }, {}, { target: 'extension', verb: 'publish' });
+  const message = shipKeyRefusal(missing);
 
-  assert.match(message, /1 ship credential/);
-  assert.match(message, /EDGE_API_KEY \(required by platforms\.edge\.formats\.store\)/);
+  assert.match(message, /^2 ship credential/);
+  assert.match(message, /EDGE_CLIENT_ID \(required by platforms\.edge\.formats\.store\): Microsoft Edge Add-ons cannot publish without it/);
+  assert.match(message, /EDGE_API_KEY \(required by platforms\.edge\.formats\.store\): Microsoft Edge Add-ons cannot publish without it/);
   assert.match(message, /omega manage --service publishing/);
 });
 

@@ -13,10 +13,8 @@
     "mgr": "bin/omega"
   },
   "files": [
-    ".claude-plugin/",
     "AGENTS.md",
     "bin/",
-    "claude-plugin/",
     "dist/",
     "docs/"
   ],

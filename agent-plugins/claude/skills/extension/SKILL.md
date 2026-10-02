@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo**: `docs/extension/index.md` is the guide (the consumer entry and the per-context instance, the component table, auth sync, build system and modes, themes, defaults, translations, hooks, environment detection, the CLI table). The per-subsystem meat lives in `docs/extension/*.md`. Cross-framework contracts live in `docs/shared/` (config, theming, icons, translation, testing, deploys, updates, local-dev).
-- **Working in a consumer project** — read `node_modules/@omega.js/manager/docs/extension/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega command.
+- **Working in a consumer project**: read `node_modules/@omega.js/manager/docs/extension/index.md`: the installed manager ships the monorepo's whole `docs/` tree, and a locally linked brand's copy is synced from the monorepo before every omega verb but a read-only one.
 - **`@omega.js/client` comes with it.** The four page contexts' instances extend the client's base class, so any task touching auth, Firestore, subscriptions, notifications, or `data-omega-bind` is client work too: `docs/client/index.md` and the `omega:client` skill.
 
 ## Non-negotiables

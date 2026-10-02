@@ -34,7 +34,7 @@ const BUILD_FACT_PATHS = CLIENT_FACT_KEYS;
 
 /**
  * Read a dotted path out of a config object — the path resolver the schema
- * walk and the env presence checker (env-rules.js) share.
+ * walk and the env rules (env-when.js) share.
  *
  * @param {object} obj - The (resolved) config object.
  * @param {string} dottedPath - e.g. 'analytics.providers.google.id'.

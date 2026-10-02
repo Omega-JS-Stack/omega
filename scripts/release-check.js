@@ -22,6 +22,8 @@ const ROOT = path.join(__dirname, '..');
 const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web'];
 // Always packed even under --only: overrides point at these tarballs
 const OVERRIDE_PACKAGES = ['client', 'backend', 'mcp-router'];
+// The Claude plugin's manifest: its version gates every machine's update.
+const PLUGIN_MANIFEST = path.join('agent-plugins', 'claude', '.claude-plugin', 'plugin.json');
 
 /**
  * Run a command, capturing output; returns { ok, output }.
@@ -62,19 +64,21 @@ function packPackage(name, destRoot) {
 }
 
 /**
- * Lockstep check: the root package.json and every publishable carry the SAME
- * version, the one the `chore(release)` commit sets by hand. Reads the
- * manifests, never the packed tarballs, so an off version fails before
- * anything is packed.
+ * Lockstep check: the root package.json, every publishable and the Claude
+ * plugin manifest carry the SAME version, the one the `chore(release)` commit
+ * sets by hand. The plugin's version is what moves every machine's installed
+ * copy, so it follows releases too. Reads the manifests, never the packed
+ * tarballs, so an off version fails before anything is packed.
  * @param {string} [root] - the monorepo root to read
  * @returns {{ ok: boolean, detail: string }}
  */
 function checkLockstepVersions(root = ROOT) {
-  const read = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version;
-  const family = read(root);
-  const off = PUBLISHABLES
-    .map((name) => ({ name, version: read(path.join(root, 'packages', name)) }))
-    .filter((entry) => entry.version !== family);
+  const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8')).version;
+  const family = read(path.join(root, 'package.json'));
+  const off = [
+    ...PUBLISHABLES.map((name) => ({ name, version: read(path.join(root, 'packages', name, 'package.json')) })),
+    { name: 'plugin', version: read(path.join(root, PLUGIN_MANIFEST)) },
+  ].filter((entry) => entry.version !== family);
 
   if (off.length === 0) {
     return { ok: true, detail: family };

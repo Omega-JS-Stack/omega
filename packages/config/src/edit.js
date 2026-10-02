@@ -788,4 +788,4 @@ function removeConfigFileValues(configPath, paths, { dryRun = false } = {}) {
   return { path: configPath, changed: next !== source, removed };
 }
 
-module.exports = { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues, parseRoot };
+module.exports = { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues, parseRoot, getAtPath };

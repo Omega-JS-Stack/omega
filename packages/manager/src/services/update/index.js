@@ -1,8 +1,7 @@
 /**
- * Update service — installs dependencies and builds every target in the brand
- * monorepo. The monorepo cousin of omega-manager's update service (which
- * walks separate per-target repos); phases beyond install/build (bump,
- * deploy, sync) port over with their flags as the cutover advances.
+ * Update service: installs dependencies and builds every target in the brand
+ * monorepo. Install and build are its whole job; the legacy bump, deploy and
+ * sync phases are retired (docs/shared/breaking-changes.md).
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 
