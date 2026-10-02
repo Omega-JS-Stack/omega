@@ -133,9 +133,10 @@ module.exports = defineCases({
         ctx.expect(bare[0].message).toContain('Missing cloud-signing env vars for azure');
       },
     },
-    // The per-provider keys are the env schema's `requiredWhen` sets, read off the
-    // schema itself here, so a key added to or dropped from a provider there is
-    // one validate-certs checks without a second list to edit.
+    // The per-provider keys are the env schema's `requiredWhen` sets, evaluated
+    // against a desktop brand that ships the installer and no snap, so a key
+    // added to or dropped from a provider there is one validate-certs checks
+    // without a second list to edit.
     {
       name: 'each cloud provider requires exactly the env schema\'s keys for it, and an unknown provider is refused',
       run: (ctx) => {
@@ -144,7 +145,10 @@ module.exports = defineCases({
         ctx.expect(providers.length).toBeGreaterThan(0);
 
         for (const provider of providers) {
-          const config = { platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider } } } } };
+          const config = {
+            targets: { desktop: { type: 'desktop' } },
+            platforms: { linux: { formats: { snap: false } }, windows: { signing: { strategy: 'cloud', cloud: { provider } } } },
+          };
           const keys = ENV_SCHEMA.filter((entry) => typeof entry.requiredWhen === 'function' && entry.requiredWhen(config)).map((entry) => entry.name);
           ctx.expect(keys.length).toBeGreaterThan(0);
 

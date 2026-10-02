@@ -41,7 +41,7 @@ const logger = new Logger('deploy');
 // sets it on the repo ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)):
 // this lane writes the CNAME file the push publishes, and the two claiming
 // different domains for one site is the bug that pairing them prevents.
-const { pagesHost } = require('@omega.js/config');
+const { pagesHost, repoMissing } = require('@omega.js/config');
 
 /**
  * The URL this deploy PUBLISHES to, split where the host ends: the two facts
@@ -222,7 +222,7 @@ function buildDirectPlan(config, options) {
   const website = websiteAddress(config, cwd);
 
   if (!website) {
-    throw new Error('Direct deploy needs repo.owner and brand.id in config/omega.json5: this target publishes to the website repo <brand.id>-<target name> under that owner. A target whose hosting.provider is not github has no repo to push to.');
+    throw new Error(`Direct deploy could not address the website repo. ${repoMissing('website')} A target whose hosting.provider is not github has no repo to push to.`);
   }
 
   const { owner, slug: repo } = website;

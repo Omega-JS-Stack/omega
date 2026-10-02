@@ -18,6 +18,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
+const { undeclaredPaths, undeclaredLine } = require('@omega.js/config');
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const ghApi = require('./lib/gh-api.js');
@@ -37,6 +38,13 @@ module.exports.run = createServiceRunner({
     const sidecarPath = join(context.brandRoot, 'config', 'seo.json5');
     if (jetpack.exists(sidecarPath)) {
       seo = { ...seo, ...JSON5.parse(jetpack.read(sidecarPath)) };
+    }
+
+    // The sidecar never passed the loader, so the merged section meets the
+    // one strict check here, before any API call
+    const undeclared = undeclaredPaths({ seo });
+    if (undeclared.length) {
+      throw new Error(undeclared.map(undeclaredLine).join('\n'));
     }
 
     if (!seo.github?.content?.length) {

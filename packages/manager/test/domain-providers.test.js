@@ -71,19 +71,24 @@ test('each mailbox provider builds its own MX and SPF include', () => {
   assert.equal(spf(null), undefined);
 });
 
+// An apex MX of each registry provider, plus one no provider serves
+const EXISTING_MX = [
+  { id: 'a', type: 'MX', name: DOMAIN, content: 'mx3.mailgun.org' },
+  { id: 'b', type: 'MX', name: DOMAIN, content: 'mx1.privateemail.com' },
+  { id: 'c', type: 'MX', name: DOMAIN, content: 'route9.mx.cloudflare.net' },
+  { id: 'd', type: 'MX', name: DOMAIN, content: 'aspmx.l.google.com' },
+];
+
+test('with no mailbox provider picked, no MX record is obsolete', () => {
+  assert.deepEqual(findObsoleteMxRecords(EXISTING_MX, DOMAIN, null), []);
+});
+
 test("an MX record of another mailbox provider is obsolete, the chosen one's is kept", () => {
-  const existing = [
-    { id: 'a', type: 'MX', name: DOMAIN, content: 'mx3.mailgun.org' },
-    { id: 'b', type: 'MX', name: DOMAIN, content: 'mx1.privateemail.com' },
-    { id: 'c', type: 'MX', name: DOMAIN, content: 'route9.mx.cloudflare.net' },
-    { id: 'd', type: 'MX', name: DOMAIN, content: 'aspmx.l.google.com' },
-  ];
-  const obsolete = (provider) => findObsoleteMxRecords(existing, DOMAIN, provider).map((r) => r.id);
+  const obsolete = (provider) => findObsoleteMxRecords(EXISTING_MX, DOMAIN, provider).map((r) => r.id);
 
   assert.deepEqual(obsolete('squarespace'), ['b', 'c']);
   assert.deepEqual(obsolete('privateemail'), ['a', 'c']);
   assert.deepEqual(obsolete('cloudflare'), ['a', 'b']);
-  assert.deepEqual(obsolete(null), ['a', 'b', 'c']);
 });
 
 test('an existing MX record is labelled by the mailbox provider that serves it', () => {

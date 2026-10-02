@@ -26,7 +26,7 @@ const fs      = require('fs');
 const jetpack = require('fs-jetpack');
 
 const { getOctokit } = require('../utils/github.js');
-const { releasesRepo } = require('@omega.js/config');
+const { releasesRepo, repoMissing } = require('@omega.js/config');
 const build = require('../build.js');
 
 const logger = build.logger('finalize-release');
@@ -61,7 +61,7 @@ module.exports = async function finalizeRelease(options = {}) {
   // The releases repo (the auto-updater feed source), from config alone.
   const releases = releasesRepo(config);
   if (!releases) {
-    throw new Error('finalize-release: could not address the releases repo. Set repo.owner and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that owner).');
+    throw new Error(`finalize-release: could not address the releases repo. ${repoMissing('releases')}`);
   }
   const { owner, name } = releases;
 

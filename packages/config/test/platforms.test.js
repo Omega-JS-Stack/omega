@@ -220,6 +220,10 @@ test('a cloud provider\'s keys are exactly the env schema entries gated on it', 
   assert.deepStrictEqual(windowsCloudProviderKeys('imaginary'), []);
 });
 
+test('windowsCloudProviderKeys still names DigiCert\'s two keys once the cloud keys ride signsWith', () => {
+  assert.deepStrictEqual(windowsCloudProviderKeys('digicert'), ['DIGICERT_API_KEY', 'DIGICERT_KEYPAIR_ALIAS']);
+});
+
 test('the Windows signing strategy defaults to self-hosted, and a configured one wins', () => {
   assert.equal(DEFAULT_WINDOWS_SIGNING_STRATEGY, 'self-hosted');
   assert.ok(WINDOWS_SIGNING_STRATEGIES.includes(DEFAULT_WINDOWS_SIGNING_STRATEGY));

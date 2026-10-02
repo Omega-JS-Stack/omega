@@ -148,6 +148,10 @@ module.exports = defineCases({
         assert.equal(error.code, 500, 'the route answers with e.code, with no `|| 400` to fall back on');
         assert.match(error.message, /GitHub repo not configured/);
         assert.match(error.message, /repo\.owner/, 'and it names the key to set');
+        assert.ok(
+          error.message.includes('Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.'),
+          'the content repo IS the source repo, so the shared line names the source role',
+        );
       },
     },
 

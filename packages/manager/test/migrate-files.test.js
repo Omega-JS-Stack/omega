@@ -52,6 +52,26 @@ test('migrate: an overlay and a target\'s own file are judged like the base, one
   assert.equal(converted.code, 1);
 });
 
+test('migrate: config/seo.json5 is read too, and an item\'s org moves to owner in that file', async () => {
+  const brand = stageBrand(BASE);
+  const sidecar = path.join(brand, 'config', 'seo.json5');
+  write(sidecar, "{\n  // parasite repos\n  github: {\n    content: [\n      { name: 'fixture-tool', org: 'Acme-Org' },\n    ],\n  },\n}\n");
+
+  const report = await runMigrate(brand);
+  assert.match(
+    block(report.text, 'config/seo.json5'),
+    /due\s+move (seo\.)?github\.content\.0\.org → (seo\.)?github\.content\.0\.owner = "Acme-Org"/,
+    report.text,
+  );
+  assert.equal(report.code, 1);
+
+  const converted = await runMigrate(brand, { execute: true });
+  const written = fs.readFileSync(sidecar, 'utf8');
+  assert.deepEqual(JSON5.parse(written), { github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org' }] } }, converted.text);
+  assert.ok(written.includes('// parasite repos'), 'its comments survive');
+  assert.equal(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'), BASE, 'the brand config is untouched');
+});
+
 test('migrate: each target\'s .env is its own block, and a .env outside the brand is never read or written', async () => {
   const brand = stageWithWebTarget();
   const targetEnv = path.join(brand, 'targets', 'web', '.env');

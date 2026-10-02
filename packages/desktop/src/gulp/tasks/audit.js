@@ -20,7 +20,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const build = require('../../build.js');
-const { validateConfig, releasesRepo, hasOmegaConfig, loadConfig } = require('@omega.js/config');
+const { validateConfig, releasesRepo, repoMissing, hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
 const logger = build.logger('audit');
 
@@ -62,7 +62,7 @@ module.exports = function audit(done) {
   // typed: @omega.js/config's releasesRepo derives `<brand.id>-releases` under
   // the brand's owner, so only a missing owner (or brand.id) leaves it unaddressable.
   if (build.isPublishMode() && config.releases?.enabled !== false && !releasesRepo(config)) {
-    errors.push('the releases repo is unaddressable: set repo.owner and brand.id. The repo is always "<brand.id>-releases" under that owner');
+    errors.push(`the releases repo is unaddressable. ${repoMissing('releases')}`);
   }
 
   // 3. Soft warnings — not fatal but worth surfacing.

@@ -411,9 +411,9 @@ function validateFeatures(config) {
  * The LEAF paths of a config the schema does not declare. A rule declares its
  * own path; an `object`/`array` rule opens its whole subtree only when no rule
  * is declared beneath it (or it says `open: true`), so a section with typed
- * keys stays closed. An empty object/array (or a `false` off switch) is a leaf,
- * declared when the schema declares anything below it. `targets` is skipped
- * whole: each target's own load judges its entry.
+ * keys stays closed. An empty object (or a `false` off switch) is a leaf,
+ * declared when the schema declares anything below it, and so is a list nothing
+ * is declared below. `targets` is skipped whole: its own load judges each entry.
  * @param {object} config - The config object.
  * @param {object[]} schema - Rule array in the schema.js entry format.
  * @param {string[]} [written] - Paths framework code wrote onto a decorated config, each open.
@@ -427,22 +427,53 @@ function findUndeclaredPaths(config, schema, written = []) {
     .concat(written);
   const found = [];
 
-  const walk = (value, path) => {
+  // A list with keys declared below it has each plain-object item walked: the
+  // reported path carries the position (`seo.github.content[0].org`), and
+  // `shape` leaves positions out, the form the rules declare.
+  const walk = (value, path, shape) => {
     if (isPlainObject(value) && Object.keys(value).length > 0) {
-      Object.keys(value).forEach((key) => walk(value[key], `${path}.${key}`));
+      Object.keys(value).forEach((key) => walk(value[key], `${path}.${key}`, `${shape}.${key}`));
       return;
     }
-    const declared = paths.includes(path)
-      || open.some((rule) => path.startsWith(`${rule}.`))
-      || paths.some((rule) => rule.startsWith(`${path}.`));
+    if (Array.isArray(value) && paths.some((rule) => rule.startsWith(`${shape}.`))) {
+      value.forEach((item, index) => {
+        if (isPlainObject(item)) walk(item, `${path}[${index}]`, shape);
+      });
+      return;
+    }
+    const declared = paths.includes(shape)
+      || open.some((rule) => shape.startsWith(`${rule}.`))
+      || paths.some((rule) => rule.startsWith(`${shape}.`));
     if (!declared) found.push(path);
   };
 
   Object.keys(isPlainObject(config) ? config : {})
     .filter((key) => key !== 'targets')
-    .forEach((key) => walk(config[key], key));
+    .forEach((key) => walk(config[key], key, key));
 
   return found;
+}
+
+/**
+ * The one line the strict check prints for a path no rule declares.
+ * @param {string} path - The undeclared path, as findUndeclaredPaths reports it.
+ * @returns {string}
+ */
+function undeclaredLine(path) {
+  return `config.${path} is not a key the schema declares. Remove it, or if it is a legacy key run `
+    + '`npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)';
+}
+
+/**
+ * The steps of a path as findUndeclaredPaths reports it, a list position a number.
+ * @param {string} path - e.g. 'seo.github.content[0].org'.
+ * @returns {Array<string|number>} e.g. ['seo', 'github', 'content', 0, 'org'].
+ */
+function pathSteps(path) {
+  return path.split('.').flatMap((segment) => {
+    const [key, ...positions] = segment.split('[');
+    return [key, ...positions.map((position) => Number(position.slice(0, -1)))];
+  });
 }
 
 /**
@@ -621,10 +652,7 @@ function validateConfig(config, options) {
   // A key nothing declares is a key nothing reads: a typo or a legacy shape.
   // One line per path, so a brand sees every key it has to move or delete.
   findUndeclaredPaths(config, schema, options.decorated ? [...RESOLVED_PATHS, ...BUILD_FACT_PATHS] : RESOLVED_PATHS).forEach((path) => {
-    errors.push(
-      `config.${path} is not a key the schema declares. Remove it, or if it is a legacy key run `
-      + '`npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)',
-    );
+    errors.push(undeclaredLine(path));
   });
 
   // ─── secrets ───────────────────────────────────────────────────────────
@@ -642,4 +670,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, formatErrors, getPath, resolvedBrandHost };
+module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, pathSteps, runSchema, formatErrors, getPath, resolvedBrandHost };

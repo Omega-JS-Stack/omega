@@ -114,6 +114,30 @@ function repoDrift(originSlug, config) {
   return `origin is ${originSlug} but config derives ${derived.slug}: fix repo.owner in config/omega.json5 or move the repo`;
 }
 
+// The name each role derives, as an owner reads it in a refusal.
+const MISSING_REPO_NAMES = {
+  source: '<brand.id>-omega',
+  releases: '<brand.id>-releases',
+  website: '<brand.id>-<target name>',
+};
+
+/**
+ * The ONE line that tells an owner how to make a repo addressable: every
+ * refusal that found no derivable repo quotes it after its own lead (what it
+ * could not do), so no caller types `repo.owner` guidance itself.
+ *
+ * @param {string} role - 'source' | 'releases' | 'website'.
+ * @returns {string} The guidance line, naming the repo the role derives.
+ * @throws {Error} When the role is not one of the three.
+ */
+function repoMissing(role) {
+  if (!Object.hasOwn(MISSING_REPO_NAMES, role)) {
+    throw new Error(`repoMissing: unknown role "${role}": one of [${Object.keys(MISSING_REPO_NAMES).join(', ')}]`);
+  }
+
+  return `Set repo.owner and brand.id in config/omega.json5: the ${role} repo is ${MISSING_REPO_NAMES[role]} under that owner.`;
+}
+
 /**
  * The brand's ONE public releases repo: `<brand.id>-releases` under the same
  * owner, ALWAYS public, because the desktop updater polls it with no token
@@ -263,6 +287,7 @@ module.exports = {
   repoBlock,
   sourceRepo,
   repoDrift,
+  repoMissing,
   releasesRepo,
   websiteRepo,
   hostingProvider,

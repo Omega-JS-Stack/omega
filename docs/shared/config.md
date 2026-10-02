@@ -715,10 +715,10 @@ own list derives from it, so a new key is **one entry**, never four edits.
   |---|---|
   | `holds(path)` | the config path holds a value |
   | `onUnlessOff(path)` | the switch is not `false`, at the path or any section above it: absent means on |
-  | `chosen(path, name)` | the provider is the chosen one: a `providers` map picks by presence, a plain value by equality (`chosen('platforms.windows.signing.cloud.provider', 'azure')`) |
+  | `chosen(path, name)` | the provider is the chosen one: a `providers` map picks by presence, a plain value by equality (`chosen('monitoring.providers', 'sentry')`) |
   | `hasTarget(...types)` | the brand declares a target of one of those types |
   | `ships(platform, format)` | a desktop target ships the format: on by default, so it holds until `platforms.<platform>` or `platforms.<platform>.formats.<format>` is `false`, judged per target view |
-  | `signsWith(strategy)` | a desktop target ships `windows.nsis` and signs it with that strategy, the default (`self-hosted`) included when none is written |
+  | `signsWith(strategy, provider)` | a desktop target ships `windows.nsis` and signs it with that strategy, the default (`self-hosted`) included when none is written. With a provider, that same target also names it at `platforms.windows.signing.cloud.provider`, and the rule prints as `platforms.windows.signing.cloud.provider=<provider>` (`signsWith('cloud', 'azure')`) |
   | `realProject()` | `cloud.config.projectId` is not a `demo-` id: a demo project is local only, so the cloud service asks for nothing there. No id yet is "not chosen", not demo: the cloud service asks for the Google client so it can pick one |
   | `all(...rules)`, `any(...rules)` | every rule, or one of them |
   | `asks({ service: rule })` | the shape of an `askedWhen`: any service asks; `.services` keeps each service's own rule |
@@ -1047,6 +1047,18 @@ per path, so a brand sees each key it has to move or delete:
 config.<path> is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)
 ```
 
+The line has one home, the validator's exported `undeclaredLine(path)`: the loader prints it,
+and so does the manager's seo service, which runs the same strict check (`undeclaredPaths`) on
+the `seo` section merged with its `config/seo.json5` sidecar before any API call, since the
+sidecar never passes through the loader.
+
+**A list with keys declared below it is walked item by item.** Rules spell an item's keys with
+the list position left out (`seo.github.content.owner`), and the check walks each plain-object
+item of such a list, so the reported path carries the position:
+`config.seo.github.content[0].org`. A list with nothing declared below it (`payment.products`,
+`account.admins`) stays one value, as do its items, and an item that is not a plain object
+(a `purgecss.safelist` string) is never walked.
+
 The validator knows only the present shape: a retired name fails exactly like a typo, with
 no special message, and the brand-root `omega migrate` is the one code that knows what an
 old name became (its tables are `@omega.js/manager`'s `src/migrate/`, see Migration below).
@@ -1054,8 +1066,8 @@ A key the code reads owes a rule; a key nothing reads is dead and goes. What sta
 
 - **A rule of type `object`/`array` opens its subtree ONLY when no rule is declared beneath
   it: a brand's postal `brand.address`, `brand.images`, the `connections` provider map,
-  `payment.products`, `seo.github`, `blog.providers`, `devlog.providers.ghostii`. A section
-  with typed keys (`cloud.config`, `devlog`, `marketing`, `repo`, `targets.web.meta`,
+  `payment.products`, `blog.providers`, `devlog.providers.ghostii`. A section
+  with typed keys (`cloud.config`, `devlog`, `marketing`, `repo`, `seo.github`, `targets.web.meta`,
   `targets.desktop.platforms`, `releases`) is CLOSED, so a retired path or a typo inside it
   fails. `cloud.config` types every key the Firebase web SDK takes. Two bags are open
   beside typed keys on purpose, marked `open: true` on their rule: the @omega.js/client
@@ -1574,6 +1586,14 @@ the line `origin is <slug> but config derives <derived>: fix repo.owner in
 config/omega.json5 or move the repo`. The boot prelude prints it; `omega manage` and
 `omega deploy` refuse with it ([deploys.md](deploys.md#the-origin-gate-934)).
 
+**`repoMissing(role)`** is the one line a refusal quotes when a role's repo is
+unaddressable (no owner, or no brand id), with `role` one of `source`, `releases` or
+`website`: `Set repo.owner and brand.id in config/omega.json5: the <role> repo is <name>
+under that owner.`, where `<name>` is that role's derivation from the table above. Each
+refusal (the backend CMS, the deploy dispatch, the secret publication skip, the desktop
+and extension release lanes, the web direct deploy) states its own lead, then this line;
+an unknown role throws.
+
 **Visibility lives in the brand root's `package.json`**, never in omega.json5
 (`brandVisibility(brandRoot)`): `private: true` or the field ABSENT is a private brand
 (every brand monorepo is private by default, Ian 2026-09-11), and only a literal `false`
@@ -1788,7 +1808,8 @@ people toward. Same for `google`/`meta` under `analytics.providers`.
 
 **`omega migrate --execute` at the brand root deletes them** ([#612](https://github.com/Omega-JS-Stack/omega/issues/612)): both halves of the
 list, from every authored omega file (the brand's `config/omega.json5` and its environment
-overlays, each target's own file and its overlays, one report block each), through the
+overlays, the `config/seo.json5` sidecar read as the `seo` section, each target's own file
+and its overlays, one report block each), through the
 comment-preserving editor (`removeConfigFileValues`):
 the key, its subtree, and the comment documenting it, with every other byte untouched. One line
 per key naming its replacement, a bare `omega migrate` for the plan, idempotent (a converged brand's rerun

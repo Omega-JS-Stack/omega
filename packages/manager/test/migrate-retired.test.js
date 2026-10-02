@@ -11,7 +11,7 @@ const JSON5 = require('json5');
 
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('../src/migrate/retired-keys.js');
 const { RETIRED_ENV_KEYS, findRetiredEnvKeys } = require('../src/migrate/retired-env.js');
-const { stageBrand, runMigrate } = require('./lib/migrate-harness.js');
+const { stageBrand, runMigrate, block } = require('./lib/migrate-harness.js');
 
 const VALID = { brand: { id: 'sandbox-brand', name: 'Sandbox Brand' } };
 
@@ -282,6 +282,49 @@ test('migrate --execute: repo.org is CONVERTED to repo.owner, and no org is left
 
   const parsed = JSON5.parse(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'));
   assert.deepEqual(parsed.repo, { provider: 'github', owner: 'Acme' }, `the owner moved, and org is gone: ${text}`);
+});
+
+const SEO_ITEM_ORG = `{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  seo: {
+    github: {
+      content: [
+        { name: 'fixture-tool', org: 'Acme-Org' },
+      ],
+    },
+  },
+  targets: { web: { type: 'web' } },
+}
+`;
+
+test('migrate: an seo content item\'s org names seo.github.content[].owner, and --execute moves the value', async () => {
+  const config = { ...VALID, seo: { github: { content: [{ name: 'fixture-tool', org: 'Acme-Org' }] } } };
+  const finding = findRetiredKeys(config).find((entry) => entry.path === 'seo.github.content.0.org');
+  assert.ok(fired(config, 'seo.github.content.0.org', '→ seo.github.content[].owner:'), lines(config).join(' | '));
+  assert.equal(finding.convert('Acme-Org'), 'Acme-Org', 'the owner moves as it is');
+
+  const brand = stageBrand(SEO_ITEM_ORG);
+  const report = await runMigrate(brand);
+  assert.match(
+    block(report.text, 'config/omega.json5'),
+    /due\s+move seo\.github\.content\.0\.org → seo\.github\.content\.0\.owner = "Acme-Org"/,
+    report.text,
+  );
+
+  const converted = await runMigrate(brand, { execute: true });
+  const parsed = JSON5.parse(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'));
+  assert.deepEqual(parsed.seo.github.content, [{ name: 'fixture-tool', owner: 'Acme-Org' }], `owner written, org gone: ${converted.text}`);
+});
+
+test('migrate --execute: an seo item carrying both org and owner is refused, never overwritten', async () => {
+  const both = SEO_ITEM_ORG.replace("org: 'Acme-Org' }", "org: 'Acme-Org', owner: 'Other-Org' }");
+  const brand = stageBrand(both);
+  const { text, code } = await runMigrate(brand, { execute: true });
+
+  assert.equal(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'), both, 'the file is untouched');
+  assert.match(block(text, 'config/omega.json5'), /refused seo\.github\.content\.0\.org → seo\.github\.content\.0\.owner/, text);
+  assert.ok(text.includes('delete one of the two by hand'), text);
+  assert.equal(code, 1);
 });
 
 test('#647: product limits and rateLimit name the features catalog, at their real array path', () => {

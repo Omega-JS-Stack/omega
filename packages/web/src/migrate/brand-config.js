@@ -8,7 +8,7 @@
  */
 const fs = require('node:fs');
 const JSON5 = require('json5');
-const { applyConfigEdits, writeConfigFileValues, undeclaredAuthoredPaths, planMerge, setAtPath } = require('@omega.js/config');
+const { applyConfigEdits, writeConfigFileValues, undeclaredAuthoredPaths, planMerge, setAtPath, pathSteps } = require('@omega.js/config');
 const { removePath } = require('./config-convert.js');
 
 /**
@@ -24,7 +24,13 @@ function brandShape(converted, name) {
   const entry = targets[name];
 
   for (const dotted of undeclaredAuthoredPaths(shared)) {
-    const steps = dotted.split('.');
+    const steps = pathSteps(dotted);
+    // Part of a list item cannot move to another layer. None arrives here:
+    // convertConfig drops every path a web load refuses, and a list's items
+    // answer to the same shared rules in a web load.
+    if (steps.some(Number.isInteger)) {
+      throw new Error(`${dotted} sits inside a list item, which cannot move under targets.${name}: convertConfig drops such a path first`);
+    }
     setAtPath(entry, dotted, steps.reduce((node, key) => node[key], shared));
     removePath(shared, steps);
   }

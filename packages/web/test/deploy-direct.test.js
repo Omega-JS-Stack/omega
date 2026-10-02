@@ -251,6 +251,10 @@ test('direct plan: a config that names no owner REFUSES, and no ambient repo can
 
   assert.match(message, /repo\.owner/, 'the one key to set is named');
   assert.match(message, /website repo/, 'and what it addresses');
+  assert.ok(
+    message.includes('Set repo.owner and brand.id in config/omega.json5: the website repo is <brand.id>-<target name> under that owner.'),
+    'the shared line names the website role',
+  );
   assert.doesNotMatch(message, /GITHUB_REPOSITORY|remote/, 'neither the CI environment nor a git remote is offered: both name the wrong repo');
 });
 

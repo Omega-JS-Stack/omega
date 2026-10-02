@@ -377,7 +377,7 @@ async function publishToGitHubRelease(options) {
   options = options || {};
 
   const { gh } = require('@omega.js/devkit/github-repo');
-  const { releasesRepo, targetNameFromDir } = require('@omega.js/config');
+  const { releasesRepo, repoMissing, targetNameFromDir } = require('@omega.js/config');
 
   const config = options.config || build.getConfig();
   const releases = releasesRepo(config);
@@ -385,7 +385,7 @@ async function publishToGitHubRelease(options) {
   // Half an address publishes nowhere: this is the address a download button on
   // the site is already pointing at, so it is named, never guessed.
   if (!releases) {
-    throw new Error('Cannot address the releases repo: set repo.owner (and brand.id) in config/omega.json5. The releases repo is `<brand.id>-releases` under that owner.');
+    throw new Error(`Cannot address the releases repo. ${repoMissing('releases')}`);
   }
 
   const version = options.version || project.version;

@@ -112,11 +112,12 @@ for (const [name, fake] of Object.entries(FAKES)) {
   childProcess[name] = seam;
 }
 
-// Loaded after the seam, since it reaches devkit modules that bind child_process.
-// A run that falls into the manage handoff inherits this env: no machine credential rides along.
-const { scrubCredentialEnv } = require('@omega.js/devkit/test/journey-harness');
-const scrubbed = scrubCredentialEnv(process.env);
+// A run that falls into the manage handoff inherits this env: no machine credential
+// rides along, and every CLI's config home sits under a fresh throwaway root.
+const { scrubCredentialEnv } = require('@omega.js/devkit/test/credential-scrub');
+const scrubbed = scrubCredentialEnv(process.env, fs.mkdtempSync(path.join(os.tmpdir(), 'omega-onboard-homes-')));
 Object.keys(process.env).filter((name) => !(name in scrubbed)).forEach((name) => { delete process.env[name]; });
+Object.assign(process.env, scrubbed);
 
 // ─── The fake gh ─────────────────────────────────────────────────────────────
 

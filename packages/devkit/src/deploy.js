@@ -60,11 +60,11 @@ const SNAPSHOT_REF = 'omega-deploy';
  * @throws {Error} when the config names no repo
  */
 function dispatchRepo(config) {
-  const { sourceRepo } = require('@omega.js/config');
+  const { sourceRepo, repoMissing } = require('@omega.js/config');
   const source = sourceRepo(config);
 
   if (!source) {
-    throw new Error('Could not determine the brand repo to dispatch on. Set repo.owner (and brand.id) in config/omega.json5: the source repo is <brand.id>-omega under that owner.');
+    throw new Error(`Could not determine the brand repo to dispatch on. ${repoMissing('source')}`);
   }
 
   return { owner: source.owner, repo: source.name };

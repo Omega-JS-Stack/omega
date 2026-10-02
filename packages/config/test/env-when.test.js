@@ -65,6 +65,17 @@ test('signsWith(strategy): the desktop target ships the Windows installer and si
   assert.equal(selfHosted({ platforms: { windows: { signing: { strategy: 'self-hosted' } } } }), false, 'a strategy with no desktop target');
 });
 
+test('signsWith(strategy, provider): the cloud strategy also has to name that provider', () => {
+  const azure = signsWith('cloud', 'azure');
+  const cloud = (provider) => ({ windows: { signing: { strategy: 'cloud', cloud: { provider } } } });
+
+  assert.equal(azure({ ...DESKTOP, platforms: cloud('azure') }), true);
+  assert.equal(azure({ ...DESKTOP, platforms: cloud('sslcom') }), false, 'another provider');
+  assert.equal(azure({ ...DESKTOP, platforms: { windows: { signing: { cloud: { provider: 'azure' } } } } }), false, 'the provider written, the strategy left at its default');
+  assert.equal(azure({ ...DESKTOP, platforms: { windows: { ...cloud('azure').windows, formats: { nsis: false } } } }), false, 'the installer turned off');
+  assert.equal(azure({ platforms: cloud('azure') }), false, 'no desktop target');
+});
+
 test('onUnlessOff(path): absent means on, and only a literal false turns it off', () => {
   const rule = onUnlessOff('captcha.providers.recaptcha.enabled');
 

@@ -80,6 +80,7 @@
     "./test/browser": "./src/test/browser.js",
     "./test/steps-log": "./src/test/steps-log.js",
     "./test/journey-harness": "./src/test/journey-harness.js",
+    "./test/credential-scrub": "./src/test/credential-scrub.js",
     "./test/stdout-guard": "./src/test/stdout-guard.js",
     "./test/temp-home": "./src/test/temp-home.js",
     "./test/dashed-files": "./src/test/dashed-files.js",

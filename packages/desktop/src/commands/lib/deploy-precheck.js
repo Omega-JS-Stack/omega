@@ -24,7 +24,7 @@
  */
 const build = require('../../build.js');
 const { runDeployPrecheck } = require('@omega.js/devkit/deploy-precheck');
-const { releasesRepo } = require('@omega.js/config');
+const { releasesRepo, repoMissing } = require('@omega.js/config');
 const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { resolveToken } = require('@omega.js/devkit/deploy');
 const { updateManager } = require('./dependencies.js');
@@ -62,7 +62,7 @@ async function provisionReleaseRepos({ log, warn, config, execFn, dryRun }) {
 
   const releases = releasesRepo(resolved);
   if (!releases) {
-    warn('provision-repos: could not address the releases repo. Set repo.owner and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that owner).');
+    warn(`provision-repos: could not address the releases repo. ${repoMissing('releases')}`);
     return;
   }
 

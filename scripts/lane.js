@@ -1,21 +1,10 @@
 /**
- * Lane timer — the thin wrapper every root test lane runs through so a lane
- * always says how long it took (Ian 2026-07-31: "make our tests/pipeline
- * mark the length of time it took to run").
- *
- *   node scripts/lane.js <label> "<command>" ["<command>" …]
- *
- * Runs each command in sequence (shell — globs and `-w` flags behave exactly
- * as they did in package.json), stops at the first failure, and prints ONE
- * line at the end with the lane's wall time. Root `npm test` is itself a lane
- * whose commands are the other lanes, so its closing line IS the pipeline
- * total, under each lane's own line.
- *
- * The lane's FULL output — its own lines plus every child command's stdout and
- * stderr — also tees to `.temp/logs/<lane>.log` (#197): the terminal is
- * untouched, the file is ANSI-stripped, and each run truncates the last. That
- * is why the children pipe instead of inheriting; FORCE_COLOR keeps their
- * colors alive across the pipe, and the tee strips them back out of the file.
+ * Lane timer: `node scripts/lane.js <label> "<command>" ["<command>" …]`.
+ * Runs every command in sequence through a shell whatever each one's result,
+ * prints a per-command summary when there is more than one, then ONE closing
+ * line with the wall time, and exits with the first failure's code. Root
+ * `npm test` is a lane whose commands are the other lanes.
+ * Output tees to `.temp/logs/<lane>.log`, so children pipe instead of inherit.
  */
 const { spawn } = require('node:child_process');
 const { teeLog } = require('./tee-log');
@@ -92,24 +81,34 @@ async function main() {
   teeLog(label);
 
   const startedAt = Date.now();
-  let failure = null;
+  const results = [];
 
   for (const command of commands) {
+    const commandStartedAt = Date.now();
     const code = await run(command);
-    if (code !== 0) {
-      failure = { command, code };
-      break;
-    }
+    results.push({ command, code, time: formatDuration(Date.now() - commandStartedAt) });
   }
 
   const elapsed = formatDuration(Date.now() - startedAt);
+  const failures = results.filter((result) => result.code !== 0);
 
-  if (failure) {
-    console.log(`\n✗ lane ${label} failed in ${elapsed} (exit ${failure.code}: ${failure.command})\n`);
-    process.exit(failure.code);
+  if (results.length > 1) {
+    console.log(`\nlane ${label} summary:`);
+    for (const { command, code, time } of results) {
+      console.log(code === 0 ? `  ✓ ${command} (${time})` : `  ✗ ${command} (${time}, exit ${code})`);
+    }
   }
 
-  console.log(`\n✓ lane ${label} done in ${elapsed}\n`);
+  // The closing line sits right under the summary; a lone command's keeps its gap.
+  const gap = results.length > 1 ? '' : '\n';
+
+  if (failures.length > 0) {
+    const { code } = failures[0];
+    console.log(`${gap}✗ lane ${label} failed in ${elapsed} (${failures.length} of ${results.length} failed, exit ${code})\n`);
+    process.exit(code);
+  }
+
+  console.log(`${gap}✓ lane ${label} done in ${elapsed}\n`);
 }
 
 main();

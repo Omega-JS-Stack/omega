@@ -11,6 +11,8 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const configIndex = require('../src/index.js');
 
@@ -415,6 +417,7 @@ const signing = (value) => ({ platforms: { windows: { signing: value } } });
 const cloudSigning = (provider) => signing({ strategy: 'cloud', cloud: { provider } });
 const GA_ID = { analytics: { providers: { google: { id: 'G-ACME123' } } } };
 const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
+const desktopCloud = (provider) => ({ ...DESKTOP, ...cloudSigning(provider) });
 
 // Each ruled key, a config its rule holds on, and one beside it that it does
 // not hold on: the rule's meaning is pinned, never its written form.
@@ -432,15 +435,15 @@ const REQUIRED_WHEN = {
   CSC_KEY_PASSWORD: [APPLE, {}],
   WIN_EV_TOKEN_PATH: [DESKTOP, { ...DESKTOP, ...cloudSigning('azure') }],
   WIN_CSC_KEY_PASSWORD: [DESKTOP, { ...DESKTOP, ...cloudSigning('azure') }],
-  AZURE_TENANT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
-  AZURE_CLIENT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
-  AZURE_CLIENT_SECRET: [cloudSigning('azure'), cloudSigning('sslcom')],
-  AZURE_TRUSTED_SIGNING_ENDPOINT: [cloudSigning('azure'), cloudSigning('sslcom')],
-  SSLCOM_USERNAME: [cloudSigning('sslcom'), cloudSigning('digicert')],
-  SSLCOM_PASSWORD: [cloudSigning('sslcom'), cloudSigning('digicert')],
-  SSLCOM_CREDENTIAL_ID: [cloudSigning('sslcom'), cloudSigning('digicert')],
-  DIGICERT_API_KEY: [cloudSigning('digicert'), cloudSigning('azure')],
-  DIGICERT_KEYPAIR_ALIAS: [cloudSigning('digicert'), cloudSigning('azure')],
+  AZURE_TENANT_ID: [desktopCloud('azure'), desktopCloud('sslcom')],
+  AZURE_CLIENT_ID: [desktopCloud('azure'), desktopCloud('sslcom')],
+  AZURE_CLIENT_SECRET: [desktopCloud('azure'), desktopCloud('sslcom')],
+  AZURE_TRUSTED_SIGNING_ENDPOINT: [desktopCloud('azure'), desktopCloud('sslcom')],
+  SSLCOM_USERNAME: [desktopCloud('sslcom'), desktopCloud('digicert')],
+  SSLCOM_PASSWORD: [desktopCloud('sslcom'), desktopCloud('digicert')],
+  SSLCOM_CREDENTIAL_ID: [desktopCloud('sslcom'), desktopCloud('digicert')],
+  DIGICERT_API_KEY: [desktopCloud('digicert'), desktopCloud('azure')],
+  DIGICERT_KEYPAIR_ALIAS: [desktopCloud('digicert'), desktopCloud('azure')],
   SNAPCRAFT_STORE_CREDENTIALS: [DESKTOP, { ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }],
   GOOGLE_ANALYTICS_SECRET_WEB: [GA_ID, { analytics: { providers: { google: {} } } }],
   GOOGLE_ANALYTICS_SECRET_BACKEND: [GA_ID, { analytics: { providers: { google: {} } } }],
@@ -479,6 +482,62 @@ test('requiredWhen: a default desktop format owes its keys until it is turned of
     assert.equal(rule({ ...DESKTOP, platforms: { windows: { formats: { nsis: false } } } }), false, `${name}: the installer turned off`);
     assert.equal(rule(signing({ strategy: 'self-hosted' })), false, `${name}: no desktop target`);
   }
+});
+
+// ─── The Windows cloud-signing keys: owed only by a shipped, cloud-signed installer ───
+
+const AZURE_KEYS = ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT'];
+const SSLCOM_KEYS = ['SSLCOM_USERNAME', 'SSLCOM_PASSWORD', 'SSLCOM_CREDENTIAL_ID'];
+const CLOUD_KEYS = [...AZURE_KEYS, ...SSLCOM_KEYS, 'DIGICERT_API_KEY', 'DIGICERT_KEYPAIR_ALIAS'];
+const SELF_HOSTED_KEYS = ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD'];
+const owed = (config, keys) => keys.filter((name) => envSchemaEntry(name).requiredWhen(config));
+
+test('cloud signing case 1: a desktop target on the cloud strategy with Azure owes the four Azure keys and no other provider\'s', () => {
+  assert.deepEqual(owed(desktopCloud('azure'), CLOUD_KEYS), AZURE_KEYS);
+});
+
+test('cloud signing case 2: the installer turned off owes no cloud key', () => {
+  const config = { ...DESKTOP, platforms: { windows: { formats: { nsis: false }, signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } };
+  assert.deepEqual(owed(config, CLOUD_KEYS), []);
+});
+
+test('cloud signing case 3: Windows turned off owes no cloud key', () => {
+  // The provider stays written in the shared block; the target turns Windows off
+  const config = { ...cloudSigning('azure'), targets: { desktop: { type: 'desktop', platforms: { windows: false } } } };
+  assert.deepEqual(owed(config, CLOUD_KEYS), []);
+});
+
+test('cloud signing case 4: a provider written without the cloud strategy owes no cloud key, and the self-hosted pair instead', () => {
+  for (const strategy of [undefined, 'self-hosted']) {
+    const config = { ...DESKTOP, ...signing({ ...(strategy ? { strategy } : {}), cloud: { provider: 'azure' } }) };
+    assert.deepEqual(owed(config, CLOUD_KEYS), [], `strategy ${strategy}`);
+    assert.deepEqual(owed(config, SELF_HOSTED_KEYS), SELF_HOSTED_KEYS, `strategy ${strategy}`);
+  }
+});
+
+test('cloud signing case 5: the cloud strategy and a provider with no desktop target owe no cloud key', () => {
+  assert.deepEqual(owed(cloudSigning('azure'), CLOUD_KEYS), []);
+  assert.deepEqual(owed({ ...cloudSigning('azure'), targets: { web: { type: 'web' } } }, CLOUD_KEYS), []);
+});
+
+test('cloud signing case 6: of two desktop targets, the one on the cloud strategy with SSL.com owes the three SSL.com keys', () => {
+  const config = {
+    targets: {
+      app: { type: 'desktop' },
+      pro: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'sslcom' } } } } },
+    },
+  };
+  assert.deepEqual(owed(config, CLOUD_KEYS), SSLCOM_KEYS);
+});
+
+test('cloud signing case 8: no rule in the env schema reads the cloud provider path with chosen', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'env-schema.js'), 'utf8');
+  const PROVIDER_PATH = 'platforms.windows.signing.cloud.provider';
+  // A name the path is bound to counts as the path itself
+  const aliases = [...source.matchAll(/(\w+)\s*=\s*['"`]platforms\.windows\.signing\.cloud\.provider['"`]/g)].map((match) => match[1]);
+  const firstArgs = [...source.matchAll(/\bchosen\(\s*([^,)]+)/g)].map((match) => match[1].trim().replace(/^['"`]|['"`]$/g, ''));
+
+  assert.deepEqual(firstArgs.filter((arg) => arg === PROVIDER_PATH || aliases.includes(arg)), []);
 });
 
 test('askedWhen: exactly the keys manage asks a person for, moved in from the manager', () => {

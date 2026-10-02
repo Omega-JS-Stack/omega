@@ -19,7 +19,7 @@ const { spawnSync } = require('node:child_process');
 const JSON5 = require('json5');
 
 require('../src/test/temp-home.js');
-const { scrubCredentialEnv } = require('../src/test/journey-harness.js');
+const { scrubCredentialEnv } = require('../src/test/credential-scrub.js');
 
 const PACKAGES = path.join(__dirname, '..', '..');
 const MANAGER_PKG = path.join(PACKAGES, 'manager');
@@ -66,7 +66,7 @@ test('first run: npm start -- --id=acme --targets=web --no-dev in a template cop
   const { root, clone, fakeBin, npmLog } = stageTemplateCopy();
 
   const env = {
-    ...scrubCredentialEnv(process.env),
+    ...scrubCredentialEnv(process.env, root),
     PATH: [fakeBin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter),
     OMEGA_TEST_NPM_LOG: npmLog,
     // The local-dist freshness heal can rebuild and re-exec; a monorepo-dev

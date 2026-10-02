@@ -85,6 +85,7 @@ module.exports = defineCases({
         });
 
         ctx.expect(lines.join('\n')).toContain('repo.owner');
+        ctx.expect(lines.join('\n')).toContain('Set repo.owner and brand.id in config/omega.json5: the releases repo is <brand.id>-releases under that owner.');
       },
     },
     {

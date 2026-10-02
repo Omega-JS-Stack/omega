@@ -20,6 +20,7 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('./lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
+const { askEmailProvider } = require('./lib/email-asks.js');
 
 // Operations allowed for subdomain projects (zone-level settings are skipped)
 const SUBDOMAIN_OPERATIONS = new Set(['zone', 'dns-records']);
@@ -49,6 +50,12 @@ module.exports.run = createServiceRunner({
     const apexDomain = getApexDomain(domain);
     const isSubdomainProject = domain !== apexDomain;
     const zoneDomain = apexDomain;
+
+    // Asked before any op, so dns-records reads the pick on this walk
+    if (!isSubdomainProject) {
+      await askEmailProvider(context);
+    }
+
     const zone = await api.getZoneByName(zoneDomain);
 
     if (isSubdomainProject) {

@@ -299,6 +299,11 @@ const RETIRED_PATHS = {
     why: 'a repo is owned by a user or an org, and GitHub\'s word is owner (#1041): `repo: { provider: \'github\', owner }` is the whole block, so the value moves unchanged',
     convert: (value) => value,
   },
+  'seo.github.content.org': {
+    replacement: 'seo.github.content[].owner',
+    why: 'a repo is owned by a user or an org, and GitHub\'s word is owner (#1041): an seo content item names its own repo owner with `owner`, so the value moves unchanged inside its item',
+    convert: (value) => value,
+  },
   'repo.providers.github.org': {
     replacement: 'repo.owner',
     why: 'ONE repo block (#883): `repo: { provider: \'github\', owner }` is the whole declaration, and the owner owns every repo the brand derives',

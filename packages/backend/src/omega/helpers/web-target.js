@@ -14,7 +14,7 @@
  * request loudly with the declared list. Nothing is guessed, and no route
  * composes `targets/` by hand.
  */
-const { targetsOfType, targetPath, sourceRepo } = require('@omega.js/config');
+const { targetsOfType, targetPath, sourceRepo, repoMissing } = require('@omega.js/config');
 
 /**
  * A 400-shaped error: the routes answer with `e.code`.
@@ -79,7 +79,7 @@ function cmsContext(config, requested) {
 
   if (!source) {
     throw Object.assign(
-      new Error('GitHub repo not configured (set repo.owner and brand.id in config/omega.json5: the content repo is <brand.id>-omega under that owner).'),
+      new Error(`GitHub repo not configured. ${repoMissing('source')}`),
       { code: 500 },
     );
   }

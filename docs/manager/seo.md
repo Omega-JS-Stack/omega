@@ -24,6 +24,16 @@ Per item, `owner` names the GitHub user or org its repo lives under (default: th
 API calls, and `author.git` rides the Contents API commits as author and committer — parasite
 repos owned by separate accounts.
 
+Every key an item takes is a schema rule (`seo.github.content.<key>`): `name`, `owner`,
+`template`, `title`, `description`, `features`, `custom`, `topics`, `cta` (`platform`, `url`)
+and `author` (`token`, `git`). The strict check refuses any other key on an item, one line per
+path with its position (`config.seo.github.content[0].org`, the standard line of
+[config.md](../shared/config.md) § Validation): the loader for `config/omega.json5`, and the
+service itself for the merged section, after it reads the sidecar and before any API call. The
+old `org` is one such key, and `npx omega migrate --execute` at the brand root moves it to
+`owner` in both files. `author.token` belongs in the sidecar: in `config/omega.json5` the
+secret-key check refuses a key named `token`.
+
 **Credentials**: the default `gh` CLI auth, plus those per-item author overrides. A headless walk
 with a signed-out `gh` skips the service like a missing key, naming `GH_TOKEN`.
 

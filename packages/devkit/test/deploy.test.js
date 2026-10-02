@@ -63,6 +63,12 @@ test('dispatchRepo: the CONFIG names the SOURCE repo a dispatch addresses, never
   // Half an address addresses nothing: throw instead of POSTing to `undefined/acme`.
   assert.throws(() => dispatchRepo({ brand: { id: 'acme' } }), /brand repo to dispatch on/);
   assert.throws(() => dispatchRepo({}), /brand repo to dispatch on/);
+
+  // The lead says what failed; the shared line says how to fix it.
+  assert.throws(
+    () => dispatchRepo({ brand: { id: 'acme' } }),
+    (error) => error.message.includes('Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.'),
+  );
 });
 
 test('dispatchTarget: the repo from config, and the COMPOSED workflow name inside a brand (#847)', () => {

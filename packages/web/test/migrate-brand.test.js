@@ -12,6 +12,8 @@ const { test } = require('node:test');
 const JSON5 = require('json5');
 const { loadConfig } = require('@omega.js/config');
 const { migrateTarget } = require('../src/migrate/index.js');
+const { convertConfig } = require('../src/migrate/config-convert.js');
+const { mergeIntoBrand } = require('../src/migrate/brand-config.js');
 const { LEGACY_JEKYLL, LEGACY_UJM, stageLegacyConsumer } = require('./lib/migrate-fixtures.js');
 
 const ROOT_CONFIG = [
@@ -138,5 +140,26 @@ test('migrateTarget outside a brand (no brandRoot) still writes its own config/o
     assert.strictEqual(own.targets.web.type, 'web', 'a standalone project is its own web target');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('convertConfig drops an undeclared key inside a list item from that item, every item kept (#1056)', () => {
+  const jekyll = structuredClone(LEGACY_JEKYLL);
+  jekyll.seo = { github: { content: [{ name: 'tool', org: 'Acme-Org' }, { name: 'other' }] } };
+
+  const { omega, notes } = convertConfig({ jekyll, ujm: null });
+
+  assert.deepStrictEqual(omega.targets.web.seo.github.content, [{ name: 'tool' }, { name: 'other' }]);
+  assert.ok(notes.includes('`targets.web.seo.github.content[0].org` dropped: no omega.json5 key reads it; carry the setting by hand if it still matters'), notes.join(' | '));
+});
+
+test('mergeIntoBrand refuses a shared path inside a list item by name, since part of an item cannot move under the target (#1056)', () => {
+  const { brand, rootFile } = stageBrandSite();
+  try {
+    const converted = { brand: { id: 'realbrand', name: 'Real Brand' }, seo: { github: { content: [{ name: 'tool', org: 'Acme-Org' }] } }, targets: { site: { type: 'web' } } };
+
+    assert.throws(() => mergeIntoBrand(rootFile, { name: 'site', converted, execute: false }), /^Error: seo\.github\.content\[0\]\.org sits inside a list item/);
+  } finally {
+    fs.rmSync(brand, { recursive: true, force: true });
   }
 });

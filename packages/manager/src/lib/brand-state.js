@@ -12,7 +12,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const JSON5 = require('json5');
 const { missingEnvKeys, loadEnvRoots, resolveCompany, resolveConfigPath } = require('@omega.js/config');
 const { resolvePackageDir } = require('@omega.js/devkit/local');
 const { missingMachineTools } = require('@omega.js/devkit/machine-tools');
@@ -20,7 +19,7 @@ const { missingMachineTools } = require('@omega.js/devkit/machine-tools');
 const { resolveBrandRoot, loadBrand, discoverTargets, APPS_SHAPE } = require('./brand.js');
 const { buildScaffoldPlan } = require('./scaffold.js');
 const { isTemplateCopy } = require('./template-marker.js');
-const { authoredConfigFiles } = require('../migrate/config-pass.js');
+const { authoredConfigFiles, readAuthoredConfig } = require('../migrate/config-pass.js');
 const { findRetiredKeys } = require('../migrate/retired-keys.js');
 const { answersFromBrand } = require('../onboard.js');
 const { serviceInputs } = require('../config.js');
@@ -54,9 +53,9 @@ function isLegacy(brandRoot) {
     throw error;
   }
 
-  return authoredConfigFiles(resolveConfigPath(brandRoot), targets).some(({ file }) => {
+  return authoredConfigFiles(resolveConfigPath(brandRoot), targets).some((authored) => {
     try {
-      return findRetiredKeys(JSON5.parse(fs.readFileSync(file, 'utf8'))).length > 0;
+      return findRetiredKeys(readAuthoredConfig(authored)).length > 0;
     } catch {
       // A file that does not parse is the config gap's to report, not a retired key
       return false;

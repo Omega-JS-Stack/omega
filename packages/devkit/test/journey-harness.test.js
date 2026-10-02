@@ -10,11 +10,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
-  JourneyRun, scrubCredentialEnv, CLI_CONFIG_HOMES, latestRunFile, discoverBrandTargets,
+  JourneyRun, latestRunFile, discoverBrandTargets,
 } = require('../src/test/journey-harness.js');
 const { machineToolLine } = require('../src/machine-tools.js');
 
-const CONFIG_HOME_VARS = ['GH_CONFIG_DIR', 'XDG_CONFIG_HOME', 'CLOUDSDK_CONFIG'];
+const STORED_LOGIN_VARS = ['GH_CONFIG_DIR', 'XDG_CONFIG_HOME', 'CLOUDSDK_CONFIG', 'GOOGLE_APPLICATION_CREDENTIALS'];
 
 /** A run bound to a throwaway log dir — no brand, no children, just the recorder. */
 function runInTempLogDir() {
@@ -28,73 +28,30 @@ function runInTempLogDir() {
   return { run, logDir, read: () => fs.readFileSync(path.join(logDir, 'steps.log'), 'utf8') };
 }
 
-test('scrubCredentialEnv with no home root drops credential-shaped vars, keeps operating env, adds no CLI config home', () => {
-  const scrubbed = scrubCredentialEnv({
-    PATH: '/usr/bin',
-    HOME: '/Users/someone',
-    NODE_ENV: 'test',
-    npm_config_cache: '/tmp/npm',
-    OMEGA_MONOREPO: '/repo',
-    OMEGA_NON_INTERACTIVE: '1',
-    // Every one of these must go — the runtime legs prove themselves credless
-    GOOGLE_CLIENT_ID: 'x',
-    GOOGLE_CLIENT_SECRET: 'x',
-    GOOGLE_APPLICATION_CREDENTIALS: '/adc.json',
-    CLOUDFLARE_TOKEN: 'x',
-    GH_TOKEN: 'x',
-    GITHUB_TOKEN: 'x',
-    SENDGRID_API_KEY: 'x',
-    APPLE_API_KEY: 'x',
-    STRIPE_SECRET_KEY: 'x',
-    OMEGA_ADMIN_KEY: 'x',
-    SENTRY_AUTH_TOKEN: 'x',
-    DB_PASSWORD: 'x',
-  });
-
-  assert.deepEqual(Object.keys(scrubbed).sort(), [
-    'HOME', 'NODE_ENV', 'OMEGA_MONOREPO', 'OMEGA_NON_INTERACTIVE', 'PATH', 'npm_config_cache',
-  ]);
-  assert.equal(scrubbed.PATH, '/usr/bin');
-  for (const key of CONFIG_HOME_VARS) assert.equal(key in scrubbed, false, key);
-});
-
-test('scrubCredentialEnv with a home root points every CLI at its throwaway config home', () => {
-  const homeRoot = path.join(path.sep, 'tmp', 'x');
-  const scrubbed = scrubCredentialEnv({ PATH: '/usr/bin', GH_TOKEN: 'x' }, homeRoot);
-
-  assert.equal(scrubbed.GH_CONFIG_DIR, path.join(homeRoot, 'gh'));
-  assert.equal(scrubbed.XDG_CONFIG_HOME, path.join(homeRoot, 'xdg'));
-  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(homeRoot, 'gcloud'));
-  assert.equal('GH_TOKEN' in scrubbed, false);
-  assert.equal(scrubbed.PATH, '/usr/bin');
-});
-
-test('scrubCredentialEnv replaces an incoming CLOUDSDK_CONFIG with the throwaway one', () => {
-  const homeRoot = path.join(path.sep, 'tmp', 'x');
-  const scrubbed = scrubCredentialEnv({ CLOUDSDK_CONFIG: '/Users/someone/.config/gcloud' }, homeRoot);
-
-  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(homeRoot, 'gcloud'));
-});
-
-test('CLI_CONFIG_HOMES lists gh, firebase-tools and gcloud', () => {
-  assert.deepEqual(CLI_CONFIG_HOMES.map((home) => home.cli), ['gh', 'firebase-tools', 'gcloud']);
-});
-
-test('childEnv puts the CLI config homes under the run temp root only when scrubbed', () => {
+test('childEnv puts the stored-login redirects under the run temp root only when scrubbed', () => {
   const { run, logDir } = runInTempLogDir();
   // runJourney sets the temp root at clone time; a unit run supplies its own
   run.tempRoot = logDir;
 
-  const scrubbed = run.childEnv({}, { scrub: true });
-  assert.equal(scrubbed.GH_CONFIG_DIR, path.join(logDir, 'gh'));
-  assert.equal(scrubbed.XDG_CONFIG_HOME, path.join(logDir, 'xdg'));
-  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(logDir, 'gcloud'));
+  // The machine may set any of these itself; cleared here so "none is set" reads plainly
+  const saved = Object.fromEntries(STORED_LOGIN_VARS.map((key) => [key, process.env[key]]));
+  for (const key of STORED_LOGIN_VARS) delete process.env[key];
 
-  // Unscrubbed keeps the machine env as it is: nothing redirected under the temp root
-  const plain = run.childEnv();
-  for (const key of CONFIG_HOME_VARS) assert.equal(plain[key], process.env[key], key);
+  try {
+    const scrubbed = run.childEnv({}, { scrub: true });
+    assert.equal(scrubbed.GH_CONFIG_DIR, path.join(logDir, 'gh'));
+    assert.equal(scrubbed.XDG_CONFIG_HOME, path.join(logDir, 'xdg'));
+    assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(logDir, 'gcloud'));
+    assert.equal(scrubbed.GOOGLE_APPLICATION_CREDENTIALS, path.join(logDir, 'gcloud', 'application_default_credentials.json'));
 
-  fs.rmSync(logDir, { recursive: true, force: true });
+    const plain = run.childEnv();
+    for (const key of STORED_LOGIN_VARS) assert.equal(key in plain, false, key);
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value !== undefined) process.env[key] = value;
+    }
+    fs.rmSync(logDir, { recursive: true, force: true });
+  }
 });
 
 test('latestRunFile picks the newest .omega/runs entry; null without one', () => {

@@ -222,6 +222,16 @@ test('#1031 case 6: a brand config with a retired key is legacy, and the next co
   assert.equal(report.next, 'npx omega migrate');
 });
 
+test('#1056: a seo sidecar item carrying the retired org is legacy, its file read as the seo section', async () => {
+  const root = await completeBrand();
+  fs.writeFileSync(path.join(root, 'config', 'seo.json5'), "{ github: { content: [{ name: 'tool', org: 'Acme-Org' }] } }\n");
+
+  const report = await brandState(root);
+
+  assert.equal(report.state, 'legacy');
+  assert.equal(report.next, 'npx omega migrate');
+});
+
 test('#1031 case 7: inside a target, the report is the brand root\'s and inTarget names the target', async () => {
   const root = await completeBrand();
   const targetDir = path.join(root, 'targets', 'web');

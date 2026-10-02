@@ -340,6 +340,84 @@ test('the shipped README lines apply only to README.md: a .gitignore keeps one',
   assert.equal(mergeLineBasedFiles(existing, incoming, '.gitignore'), `${incoming}# Project tests\ntest/.output/\n`);
 });
 
+// ─── test/README.md: the first converge reads blocks, not lines ─────────────
+
+// The extension's old shipped text with the brand's own section after it, converged against today's template.
+const convergeExtension = (brand) => splitReadme(mergeLineBasedFiles(`${shippedReadme('extension-b9d9aeda').trimEnd()}\n\n${brand}\n`, readmeTemplate('extension'), 'README.md')).custom;
+
+test('unmarked README: a brand code block whose lines equal framework lines lands whole under Custom', () => {
+  const brand = [
+    '## Seeding',
+    '',
+    'Our build suites seed a local store first:',
+    '',
+    '```js',
+    'beforeEach(() => {',
+    '  seed.reset();',
+    '});',
+    'module.exports = {',
+    '  layer: \'build\',',
+    '};',
+    '```',
+  ].join('\n');
+  assert.equal(convergeExtension(brand).trim(), brand);
+});
+
+test('unmarked README: a blank line inside a brand code block is kept where it was', () => {
+  const brand = [
+    '## Seeding',
+    '',
+    '```js',
+    'beforeEach(() => {',
+    '  seed.reset();',
+    '});',
+    '',
+    'module.exports = {',
+    '  layer: \'build\',',
+    '};',
+    '```',
+  ].join('\n');
+  assert.equal(convergeExtension(brand).trim(), brand);
+});
+
+test('unmarked README: a brand table whose separator equals the framework\'s lands whole, in order', () => {
+  const brand = [
+    '## Our suites',
+    '',
+    '| Suite | Store | Owner |',
+    '|---|---|---|',
+    '| `test/build/seed.test.js` | Local | Platform team |',
+    '| `test/boot/smoke.test.js` | None | QA |',
+  ].join('\n');
+  assert.equal(convergeExtension(brand).trim(), brand);
+});
+
+test('unmarked README: a brand row added to a framework table lands alone under Custom', () => {
+  const row = '| `test/fixtures/` | Plain Node | Static data the build suites read |';
+  const shipped = shippedReadme('extension-b9d9aeda');
+  const after = '| `test/boot/` | Consumer\'s actual built extension | End-to-end smoke tests (does the extension load, does the background register, do views render) |\n';
+  assert.ok(shipped.includes(after), 'the fixture still holds the row the brand row follows');
+  const merged = mergeLineBasedFiles(shipped.replace(after, `${after}${row}\n`), readmeTemplate('extension'), 'README.md');
+  assert.equal(splitReadme(merged).custom.trim(), row);
+});
+
+test('unmarked README: a framework heading over a body all the brand\'s lands with that body under Custom', () => {
+  const shipped = shippedReadme('extension-b9d9aeda');
+  const frameworkSeeAlso = shipped.slice(shipped.indexOf('## See also'));
+  const brandSeeAlso = '## See also\n\nOur runbook at `docs/testing.md` covers the staging store.\n';
+  const merged = mergeLineBasedFiles(shipped.replace(frameworkSeeAlso, brandSeeAlso), readmeTemplate('extension'), 'README.md');
+  assert.equal(splitReadme(merged).custom.trim(), '## See also\n\nOur runbook at `docs/testing.md` covers the staging store.');
+});
+
+test('unmarked README: a framework code block copied unchanged goes whole, nothing of it under Custom', () => {
+  const template = readmeTemplate('extension');
+  const open = template.indexOf('```js\n');
+  const block = template.slice(open, template.indexOf('\n```\n', open) + 4);
+  assert.ok(block.startsWith('```js\n') && block.endsWith('\n```'), 'the template still carries a fenced example');
+  const merged = mergeLineBasedFiles(`Our build suites follow the framework example:\n\n${block}\n`, template, 'README.md');
+  assert.equal(splitReadme(merged).custom.trim(), 'Our build suites follow the framework example:');
+});
+
 // ─── .env: the value dotenv reads never changes ──────────────────────────────
 
 const dotenv = require('dotenv');

@@ -19,6 +19,7 @@ const { isDeepStrictEqual } = require('node:util');
 const { spawn, spawnSync } = require('node:child_process');
 const { afterExit } = require('./boot-child.js');
 const { createStepsLog } = require('./steps-log.js');
+const { scrubCredentialEnv } = require('./credential-scrub.js');
 const { targetOfType } = require('./target-of-type.js');
 const { resolvePackageRealDir } = require('../local.js');
 const { missingMachineTools, machineToolLine } = require('../machine-tools.js');
@@ -47,40 +48,6 @@ const EMULATOR_READY = /Emulator ready\. Press Ctrl\+C/i;
 const DEV_SERVER_URL = /Dev server: (https?:\/\/localhost:\d+)/;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Every CLI the manage walk can spawn, and the variable naming its config home
-// (where its stored login lives). A scrubbed run points each at an empty dir.
-const CLI_CONFIG_HOMES = [
-  { cli: 'gh', env: 'GH_CONFIG_DIR', dir: 'gh' },
-  { cli: 'firebase-tools', env: 'XDG_CONFIG_HOME', dir: 'xdg' },
-  { cli: 'gcloud', env: 'CLOUDSDK_CONFIG', dir: 'gcloud' },
-];
-
-/**
- * Strip credential-shaped variables from an env copy: the runtime legs of
- * the journey (dev boot, manage) must prove themselves without any machine
- * credentials in reach. Given a home root, every CLI_CONFIG_HOMES variable is
- * also pointed at `<homeRoot>/<dir>`, so each CLI's own stored login is out of reach.
- *
- * @param {Object} env - Source environment (not mutated)
- * @param {string} [homeRoot] - Throwaway root for the CLI config homes
- * @returns {Object} Scrubbed copy
- */
-function scrubCredentialEnv(env, homeRoot) {
-  const CREDENTIAL_SHAPE = /(TOKEN|SECRET|PASSWORD|PASSPHRASE|API_KEY|APIKEY|_KEY$|CLIENT_ID|CLIENT_SECRET|ACCESS_KEY|PRIVATE_KEY|CREDENTIALS|AUTH)/i;
-  const scrubbed = {};
-  for (const [name, value] of Object.entries(env)) {
-    if (!CREDENTIAL_SHAPE.test(name)) {
-      scrubbed[name] = value;
-    }
-  }
-  if (homeRoot) {
-    for (const home of CLI_CONFIG_HOMES) {
-      scrubbed[home.env] = path.join(homeRoot, home.dir);
-    }
-  }
-  return scrubbed;
-}
 
 /** Whether an https URL answers at all (any status), within 8s. */
 function reachable(url) {
@@ -634,4 +601,4 @@ async function runJourney(options) {
 
 // JourneyRun is exported for its unit pins — the step recorder is testable
 // without a two-hour brand birth; nothing else constructs one.
-module.exports = { runJourney, JourneyRun, CLI_CONFIG_HOMES, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandTargets };
+module.exports = { runJourney, JourneyRun, checkPreconditions, latestRunFile, discoverBrandTargets };

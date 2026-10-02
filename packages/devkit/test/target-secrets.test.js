@@ -275,6 +275,7 @@ test('publish: the four skips are loud, and none of them touches gh', () => {
     assert.match(heard, /no keys composed for this target/);
     assert.match(heard, /no GitHub remote/);
     assert.match(heard, /names no GitHub repo in config/);
+    assert.ok(heard.includes('Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.'));
   } finally {
     for (const { brand } of [empty, keyed, undeclared]) fs.rmSync(brand, { recursive: true, force: true });
   }

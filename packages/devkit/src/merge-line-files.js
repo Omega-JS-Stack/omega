@@ -16,6 +16,11 @@ const CUSTOM_MARKER  = '# ========== Custom Values ==========';
 const MARKDOWN_DEFAULT_MARKER = '<!-- ========== Default Values ========== -->';
 const MARKDOWN_CUSTOM_MARKER  = '<!-- ========== Custom Values ========== -->';
 
+// The markdown structure an unmarked converge reads as blocks
+const FENCE = /^(`{3,}|~{3,})/;
+const HEADING = /^#{1,6}(\s|$)/;
+const TABLE_SEPARATOR = /^\|(\s*:?-+:?\s*\|)*\s*:?-+:?\s*\|?$/;
+
 // Framework text earlier generations wrote, one pattern per line, each block
 // scoped to the file type that shipped it: Custom boilerplate (the retired
 // per-framework AGENTS.md's included), and old .env headers and group notes,
@@ -226,28 +231,82 @@ function withPreamble(preamble, custom) {
 // under Custom in order, one blank line between paragraphs.
 function convergeUnmarked(lines, newDefault, markers, fileName) {
   const framework = new Set(newDefault.map((line) => line.trim()).filter(Boolean));
+  const isFramework = (line) => framework.has(line.trim()) || isShipped(line, fileName);
   // The grammar's comment token opens every marker: `#`, or `<!--` in markdown
   const commentToken = markers.defaultMarker.split(' ')[0];
-  const paragraphs = [[]];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (isMarkerLine(line, markers)) continue;
-    if (trimmed) paragraphs[paragraphs.length - 1].push(line);
-    else if (paragraphs[paragraphs.length - 1].length > 0) paragraphs.push([]);
+  const markdown = isMarkdown(fileName);
+  const records = readRecords(lines, markers, markdown, isFramework);
+
+  for (const paragraph of new Set(records.map((record) => record.paragraph))) {
+    const members = records.filter((record) => record.paragraph === paragraph);
+    const entries = members.filter((record) => record.line.trim() && !record.line.trim().startsWith(commentToken));
+    if (entries.length === 0 || !entries.every((record) => framework.has(record.line.trim()))) continue;
+    for (const record of members) if (!record.heading) record.keep = false;
   }
+  if (markdown) keepFrameworkHeadings(records, isFramework);
 
   const custom = [];
-  for (const paragraph of paragraphs) {
-    const entries = paragraph.filter((line) => !line.trim().startsWith(commentToken));
-    if (entries.length > 0 && entries.every((line) => framework.has(line.trim()))) continue;
-
-    const kept = paragraph.filter((line) => !framework.has(line.trim()) && !isShipped(line, fileName));
-    if (kept.length === 0) continue;
-    if (custom.length > 0) custom.push('');
-    custom.push(...kept);
+  let paragraph = null;
+  for (const record of records) {
+    if (!record.keep) continue;
+    if (custom.length > 0 && record.paragraph !== paragraph) custom.push('');
+    custom.push(record.line);
+    paragraph = record.paragraph;
   }
   custom.push('');
   return custom;
+}
+
+// A converge's lines in file order, each with its paragraph and whether it is
+// the brand's. Markdown reads blocks: a fenced code block is one unit, the
+// brand's whole when any line in it is, and a table separator row stays only
+// when the header row above it stays.
+function readRecords(lines, markers, markdown, isFramework) {
+  const records = [];
+  let paragraph = 0;
+  for (let at = 0; at < lines.length; at++) {
+    const line = lines[at];
+    const trimmed = line.trim();
+    const last = records[records.length - 1];
+    if (isMarkerLine(line, markers)) continue;
+    if (!trimmed) {
+      if (last && last.paragraph === paragraph) paragraph++;
+      continue;
+    }
+
+    const fence = markdown && trimmed.match(FENCE);
+    if (fence) {
+      let end = at + 1;
+      while (end < lines.length && !closesFence(lines[end], fence[1])) end++;
+      const block = lines.slice(at, end + 1).filter((inner) => !isMarkerLine(inner, markers));
+      const keep = block.some((inner) => inner.trim() && !isFramework(inner));
+      for (const inner of block) records.push({ line: inner, paragraph, keep, heading: false });
+      at = end;
+      continue;
+    }
+
+    const separator = markdown && TABLE_SEPARATOR.test(trimmed) && last && last.paragraph === paragraph
+      && last.line.trim().startsWith('|');
+    records.push({ line, paragraph, keep: separator ? last.keep : !isFramework(line), heading: markdown && HEADING.test(trimmed) });
+  }
+  return records;
+}
+
+// A fence closes on a line of its own character, at least as long as its opener
+function closesFence(line, fence) {
+  const trimmed = line.trim();
+  return trimmed.length >= fence.length && trimmed === fence[0].repeat(trimmed.length);
+}
+
+// A heading framework text carries stays only when its section (the lines down
+// to the next heading) holds the brand's lines and none of the framework's.
+function keepFrameworkHeadings(records, isFramework) {
+  records.forEach((record, at) => {
+    if (!record.heading || !isFramework(record.line)) return;
+    const next = records.findIndex((other, index) => index > at && other.heading);
+    const body = records.slice(at + 1, next < 0 ? records.length : next).filter((other) => other.line.trim());
+    record.keep = body.some((other) => other.keep) && body.every((other) => other.keep);
+  });
 }
 
 // An .env key the framework block does not know, holding a value.
@@ -297,6 +356,8 @@ function isShippedBlock(lines, fileName) {
   return SHIPPED.some((entry) => entry.file === fileName && entry.lines.length === body.length && entry.lines.every((shipped, i) => shipped.test(body[i])));
 }
 
+const isMarkdown = (fileName) => typeof fileName === 'string' && fileName.endsWith('.md');
+
 /**
  * The marker pair a file speaks, by file type: markdown takes the HTML-comment
  * flavor of the one grammar, every other line file the `#` flavor.
@@ -304,7 +365,7 @@ function isShippedBlock(lines, fileName) {
  * @returns {{ defaultMarker: string, customMarker: string }}
  */
 function sectionMarkers(fileName) {
-  return typeof fileName === 'string' && fileName.endsWith('.md')
+  return isMarkdown(fileName)
     ? { defaultMarker: MARKDOWN_DEFAULT_MARKER, customMarker: MARKDOWN_CUSTOM_MARKER }
     : { defaultMarker: DEFAULT_MARKER, customMarker: CUSTOM_MARKER };
 }

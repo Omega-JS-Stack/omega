@@ -10,7 +10,7 @@ const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const JSON5 = require('json5');
 
-const { ENV_ENVIRONMENTS, FILE_NAME, overlayPath, TARGETS, removeConfigFileValues, writeConfigFileValues, undeclaredAuthoredPaths } = require('@omega.js/config');
+const { ENV_ENVIRONMENTS, FILE_NAME, overlayPath, TARGETS, removeConfigFileValues, writeConfigFileValues, undeclaredAuthoredPaths, pathSteps } = require('@omega.js/config');
 const { findRetiredKeys } = require('./retired-keys.js');
 
 /**
@@ -25,35 +25,54 @@ function layerFiles(dir) {
 
 /**
  * Every authored omega file of a brand: its base file and the environment
- * overlays beside it, then each framework target's own file and overlays.
+ * overlays beside it, the `config/seo.json5` sidecar (its root is the `seo`
+ * section), then each framework target's own file and overlays.
  * @param {string} baseFile - The brand's config/omega.json5.
  * @param {Array<object>} targets - discoverTargets entries.
- * @returns {Array<{ file: string, target?: string }>}
+ * @returns {Array<{ file: string, target?: string, section?: string }>}
  */
 function authoredConfigFiles(baseFile, targets) {
   const layer = (dir, target) => layerFiles(dir)
     .filter((file) => fs.existsSync(file))
     .map((file) => ({ file, target }));
+  const seoFile = path.join(path.dirname(baseFile), 'seo.json5');
 
   return [
     ...layer(path.dirname(baseFile)),
+    ...(fs.existsSync(seoFile) ? [{ file: seoFile, section: 'seo' }] : []),
     ...targets.filter((entry) => TARGETS.includes(entry.target)).flatMap((entry) => layer(path.join(entry.path, 'config'), entry.target)),
   ];
 }
 
 /**
+ * One authored file parsed from the config's root: a section file's own root
+ * is that section, so its keys sit under it.
+ * @param {{ file: string, section?: string }} authored - An authoredConfigFiles entry.
+ * @returns {object}
+ */
+function readAuthoredConfig({ file, section }) {
+  const parsed = JSON5.parse(fs.readFileSync(file, 'utf8'));
+  return section ? { [section]: parsed } : parsed;
+}
+
+/**
  * The pass over one file, as the line lists every migrate block answers with.
- * @param {{ file: string, target?: string }} authored - The file, and the type
- *   of the target it belongs to (a target's own file is that target's layer).
+ * Paths are judged and reported from the config's root, so a section file's
+ * own root is that section.
+ * @param {{ file: string, target?: string, section?: string }} authored - The
+ *   file, the type of the target it belongs to (a target's own file is that
+ *   target's layer), and the section a sidecar's root is.
  * @param {boolean} execute
  * @returns {{ due: string[], changed: string[], errors: string[], undeclared: number }}
  */
-function migrateConfigFile({ file, target }, execute) {
+function migrateConfigFile({ file, target, section }, execute) {
   const result = { due: [], changed: [], errors: [], undeclared: 0 };
+  const read = () => readAuthoredConfig({ file, section });
+  const inFile = (dotted) => (section ? dotted.slice(section.length + 1) : dotted);
   let config;
 
   try {
-    config = JSON5.parse(fs.readFileSync(file, 'utf8'));
+    config = read();
   } catch (e) {
     result.errors.push(`does not parse, fix the syntax first: ${e.message}`);
     return result;
@@ -92,16 +111,20 @@ function migrateConfigFile({ file, target }, execute) {
 
   if (execute) {
     // Conversions FIRST: the new key is written while the old one is still there
-    if (conversions.length) writeConfigFileValues(file, Object.fromEntries(conversions.map((entry) => [entry.path, entry.value])));
-    removeConfigFileValues(file, findings.filter((finding) => !refused.has(finding)).map((finding) => finding.path));
-    config = JSON5.parse(fs.readFileSync(file, 'utf8'));
+    if (conversions.length) writeConfigFileValues(file, Object.fromEntries(conversions.map((entry) => [inFile(entry.path), entry.value])));
+    removeConfigFileValues(file, findings.filter((finding) => !refused.has(finding)).map((finding) => inFile(finding.path)));
+    config = read();
   }
 
   // Judged after converting, so the residue is what the brand still owes; a
-  // path a reported row covers is that row's line, never a second one
+  // path a reported row covers is that row's line, never a second one (the
+  // strict check spells a list position `[0]`, a row's path `.0`)
   const covered = findings.filter((finding) => !execute || refused.has(finding)).map((finding) => finding.path);
   const residue = undeclaredAuthoredPaths(config, { target })
-    .filter((dotted) => !covered.some((row) => dotted === row || dotted.startsWith(`${row}.`)));
+    .filter((spelled) => {
+      const dotted = pathSteps(spelled).join('.');
+      return !covered.some((row) => dotted === row || dotted.startsWith(`${row}.`));
+    });
   result.due.push(...residue.map((dotted) => `config.${dotted} is not a key the schema declares; remove it by hand`));
   result.undeclared = residue.length;
 
@@ -133,4 +156,4 @@ function valueAt(config, dotted) {
   return dotted.split('.').reduce((node, key) => (node == null ? undefined : node[key]), config);
 }
 
-module.exports = { layerFiles, authoredConfigFiles, migrateConfigFile };
+module.exports = { layerFiles, authoredConfigFiles, readAuthoredConfig, migrateConfigFile };

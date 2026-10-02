@@ -24,7 +24,7 @@ const { clientConfig, CLIENT_FACT_KEYS } = require('./client-config.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { chosenProvider } = require('./providers.js');
-const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
+const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, pathSteps, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
@@ -44,7 +44,7 @@ const { WINDOWS_SIGNING_STRATEGIES, DEFAULT_WINDOWS_SIGNING_STRATEGY, WINDOWS_CL
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
 const { PAYMENT_PROVIDERS, paymentProvider } = require('./payment-providers.js');
 const { SUBSCRIPTION_CADENCES } = require('./payment-cadences.js');
-const { REPO_PROVIDERS, HOSTING_PROVIDERS, repoBlock, sourceRepo, repoDrift, releasesRepo, websiteRepo, hostingProvider, pagesHost, brandVisibility } = require('./repo.js');
+const { REPO_PROVIDERS, HOSTING_PROVIDERS, repoBlock, sourceRepo, repoDrift, repoMissing, releasesRepo, websiteRepo, hostingProvider, pagesHost, brandVisibility } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { deriveBundleIdPrefix, composeBundleId } = require('./bundle-id.js');
 const { DEV_FACT_CHANNEL, devFactMissing } = require('./dev-facts.js');
@@ -252,6 +252,8 @@ module.exports = {
   // comparison and the one drift line, stated at boot and refused on by the
   // verbs that act on the derived repo
   repoDrift,
+  // The ONE line every refusal quotes when a role's repo is unaddressable
+  repoMissing,
   // The brand's ONE public releases repo `<brand.id>-releases`, always public:
   // the one home every release reader takes its address from
   releasesRepo,
@@ -275,6 +277,8 @@ module.exports = {
   validateConfig,
   undeclaredPaths,
   undeclaredAuthoredPaths,
+  undeclaredLine,
+  pathSteps,
   runSchema,
   formatErrors,
 

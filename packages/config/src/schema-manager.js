@@ -137,6 +137,96 @@ const MANAGER_RULES = [
     required:    false,
     description: "The parasite-SEO content repos (`seo.github.content[]`) the seo service reconciles; a `config/seo.json5` sidecar merges over it.",
   },
+  {
+    path:        'seo.github.content',
+    type:        'array',
+    required:    false,
+    description: 'The parasite-SEO content items, one public repo `<owner>/<name>` each, which the seo service creates and keeps matching its template.',
+  },
+  {
+    path:        'seo.github.content.name',
+    type:        'string',
+    required:    false,
+    description: "The item's repo name: the repo is `<owner>/<name>`, and an item with no name is skipped as an error.",
+  },
+  {
+    path:        'seo.github.content.owner',
+    type:        'string',
+    required:    false,
+    description: "The GitHub user or org the item's repo lives under (default: `repo.owner`).",
+  },
+  {
+    path:        'seo.github.content.template',
+    type:        'string',
+    required:    false,
+    description: "The seo template the item's repo is generated from (default: `developer-tool`).",
+  },
+  {
+    path:        'seo.github.content.title',
+    type:        'string',
+    required:    false,
+    description: "The README heading and the generated package.json description's lead.",
+  },
+  {
+    path:        'seo.github.content.description',
+    type:        'string',
+    required:    false,
+    description: "The repo description, the README's lead sentence and the generated package.json description.",
+  },
+  {
+    path:        'seo.github.content.features',
+    type:        'array',
+    required:    false,
+    description: "The README's Features list, one string per bullet.",
+  },
+  {
+    path:        'seo.github.content.custom',
+    type:        'string',
+    required:    false,
+    description: 'Markdown the README carries after its Features list.',
+  },
+  {
+    path:        'seo.github.content.topics',
+    type:        'array',
+    required:    false,
+    description: "The repo's topics, also the generated package.json keywords.",
+  },
+  {
+    path:        'seo.github.content.cta',
+    type:        'object',
+    required:    false,
+    description: "The item's links ({ platform, url }); each falls back to `brand.url`.",
+  },
+  {
+    path:        'seo.github.content.cta.platform',
+    type:        'string',
+    required:    false,
+    description: "The website link: the repo homepage and the README's website buttons (falls back to `cta.url`).",
+  },
+  {
+    path:        'seo.github.content.cta.url',
+    type:        'string',
+    required:    false,
+    description: "The download link the README's download buttons point at.",
+  },
+  {
+    path:        'seo.github.content.author',
+    type:        'object',
+    required:    false,
+    description: "The item's own GitHub identity ({ token, git }), for a repo owned by a separate account.",
+  },
+  {
+    path:        'seo.github.content.author.token',
+    type:        'string',
+    required:    false,
+    description: "The token the item's API calls use instead of the `gh` auth: `env:VAR_NAME` reads it from the environment, anything else is the token itself.",
+  },
+  {
+    path:        'seo.github.content.author.git',
+    type:        'object',
+    required:    false,
+    description: "The { name, email } the item's Contents API commits carry as author and committer.",
+  },
 ];
 
 module.exports = { MANAGER_RULES };

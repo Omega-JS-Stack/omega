@@ -11,33 +11,19 @@ const assert = require('node:assert/strict');
 // temp home, never the developer's ~/.omega (#677).
 require('@omega.js/devkit/test/temp-home');
 
-const { OPERATIONS, DEFAULTS } = require('../src/config.js');
-const service = require('../src/services/edge/index.js');
+const { DEFAULTS } = require('../src/config.js');
 const { buildRequiredRecords } = require('../src/services/edge/lib/dns-records-helpers.js');
 const { loadBrand } = require('../src/lib/brand.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
-const { DOMAIN, tmpRoot, brandConfig, fakeApi, handlerContext } = require('./lib/edge-fixture.js');
+const {
+  DOMAIN, ZONE, brandConfig, fakeApi, handlerContext, runService, convergedResponses,
+} = require('./lib/edge-fixture.js');
 
 // Tests must never see a real token from the shell environment
 delete process.env.CLOUDFLARE_TOKEN;
 delete process.env.SENDGRID_API_KEY;
 
-const ZONE = { id: 'zone-1', name: DOMAIN, status: 'active' };
-
 // ─── Fixtures ────────────────────────────────────────────────────────────────
-
-function runService(config, api, options = {}) {
-  return service.run({
-    brandId: config.brand?.id || 'fixture-brand',
-    brandRoot: tmpRoot(),
-    brandConfig: config,
-    brand: { id: config.brand?.id, config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
-    targets: [],
-    operations: OPERATIONS.edge,
-    options,
-    cloudflareApi: api,
-  });
-}
 
 /**
  * SendGrid's live answer for `GET /v3/whitelabel/domains`: the domain-auth
@@ -74,87 +60,6 @@ async function captureLogAsync(fn) {
     console.log = original;
   }
   return lines.join('\n');
-}
-
-/** Every read a fully-converged default-config zone answers. */
-function convergedResponses(config) {
-  const cacheRules = config.edge.providers.cloudflare.cacheRules;
-  const redirect = config.edge.providers.cloudflare.rules.redirect[0];
-  const sec = config.edge.providers.cloudflare.rules.security[0];
-  const csp = config.edge.providers.cloudflare.rules.responseHeaders[0].headers['Content-Security-Policy'];
-
-  return {
-    'GET /accounts': [{ id: 'acct-1' }],
-    'GET /zones/zone-1/dns_records': [
-      { id: 'r1', type: 'A', name: DOMAIN, content: '185.199.108.153', proxied: true, comment: 'GitHub Pages IP' },
-      { id: 'r2', type: 'AAAA', name: DOMAIN, content: '2606:50c0:8000::153', proxied: true, comment: 'GitHub Pages IP' },
-      { id: 'r3', type: 'CNAME', name: `www.${DOMAIN}`, content: DOMAIN, proxied: true, comment: 'Redirect www to root domain' },
-      { id: 'r4', type: 'TXT', name: DOMAIN, content: '"v=spf1 include:_spf.google.com include:sendgrid.net -all"', comment: 'SPF policy' },
-      { id: 'r5', type: 'TXT', name: `_dmarc.${DOMAIN}`, content: '"v=DMARC1; p=quarantine; pct=100"', comment: 'DMARC policy' },
-    ],
-    'GET /zones/zone-1/settings': Object.entries(config.edge.providers.cloudflare.settings)
-      .map(([id, value]) => ({ id, value: structuredClone(value), editable: true })),
-    'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': {
-      id: 'rs-cache', kind: 'zone', phase: 'http_request_cache_settings', name: 'Cache Rules', description: 'managed',
-      rules: cacheRules.map((rule, i) => ({
-        id: `cr${i + 1}`, description: rule.name, expression: rule.expression, enabled: rule.enabled,
-        action: 'set_cache_settings',
-        action_parameters: {
-          cache: true,
-          edge_ttl: { mode: 'override_origin', default: rule.edgeTtl },
-          browser_ttl: { mode: 'override_origin', default: rule.browserTtl },
-        },
-      })),
-    },
-    'GET /zones/zone-1/managed_headers': {
-      managed_request_headers: [
-        { id: 'add_client_certificate_headers', enabled: false },
-        { id: 'add_visitor_location_headers', enabled: true },
-        { id: 'remove_visitor_ip_headers', enabled: false },
-        { id: 'add_waf_credential_check_status_header', enabled: false },
-      ],
-      managed_response_headers: [
-        { id: 'remove_x-powered-by_header', enabled: true },
-        { id: 'add_security_headers', enabled: false },
-      ],
-    },
-    'GET /zones/zone-1/rulesets/phases/http_request_dynamic_redirect/entrypoint': {
-      id: 'rs-redirect', kind: 'zone', phase: 'http_request_dynamic_redirect', name: 'Redirect Rules',
-      rules: [{
-        id: 'rr1', description: redirect.name, expression: redirect.expression, enabled: redirect.enabled,
-        action: 'redirect',
-        action_parameters: {
-          from_value: {
-            status_code: redirect.statusCode,
-            preserve_query_string: redirect.preserveQueryString,
-            target_url: redirect.targetUrl,
-          },
-        },
-      }],
-    },
-    'GET /zones/zone-1/rulesets/phases/http_config_settings/entrypoint': { id: 'rs-config', rules: [] },
-    'GET /zones/zone-1/rulesets/phases/http_response_headers_transform/entrypoint': {
-      id: 'rs-rh',
-      rules: [{
-        id: 'rh1', description: 'CSP: Allow iframe from self', expression: 'true', action: 'rewrite',
-        action_parameters: { headers: { 'Content-Security-Policy': { operation: 'set', value: csp } } },
-        enabled: true,
-      }],
-    },
-    'GET /zones/zone-1/rulesets/phases/http_request_firewall_custom/entrypoint': {
-      id: 'rs-sec', description: '',
-      rules: [{
-        id: 'sr1', description: sec.name, action: 'skip',
-        action_parameters: { products: sec.skipProducts, phases: sec.skipPhases, ruleset: sec.skipRuleset },
-        expression: sec.expression, enabled: sec.enabled, logging: { enabled: sec.logging },
-      }],
-    },
-    'GET /zones/zone-1/rulesets/phases/http_request_firewall_managed/entrypoint': { id: 'rs-man', rules: [] },
-    'GET /zones/zone-1/speed_api/pages': [{ url: `https://${DOMAIN}` }],
-    [`GET /zones/zone-1/speed_api/schedule/${encodeURIComponent(`https://${DOMAIN}`)}`]: {
-      frequency: 'WEEKLY', region: 'us-central1',
-    },
-  };
 }
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────

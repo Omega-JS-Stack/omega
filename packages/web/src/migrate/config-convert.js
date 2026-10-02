@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
 const JSON5 = require('json5');
-const { findSecretKeys, undeclaredAuthoredPaths } = require('@omega.js/config');
+const { findSecretKeys, undeclaredAuthoredPaths, pathSteps } = require('@omega.js/config');
 const { excludeToInclude } = require('@omega.js/devkit/translation-include');
 
 // _config.yml sections that were Jekyll/UJM machinery — gone with Jekyll
@@ -412,7 +412,7 @@ function convertConfig({ jekyll, ujm, name: targetName = 'web' }) {
   // (judged as a web target's own file; inside a brand, brand-config.js moves what
   // the root's shared layer does not declare under the target)
   for (const dotPath of undeclaredAuthoredPaths(omega, { target: 'web' })) {
-    removePath(omega, dotPath.split('.'));
+    removePath(omega, pathSteps(dotPath));
     notes.push(`\`${dotPath}\` dropped: no omega.json5 key reads it; carry the setting by hand if it still matters`);
   }
 
@@ -420,15 +420,16 @@ function convertConfig({ jekyll, ujm, name: targetName = 'web' }) {
 }
 
 /**
- * Delete the key at `steps` and every ancestor it leaves empty.
+ * Delete the key at `steps` and every ancestor it leaves empty. A list item
+ * stays, emptied or not, so a later path's position still names its item.
  * @param {object} node
- * @param {string[]} steps
+ * @param {Array<string|number>} steps - pathSteps of the path, a list position a number.
  */
 function removePath(node, steps) {
   const [head, ...rest] = steps;
   if (rest.length && node[head] && typeof node[head] === 'object') {
     removePath(node[head], rest);
-    if (Object.keys(node[head]).length) return;
+    if (Object.keys(node[head]).length || Array.isArray(node)) return;
   }
   delete node[head];
 }

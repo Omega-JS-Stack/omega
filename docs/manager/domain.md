@@ -29,7 +29,8 @@ with no TTY — reports warned with the rerun message.
   service skips.
 - `domain.email.providers.<provider>` and `domain.email.forwarding`: the MAILBOX provider,
   `cloudflare`, `squarespace` or `privateemail`. This service does not read them: the `edge`
-  service's `dns-records` and `email-routing` operations do.
+  service does, in its setup (the provider ask) and its `dns-records` and `email-routing`
+  operations.
 
 Both sets are exactly the rows of ONE registry, `packages/manager/src/services/domain/lib/providers.js`,
 the one place a registrar or mailbox provider is added. A registrar entry carries its API

@@ -17,6 +17,7 @@ const {
   sourceRepo,
   releasesRepo,
   repoDrift,
+  repoMissing,
   websiteRepo,
   hostingProvider,
   pagesHost,
@@ -109,6 +110,35 @@ test('repoDrift: another owner OR another name is the one drift line, naming bot
 test('repoDrift: a config that derives no source repo has nothing to disagree with (#934)', () => {
   assert.equal(repoDrift('Acme-Org/acme-omega', { brand: { id: 'acme' } }), null, 'no owner');
   assert.equal(repoDrift('Acme-Org/acme-omega', { repo: { owner: 'Acme-Org' } }), null, 'no brand id');
+});
+
+// The one guidance line every unaddressable-repo refusal quotes after its own
+// lead. It names the repo by ROLE, so the placeholders stay literal.
+test('repoMissing: the source role names `<brand.id>-omega`', () => {
+  assert.equal(
+    repoMissing('source'),
+    'Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.',
+  );
+});
+
+test('repoMissing: the releases role names `<brand.id>-releases`', () => {
+  assert.equal(
+    repoMissing('releases'),
+    'Set repo.owner and brand.id in config/omega.json5: the releases repo is <brand.id>-releases under that owner.',
+  );
+});
+
+test('repoMissing: the website role names `<brand.id>-<target name>`', () => {
+  assert.equal(
+    repoMissing('website'),
+    'Set repo.owner and brand.id in config/omega.json5: the website repo is <brand.id>-<target name> under that owner.',
+  );
+});
+
+test('repoMissing: an unknown role throws, never a line naming nothing', () => {
+  assert.equal(typeof repoMissing, 'function', 'the throw below is the role check, not a missing export');
+  assert.throws(() => repoMissing('content'));
+  assert.throws(() => repoMissing(undefined));
 });
 
 test('websiteRepo: a web target publishes to `<brand.id>-<its name>`', () => {

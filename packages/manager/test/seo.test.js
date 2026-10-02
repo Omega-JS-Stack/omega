@@ -239,6 +239,35 @@ test('seo: content from the config/seo.json5 sidecar merges over the config sect
   assert.equal(result.output.githubRepos.synced, 1);
 });
 
+test('seo: a sidecar item carrying org is refused with the standard line, before any API call', async () => {
+  const root = stageBrand();
+  const item = contentItem({ owner: undefined, org: 'Acme-Org' });
+  jetpack.write(join(root, 'config', 'seo.json5'), `{\n  github: { content: [${JSON.stringify(item)}] },\n}\n`);
+
+  const api = fakeSeo(convergedResponses(item, 'Acme-Org'));
+  const result = await runService(brandConfig({ seo: { enabled: true } }), { root, api })
+    .then((r) => r, (error) => ({ status: 'error', error: error.message }));
+
+  assert.equal(result.status, 'error', JSON.stringify(result));
+  assert.ok(
+    result.error.includes('config.seo.github.content[0].org is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)'),
+    result.error,
+  );
+  assert.deepEqual(api.calls, []);
+});
+
+test('seo: the playground brand\'s config/seo.json5 as it stands passes the check', async () => {
+  const root = join(__dirname, '..', '..', '..', 'brands', 'playground-omega');
+  const api = fakeSeo({ getRepo: null });
+  const config = brandConfig({ seo: { enabled: true }, repo: { provider: 'github', owner: 'Omega-JS-Stack' } });
+
+  const result = await runService(config, { root, api, options: { dryRun: true } });
+
+  assert.equal(result.status, 'success', JSON.stringify(result));
+  assert.deepEqual(result.output.githubRepos.repos, [{ repo: 'Omega-JS-Stack/omega-playground-seo-demo', status: 'planned' }]);
+  assert.deepEqual(api.mutations(), []);
+});
+
 // ─── Converged no-op ─────────────────────────────────────────────────────────
 
 test('seo: a fully converged repo is a zero-mutation no-op', async () => {

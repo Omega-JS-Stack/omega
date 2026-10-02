@@ -955,6 +955,66 @@ test('a retired path or a typo inside a container section fails the load', () =>
   );
 });
 
+// ─── a declared list: the strict check walks each item ───
+
+// A brand root carrying `source` as its config/omega.json5, loaded the real way
+function loadStaged(source) {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { loadConfig } = require('../src/load.js');
+
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-home-'));
+
+  try {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-brand-'));
+    fs.mkdirSync(path.join(root, 'config'));
+    fs.writeFileSync(path.join(root, 'config', 'omega.json5'), source);
+    return loadConfig(root);
+  } finally {
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  }
+}
+
+test('an seo content item carrying org fails the load, naming the item by its position', () => {
+  const { errors } = loadStaged(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand' },
+  seo: { github: { content: [{ name: 'fixture-tool', org: 'Acme-Org' }] } },
+}
+`);
+
+  assert.deepStrictEqual(errors, [`config.seo.github.content[0].org ${UNDECLARED}`]);
+});
+
+test('an seo content item carrying only declared keys loads', () => {
+  const { errors } = loadStaged(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand' },
+  seo: { github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org', title: 'Fixture Tool', description: 'automates fixture things' }] } },
+}
+`);
+
+  assert.deepStrictEqual(errors, []);
+});
+
+test('a list with no keys declared below it stays one value: nothing inside payment.products is judged', () => {
+  const { errors } = validateConfig({ ...VALID, payment: { products: [{ id: 'basic', name: 'Basic', madeUpKey: { deep: true } }] } });
+
+  assert.deepStrictEqual(errors, []);
+});
+
+test('every key the seo repo op and its templates read off an item has a schema rule', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const paths = SHARED_SCHEMA.map((rule) => rule.path);
+  const read = ['name', 'owner', 'template', 'title', 'description', 'topics', 'features', 'cta', 'custom', 'author'];
+
+  assert.ok(paths.includes('seo.github.content'), 'the list itself owes a rule');
+  for (const key of read) {
+    assert.ok(paths.includes(`seo.github.content.${key}`), `seo.github.content.${key} owes a rule`);
+  }
+});
+
 // The drift guard: a framework's ANNOTATED DEFAULT is the checklist of what
 // its runtime reads, so it must declare itself completely.
 test('the desktop annotated default carries no undeclared paths (#911)', () => {

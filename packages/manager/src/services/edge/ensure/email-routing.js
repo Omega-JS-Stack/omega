@@ -11,12 +11,11 @@
  * verifying.
  */
 const chalk = require('chalk').default;
-const { chosenProvider } = require('@omega.js/config');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
-const { DOMAIN_PROVIDERS, presencePick, resolveEmailProvider } = require('../../domain/lib/providers.js');
+const { DOMAIN_PROVIDERS, resolveEmailProvider } = require('../../domain/lib/providers.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function isUnverifiedError(error) {
@@ -88,19 +87,11 @@ async function handleUnverified(api, zoneId, destination, retryWrite, options = 
 }
 
 /**
- * Ask for the mailbox provider when none is picked, then, for one that
- * routes mail, the first forwarding rule when the list is empty. Each
- * Disable lands `false` at its own key, which every reader takes as none.
+ * For a provider that routes mail, ask for the first forwarding rule when the
+ * list is empty. Disable lands `false` at `domain.email.forwarding`, which
+ * every reader takes as no rules.
  */
-async function askEmailSettings(context) {
-  await resolveConfigValue(context, {
-    path: 'domain.email.providers',
-    label: 'Email provider',
-    instructions: ["The mailbox provider the domain's MX and SPF records point at."],
-    present: (providers) => providers === false || chosenProvider(providers) !== null,
-    ...presencePick('mailbox'),
-  });
-
+async function askEmailForwarding(context) {
   if (!DOMAIN_PROVIDERS.mailbox[resolveEmailProvider(context.brandConfig)]?.routing) {
     return;
   }
@@ -120,7 +111,7 @@ async function askEmailSettings(context) {
 
 module.exports = async function ensureEmailRouting(context) {
   const { cloudflareApi: api, brandRoot, domain, brandConfig, options = {} } = context;
-  await askEmailSettings(context);
+  await askEmailForwarding(context);
   const zoneId = getZoneId(context);
   const gated = zoneGate(context, 'emailRouting');
   if (gated) return gated;

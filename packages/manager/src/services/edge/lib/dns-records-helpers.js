@@ -147,6 +147,11 @@ function buildRequiredRecords(domain, dnsConfig, isSubdomainProject = false, ema
 function findObsoleteMxRecords(existingRecords, domain, emailProvider = null) {
   const toDelete = [];
 
+  // No pick says nothing about whose mail the existing MX carries: leave them
+  if (!emailProvider) {
+    return toDelete;
+  }
+
   const obsoleteServers = Object.entries(DOMAIN_PROVIDERS.mailbox)
     .filter(([provider]) => provider !== emailProvider)
     .map(([, mailbox]) => mailbox.mxDomain);

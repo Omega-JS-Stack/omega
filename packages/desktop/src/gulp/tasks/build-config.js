@@ -14,7 +14,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
-const { deepMerge, enabledFormats, desktopArtifactName, sanitizeProductName, releasesRepo } = require('@omega.js/config');
+const { deepMerge, enabledFormats, desktopArtifactName, sanitizeProductName, releasesRepo, repoMissing } = require('@omega.js/config');
 const build = require('../../build.js');
 
 const { writeMacEntitlements } = require('../../lib/sign-helpers/entitlements.js');
@@ -79,7 +79,7 @@ module.exports = function buildConfig(done) {
       builderConfig.publish = publish;
       logger.log(`releases → publish block: github ${publish.owner}/${publish.repo}`);
     } else if (config.releases?.enabled !== false) {
-      logger.warn('Could not address the releases repo (set repo.owner and brand.id); leaving publish block off.');
+      logger.warn(`Could not address the releases repo; leaving publish block off. ${repoMissing('releases')}`);
     }
 
     // Inject the two notarize hooks (the .app, then each .dmg).

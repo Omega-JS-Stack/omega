@@ -12,7 +12,7 @@ read step is cached to `.omega/cache/cloudflare/{op}.json` as a debugging aid.
 | Operation | What it does |
 |---|---|
 | `zone` | The zone exists; created when missing. A pending zone reports its nameservers, and an interactive run on a manual registrar opens the registrar's nameserver page and polls until the zone activates. The resolved id lands in `edge.providers.cloudflare.zone` ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)) — the id `omega purge` targets from a build, where no Cloudflare token is in play — and rides the run as state for every later operation. |
-| `dns-records` | The required platform record set (GitHub Pages, `www`, the email provider's MX/SPF, DMARC; BIMI and the SendGrid CNAMEs only when configured) plus `dns.records` custom entries, diff-synced: create, update, delete. |
+| `dns-records` | The required platform record set (GitHub Pages, `www`, the email provider's MX/SPF, DMARC; BIMI and the SendGrid CNAMEs only when configured) plus `dns.records` custom entries, diff-synced: create, update, delete. An apex MX record pointing at another registry mailbox provider is deleted only while a provider is picked; with none picked, existing MX records stay. |
 | `email-routing` | Cloudflare Email Routing, only when `domain.email.providers` names cloudflare; rules come from `domain.email.forwarding` (`[{ from: 'support' \| '*', to: 'inbox@…' }]`). |
 | `zone-settings` | A flat map matching Cloudflare's own setting IDs, diffed in one bulk read and patched per changed setting (Cloudflare has no bulk PATCH). Addon settings (`speed_brain`, `fonts`) need their own GET each. Read-only and absent settings are skipped, and one setting's failure never blocks the rest. |
 | `cache-rules` | The `http_request_cache_settings` entrypoint ruleset, rules matched by description. The framework ships the whole default set (below), so a brand that declares nothing still gets both cache lifetimes. |
@@ -45,15 +45,22 @@ addresses, the BIMI logo, extra CSP hosts) belong in the company or brand layer.
 **Credential**: `CLOUDFLARE_TOKEN` in the brand `.env`, asked for through the shared setup
 contract. No `brand.url` → the service skips.
 
-**The email asks.** `email-routing` asks for the mailbox provider when none is picked
+**The email asks.** The service's setup asks for the mailbox provider when none is picked
 (`domain.email.providers`, a choice from the registry's mailbox providers, landed as the
-presence pick). When the picked provider routes mail (cloudflare) and `domain.email.forwarding`
-is empty, it then asks for the first rule: the address to forward (`support`, or `*` for all)
-and the inbox it goes to, landed as one `{ from, to }` entry. Disable at either ask writes
-`false` at that key, and every reader takes `false` as none: no MX or SPF include, no rules.
-`dns-records` runs before this operation, so the MX records of a provider picked here land on
-the next walk. A headless or dry run never asks: it prints the one line naming the key and
-`config/omega.json5`.
+presence pick), after the token gate and the `brand.url` check and before any operation, so
+`dns-records` reads the pick on the same walk. Its MX records land on that walk when no MX
+sits at the apex, and on the next walk when another provider's MX had to be deleted first
+(an existing record of the same name and type blocks creation while its delete clears it).
+While no provider is picked (unset, `{}`, or `false`), `dns-records` leaves every existing MX
+record alone; only a
+pick marks another registry provider's apex MX records as obsolete. When the picked provider
+routes mail (cloudflare) and `domain.email.forwarding` is empty, `email-routing` asks for the
+first rule: the address to forward (`support`, or `*` for all) and the inbox it goes to,
+landed as one `{ from, to }` entry. Disable at either ask writes `false` at that key and stops
+that ask, and every reader takes `false` as none: no MX or SPF include and no rules, with
+nothing deleted. A headless or dry run never asks: it prints the one line naming the key and
+`config/omega.json5`. A subdomain project is never asked, since its parent brand owns the
+apex mail records.
 
 ## Cache lifetimes: /assets for a year, HTML for a minute
 

@@ -200,6 +200,7 @@ module.exports = defineCases({
           ctx.expect(err).toBeDefined();
           ctx.expect(err.message).toMatch(/releases repo is unaddressable/);
           ctx.expect(err.message).toMatch(/<brand\.id>-releases/);
+          ctx.expect(err.message).toContain('Set repo.owner and brand.id in config/omega.json5: the releases repo is <brand.id>-releases under that owner.');
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

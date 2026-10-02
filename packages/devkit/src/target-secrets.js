@@ -73,7 +73,7 @@
  * sends nothing. The refusal still THROWS in a dry run: a plan that cannot be
  * made is loud.
  */
-const { composeTargetEnv, loadConfig, sourceRepo, missingEnvKeys } = require('@omega.js/config');
+const { composeTargetEnv, loadConfig, sourceRepo, repoMissing, missingEnvKeys } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
 const { publishActionsSecrets } = require('./actions-secrets.js');
 const { isCI } = require('./ci.js');
@@ -286,7 +286,7 @@ function publishTargetSecrets(options) {
   const config = productionConfig({ targetDir, target });
   const source = config ? sourceRepo(config) : null;
   if (!source) {
-    logger.warn('Skipping secret publication: this brand names no GitHub repo in config (repo.owner). Set it, then re-run `omega deploy`.');
+    logger.warn(`Skipping secret publication: this brand names no GitHub repo in config. ${repoMissing('source')} Then re-run \`omega deploy\`.`);
     return { skipped: 'no-declared-repo' };
   }
 

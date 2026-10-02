@@ -149,17 +149,26 @@ function ships(platform, format) {
 
 /**
  * A desktop target ships the Windows installer and signs it with this
- * strategy, the default strategy included when none is written.
+ * strategy, the default strategy included when none is written. With a
+ * provider, that same view must also name it as its cloud provider.
  * @param {string} strategy - A Windows signing strategy ('self-hosted', ...).
+ * @param {string} [provider] - A cloud provider ('azure', ...).
  * @returns {function} The rule.
  */
-function signsWith(strategy) {
-  const path = 'platforms.windows.signing.strategy';
+function signsWith(strategy, provider) {
+  const strategyPath = 'platforms.windows.signing.strategy';
+  const providerPath = 'platforms.windows.signing.cloud.provider';
   const test = (config) => viewsShipping(config, 'windows', 'nsis')
-    .some((view) => windowsSigningStrategy(view) === strategy);
-  const isDefault = strategy === DEFAULT_WINDOWS_SIGNING_STRATEGY ? `${strategy} is the default strategy, and ` : '';
+    .some((view) => windowsSigningStrategy(view) === strategy
+      && (provider === undefined || getPath(view, providerPath) === provider));
+  const installer = `platforms.windows.formats.nsis is ${ON_BY_DEFAULT}`;
 
-  return rule(test, { text: `${path}=${strategy}`, note: `${isDefault}platforms.windows.formats.nsis is ${ON_BY_DEFAULT}`, path });
+  if (provider !== undefined) {
+    return rule(test, { text: `${providerPath}=${provider}`, note: `signed with ${strategyPath}=${strategy}, and ${installer}`, path: providerPath });
+  }
+
+  const isDefault = strategy === DEFAULT_WINDOWS_SIGNING_STRATEGY ? `${strategy} is the default strategy, and ` : '';
+  return rule(test, { text: `${strategyPath}=${strategy}`, note: `${isDefault}${installer}`, path: strategyPath });
 }
 
 /**

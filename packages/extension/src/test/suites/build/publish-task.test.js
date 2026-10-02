@@ -545,6 +545,7 @@ module.exports = defineCases({
         });
 
         ctx.expect(message).toContain('repo.owner');
+        ctx.expect(message).toContain('Set repo.owner and brand.id in config/omega.json5: the releases repo is <brand.id>-releases under that owner.');
         fs.rmSync(tmp, { recursive: true, force: true });
       },
     },
