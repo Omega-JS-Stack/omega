@@ -15,7 +15,7 @@ const dotenv = require('dotenv');
 const jetpack = require('fs-jetpack');
 
 const TestCommand = require('../../dist/cli/commands/test.js');
-const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
+const { baseMissingKeys } = require('../../dist/vendor/config/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /** Run the seeder against a temp fixture holding `existing` (null: no .env). */
@@ -54,7 +54,7 @@ module.exports = defineCases({
         const { fixture, envPath } = seed(null);
         try {
           const read = dotenv.parse(jetpack.read(envPath));
-          for (const key of requiredEnvKeys('backend')) {
+          for (const { key } of baseMissingKeys({}, { target: 'backend', verb: 'start' })) {
             assert.ok(read[key], `${key} is not set after the run`);
           }
         } finally {

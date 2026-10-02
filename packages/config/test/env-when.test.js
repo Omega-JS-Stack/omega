@@ -7,7 +7,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { holds, onUnlessOff, chosen, hasTarget, realProject, all, any } = require('../src/env-when.js');
+const { holds, onUnlessOff, chosen, hasTarget, realProject, ships, signsWith, all, any } = require('../src/env-when.js');
 
 test('holds(path): a value at the path holds, an absent or empty one does not', () => {
   const rule = holds('captcha.providers.recaptcha.siteKey');
@@ -20,11 +20,49 @@ test('holds(path): a value at the path holds, an absent or empty one does not', 
 });
 
 test('holds(path): an object at the path holds, even an empty one, and false does not', () => {
-  const rule = holds('platforms.linux.formats.snap');
+  const rule = holds('certificates.providers.apple');
 
-  assert.equal(rule({ platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } }), true);
-  assert.equal(rule({ platforms: { linux: { formats: { snap: {} } } } }), true, 'an empty settings block is still a declared format');
-  assert.equal(rule({ platforms: { linux: { formats: { snap: false } } } }), false, 'the format dropped');
+  assert.equal(rule({ certificates: { providers: { apple: { bundleIdPrefix: 'com.acme' } } } }), true);
+  assert.equal(rule({ certificates: { providers: { apple: {} } } }), true, 'an empty settings block is still a declared block');
+  assert.equal(rule({ certificates: { providers: { apple: false } } }), false, 'the block dropped');
+});
+
+const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
+
+test('ships(platform, format): a desktop target ships the format unless the platform or the format is false', () => {
+  const rule = ships('linux', 'snap');
+
+  assert.equal(rule(DESKTOP), true, 'no platforms block: the default formats ship');
+  assert.equal(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } }), true, 'declared');
+  assert.equal(rule({ ...DESKTOP, platforms: { linux: {} } }), true, 'the platform declared, the format left alone');
+  assert.equal(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }), false, 'the format turned off');
+  assert.equal(rule({ ...DESKTOP, platforms: { linux: false } }), false, 'the platform turned off');
+  assert.equal(rule({ ...DESKTOP, platforms: { windows: false } }), true, 'another platform off leaves this one on');
+  // Only a desktop brand ships a desktop format
+  assert.equal(rule({}), false);
+  assert.equal(rule({ targets: { web: { type: 'web' }, extension: { type: 'extension' } } }), false);
+  assert.equal(rule({ platforms: { linux: { formats: { snap: {} } } } }), false, 'a declaration with no desktop target');
+
+  assert.equal(rule.path, 'platforms.linux.formats.snap');
+  assert.equal(ships('windows', 'nsis').path, 'platforms.windows.formats.nsis');
+});
+
+test('signsWith(strategy): the desktop target ships the Windows installer and signs it with that strategy, the default included', () => {
+  const selfHosted = signsWith('self-hosted');
+  const cloud = signsWith('cloud');
+  const strategy = (name) => ({ ...DESKTOP, platforms: { windows: { signing: { strategy: name, ...(name === 'cloud' ? { cloud: { provider: 'azure' } } : {}) } } } });
+
+  assert.equal(selfHosted(DESKTOP), true, 'no strategy written: self-hosted is the default');
+  assert.equal(selfHosted(strategy('self-hosted')), true);
+  assert.equal(selfHosted(strategy('cloud')), false);
+  assert.equal(cloud(strategy('cloud')), true);
+  assert.equal(cloud(DESKTOP), false, 'the default is not the cloud');
+
+  assert.equal(selfHosted({ ...DESKTOP, platforms: { windows: false } }), false, 'Windows turned off');
+  assert.equal(selfHosted({ ...DESKTOP, platforms: { windows: { formats: { nsis: false } } } }), false, 'the installer turned off');
+  assert.equal(selfHosted({ ...DESKTOP, platforms: { linux: false } }), true, 'another platform off leaves Windows on');
+  assert.equal(selfHosted({}), false, 'no desktop target');
+  assert.equal(selfHosted({ platforms: { windows: { signing: { strategy: 'self-hosted' } } } }), false, 'a strategy with no desktop target');
 });
 
 test('onUnlessOff(path): absent means on, and only a literal false turns it off', () => {

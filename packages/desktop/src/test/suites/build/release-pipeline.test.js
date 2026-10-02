@@ -42,7 +42,7 @@ module.exports = defineCases({
   tests: [
 
     {
-      name: 'deploy-precheck: provisions <org>/<brand.id>-releases PUBLIC through the devkit ensureRepo (#799, #883)',
+      name: 'deploy-precheck: provisions <owner>/<brand.id>-releases PUBLIC through the devkit ensureRepo (#799, #883)',
       run: async (ctx) => {
         const { provisionReleaseRepos } = require(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'deploy-precheck.js'));
         const calls = [];
@@ -51,7 +51,7 @@ module.exports = defineCases({
         await provisionReleaseRepos({
           log: (line) => lines.push(line),
           warn: (line) => lines.push(line),
-          config: { brand: { id: 'omega-playground' }, repo: { provider: 'github', org: 'Omega-JS-Stack' }, releases: {} },
+          config: { brand: { id: 'omega-playground' }, repo: { provider: 'github', owner: 'Omega-JS-Stack' }, releases: {} },
           // The ONE github boundary (#883): `gh` with an argv array, so the
           // create is readable here exactly as it runs.
           execFn: (file, args) => {
@@ -72,7 +72,7 @@ module.exports = defineCases({
     },
 
     {
-      name: 'deploy-precheck: a config that names no org warns and creates nothing (#883)',
+      name: 'deploy-precheck: a config that names no owner warns and creates nothing (#883)',
       run: async (ctx) => {
         const { provisionReleaseRepos } = require(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'deploy-precheck.js'));
         const lines = [];
@@ -84,7 +84,7 @@ module.exports = defineCases({
           execFn: () => { throw new Error('gh must not run'); },
         });
 
-        ctx.expect(lines.join('\n')).toContain('repo.org');
+        ctx.expect(lines.join('\n')).toContain('repo.owner');
       },
     },
     {
@@ -93,7 +93,7 @@ module.exports = defineCases({
         const finalizeRelease = require(path.join(__dirname, '..', '..', '..', 'commands', 'finalize-release.js'));
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           targets: { desktop: { type: 'desktop', releases: {} } },
         });
         fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-desktop', version: '1.2.3' }));

@@ -20,8 +20,8 @@ const { layerFiles, authoredConfigFiles, migrateConfigFile } = require('../migra
 const { envFiles, migrateEnv } = require('../migrate/env-pass.js');
 const { resolveBrandRoot, discoverTargets, loadBrand } = require('../lib/brand.js');
 const { PICKER_FLAG, assertPickerFlags, selectTargets } = require('../lib/target-selection.js');
-const { resolveFrameworkPackage } = require('../lib/framework-bin.js');
 const { walkMigrations, printBlock } = require('../lib/migrate-walk.js');
+const { registerPath } = require('../lib/breaking-changes.js');
 
 module.exports = async (options = {}) => {
   assertPickerFlags(options);
@@ -121,17 +121,4 @@ function rejudge(blocks, heading, file, execute) {
   }
   const after = blocks.findLastIndex((entry) => !entry.heading.startsWith('targets'));
   blocks.splice(after + 1, 0, { heading, ...again });
-}
-
-/**
- * The register the report points at: the copy inside the installed manager.
- * A brand-shaped root with no installed manager runs this bundled one (the
- * dispatcher's documented fallback), so its own copy is the one that matches.
- * @param {string} brandRoot
- * @returns {string}
- */
-function registerPath(brandRoot) {
-  const installed = resolveFrameworkPackage(brandRoot, '@omega.js/manager');
-  const root = installed ? fs.realpathSync(installed.dir) : path.join(__dirname, '..', '..');
-  return path.join(root, 'docs', 'shared', 'breaking-changes.md');
 }

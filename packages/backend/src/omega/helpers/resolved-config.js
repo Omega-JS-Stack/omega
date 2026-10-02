@@ -19,15 +19,15 @@ const { sourceRepo } = require('@omega.js/config');
  * Build the `resolved` group for a composed config.
  *
  * @param {object} config - The composed omega config (brand + backend target layers).
- * @returns {{ github: { owner: string, name: string, slug: string }|null }} Derived values; `github` is null when the config names no org (or no brand id).
+ * @returns {{ github: { owner: string, name: string, slug: string }|null }} Derived values; `github` is null when the config names no owner (or no brand id).
  */
 function resolvedConfigValues(config) {
   return {
-    // The brand's SOURCE repo, `<brand.id>-omega` under the one `repo.org`
+    // The brand's SOURCE repo, `<brand.id>-omega` under the one `repo.owner`
     // block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): where
     // the site's content lives, so it is the repo the CMS routes commit to.
     // `.slug` is the "owner/name" every GitHub API call wants, `.owner`/`.name`
-    // the same answer split. Null when the config names no org: half an address
+    // the same answer split. Null when the config names no owner: half an address
     // addresses nothing, and the routes' guards say so.
     github: sourceRepo(config),
   };

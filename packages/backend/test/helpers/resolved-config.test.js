@@ -9,7 +9,7 @@
  *
  * Two things are pinned: the exposed value is the SOURCE repo the one `repo`
  * block derives ([#883](https://github.com/Omega-JS-Stack/omega/issues/883):
- * `<brand.id>-omega` under `repo.org`, loaded by the real loader), and it IS
+ * `<brand.id>-omega` under `repo.owner`, loaded by the real loader), and it IS
  * @omega.js/config's own derivation rather than a second implementation living
  * here. The booted Omega instance carries the group, which is the surface consumer
  * code actually reads.
@@ -30,7 +30,7 @@ function composeBrandConfig(targetsBackend, repo) {
 
   jetpack.write(path.join(root, 'config', 'omega.json5'), `{
     brand: { id: 'acme' },
-    ${repo === null ? '' : `repo: ${JSON.stringify(repo || { provider: 'github', org: 'Acme-Org' })},`}
+    ${repo === null ? '' : `repo: ${JSON.stringify(repo || { provider: 'github', owner: 'Acme-Org' })},`}
     targets: { backend: ${JSON.stringify({ type: 'backend', ...targetsBackend })} },
   }`);
 
@@ -66,7 +66,7 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        // #883: a brand that declares no org has no content repo, and the CMS
+        // #883: a brand that declares no owner has no content repo, and the CMS
         // routes answer "GitHub repo not configured" off exactly this value.
         assert.equal(resolvedConfigValues(composeBrandConfig({}, null)).github, null);
       },
@@ -79,7 +79,7 @@ module.exports = defineCases({
       async run({ assert }) {
         // The whole point of #290: ONE implementation, in @omega.js/config. If
         // this ever diverges, a second copy of the rule has grown here.
-        for (const repo of [undefined, { provider: 'github', org: 'Other-Org' }]) {
+        for (const repo of [undefined, { provider: 'github', owner: 'Other-Org' }]) {
           const config = composeBrandConfig({}, repo);
 
           assert.deepEqual(resolvedConfigValues(config).github, sourceRepo(config),

@@ -1,6 +1,6 @@
 /**
- * The GitHub owner question in onboard, written as `repo.org`: the origin
- * remote's owner is the default, `--org` is the flag form, and a missing or
+ * The GitHub owner question in onboard, written as `repo.owner`: the origin
+ * remote's owner is the default, `--owner` is the flag form, and a missing or
  * signed-out GitHub CLI skips the question with one line. The CLI is the fake
  * `gh` the seams put first on PATH; nothing here reaches GitHub.
  */
@@ -16,12 +16,13 @@ require('@omega.js/devkit/test/temp-home');
 const { runOnboard } = require('../src/onboard.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 const { createGh } = require('./lib/fake-gh.js');
+const { createMachine } = require('./lib/fake-claude.js');
 
 pluginInstalled();
 
 const FLAGS = { name: 'Acme', url: 'https://acme.test', targets: 'web', contactName: 'Jane Doe', manage: false };
 const CREATE_ORG_URL = 'https://github.com/account/organizations/new';
-const SKIP_LINE = 'GitHub CLI is not signed in, so the repo owner was not set. Set repo.org in config/omega.json5 later.';
+const SKIP_LINE = 'GitHub CLI is not signed in, so the repo owner was not set. Set repo.owner in config/omega.json5 later.';
 
 /** Open a fake terminal with the console captured, both undone after the test. */
 function terminal(t) {
@@ -43,7 +44,7 @@ async function until(check, label, timeoutMs = 10000) {
 }
 
 test('#889 case 2, in the wizard: the org holding <brand id>-omega ranks first, and a probe that fails counts as not the holder', async (t) => {
-  t.after(useGh({ user: 'jane', orgs: ['beta', 'zz-holder', 'alpha'], repos: ['zz-holder/acme-omega'], failing: ['beta/acme-omega'] }));
+  t.after(useGh({ user: 'jane', orgs: ['beta', 'zz-holder', 'alpha'], repos: { 'zz-holder/acme-omega': {} }, failing: ['beta/acme-omega'] }));
   const root = folder('holder');
   const { tty } = terminal(t);
 
@@ -57,28 +58,45 @@ test('#889 case 2, in the wizard: the org holding <brand id>-omega ranks first, 
   const { report } = await driveWizard(tty, runOnboard(root, { id: 'acme', ...FLAGS }), { ...ENTER_THE_REST, 'zz-holder': pickSecond });
 
   assert.equal(report.valid, true, 'the failed probe threw nothing');
-  assert.deepEqual(readConfig(root).repo, { org: 'zz-holder' });
+  assert.deepEqual(readConfig(root).repo, { owner: 'zz-holder' });
 });
 
-test('#889 case 3: an origin of someone/acme-omega makes someone the default, and a run with no terminal writes repo.org: someone', async (t) => {
+test('#889 case 3: an origin of someone/acme-omega makes someone the default, and a run with no terminal writes repo.owner: someone', async (t) => {
   const headless = withOrigin(folder('acme-omega'), 'someone/acme-omega');
   await quietly(() => runOnboard(headless, { id: 'acme', ...FLAGS }));
-  assert.deepEqual(readConfig(headless).repo, { org: 'someone' });
+  assert.deepEqual(readConfig(headless).repo, { owner: 'someone' });
 
   // In a terminal, Enter takes the default, ahead of the org named like the brand
   t.after(useGh({ user: 'jane', orgs: ['acme', 'someone', 'zeta'] }));
   const typed = withOrigin(folder('acme-omega'), 'someone/acme-omega');
   const { tty } = terminal(t);
   await pressEnterThrough(tty, runOnboard(typed, { id: 'acme', ...FLAGS }));
-  assert.deepEqual(readConfig(typed).repo, { org: 'someone' });
+  assert.deepEqual(readConfig(typed).repo, { owner: 'someone' });
 });
 
-test('#889 case 4: --org=acme-co writes repo: { org: \'acme-co\' }', async () => {
+test('#889 case 4: --owner=acme-co writes repo: { owner: \'acme-co\' }', async () => {
   const root = folder('flagged');
+
+  await quietly(() => runOnboard(root, { id: 'acme', owner: 'acme-co', ...FLAGS }));
+
+  assert.deepEqual(readConfig(root).repo, { owner: 'acme-co' });
+});
+
+test('--org is no alias: --org=acme-co writes no repo block', async () => {
+  const root = folder('old-flag');
 
   await quietly(() => runOnboard(root, { id: 'acme', org: 'acme-co', ...FLAGS }));
 
-  assert.deepEqual(readConfig(root).repo, { org: 'acme-co' });
+  assert.ok(!('repo' in readConfig(root)), 'the retired flag is unknown, so nothing names an owner');
+});
+
+test('a bare --owner is refused, naming the flag form', async () => {
+  const root = folder('bare-owner');
+
+  await assert.rejects(
+    () => quietly(() => runOnboard(root, { id: 'acme', owner: true, ...FLAGS })),
+    /Invalid --owner: pass the GitHub owner \(--owner=acme\)/,
+  );
 });
 
 test('#889 case 5: no terminal, no flag and no origin writes no repo block', async () => {
@@ -112,14 +130,14 @@ test('#889 case 6, with an origin: in a terminal, a GitHub CLI that cannot answe
   await pressEnterThrough(first.tty, runOnboard(signedOut, { id: 'acme', ...FLAGS }));
   first.tty.close();
   first.capture.restore();
-  assert.deepEqual(readConfig(signedOut).repo, { org: 'someone' }, 'signed out');
+  assert.deepEqual(readConfig(signedOut).repo, { owner: 'someone' }, 'signed out');
   assert.ok(!first.capture.text().includes(SKIP_LINE), `no skip line when the origin answers: ${first.capture.text()}`);
 
   t.after(withoutGh());
   const missing = withOrigin(folder('acme-omega'), 'someone/acme-omega');
   const second = terminal(t);
   await pressEnterThrough(second.tty, runOnboard(missing, { id: 'acme', ...FLAGS }));
-  assert.deepEqual(readConfig(missing).repo, { org: 'someone' }, 'no gh at all');
+  assert.deepEqual(readConfig(missing).repo, { owner: 'someone' }, 'no gh at all');
   assert.ok(!second.capture.text().includes(SKIP_LINE));
 });
 
@@ -134,8 +152,15 @@ test('#889 case 6, an old GitHub CLI: when `gh api user/orgs` fails (no --slurp)
   assert.ok(!('repo' in readConfig(root)), 'no repo block');
 });
 
-test('#889 a `ghExec` runner passed to runOnboard is the one the owner question uses', async (t) => {
-  const ghExec = createGh({ user: 'jane', orgs: ['acme', 'beta'] });
+test('#1044 one `execFn` passed to runOnboard runs both the owner question and the plugin offer', async (t) => {
+  // A machine with claude and no plugin, so the offer is made through the same runner
+  const gh = createGh({ user: 'jane', orgs: ['acme', 'beta'] });
+  const machine = createMachine({ published: require('../package.json').version });
+  const calls = [];
+  const execFn = (file, args, options) => {
+    calls.push([file, ...args]);
+    return file === 'gh' ? gh(file, args, options) : machine.exec(file, args, options);
+  };
   const root = folder('injected');
   const { tty } = terminal(t);
   const pathCalls = ghCalls().length;
@@ -147,11 +172,13 @@ test('#889 a `ghExec` runner passed to runOnboard is the one the owner question 
     await sleep(150);
     await tty.answer('beta', '\r');
   };
-  await driveWizard(tty, runOnboard(root, { id: 'acme', ...FLAGS, ghExec }), { ...ENTER_THE_REST, beta: pickSecond });
+  const { asked } = await driveWizard(tty, runOnboard(root, { id: 'acme', ...FLAGS, execFn }), { ...ENTER_THE_REST, beta: pickSecond, Claude: 'n\r' });
 
-  assert.ok(ghExec.calls.some((args) => args.includes('user/orgs')), `the injected runner listed the orgs: ${JSON.stringify(ghExec.calls)}`);
+  assert.ok(calls.some((call) => call[0] === 'gh' && call.includes('user/orgs')), `the owner question listed the orgs: ${JSON.stringify(calls)}`);
+  assert.ok(calls.some((call) => call[0] === 'claude'), `the plugin offer read the machine: ${JSON.stringify(calls)}`);
+  assert.ok(asked.includes('Claude'), 'the injected machine has no plugin, so the install was offered');
   assert.deepEqual(ghCalls().slice(pathCalls), [], 'the gh on PATH was never called');
-  assert.deepEqual(readConfig(root).repo, { org: 'acme' });
+  assert.deepEqual(readConfig(root).repo, { owner: 'acme' });
 });
 
 test('#889 case 7:picking "create a new org" prints the GitHub page for it and asks again', async (t) => {
@@ -177,5 +204,5 @@ test('#889 case 7:picking "create a new org" prints the GitHub page for it and a
   await driveWizard(tty, runOnboard(root, { id: 'acme', ...FLAGS }), { ...ENTER_THE_REST, zeta: pickOwner });
 
   assert.ok(await pageShown(), 'the GitHub page for a new org was printed');
-  assert.deepEqual(readConfig(root).repo, { org: 'acme' }, 'the question came back, and the second answer was written');
+  assert.deepEqual(readConfig(root).repo, { owner: 'acme' }, 'the question came back, and the second answer was written');
 });

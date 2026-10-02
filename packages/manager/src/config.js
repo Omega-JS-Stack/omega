@@ -56,11 +56,9 @@ const TARGET_FRAMEWORKS = {
 // `providers.<vendor>` key whose presence picks that vendor, and the case-3
 // `devlog.enabled`. The exported DEFAULTS is the schema's defaults plus this.
 const MANAGER_DEFAULTS = {
-  // Domain registrar + email — two roles, one providers block each (#425).
-  // The domain service reconciles registrar nameservers from the KEY under
-  // `providers`; the cloudflare dns/email-routing operations read the key
-  // under `email.providers` + `email.forwarding`. No entry = not chosen yet,
-  // and the service skips (what a null provider meant).
+  // Domain registrar and email: two roles, one providers block each, the KEY
+  // under `providers` picking the vendor. No entry: a terminal walk asks, a
+  // headless one skips. `false` at `email.providers` or `email.forwarding` means none.
   domain: {
     providers: {},    // { namecheap: {} } | { squarespace: {} } — one registrar
     email: {

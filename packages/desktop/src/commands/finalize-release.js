@@ -61,7 +61,7 @@ module.exports = async function finalizeRelease(options = {}) {
   // The releases repo (the auto-updater feed source), from config alone.
   const releases = releasesRepo(config);
   if (!releases) {
-    throw new Error('finalize-release: could not address the releases repo. Set repo.org and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that org).');
+    throw new Error('finalize-release: could not address the releases repo. Set repo.owner and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that owner).');
   }
   const { owner, name } = releases;
 

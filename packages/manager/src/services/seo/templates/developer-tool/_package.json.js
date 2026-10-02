@@ -5,14 +5,14 @@
 /**
  * Generate package.json from content item + brand data
  *
- * @param {Object} data - { name, org, title, description, cta, topics, brand }
+ * @param {Object} data - { name, owner, title, description, cta, topics, brand }
  * @returns {string} Stringified JSON
  */
 module.exports = function generatePackageJson(data) {
-  const { name, org, title, description, cta, topics, brand } = data;
+  const { name, owner, title, description, cta, topics, brand } = data;
 
   const pkg = {
-    name: `${org}-${name}`,
+    name: `${owner}-${name}`,
     version: '1.0.0',
     description: `${title} ${description}`,
     main: 'src/index.js',
@@ -25,7 +25,7 @@ module.exports = function generatePackageJson(data) {
     homepage: cta?.platform || cta?.url || brand?.url || '',
     repository: {
       type: 'git',
-      url: `git+https://github.com/${org}/${name}.git`,
+      url: `git+https://github.com/${owner}/${name}.git`,
     },
   };
 

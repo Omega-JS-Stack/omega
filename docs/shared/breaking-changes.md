@@ -20,13 +20,31 @@ convert.
 own mind about between two versions is a dated section in this register with its
 by-hand step, never a migrate rule. Every `omega migrate` report ends on one line
 naming this file inside the installed manager, so the by-hand steps sit one path
-away from the run.
+away from the run. A brand-root `omega update` that moves the manager pin ends on
+the dated sections due since the version it moved from, by date and title, then
+this file's path ([updates.md](updates.md#brand-root)).
 
 **Boundaries.** What never got PORTED is [#78](https://github.com/Omega-JS-Stack/omega/issues/78)'s
 gap tables, not this file. Converter TOOLING is
 [#40](https://github.com/Omega-JS-Stack/omega/issues/40) — these rows are its
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
+
+## 2026-10-01: the repo block's owner key is `repo.owner` ([#1041](https://github.com/Omega-JS-Stack/omega/issues/1041))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The repo block's owner | `repo: { provider: 'github', org: 'Acme-Org' }` | `repo: { provider: 'github', owner: 'Acme-Org' }`: a GitHub user or org, GitHub's own word for it. The strict schema refuses `repo.org`, naming `npx omega migrate` | Run `npx omega migrate --execute` at the brand root: it moves `repo.org` to `repo.owner` |
+| `omega onboard`'s owner flag | `--org=<owner>` | `--owner=<owner>`; `--org` is no flag at all, so it writes no `repo` block | Type `--owner` where a script passed `--org` |
+| The `/brand` payload's `repo` | `{ provider, org }` | `{ provider, owner }` | A client reading `repo.org` from the payload reads `repo.owner` |
+| A seo content item's owner override | `org` on an item of `seo.github.content` | `owner` on the item | Rename the key on each item that set one |
+
+## 2026-10-01: a default desktop format owes its keys ([#1035](https://github.com/Omega-JS-Stack/omega/issues/1035))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `SNAPCRAFT_STORE_CREDENTIALS` on a desktop target | Owed only when the config wrote `platforms.linux.formats.snap`, so a defaulted snap owed nothing and the build skipped it quietly | Owed whenever the target ships the snap, which is on by default: `omega manage` asks for it, and `omega publish` and the deploy's secrets check refuse without it, naming `platforms.linux.formats.snap` | Set the key (`snapcraft export-login -`, or `npx omega manage --service publishing`), or turn the format off with `platforms.linux.formats.snap: false` (or `platforms.linux: false`) |
+| `WIN_EV_TOKEN_PATH` and `WIN_CSC_KEY_PASSWORD` on a desktop target | Owed only when the config wrote `platforms.windows.signing.strategy: 'self-hosted'` | Owed whenever the target ships the Windows installer (`platforms.windows.formats.nsis`, on by default) and signs it self-hosted, the default strategy | Set both keys, pick another `platforms.windows.signing.strategy` (and its own keys), or turn the installer off with `platforms.windows.formats.nsis: false` (or `platforms.windows: false`) |
 
 ## 2026-10-01: the omega plugin comes from GitHub, never from the manager package ([#1028](https://github.com/Omega-JS-Stack/omega/issues/1028))
 
@@ -58,7 +76,7 @@ input, not its implementation. The legacy repos stay read-only reference
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|
-| A backend, desktop or extension target's `test/README.md` | Copied once on the first verb and never touched again, so a framework fix to it never reached an existing project | The marked file: the framework's text under `<!-- ========== Default Values ========== -->`, rewritten from the framework's `src/defaults/test/README.md` on every verb; your own notes under `<!-- ========== Custom Values ========== -->`, verbatim. The next verb converges an unmarked copy: a line the framework text carries goes, every other line lands under Custom in order | Before the next verb, move a note you wrote INSIDE a framework paragraph or table (an extra row in the layout table, say) into a paragraph of its own: the converge keeps it, but lifted out of its table |
+| A backend, desktop or extension target's `test/README.md` | Copied once on the first verb and never touched again, so a framework fix to it never reached an existing project | The marked file: the framework's text under `<!-- ========== Default Values ========== -->`, rewritten from the framework's `src/defaults/test/README.md` on every verb; your own notes under `<!-- ========== Custom Values ========== -->`, verbatim. The next verb converges an unmarked copy: a line the framework text carries goes, a line any earlier framework text carried goes, and every other line, your own, lands under Custom in order. The match is line by line, so a line of your own that equals a framework line (a code fence, a bare bracket, a table separator row, a heading such as `## Layout`) goes with it | Before the next verb, move a note you wrote INSIDE a framework paragraph or table (an extra row in the layout table, say) into a paragraph of its own: the converge keeps it, but lifted out of its table. A README holding a code block or a table of your own: add the two marker lines by hand first, with your notes under Custom, and the converge keeps them verbatim |
 
 ## 2026-09-30: the backend and the router have exports maps ([#1009](https://github.com/Omega-JS-Stack/omega/issues/1009))
 
@@ -447,7 +465,7 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|
-| The repo block | `repo: { providers: { github: { enabled, org, repo, shared, private } } }` | `repo: { provider: 'github', org }` | Replace the block: keep the org, drop the rest. Presence is the switch, so a brand the manager should not touch deletes the block |
+| The repo block | `repo: { providers: { github: { enabled, org, repo, shared, private } } }` | `repo: { provider: 'github', org }` (`owner` since the 2026-10-01 entry above) | Replace the block: keep the org, drop the rest. Presence is the switch, so a brand the manager should not touch deletes the block |
 | The GitHub identity block | `github: { user, website }` | nothing | Delete it. Nothing read `user`, and the website has its own derived repo now |
 | A per-target repo override | `targets.backend.github.repo` (the CMS content repo) | nothing | Delete it: the CMS commits to the source repo `<brand.id>-omega` |
 | The releases repo | `targets.desktop.releases: { owner, repo }` | nothing | Delete both keys. `releases: {}` stays the presence switch for the site's download links |
@@ -588,6 +606,9 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 | Brand assets | `omega-manager/.brands/<id>/assets/` | The brand repo's `assets/` (logo sources, templates); derived variants land in the gitignored `.omega/assets/` | Copy the source assets into the brand repo; a manage cycle regenerates the derived set |
 | Entry point | `npm start` inside the omega-manager repo, all brands at once, `--brand <id>` to narrow | `npx omega` (or `npm run manage`) inside the BRAND root — one brand, always; `--service=<name>` still narrows to one service | Run the manage cycle from the brand repo; there is no cross-brand run |
 | Retired flags | `--bump`, `--build`, `--sync`, `--deploy`, `--exec`, `--dirty`, `--force-recreate` | Gone with the multi-repo-clone model | Use the per-target verbs instead: `omega deploy` at the brand root fans out (backend → web → extension/desktop), `omega update` handles version bumps. The drop calls are recorded in [#78](https://github.com/Omega-JS-Stack/omega/issues/78) |
+| Quick task runner | `npm start -- --quick[=<task>]` in the omega-manager repo: one-off AI prompt tasks under `src/services/_quick/`, run across every brand | Retired; nothing replaced it | Nothing to migrate: a one-off task is a script in the brand, or an issue against the framework |
+| Stripe test-flow simulator | `npm run stripe` in the omega-manager repo: the `stripe-cli` flows (cancellation, payment-failure, reset, trial-expiry), run by hand against Stripe test mode | The backend's payment journey tests (`journey-payments-*`: the `test` provider through the full unified pipeline, end to end) and the opt-in `--lane=stripe-live` lane (the pipeline against real Stripe test-mode events, forwarded by `stripe listen`): [docs/backend/payment-system.md](../backend/payment-system.md), [docs/backend/test-framework.md](../backend/test-framework.md) | Run `npx omega test` in the backend target; for real deliveries, `npx omega test --lane=stripe-live` with an `sk_test_` `STRIPE_SECRET_KEY` in `.env.testing` |
+| Disperse `products`, `pricing-md` and `cdn` paths | Disperse copied the payment catalog into the backend's `backend-manager-config.json`, stripped hardcoded values from the website's `src/pages/pricing.md`, and copied the derived brand assets into a CDN repo and deployed it | Nothing is copied: every target reads `payment.products[]` in `config/omega.json5` directly. No `pricing.md` is written: pricing renders from that catalog (`site.pricing`, [docs/web/index.md](../web/index.md)). No CDN repo is fed: the derived asset set stays in `.omega/assets/`, and a CDN is a sibling web target ([config.md](config.md)) | Move any plan data a page kept by hand into `payment.products[]` (a page's `pricing.plans` front matter has no successor: [docs/manager/migration.md](../manager/migration.md)); declare a CDN as a sibling `cdn: { type: 'web' }` target |
 
 ## Cross-cutting
 

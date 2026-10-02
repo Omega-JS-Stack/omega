@@ -2,7 +2,7 @@
  * Test: POST /admin/repo/content
  * Tests the admin write repo content endpoint
  * Writes arbitrary content to a GitHub repository
- * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
+ * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.owner + brand.id -> <brand.id>-omega)
  *
  * IMPORTANT: These tests require GH_TOKEN and a resolvable github repo to be configured.
  * If GitHub is not configured, the tests will fail.

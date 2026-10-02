@@ -33,6 +33,7 @@ const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { freshnessSweep, linkLocalPackages, resolveLinkedMonorepo, resolveMonorepoRoot, startMonorepoWatch } = require('@omega.js/devkit/local');
 const { mkcertCaRootPem } = require('@omega.js/devkit/local-https');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // Local
@@ -314,17 +315,25 @@ module.exports = async (options = {}) => {
   // bypass, so Node prints no warning. A shell-set value wins verbatim.
   const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
 
-  // A target with no `start` script has no dev leg: it steps aside, loudly.
-  // Read after the manage cycle, which writes a fresh target's scripts.
+  // A target missing a machine tool, or with no `start` script, has no dev leg:
+  // it steps aside, loudly. Read after the manage cycle, which writes a fresh
+  // target's scripts.
+  const misses = missingMachineTools(picked.map((name) => {
+    const entry = targets.find((item) => item.name === name);
+    return { name, type: entry.target, projectType: entry.projectType };
+  }), { execFn: options.execFn });
   const selected = picked.filter((name) => {
     const entry = targets.find((item) => item.name === name);
+    const missed = misses.filter((miss) => miss.target === name);
+    missed.forEach((miss) => console.log(chalk.yellow(`   ⊘ ${name}: ${machineToolLine(miss)}`)));
+    if (missed.length > 0) return false;
     if (targetScripts(entry.path).start) return true;
     console.log(chalk.yellow(`   ⊘ ${name}: no \`start\` script in ${entry.dir}/package.json, no dev leg`));
     return false;
   });
 
   if (selected.length === 0) {
-    console.error(chalk.red('✖ omega dev: nothing to boot (no selected target has a `start` script)'));
+    console.error(chalk.red('✖ omega dev: nothing to boot (every selected target stepped aside, see above)'));
     process.exit(1);
   }
 

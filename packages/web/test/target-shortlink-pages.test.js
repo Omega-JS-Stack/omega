@@ -38,7 +38,7 @@ const DOWNLOADS = {
 // A brand that opted into desktop releases and listed three stores — the whole
 // declaration, in the one place it lives.
 const TARGETS = {
-  repo: { provider: 'github', org: 'mini-org' },
+  repo: { provider: 'github', owner: 'mini-org' },
   targets: {
     web: { type: 'web' },
     desktop: { type: 'desktop', releases: {} },

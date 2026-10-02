@@ -10,11 +10,11 @@ const ICON_WINDOWS = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZX
 /**
  * Generate README.md from content item + brand data
  *
- * @param {Object} data - { name, org, title, description, features, cta, custom, brand }
+ * @param {Object} data - { name, owner, title, description, features, cta, custom, brand }
  * @returns {string} Generated markdown
  */
 module.exports = function generateReadme(data) {
-  const { name, org, title, description, features, cta, custom, brand } = data;
+  const { name, owner, title, description, features, cta, custom, brand } = data;
 
   const brandmarkUrl = brand?.images?.brandmark || '';
   const platformUrl = cta?.platform || cta?.url || brand?.url || '';
@@ -42,9 +42,9 @@ module.exports = function generateReadme(data) {
   lines.push('</p>');
   lines.push('');
   lines.push('<p>');
-  lines.push(`<a href="https://github.com/${org}/${name}/stargazers"><img src="https://img.shields.io/github/stars/${org}/${name}?style=flat-square&logo=github" alt="Stars"></a>`);
-  lines.push(`<a href="https://github.com/${org}/${name}/network/members"><img src="https://img.shields.io/github/forks/${org}/${name}?style=flat-square&logo=github" alt="Forks"></a>`);
-  lines.push(`<a href="https://github.com/${org}/${name}/issues"><img src="https://img.shields.io/github/issues/${org}/${name}?style=flat-square" alt="Issues"></a>`);
+  lines.push(`<a href="https://github.com/${owner}/${name}/stargazers"><img src="https://img.shields.io/github/stars/${owner}/${name}?style=flat-square&logo=github" alt="Stars"></a>`);
+  lines.push(`<a href="https://github.com/${owner}/${name}/network/members"><img src="https://img.shields.io/github/forks/${owner}/${name}?style=flat-square&logo=github" alt="Forks"></a>`);
+  lines.push(`<a href="https://github.com/${owner}/${name}/issues"><img src="https://img.shields.io/github/issues/${owner}/${name}?style=flat-square" alt="Issues"></a>`);
   lines.push(`<a href="${brandUrl}"><img src="https://img.shields.io/website?url=${encodedUrl}&style=flat-square" alt="Website"></a>`);
   lines.push('</p>');
   lines.push('');
@@ -75,7 +75,7 @@ module.exports = function generateReadme(data) {
   lines.push('Requires [Node.js](https://nodejs.org) and [Git](https://git-scm.com).');
   lines.push('');
   lines.push('```bash');
-  lines.push(`git clone https://github.com/${org}/${name}.git`);
+  lines.push(`git clone https://github.com/${owner}/${name}.git`);
   lines.push(`cd ${name}`);
   lines.push('npm install');
   lines.push('npm start');
@@ -101,11 +101,11 @@ module.exports = function generateReadme(data) {
   // --- Star History ---
   lines.push('## ⭐ Star History');
   lines.push('');
-  lines.push(`<a href="https://www.star-history.com/#${org}/${name}&Date">`);
+  lines.push(`<a href="https://www.star-history.com/#${owner}/${name}&Date">`);
   lines.push('  <picture>');
-  lines.push(`    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=${org}/${name}&type=Date&theme=dark" />`);
-  lines.push(`    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=${org}/${name}&type=Date" />`);
-  lines.push(`    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=${org}/${name}&type=Date" width="100%" />`);
+  lines.push(`    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=${owner}/${name}&type=Date&theme=dark" />`);
+  lines.push(`    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=${owner}/${name}&type=Date" />`);
+  lines.push(`    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=${owner}/${name}&type=Date" width="100%" />`);
   lines.push('  </picture>');
   lines.push('</a>');
   lines.push('');

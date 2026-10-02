@@ -83,7 +83,7 @@ function targetName(cwd) {
 
 /**
  * The WEBSITE repo this deploy publishes to: `<brand.id>-<target name>` under
- * the brand's org, holding the BUILT site only
+ * the brand's owner, holding the BUILT site only
  * ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)). The SOURCE
  * monorepo is a different repo (`sourceRepo`, where the dispatch lane sends its
  * workflow_dispatch), which is what lets a private brand serve a public site.
@@ -94,7 +94,7 @@ function targetName(cwd) {
  *
  * @param {object} config - Composed omega config (brand + local layers).
  * @param {string} cwd - The target dir (its basename is the target name inside a brand).
- * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org (or no brand id), and null when another provider hosts this target.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no owner (or no brand id), and null when another provider hosts this target.
  * @throws {Error} When the resolved target name is not declared in the config.
  */
 function websiteAddress(config, cwd) {
@@ -222,7 +222,7 @@ function buildDirectPlan(config, options) {
   const website = websiteAddress(config, cwd);
 
   if (!website) {
-    throw new Error('Direct deploy needs repo.org and brand.id in config/omega.json5: this target publishes to the website repo <brand.id>-<target name> under that org. A target whose hosting.provider is not github has no repo to push to.');
+    throw new Error('Direct deploy needs repo.owner and brand.id in config/omega.json5: this target publishes to the website repo <brand.id>-<target name> under that owner. A target whose hosting.provider is not github has no repo to push to.');
   }
 
   const { owner, slug: repo } = website;

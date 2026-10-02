@@ -13,7 +13,7 @@ const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warnin
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { seed } = require('../../test/seed.js');
 const { createChildLog } = require('../utils/attach-log-file');
-const { refuseWhenCustom } = require('../utils/project-type');
+const { refuseWhenCustom, refuseWhenToolsMissing } = require('../utils/project-type');
 const emulatorOrphans = require('./emulator-orphans');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
@@ -567,6 +567,7 @@ class EmulatorCommand extends BaseCommand {
   async execute() {
     // Custom-server mode exports no Cloud Functions to emulate (#584)
     if (refuseWhenCustom(this.main.firebaseProjectPath, 'emulator')) return;
+    if (refuseWhenToolsMissing(this.main.firebaseProjectPath, 'emulator', ['java', 'firebase'])) return;
 
     // The emulator IS the backend's dev leg under brand-root `omega dev`, so it
     // shares the dev-log lane with `omega serve` (they never run together — same

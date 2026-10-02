@@ -335,14 +335,14 @@ test('testing: GitHub Actions success, the exact gh command on `<brand.id>-omega
     [GH_CMD]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ repo: { provider: 'github', owner: 'sandbox-org' } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.ok(report.output.results.passed.includes('GitHub Actions'));
   assert.ok(exec.calls.some(([cmd]) => cmd === GH_CMD));
 });
 
-test('testing: the run list reads the brand\'s OWN org, whichever it is (#883)', async () => {
+test('testing: the run list reads the brand\'s OWN owner, whichever it is (#883)', async () => {
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
@@ -353,7 +353,7 @@ test('testing: the run list reads the brand\'s OWN org, whichever it is (#883)',
   });
 
   const report = await runService(
-    brandConfig({ repo: { provider: 'github', org: 'Acme-Org' } }),
+    brandConfig({ repo: { provider: 'github', owner: 'Acme-Org' } }),
     { root, targets, fetch, exec },
   );
 
@@ -370,7 +370,7 @@ test('testing: failed GitHub Actions run → error', async () => {
     [GH_CMD]: '[{"status":"completed","conclusion":"failure","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ repo: { provider: 'github', owner: 'sandbox-org' } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [
@@ -382,7 +382,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
 
-  const inProgress = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), {
+  const inProgress = await runService(brandConfig({ repo: { provider: 'github', owner: 'sandbox-org' } }), {
     root,
     targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -393,7 +393,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
     { name: 'GitHub Actions', warning: 'Build → in progress' },
   ]);
 
-  const unavailable = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), {
+  const unavailable = await runService(brandConfig({ repo: { provider: 'github', owner: 'sandbox-org' } }), {
     root,
     targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -414,7 +414,7 @@ test('testing: dry-run — zero network, local checks still run', async () => {
   const exec = fakeExec({ [GIT_CMD]: '' });
 
   const report = await runService(
-    brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }),
+    brandConfig({ repo: { provider: 'github', owner: 'sandbox-org' } }),
     { root, targets, fetch, exec, options: { dryRun: true } },
   );
 

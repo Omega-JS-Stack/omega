@@ -442,7 +442,7 @@ async function checkApiHealth(recorder, entry, ctx) {
 /**
  * GitHub Actions check: the latest workflow run of the brand's SOURCE repo, the
  * one every workflow runs in (#883). Silent when the brand declares no
- * `repo.org` (the repo service already reports that skip) or when the gh CLI
+ * `repo.owner` (the repo service already reports that skip) or when the gh CLI
  * is unavailable.
  */
 function checkGitHubActions(recorder, ctx) {

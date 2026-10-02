@@ -23,12 +23,7 @@
  */
 const { execFileSync } = require('node:child_process');
 
-const GH_INSTRUCTIONS = [
-  'The GitHub CLI is required to publish Actions secrets.',
-  '  install: https://cli.github.com  (macOS: brew install gh)',
-  '  sign in: gh auth login',
-  '  or skip: run deploy with --no-secrets',
-].join('\n');
+const { assertGhReady } = require('./github-repo.js');
 
 /** Default exec boundary — execFileSync, injectable everywhere below (tests). */
 function defaultExecFn(file, args, options) {
@@ -53,23 +48,6 @@ function buildSecretArgs(options) {
     throw new Error(`[devkit actions-secrets] invalid secret name: ${key || '(none)'}`);
   }
   return ['secret', 'set', key, '--repo', repo];
-}
-
-/**
- * Assert a usable `gh`: installed AND authenticated. `gh auth status` covers
- * both — a missing binary throws ENOENT, an anonymous CLI exits non-zero.
- *
- * @param {object} [options]
- * @param {function} [options.execFn] - Injectable exec (tests)
- * @throws {Error} With install/auth instructions when gh is unusable.
- */
-function assertGhReady(options) {
-  const execFn = (options || {}).execFn || defaultExecFn;
-  try {
-    execFn('gh', ['auth', 'status'], { stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (e) {
-    throw new Error(`[devkit actions-secrets] ${GH_INSTRUCTIONS}`);
-  }
 }
 
 /**
@@ -116,7 +94,11 @@ function publishActionsSecrets(options) {
   const result = { published: [], failed: [] };
   if (keys.length === 0) return result;
 
-  assertGhReady({ execFn });
+  try {
+    assertGhReady({ execFn });
+  } catch (error) {
+    throw new Error(`${error.message}\n  or skip: run deploy with --no-secrets`);
+  }
 
   for (const key of keys) {
     try {
@@ -138,8 +120,6 @@ function publishActionsSecrets(options) {
 
 module.exports = {
   buildSecretArgs,
-  assertGhReady,
   setActionsSecret,
   publishActionsSecrets,
-  GH_INSTRUCTIONS,
 };

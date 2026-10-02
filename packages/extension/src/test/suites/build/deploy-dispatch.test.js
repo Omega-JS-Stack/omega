@@ -135,7 +135,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           targets: { extension: { type: 'extension' } },
         });
         const sent = [];
@@ -151,7 +151,7 @@ module.exports = defineCases({
           await inTarget(targetDir, () => withStubs(stubs, (deploy) => deploy({})));
 
           // The one devkit helper answers both halves (#847): the repo is the
-          // derived `<brand.id>-omega` default (#809, the config declares an org
+          // derived `<brand.id>-omega` default (#809, the config declares an owner
           // and no repo of its own), and the workflow is the per-target name the
           // brand root's scaffold composed (#265).
           ctx.expect(sent.length).toBe(1);
@@ -198,7 +198,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           targets: { extension: { type: 'extension' } },
         });
         const sent = [];
@@ -245,7 +245,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           targets: { extension: { type: 'extension' } },
         });
         const followed = [];

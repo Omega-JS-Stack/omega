@@ -24,7 +24,7 @@ targets follow): no `repo` block, no repo service.
 ```json5
 repo: {
   provider: 'github',   // optional; `github` is the only one built
-  org: 'Acme-Org',      // the owner every repo the brand owns lives in
+  owner: 'Acme-Org',    // the GitHub user or org every repo the brand owns lives under
 }
 ```
 
@@ -89,7 +89,7 @@ A web target says where it is hosted with `targets.<name>.hosting.provider` (def
 
 The website repo's visibility is NOT the brand's:
 
-| Brand | Org plan | Website repo | Why |
+| Brand | Owner plan | Website repo | Why |
 |---|---|---|---|
 | public | any | public | the brand publishes its source anyway |
 | private | free | public | Pages on a private repo is a paid feature, and the alternative is publishing the SOURCE |
@@ -97,7 +97,7 @@ The website repo's visibility is NOT the brand's:
 
 The plan comes from `GET /orgs/{org}` (`.plan.name`); a user owner, or an org whose plan the
 token cannot read, answers `free`, the half that cannot serve private Pages. It is read ONCE
-per walk, because the plan is the org's, not a target's. Every run prints which visibility it
+per walk, because the plan is the owner's, not a target's. Every run prints which visibility it
 chose and why, and a dry run prints it as the plan line:
 
 ```
@@ -122,14 +122,14 @@ config. Then the WHOLE slug GitHub answered is compared with the source repo the
 derives, case-insensitively ([#934](https://github.com/Omega-JS-Stack/omega/issues/934),
 `@omega.js/config`'s `repoDrift`), so a rename drifts as surely as a transfer. A mismatch
 is stated in one line and nothing more at boot (`origin is <slug> but config derives
-<derived>: fix repo.org in config/omega.json5 or move the repo`): the prelude runs before
+<derived>: fix repo.owner in config/omega.json5 or move the repo`): the prelude runs before
 every verb, and a fatal boot would lock out the verbs that fix it. The prelude never
-writes config, so a brand that really did move orgs is a `repo.org` edit by hand, and a
+writes config, so a brand that really did move owners is a `repo.owner` edit by hand, and a
 renamed repo is a brand id that must differ or a rename back.
 
 **This service REFUSES on that same line, before any ensure** (dry runs included, since
 the check only reads): it reads the brand's own `origin` (`@omega.js/devkit/git-remote`'s
-`assertOriginMatches`) and throws when it is not `<brand.id>-omega` under `repo.org`,
+`assertOriginMatches`) and throws when it is not `<brand.id>-omega` under `repo.owner`,
 because the walk would otherwise ensure the derived repo beside the one the checkout
 points at. `omega deploy` refuses the same way ([deploys.md](../shared/deploys.md#the-origin-gate-934)).
 No `origin` at all (a brand nobody has pushed yet) and no `.git` at the brand root are
@@ -149,8 +149,13 @@ one.
 ## Credentials
 
 The `gh` CLI, authenticated: `gh auth login`, or a `GH_TOKEN`/`GITHUB_TOKEN` in the brand
-`.env` (loaded before services run; `gh` honors both). The service verifies `gh` is installed
-and authenticated before its first call, and every invocation is `execFile` with an argv
+`.env` (loaded before services run; `gh` honors both). Before its first call the service checks
+`gh` once, through devkit's `probeGh` (the manager's `ghGate`): `gh --version` proves it is installed, and `gh api user`
+proves the login with a real call. `gh auth status` is never the probe, because it refuses a
+`GH_TOKEN` every API call accepts. A missing `gh` is an error. A signed-out `gh` is an error in a
+terminal; in a headless walk it is a skip, like a missing key: the run summary lists `GH_TOKEN`
+under "Missing secrets", and the skip line names `gh auth login` and, when gh printed one, gh's own reason (a rate limit, no network). The seo service and the
+devlog use the same check. Every invocation is `execFile` with an argv
 array (no shell), so brand-config values can never inject commands. The transport and the
 repo/Pages calls are `@omega.js/devkit/github-repo`, the ONE GitHub-repo boundary the desktop
 precheck and the extension publish share; the manager adds only the three org-Actions reads

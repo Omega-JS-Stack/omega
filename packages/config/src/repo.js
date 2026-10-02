@@ -1,8 +1,8 @@
 /**
  * @omega.js/config repo: the ONE derivation of every repo a brand owns. One
- * block says where a brand hosts its code, `repo: { provider: 'github', org }`:
+ * block says where a brand hosts its code, `repo: { provider: 'github', owner }`:
  * its presence enables the repo service, `provider` defaults to `github`, and
- * `org` is the only typed value. No repo NAME is configured anywhere; each
+ * `owner` is the only typed value. No repo NAME is configured anywhere; each
  * derives from `<brand.id>-<role>`, one function per role: `<brand.id>-omega`
  * the source monorepo (`sourceRepo`), `<brand.id>-releases` the public release
  * channel (`releasesRepo`), `<brand.id>-<name>` per GitHub-hosted web target
@@ -29,24 +29,24 @@ const DEFAULT_PAGES_HOST = /(^|\.)github\.io$/i;
 const DEFAULT_HOSTING_PROVIDER = 'github';
 
 /**
- * The brand's repo block: `{ provider, org }`, with the provider defaulted.
+ * The brand's repo block: `{ provider, owner }`, with the provider defaulted.
  *
  * Null when the config carries no `repo` block, and null when the block names
- * no org: half an address addresses nothing, and the validator fails an
- * org-less block on its own (an error here would be a second, quieter copy of
+ * no owner: half an address addresses nothing, and the validator fails an
+ * owner-less block on its own (an error here would be a second, quieter copy of
  * that rule).
  *
  * @param {object} config - Composed omega config (brand + local layers).
- * @returns {{ provider: string, org: string }|null}
+ * @returns {{ provider: string, owner: string }|null}
  */
 function repoBlock(config) {
   const repo = config ? config.repo : undefined;
   if (!isPlainObject(repo)) return null;
 
-  const org = typeof repo.org === 'string' ? repo.org.trim() : '';
-  if (!org) return null;
+  const owner = typeof repo.owner === 'string' ? repo.owner.trim() : '';
+  if (!owner) return null;
 
-  return { provider: repo.provider || DEFAULT_REPO_PROVIDER, org };
+  return { provider: repo.provider || DEFAULT_REPO_PROVIDER, owner };
 }
 
 /**
@@ -73,11 +73,11 @@ function derivedRepo(config, role) {
 
   const name = `${id}-${role}`;
 
-  return { owner: block.org, name, slug: `${block.org}/${name}` };
+  return { owner: block.owner, name, slug: `${block.owner}/${name}` };
 }
 
 /**
- * The brand's SOURCE monorepo: `<brand.id>-omega` under the declared org. This
+ * The brand's SOURCE monorepo: `<brand.id>-omega` under the declared owner. This
  * is the repo every SOURCE fact addresses: the workflow dispatch, the repo
  * Actions secrets, the CMS content commits, the scaffolded workflows.
  *
@@ -85,7 +85,7 @@ function derivedRepo(config, role) {
  * config key.
  *
  * @param {object} config - Composed omega config.
- * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no owner or no brand id.
  */
 function sourceRepo(config) {
   return derivedRepo(config, 'omega');
@@ -105,18 +105,18 @@ function sourceRepo(config) {
  * @param {string} originSlug - The origin's `Owner/name`.
  * @param {object} config - Composed omega config.
  * @returns {string|null} The drift line, or null when the two agree or the
- *   config derives no source repo (no org, or no brand id: nothing to compare).
+ *   config derives no source repo (no owner, or no brand id: nothing to compare).
  */
 function repoDrift(originSlug, config) {
   const derived = sourceRepo(config);
   if (!derived || derived.slug.toLowerCase() === originSlug.toLowerCase()) return null;
 
-  return `origin is ${originSlug} but config derives ${derived.slug}: fix repo.org in config/omega.json5 or move the repo`;
+  return `origin is ${originSlug} but config derives ${derived.slug}: fix repo.owner in config/omega.json5 or move the repo`;
 }
 
 /**
  * The brand's ONE public releases repo: `<brand.id>-releases` under the same
- * org, ALWAYS public, because the desktop updater polls it with no token
+ * owner, ALWAYS public, because the desktop updater polls it with no token
  * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620),
  * [#799](https://github.com/Omega-JS-Stack/omega/issues/799)).
  *
@@ -128,7 +128,7 @@ function repoDrift(originSlug, config) {
  * download button carries.
  *
  * @param {object} config - Composed omega config.
- * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no owner or no brand id.
  */
 function releasesRepo(config) {
   return derivedRepo(config, 'releases');
@@ -169,7 +169,7 @@ function hostingProvider(config, name) {
 }
 
 /**
- * A web target's own repo: `<brand.id>-<target name>` under the brand's org,
+ * A web target's own repo: `<brand.id>-<target name>` under the brand's owner,
  * holding the BUILT site only (one force-orphan commit on `gh-pages`, served
  * by Pages at the target's url). The source monorepo stays private in a free
  * org this way, which is what a shared `gh-pages` branch on it made impossible.
@@ -179,7 +179,7 @@ function hostingProvider(config, name) {
  *
  * @param {object} config - Composed omega config carrying `targets`.
  * @param {string} name - The web target's name.
- * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id, and null when another provider hosts this target (there is no GitHub repo to address then).
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no owner or no brand id, and null when another provider hosts this target (there is no GitHub repo to address then).
  * @throws {Error} When the name is not declared, or names a target that is not web.
  */
 function websiteRepo(config, name) {

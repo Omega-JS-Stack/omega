@@ -37,6 +37,10 @@ A release is bumped by hand, in its own `chore(release): <x.y.z>` commit. That c
 - sets the Claude plugin manifest, `agent-plugins/claude/.claude-plugin/plugin.json`, to that version;
 - sets the exact internal ranges (above) to the same number.
 
+The ship's GitHub release step (`gh release create v<version> --target <release sha>`)
+creates the `v<version>` tag on the remote, one per release commit; a local clone
+sees it after `git fetch --tags`. No other step of a release tags; the `pre-*-rename` tags are the backup lane named in `AGENTS.md`, made by hand once.
+
 Packages with no code change republish anyway. The plugin's version is what moves
 every machine's installed copy: Claude Code ignores a new commit under the same
 version, so the plugin follows releases, never commits ([agent-docs.md](agent-docs.md#the-omega-plugin-reaches-every-machine-from-the-right-place)).

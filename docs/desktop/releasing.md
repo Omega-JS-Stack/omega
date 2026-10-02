@@ -60,7 +60,7 @@ If the releases repo has to move (rename or transfer), the rules are:
 
 - **The existing repo is the survivor** — transfer it, never build a fresh one. GitHub keeps redirects for the web pages, git remotes, the API and release-asset URLs, and `electron-updater` follows them, so every already-installed app (its feed URL is baked into `app-update.yml` at build time) keeps updating.
 - **Never reuse the old org/name.** A new repo created at the old path takes the redirect over and silently steals every installed app's update feed and every published download link.
-- The repo NAME is not configurable ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): it is always `<brand.id>-releases` under `repo.org`, so a move means renaming the repo to match (or, if the brand itself is renaming, changing `brand.id` / `repo.org` once). The website's URLs re-derive on its next build; the asset names do not change.
+- The repo NAME is not configurable ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): it is always `<brand.id>-releases` under `repo.owner`, so a move means renaming the repo to match (or, if the brand itself is renaming, changing `brand.id` / `repo.owner` once). The website's URLs re-derive on its next build; the asset names do not change.
 - **Fallback only** — if the surviving repo were a *different* repo, installed apps would need a bridge release: build once with the new feed baked in and publish it to the OLD repo, so clients update themselves onto the new feed before it is retired.
 
 > The `downloads:` block (the `download-server` mirror at tag `installer`, `gulp/mirror-downloads`) predated this: it existed only to give marketing a fixed filename, which the versionless names made free. It is GONE ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)): the task, the `publish` step, the finalize-release mirror and the second repo's provisioning are deleted, and `downloads.enabled|owner|repo|tag` are retired config keys a brand still carrying them fails validation on. One public repo, one set of assets.
@@ -92,7 +92,7 @@ Every verb runs `ensureTarget()` first ([#675](https://github.com/Omega-JS-Stack
 `npx omega deploy` adds the network half as a precheck (`--no-secrets` opts out):
 
 - Validates signing prereqs (warns if missing — non-fatal).
-- Pushes the composed `.env` → GitHub Actions secrets over the `gh` CLI (`gh auth login`; a CI run, an empty cascade, or no GitHub remote skips loudly, and a checkout whose `origin` is not the derived source repo refuses on the one drift line, `origin is <slug> but config derives <derived>: fix repo.org in config/omega.json5 or move the repo`, [#934](https://github.com/Omega-JS-Stack/omega/issues/934)).
+- Pushes the composed `.env` → GitHub Actions secrets over the `gh` CLI (`gh auth login`; a CI run, an empty cascade, or no GitHub remote skips loudly, and a checkout whose `origin` is not the derived source repo refuses on the one drift line, `origin is <slug> but config derives <derived>: fix repo.owner in config/omega.json5 or move the repo`, [#934](https://github.com/Omega-JS-Stack/omega/issues/934)).
 
 Now drop your cert files:
 
@@ -230,7 +230,7 @@ For details see [`docs/desktop/signing.md`](signing.md#windows-setup).
 
 ### CI: GitHub Releases upload fails
 - Verify `GH_TOKEN` secret is set. The auto-injected `GITHUB_TOKEN` won't work for cross-repo writes.
-- Confirm the config addresses the right repo: `repo.org` + `brand.id` derive both the source repo (`<brand.id>-omega`) and the artifacts' repo (`<brand.id>-releases`), and `targets.desktop.releases` is the presence switch alone.
+- Confirm the config addresses the right repo: `repo.owner` + `brand.id` derive both the source repo (`<brand.id>-omega`) and the artifacts' repo (`<brand.id>-releases`), and `targets.desktop.releases` is the presence switch alone.
 
 ## Related docs
 

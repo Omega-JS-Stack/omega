@@ -24,7 +24,7 @@ const CLIENT_ENTRY = path.join(PKG, '..', 'client', 'src', 'index.js');
 const SITE_DATA = {
   brand: { id: 'contract', name: 'Contract' },
   theme: { id: 'newsflash' },
-  repo: { provider: 'github', org: 'Omega-JS-Stack' },
+  repo: { provider: 'github', owner: 'Omega-JS-Stack' },
   cloud: { config: { projectId: 'demo-contract' } },
 };
 
@@ -84,11 +84,11 @@ test('packages: an unresolvable client still leaves a usable manifest', () => {
 
 // #883: the manifest links where the site is AUTHORED, so it names the
 // SOURCE monorepo (`<brand.id>-omega`), never the website repo the built site
-// is pushed to. Both derive from the one `repo.org`.
+// is pushed to. Both derive from the one `repo.owner`.
 test('repo: the SOURCE repo, derived through @omega.js/config (#883)', () => {
-  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract-omega' }, 'owner from repo.org, name derived as `<brand.id>-omega`');
-  assert.equal(emit({ siteData: { brand: { id: 'contract' } } }).json.repo, null, 'no org, no repo link: never half a URL');
-  assert.equal(emit({ siteData: { repo: { org: 'Omega-JS-Stack' } } }).json.repo, null, 'and no brand.id is half an address too');
+  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract-omega' }, 'owner from repo.owner, name derived as `<brand.id>-omega`');
+  assert.equal(emit({ siteData: { brand: { id: 'contract' } } }).json.repo, null, 'no owner, no repo link: never half a URL');
+  assert.equal(emit({ siteData: { repo: { owner: 'Omega-JS-Stack' } } }).json.repo, null, 'and no brand.id is half an address too');
 });
 
 test('commit: the sha when the consumer is a repo, null when it is not', () => {

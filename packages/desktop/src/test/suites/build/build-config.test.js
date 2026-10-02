@@ -458,7 +458,7 @@ module.exports = defineCases({
         // framework monorepo, and a feed baked from it would 404 forever.
         ctx.expect(publishConfig({
           brand: { id: 'omega-playground' },
-          repo: { provider: 'github', org: 'Omega-JS-Stack' },
+          repo: { provider: 'github', owner: 'Omega-JS-Stack' },
           releases: {},
         })).toEqual({
           provider:    'github',
@@ -472,7 +472,7 @@ module.exports = defineCases({
         // brand's one derived releases repo.
         ctx.expect(publishConfig({
           brand: { id: 'acme' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           releases: {},
         })).toEqual({
           provider:    'github',
@@ -489,7 +489,7 @@ module.exports = defineCases({
 
         ctx.expect(publishConfig({
           brand: { id: 'acme' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           releases: { enabled: false },
         })).toBe(null);
 

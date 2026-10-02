@@ -42,30 +42,42 @@ test('ship-plan: a dropped format leaves the plan, and a declared one keeps its 
   assert.deepEqual(plan.find((entry) => entry.format === 'store').options, { channel: 'unlisted' });
 });
 
-test('ship-plan: the desktop snap owes its store credential only where the brand DECLARES it', () => {
-  // Undeclared: the snap is on by default, but nothing in the config makes
-  // `SNAPCRAFT_STORE_CREDENTIALS` mandatory (the schema gates it on the
-  // declaration), so a desktop brand that never mentions the snap owes nothing
-  const bare = shipPlan({}, 'desktop').find((entry) => entry.format === 'snap');
-  assert.deepEqual(bare.requires, []);
+const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
 
-  const declared = shipPlan({ platforms: { linux: { formats: { snap: { channels: ['edge'] } } } } }, 'desktop')
+test('ship-plan: the desktop snap owes its store credential by default, declared or not', () => {
+  // The snap is on by default, so a desktop target that never mentions it owes its login
+  const bare = shipPlan(DESKTOP, 'desktop').find((entry) => entry.format === 'snap');
+  assert.deepEqual(bare.requires, ['SNAPCRAFT_STORE_CREDENTIALS']);
+  assert.equal(bare.path, 'platforms.linux.formats.snap');
+
+  const declared = shipPlan({ ...DESKTOP, platforms: { linux: { formats: { snap: { channels: ['edge'] } } } } }, 'desktop')
     .find((entry) => entry.format === 'snap');
   assert.deepEqual(declared.requires, ['SNAPCRAFT_STORE_CREDENTIALS']);
   assert.equal(declared.kind, 'store');
+
+  // Turned off, the snap leaves the plan with its login
+  for (const platforms of [{ linux: { formats: { snap: false } } }, { linux: false }]) {
+    assert.equal(shipPlan({ ...DESKTOP, platforms }, 'desktop').some((entry) => entry.format === 'snap'), false, JSON.stringify(platforms));
+  }
+
+  // A brand with no desktop target owes no desktop key
+  assert.deepEqual(shipPlan({}, 'desktop').find((entry) => entry.format === 'snap').requires, []);
 });
 
-test('ship-plan: the windows signing set narrows to the CONFIGURED strategy', () => {
-  const selfHosted = shipPlan({ platforms: { windows: { signing: { strategy: 'self-hosted' } } } }, 'desktop')
+test('ship-plan: the windows signing set narrows to the strategy in force, the default included', () => {
+  const selfHosted = shipPlan({ ...DESKTOP, platforms: { windows: { signing: { strategy: 'self-hosted' } } } }, 'desktop')
     .find((entry) => entry.format === 'nsis');
   assert.deepEqual(selfHosted.requires, ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']);
 
-  const cloud = shipPlan({ platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } }, 'desktop')
+  const cloud = shipPlan({ ...DESKTOP, platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } }, 'desktop')
     .find((entry) => entry.format === 'nsis');
   assert.deepEqual(cloud.requires, ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT']);
 
-  // No strategy declared = no signing set owed at all
-  assert.deepEqual(shipPlan({}, 'desktop').find((entry) => entry.format === 'nsis').requires, []);
+  // No strategy written = self-hosted, the default, and its pair is owed
+  assert.deepEqual(shipPlan(DESKTOP, 'desktop').find((entry) => entry.format === 'nsis').requires, ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']);
+
+  // Windows turned off leaves the plan with its signing set
+  assert.equal(shipPlan({ ...DESKTOP, platforms: { windows: false } }, 'desktop').some((entry) => entry.format === 'nsis'), false);
 });
 
 test('ship-plan: the publish rows name every empty key the plan requires, with its declaration and store', () => {
@@ -89,6 +101,17 @@ test('ship-plan: the refusal names each key, its declaration, its store, and the
   assert.match(message, /^2 ship credential/);
   assert.match(message, /EDGE_CLIENT_ID \(required by platforms\.edge\.formats\.store\): Microsoft Edge Add-ons cannot publish without it/);
   assert.match(message, /EDGE_API_KEY \(required by platforms\.edge\.formats\.store\): Microsoft Edge Add-ons cannot publish without it/);
+  assert.match(message, /omega manage --service publishing/);
+});
+
+test('ship-plan: a desktop target with an empty env is refused on the default formats, naming the snap\'s path', () => {
+  const message = shipKeyRefusal(missingEnvKeys(DESKTOP, {}, { target: 'desktop', verb: 'publish' }));
+
+  assert.match(message, /SNAPCRAFT_STORE_CREDENTIALS \(required by platforms\.linux\.formats\.snap\b/);
+  // The refusal says the format is on by default, so a brand that never wrote it knows why
+  assert.match(message, /on by default/);
+  assert.match(message, /WIN_EV_TOKEN_PATH/);
+  assert.match(message, /WIN_CSC_KEY_PASSWORD/);
   assert.match(message, /omega manage --service publishing/);
 });
 

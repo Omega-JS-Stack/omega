@@ -220,15 +220,18 @@ test('the REAL templates: no hashFiles() pattern is left pointing at the repo ro
   }
 });
 
-test('the REAL web template: the action inputs a working-directory can never reach are target-scoped', () => {
+test('the REAL web template: the cache key is target-scoped, and the cache path stays at the workspace root', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'web/build.yml');
   assert.ok(template, 'the web build template is missing');
 
   const composed = composeWorkflow(template.contents, { targetPath: 'targets/web', targetName: 'web' });
 
-  // `working-directory:` is a `run:` key: an action's inputs ignore it, so an
-  // unscoped cache path and key hash a directory no build ever wrote
-  assert.match(composed, /^ {10}path: targets\/web\/\.omega\/cache\/imagemin$/m);
+  // The build writes its image cache under the BRAND root, which is the runner's
+  // workspace, so the whole path line stays the standalone one, with no target prefix
+  assert.match(composed, /^ {10}path: \$\{\{ github\.workspace \}\}\/\.omega\/cache\/imagemin$/m);
+
+  // `working-directory:` is a `run:` key: an action's inputs ignore it, so the
+  // key's hash still has to name the target's images itself
   assert.match(composed, /hashFiles\('targets\/web\/src\/assets\/images\/\*\*'\)/);
 
   // Untouched: the key's literal prefix
@@ -241,7 +244,7 @@ test('the REAL web template: the action inputs a working-directory can never rea
 
   // A standalone project IS the repo root: the scaffolded template is unchanged,
   // scoping belongs to composition alone
-  assert.match(template.contents, /^ {10}path: \.omega\/cache\/imagemin$/m);
+  assert.match(template.contents, /^ {10}path: \$\{\{ github\.workspace \}\}\/\.omega\/cache\/imagemin$/m);
   assert.doesNotMatch(template.contents, /targets\//);
 });
 

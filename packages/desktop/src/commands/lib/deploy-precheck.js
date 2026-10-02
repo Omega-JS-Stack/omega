@@ -34,7 +34,7 @@ const package = build.getPackage('main');
 /**
  * Auto-provision the brand's ONE public releases repo, addressed by
  * @omega.js/config's `releasesRepo` (`<brand.id>-releases` under the brand's
- * org, #883: no repo name is ever typed). Idempotent: only creates if
+ * owner, #883: no repo name is ever typed). Idempotent: only creates if
  * missing. Config-only, never the git remote: a brand nested in another repo
  * would provision under the enclosing repo's owner (#799).
  *
@@ -62,7 +62,7 @@ async function provisionReleaseRepos({ log, warn, config, execFn, dryRun }) {
 
   const releases = releasesRepo(resolved);
   if (!releases) {
-    warn('provision-repos: could not address the releases repo. Set repo.org and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that org).');
+    warn('provision-repos: could not address the releases repo. Set repo.owner and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that owner).');
     return;
   }
 

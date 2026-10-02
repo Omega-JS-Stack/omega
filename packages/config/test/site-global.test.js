@@ -69,7 +69,7 @@ test('exposes curated site.targets: presence + enabled, machinery absent', () =>
 test('derives the desktop releases URL: the brand\'s ONE releases repo (#799)', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
-    repo: { org: 'Omega-JS-Stack' },
+    repo: { owner: 'Omega-JS-Stack' },
     targets: { desktop: { type: 'desktop', releases: {} } },
   });
 
@@ -84,7 +84,7 @@ test('derives the desktop releases URL: the brand\'s ONE releases repo (#799)', 
 test('desktop releases URL: the address derives, with no override left to disagree with it (#883)', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme', name: 'Acme App' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     // The retired owner/repo keys are inert: a config still carrying them (the
     // validator fails it) never moves the download surface.
     targets: { desktop: { type: 'desktop', releases: { owner: 'Acme-Binaries', repo: 'acme-bins' } } },
@@ -99,7 +99,7 @@ test('desktop releases URL: the address derives, with no override left to disagr
   );
 });
 
-test('desktop releases URL omitted without a github org', () => {
+test('desktop releases URL omitted without a repo owner', () => {
   const site = toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { type: 'desktop', releases: {} } } });
   assert.strictEqual(site.targets.desktop.enabled, true);
   assert.strictEqual(site.targets.desktop.releasesUrl, undefined);
@@ -110,7 +110,7 @@ test('desktop releases URL omitted without a github org', () => {
 test('derives a download URL per FORMAT, beside the releases hub', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme', name: 'Acme App' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', releases: {} } },
   });
 
@@ -134,7 +134,7 @@ test('the artifact names are the packager\'s own — app.productName wins over b
   const { desktopArtifactNames } = require('../src/platforms.js');
   const site = toSiteGlobal({
     brand: { id: 'acme', name: 'Acme App' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', app: { productName: 'Acme Studio' }, releases: {} } },
   });
 
@@ -148,7 +148,7 @@ test('the artifact names are the packager\'s own — app.productName wins over b
 test('no product name, no direct URLs — a guessed filename is a dead button', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', releases: {} } },
   });
 
@@ -159,7 +159,7 @@ test('no product name, no direct URLs — a guessed filename is a dead button', 
 test('the direct URLs survive the second toSiteGlobal pass', () => {
   const once = toSiteGlobal({
     brand: { id: 'acme', name: 'Acme App' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', releases: {} } },
   });
   const twice = toSiteGlobal(once);
@@ -174,7 +174,7 @@ test('the direct URLs survive the second toSiteGlobal pass', () => {
 test('a bare desktop target derives nothing — no releases config, no links', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', app: { category: 'utilities' } } },
   });
 
@@ -184,7 +184,7 @@ test('a bare desktop target derives nothing — no releases config, no links', (
 
 test('a present releases block opts in (enabled defaults true)', () => {
   const url = 'https://github.com/Acme-Org/acme-releases/releases/latest';
-  const base = { brand: { id: 'acme' }, repo: { org: 'Acme-Org' } };
+  const base = { brand: { id: 'acme' }, repo: { owner: 'Acme-Org' } };
 
   for (const releases of [{}, { enabled: true }, { repo: 'acme-releases' }]) {
     const site = toSiteGlobal({ ...base, targets: { desktop: { type: 'desktop', releases } } });
@@ -195,7 +195,7 @@ test('a present releases block opts in (enabled defaults true)', () => {
 test('releases.enabled false always suppresses the derivation', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: { desktop: { type: 'desktop', releases: { enabled: false, repo: 'update-server' } } },
   });
 
@@ -206,7 +206,7 @@ test('double application is idempotent for a bare and a suppressed desktop targe
   for (const desktop of [{}, { releases: { enabled: false, repo: 'update-server' } }]) {
     const once = toSiteGlobal({
       brand: { id: 'acme' },
-      repo: { org: 'Acme-Org' },
+      repo: { owner: 'Acme-Org' },
       targets: { desktop },
     });
     const twice = toSiteGlobal(once);
@@ -221,7 +221,7 @@ test('#886: the curated facts key off the entry TYPE, not the name', () => {
   // facts it carries, so the renamed target still derives its downloads.
   const config = {
     brand: { id: 'acme', name: 'Acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: {
       web: { type: 'web' },
       app: { type: 'desktop', releases: {} },
@@ -264,7 +264,7 @@ test('exposes extension listings on site.targets.extension', () => {
 test('#610: the site data carries NO download or extension page map — site.targets is the only home', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
-    repo: { org: 'Omega-JS-Stack' },
+    repo: { owner: 'Omega-JS-Stack' },
     targets: {
       desktop: { type: 'desktop', releases: {} },
       extension: { type: 'extension', listings: { chrome: { url: 'https://chromewebstore.google.com/detail/x', state: 'live' } } },
@@ -303,7 +303,7 @@ test('#610: a config still carrying the legacy keys keeps nothing — they are n
 test('double application is idempotent — the build pipeline applies toSiteGlobal twice', () => {
   const resolved = {
     brand: { id: 'acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: {
       desktop: { type: 'desktop', releases: {} },
       extension: { type: 'extension', listings: { chrome: { url: 'https://store/x', state: 'live' } } },
@@ -322,7 +322,7 @@ test('double application is idempotent — the build pipeline applies toSiteGlob
 test('array-form (multi-instance) targets derive nothing — presence only', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     targets: {
       desktop: [{ id: 'main', releases: { repo: 'update-server' } }],
       extension: [{ id: 'main', listings: { chrome: { url: 'https://store/x' } } }],

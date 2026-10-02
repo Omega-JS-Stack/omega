@@ -1,10 +1,7 @@
-// The ship-credential check every publish runs FIRST: a declared format with
-// no credential is a release that dies on a runner. What is owed is
-// @omega.js/config's missingEnvKeys for `publish` (the format table, narrowed
-// by the schema's `requiredWhen`), so a brand that never mentions the snap owes
-// no Snap login. The refusal names the ONE walk that collects the keys, as the
-// extension publish does. A BUILD keeps its clean skip instead: it puts
-// nothing in front of users.
+// The ship-credential check every publish runs FIRST. A format ships unless it
+// is `false`, so a brand that never mentions the snap owes the Snap login
+// (missingEnvKeys for `publish`). A plain local BUILD keeps its clean skip: it
+// puts nothing in front of users.
 
 const { missingEnvKeys } = require('@omega.js/config');
 const { shipPlan, shipKeyRefusal } = require('@omega.js/devkit/ship-plan');

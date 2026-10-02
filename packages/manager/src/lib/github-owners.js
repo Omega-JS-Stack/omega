@@ -1,11 +1,11 @@
 /**
  * The onboard wizard's GitHub owner question: every owner the signed-in GitHub
  * CLI can create the brand's repos under (the user and its orgs), listed in
- * the wizard's order, and the pick that lands as `repo.org`.
+ * the wizard's order, and the pick that lands as `repo.owner`.
  *
- * Every call goes through `exec(args)`, which runs `gh <args>`, returns its
- * stdout and throws on a failed command; the default is devkit's `gh`. A
- * missing or signed-out CLI fails the first call, which skips the question.
+ * Every call goes through devkit's `gh`, on the injected runner
+ * `execFn(file, args, options)` (execFileSync by default). A missing or
+ * signed-out CLI fails the first call, which skips the question.
  */
 
 const chalk = require('chalk').default;
@@ -22,24 +22,22 @@ const CREATE_ORG_URL = 'https://github.com/account/organizations/new';
 const CREATE_ORG = '__CREATE_ORG__';
 
 // The one line a run prints when the question cannot be asked
-const OWNER_SKIP_LINE = 'GitHub CLI is not signed in, so the repo owner was not set. Set repo.org in config/omega.json5 later.';
-
-const runGh = (args) => gh(args);
+const OWNER_SKIP_LINE = 'GitHub CLI is not signed in, so the repo owner was not set. Set repo.owner in config/omega.json5 later.';
 
 /**
  * The owners the signed-in GitHub CLI can see: the user first, then its orgs.
  *
  * @param {object} [options]
- * @param {Function} [options.exec] - The `gh` runner: `(args) => stdout`
+ * @param {Function} [options.execFn] - The runner: `(file, args, options) => stdout`
  * @returns {Array<{ login: string, kind: 'user'|'org' }>|null} null when the CLI cannot answer (missing, signed out, or a failed call)
  */
-function listOwners({ exec = runGh } = {}) {
+function listOwners({ execFn } = {}) {
   let user;
   let orgs;
   try {
-    user = exec(['api', 'user']);
+    user = gh(['api', 'user'], { execFn });
     // --slurp wraps every page in one outer array, so a long org list parses whole
-    orgs = exec(['api', 'user/orgs', '--paginate', '--slurp']);
+    orgs = gh(['api', 'user/orgs', '--paginate', '--slurp'], { execFn });
   } catch {
     return null;
   }
@@ -61,14 +59,13 @@ function listOwners({ exec = runGh } = {}) {
  * @param {Array<{ login: string }>} owners - From listOwners()
  * @param {string} brandId - The brand id the source repo derives from
  * @param {object} [options]
- * @param {Function} [options.exec] - The `gh` runner: `(args) => stdout`
+ * @param {Function} [options.execFn] - The runner: `(file, args, options) => stdout`
  * @returns {string|null} The holder's login
  */
-function findRepoHolder(owners, brandId, { exec = runGh } = {}) {
-  const execFn = (file, args) => exec(args);
+function findRepoHolder(owners, brandId, { execFn } = {}) {
   const holds = (owner) => {
     try {
-      const repo = sourceRepo({ brand: { id: brandId }, repo: { org: owner.login } });
+      const repo = sourceRepo({ brand: { id: brandId }, repo: { owner: owner.login } });
       return Boolean(getRepo(repo.owner, repo.name, { execFn }));
     } catch {
       return false;
@@ -108,12 +105,12 @@ function orderOwners(owners, { brandId, repoHolder = null }) {
  * @param {object} context
  * @param {string} context.brandId - The new brand's id
  * @param {string|null} [context.defaultOwner] - The origin remote's owner, the default answer when listed
- * @param {Function} [context.exec] - The `gh` runner: `(args) => stdout`
+ * @param {Function} [context.execFn] - The runner: `(file, args, options) => stdout`
  * @returns {Promise<string|null>} The owner's login, or null when there is no answer
  */
-async function askOwner({ brandId, defaultOwner = null, exec = runGh }) {
+async function askOwner({ brandId, defaultOwner = null, execFn }) {
   for (;;) {
-    const owners = listOwners({ exec });
+    const owners = listOwners({ execFn });
     if (!owners && defaultOwner) {
       console.log(`${chalk.dim('•')} GitHub owner: ${chalk.cyan(defaultOwner)} ${chalk.dim('(the origin remote\'s; the GitHub CLI could not list owners)')}`);
       return defaultOwner;
@@ -123,7 +120,7 @@ async function askOwner({ brandId, defaultOwner = null, exec = runGh }) {
       return null;
     }
 
-    const ordered = orderOwners(owners, { brandId, repoHolder: findRepoHolder(owners, brandId, { exec }) });
+    const ordered = orderOwners(owners, { brandId, repoHolder: findRepoHolder(owners, brandId, { execFn }) });
     const choices = ordered.map((owner) => (owner.kind === 'create'
       ? { name: '+ Create a new org', value: CREATE_ORG }
       : { name: owner.login, value: owner.login }));

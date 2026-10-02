@@ -22,14 +22,14 @@
     },
   },
 
-  // Where this brand's code and artifacts live (#883): ONE org, and every repo
+  // Where this brand's code and artifacts live (#883): ONE owner, and every repo
   // derives from `<brand.id>-<role>`: `<brand.id>-omega` (source),
   // `<brand.id>-releases` (the public artifact channel this app's updater
   // polls), `<brand.id>-<web target>` (a built site). No repo NAME is ever
-  // typed. Uncomment and name the org to address them.
+  // typed. Uncomment and name the owner to address them.
   // repo: {
   //   provider: 'github',
-  //   org: 'MyOrg',
+  //   owner: 'MyOrg',
   // },
 
   monitoring: {
@@ -271,11 +271,11 @@
 
       // Releases: the ONE public repo where built artifacts (and the auto-update feed) live.
       // The source repo can stay private; this one is always public, for unauthenticated downloads + auto-updates.
-      // Nothing names it: it is always `<brand.id>-releases` under the top-level `repo.org`, so this block is
+      // Nothing names it: it is always `<brand.id>-releases` under the top-level `repo.owner`, so this block is
       // a presence switch and nothing more (#883). An empty `releases: {}` addresses the repo in full.
       // `npx omega deploy`'s precheck auto-creates it if it doesn't exist (uses GH_TOKEN).
       // Artifact names carry NO version (MyApp-mac-dmg.dmg), so this repo also serves the marketing
-      // site: https://github.com/<org>/<brand.id>-releases/releases/latest/download/<asset> never changes
+      // site: https://github.com/<owner>/<brand.id>-releases/releases/latest/download/<asset> never changes
       // across versions, and the website derives its download buttons from it. See @omega.js/manager/docs/desktop/releasing.md.
       releases: {
         enabled: true,

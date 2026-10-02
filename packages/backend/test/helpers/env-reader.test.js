@@ -23,14 +23,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
+const { baseMissingKeys } = require('../../dist/vendor/config/index.js');
 const { getEnvironment } = require('../../dist/vendor/config/environment.js');
 
 const env = require('../../dist/omega/libraries/env.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const OMEGA_PATH = require.resolve('../../dist/omega/index.js');
-const REQUIRED = requiredEnvKeys('backend');
+const REQUIRED = baseMissingKeys({}, { target: 'backend', verb: 'start' }).map((row) => row.key);
 
 /** A FRESH omega module, so the boot latches start unset. */
 function freshOmegaModule() {

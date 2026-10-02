@@ -118,7 +118,7 @@ Target: `brands/{brand.id}` in the parent project.
 | `brand.id` | document id `brands/{brand.id}`, and `brand.id` | Unchanged; denormalized into the entry as legacy did |
 | `brand.name` | `brand.name` | Unchanged — the ITW routes read `brand.brand.name` |
 | `brand.url` | `brand.url` | Unchanged — the ITW routes derive the brand's API host from it |
-| `github.orgMain` / `github.orgWebsite` + `github.templates.website.{useOrgWebsite,suffix}` | `github.owner` | **Derived, not carried.** Legacy pushed the raw org pair and the CONSUMER picked between them; the entry now carries the already-resolved owner from the one `repo` block, `repo.org` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)) |
+| `github.orgMain` / `github.orgWebsite` + `github.templates.website.{useOrgWebsite,suffix}` | `github.owner` | **Derived, not carried.** Legacy pushed the raw org pair and the CONSUMER picked between them; the entry now carries the already-resolved owner from the one `repo` block, `repo.owner` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)) |
 | `brand.id` + `github.templates.website.suffix` (`'-website'` default), composed by the consumer | `github.name` | **Derived, not carried.** One repo per brand now (the brand monorepo), so the `<id><suffix>` composition retires with the split-repo era |
 | — | `github.repo` | New: the `owner/name` slug the GitHub API takes, so no consumer composes it |
 | `sponsorships.acceptable` | `sponsorships.acceptable` | Verbatim |

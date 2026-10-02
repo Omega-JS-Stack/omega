@@ -176,7 +176,7 @@ module.exports = defineCases({
       name: 'publish mode: a bare `releases: {}` passes, since the repo derives as `<brand.id>-releases` (#799, #883)',
       run: async (ctx) => {
         const tmp = stageConsumer(
-          { brand: { id: 'acme', name: 'Acme', images: { icon: 'icon.png' } }, repo: { provider: 'github', org: 'Acme-Org' } },
+          { brand: { id: 'acme', name: 'Acme', images: { icon: 'icon.png' } }, repo: { provider: 'github', owner: 'Acme-Org' } },
           { releases: {} },
         );
         jetpack.write(path.join(tmp, 'icon.png'), 'stub');
@@ -191,7 +191,7 @@ module.exports = defineCases({
     {
       name: 'publish mode: an UNADDRESSABLE releases repo fails, naming the default (#799)',
       run: async (ctx) => {
-        // No brand.id and no github org: nothing in the config can name a repo,
+        // No brand.id and no repo owner: nothing in the config can name a repo,
         // which is the only way the gate fires now.
         const tmp = stageConsumer({ brand: { name: 'Acme', images: { icon: 'icon.png' } } }, { releases: {} });
         jetpack.write(path.join(tmp, 'icon.png'), 'stub');

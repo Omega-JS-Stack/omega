@@ -33,6 +33,12 @@ const DEFAULT_PAGES_BRANCH = 'gh-pages';
 // private Pages site.
 const FREE_PLAN = 'free';
 
+// The one line each unusable gh state fails with: the command that fixes it.
+const GH_STATE_ERRORS = {
+  missing: 'GitHub CLI (gh) is not installed. Install from: https://cli.github.com/',
+  'signed-out': 'GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env)',
+};
+
 /**
  * Run `gh` with an argv array and return its trimmed stdout.
  *
@@ -41,7 +47,7 @@ const FREE_PLAN = 'free';
  * @param {function} [options.execFn] - Injectable `(file, args, opts) => stdout` (tests).
  * @param {number} [options.timeout] - Milliseconds before the call is given up on (default: none).
  * @returns {string} Trimmed stdout ('' when gh printed nothing).
- * @throws {Error} When gh exits non-zero or times out, carrying its stderr.
+ * @throws {Error} When gh exits non-zero or times out, carrying its stderr (`.stderr`: its first line, '' when gh printed none).
  */
 function gh(args, options = {}) {
   const execFn = options.execFn || execFileSync;
@@ -50,7 +56,62 @@ function gh(args, options = {}) {
     return String(execFn('gh', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: options.timeout })).trim();
   } catch (error) {
     const stderr = (error.stderr && error.stderr.toString()) || error.message;
-    throw new Error(`gh ${args.join(' ')} failed: ${stderr.trim()}`);
+    const firstLine = String(error.stderr || '').trim().split('\n', 1)[0];
+    throw Object.assign(new Error(`gh ${args.join(' ')} failed: ${stderr.trim()}`), { stderr: firstLine });
+  }
+}
+
+/**
+ * Probe gh once: the state, plus gh's own stderr line when `gh api user`
+ * failed (a rate limit or a network error reads there, not as a sign-in).
+ *
+ * @param {object} [options]
+ * @param {function} [options.execFn] - Injectable `(file, args, opts) => stdout` (tests).
+ * @returns {{ state: 'ready'|'missing'|'signed-out', detail: string }}
+ */
+function probeGh(options = {}) {
+  const { execFn } = options;
+  try {
+    gh(['--version'], { execFn });
+  } catch {
+    return { state: 'missing', detail: '' };
+  }
+
+  try {
+    gh(['api', 'user'], { execFn });
+  } catch (error) {
+    return { state: 'signed-out', detail: error.stderr };
+  }
+
+  return { state: 'ready', detail: '' };
+}
+
+/**
+ * Whether gh can work here: installed, and signed in. Sign-in is proven by a
+ * real call (`gh api user`), never by `gh auth status`, which refuses a
+ * GH_TOKEN every API call accepts.
+ *
+ * @param {object} [options]
+ * @param {function} [options.execFn] - Injectable `(file, args, opts) => stdout` (tests).
+ * @returns {'ready'|'missing'|'signed-out'}
+ */
+function ghState(options = {}) {
+  return probeGh(options).state;
+}
+
+/**
+ * Assert a usable gh before the first call, so a run names the fix up front
+ * instead of failing four calls deep.
+ *
+ * @param {object} [options]
+ * @param {function} [options.execFn] - Injectable `(file, args, opts) => stdout` (tests).
+ * @param {{ state: string, detail: string }} [options.probe] - A probeGh() answer already read, so gh is not probed again.
+ * @throws {Error} The install line when gh is missing, the sign-in line (plus `: <gh's stderr>` when it printed one) when it is signed out.
+ */
+function assertGhReady(options = {}) {
+  const { state, detail } = options.probe || probeGh(options);
+  if (state !== 'ready') {
+    throw new Error(detail ? `${GH_STATE_ERRORS[state]}: ${detail}` : GH_STATE_ERRORS[state]);
   }
 }
 
@@ -280,6 +341,10 @@ function ownerPlan(owner, options = {}) {
 
 module.exports = {
   gh,
+  ghState,
+  probeGh,
+  assertGhReady,
+  GH_STATE_ERRORS,
   getRepo,
   ensureRepo,
   getPages,

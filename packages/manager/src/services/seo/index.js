@@ -21,6 +21,7 @@ const JSON5 = require('json5');
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const ghApi = require('./lib/gh-api.js');
+const { ghGate } = require('../../lib/gh-gate.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -43,10 +44,12 @@ module.exports.run = createServiceRunner({
     }
 
     // Tests inject a fake API via context.seoApi; the real path needs gh
-    // installed + authenticated before any item work starts
+    // installed and signed in before any item work starts (a headless walk
+    // skips a signed-out gh)
     let seoApi = context.seoApi;
     if (!seoApi) {
-      ghApi.verifyGhCli();
+      const skip = ghGate(context);
+      if (skip) return skip;
       seoApi = ghApi;
     }
 

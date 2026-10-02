@@ -162,14 +162,14 @@
     ],
   },
 
-  // Where this brand's code lives (#883): ONE org, and every repo derives from
+  // Where this brand's code lives (#883): ONE owner, and every repo derives from
   // `<brand.id>-<role>`. The content routes (the admin/post CMS, content/post)
-  // commit to the SOURCE repo, `<brand.id>-omega` under this org. No repo name
+  // commit to the SOURCE repo, `<brand.id>-omega` under this owner. No repo name
   // is ever typed here. Left out by default, so the routes' "not configured"
   // guard fires instead of aiming a real GH_TOKEN at a placeholder repo.
   // repo: {
   //   provider: 'github',
-  //   org: 'MyOrg',
+  //   owner: 'MyOrg',
   // },
 
   cloud: {

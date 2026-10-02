@@ -30,12 +30,12 @@ const { runDevlog } = require('../src/devlog/index.js');
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 /** A loaded-brand shape with just what the devlog libs read. */
-function fakeBrand(id, { org = 'fixture-org', name, url } = {}) {
+function fakeBrand(id, { owner = 'fixture-org', name, url } = {}) {
   return {
     id,
     config: {
       brand: { id, name: name ?? `${id} brand`, url: url ?? `https://${id}.test` },
-      ...(org ? { repo: { provider: 'github', org } } : {}),
+      ...(owner ? { repo: { provider: 'github', owner } } : {}),
     },
   };
 }
@@ -110,7 +110,7 @@ function devlogConfig(id, { enabled = true, org = 'fixture-org' } = {}) {
   return `{
   brand: { id: '${id}', name: '${id} brand', url: 'https://${id}.test' },
   targets: { web: { type: 'web' } },
-  repo: { provider: 'github', org: '${org}' },
+  repo: { provider: 'github', owner: '${org}' },
   devlog: { enabled: ${enabled}, providers: { ghostii: { orgs: ['${org}'] } } },
 }`;
 }
@@ -132,7 +132,7 @@ test('devlog: the project map addresses the SOURCE repo the one derivation names
   const brands = [
     fakeBrand('alpha'),
     fakeBrand('beta'),
-    fakeBrand('gamma', { org: null }), // no repo.org: skipped, like the repo service
+    fakeBrand('gamma', { owner: null }), // no repo.owner: skipped, like the repo service
   ];
 
   const map = buildProjectMap(brands);
@@ -148,8 +148,8 @@ test('devlog: the project map addresses the SOURCE repo the one derivation names
   ]);
 });
 
-test('devlog: a brand in another org scans THAT org, never the first one', () => {
-  const brands = [fakeBrand('acme', { org: 'Acme-Org' })];
+test('devlog: a brand under another owner scans THAT owner, never the first one', () => {
+  const brands = [fakeBrand('acme', { owner: 'Acme-Org' })];
 
   assert.deepEqual(buildProjectMap(brands), {
     'acme-omega': { project: 'acme brand', url: 'https://acme.test' },
@@ -249,7 +249,7 @@ function brandConfigFor(id, overrides = {}) {
       enabled: true,
       providers: { ghostii: { ...DEFAULTS.devlog.providers.ghostii, orgs: ['fixture-org'], ...overrides } },
     },
-    repo: { provider: 'github', org: 'fixture-org' },
+    repo: { provider: 'github', owner: 'fixture-org' },
   };
 }
 

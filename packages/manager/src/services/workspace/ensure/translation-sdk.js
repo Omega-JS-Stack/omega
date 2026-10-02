@@ -23,7 +23,6 @@ const jetpack = require('fs-jetpack');
 const { loadConfig } = require('@omega.js/config');
 const { resolveTranslationSettings } = require('@omega.js/devkit/translate');
 const { resolvePackageRealDir } = require('@omega.js/devkit/local');
-const { runCommand } = require('../../../lib/run-command.js');
 const { npmInstall } = require('../../../lib/npm-install.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -65,7 +64,7 @@ function wantsClaudeTranslation(entry) {
   return settings.enabled && settings.provider === 'claude';
 }
 
-module.exports = async ({ brandRoot, targets, options = {}, runCommand: run = runCommand }) => {
+module.exports = async ({ brandRoot, targets, options = {}, runCommand }) => {
   const drifted = [];
   const findings = [];
 
@@ -127,7 +126,7 @@ module.exports = async ({ brandRoot, targets, options = {}, runCommand: run = ru
   // One install at the brand root, since npm workspaces cover every target (the
   // same shape the update service's install phase uses)
   console.log(`      ${chalk.dim('→')} npm install ${chalk.dim(`(${SDK})`)}`);
-  const result = await npmInstall(brandRoot, run);
+  const result = await npmInstall(brandRoot, runCommand);
 
   const added = drifted.map(({ entry }) => entry.name);
 

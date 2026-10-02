@@ -16,11 +16,15 @@ const { recordBrand } = require('@omega.js/config');
 
 const { runOnboard } = require('../src/onboard.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
+const { toolProbe } = require('./lib/tool-probe.js');
 
 pluginInstalled();
 
 const FLAGS = { name: 'Target Brand', url: 'https://targetbrand.test', contactName: 'Jane Doe', manage: false };
 const REMOVAL_LINE = 'Removing a target is by hand: delete targets/web and its entry in config/omega.json5.';
+
+const TOOLS_PRESENT = toolProbe();
 
 /** At the target list, press `key` (the item's number toggles it), then Enter. */
 const toggleTargets = (tty, key) => async () => {
@@ -97,7 +101,7 @@ test('#1030 case 5: a rerun with --targets=web,backend adds backend (and the clo
   const before = readConfig(root);
   const web = snapshot(path.join(root, 'targets', 'web'));
 
-  const { report } = await quietly(() => runOnboard(root, { targets: 'web,backend', manage: false }));
+  const { report } = await quietly(() => runOnboard(root, { targets: 'web,backend', manage: false, execFn: TOOLS_PRESENT }));
 
   const after = readConfig(root);
   assert.deepEqual(after.targets, { web: { type: 'web' }, backend: { type: 'backend' } });
@@ -132,7 +136,7 @@ test('#1030 a rerun seeds what a fresh scaffold writes: desktop added to a compa
 
   const fresh = folder('fresh');
   const freshTty = openTtyPrompt();
-  await driveWizard(freshTty, runOnboard(fresh, { ...flags, targets: 'web,backend,desktop' }), answers);
+  await driveWizard(freshTty, runOnboard(fresh, { ...flags, targets: 'web,backend,desktop', execFn: TOOLS_PRESENT }), answers);
   freshTty.close();
 
   const grown = folder('grown');
@@ -155,16 +159,28 @@ test('#1030 case 6:a rerun in a terminal shows web checked; checking backend add
 
   // Only backend toggled: web stays because it was shown checked
   const add = openTtyPrompt();
-  await driveWizard(add, runOnboard(root, { manage: false }), { ...ENTER_THE_REST, 'Targets (': toggleTargets(add, '2') });
+  await driveWizard(add, runOnboard(root, { manage: false, execFn: TOOLS_PRESENT }), { ...ENTER_THE_REST, 'Targets (': toggleTargets(add, '2') });
   add.close();
   assert.deepEqual(Object.keys(readConfig(root).targets).sort(), ['backend', 'web']);
   assert.ok(fs.existsSync(path.join(root, 'targets', 'backend', 'package.json')));
   assert.ok(!capture.text().includes(REMOVAL_LINE), 'nothing was unchecked');
 
   const remove = openTtyPrompt();
-  await driveWizard(remove, runOnboard(root, { manage: false }), { ...ENTER_THE_REST, 'Targets (': toggleTargets(remove, '1') });
+  await driveWizard(remove, runOnboard(root, { manage: false, execFn: TOOLS_PRESENT }), { ...ENTER_THE_REST, 'Targets (': toggleTargets(remove, '1') });
   remove.close();
   assert.ok(capture.text().includes(REMOVAL_LINE), `the removal line: ${capture.text()}`);
   assert.deepEqual(Object.keys(readConfig(root).targets).sort(), ['backend', 'web'], 'web is still declared');
   assert.deepEqual(snapshot(path.join(root, 'targets', 'web')), web, 'and its files are untouched');
+});
+
+test('#1032 case 7: picking a backend with Java missing prints the line once and still writes the backend target', async () => {
+  const root = folder('java-brand');
+  const execFn = toolProbe('java');
+  const line = machineToolLine(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform, execFn })[0]);
+
+  const { report, output } = await quietly(() => runOnboard(root, { id: 'java-brand', ...FLAGS, targets: 'web,backend', execFn }));
+
+  assert.equal(report.valid, true);
+  assert.equal(output.split(line).length - 1, 1, `the line prints once: ${output}`);
+  assert.deepEqual(readConfig(root).targets, { web: { type: 'web' }, backend: { type: 'backend' } }, 'the backend is still added');
 });

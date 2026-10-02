@@ -21,7 +21,7 @@ const { stageLocalPackages } = require('@omega.js/devkit/pack-local');
 const { isCI } = require('@omega.js/devkit/ci');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { refuseWhenCustom } = require('../utils/project-type');
+const { refuseWhenCustom, refuseWhenToolsMissing } = require('../utils/project-type');
 const { loadConfig, loadEnv, targetNameFromDir } = require('@omega.js/config');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
@@ -176,6 +176,8 @@ class DeployCommand extends BaseCommand {
     if (self.argv?.dryRun || self.argv?.['dry-run']) {
       return this.log(`DRY RUN, would run: firebase deploy${only} (this machine)`);
     }
+
+    if (refuseWhenToolsMissing(self.firebaseProjectPath, 'deploy', ['firebase'])) return;
 
     const logPath = this.getLogsPath('deploy.log');
     const detachLog = attachLogFile(logPath);

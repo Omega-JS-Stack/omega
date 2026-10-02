@@ -17,9 +17,12 @@ const { folder, quietly, pluginInstalled } = require('./lib/onboard-seams.js');
 require('@omega.js/devkit/test/temp-home');
 
 const { ENV_SCHEMA } = require('@omega.js/config');
+const { commandOnPath } = require('@omega.js/devkit/command-path');
+const { MACHINE_TOOLS } = require('@omega.js/devkit/machine-tools');
 const { runOnboard } = require('../src/onboard.js');
 const { stageTemplate } = require('./lib/brand-template.js');
 const { install } = require('./lib/brand-install.js');
+const { toolProbe } = require('./lib/tool-probe.js');
 
 pluginInstalled();
 
@@ -27,9 +30,9 @@ const BIN = path.join(__dirname, '..', 'bin', 'omega');
 const FIELDS = ['brand', 'brandRoot', 'inTarget', 'missing', 'next', 'state', 'targets'];
 const OPERATOR_ONLY_KEYS = ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT'];
 
-/** Run `omega status` with `args` in `cwd`, the freshness heal held off and no schema key in its env. */
-function status(cwd, args = []) {
-  const env = { ...process.env, OMEGA_SKIP_FRESHNESS: '1' };
+/** Run `omega status` with `args` in `cwd`, the freshness heal held off, no schema key in its env, `overrides` on top. */
+function status(cwd, args = [], overrides = {}) {
+  const env = { ...process.env, OMEGA_SKIP_FRESHNESS: '1', ...overrides };
   for (const { name } of ENV_SCHEMA) if (name) delete env[name];
   return spawnSync(process.execPath, [BIN, 'status', ...args], { cwd, encoding: 'utf8', env });
 }
@@ -107,4 +110,33 @@ test('#1031 status: a brand missing only optional keys prints no going-live head
   const optionalLine = out.stdout.split('\n').find((line) => line.includes('optional, for later'));
   assert.ok(optionalLine, `an optional line is printed:\n${out.stdout}`);
   assert.match(optionalLine, /SLAPFORM_SERVICE_ACCOUNT/);
+});
+
+/** A PATH holding only node and git, so every machine-tool probe the bin runs finds nothing. */
+function pathWithoutMachineTools() {
+  const bin = scratch('bin');
+  fs.symlinkSync(process.execPath, path.join(bin, 'node'));
+  fs.symlinkSync(commandOnPath('git'), path.join(bin, 'git'));
+  return bin;
+}
+
+test('#1032 case 9: on a brand whose backend misses the Firebase CLI, status lists it under Machine tools', async () => {
+  const root = folder('acme');
+  const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, targets: 'web,backend' };
+  // The onboarding itself finds every tool present, so it never probes this machine's own
+  await quietly(() => runOnboard(root, { ...flags, execFn: toolProbe() }));
+  install(root);
+  const firebase = MACHINE_TOOLS.backend.find((tool) => tool.name === 'firebase');
+  const env = { PATH: pathWithoutMachineTools() };
+
+  const out = status(root, [], env);
+  assert.equal(out.status, 0, out.stderr);
+  const lines = out.stdout.split('\n');
+  const header = lines.findIndex((line) => line.includes('Machine tools'));
+  assert.notEqual(header, -1, `a Machine tools gap is printed:\n${out.stdout}`);
+  assert.ok(lines.slice(header).some((line) => line.includes(firebase.name)), `firebase is listed under it:\n${out.stdout}`);
+
+  const report = JSON.parse(status(root, ['--json'], env).stdout);
+  const names = report.missing.tools.map((tool) => (typeof tool === 'string' ? tool : tool.name));
+  assert.ok(names.includes(firebase.name), JSON.stringify(report.missing.tools));
 });

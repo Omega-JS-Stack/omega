@@ -48,7 +48,10 @@ everything that depends on a backend.
   project's settings. The DEPLOY lane honors the same key
   ([#882](https://github.com/Omega-JS-Stack/omega/issues/882)): the backend deploy quits with
   one line and exit 0 on every lane, so a shared project is never deployed into
-  ([deploys.md](../shared/deploys.md)).
+  ([deploys.md](../shared/deploys.md)). The schema's `false` default is no answer, so while the
+  brand's own `config/omega.json5` does not hold the key the walk asks once (default No) and
+  lands the answer there either way; a headless or dry run prints the one line naming
+  `cloud.shared` instead.
 
 **Credentials**: `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in the brand `.env` (OAuth2;
 tokens cache to `.omega/auth/google-tokens.json`, and the first run prints an auth URL).

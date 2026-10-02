@@ -54,7 +54,9 @@ const NODEMON_WATCHER = 'nodemon --on-change-only --delay 1 --watch /omega/packa
 // its caller is decided by two things only — whether the ready marker ever
 // arrives, and when the child exits.
 const FIREBASE_READY_THEN_EXITS = '#!/bin/sh\necho "All emulators ready!"\nsleep 0.5\n';
-const FIREBASE_DIES_BEFORE_READY = '#!/bin/sh\necho "Error: could not start emulators" >&2\nexit 1\n';
+// The dying one still answers the tool probe (`firebase --version`): the
+// firebase is installed, and the boot is what fails.
+const FIREBASE_DIES_BEFORE_READY = '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho "Error: could not start emulators" >&2\nexit 1\n';
 
 /**
  * A real, detached, long-lived process whose command line reads like `marker`.

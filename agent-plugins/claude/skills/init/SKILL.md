@@ -39,7 +39,7 @@ Ask what the person is building. From the answer, propose ONE card: brand id, na
 
 ## 3. One yes, then the repo
 
-- Check `gh auth status` first. When `gh` is missing or not signed in, say so, name the fix (`gh auth login`), and stop.
+- Check `gh api user` first (it proves a token; `gh auth status` refuses a working `GH_TOKEN`). When `gh` is missing or not signed in, say so, name the fix (`gh auth login`), and stop.
 - Show the repo name `<brand-id>-omega`, the owner, and that the repo is private. Ask once.
 - On yes, create it from the template so GitHub shows "generated from": `gh repo create <owner>/<brand-id>-omega --private --template Omega-JS-Stack/brand-template`.
 - Wait until the new repo shows its first commit: `gh api repos/<owner>/<brand-id>-omega/commits` answers with one.
@@ -49,7 +49,7 @@ Ask what the person is building. From the answer, propose ONE card: brand id, na
 
 In the clone (or the template copy), run in the background, because the dev stack keeps running:
 
-`OMEGA_NON_INTERACTIVE=1 npm start -- --id=<brand-id> --name="<name>" --tagline="<tagline>" --description="<description>" --targets=<targets> --org=<owner>`
+`OMEGA_NON_INTERACTIVE=1 npm start -- --id=<brand-id> --name="<name>" --tagline="<tagline>" --description="<description>" --targets=<targets> --owner=<owner>`
 
 Flags after `npm start --` reach the onboarding wizard. Add `--company=<company-id>` or `--admins=<emails>` only when the person named them. Follow the run in its output or `<brandRoot>/logs/dev.log` until the local site answers, then open it in the browser. The skill ends here, on a running local site.
 

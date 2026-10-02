@@ -3,18 +3,10 @@ const build = require('../build.js');
 const logger = build.logger('publish');
 const { runPipeline } = require('../utils/build-pipeline.js');
 
-// `npx omega publish` publishes from an already-built tree (the CI lane calls it
-// after its own build); `--local` (the consumer's `release:local` script) cleans
-// first. Both check the SHIP credentials the brand's declared formats need
-// before anything else runs (#867: a declared snap with no Snap Store login is
-// a release that dies on a runner, so it is refused in a second rather than in
-// a build), then deliver the Apple signing artifacts (#678) and run cert
-// validation before the gulp task, STRICT
-// ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): publish is the
-// verb that puts a build in front of users, so signing material it cannot find
-// stops it here rather than shipping an app Gatekeeper refuses. What is strict
-// about it is the mac leg (validate-certs.js owns that rule: a leg that cannot
-// sign for mac only warns).
+// Publish from an already-built tree (`--local` cleans first): the ship keys the
+// shipped formats need are checked first, so a runner never dies on a missing
+// login, then cert validation runs STRICT, since publish puts a build in front of
+// users (validate-certs.js owns which leg is strict).
 function plan(options) {
   options = options || {};
 

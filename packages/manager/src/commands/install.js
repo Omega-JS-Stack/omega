@@ -42,11 +42,11 @@ function swapPlugin(brandRoot) {
  * Make the local copy this machine's default. A failing `claude` is the
  * machine's, never the link's, so it warns and the verb goes on.
  * @param {string} monorepoRoot - The checkout the brand is linked to
- * @param {Function} [claudeExec] - The `claude` runner (the real one by default)
+ * @param {Function} [execFn] - The runner (execFileSync by default)
  */
-function switchMachine(monorepoRoot, claudeExec) {
+function switchMachine(monorepoRoot, execFn) {
   try {
-    const machine = ensureLocalDefault({ exec: claudeExec, monorepoRoot });
+    const machine = ensureLocalDefault({ execFn, monorepoRoot });
     if (machine.warning) {
       logger.warn(`Could not register the local omega plugin with Claude Code: ${machine.warning}`);
     }
@@ -81,7 +81,7 @@ module.exports = async (options = {}) => {
     logger.log(linked > 0 ? `${dryRun ? 'Would link' : 'Linked'} ${linked} package(s).` : 'Already linked: nothing to do.');
     if (!dryRun) {
       swapPlugin(brandRoot);
-      switchMachine(monorepoRoot, options.claudeExec);
+      switchMachine(monorepoRoot, options.execFn);
     }
     return;
   }

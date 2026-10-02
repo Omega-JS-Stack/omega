@@ -30,16 +30,16 @@ const PAGES_BRANCH = 'gh-pages';
  * Whether the site repo is private, and the one-line WHY the plan prints.
  *
  * @param {string} visibility - The brand's visibility ('private' | 'public').
- * @param {function} orgPlan - The memoized owner-plan read.
- * @param {string} org - The brand's GitHub org.
+ * @param {function} ownerPlan - The memoized owner-plan read.
+ * @param {string} owner - The brand's GitHub owner.
  * @returns {{ private: boolean, visibility: string, reason: string }}
  */
-function resolveVisibility(visibility, orgPlan, org) {
+function resolveVisibility(visibility, ownerPlan, owner) {
   if (visibility !== 'private') {
     return { private: false, visibility: 'public', reason: 'the brand is public' };
   }
 
-  const plan = orgPlan();
+  const plan = ownerPlan();
 
   // A free owner cannot serve Pages from a private repo at all, so the built
   // site is public: it is a build output, and the source stays private.
@@ -47,18 +47,18 @@ function resolveVisibility(visibility, orgPlan, org) {
     return { private: false, visibility: 'public', reason: 'free plan' };
   }
 
-  return { private: true, visibility: 'private', reason: `${org} is on the ${plan} plan` };
+  return { private: true, visibility: 'private', reason: `${owner} is on the ${plan} plan` };
 }
 
 /**
  * Reconcile one website repo, and its Pages, per GitHub-hosted web target.
  *
- * @param {object} context - The service context: githubApi, repoOrg, orgPlan,
+ * @param {object} context - The service context: githubApi, repoBlock, ownerPlan,
  *   brandVisibility, brandConfig, options.
  * @returns {Promise<object>} A handler return: `{ status, error?, output }`.
  */
 module.exports = async function ensureWebsiteRepos(context) {
-  const { brandConfig, options = {}, githubApi: github, repoOrg: block, brandVisibility: visibility, orgPlan } = context;
+  const { brandConfig, options = {}, githubApi: github, repoBlock: block, brandVisibility: visibility, ownerPlan } = context;
 
   const hosted = targetsOfType(brandConfig, 'web').filter((entry) => hostingProvider(brandConfig, entry.name) === 'github');
 
@@ -76,7 +76,7 @@ module.exports = async function ensureWebsiteRepos(context) {
     // The config's ONE derivation, shared with the web deploy that writes the
     // CNAME file: a `*.github.io` address is no custom domain at all (#366).
     const host = pagesHost(brandConfig, entry.name);
-    const wanted = resolveVisibility(visibility, orgPlan, block.org);
+    const wanted = resolveVisibility(visibility, ownerPlan, block.owner);
 
     console.log(`      ${chalk.cyan(repo.slug)} ${chalk.dim(`(${wanted.visibility}: ${wanted.reason})`)}`);
 

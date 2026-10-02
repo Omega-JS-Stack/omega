@@ -46,13 +46,13 @@ const REQUIRED_ENV = 'OMEGA_WEBHOOK_KEY="fixture-webhook"\n'
   + 'UNSUBSCRIBE_HMAC_KEY="fixture-unsubscribe-hmac"\n';
 
 /** A brand root (config/omega.json5) with a targets/backend target under it. */
-function seedBrand({ brandEnv, org } = {}) {
+function seedBrand({ brandEnv, owner } = {}) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-secrets-')));
   const targetDir = path.join(root, 'targets', 'backend');
 
   jetpack.write(path.join(root, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    ...(org ? { repo: { provider: 'github', org } } : {}),
+    ...(owner ? { repo: { provider: 'github', owner } } : {}),
     targets: { backend: { type: 'backend' } },
   }));
   if (brandEnv !== undefined) jetpack.write(path.join(root, '.env'), brandEnv);
@@ -76,7 +76,7 @@ function publish(targetDir, gh) {
     target: 'backend',
     logger: quiet,
     env: {},
-    execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
+    execFn: (file, args, options) => { gh.push({ file, args, input: (options || {}).input }); return ''; },
   });
 }
 
@@ -92,7 +92,7 @@ module.exports = defineCases({
 
       async run({ assert }) {
         const { root, targetDir } = seedBrand({
-          org: 'acme',
+          owner: 'acme',
           brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n${REQUIRED_ENV}`,
         });
         // The key's ONE home in a brand monorepo: the firebase manage service
@@ -114,7 +114,7 @@ module.exports = defineCases({
           assert.equal(sent.input, key, 'the key file is published verbatim');
           assert.deepEqual(sent.args, ['secret', 'set', 'OMEGA_SERVICE_ACCOUNT_JSON', '--repo', 'acme/fixture-omega']);
           assert.equal(gh.every((call) => call.file === 'gh'), true, 'one transport: the gh CLI');
-          assert.deepEqual(gh[0].args, ['auth', 'status'], 'an unusable gh fails before anything is sent');
+          assert.deepEqual(gh.slice(0, 2).map((call) => call.args), [['--version'], ['api', 'user']], 'an unusable gh fails before anything is sent');
         } finally {
           jetpack.remove(root);
         }
@@ -127,7 +127,7 @@ module.exports = defineCases({
 
       async run({ assert }) {
         const { root, targetDir } = seedBrand({
-          org: 'acme',
+          owner: 'acme',
           brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n',
         });
         jetpack.write(path.join(root, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account"}');
@@ -152,7 +152,7 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
+        const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         jetpack.write(path.join(root, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account","project_id":"brand"}');
         jetpack.write(path.join(targetDir, 'service-account.json'), '{"type":"service_account","project_id":"target"}');
 
@@ -176,7 +176,7 @@ module.exports = defineCases({
       // authenticate, and the MISSING secret is what says so. Publishing an
       // empty one would look like a credential and fail at `firebase deploy`.
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\n${REQUIRED_ENV}` });
+        const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\n${REQUIRED_ENV}` });
 
         const gh = [];
         try {
@@ -198,7 +198,7 @@ module.exports = defineCases({
       // The same opt-out name web, desktop and the extension honor. On backend
       // the flag used to be accepted and ignored.
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
+        const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         const ran = [];
 
         try {

@@ -12,10 +12,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
+const configIndex = require('../src/index.js');
+
 const {
   ENV_SCHEMA, ENV_GROUPS, TARGETS, DELIVERY_MODES,
-  envSchemaEntry, envKeysForTarget, envKeysByGroup, envFileGroups, generatedEnvKeys, requiredEnvKeys,
-} = require('../src/index.js');
+  envSchemaEntry, envKeysForTarget, envKeysByGroup, envFileGroups, generatedEnvKeys, baseMissingKeys,
+} = configIndex;
 
 // The union of the three manager lanes as they stood before the schema
 // (lib/env-generated.js, lib/env-order.js's groups, the retired disperse
@@ -175,10 +177,17 @@ test('generatedEnvKeys(): name → a function that mints a fresh value', () => {
   }
 });
 
-test('requiredEnvKeys(): the backend refuses to run without the minted four', () => {
-  assert.deepEqual(requiredEnvKeys('backend'), ['OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE', 'UNSUBSCRIBE_HMAC_KEY']);
-  // Nothing else is required — a brand with no Stripe account boots fine
-  assert.deepEqual(requiredEnvKeys('web'), []);
+test('baseMissingKeys(): the backend refuses to run without the minted four', () => {
+  const owed = (target) => baseMissingKeys({}, { target, verb: 'start' }).map((row) => row.key);
+
+  assert.deepEqual(owed('backend').sort(), ['OMEGA_ADMIN_KEY', 'OMEGA_NAMESPACE', 'OMEGA_WEBHOOK_KEY', 'UNSUBSCRIBE_HMAC_KEY']);
+  // Nothing else is required: a brand with no Stripe account boots fine
+  assert.deepEqual(owed('web'), []);
+});
+
+test('requiredEnvKeys is gone: no second list of what every brand owes', () => {
+  assert.equal('requiredEnvKeys' in configIndex, false);
+  assert.equal('requiredEnvKeys' in require('../src/env-schema.js'), false);
 });
 
 test('GH_TOKEN names every target that consumes it, the extension included (#883)', () => {
@@ -405,6 +414,7 @@ const APPLE = { certificates: { providers: { apple: { bundleIdPrefix: 'com.acme'
 const signing = (value) => ({ platforms: { windows: { signing: value } } });
 const cloudSigning = (provider) => signing({ strategy: 'cloud', cloud: { provider } });
 const GA_ID = { analytics: { providers: { google: { id: 'G-ACME123' } } } };
+const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
 
 // Each ruled key, a config its rule holds on, and one beside it that it does
 // not hold on: the rule's meaning is pinned, never its written form.
@@ -412,15 +422,16 @@ const REQUIRED_WHEN = {
   RECAPTCHA_SECRET_KEY: [{ captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } }, { captcha: { providers: { recaptcha: {} } } }],
   SENTRY_AUTH_TOKEN: [{ monitoring: { providers: { sentry: { dsn: 'https://public@o0.ingest.sentry.io/0' } } } }, { monitoring: { providers: { sentry: { org: 'acme' } } } }],
   // The signing sets: a brand that declares Apple signing owes the mac set,
-  // and each Windows strategy owes ITS credentials and no other's
+  // and each Windows strategy owes ITS credentials and no other's. A desktop
+  // target ships the snap and signs with self-hosted unless its config says otherwise
   APPLE_API_ISSUER: [APPLE, {}],
   APPLE_API_KEY_ID: [APPLE, {}],
   APPLE_TEAM_ID: [APPLE, {}],
   CSC_LINK: [APPLE, {}],
   APPLE_API_KEY: [APPLE, {}],
   CSC_KEY_PASSWORD: [APPLE, {}],
-  WIN_EV_TOKEN_PATH: [signing({ strategy: 'self-hosted' }), cloudSigning('azure')],
-  WIN_CSC_KEY_PASSWORD: [signing({ strategy: 'self-hosted' }), cloudSigning('azure')],
+  WIN_EV_TOKEN_PATH: [DESKTOP, { ...DESKTOP, ...cloudSigning('azure') }],
+  WIN_CSC_KEY_PASSWORD: [DESKTOP, { ...DESKTOP, ...cloudSigning('azure') }],
   AZURE_TENANT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
   AZURE_CLIENT_ID: [cloudSigning('azure'), cloudSigning('sslcom')],
   AZURE_CLIENT_SECRET: [cloudSigning('azure'), cloudSigning('sslcom')],
@@ -430,7 +441,7 @@ const REQUIRED_WHEN = {
   SSLCOM_CREDENTIAL_ID: [cloudSigning('sslcom'), cloudSigning('digicert')],
   DIGICERT_API_KEY: [cloudSigning('digicert'), cloudSigning('azure')],
   DIGICERT_KEYPAIR_ALIAS: [cloudSigning('digicert'), cloudSigning('azure')],
-  SNAPCRAFT_STORE_CREDENTIALS: [{ platforms: { linux: { formats: { snap: {} } } } }, { platforms: { linux: { formats: { snap: false } } } }],
+  SNAPCRAFT_STORE_CREDENTIALS: [DESKTOP, { ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }],
   GOOGLE_ANALYTICS_SECRET_WEB: [GA_ID, { analytics: { providers: { google: {} } } }],
   GOOGLE_ANALYTICS_SECRET_BACKEND: [GA_ID, { analytics: { providers: { google: {} } } }],
   GOOGLE_ANALYTICS_SECRET_DESKTOP: [GA_ID, { analytics: { providers: { google: {} } } }],
@@ -453,6 +464,21 @@ test('requiredWhen: exactly the 24 keys a config can make required, each on its 
   // The parked mobile target carries NO rule: MAM has no mint, no delivery
   // and no target, so a rule on its key could only warn, forever.
   assert.equal(envSchemaEntry('GOOGLE_ANALYTICS_SECRET_MOBILE').requiredWhen, undefined);
+});
+
+test('requiredWhen: a default desktop format owes its keys until it is turned off, and only on a desktop brand', () => {
+  const snap = envSchemaEntry('SNAPCRAFT_STORE_CREDENTIALS').requiredWhen;
+  const selfHosted = ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD'].map((name) => [name, envSchemaEntry(name).requiredWhen]);
+
+  assert.equal(snap({ ...DESKTOP, platforms: { linux: false } }), false, 'linux turned off');
+  assert.equal(snap({ platforms: { linux: { formats: { snap: {} } } } }), false, 'a declared snap with no desktop target');
+
+  for (const [name, rule] of selfHosted) {
+    assert.equal(rule({ ...DESKTOP, ...signing({ strategy: 'self-hosted' }) }), true, `${name}: the strategy written out`);
+    assert.equal(rule({ ...DESKTOP, platforms: { windows: false } }), false, `${name}: windows turned off`);
+    assert.equal(rule({ ...DESKTOP, platforms: { windows: { formats: { nsis: false } } } }), false, `${name}: the installer turned off`);
+    assert.equal(rule(signing({ strategy: 'self-hosted' })), false, `${name}: no desktop target`);
+  }
 });
 
 test('askedWhen: exactly the keys manage asks a person for, moved in from the manager', () => {

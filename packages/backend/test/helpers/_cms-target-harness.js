@@ -33,7 +33,7 @@ function brandConfig(targets) {
 
   jetpack.write(path.join(root, 'config', 'omega.json5'), `{
     brand: { id: 'acme', name: 'Acme' },
-    repo: { provider: 'github', org: 'Acme-Org' },
+    repo: { provider: 'github', owner: 'Acme-Org' },
     targets: ${JSON.stringify(targets)},
   }`);
 

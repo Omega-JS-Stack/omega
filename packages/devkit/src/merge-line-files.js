@@ -6,6 +6,8 @@
 // lives in docs/devkit/index.md.
 
 const { joinEnvUnits, envKey, normalizeEnvLine, findKeyLine, parsePlaceholderKey, isMachineComment, envValueIsEmpty } = require('./env-lines');
+const crypto = require('node:crypto');
+const { SHIPPED_README_HASHES } = require('./shipped-readme-lines');
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 const CUSTOM_MARKER  = '# ========== Custom Values ==========';
@@ -49,6 +51,11 @@ const SHIPPED = [
     ],
   },
 ];
+
+// The old test/README.md texts, matched line by line by digest: only an
+// unmarked README's converge reads them, never a marked Custom block.
+const SHIPPED_README = new Set(SHIPPED_README_HASHES);
+const readmeDigest = (line) => crypto.createHash('sha256').update(line).digest('hex').slice(0, 16);
 
 function mergeLineBasedFiles(existingContent, newContent, fileName) {
   const isEnvFile = fileName === '.env';
@@ -275,11 +282,13 @@ function convergeUnmarkedEnv(lines, newDefault, known) {
 /**
  * Is this line framework text an earlier generation shipped in this file type?
  * @param {string} line
- * @param {string} fileName - The file's name (e.g. `.gitignore`, `AGENTS.md`, `.env`)
+ * @param {string} fileName - The file's name (e.g. `.gitignore`, `AGENTS.md`, `.env`, `README.md`)
  * @returns {boolean}
  */
 function isShipped(line, fileName) {
-  return SHIPPED.some((entry) => entry.file === fileName && entry.lines.some((shipped) => shipped.test(line.trim())));
+  const trimmed = line.trim();
+  if (fileName === 'README.md' && SHIPPED_README.has(readmeDigest(trimmed))) return true;
+  return SHIPPED.some((entry) => entry.file === fileName && entry.lines.some((shipped) => shipped.test(trimmed)));
 }
 
 // Is this Custom section exactly one block this file type shipped?

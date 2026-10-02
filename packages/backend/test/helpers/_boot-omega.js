@@ -14,7 +14,7 @@
  * `_`-prefixed: the runner skips it in discovery (a helper, not a suite).
  */
 const path = require('node:path');
-const { requiredEnvKeys } = require('./_shared-config.js');
+const { baseMissingKeys } = require('./_shared-config.js');
 const { Omega } = require('../../dist/omega/index.js');
 
 const FIXTURE_DIR = path.join(__dirname, '..', '..', 'dist', 'test', 'fixtures', 'firebase-project');
@@ -37,7 +37,8 @@ function bootOmega(instance = new Omega()) {
 
   set('OMEGA_TEST_RUNNER', '1');
 
-  requiredEnvKeys('backend')
+  baseMissingKeys({}, { target: 'backend', verb: 'start' })
+    .map((row) => row.key)
     .filter((key) => !process.env[key])
     .forEach((key) => set(key, `fixture-${key.toLowerCase().replace(/_/g, '-')}`));
 

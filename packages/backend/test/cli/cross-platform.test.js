@@ -12,7 +12,7 @@
  * Run: npx omega test backend:cli/cross-platform
  */
 const { shellInvocation, pathInvocation } = require('../../dist/cli/utils/spawn-shell.js');
-const { javaInstallHint } = require('../../dist/cli/commands/setup-tests/helpers.js');
+const { MACHINE_TOOLS } = require('../../dist/vendor/devkit/machine-tools.js');
 const WatchCommand = require('../../dist/cli/commands/watch.js');
 const BaseCommand = require('../../dist/cli/commands/base-command.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -127,24 +127,27 @@ module.exports = defineCases({
     },
 
     {
-      name: 'the-java-hint-names-a-manager-the-host-actually-has',
+      name: 'every-machine-tool-install-names-a-manager-the-host-actually-has',
       async run({ assert }) {
-        assert.equal(javaInstallHint('darwin'), 'brew install openjdk');
-        assert.equal(javaInstallHint('win32').split('.')[0], 'winget install Microsoft', 'windows opens with winget');
-        assert.equal(javaInstallHint('linux'), 'sudo apt install default-jdk');
+        const java = MACHINE_TOOLS.backend.find((tool) => tool.name === 'java').install;
+        assert.equal(java.darwin, 'brew install openjdk');
+        assert.equal(java.win32.split('.')[0], 'winget install Microsoft', 'windows opens with winget');
+        assert.equal(java.linux, 'sudo apt install default-jdk');
+        assert.equal(/choco install openjdk/.test(java.win32), true, 'chocolatey is still named');
 
-        for (const platform of ['win32', 'linux']) {
-          assert.equal(javaInstallHint(platform).includes('brew install'), false, `${platform} has no Homebrew`);
-        }
+        for (const tool of Object.values(MACHINE_TOOLS).flat()) {
+          for (const platform of ['win32', 'linux']) {
+            assert.equal(tool.install[platform].includes('brew install'), false, `${tool.name} on ${platform}: no Homebrew there`);
+          }
 
-        // Same rule as the mkcert hint: the head of the line is pasteable, an
-        // alternative follows in a sentence. `(or: choco …)` inside the command
-        // is a command that does not run.
-        for (const platform of ['darwin', 'win32', 'linux']) {
-          const head = javaInstallHint(platform).split('.')[0];
-          assert.equal(/\(or\b|\bor:/.test(head), false, `${platform} splices an alternative into the command`);
+          // Same rule as the mkcert hint: the head of the line is pasteable, an
+          // alternative follows in a sentence. `(or: choco …)` inside the command
+          // is a command that does not run.
+          for (const platform of ['darwin', 'win32', 'linux']) {
+            const head = tool.install[platform].split('.')[0];
+            assert.equal(/\(or\b|\bor:/.test(head), false, `${tool.name} on ${platform} splices an alternative into the command`);
+          }
         }
-        assert.equal(/choco install openjdk/.test(javaInstallHint('win32')), true, 'chocolatey is still named');
       },
     },
 

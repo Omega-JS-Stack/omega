@@ -25,6 +25,7 @@ const { runOnboard, deriveId, deriveName, deriveUrl } = require('../src/onboard.
 const { runManage } = require('../src/manage.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 const { createMachine } = require('./lib/fake-claude.js');
+const { toolProbe } = require('./lib/tool-probe.js');
 
 // Every scaffolded @omega.js/* spec is this exact number (#794)
 const MANAGER_VERSION = require('../package.json').version;
@@ -156,6 +157,7 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     contactUrl: 'https://acme.io/wile',
     targets: 'web,backend,desktop',
     manage: false,
+    execFn: toolProbe(),
   });
 
   assert.equal(report.mode, 'fresh');
@@ -369,7 +371,7 @@ test('interactive: customizing the account list writes account.admins into the b
   const tty = openTtyPrompt();
 
   try {
-    const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend' });
+    const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend', execFn: toolProbe() });
 
     await tty.answer('Company brand id', '\r');
     await tty.answer('Brand description', '\r');
@@ -591,9 +593,9 @@ test('company: the wizard asks ONE field, and the answer lands as the top-level 
 
 test('fresh scaffold runs the workspace service green', async () => {
   const root = tempDir();
-  await runOnboard(root, { id: 'green', targets: 'web,backend', manage: false });
+  await runOnboard(root, { id: 'green', targets: 'web,backend', manage: false, execFn: toolProbe() });
 
-  const report = await runManage(root, { service: 'workspace' });
+  const report = await runManage(root, { service: 'workspace', execFn: toolProbe() });
 
   assert.equal(report.hasErrors, false);
   assert.equal(report.results.workspace.status, 'success');
@@ -601,12 +603,12 @@ test('fresh scaffold runs the workspace service green', async () => {
 
 test('full manage on a fresh brand: services skip cleanly, testing honestly nudges toward the frameworks', async () => {
   const root = tempDir();
-  await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false });
+  await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false, execFn: toolProbe() });
   // Both declared frameworks stubbed (the backend's is a runtime dep on its
   // target manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
   stubFrameworks(root, ['@omega.js/web', '@omega.js/backend']);
 
-  const report = await runManage(root, { ...FAKE_FETCH_200 });
+  const report = await runManage(root, { ...FAKE_FETCH_200, execFn: toolProbe() });
 
   // The scaffold itself is sound…
   assert.equal(report.results.workspace.status, 'success');

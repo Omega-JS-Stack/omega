@@ -11,76 +11,20 @@ const assert = require('node:assert/strict');
 // temp home, never the developer's ~/.omega (#677).
 require('@omega.js/devkit/test/temp-home');
 
-const { OPERATIONS, DEFAULTS, templateObject } = require('../src/config.js');
+const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/edge/index.js');
 const { buildRequiredRecords } = require('../src/services/edge/lib/dns-records-helpers.js');
 const { loadBrand } = require('../src/lib/brand.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+const { DOMAIN, tmpRoot, brandConfig, fakeApi, handlerContext } = require('./lib/edge-fixture.js');
 
 // Tests must never see a real token from the shell environment
 delete process.env.CLOUDFLARE_TOKEN;
 delete process.env.SENDGRID_API_KEY;
 
-const DOMAIN = 'fixture-brand.test';
 const ZONE = { id: 'zone-1', name: DOMAIN, status: 'active' };
-const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
-
-// The zone ensure lands the resolved zone id in omega.json5 (#434), so a
-// fixture root has to be a real brand root
-function tmpRoot() {
-  return makeBrandRoot(`{
-  brand: { id: 'fixture-brand', url: 'https://${DOMAIN}' },
-}
-`);
-}
-
-/**
- * Brand config as loadBrand would produce it: manager DEFAULTS merged under
- * brand choices, `{ domain }` templated. Tests mutate the returned clone.
- */
-function brandConfig(url = `https://${DOMAIN}`) {
-  const config = {
-    brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    domain: structuredClone(DEFAULTS.domain),
-    edge: { providers: { cloudflare: structuredClone(DEFAULTS.edge.providers.cloudflare) } },
-    targets: { web: { type: 'web' } },
-  };
-  return templateObject(config, { domain: url.replace(/^https?:\/\//, '') });
-}
-
-/**
- * Recording fake CloudflareAPI. `responses` maps "METHOD endpoint" to a
- * result (or a function — throw inside it to simulate API errors). Missing
- * keys throw, so any unexpected call fails loudly.
- */
-function fakeApi({ zones = [], responses = {} } = {}) {
-  const api = { calls: [], responses };
-
-  api.makeRequest = async (endpoint, options = {}) => {
-    const method = options.method || 'GET';
-    const isFormData = options.body instanceof FormData;
-    api.calls.push({
-      method,
-      endpoint,
-      body: options.body ? (isFormData ? '[form-data]' : JSON.parse(options.body)) : undefined,
-    });
-
-    const responder = api.responses[`${method} ${endpoint}`];
-    if (responder === undefined) {
-      throw new Error(`fakeApi: no response for "${method} ${endpoint}"`);
-    }
-    return { success: true, result: typeof responder === 'function' ? responder() : responder };
-  };
-
-  api.getZoneByName = async (name) => zones.find((z) => z.name === name) || null;
-  api.getAllZones = async () => zones;
-
-  api.mutations = () => api.calls.filter((c) => MUTATING.has(c.method));
-  api.call = (method, endpoint) => api.calls.find((c) => c.method === method && c.endpoint === endpoint);
-  return api;
-}
 
 function runService(config, api, options = {}) {
   return service.run({
@@ -130,22 +74,6 @@ async function captureLogAsync(fn) {
     console.log = original;
   }
   return lines.join('\n');
-}
-
-// Direct-handler context (bypasses setup — for focused per-operation tests)
-function handlerContext(config, api, extra = {}) {
-  return {
-    cloudflareApi: api,
-    brandRoot: tmpRoot(),
-    brandConfig: config,
-    domain: DOMAIN,
-    zoneDomain: DOMAIN,
-    isSubdomainProject: false,
-    zoneId: 'zone-1',
-    serviceData: {},
-    options: {},
-    ...extra,
-  };
 }
 
 /** Every read a fully-converged default-config zone answers. */

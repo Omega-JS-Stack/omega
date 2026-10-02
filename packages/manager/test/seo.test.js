@@ -19,6 +19,10 @@ const jetpack = require('fs-jetpack');
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { loadTemplate } = require('../src/services/seo/templates/index.js');
 const service = require('../src/services/seo/index.js');
+const { activate } = require('./lib/fake-gh.js');
+
+// A run with no injected API reaches the `gh` on PATH: the fake, signed out.
+const { useGh } = activate();
 
 const BRAND = {
   id: 'fixture-brand',
@@ -46,7 +50,7 @@ function stageBrand() {
 function contentItem(overrides = {}) {
   return {
     name: 'fixture-tool',
-    org: 'fixture-org',
+    owner: 'fixture-org',
     title: 'Fixture Tool',
     description: 'automates fixture things',
     topics: ['fixture', 'automation'],
@@ -56,7 +60,7 @@ function contentItem(overrides = {}) {
   };
 }
 
-function brandConfig({ seo, content = [contentItem()], repo = { provider: 'github', org: 'default-org' } } = {}) {
+function brandConfig({ seo, content = [contentItem()], repo = { provider: 'github', owner: 'default-org' } } = {}) {
   const config = {
     brand: structuredClone(BRAND),
     targets: { web: { type: 'web' } },
@@ -71,9 +75,9 @@ function brandConfig({ seo, content = [contentItem()], repo = { provider: 'githu
 }
 
 /** The exact file contents the template generates for an item. */
-function templateContents(item, org = item.org) {
+function templateContents(item, owner = item.owner) {
   const template = loadTemplate(item.template || 'developer-tool');
-  const data = { ...item, org, brand: structuredClone(BRAND) };
+  const data = { ...item, owner, brand: structuredClone(BRAND) };
   const map = {};
   for (const file of template.files) {
     map[file.path] = file.generate ? file.generate(data) : file.content;
@@ -108,8 +112,8 @@ function fakeSeo(responses = {}) {
 }
 
 /** Responses for a repo fully converged to `item` (nothing to change). */
-function convergedResponses(item, org = item.org) {
-  const contents = templateContents(item, org);
+function convergedResponses(item, owner = item.owner) {
+  const contents = templateContents(item, owner);
   return {
     getRepo: { description: item.description || '', homepage: item.cta?.platform || item.cta?.url || BRAND.url },
     getTree: Object.keys(contents).map((path) => ({ path, type: 'blob' })),
@@ -196,6 +200,27 @@ test('seo: no content anywhere skips with sidecar guidance', async () => {
   const result = await runService(brandConfig({ seo: { enabled: true } }));
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /no SEO content configured.*seo\.json5/);
+});
+
+test('#1037 seo: a headless walk with a signed-out gh skips, naming GH_TOKEN and gh auth login', async (t) => {
+  const saved = { OMEGA_NON_INTERACTIVE: process.env.OMEGA_NON_INTERACTIVE, GH_TOKEN: process.env.GH_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN };
+  process.env.OMEGA_NON_INTERACTIVE = '1';
+  delete process.env.GH_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+  t.after(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  t.after(useGh(null));
+
+  // No seoApi: the service's real setup path, with content configured
+  const result = await runService(brandConfig()).then((r) => r, (error) => ({ status: 'error', error: error.message }));
+
+  assert.equal(result.status, 'skipped', JSON.stringify(result));
+  assert.deepEqual(result.missingEnv, ['GH_TOKEN']);
+  assert.match(result.reason, /gh auth login/);
 });
 
 test('seo: content from the config/seo.json5 sidecar merges over the config section', async () => {
@@ -403,8 +428,8 @@ test('seo: an unset token env var falls back to default auth', async () => {
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
-test('seo: org defaults to repo.org and homepage to brand.url', async () => {
-  const item = contentItem({ org: undefined, cta: undefined });
+test('seo: owner defaults to repo.owner and homepage to brand.url', async () => {
+  const item = contentItem({ owner: undefined, cta: undefined });
   const contents = templateContents(item, 'default-org');
   const api = fakeSeo({
     getRepo: { description: item.description, homepage: '' },
@@ -423,14 +448,14 @@ test('seo: org defaults to repo.org and homepage to brand.url', async () => {
   assert.deepEqual(api.of('patchRepo')[0].args[1], { description: 'automates fixture things', homepage: 'https://fixture-brand.test' });
 });
 
-test('seo: an item with no org anywhere errors without touching the API', async () => {
-  const item = contentItem({ org: undefined });
+test('seo: an item with no owner anywhere errors without touching the API', async () => {
+  const item = contentItem({ owner: undefined });
   const api = fakeSeo();
 
   const result = await runService(brandConfig({ content: [item], repo: null }), { api });
 
   assert.equal(result.status, 'error');
-  assert.match(result.output.githubRepos.repos[0].error, /missing org or name/);
+  assert.match(result.output.githubRepos.repos[0].error, /missing owner or name/);
   assert.deepEqual(api.calls, []);
 });
 

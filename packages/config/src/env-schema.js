@@ -124,7 +124,7 @@
  * missingEnvKeys (env-needs.js) is the ONE reader of all three.
  */
 const { randomBytes, randomUUID } = require('node:crypto');
-const { holds, onUnlessOff, chosen, hasTarget, realProject, all, asks } = require('./env-when.js');
+const { holds, onUnlessOff, chosen, hasTarget, ships, signsWith, realProject, all, asks } = require('./env-when.js');
 const { ENV_GROUPS, envFileGroups } = require('./env-groups.js');
 
 // The three ways a key reaches a target (#627) — see the header.
@@ -579,12 +579,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      false,
     required:    false,
-    requiredWhen: chosen('platforms.windows.signing.strategy', 'self-hosted'),
+    requiredWhen: signsWith('self-hosted'),
     delivery:    { desktop: 'ci' },
     label:       'Windows EV certificate thumbprint',
     url:         null,
     hint:        'Read off the EV token on the self-hosted Windows runner: `certutil -user -store My` prints the thumbprint of the installed certificate',
-    description: 'Thumbprint/path of the EV code-signing certificate on the self-hosted Windows runner (platforms.windows.signing.strategy = self-hosted). Required when platforms.windows.signing.strategy is self-hosted.',
+    description: 'Thumbprint/path of the EV code-signing certificate on the self-hosted Windows runner (platforms.windows.signing.strategy = self-hosted). Required when a desktop target ships the Windows installer (platforms.windows.formats.nsis, on by default) and signs it self-hosted, the default platforms.windows.signing.strategy.',
   },
   {
     name:        'WIN_CSC_KEY_PASSWORD',
@@ -593,12 +593,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: chosen('platforms.windows.signing.strategy', 'self-hosted'),
+    requiredWhen: signsWith('self-hosted'),
     delivery:    { desktop: 'ci' },
     label:       'Windows EV token PIN',
     url:         null,
     hint:        'The SafeNet token PIN set when the EV certificate was issued; the token vendor never shows it again',
-    description: 'SafeNet token PIN the Windows signing job unlocks the EV token with. Required when platforms.windows.signing.strategy is self-hosted.',
+    description: 'SafeNet token PIN the Windows signing job unlocks the EV token with. Required when a desktop target ships the Windows installer (platforms.windows.formats.nsis, on by default) and signs it self-hosted, the default platforms.windows.signing.strategy.',
   },
   {
     name:        'SIGNTOOL_PATH',
@@ -749,12 +749,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: holds('platforms.linux.formats.snap'),
+    requiredWhen: ships('linux', 'snap'),
     delivery:    { desktop: 'ci' },
     label:       'Snap Store credentials',
     url:         'https://snapcraft.io/account',
     hint:        'Log in, then run `snapcraft export-login -` locally and paste the whole blob it prints',
-    description: 'Snap Store credentials blob (`snapcraft export-login -`) the Linux publish job uses. Required only when the brand ships the snap format (platforms.linux.formats.snap).',
+    description: 'Snap Store credentials blob (`snapcraft export-login -`) the Linux publish job uses. Required when a desktop target ships the snap format, which is on by default: `false` at platforms.linux.formats.snap turns it off.',
   },
 
   // ── extension-stores — one credential set per browser store ──────────────
@@ -1125,18 +1125,6 @@ function generatedEnvKeys() {
 }
 
 /**
- * The keys a target refuses to run without — the backend's boot guard.
- *
- * @param {string} target - Target name.
- * @returns {string[]} Env var names.
- */
-function requiredEnvKeys(target) {
-  return ENV_SCHEMA
-    .filter((entry) => entry.name && entry.required && entry.targets.includes(target))
-    .map((entry) => entry.name);
-}
-
-/**
  * Group id → its keys in schema order, every declared group present.
  *
  * @returns {Object<string, string[]>} Group id → env var names.
@@ -1160,6 +1148,5 @@ module.exports = {
   isMachineLocal,
   envKeysForTarget,
   generatedEnvKeys,
-  requiredEnvKeys,
   envKeysByGroup,
 };

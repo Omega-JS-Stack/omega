@@ -56,7 +56,7 @@ A non-empty credential value enables a feature — there is no separate `enabled
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
 | Firebase Auth (renderer) | `cloud.config.projectId = '...'` (etc.) | empty `cloud.config` |
 
-**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`. (`platforms.linux.snap.enabled` was one until [#867](https://github.com/Omega-JS-Stack/omega/issues/867): the snap is a declared FORMAT now, so its presence is the switch and `platforms.linux.formats.snap: false` is the off.) These toggle BEHAVIOR, not credentials: a fork can keep the brand's `repo.org` and still want releases off, for example.
+**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`. (`platforms.linux.snap.enabled` was one until [#867](https://github.com/Omega-JS-Stack/omega/issues/867): the snap is a declared FORMAT now, so its presence is the switch and `platforms.linux.formats.snap: false` is the off.) These toggle BEHAVIOR, not credentials: a fork can keep the brand's `repo.owner` and still want releases off, for example.
 
 ## Adding a new field
 
@@ -72,7 +72,7 @@ These checks live in [`gulp/tasks/audit.js`](../../packages/desktop/src/gulp/tas
 
 - **`src/main.js` / `src/preload.js` existence** — the bundle task skips them with a warning but the schema doesn't know about consumer entry points.
 - **`brand.images.icon` file existence** — only enforced when packaging (`isBuildMode()` / `isPublishMode()`); dev runs with the default Electron icon.
-- **An addressable releases repo** (`repo.org` + `brand.id`), only enforced in publish mode.
+- **An addressable releases repo** (`repo.owner` + `brand.id`), only enforced in publish mode.
 
 These are kept in `audit.js` so the schema stays a pure description of the config shape, callable from any context without dragging in build state.
 

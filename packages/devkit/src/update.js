@@ -24,6 +24,10 @@ const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DEFAULT_MIN_AGE_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// The packages the age quarantine never holds: an exact name or a `<scope>/*`.
+// The family is the brand's own lockstep framework, so it moves the day it ships.
+const QUARANTINE_EXEMPT = ['@omega.js/*'];
+
 // Specs with no registry story: local links, git, tarball URLs, and the
 // bare `owner/repo` GitHub shorthand (never a valid version range).
 const NON_REGISTRY_SPEC = /^(file:|link:|workspace:|portal:|git\+|git:|github:|https?:)/;
@@ -190,6 +194,30 @@ function highestWithin(versions, current, tier) {
 }
 
 /**
+ * Whether a package is on the quarantine allowlist (QUARANTINE_EXEMPT).
+ * @param {string} name - package name
+ * @returns {boolean}
+ */
+function isQuarantineExempt(name) {
+  return QUARANTINE_EXEMPT.some((entry) => (entry.endsWith('/*')
+    ? name.startsWith(entry.slice(0, -1))
+    : name === entry));
+}
+
+/**
+ * The one age rule: a release younger than minAge days is held, unless its
+ * package is exempt. An unknown age (no publish time) is never held.
+ * @param {object} options
+ * @param {string} options.name - package name
+ * @param {number|null} options.ageDays - the release's age in whole days
+ * @param {number} options.minAge - quarantine threshold in days (0 disables)
+ * @returns {boolean}
+ */
+function isHeld({ name, ageDays, minAge }) {
+  return minAge > 0 && ageDays !== null && ageDays < minAge && !isQuarantineExempt(name);
+}
+
+/**
  * Find a dependency's physically installed version: the nearest copy
  * `resolvePackageRealDir` finds from dir (npm hoists to the brand root in
  * brand monorepos).
@@ -312,7 +340,7 @@ async function buildUpdateReport(options) {
     if (publishedAt) {
       row.publishedAt = new Date(publishedAt);
       row.ageDays = Math.floor((now - row.publishedAt.getTime()) / DAY_MS);
-      row.quarantined = minAge > 0 && row.ageDays < minAge && installed !== row.latest;
+      row.quarantined = isHeld({ name, ageDays: row.ageDays, minAge }) && installed !== row.latest;
     }
   })));
 
@@ -330,7 +358,8 @@ async function buildUpdateReport(options) {
 /**
  * Pick the updates a run installs. Default tier is MINOR (highest
  * same-major — npu's non-breaking lane); --major unlocks latest. A target
- * published < minAge days ago is HELD (quarantine) unless already installed.
+ * published < minAge days ago is HELD (quarantine) unless already installed
+ * or exempt (isHeld).
  * @param {object[]} rows - buildUpdateReport rows
  * @param {object} [options]
  * @param {boolean} [options.major] - allow breaking jumps to latest
@@ -361,7 +390,7 @@ function selectUpdates(rows, options = {}) {
     // Quarantine the TARGET version by its own publish age
     const publishedAt = row.time?.[target];
     const ageDays = publishedAt ? Math.floor((now - new Date(publishedAt).getTime()) / DAY_MS) : null;
-    if (minAge > 0 && ageDays !== null && ageDays < minAge && row.installed !== target) {
+    if (isHeld({ name: row.name, ageDays, minAge }) && row.installed !== target) {
       quarantined.push({ name: row.name, from: row.current, to: target, ageDays });
       continue;
     }
@@ -465,7 +494,7 @@ function formatReport(report, options = {}) {
     for (const cells of body) lines.push(render(cells));
 
     if (report.rows.some((row) => row.quarantined)) {
-      lines.push(`QUARANTINED = latest published < ${minAge} days ago (held from the install; --min-age 0 or --force-fresh overrides)`);
+      lines.push(`QUARANTINED = latest published < ${minAge} days ago (held from the install; --min-age 0 or --force-fresh overrides; ${QUARANTINE_EXEMPT.join(', ')} exempt)`);
     }
     if (report.rows.some((row) => row.bump === 'major')) {
       lines.push('major = breaking — never auto-applied (explicit --major opt-in)');
@@ -547,6 +576,9 @@ async function runUpdate(options = {}) {
 
 module.exports = {
   DEFAULT_MIN_AGE_DAYS,
+  QUARANTINE_EXEMPT,
+  isQuarantineExempt,
+  isHeld,
   parseVersion,
   compareVersions,
   classifyBump,

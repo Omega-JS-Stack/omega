@@ -2,7 +2,7 @@
 // delivery. The published copy is installed for the user from GitHub, moved
 // there from an older folder record, updated when it falls behind the brand's
 // OMEGA, and an omega developer's machine defaults to the local copy. Every
-// call into `claude` goes through the injected exec: here a fake machine in a
+// call into `claude` goes through the injected execFn: here a fake machine in a
 // throwaway config folder (test/lib/fake-claude.js), never the real ~/.claude.
 
 const { test } = require('node:test');
@@ -40,7 +40,7 @@ const userScoped = (argv) => {
 
 test('machinePluginState: reads the installed version and whether the local copy is the default', async (t) => {
   const consumer = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '0.9.0' } });
-  const state = await machinePluginState({ exec: consumer.exec });
+  const state = await machinePluginState({ execFn: consumer.exec });
   assert.equal(state.claude, true);
   assert.equal(state.version, '0.9.0');
   assert.equal(state.localDefault, false);
@@ -50,15 +50,42 @@ test('machinePluginState: reads the installed version and whether the local copy
     installed: { 'omega@omega': '0.9.0', 'omega@omega-local': '0.9.0' },
     enabled: { 'omega@omega': false },
   });
-  assert.equal((await machinePluginState({ exec: developer.exec })).localDefault, true);
+  assert.equal((await machinePluginState({ execFn: developer.exec })).localDefault, true);
 });
 
 test('machinePluginState: a machine with claude and no plugin reports no version', async (t) => {
   const bare = machine(t, {});
-  const state = await machinePluginState({ exec: bare.exec });
+  const state = await machinePluginState({ execFn: bare.exec });
   assert.equal(state.claude, true);
   assert.ok(state.version === null || state.version === undefined, `no install reads as no version, got ${state.version}`);
   assert.deepEqual(bare.mutations(), [], 'reading the state changes nothing');
+});
+
+test('#1044 machinePluginState runs every call through execFn, the program named first', async (t) => {
+  const fake = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '0.9.0' } });
+  const files = [];
+  const execFn = (file, args, options) => {
+    files.push(file);
+    return fake.exec(file, args, options);
+  };
+
+  await machinePluginState({ execFn });
+
+  assert.ok(files.length > 0, 'the machine was read through the injected runner');
+  assert.ok(files.every((file) => file === 'claude'), JSON.stringify(files));
+});
+
+test('#1042 ensureMachinePlugin acts on the machine it is handed, without reading it again', async (t) => {
+  const behind = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '1.3.9' }, published: '1.4.0' });
+  const state = await machinePluginState({ execFn: behind.exec });
+  const read = behind.calls().length;
+
+  await ensureMachinePlugin({ execFn: behind.exec, familyVersion: '1.4.0', machine: state });
+
+  const after = behind.calls().slice(read);
+  assert.equal(after.length, 2, `only the two update commands: ${JSON.stringify(after)}`);
+  assert.ok(ran(after, ['marketplace', 'update', 'omega']), 'the marketplace is refreshed');
+  assert.ok(after.some((argv) => !argv.includes('marketplace') && ran([argv], ['update', 'omega@omega'])), 'the plugin is updated');
 });
 
 // ─── Case 8: no claude ───────────────────────────────────────────────────────
@@ -66,9 +93,9 @@ test('machinePluginState: a machine with claude and no plugin reports no version
 test('case 8: with claude not on the machine, the helper does nothing and reports no error', async (t) => {
   const none = machine(t, { missing: true });
 
-  assert.equal((await machinePluginState({ exec: none.exec })).claude, false);
-  await ensureMachinePlugin({ exec: none.exec, familyVersion: '1.0.0' });
-  await ensureLocalDefault({ exec: none.exec, monorepoRoot: MONOREPO });
+  assert.equal((await machinePluginState({ execFn: none.exec })).claude, false);
+  await ensureMachinePlugin({ execFn: none.exec, familyVersion: '1.0.0' });
+  await ensureLocalDefault({ execFn: none.exec, monorepoRoot: MONOREPO });
 
   assert.deepEqual(fs.readdirSync(none.configDir).filter((name) => name !== 'fake-claude.json'), [], 'nothing was written for a machine with no Claude Code');
 });
@@ -82,7 +109,7 @@ test('case 9: an omega record that points at a folder is moved to GitHub', async
     published: '1.0.0',
   });
 
-  await ensureMachinePlugin({ exec: old.exec, familyVersion: '1.0.0' });
+  await ensureMachinePlugin({ execFn: old.exec, familyVersion: '1.0.0' });
 
   const record = old.state().records.omega.source;
   assert.equal(record.source, 'github');
@@ -93,7 +120,7 @@ test('case 9: an omega record that points at a folder is moved to GitHub', async
 test('case 9: a machine with no plugin gets omega registered from GitHub and omega@omega installed for the user', async (t) => {
   const fresh = machine(t, { published: '1.0.0' });
 
-  await ensureMachinePlugin({ exec: fresh.exec, familyVersion: '1.0.0' });
+  await ensureMachinePlugin({ execFn: fresh.exec, familyVersion: '1.0.0' });
 
   const { records, installed, settings } = fresh.state();
   assert.deepEqual([records.omega.source.source, records.omega.source.repo], ['github', 'Omega-JS-Stack/omega']);
@@ -106,7 +133,7 @@ test('case 9: a machine with no plugin gets omega registered from GitHub and ome
 test('case 9: a registered GitHub record with no install is installed, not re-added', async (t) => {
   const half = machine(t, { marketplaces: { omega: PUBLISHED }, published: '1.0.0' });
 
-  await ensureMachinePlugin({ exec: half.exec, familyVersion: '1.0.0' });
+  await ensureMachinePlugin({ execFn: half.exec, familyVersion: '1.0.0' });
 
   assert.equal(half.state().installed['omega@omega'][0].scope, 'user');
   assert.equal(ran(half.mutations(), ['marketplace', 'add']), false, 'a GitHub record is already right');
@@ -117,7 +144,7 @@ test('case 9: a registered GitHub record with no install is installed, not re-ad
 test('case 10: an installed plugin older than the brand\'s OMEGA gets the two update commands', async (t) => {
   const behind = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '1.3.9' }, published: '1.4.0' });
 
-  await ensureMachinePlugin({ exec: behind.exec, familyVersion: '1.4.0' });
+  await ensureMachinePlugin({ execFn: behind.exec, familyVersion: '1.4.0' });
 
   const mutations = behind.mutations();
   assert.equal(mutations.length, 2, JSON.stringify(mutations));
@@ -131,7 +158,7 @@ test('case 10: an installed plugin equal to or newer than the brand\'s OMEGA run
   for (const [installed, family] of [['1.4.0', '1.4.0'], ['1.5.0', '1.4.0'], ['1.10.0', '1.9.0']]) {
     const current = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': installed }, published: installed });
 
-    await ensureMachinePlugin({ exec: current.exec, familyVersion: family });
+    await ensureMachinePlugin({ execFn: current.exec, familyVersion: family });
 
     assert.deepEqual(current.mutations(), [], `installed ${installed}, family ${family}`);
   }
@@ -156,7 +183,7 @@ function assertLocalDefault(fake) {
 test('case 11: a consumer machine becomes a developer machine: local on, published off, for the user', async (t) => {
   const consumer = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '1.0.0' } });
 
-  await ensureLocalDefault({ exec: consumer.exec, monorepoRoot: MONOREPO });
+  await ensureLocalDefault({ execFn: consumer.exec, monorepoRoot: MONOREPO });
 
   assertLocalDefault(consumer);
   assert.ok(consumer.mutations().every(userScoped), 'every change is for the user, never a project');
@@ -165,18 +192,18 @@ test('case 11: a consumer machine becomes a developer machine: local on, publish
 test('case 11: a machine with no plugin at all gets the same default', async (t) => {
   const bare = machine(t, {});
 
-  await ensureLocalDefault({ exec: bare.exec, monorepoRoot: MONOREPO });
+  await ensureLocalDefault({ execFn: bare.exec, monorepoRoot: MONOREPO });
 
   assertLocalDefault(bare);
 });
 
 test('case 11: a second run on a developer machine adds nothing and changes nothing', async (t) => {
   const developer = machine(t, { marketplaces: { omega: PUBLISHED }, installed: { 'omega@omega': '1.0.0' } });
-  await ensureLocalDefault({ exec: developer.exec, monorepoRoot: MONOREPO });
+  await ensureLocalDefault({ execFn: developer.exec, monorepoRoot: MONOREPO });
   const before = JSON.stringify(developer.state());
   const settled = developer.mutations().length;
 
-  await ensureLocalDefault({ exec: developer.exec, monorepoRoot: MONOREPO });
+  await ensureLocalDefault({ execFn: developer.exec, monorepoRoot: MONOREPO });
 
   assert.equal(JSON.stringify(developer.state()), before);
   assert.deepEqual(developer.mutations().slice(settled), [], 'no add and no other command on a machine already switched');
@@ -189,7 +216,7 @@ test('case 11: the switch heals an omega record that points at a folder: removed
     installed: { 'omega@omega': '1.0.0' },
   });
 
-  await ensureLocalDefault({ exec: old.exec, monorepoRoot: MONOREPO });
+  await ensureLocalDefault({ execFn: old.exec, monorepoRoot: MONOREPO });
 
   // The fake refuses a GitHub add over a folder declaration, as the real CLI does, so this passing proves the remove
   const { records, settings } = old.state();
@@ -206,7 +233,7 @@ test('case 11: a claude failure in the switch is a warning, never a throw', asyn
   for (const key of Object.keys(saved)) console[key] = (...parts) => lines.push(parts.join(' '));
   let result;
   try {
-    result = await ensureLocalDefault({ exec: broken.exec, monorepoRoot: MONOREPO });
+    result = await ensureLocalDefault({ execFn: broken.exec, monorepoRoot: MONOREPO });
   } finally {
     Object.assign(console, saved);
   }

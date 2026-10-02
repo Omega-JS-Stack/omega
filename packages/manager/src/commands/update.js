@@ -36,6 +36,7 @@ const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveFrameworkBin } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 const { PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('../lib/target-selection.js');
+const { registerPath, dueEntries, formatDueSteps } = require('../lib/breaking-changes.js');
 
 // The one @omega.js dependency a brand-root shell manifest carries
 const ROOT_PACKAGE = '@omega.js/manager';
@@ -96,10 +97,11 @@ module.exports = async (options = {}) => {
   const rootManifest = jetpack.read(path.join(brandRoot, 'package.json'), 'json') || {};
   const rootSpec = rootManifest.dependencies?.[ROOT_PACKAGE] || rootManifest.devDependencies?.[ROOT_PACKAGE];
 
+  let rootResult = null;
   if (!options[PICKER_FLAG] && rootSpec) {
     console.log(chalk.cyan(`${`\n─── [root] brand root ${chalk.dim(`(${ROOT_PACKAGE})`)} — omega update ${forwarded.join(' ')}`.trimEnd()} ───`));
     try {
-      await devkitUpdate.runUpdate({
+      rootResult = await devkitUpdate.runUpdate({
         dir: brandRoot,
         only: [ROOT_PACKAGE],
         dryRun: options.dryRun || options['dry-run'],
@@ -122,7 +124,29 @@ module.exports = async (options = {}) => {
       : `  ${chalk.red('✗')} ${entry.name} ${chalk.dim(`— ${entry.detail}`)}`);
   }
 
+  const steps = byHandSteps(brandRoot, rootResult);
+  if (steps.length > 0) console.log(`\n${steps.join('\n')}`);
+
   if (summary.some((entry) => !entry.ok)) {
     process.exitCode = 1;
   }
 };
+
+/**
+ * The by-hand block for a root leg that installed a new manager pin: the
+ * register entries due since the old pin's publish day, read from the copy
+ * the install just put on disk. A dry run or an unmoved pin prints nothing.
+ * @param {string} brandRoot
+ * @param {{ report: object, selection: object|null }|null} result - The root leg's runUpdate result.
+ * @returns {string[]}
+ */
+function byHandSteps(brandRoot, result) {
+  const moved = result?.selection?.updates.find((update) => update.name === ROOT_PACKAGE);
+  if (!moved) return [];
+
+  const row = result.report.rows.find((entry) => entry.name === ROOT_PACKAGE);
+  const publishedAt = row.time?.[moved.from];
+  const file = registerPath(brandRoot);
+  const entries = publishedAt ? dueEntries(jetpack.read(file), publishedAt) : null;
+  return formatDueSteps({ from: moved.from, entries, file });
+}

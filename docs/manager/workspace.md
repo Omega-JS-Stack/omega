@@ -27,7 +27,7 @@ Under `--dry-run` every operation below prints its plan line and writes nothing:
 
 ## Config and credentials
 
-No credential of its own. Only the `claude-settings` op reaches the network, through the `claude` CLI's plugin update. It reads `targets` (which dirs
+No credential of its own. Only the `claude-settings` op reaches the network, through the `claude` CLI's plugin update, and only on the full walk (never the boot lane). It reads `targets` (which dirs
 must exist), the whole of `config/omega.json5` (the `config` and `defaults` ops), and each
 target's own config for the translation check.
 
@@ -58,7 +58,7 @@ The `claude-settings` op writes the OTHER half of a brand's agent setup: which c
 
 - **The committed `.claude/settings.json`** declares `omega` from GitHub (`Omega-JS-Stack/omega`, sparse paths `.claude-plugin` and `agent-plugins/claude`, `autoUpdate: true`), sets `omega@omega` on and `omega@omega-local` off. The same for every brand, linked or live. A file in an older shape (a `node_modules` folder source) is healed.
 - **The private `.claude/settings.local.json`** declares `omega-local` at the linked monorepo's `.claude-plugin/marketplace.local.json`, sets `omega@omega-local` on and `omega@omega` off, while the brand is linked to a monorepo checkout (devkit's `resolveLinkedMonorepo`). When it does not, those keys leave the file, and a file left empty is removed. The brand `.gitignore` lists the file.
-- **The machine**, outside a dry run: with Claude Code on the machine and `omega@omega` not installed for the user, one line names the two install commands; installed but older than this OMEGA, the op runs `claude plugin marketplace update omega` and `claude plugin update omega@omega` (`src/lib/claude-machine.js`). A failing `claude` warns and the walk goes on.
+- **The machine**, on the full walk only: never on a dry run, and never on the boot lane, so `npm start` writes the two files and spawns no `claude`. The walk reads the machine once (`claude --version`, `claude plugin marketplace list --json`, `claude plugin list --json`) and acts on that read, reading again only after it moved the marketplace record. With Claude Code on the machine and `omega@omega` not installed for the user, one line names the two install commands; installed but older than this OMEGA, the op runs `claude plugin marketplace update omega` and `claude plugin update omega@omega` (`src/lib/claude-machine.js`). A failing `claude` warns and the walk goes on.
 
 Verdicts: the committed file is `created`, `healed`, `present` or `invalid`; the private file is `written`, `removed`, `present`, `absent` or `invalid`. Only the omega keys are written, every other key in either file is kept, a correct file is not rewritten, and a file that does not parse is reported, never overwritten (`src/lib/claude-settings.js`, pinned by `test/claude-settings.test.js`). `omega i local` and `omega i live` run the same writer right after the flip.
 

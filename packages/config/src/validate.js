@@ -182,9 +182,9 @@ function resolvedBrandHost(config) {
 /**
  * The repo block and the hosting key (#883).
  *
- * `repo` is `{ provider, org }` and nothing else: its PRESENCE enables the repo
- * service, and every repo name derives from `<brand.id>-<role>`, so the org is
- * the whole address. A block with no usable org is the failure this catches
+ * `repo` is `{ provider, owner }` and nothing else: its PRESENCE enables the repo
+ * service, and every repo name derives from `<brand.id>-<role>`, so the owner
+ * is the whole address. A block with no usable owner is the failure this catches
  * loudly, because every derivation would otherwise answer null and each reader
  * would skip in its own quiet way.
  *
@@ -205,9 +205,9 @@ function validateRepo(config) {
       errors.push(`config.repo.provider ${JSON.stringify(repo.provider)} is not a host OMEGA builds for: one of [${REPO_PROVIDERS.join(', ')}]`);
     }
 
-    if (typeof repo.org !== 'string' || !repo.org.trim()) {
+    if (typeof repo.owner !== 'string' || !repo.owner.trim()) {
       errors.push(
-        'config.repo.org is required when the repo block is present: it is the org every repo the brand owns lives in '
+        'config.repo.owner is required when the repo block is present: it is the GitHub owner every repo the brand owns lives under '
         + '(`<brand.id>-omega`, `<brand.id>-releases`, `<brand.id>-<web target>`), and no repo name is configurable anywhere',
       );
     }

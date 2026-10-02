@@ -17,6 +17,7 @@ const jetpack = require('fs-jetpack');
 
 const { input, checkbox, confirm } = require('@omega.js/devkit/prompt');
 const { readOrigin } = require('@omega.js/devkit/git-remote');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
 const { TARGETS, targetEntries, resolveCompany, deriveBundleIdPrefix, sourceRepo, repoDrift, getAtPath } = require('@omega.js/config');
 
 const { TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
@@ -30,7 +31,7 @@ const { npmInstall } = require('./lib/npm-install.js');
 const { DEFAULT_TARGETS, NO_TARGETS, NO_TARGETS_LINE } = require('./lib/default-targets.js');
 const { canPrompt } = require('./lib/run-gates.js');
 const { convertLegacyOAuthSecret } = require('./lib/legacy-oauth.js');
-const { runClaude, machinePluginState, ensureMachinePlugin } = require('./lib/claude-machine.js');
+const { machinePluginState, ensureMachinePlugin } = require('./lib/claude-machine.js');
 const { PLUGIN_ID } = require('./lib/claude-settings.js');
 
 // New-brand ids are a conservative subset of the schema's brand.id pattern —
@@ -186,6 +187,19 @@ function pickTargets(checked) {
 }
 
 /**
+ * Name each machine tool the picked targets miss, one line each. The pick
+ * stands: a target is added whatever this machine has.
+ *
+ * @param {Array<{ name: string, type: string, projectType?: string }>} targets - The picked targets
+ * @param {Function} [execFn] - The probe runner (execFileSync by default)
+ */
+function warnMissingTools(targets, execFn) {
+  for (const miss of missingMachineTools(targets, { execFn })) {
+    console.log(`${chalk.yellow('⚠')} ${machineToolLine(miss)}`);
+  }
+}
+
+/**
  * The admin-account list a fresh brand would inherit without writing
  * anything: the company layer's account.admins when the brand names a company
  * whose tree resolves here (#677), else the manager's built-in default.
@@ -293,7 +307,7 @@ async function collectAnswers(options, interactive, brandRoot, origin) {
     }
   }
   // The origin judged against the source repo this id derives under its owner
-  const derived = origin.slug ? { brand: { id }, repo: { org: origin.owner } } : null;
+  const derived = origin.slug ? { brand: { id }, repo: { owner: origin.owner } } : null;
   if (derived && repoDrift(origin.slug, derived)) {
     console.log(`${chalk.yellow('⚠')} ${mismatchLine(origin.repo, sourceRepo(derived).name)}`);
   }
@@ -393,8 +407,9 @@ async function collectAnswers(options, interactive, brandRoot, origin) {
   if (!targetTypes) {
     targetTypes = interactive ? await pickTargets(DEFAULT_TARGETS) : DEFAULT_TARGETS;
   }
+  warnMissingTools(targetEntriesFromTypes(targetTypes), options.execFn);
 
-  const org = await resolveOwner(options, interactive, id, origin);
+  const owner = await resolveOwner(options, interactive, id, origin);
 
   // accounts — inherit by default (null writes nothing); customizing lands
   // the brand's own account.admins
@@ -410,29 +425,29 @@ async function collectAnswers(options, interactive, brandRoot, origin) {
     email: deriveEmail(url),
     person: buildPerson({ name: contactName, image: contactImage, url: contactUrl }),
     targets: targetEntriesFromTypes(targetTypes),
-    repo: org ? { org } : null,
+    repo: owner ? { owner } : null,
     accountAdmins,
     bundleIdPrefix: bundleIdPrefixFor(company, url),
   };
 }
 
 /**
- * The GitHub owner of the brand's repos: the --org flag, else the question in
+ * The GitHub owner of the brand's repos: the --owner flag, else the question in
  * a TTY (the origin's owner as its default), else the origin's owner.
  *
  * @returns {Promise<string|null>} The owner, or null to write no `repo` block
  */
 async function resolveOwner(options, interactive, brandId, origin) {
-  if (options.org != null) {
-    if (typeof options.org !== 'string' || !options.org.trim()) {
-      throw new Error('Invalid --org: pass the GitHub owner (--org=acme)');
+  if (options.owner != null) {
+    if (typeof options.owner !== 'string' || !options.owner.trim()) {
+      throw new Error('Invalid --owner: pass the GitHub owner (--owner=acme)');
     }
-    return options.org.trim();
+    return options.owner.trim();
   }
   if (!interactive) {
     return origin.owner || null;
   }
-  return askOwner({ brandId, defaultOwner: origin.owner || null, exec: options.ghExec });
+  return askOwner({ brandId, defaultOwner: origin.owner || null, execFn: options.execFn });
 }
 
 /**
@@ -595,6 +610,7 @@ async function addTargets(brandRoot, answers, options, interactive) {
       ...Object.fromEntries(seeds),
     });
   }
+  warnMissingTools([...answers.targets, ...added], options.execFn);
 
   return added;
 }
@@ -605,16 +621,16 @@ async function addTargets(brandRoot, answers, options, interactive) {
  * a failing `claude` is the machine's problem, never the onboarding's.
  *
  * @param {boolean} interactive - A terminal can answer
- * @param {Function} exec - The `claude` runner
+ * @param {Function} [execFn] - The runner (execFileSync by default)
  * @returns {Promise<'installed'|'declined'|null>} - null when nothing was asked
  */
-async function offerClaudePlugin(interactive, exec) {
+async function offerClaudePlugin(interactive, execFn) {
   if (!interactive) {
     return null;
   }
 
   try {
-    const state = machinePluginState({ exec });
+    const state = machinePluginState({ execFn });
     if (!state.claude || state.version) {
       return null;
     }
@@ -622,7 +638,7 @@ async function offerClaudePlugin(interactive, exec) {
     if (!await confirm({ message: `Install the omega Claude plugin for this machine (${PLUGIN_ID})?`, default: true })) {
       return 'declined';
     }
-    ensureMachinePlugin({ exec });
+    ensureMachinePlugin({ execFn, machine: state });
     console.log(`${chalk.green('✓')} Claude plugin installed ${chalk.dim(`(${PLUGIN_ID}, every Claude Code session on this machine)`)}`);
     return 'installed';
   } catch (error) {
@@ -648,7 +664,7 @@ function printNextSteps(answers) {
  * Main onboard runner.
  *
  * @param {string} cwd - Where the command ran
- * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, org, company, admins, dryRun, manage, dev, claudeExec and ghExec (the `claude` and `gh` runners; tests inject them) }
+ * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, owner, company, admins, dryRun, manage, dev, execFn (the `gh`, `claude` and machine-tool runner, `(file, args, options) => stdout`; tests inject it) }
  * @returns {Object} - { brandRoot, mode, firstRun, created, kept, replaced, planned, valid, added, installed, manageExitCode, devExitCode }
  */
 async function runOnboard(cwd, options = {}) {
@@ -727,7 +743,7 @@ async function runOnboard(cwd, options = {}) {
     printNextSteps(answers);
   }
 
-  const claudePlugin = await offerClaudePlugin(interactive, options.claudeExec || runClaude);
+  const claudePlugin = await offerClaudePlugin(interactive, options.execFn);
 
   let installed = null;
   if (handover || (added.length > 0 && options.dev !== false)) {

@@ -166,7 +166,7 @@ task, so there is no separate account to configure: `WIN_RUNNER_LOGON_ACCOUNT`,
 `WIN_RUNNER_LOGON_PASSWORD` and the `set-credentials` subcommand were retired in
 [#337](https://github.com/Omega-JS-Stack/omega/issues/337).
 
-**Delivered by CI, optionally**: a brand MAY push `WIN_EV_TOKEN_PATH`, `WIN_CSC_KEY_PASSWORD` and `SIGNTOOL_PATH` as GitHub Actions secrets (`omega deploy`'s precheck sends them from its `.env`); the `windows-sign` job's env block carries them and they win over the box file. A self-hosted box normally holds all three itself, so a brand pushes none: the generated env block delivers them empty, and an empty value counts as absent.
+**Delivered by CI**: a brand on the default strategy owes `WIN_EV_TOKEN_PATH` and `WIN_CSC_KEY_PASSWORD` in its `.env`. `omega deploy`'s precheck refuses without them and pushes them as GitHub Actions secrets; the `windows-sign` job's env block carries them and they win over the box file. `SIGNTOOL_PATH` stays optional. A brand that signs on the box alone turns the installer off (`platforms.windows: false` or `formats.nsis: false`) or writes a cloud strategy.
 
 The signing strategy itself is config, not env: `platforms.windows.signing.strategy` in `config/omega.json5`, `self-hosted` by default.
 

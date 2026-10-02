@@ -12,10 +12,9 @@
  */
 
 const { ENV_SCHEMA, envSchemaEntry } = require('./env-schema.js');
-const { onUnlessOff } = require('./env-when.js');
+const { onUnlessOff, targetViews } = require('./env-when.js');
 const { PLATFORMS, FORMATS, enabledFormats, formatKeys } = require('./platforms.js');
 const { hasTargetOfType } = require('./targets.js');
-const { deepMerge } = require('./merge.js');
 
 const ENV_VERBS = ['onboard', 'status', 'manage', 'dev', 'build', 'deploy', 'publish', 'start'];
 
@@ -68,21 +67,6 @@ function readBy(entry, config, target) {
 }
 
 /**
- * What each target of a type sees: its `targets.<name>` entry over the shared
- * config, the same overlay the loader resolves. A resolved view (it carries
- * its own `type`) or a config with no such entry is taken as it is.
- * @param {object} config - A brand config, or one target's resolved view.
- * @param {string} type - The target type.
- * @returns {object[]} One view per target of that type.
- */
-function targetViews(config, type) {
-  if (config.type === type) return [config];
-
-  const entries = Object.values(config.targets || {}).filter((entry) => entry && entry.type === type);
-  return entries.length > 0 ? entries.map((entry) => deepMerge(config, entry)) : [config];
-}
-
-/**
  * Whether the config makes a key required: on the target asked about, or
  * brand-wide on the shared config or any target that reads the key.
  * @param {object} entry - The schema entry.
@@ -108,10 +92,12 @@ function isRequired(entry, config, target) {
  * @param {string} need - 'required', 'asked' or 'ship'.
  * @param {string} service - Who owes it.
  * @param {string|null} path - What requires it.
+ * @param {object} [gate] - The key's `requiredWhen`, whose `note` the text adds.
  * @returns {{ key: string, need: string, service: string, path: string|null, text: string }}
  */
-function row(key, need, service, path) {
-  return { key, need, service, path, text: path ? `${key} (required by ${path})` : key };
+function row(key, need, service, path, gate) {
+  const note = gate && gate.note ? `, ${gate.note}` : '';
+  return { key, need, service, path, text: path ? `${key} (required by ${path})${note}` : key };
 }
 
 /**
@@ -160,7 +146,7 @@ function shipRows(config, env, target, need) {
       return readBy(entry, config, target) && !hasValue(env, entry);
     })
     .map(({ key, path, label }) => (need === 'ship'
-      ? { ...row(key, need, SHIP_SERVICE, path), label }
+      ? { ...row(key, need, SHIP_SERVICE, path, envSchemaEntry(key).requiredWhen), label }
       : row(key, need, SHIP_SERVICE, null)));
 }
 
@@ -197,7 +183,7 @@ function missingEnvKeys(config, env, { target, verb } = {}) {
 
     if (need === 'required') {
       if (readBy(entry, brand, target) && isRequired(entry, brand, target)) {
-        rows.push(row(entry.name, need, entry.owner, entry.requiredWhen ? entry.requiredWhen.text : null));
+        rows.push(row(entry.name, need, entry.owner, entry.requiredWhen ? entry.requiredWhen.text : null, entry.requiredWhen));
       }
       continue;
     }
@@ -215,6 +201,17 @@ function missingEnvKeys(config, env, { target, verb } = {}) {
 }
 
 /**
+ * What every brand owes a verb, whatever its config. An empty config makes no
+ * key mandatory, so its answer is exactly the keys no config can switch off.
+ * @param {object} env - Env var map.
+ * @param {{ verb: string, target?: string }} options - As missingEnvKeys.
+ * @returns {object[]} Rows.
+ */
+function baseMissingKeys(env, { target, verb } = {}) {
+  return missingEnvKeys({}, env, { target, verb });
+}
+
+/**
  * What THIS config makes a verb owe beyond what every brand owes: the rows an
  * empty config would not return. For the lanes that report what the config
  * added, where the keys every brand owes are another lane's to name.
@@ -224,7 +221,7 @@ function missingEnvKeys(config, env, { target, verb } = {}) {
  * @returns {object[]} Rows.
  */
 function missingConfigKeys(config, env, options) {
-  const owedByAll = new Set(missingEnvKeys({}, env, options).map((entry) => entry.key));
+  const owedByAll = new Set(baseMissingKeys(env, options).map((entry) => entry.key));
   return missingEnvKeys(config, env, options).filter((entry) => !owedByAll.has(entry.key));
 }
 
@@ -241,4 +238,4 @@ function serviceAskedKeys(config, service) {
     .map((entry) => entry.key));
 }
 
-module.exports = { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, missingConfigKeys, serviceAskedKeys };
+module.exports = { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, baseMissingKeys, missingConfigKeys, serviceAskedKeys };

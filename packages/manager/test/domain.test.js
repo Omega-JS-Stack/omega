@@ -8,11 +8,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const { stripVTControlCharacters } = require('node:util');
+const JSON5 = require('json5');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/domain/index.js');
 const { NamecheapAPI, API_ACCESS_URL, isWhitelistError } = require('../src/services/domain/lib/namecheap-api.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.CLOUDFLARE_TOKEN;
@@ -25,6 +28,7 @@ const CF_NS = ['rita.ns.cloudflare.com', 'abe.ns.cloudflare.com'];
 const CF_NS_SORTED = [...CF_NS].sort();
 // The caller IP Namecheap refuses until it is whitelisted (TEST-NET-3)
 const CLIENT_IP = '203.0.113.7';
+const DOWN = '\x1B[B'; // arrow-down escape for select() answers
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -107,13 +111,13 @@ async function captureLogAsync(fn) {
   } finally {
     console.log = original;
   }
-  return lines.join('\n');
+  return stripVTControlCharacters(lines.join('\n'));
 }
 
-function runService(config, { cloudflare, namecheap, options = {} } = {}) {
+function runService(config, { cloudflare, namecheap, options = {}, brandRoot } = {}) {
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-domain-unused', // no handler touches disk
+    brandRoot: brandRoot || '/tmp/omega-manager-domain-unused', // the registrar ask writes config/omega.json5 when given a real root
     brandConfig: config,
     brand: { id: 'fixture-brand', config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
     targets: [],
@@ -127,10 +131,79 @@ function runService(config, { cloudflare, namecheap, options = {} } = {}) {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('domain: skips without a domain.providers registrar', async () => {
-  const result = await runService(brandConfig({ provider: null }));
+test('domain: headless with no registrar picked skips, printing the line that names domain.providers', async () => {
+  let result;
+  const printed = await captureLogAsync(async () => {
+    result = await runService(brandConfig({ provider: null }));
+  });
+
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /domain\.providers/);
+  assert.ok(
+    printed.includes('→ Set domain.providers in config/omega.json5, or run manage in a terminal to answer'),
+    `headless line missing from: ${printed}`,
+  );
+});
+
+// ─── The registrar ask ───────────────────────────────────────────────────────
+
+const REGISTRAR_ASK_CONFIG = `{
+  // Fixture Brand: the registrar pick lands here
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://${DOMAIN}' },
+}
+`;
+
+/** Run fn with the registrar's credentials in the env, so the ask is the only gate. */
+async function withRegistrarCredentials(fn) {
+  process.env.CLOUDFLARE_TOKEN = 'fixture-cf-token';
+  process.env.NAMECHEAP_USERNAME = 'fixture-user';
+  process.env.NAMECHEAP_API_KEY = 'fixture-key';
+  try {
+    return await fn();
+  } finally {
+    delete process.env.CLOUDFLARE_TOKEN;
+    delete process.env.NAMECHEAP_USERNAME;
+    delete process.env.NAMECHEAP_API_KEY;
+  }
+}
+
+test('domain: no registrar picked, in a terminal, the owner picks namecheap: it lands and the service goes on with it', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  const namecheap = fakeNamecheap({ current: ['dns1.registrar-servers.com'] });
+  const brandRoot = makeBrandRoot(REGISTRAR_ASK_CONFIG);
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await withRegistrarCredentials(async () => {
+      const run = runService(brandConfig({ provider: null }), { cloudflare: fakeCloudflare(zone), namecheap, brandRoot });
+      await tty.answer('Set up now?', '\r'); // Yes
+      // The select lists the registry's registrars; typing jumps to the match
+      await tty.answer('namecheap', 'namecheap\r');
+      return run;
+    });
+
+    assert.deepEqual(JSON5.parse(readConfigSource(brandRoot)).domain.providers, { namecheap: {} });
+    assert.equal(result.status, 'success', 'the walk went on with the registrar it just landed');
+    assert.deepEqual(namecheap.mutations()[0].nameservers, CF_NS_SORTED);
+  } finally {
+    tty.close();
+  }
+});
+
+test('domain: Disable at the registrar ask lands domain.enabled: false and skips', async () => {
+  const brandRoot = makeBrandRoot(REGISTRAR_ASK_CONFIG);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ provider: null }), { brandRoot });
+    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
+    const result = await run;
+
+    assert.equal(JSON5.parse(readConfigSource(brandRoot)).domain.enabled, false);
+    assert.equal(result.status, 'skipped');
+  } finally {
+    tty.close();
+  }
 });
 
 test('domain: domain.enabled = false skips the service', async () => {

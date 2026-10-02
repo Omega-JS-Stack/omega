@@ -13,15 +13,17 @@
  * verbs read — FIREBASE_ONLY_SCAFFOLD and FIREBASE_ONLY_SETUP_CHECKS are the one home of
  * that list ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)) — and
  * the package SCRIPTS that run them, CUSTOM_OWNED_SCRIPTS, derived from the
- * verbs.
+ * verbs. A Firebase verb that runs a machine tool (java, the firebase CLI)
+ * refuses through refuseWhenToolsMissing when the tool is absent.
  * Everything else — the routes, the schemas, the auth middleware, every
  * helper, and the rest of setup — is identical in both modes, which is the
  * whole point of the mode.
  */
 const chalk = require('chalk').default;
 
-const { hasOmegaConfig, loadConfig, backendProjectType } = require('@omega.js/config');
+const { hasOmegaConfig, loadConfig, backendProjectType, targetNameFromDir } = require('@omega.js/config');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
 
 // The framework's own manifest: its `projectScripts` are the target scripts the
 // verb table cannot derive.
@@ -60,10 +62,10 @@ const CUSTOM_OWNED_SCRIPTS = Object.entries(projectScripts(frameworkPackage))
 // removed: an existing custom project keeps whatever it authored.
 const FIREBASE_ONLY_SCAFFOLD = ['firebase.json', 'firestore.rules', 'database.rules.json'];
 
-// The setup CHECKS that exist only for those artifacts — every check that
-// reads or writes firebase.json, plus the ones that seed the rules and index
-// files. Module names under src/cli/commands/setup-tests/, which is where the
-// registry resolves them.
+// The setup CHECKS that exist only for that lane: every firebase.json check,
+// the rules and index seeds, and the machine tools the emulators and the
+// Functions deploy run on. Module names under src/cli/commands/setup-tests/,
+// which is where the registry resolves them.
 const FIREBASE_ONLY_SETUP_CHECKS = [
   'is-firebase-project',
   'firestore-rules-in-json',
@@ -80,6 +82,8 @@ const FIREBASE_ONLY_SETUP_CHECKS = [
   'firestore-indexes-synced',
   'realtime-rules-file',
   'storage-rules-file',
+  'java-installed',
+  'firebase-cli',
 ];
 
 /**
@@ -151,4 +155,34 @@ function refuseWhenCustom(targetRoot, verb) {
   return true;
 }
 
-module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, frameworkOwnedScripts, verbOfCommand, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS, CUSTOM_OWNED_SCRIPTS };
+/**
+ * The machine tools the backend target at `targetRoot` misses, from devkit's
+ * one list: a custom backend needs none.
+ *
+ * @param {string} targetRoot - The backend target root.
+ * @returns {Array<object>} The missingMachineTools rows.
+ */
+function missingBackendTools(targetRoot) {
+  return missingMachineTools([{ name: targetNameFromDir(targetRoot) || 'backend', type: 'backend', projectType: resolveProjectType(targetRoot) }]);
+}
+
+/**
+ * The gate a verb that cannot run without a machine tool opens with: each
+ * missing one of `names` prints its line, the process fails, and it returns
+ * true; the caller returns at once.
+ *
+ * @param {string} targetRoot - The backend target root.
+ * @param {string} verb - The verb being refused.
+ * @param {string[]} names - The tools this verb runs.
+ * @returns {boolean} True when the caller must stop.
+ */
+function refuseWhenToolsMissing(targetRoot, verb, names) {
+  const misses = missingBackendTools(targetRoot).filter((miss) => names.includes(miss.name));
+  if (misses.length === 0) return false;
+
+  misses.forEach((miss) => console.log(chalk.yellow(`\n⊘ omega ${verb}: ${machineToolLine(miss)}`)));
+  process.exitCode = 1;
+  return true;
+}
+
+module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, missingBackendTools, refuseWhenToolsMissing, frameworkOwnedScripts, verbOfCommand, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS, CUSTOM_OWNED_SCRIPTS };

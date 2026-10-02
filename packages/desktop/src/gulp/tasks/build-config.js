@@ -79,7 +79,7 @@ module.exports = function buildConfig(done) {
       builderConfig.publish = publish;
       logger.log(`releases → publish block: github ${publish.owner}/${publish.repo}`);
     } else if (config.releases?.enabled !== false) {
-      logger.warn('Could not address the releases repo (set repo.org and brand.id); leaving publish block off.');
+      logger.warn('Could not address the releases repo (set repo.owner and brand.id); leaving publish block off.');
     }
 
     // Inject the two notarize hooks (the .app, then each .dmg).
@@ -220,7 +220,7 @@ function baseConfig(config, extras = {}) {
   const haveSnapCreds = !!process.env.SNAPCRAFT_STORE_CREDENTIALS;
   const snapEnabled = snapConfigEnabled && haveSnapCreds;
   if (snapConfigEnabled && !haveSnapCreds) {
-    logger.log('This build ships the snap (platforms.linux.formats.snap, on unless dropped with `false`) but SNAPCRAFT_STORE_CREDENTIALS is not set, skipping the snap target. Run `npx omega manage` (it asks) or `snapcraft export-login -` and add the blob to .env.');
+    logger.log('This local build skips the snap target: SNAPCRAFT_STORE_CREDENTIALS is not set (platforms.linux.formats.snap is on by default, so a publish refuses without it). Run `npx omega manage` (it asks) or `snapcraft export-login -` and add the blob to .env, or set platforms.linux.formats.snap to `false`.');
   }
 
   const { entitlementsPath, icons, distRoot, projectRoot } = extras;
@@ -475,7 +475,7 @@ function assertArchRules(arch, options) {
 
 // The electron-builder `publish` block: the brand's ONE public releases repo,
 // resolved by @omega.js/config's releasesRepo (`<brand.id>-releases` under the
-// brand's org, #883: never a typed name). Config-only on purpose:
+// brand's owner, #883: never a typed name). Config-only on purpose:
 // this address is baked into app-update.yml and polled by every installed copy
 // forever, and a brand-monorepo app's git remote is the repo it is NESTED in
 // (the playground inside the framework monorepo), which would bake a feed that

@@ -9,7 +9,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { JourneyRun, scrubCredentialEnv, latestRunFile, discoverBrandTargets } = require('../src/test/journey-harness.js');
+const {
+  JourneyRun, scrubCredentialEnv, CLI_CONFIG_HOMES, latestRunFile, discoverBrandTargets,
+} = require('../src/test/journey-harness.js');
+const { machineToolLine } = require('../src/machine-tools.js');
+
+const CONFIG_HOME_VARS = ['GH_CONFIG_DIR', 'XDG_CONFIG_HOME', 'CLOUDSDK_CONFIG'];
 
 /** A run bound to a throwaway log dir — no brand, no children, just the recorder. */
 function runInTempLogDir() {
@@ -23,7 +28,7 @@ function runInTempLogDir() {
   return { run, logDir, read: () => fs.readFileSync(path.join(logDir, 'steps.log'), 'utf8') };
 }
 
-test('scrubCredentialEnv drops credential-shaped vars, keeps operating env', () => {
+test('scrubCredentialEnv with no home root drops credential-shaped vars, keeps operating env, adds no CLI config home', () => {
   const scrubbed = scrubCredentialEnv({
     PATH: '/usr/bin',
     HOME: '/Users/someone',
@@ -50,6 +55,46 @@ test('scrubCredentialEnv drops credential-shaped vars, keeps operating env', () 
     'HOME', 'NODE_ENV', 'OMEGA_MONOREPO', 'OMEGA_NON_INTERACTIVE', 'PATH', 'npm_config_cache',
   ]);
   assert.equal(scrubbed.PATH, '/usr/bin');
+  for (const key of CONFIG_HOME_VARS) assert.equal(key in scrubbed, false, key);
+});
+
+test('scrubCredentialEnv with a home root points every CLI at its throwaway config home', () => {
+  const homeRoot = path.join(path.sep, 'tmp', 'x');
+  const scrubbed = scrubCredentialEnv({ PATH: '/usr/bin', GH_TOKEN: 'x' }, homeRoot);
+
+  assert.equal(scrubbed.GH_CONFIG_DIR, path.join(homeRoot, 'gh'));
+  assert.equal(scrubbed.XDG_CONFIG_HOME, path.join(homeRoot, 'xdg'));
+  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(homeRoot, 'gcloud'));
+  assert.equal('GH_TOKEN' in scrubbed, false);
+  assert.equal(scrubbed.PATH, '/usr/bin');
+});
+
+test('scrubCredentialEnv replaces an incoming CLOUDSDK_CONFIG with the throwaway one', () => {
+  const homeRoot = path.join(path.sep, 'tmp', 'x');
+  const scrubbed = scrubCredentialEnv({ CLOUDSDK_CONFIG: '/Users/someone/.config/gcloud' }, homeRoot);
+
+  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(homeRoot, 'gcloud'));
+});
+
+test('CLI_CONFIG_HOMES lists gh, firebase-tools and gcloud', () => {
+  assert.deepEqual(CLI_CONFIG_HOMES.map((home) => home.cli), ['gh', 'firebase-tools', 'gcloud']);
+});
+
+test('childEnv puts the CLI config homes under the run temp root only when scrubbed', () => {
+  const { run, logDir } = runInTempLogDir();
+  // runJourney sets the temp root at clone time; a unit run supplies its own
+  run.tempRoot = logDir;
+
+  const scrubbed = run.childEnv({}, { scrub: true });
+  assert.equal(scrubbed.GH_CONFIG_DIR, path.join(logDir, 'gh'));
+  assert.equal(scrubbed.XDG_CONFIG_HOME, path.join(logDir, 'xdg'));
+  assert.equal(scrubbed.CLOUDSDK_CONFIG, path.join(logDir, 'gcloud'));
+
+  // Unscrubbed keeps the machine env as it is: nothing redirected under the temp root
+  const plain = run.childEnv();
+  for (const key of CONFIG_HOME_VARS) assert.equal(plain[key], process.env[key], key);
+
+  fs.rmSync(logDir, { recursive: true, force: true });
 });
 
 test('latestRunFile picks the newest .omega/runs entry; null without one', () => {
@@ -109,10 +154,15 @@ test('every journey step writes its verdict to steps.log as it lands', async () 
 
 test('a journey abort outside the steps is recorded as a preflight failure', () => {
   const { run, read, logDir } = runInTempLogDir();
+  // The harness names a missing machine tool with the helper's one line
+  const javaLine = machineToolLine({
+    target: 'backend', type: 'backend', name: 'java', why: 'the Firebase emulators run on it', install: 'brew install openjdk',
+  });
 
-  run.stepsLog.abort('preconditions unmet: java is not installed');
+  run.stepsLog.abort(`preconditions unmet: ${javaLine}`);
 
-  assert.match(read(), /^FAIL {2}preflight — preconditions unmet: java is not installed$/m);
+  const verdict = read().split('\n').find((line) => line.startsWith('FAIL  preflight '));
+  assert.ok(verdict && verdict.endsWith(` preconditions unmet: ${javaLine}`), read());
 
   fs.rmSync(logDir, { recursive: true, force: true });
 });

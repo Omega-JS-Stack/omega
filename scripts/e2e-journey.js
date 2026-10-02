@@ -21,17 +21,17 @@ const MONOREPO_ROOT = path.join(__dirname, '..');
 
 // The full consumer shape: every framework target, classy defaults. The .invalid
 // URL (RFC 2606) keeps the live probe off anyone's real domain. No service may error
-// on a virgin brand but the allowed set: `publishing` refuses a declared store format
-// whose keys a headless run cannot collect, and `repo` (below).
+// on a virgin brand but `publishing`, which refuses a declared store format whose keys
+// a headless run cannot collect.
 const SPEC = {
   id: 'journey-brand',
   origin: 'https://github.com/journey-org/journey-brand-omega.git',
   url: 'https://journey-brand.invalid',
   targets: ['web', 'backend', 'desktop', 'extension'],
   expect: { brandName: 'Journey Brand', themeId: 'classy' },
-  // The runtime legs run gh signed out on purpose, and the repo service
-  // reports a signed-out gh as an error today (to become a skip, like a missing key).
-  allowedServiceErrors: ['publishing', 'repo'],
+  // The runtime legs run gh signed out on purpose: the headless walk skips the
+  // repo service for it, like a missing key.
+  allowedServiceErrors: ['publishing'],
 };
 
 async function main() {

@@ -11,10 +11,12 @@
  * verifying.
  */
 const chalk = require('chalk').default;
+const { chosenProvider } = require('@omega.js/config');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
+const { resolveConfigValue } = require('../../../lib/config-flow.js');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
-const { DOMAIN_PROVIDERS, resolveEmailProvider } = require('../../domain/lib/providers.js');
+const { DOMAIN_PROVIDERS, presencePick, resolveEmailProvider } = require('../../domain/lib/providers.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function isUnverifiedError(error) {
@@ -85,8 +87,40 @@ async function handleUnverified(api, zoneId, destination, retryWrite, options = 
   return false;
 }
 
+/**
+ * Ask for the mailbox provider when none is picked, then, for one that
+ * routes mail, the first forwarding rule when the list is empty. Each
+ * Disable lands `false` at its own key, which every reader takes as none.
+ */
+async function askEmailSettings(context) {
+  await resolveConfigValue(context, {
+    path: 'domain.email.providers',
+    label: 'Email provider',
+    instructions: ["The mailbox provider the domain's MX and SPF records point at."],
+    present: (providers) => providers === false || chosenProvider(providers) !== null,
+    ...presencePick('mailbox'),
+  });
+
+  if (!DOMAIN_PROVIDERS.mailbox[resolveEmailProvider(context.brandConfig)]?.routing) {
+    return;
+  }
+
+  await resolveConfigValue(context, {
+    path: 'domain.email.forwarding',
+    label: 'Email forwarding',
+    instructions: ['One address on the domain (or * for all of them) and the inbox it forwards to.'],
+    present: (rules) => rules === false || rules.length > 0,
+    entry: [
+      { message: 'Address to forward (support, or * for all):', validate: (val) => (/^(\*|[^@\s]+)$/.test(val.trim()) ? true : 'A name before the @, or *') },
+      { message: 'Inbox it forwards to:', validate: (val) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val.trim()) ? true : 'An email address') },
+    ],
+    getValue: ([from, to]) => [{ from, to }],
+  });
+}
+
 module.exports = async function ensureEmailRouting(context) {
   const { cloudflareApi: api, brandRoot, domain, brandConfig, options = {} } = context;
+  await askEmailSettings(context);
   const zoneId = getZoneId(context);
   const gated = zoneGate(context, 'emailRouting');
   if (gated) return gated;

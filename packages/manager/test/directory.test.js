@@ -32,7 +32,7 @@ function brandConfig({ directory = { enabled: true }, company = COMPANY, sponsor
   const config = {
     brand: structuredClone(BRAND),
     cloud: { config: { projectId } },
-    repo: { provider: 'github', org: 'fixture-org' },
+    repo: { provider: 'github', owner: 'fixture-org' },
     targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     // Never publishable — the entry carries identity + declared blocks only
     payment: { products: [{ id: 'premium' }] },
@@ -272,9 +272,9 @@ test('directory: an empty sponsorships block is not a declared block', async () 
 
 test('directory: the repo slug comes from the shared derivation, not a local one', async () => {
   const config = brandConfig();
-  // The org is the only half configured: the name is `<brand.id>-omega`, the
+  // The owner is the only half configured: the name is `<brand.id>-omega`, the
   // SOURCE role's derivation (#883), never a value the entry re-invents.
-  config.repo.org = 'Renamed-Org';
+  config.repo.owner = 'Renamed-Org';
   const db = fakeDb({ getDoc: null, patchDoc: {} });
 
   await runService(config, { db });
@@ -288,7 +288,7 @@ test('directory: the repo slug comes from the shared derivation, not a local one
 
 test('directory: an unresolvable repo is omitted rather than pushed half-formed', async () => {
   const config = brandConfig();
-  delete config.repo; // no org means no address at all
+  delete config.repo; // no owner means no address at all
   const db = fakeDb({ getDoc: null, patchDoc: {} });
 
   await runService(config, { db });

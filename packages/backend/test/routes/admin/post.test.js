@@ -2,7 +2,7 @@
  * Test: PUT /admin/post
  * Tests the admin edit post endpoint
  * Edits blog post content in a GitHub repository
- * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
+ * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.owner + brand.id -> <brand.id>-omega)
  *
  * This is a suite because we need to:
  * 1. Create a test post file via Octokit
@@ -120,7 +120,7 @@ module.exports = defineCases({
         const { sourceRepo } = require('../../helpers/_shared-config.js');
         const source = sourceRepo(config);
         if (!source) {
-          assert.fail('source repo not resolvable (set repo.org + brand.id)');
+          assert.fail('source repo not resolvable (set repo.owner + brand.id)');
           return;
         }
 

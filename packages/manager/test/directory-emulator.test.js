@@ -114,7 +114,7 @@ function brandConfig(guestPostPrice) {
     company: { id: COMPANY_ID },
     directory: { enabled: true },
     cloud: { config: { projectId: 'emulator-brand-prod' } },
-    repo: { provider: 'github', org: 'emulator-org' },
+    repo: { provider: 'github', owner: 'emulator-org' },
     sponsorships: {
       acceptable: ['tech'],
       unacceptable: ['gambling'],

@@ -121,12 +121,12 @@ function renderOmegaConfig(answers) {
   }
 
   // The GitHub owner the wizard settled on. Unanswered writes nothing: the
-  // repo service skips until `repo.org` is set by hand.
+  // repo service skips until `repo.owner` is set by hand.
   if (answers.repo) {
     lines.push(
       '  // Where the brand\'s repos live: <brand.id>-omega and the rest, under this',
       '  // GitHub owner (an org or a user).',
-      `  repo: { org: ${JSON.stringify(answers.repo.org)} },`,
+      `  repo: { owner: ${JSON.stringify(answers.repo.owner)} },`,
       '',
     );
   }

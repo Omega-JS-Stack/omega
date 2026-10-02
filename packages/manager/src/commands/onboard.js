@@ -3,7 +3,7 @@
  *
  * Flags pre-answer the wizard: --id/--name/--url/--description/--tagline,
  * --contactName (plus --contactImage/--contactUrl), --targets=web,backend (or
- * `none`), --org=<GitHub owner>, --company=<company brand id>,
+ * `none`), --owner=<GitHub owner>, --company=<company brand id>,
  * --admins=a@x.com,b@x.com. Prompts fill the gaps in a TTY; without one
  * the rest derives. --dry-run prints the file plan without writing or
  * prompting; --manage/--no-manage forces the manage handoff, and --no-dev
@@ -22,7 +22,7 @@ module.exports = async (options) => {
     contactImage: options.contactImage,
     contactUrl: options.contactUrl,
     targets: options.targets,
-    org: options.org,
+    owner: options.owner,
     company: options.company,
     admins: options.admins,
     dryRun: options.dryRun,

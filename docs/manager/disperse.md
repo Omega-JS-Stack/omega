@@ -17,6 +17,11 @@ it moves nothing at all:
   `config/certs/` meant two homes for one fact, and the dispersed duplicate is what a build could
   silently sign with after the tree had moved on. The whole delivery layer went with the
   operation: devkit's `deliverCerts()`, its rule table, and desktop's `deliver-certs.js`.
+- **`products`** dissolved into the hierarchy too: every target reads `payment.products[]` in
+  `config/omega.json5` directly, so no target config gets a copy of the catalog.
+- **`pricing-md`** is gone: no `pricing.md` is edited, pricing renders from that catalog.
+- **`cdn`** is gone: no CDN repo is fed. The derived asset set stays in `.omega/assets/`, and a
+  CDN is a sibling web target ([the register's omega-manager rows](../shared/breaking-changes.md#omega-manager--omegajsmanager)).
 
 ## Why it is still here
 

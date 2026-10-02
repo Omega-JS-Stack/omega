@@ -202,7 +202,7 @@ function write(filePath, content) {
  * Stage a brand monorepo with a web target and a backend target (LISTED so the
  * web dir sorts before backend, proving the order comes from
  * TARGET_ORDER, not the directory listing), plus fake framework packages. The
- * config names a repo org, because a snapshot-lane run derives its push
+ * config names a repo owner, because a snapshot-lane run derives its push
  * address from it (#901).
  *
  * @param {string[]} [extra] - Further target types to stage ('desktop', …), the
@@ -219,7 +219,7 @@ function stageBrand(extra = []) {
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  repo: { provider: 'github', org: 'Fixture-Org' },
+  repo: { provider: 'github', owner: 'Fixture-Org' },
   targets: { ${types.map((type) => `${type}: { type: '${type}' }`).join(', ')} },
 }
 `);
@@ -539,7 +539,7 @@ test('the snapshot address composes the PRODUCTION config, never the machine\'s 
   // environment (a terminal answers `development`) would push it to a repo the
   // targets never dispatch against.
   write(path.join(brand, 'config', 'omega.production.json5'), `{
-  repo: { provider: 'github', org: 'Prod-Org' },
+  repo: { provider: 'github', owner: 'Prod-Org' },
 }
 `);
 

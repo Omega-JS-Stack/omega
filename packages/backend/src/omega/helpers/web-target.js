@@ -79,7 +79,7 @@ function cmsContext(config, requested) {
 
   if (!source) {
     throw Object.assign(
-      new Error('GitHub repo not configured (set repo.org and brand.id in config/omega.json5: the content repo is <brand.id>-omega under that org).'),
+      new Error('GitHub repo not configured (set repo.owner and brand.id in config/omega.json5: the content repo is <brand.id>-omega under that owner).'),
       { code: 500 },
     );
   }

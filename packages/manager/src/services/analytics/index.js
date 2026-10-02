@@ -98,7 +98,7 @@ module.exports.run = createServiceRunner({
     // Decide whether the google operations can run this pass
     let operations = context.operations;
     if (!google.propertyId) {
-      console.log(chalk.dim('    ⊘ google operations skipped — no analytics.providers.google.propertyId (rerun interactively to select/create the property)'));
+      console.log(chalk.dim('    ⊘ google operations skipped: no analytics.providers.google.propertyId'));
       operations = operations.filter((op) => !GOOGLE_OPERATIONS.has(op.name));
     } else if (!haveGoogleAuth) {
       if (!havePixelWork) {

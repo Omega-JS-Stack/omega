@@ -28,7 +28,7 @@
  *      schema drops them from the delivered set itself.
  *   3. GUARD — secrets belong to the repo whose Actions run the workflow, and
  *      the only acceptable proof of which repo that is, is the brand's own
- *      config (`repo.org`, the SOURCE repo). An inferred git remote is not proof: a
+ *      config (`repo.owner`, the SOURCE repo). An inferred git remote is not proof: a
  *      target vendored into a framework/test monorepo, a cloned starter still
  *      pointing at the template author, or any fork would publish this brand's
  *      `.env` to a stranger's Actions. A checkout that could be the brand's own
@@ -39,8 +39,8 @@
  *      `gh` boundary (values on stdin, never logged).
  *
  * Every skip is LOUD (a line, never silence). A missing/signed-out `gh` is NOT
- * a skip — it throws the boundary's instructions (install, `gh auth login`, or
- * `omega deploy --no-secrets`).
+ * a skip: the publish throws the boundary's state line (install gh, or sign
+ * it in) plus the `omega deploy --no-secrets` opt-out.
  *
  * A key the SCHEMA says this target's config requires (`required` /
  * `requiredWhen`, @omega.js/config's missingEnvKeys) and the cascade resolves EMPTY
@@ -286,7 +286,7 @@ function publishTargetSecrets(options) {
   const config = productionConfig({ targetDir, target });
   const source = config ? sourceRepo(config) : null;
   if (!source) {
-    logger.warn('Skipping secret publication: this brand names no GitHub repo in config (repo.org). Set it, then re-run `omega deploy`.');
+    logger.warn('Skipping secret publication: this brand names no GitHub repo in config (repo.owner). Set it, then re-run `omega deploy`.');
     return { skipped: 'no-declared-repo' };
   }
 

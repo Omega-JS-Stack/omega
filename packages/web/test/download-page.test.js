@@ -25,7 +25,7 @@ const RELEASES = 'https://github.com/mini-org/mini-releases/releases/latest';
 const DL = (asset) => `${RELEASES}/download/MiniCo-${asset}`;
 const withDownloads = {
   ...miniData,
-  repo: { provider: 'github', org: 'mini-org' },
+  repo: { provider: 'github', owner: 'mini-org' },
   targets: { web: { type: 'web' }, desktop: { type: 'desktop', releases: {} } },
 };
 

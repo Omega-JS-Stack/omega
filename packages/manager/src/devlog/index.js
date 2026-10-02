@@ -21,8 +21,7 @@ const jetpack = require('fs-jetpack');
 const { loadEnvRoots, chosenProvider, resolveCompany } = require('@omega.js/config');
 
 const { resolveBrandRoot, loadBrand } = require('../lib/brand.js');
-const { gh } = require('@omega.js/devkit/github-repo');
-const { verifyGhCli } = require('../services/repo/lib/github.js');
+const { gh, assertGhReady } = require('@omega.js/devkit/github-repo');
 const { collectCommits } = require('./lib/collect-commits.js');
 const { buildProjectMap, buildBrandRepos } = require('./lib/project-map.js');
 const { generatePost } = require('./lib/generate-post.js');
@@ -109,11 +108,11 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   const brandRepos = buildBrandRepos(brands, { excludeRepos: settings.excludeRepos });
 
   // 2. Collect commits from GitHub. The listings are plain `gh api` reads, so
-  //    they ride devkit's ONE gh wrapper (#883) behind the same verify the
-  //    walk does, which names a missing or unauthenticated CLI up front.
+  //    they ride devkit's ONE gh wrapper behind the same check the walk
+  //    makes, which names a missing or signed-out CLI up front.
   let api = deps.githubApi;
   if (!api) {
-    verifyGhCli();
+    assertGhReady();
     api = { runCommand: (args) => gh(args) };
   }
   const { commits, repos } = collectCommits({

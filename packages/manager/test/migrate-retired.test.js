@@ -5,9 +5,13 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const JSON5 = require('json5');
 
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('../src/migrate/retired-keys.js');
 const { RETIRED_ENV_KEYS, findRetiredEnvKeys } = require('../src/migrate/retired-env.js');
+const { stageBrand, runMigrate } = require('./lib/migrate-harness.js');
 
 const VALID = { brand: { id: 'sandbox-brand', name: 'Sandbox Brand' } };
 
@@ -239,12 +243,12 @@ test('#883: every retired repo key names what replaced it', () => {
   };
 
   const rows = {
-    'repo.providers.github.org': 'repo.org',
+    'repo.providers.github.org': 'repo.owner',
     'repo.providers.github.repo': '<brand.id>-omega',
     'repo.providers.github.private': 'package.json `private` field',
     'repo.providers.github.shared': 'org profile',
     'repo.providers.github.enabled': 'presence of the `repo` block',
-    'github.user': 'repo.org',
+    'github.user': 'repo.owner',
     'github.website': '<brand.id>-<target name>',
     'targets.api.github.repo': '<brand.id>-<role>',
     'targets.desktop.releases.owner': '<brand.id>-releases',
@@ -254,6 +258,30 @@ test('#883: every retired repo key names what replaced it', () => {
   for (const [path, replacement] of Object.entries(rows)) {
     assert.ok(fired(config, path, replacement), `${path} must name ${replacement}: ${lines(config).join(' | ')}`);
   }
+});
+
+test('repo.org names repo.owner, and CONVERTS with the value as it is', () => {
+  const config = { ...VALID, repo: { provider: 'github', org: 'Acme' } };
+  const finding = findRetiredKeys(config).find((entry) => entry.path === 'repo.org');
+
+  assert.ok(fired(config, 'repo.org', 'repo.owner'), lines(config).join(' | '));
+  assert.equal(finding.convert('Acme'), 'Acme', 'the owner moves as it is');
+
+  // The live spelling is clean
+  assert.deepStrictEqual(findRetiredKeys({ ...VALID, repo: { provider: 'github', owner: 'Acme' } }), []);
+});
+
+test('migrate --execute: repo.org is CONVERTED to repo.owner, and no org is left', async () => {
+  const brand = stageBrand(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  repo: { provider: 'github', org: 'Acme' },
+  targets: { web: { type: 'web' } },
+}
+`);
+  const { text } = await runMigrate(brand, { execute: true });
+
+  const parsed = JSON5.parse(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'));
+  assert.deepEqual(parsed.repo, { provider: 'github', owner: 'Acme' }, `the owner moved, and org is gone: ${text}`);
 });
 
 test('#647: product limits and rateLimit name the features catalog, at their real array path', () => {

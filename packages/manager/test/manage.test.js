@@ -20,6 +20,23 @@ const { resolveBrandRoot, loadBrand, discoverTargets } = require('../src/lib/bra
 const { runManage } = require('../src/manage.js');
 const { CONSENT_REQUIRED } = require('../src/lib/google-auth.js');
 const { SERVICE_ORDER, BOOT_SERVICES } = require('../src/config.js');
+const { createMachine } = require('./lib/fake-claude.js');
+const { toolProbe } = require('./lib/tool-probe.js');
+
+const { before, after } = test;
+
+// The workspace op reaches for `claude`. File-wide that is a fake machine that
+// already has the plugin, so no walk below spawns the real one or touches ~/.claude.
+const MANAGER_VERSION = require('../package.json').version;
+let restoreClaude;
+before(() => {
+  restoreClaude = createMachine({
+    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+    installed: { 'omega@omega': MANAGER_VERSION },
+    published: MANAGER_VERSION,
+  }).activate();
+});
+after(() => restoreClaude());
 
 // Fixture brands must never reach a real Cloudflare/Namecheap/Google account
 // via shell-exported credentials — those services must skip in every e2e run
@@ -290,7 +307,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(report.results.workspace.status, 'success');
   // No repo block configured (its presence is the switch, #883) → clean skip
   assert.equal(report.results.repo.status, 'skipped');
-  assert.match(report.results.repo.reason, /repo\.org/);
+  assert.match(report.results.repo.reason, /repo\.owner/);
   // No CLOUDFLARE_TOKEN in the environment → clean skip
   assert.equal(report.results.edge.status, 'skipped');
   assert.match(report.results.edge.reason, /CLOUDFLARE_TOKEN/);
@@ -530,6 +547,17 @@ test('runManage: unloadable brand config fails the workspace service and stops t
   assert.equal(report.results.testing, undefined);
 });
 
+test('runManage: a target with no type walks to the workspace report instead of throwing', async () => {
+  const root = stageBrand({
+    config: `{ brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: {} } }`,
+  });
+
+  const report = await runManage(root, { execFn: toolProbe() });
+
+  assert.equal(report.results.workspace.status, 'error');
+  assert.match(report.results.workspace.error, /targets\.web must declare a type/);
+});
+
 test('runManage: enabled target with no dir is a structure error naming the dir to create', async () => {
   const root = stageBrand({
     config: `{
@@ -538,10 +566,40 @@ test('runManage: enabled target with no dir is a structure error naming the dir 
     }`,
   });
 
-  const report = await runManage(root, {});
+  const report = await runManage(root, { execFn: toolProbe() }); // every machine tool probe passes
 
   assert.equal(report.hasErrors, true);
   assert.match(report.results.workspace.error, /create targets\/backend\//);
+});
+
+test('#1032 case 8: a backend missing the Firebase CLI gets the line once, and the walk goes on', async () => {
+  const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
+  // The probe seam (options.execFn): only the Firebase CLI's probe fails
+  const execFn = toolProbe('firebase');
+  const line = machineToolLine(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform, execFn })[0]);
+  const root = stageBrand({
+    config: `{
+      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
+      targets: { web: { type: 'web' }, backend: { type: 'backend' } },
+    }`,
+  });
+  fs.mkdirSync(path.join(root, 'targets', 'backend'));
+  fs.writeFileSync(path.join(root, 'targets', 'backend', 'package.json'), JSON.stringify({ name: 'fixture-backend', private: true }));
+
+  let report;
+  const lines = [];
+  const methods = ['log', 'warn', 'error'];
+  const originals = methods.map((method) => console[method]);
+  methods.forEach((method) => { console[method] = (...args) => lines.push(args.join(' ')); });
+  try {
+    report = await runManage(root, { ...FAKE_FETCH_200, execFn });
+  } finally {
+    methods.forEach((method, i) => { console[method] = originals[i]; });
+  }
+  const output = lines.join('\n');
+
+  assert.equal(output.split(line).length - 1, 1, `the line prints once: ${output}`);
+  assert.equal(Object.keys(report.results).pop(), SERVICE_ORDER.at(-1), 'the walk ran on to the last service');
 });
 
 // #677: membership is a fact of the brand, so the header states it on EVERY

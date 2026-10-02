@@ -45,6 +45,12 @@ load naming `npx omega migrate`.
 
 `domain.enabled: false` skips the service.
 
+When no registrar is picked, the manage walk asks for one: a choice from the registry's
+registrars lands as the presence pick (`domain.providers: { namecheap: {} }`) and the service
+goes on with it in the same run. Disable at that ask writes `domain.enabled: false`. A
+headless or dry run never asks: it prints the one line naming `domain.providers` and
+`config/omega.json5`, and the service skips as before.
+
 ## Credentials
 
 - `CLOUDFLARE_TOKEN` — always, even for a manual registrar: the required nameserver values

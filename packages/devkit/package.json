@@ -54,6 +54,7 @@
     "./brand-version": "./src/brand-version.js",
     "./clean-dirs": "./src/clean-dirs.js",
     "./command-path": "./src/command-path.js",
+    "./machine-tools": "./src/machine-tools.js",
     "./parse-audit": "./src/parse-audit.js",
     "./strip-dev-blocks": "./src/strip-dev-blocks.js",
     "./strip-dev-blocks-plugin": "./src/strip-dev-blocks-plugin.js",

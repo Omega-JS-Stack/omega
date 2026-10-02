@@ -20,7 +20,7 @@ const FULL_CONFIG = {
   brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' },
   cloud: { config: { projectId: 'fixture-project' } },
   analytics: { providers: { google: { accountId: '111', propertyId: '222' } } },
-  repo: { provider: 'github', org: 'fixture-org' },
+  repo: { provider: 'github', owner: 'fixture-org' },
   payment: { providers: { stripe: { publishableKey: 'pk_fixture' } } },
 };
 
@@ -82,10 +82,10 @@ test('bookmark: groups with unmet inputs are absent', () => {
   const links = generateLinks({ brand: { id: 'bare', name: 'Bare' } }, []);
   assert.deepEqual(links, {});
 
-  // The source repo derives from the org plus the brand id; no backend target
+  // The source repo derives from the owner plus the brand id; no backend target
   // means no API link
   const partial = generateLinks(
-    { brand: { id: 'p', url: 'https://p.example' }, repo: { org: 'o' } },
+    { brand: { id: 'p', url: 'https://p.example' }, repo: { owner: 'o' } },
     [{ name: 'web', target: 'web' }],
   );
   assert.deepEqual(Object.keys(partial), ['Search', 'GitHub', 'Live']);
@@ -94,10 +94,10 @@ test('bookmark: groups with unmet inputs are absent', () => {
 });
 
 test('bookmark: the links address the SOURCE repo the one derivation names (#883)', () => {
-  // No repo name is configurable anywhere: the org plus `<brand.id>-omega` IS
+  // No repo name is configurable anywhere: the owner plus `<brand.id>-omega` IS
   // the address, so a link can never point at a repo that does not exist.
   const links = generateLinks(
-    { brand: { id: 'acme', url: 'https://acme.example' }, repo: { org: 'Acme-Org' } },
+    { brand: { id: 'acme', url: 'https://acme.example' }, repo: { owner: 'Acme-Org' } },
     [{ name: 'web', target: 'web' }],
   );
 
@@ -140,7 +140,7 @@ test('bookmark: extension ack lands the sync as success', async () => {
   process.env.OMEGA_EXTENSION_PORT = String(port);
 
   // No cloud.config.projectId → no gcloud shell-out during the test
-  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, repo: { org: 'o' } };
+  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, repo: { owner: 'o' } };
 
   const tty = openTtyPrompt();
   try {

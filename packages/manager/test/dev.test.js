@@ -187,7 +187,7 @@ async function bootDev(cwd, options = {}) {
   process.chdir(cwd);
   try {
     return await Promise.race([
-      devCommand(options),
+      devCommand({ execFn: require('./lib/tool-probe.js').toolProbe(), ...options }), // every machine tool probe passes
       new Promise((resolve) => setTimeout(() => resolve('running'), 250)),
     ]);
   } finally {

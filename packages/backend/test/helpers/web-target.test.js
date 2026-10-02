@@ -121,7 +121,7 @@ module.exports = defineCases({
         const { source, target } = cmsContext(brandConfig(ONE_WEBSITE), undefined);
 
         assert.deepEqual(source, { owner: 'Acme-Org', name: 'acme-omega', slug: 'Acme-Org/acme-omega' },
-          'the content repo is <brand.id>-omega under repo.org');
+          'the content repo is <brand.id>-omega under repo.owner');
         assert.deepEqual(target, { name: 'web', path: 'targets/web' });
       },
     },
@@ -147,7 +147,7 @@ module.exports = defineCases({
         assert.ok(error, 'half an address commits nowhere');
         assert.equal(error.code, 500, 'the route answers with e.code, with no `|| 400` to fall back on');
         assert.match(error.message, /GitHub repo not configured/);
-        assert.match(error.message, /repo\.org/, 'and it names the key to set');
+        assert.match(error.message, /repo\.owner/, 'and it names the key to set');
       },
     },
 

@@ -8,7 +8,7 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { gh, getRepo, ensureRepo, getPages, ensurePages, ownerPlan } = require('../src/github-repo.js');
+const { gh, getRepo, ensureRepo, getPages, ensurePages, ownerPlan, ghState, assertGhReady } = require('../src/github-repo.js');
 
 const quiet = { log() {} };
 
@@ -238,4 +238,74 @@ test('ownerPlan: the paid plan reads through; a free org and a USER owner both r
 
   const planless = ghStub({ 'api orgs/acme': '{}' });
   assert.strictEqual(ownerPlan('acme', { execFn: planless.execFn }), 'free');
+});
+
+// ─── The GitHub CLI check: installed, then signed in by a real call ─────────
+
+const INSTALL_LINE = 'GitHub CLI (gh) is not installed. Install from: https://cli.github.com/';
+
+/**
+ * A `gh` that answers the two probes as told, recording every call's argv.
+ * `authStatus` is how `gh auth status` exits, which no check may ask.
+ * @param {object} answers - { version, apiUser, authStatus }, each true to pass.
+ * @returns {{ calls: string[][], execFn: Function }}
+ */
+function probeStub({ version = true, apiUser = true, authStatus = true }) {
+  const calls = [];
+  const execFn = (file, args) => {
+    calls.push([file, ...args]);
+    const fail = (message) => { throw Object.assign(new Error(message), { status: 1, stderr: Buffer.from(message) }); };
+    if (args[0] === '--version') return version ? 'gh version 2.100.0' : fail('spawnSync gh ENOENT');
+    if (args[0] === 'api' && args[1] === 'user') return apiUser ? '{"login":"acme"}' : fail('gh: Bad credentials (HTTP 401)');
+    if (args[0] === 'auth' && args[1] === 'status') return authStatus ? 'Logged in' : fail('The token in GH_TOKEN is invalid');
+    return fail(`no answer for gh ${args.join(' ')}`);
+  };
+  return { calls, execFn };
+}
+
+test('ghState: a gh whose --version fails is missing, and assertGhReady throws the install line', () => {
+  const { execFn } = probeStub({ version: false });
+
+  assert.strictEqual(ghState({ execFn }), 'missing');
+  assert.throws(() => assertGhReady({ execFn }), (error) => error.message.includes(INSTALL_LINE));
+});
+
+test('ghState: an installed gh whose `gh api user` fails is signed out, and assertGhReady names gh auth login and GH_TOKEN', () => {
+  const { execFn } = probeStub({ apiUser: false });
+
+  assert.strictEqual(ghState({ execFn }), 'signed-out');
+  assert.throws(
+    () => assertGhReady({ execFn }),
+    (error) => error.message.includes('gh auth login (or set GH_TOKEN in the brand .env)'),
+  );
+});
+
+test('assertGhReady: a failing `gh api user` keeps gh\'s first stderr line after the sign-in line', () => {
+  const execFn = (file, args) => {
+    if (args[0] === '--version') return 'gh version 2.100.0';
+    const stderr = 'HTTP 403: API rate limit exceeded for user ID 1. (https://api.github.com/user)\nretry later\n';
+    throw Object.assign(new Error('Command failed: gh api user'), { status: 1, stderr: Buffer.from(stderr) });
+  };
+
+  assert.throws(
+    () => assertGhReady({ execFn }),
+    (error) => error.message === 'GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env): HTTP 403: API rate limit exceeded for user ID 1. (https://api.github.com/user)',
+  );
+});
+
+test('ghState: both probes passing is ready, and assertGhReady returns', () => {
+  const { calls, execFn } = probeStub({});
+
+  assert.strictEqual(ghState({ execFn }), 'ready');
+  assert.doesNotThrow(() => assertGhReady({ execFn }));
+  assert.deepStrictEqual(calls.slice(0, 2), [['gh', '--version'], ['gh', 'api', 'user']], 'the two probes, in order');
+});
+
+test('ghState: a working GH_TOKEN that `gh auth status` refuses is ready, and auth status is never asked', () => {
+  const { calls, execFn } = probeStub({ authStatus: false });
+
+  assert.strictEqual(ghState({ execFn }), 'ready');
+  assertGhReady({ execFn });
+  assert.ok(calls.length > 0, 'the state was probed');
+  assert.ok(!calls.some((call) => call.includes('auth') && call.includes('status')), JSON.stringify(calls));
 });

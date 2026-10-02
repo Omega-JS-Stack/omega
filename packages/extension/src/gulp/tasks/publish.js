@@ -357,7 +357,7 @@ async function publishStores(stores, options) {
  * hand to a store whose listing does not exist yet.
  *
  * It runs HERE rather than as a shell block in the scaffolded workflow: the
- * repo is DERIVED (`<brand.id>-releases` under `repo.org`), so no YAML types a
+ * repo is DERIVED (`<brand.id>-releases` under `repo.owner`), so no YAML types a
  * repo name, and a laptop publish and a CI publish do the same thing. The tag
  * is namespaced by TARGET (`<target name>-v<version>`), so a brand shipping two
  * extensions gets one release per target on the one repo.
@@ -385,7 +385,7 @@ async function publishToGitHubRelease(options) {
   // Half an address publishes nowhere: this is the address a download button on
   // the site is already pointing at, so it is named, never guessed.
   if (!releases) {
-    throw new Error('Cannot address the releases repo: set repo.org (and brand.id) in config/omega.json5. The releases repo is `<brand.id>-releases` under that org.');
+    throw new Error('Cannot address the releases repo: set repo.owner (and brand.id) in config/omega.json5. The releases repo is `<brand.id>-releases` under that owner.');
   }
 
   const version = options.version || project.version;

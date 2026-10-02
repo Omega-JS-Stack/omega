@@ -1,7 +1,7 @@
 /**
  * Sync the brand's registry entry to the company server's Firestore at
  * brands/{brand.id}. Only the whitelisted top-level config sections cross
- * (brand identity, repo org info, sponsorship terms), and the document
+ * (brand identity, repo owner info, sponsorship terms), and the document
  * is fully REPLACED on write so keys removed from config disappear from
  * the registry too — omega-manager's `set(data, { merge: false })`
  * semantic, but diff-synced: omega-manager overwrote the document blindly

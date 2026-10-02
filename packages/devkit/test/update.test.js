@@ -40,6 +40,16 @@ const REGISTRY = {
     versions: ['5.5.5'],
     time: { '5.5.5': day(1000) },
   },
+  '@omega.js/web': {
+    latest: '0.55.0',
+    versions: ['0.54.1', '0.55.0'],
+    time: { '0.55.0': day(1), '0.54.1': day(30) },
+  },
+  'day-old-pkg': {
+    latest: '1.1.0',
+    versions: ['1.0.0', '1.1.0'],
+    time: { '1.1.0': day(1), '1.0.0': day(60) },
+  },
 };
 
 const lookup = async (name) => {
@@ -330,5 +340,73 @@ test('formatReport: QUARANTINED status + legends + local skips', async () => {
   assert.ok(lines.some((line) => line.includes('QUARANTINED = latest published < 7 days ago')));
   assert.ok(lines.some((line) => line.includes('major = breaking')));
   assert.ok(lines.some((line) => line.includes('skipped @omega.js/web (file:../x)')));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ─── The quarantine allowlist ────────────────────────────────────────────────
+
+/** One run holding a family release and a third-party release, both 1 day old. */
+async function familyReport() {
+  const dir = stageTarget({
+    name: 'family',
+    dependencies: { '@omega.js/web': '0.54.1', 'day-old-pkg': '^1.0.0' },
+  }, { '@omega.js/web': '0.54.1', 'day-old-pkg': '1.0.0' });
+  const report = await update.buildUpdateReport({ dir, lookup, now: NOW });
+  fs.rmSync(dir, { recursive: true, force: true });
+  return report;
+}
+
+test('QUARANTINE_EXEMPT: the one allowlist holds the @omega.js family alone', () => {
+  assert.deepEqual(update.QUARANTINE_EXEMPT, ['@omega.js/*']);
+});
+
+test('isQuarantineExempt: a name under the scope matches; a look-alike scope or bare name does not', () => {
+  assert.equal(update.isQuarantineExempt('@omega.js/web'), true);
+  assert.equal(update.isQuarantineExempt('@omega.js/manager'), true);
+  assert.equal(update.isQuarantineExempt('@omega.jsx/web'), false);
+  assert.equal(update.isQuarantineExempt('omega.js'), false);
+});
+
+test('buildUpdateReport: a 1-day-old family release is never QUARANTINED', async () => {
+  const report = await familyReport();
+
+  const family = report.rows.find((row) => row.name === '@omega.js/web');
+  assert.equal(family.latest, '0.55.0');
+  assert.equal(family.ageDays, 1);
+  assert.equal(family.quarantined, false, 'the family is exempt from the age hold');
+
+  const lines = update.formatReport(report, { minAge: 7 });
+  const familyLines = lines.filter((line) => line.includes('@omega.js/web') && line.includes('0.55.0'));
+  assert.ok(familyLines.length > 0, 'the family row prints');
+  assert.ok(familyLines.every((line) => !line.includes('QUARANTINED')), 'and never as QUARANTINED');
+});
+
+test('selectUpdates: the 1-day-old family release installs at the default min-age', async () => {
+  const { rows } = await familyReport();
+  const selection = update.selectUpdates(rows, { now: NOW });
+
+  assert.ok(selection.updates.some((entry) => entry.name === '@omega.js/web' && entry.to === '0.55.0'), 'the family moves');
+  assert.ok(!selection.quarantined.some((entry) => entry.name === '@omega.js/web'), 'and is not held');
+});
+
+test('a 1-day-old third-party release in the same run is still held', async () => {
+  const report = await familyReport();
+
+  const thirdParty = report.rows.find((row) => row.name === 'day-old-pkg');
+  assert.equal(thirdParty.quarantined, true, 'the exemption never reaches a third-party package');
+
+  const selection = update.selectUpdates(report.rows, { now: NOW });
+  assert.ok(selection.quarantined.some((entry) => entry.name === 'day-old-pkg'), 'listed as held');
+  assert.ok(!selection.updates.some((entry) => entry.name === 'day-old-pkg'), 'and not installed');
+});
+
+test('formatReport: with a held row, the legend names the exempt family', async () => {
+  // No @omega.js row or local in this run, so any line naming the family is the legend
+  const dir = stageTarget({ name: 'legend', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
+  const report = await update.buildUpdateReport({ dir, lookup, now: NOW, minAge: 7 });
+  const lines = update.formatReport(report, { minAge: 7 });
+
+  assert.ok(lines.some((line) => line.includes('fresh-pkg') && line.includes('QUARANTINED')), 'a held row');
+  assert.ok(lines.some((line) => line.includes('@omega.js')), `the legend names the family:\n${lines.join('\n')}`);
   fs.rmSync(dir, { recursive: true, force: true });
 });

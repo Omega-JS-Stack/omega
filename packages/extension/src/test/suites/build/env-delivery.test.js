@@ -36,15 +36,15 @@ function tmpTarget(env) {
 }
 
 /**
- * Declare the brand's org, the publish precondition. Secrets belong to the
+ * Declare the brand's owner, the publish precondition. Secrets belong to the
  * SOURCE repo (#883), which derives as `<brand.id>-omega` under it.
  */
-function declareRepo(dir, org) {
+function declareRepo(dir, owner) {
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), [
     '{',
     "  brand: { id: 'my-brand', name: 'My Brand', url: 'https://my.brand' },",
-    `  repo: { provider: 'github', org: '${org}' },`,
+    `  repo: { provider: 'github', owner: '${owner}' },`,
     '  targets: { extension: { type: "extension" } },',
     '}',
   ].join('\n'));
@@ -192,7 +192,7 @@ module.exports = defineCases({
             target: 'extension',
             logger: quiet,
             env: {},
-            execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
+            execFn: (file, args, options) => { gh.push({ file, args, input: (options || {}).input }); return ''; },
           });
 
           // The brand-level GOOGLE_ANALYTICS_SECRET_EXTENSION lands under its
@@ -204,13 +204,14 @@ module.exports = defineCases({
           // with the brand token rather than wait for a sibling target's push.
           ctx.expect(result.published).toEqual(['CHROME_CLIENT_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET', 'MY_CUSTOM_THING']);
           ctx.expect(gh.map((c) => c.args.join(' '))).toEqual([
-            'auth status',
+            '--version',
+            'api user',
             'secret set CHROME_CLIENT_ID --repo acme/my-brand-omega',
             'secret set GH_TOKEN --repo acme/my-brand-omega',
             'secret set GOOGLE_ANALYTICS_SECRET --repo acme/my-brand-omega',
             'secret set MY_CUSTOM_THING --repo acme/my-brand-omega',
           ]);
-          ctx.expect(gh.slice(1).map((c) => c.input)).toEqual(['chrome-id', 'brand-token', 'mp-secret', 'custom']);
+          ctx.expect(gh.slice(2).map((c) => c.input)).toEqual(['chrome-id', 'brand-token', 'mp-secret', 'custom']);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -257,7 +258,7 @@ module.exports = defineCases({
             logger: loud,
             env: {},
             execFn: noGh,
-          })).toThrow('origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.org in config/omega.json5 or move the repo');
+          })).toThrow('origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.owner in config/omega.json5 or move the repo');
 
           fs.rmSync(keyed, { recursive: true, force: true });
 

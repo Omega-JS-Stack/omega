@@ -49,14 +49,14 @@ test('resolveRepo: reads the origin remote via the injected exec', () => {
 
 test('dispatchRepo: the CONFIG names the SOURCE repo a dispatch addresses, never a remote (#799/#883)', () => {
   assert.deepStrictEqual(
-    dispatchRepo({ brand: { id: 'acme' }, repo: { org: 'Acme-Org' } }),
+    dispatchRepo({ brand: { id: 'acme' }, repo: { owner: 'Acme-Org' } }),
     { owner: 'Acme-Org', repo: 'acme-omega' },
   );
 
   // The workflows live on the SOURCE repo whatever a target publishes to, so a
   // web target's own website repo never becomes the dispatch address (#883).
   assert.deepStrictEqual(
-    dispatchRepo({ brand: { id: 'acme' }, repo: { org: 'Acme-Org' }, targets: { web: { type: 'web' } } }),
+    dispatchRepo({ brand: { id: 'acme' }, repo: { owner: 'Acme-Org' }, targets: { web: { type: 'web' } } }),
     { owner: 'Acme-Org', repo: 'acme-omega' },
   );
 
@@ -71,7 +71,7 @@ test('dispatchTarget: the repo from config, and the COMPOSED workflow name insid
   const path = require('node:path');
   const { dispatchTarget } = require('../src/deploy.js');
 
-  const config = { brand: { id: 'acme' }, repo: { org: 'Acme-Org' } };
+  const config = { brand: { id: 'acme' }, repo: { owner: 'Acme-Org' } };
   const brandRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dispatch-target-')));
   const targetDir = path.join(brandRoot, 'targets', 'extension');
 
@@ -645,8 +645,8 @@ test('resolveDeployLane: a LINKED brand outside any git repo refuses BY NAME (#8
 
   // The shape: `omega i local` in a folder nobody ran `git init` in. The lane
   // it would otherwise pick is the snapshot one, which is built out of a git
-  // index, so the push died on a raw `fatal: not a git repository` from
-  // `git check-ignore` a step later.
+  // index, so the push would die a step later on a raw
+  // `fatal: not a git repository`.
   const loose = stageBrandTree({ linked: true });
 
   try {
@@ -808,7 +808,7 @@ test('deliverLane: the one lane checks, composes, packs, pushes, restores, and r
     },
     stage: async ({ dir }) => { order.push(`stage:${dir}`); return { staged: ['@omega.js/web'], restore: async () => order.push('restore') }; },
     push: (options) => {
-      assert.deepStrictEqual(options.require, ['omega_modules', 'package-lock.json'], 'the push refuses a tree whose ignore rules would drop the staged tarballs');
+      assert.deepStrictEqual(options.require, ['omega_modules', 'package-lock.json'], 'the push force-adds the staged tarballs and the lockfile');
       order.push(`push:${options.owner}/${options.repo}#${options.ref}`);
       return 'abc1234567890';
     },
@@ -959,7 +959,7 @@ test('deliverLane: an origin that is not the derived source repo REFUSES first, 
 
   // A real checkout whose origin a transfer left behind: the config derives
   // Acme-Org/acme-omega, and the snapshot would be pushed there.
-  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { org: \'Acme-Org\' } }');
+  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { owner: \'Acme-Org\' } }');
   execFileSync('git', ['-C', plain.brandRoot, 'init', '-q']);
   execFileSync('git', ['-C', plain.brandRoot, 'remote', 'add', 'origin', 'https://github.com/Other-Org/acme-omega.git']);
 
@@ -983,7 +983,7 @@ test('deliverLane: an origin that is not the derived source repo REFUSES first, 
         },
       }),
       (error) => {
-        assert.strictEqual(error.message, 'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+        assert.strictEqual(error.message, 'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo');
         return true;
       },
     );
@@ -1001,7 +1001,7 @@ test('deliverLane: the DEFAULT origin step is the real gate: a drifted checkout 
   const { deliverLane } = require('../src/deploy.js');
   const plain = stageBrandTree({ linked: false });
 
-  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { org: \'Acme-Org\' } }');
+  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { owner: \'Acme-Org\' } }');
   execFileSync('git', ['-C', plain.brandRoot, 'init', '-q']);
   execFileSync('git', ['-C', plain.brandRoot, 'remote', 'add', 'origin', 'git@github.com:Acme-Org/acme-site.git']);
 
@@ -1017,7 +1017,7 @@ test('deliverLane: the DEFAULT origin step is the real gate: a drifted checkout 
         token: 'tok',
       }),
       (error) => {
-        assert.strictEqual(error.message, 'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+        assert.strictEqual(error.message, 'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo');
         return true;
       },
     );

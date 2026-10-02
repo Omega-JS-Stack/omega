@@ -15,14 +15,18 @@ require('@omega.js/devkit/test/temp-home');
 
 const { ENV_SCHEMA } = require('@omega.js/config');
 const { runOnboard } = require('../src/onboard.js');
-const { brandState, STATES } = require('../src/lib/brand-state.js');
+const { brandState: readBrandState, STATES } = require('../src/lib/brand-state.js');
+const { toolProbe } = require('./lib/tool-probe.js');
 const { stageTemplate } = require('./lib/brand-template.js');
 const { snapshot } = require('./lib/tree-snapshot.js');
 const { install } = require('./lib/brand-install.js');
 
 pluginInstalled();
 
-const FLAGS = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false };
+/** brandState with every machine tool present unless `options` hands in its own probe. */
+const brandState = (cwd, options = {}) => readBrandState(cwd, { execFn: toolProbe(), ...options });
+
+const FLAGS = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, execFn: toolProbe() };
 
 // Keys only the backend reads, so a brand with no backend never lacks one
 const BACKEND_ONLY_KEYS = [
@@ -314,4 +318,15 @@ test('#1031 status: a brand that turns a gating service on and lacks its key is 
   assert.equal(report.state, 'brand');
   assert.equal(report.next, 'npm start');
   assert.ok(envKeys(report, false).includes('SENTRY_AUTH_TOKEN'), `SENTRY_AUTH_TOKEN is listed with optional: false: ${JSON.stringify(report.missing.env)}`);
+});
+
+// ─── Machine tools ───────────────────────────────────────────────────────────
+
+test('#1032 case 9: a brand whose backend misses the Firebase CLI lists it in missing.tools', async () => {
+  const root = await completeBrand('web,backend');
+
+  const report = await brandState(root, { execFn: toolProbe('firebase') });
+
+  const names = (report.missing.tools || []).map((tool) => (typeof tool === 'string' ? tool : tool.name));
+  assert.deepEqual(names, ['firebase'], JSON.stringify(report.missing));
 });

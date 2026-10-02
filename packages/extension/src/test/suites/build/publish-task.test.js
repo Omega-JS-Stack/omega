@@ -140,7 +140,7 @@ module.exports = defineCases({
 
     // #883: the GitHub release moved out of the scaffolded workflow's shell
     // and into the task: the repo is DERIVED (`<brand.id>-releases` under
-    // repo.org), so no YAML types a repo name, and the tag is namespaced by
+    // repo.owner), so no YAML types a repo name, and the tag is namespaced by
     // target so a second extension target publishes beside the first.
     {
       name: 'the release targets the brand releases repo, tagged per target (#883)',
@@ -155,7 +155,7 @@ module.exports = defineCases({
         const calls = [];
         await inProject(tmp, async (task) => {
           await task.publishToGitHubRelease({
-            config: { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Acme-Org' } },
+            config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Acme-Org' } },
             execFn: (file, args) => {
               calls.push({ file, args });
               // `release view` answers "no release yet", which is what makes
@@ -527,7 +527,7 @@ module.exports = defineCases({
     // Half an address uploads nowhere: the same repo a download button on the
     // site already points at is named in config, never guessed here.
     {
-      name: 'a config that names no org refuses instead of publishing somewhere (#883)',
+      name: 'a config that names no owner refuses instead of publishing somewhere (#883)',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-noorg-'));
         fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
@@ -544,7 +544,7 @@ module.exports = defineCases({
           }
         });
 
-        ctx.expect(message).toContain('repo.org');
+        ctx.expect(message).toContain('repo.owner');
         fs.rmSync(tmp, { recursive: true, force: true });
       },
     },

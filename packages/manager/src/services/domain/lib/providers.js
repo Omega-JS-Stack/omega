@@ -54,6 +54,20 @@ const DOMAIN_PROVIDERS = {
 };
 
 /**
+ * The selection a presence-picked role asks with: one choice per provider in
+ * the role, landing as `{ <provider>: {} }`.
+ *
+ * @param {'registrar'|'mailbox'} role - A DOMAIN_PROVIDERS role
+ * @returns {{ choices: Function, getValue: Function }} - Spread into a resolveConfigValue spec
+ */
+function presencePick(role) {
+  return {
+    choices: () => Object.keys(DOMAIN_PROVIDERS[role]),
+    getValue: (name) => ({ [name]: {} }),
+  };
+}
+
+/**
  * The brand's domain registrar (`domain.providers.<registrar>`).
  *
  * @param {Object} brandConfig - Resolved brand config
@@ -73,4 +87,4 @@ function resolveEmailProvider(brandConfig) {
   return chosenProvider(brandConfig?.domain?.email?.providers);
 }
 
-module.exports = { DOMAIN_PROVIDERS, resolveRegistrar, resolveEmailProvider };
+module.exports = { DOMAIN_PROVIDERS, presencePick, resolveRegistrar, resolveEmailProvider };

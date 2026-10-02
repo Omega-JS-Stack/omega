@@ -41,7 +41,7 @@ from the real merge rules. The framework runs the recipe once; brands read the a
 | `config.resolved.github.name` | The same answer's bare repo name |
 
 The GitHub value is the brand's SOURCE repo, `<brand.id>-omega` under the one
-`repo: { provider, org }` block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
+`repo: { provider, owner }` block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
 No repo name is configurable anywhere: the per-target `github` override, the top-level
 `github` block and the `repo.providers.*` keys are all retired, and a config still
 carrying one fails validation. `null` is the honest answer for a brand that declares no

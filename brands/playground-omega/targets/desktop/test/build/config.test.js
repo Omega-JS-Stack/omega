@@ -52,7 +52,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const config = build.getConfig();
 
-        // No repo NAME is ever configured (#883): the one `repo.org` block plus
+        // No repo NAME is ever configured (#883): the one `repo.owner` block plus
         // brand.id derive `<brand.id>-releases`, the address every release verb
         // uses and the feed a shipped app polls.
         ctx.expect(releasesRepo(config).name).toBe('playground-releases');

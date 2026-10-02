@@ -13,10 +13,11 @@ const GAP_LABELS = [
   ['targets', 'Declared targets with no folder'],
   ['files', 'Missing files'],
   ['install', 'Not installed'],
+  ['tools', 'Machine tools'],
 ];
 
 module.exports = async (options) => {
-  const report = brandState(process.cwd());
+  const report = brandState(process.cwd(), { execFn: options.execFn });
 
   if (options.json) {
     console.log(JSON.stringify(report, null, 2));

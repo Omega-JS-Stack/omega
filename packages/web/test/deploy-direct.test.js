@@ -3,7 +3,7 @@
  *
  * The push target is the WEBSITE repo
  * ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)):
- * `<brand.id>-<target name>` under `repo.org`, holding the built site alone,
+ * `<brand.id>-<target name>` under `repo.owner`, holding the built site alone,
  * so the SOURCE monorepo (`<brand.id>-omega`, where the dispatch lane sends
  * its workflow_dispatch) can stay private. The cname comes from the target's
  * url. The build+push path is exercised live against the playground via the
@@ -43,7 +43,7 @@ after(() => fs.rmSync(BRAND_ROOT, { recursive: true, force: true }));
 // about the push depends on what the SOURCE repo is called or who may read it.
 test('direct plan: the push target is the website repo `<brand.id>-<target>`, cname from the target url', () => {
   const plan = buildDirectPlan({
-    repo: { provider: 'github', org: 'Org' },
+    repo: { provider: 'github', owner: 'Org' },
     brand: { id: 'b', url: 'https://www.example.com/landing' },
     targets: TARGETS,
   }, WEB);
@@ -58,7 +58,7 @@ test('direct plan: the push target is the website repo `<brand.id>-<target>`, cn
 
 test('direct plan: a custom-domain plan carries the domain root prefix and its CNAME, unchanged', () => {
   const plan = buildDirectPlan({
-    repo: { org: 'Org' },
+    repo: { owner: 'Org' },
     brand: { id: 'b', url: 'https://www.example.com' },
     targets: TARGETS,
   }, WEB);
@@ -70,7 +70,7 @@ test('direct plan: a custom-domain plan carries the domain root prefix and its C
 
 test('direct plan: NO brand.url → a gh-pages PROJECT site (derived address, no CNAME, the #358 prefix)', () => {
   const plan = buildDirectPlan({
-    repo: { org: 'Omega-JS-Stack' },
+    repo: { owner: 'Omega-JS-Stack' },
     brand: { id: 'omega' },
     targets: TARGETS,
   }, WEB);
@@ -95,9 +95,9 @@ test('direct plan: a project site with no brand.url WARNS, printing the Pages UR
   let plan;
   let quiet;
   try {
-    plan = buildDirectPlan({ repo: { org: 'Omega-JS-Stack' }, brand: { id: 'omega' }, targets: TARGETS }, WEB);
+    plan = buildDirectPlan({ repo: { owner: 'Omega-JS-Stack' }, brand: { id: 'omega' }, targets: TARGETS }, WEB);
     quiet = warnings.length;
-    buildDirectPlan({ repo: { org: 'Org' }, brand: { id: 'b', url: 'https://www.example.com' }, targets: TARGETS }, WEB);
+    buildDirectPlan({ repo: { owner: 'Org' }, brand: { id: 'b', url: 'https://www.example.com' }, targets: TARGETS }, WEB);
   } finally {
     console.warn = originalWarn;
   }
@@ -122,7 +122,7 @@ test('direct plan: taking the advice (brand.url = the Pages address) keeps the p
   let plan;
   try {
     plan = buildDirectPlan({
-      repo: { org: 'Omega-JS-Stack' },
+      repo: { owner: 'Omega-JS-Stack' },
       brand: { id: 'omega', url: 'https://omega-js-stack.github.io/omega-web' },
       targets: TARGETS,
     }, WEB);
@@ -138,7 +138,7 @@ test('direct plan: taking the advice (brand.url = the Pages address) keeps the p
 
 test('direct plan: a *.github.io brand.url names the mount, the repo only fills the gaps (#366)', () => {
   const plan = buildDirectPlan({
-    repo: { org: 'Omega-JS-Stack' },
+    repo: { owner: 'Omega-JS-Stack' },
     brand: { id: 'omega', url: 'https://omega-js-stack.github.io/workkit/' },
     targets: TARGETS,
   }, WEB);
@@ -238,8 +238,8 @@ test('the production build writes a CNAME only for a real custom domain, never *
 // #883: the environment and the git remote both name the repo the checkout
 // SITS IN (the source repo on a runner, the enclosing monorepo in a nested
 // brand). Neither is the website repo, so neither is consulted any more: a
-// config that names no org refuses, and says which key to set.
-test('direct plan: a config that names no org REFUSES, and no ambient repo can stand in', () => {
+// config that names no owner refuses, and says which key to set.
+test('direct plan: a config that names no owner REFUSES, and no ambient repo can stand in', () => {
   const message = (() => {
     try {
       buildDirectPlan({ brand: { id: 'b', url: 'https://x.y' }, targets: TARGETS }, { env: { GITHUB_REPOSITORY: 'Acme/site' }, cwd: WEB.cwd });
@@ -249,21 +249,21 @@ test('direct plan: a config that names no org REFUSES, and no ambient repo can s
     }
   })();
 
-  assert.match(message, /repo\.org/, 'the one key to set is named');
+  assert.match(message, /repo\.owner/, 'the one key to set is named');
   assert.match(message, /website repo/, 'and what it addresses');
   assert.doesNotMatch(message, /GITHUB_REPOSITORY|remote/, 'neither the CI environment nor a git remote is offered: both name the wrong repo');
 });
 
 test('direct plan: a target the config does not declare refuses, listing the ones it does', () => {
   assert.throws(
-    () => buildDirectPlan({ repo: { org: 'Org' }, brand: { id: 'b' }, targets: { site: { type: 'web' } } }, WEB),
+    () => buildDirectPlan({ repo: { owner: 'Org' }, brand: { id: 'b' }, targets: { site: { type: 'web' } } }, WEB),
     /No target "web" is declared[\s\S]*site/,
   );
 });
 
 test('direct plan: a second web target pushes to ITS OWN repo, the first untouched (#588, #883)', () => {
   const config = {
-    repo: { org: 'Org' },
+    repo: { owner: 'Org' },
     brand: { id: 'acme', url: 'https://acme.test' },
     targets: TARGETS,
   };
@@ -292,7 +292,7 @@ test('direct plan: the composed config of a named target resolves to its own hos
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-  repo: { provider: 'github', org: 'Acme-Org' },
+  repo: { provider: 'github', owner: 'Acme-Org' },
   targets: { web: { type: 'web' }, admin: { type: 'web' } },
 }`);
   for (const dir of ['web', 'admin']) {
@@ -332,12 +332,12 @@ test('deploy --direct: a fatal config finding stops the lane before any deploy w
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  // Everything a plan needs IS here (org + brand.id + brand.url), so the retired
+  // Everything a plan needs IS here (owner + brand.id + brand.url), so the retired
   // key is the only reason to refuse.
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), `{
   brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-  repo: { provider: 'github', org: 'Org' },
+  repo: { provider: 'github', owner: 'Org' },
   payment: { processors: { stripe: {} } },
   targets: { web: { type: 'web' } },
 }`);
@@ -372,7 +372,7 @@ test('deploy --direct: the PRODUCTION overlay is the config the lane reads (#856
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), `{
   brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-  repo: { provider: 'github', org: 'Org' },
+  repo: { provider: 'github', owner: 'Org' },
   targets: { web: { type: 'web' } },
 }`);
   fs.writeFileSync(path.join(dir, 'config', 'omega.production.json5'), '{ payment: { processors: { stripe: {} } } }');

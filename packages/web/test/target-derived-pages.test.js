@@ -13,7 +13,7 @@ const { buildWith, miniData } = require('./lib/build.js');
 // only download/extension facts in the config are inside `targets`.
 const withTargets = {
   ...miniData,
-  repo: { provider: 'github', org: 'mini-org' },
+  repo: { provider: 'github', owner: 'mini-org' },
   targets: {
     web: { type: 'web' },
     desktop: { type: 'desktop', releases: {} },

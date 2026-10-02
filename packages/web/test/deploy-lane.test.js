@@ -36,7 +36,7 @@ function linkedBrand({ version = '1.0.0', linked = true } = {}) {
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    repo: { provider: 'github', org: 'Fixture-Org' },
+    repo: { provider: 'github', owner: 'Fixture-Org' },
     targets: { web: { type: 'web' } },
   }));
   // The brand root's version is the one every target follows (#869): a deploy

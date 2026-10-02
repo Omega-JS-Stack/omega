@@ -28,9 +28,9 @@ const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, for
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
-const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
+const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
-const { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, missingConfigKeys, serviceAskedKeys } = require('./env-needs.js');
+const { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, baseMissingKeys, missingConfigKeys, serviceAskedKeys } = require('./env-needs.js');
 const { resolveCompany, recordBrand, readRegistry, registryFile, COMPANY_DIR, COMPANY_RESOLVED_FILE, COMPANY_SELF } = require('./company.js');
 const { MINT_ROOT, LOGO_SOURCES_DIR, BRANDMARK_SOURCE, MINT_BRIDGE, FAVICON_DEST, BRANDMARK_SVG_DEST, BRANDMARK_PNG_DEST, mintBridgeSources, hasLogoSources } = require('./mint-bridge.js');
 const { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues, getAtPath } = require('./edit.js');
@@ -118,7 +118,6 @@ module.exports = {
   envSchemaEntry,
   envKeysForTarget,
   generatedEnvKeys,
-  requiredEnvKeys,
   envKeysByGroup,
 
   // The delivery renderer (#627) — the ONE derivation of how a declared key
@@ -140,6 +139,7 @@ module.exports = {
   ENV_VERBS,
   SHIP_SERVICE,
   missingEnvKeys,
+  baseMissingKeys,
   missingConfigKeys,
   serviceAskedKeys,
 
@@ -239,9 +239,9 @@ module.exports = {
   // surfaces short-circuit on this instead of 403ing at Google
   isDemoProject,
 
-  // The repo derivations (#883): ONE `repo: { provider, org }` block, and every
+  // The repo derivations (#883): ONE `repo: { provider, owner }` block, and every
   // repo a brand owns derives its name from `<brand.id>-<role>` (#809), so no
-  // name, owner or visibility is ever configured
+  // repo name or visibility is ever configured
   REPO_PROVIDERS,
   HOSTING_PROVIDERS,
   repoBlock,

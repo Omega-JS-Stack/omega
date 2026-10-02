@@ -35,7 +35,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const powertools = require('node-powertools');
-const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
+const { baseMissingKeys } = require('../../dist/vendor/config/index.js');
 
 const { resolveProjectType, isCustomProject, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS } = require('../../dist/cli/utils/project-type.js');
 const BuildCommand = require('../../dist/cli/commands/build.js');
@@ -137,7 +137,7 @@ function setupCheckNames(dir) {
  */
 function bootOmega(dir, options = {}) {
   const saved = {};
-  for (const name of requiredEnvKeys('backend')) {
+  for (const { key: name } of baseMissingKeys({}, { target: 'backend', verb: 'start' })) {
     saved[name] = process.env[name];
     process.env[name] = process.env[name] || 'fixture-value';
   }

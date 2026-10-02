@@ -261,74 +261,73 @@ test('a brand with no minted set pushes clean, with no .omega path in the tree (
   assert.deepEqual(mintedIn(bare, 'omega-deploy'), []);
 });
 
-test('a brand whose ignore rules hide the staged tarballs fails BEFORE the push (#872)', () => {
-  const { brandRoot, bare } = buildFixture();
-  const calls = [];
+// ─── The staged set rides by force ───
 
-  // The shape the guard exists for: a brand that ignores build output by name
-  // and catches the staging folder with it. The push would succeed, the runner's
-  // `npm ci` would then fail on a file: spec pointing at nothing, minutes later
-  // and a machine away.
+/** Push the fixture brand with the staged set a linked deploy requires. */
+function pushStaged(brandRoot, bare, required = ['omega_modules', 'package-lock.json']) {
+  return pushSnapshot({
+    brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, require: required, execFn: localRemote(bare, []),
+  });
+}
+
+test('a brand whose own ignore rules hide the staged tarballs and lockfile still pushes them', () => {
+  const { repo, brandRoot, bare } = buildFixture();
   jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
+  const status = () => run('git', ['status', '--porcelain'], repo);
+  const before = status();
 
-  assert.throws(
-    () => pushSnapshot({
-      brandRoot,
-      owner: 'acme',
-      repo: 'acme-omega',
-      ref: 'main',
-      token: TOKEN,
-      require: ['omega_modules', 'package-lock.json'],
-      execFn: localRemote(bare, calls),
-    }),
-    (error) => {
-      assert.match(error.message, /omega_modules/, 'the error names the path that cannot ride');
-      assert.match(error.message, /package-lock\.json/, 'and every other one');
-      assert.match(error.message, /\.gitignore/, 'and where the rule lives');
-      assert.match(error.message, /`!omega_modules` and `!package-lock\.json`/, 'and the lines that un-ignore them');
-      return true;
-    },
-  );
+  const sha = pushStaged(brandRoot, bare);
 
-  assert.equal(calls.some((call) => call.args[0] === 'push'), false, 'nothing was pushed');
-  assert.equal(run('git', ['for-each-ref'], bare).trim(), '', 'the mirror is untouched');
-  // The staged files are untouched: cleaning them up is the caller's restore.
-  assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
+  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), sha, 'the push landed');
+  const tree = treeOf(bare, 'main');
+  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode');
+  assert.ok(tree.includes('package-lock.json'), 'and the regenerated lockfile');
+  assert.equal(status(), before, 'the forced adds stayed in the temporary index');
 });
 
-test('an ignore rule that matches the staged FILES, not their folder, fails before the push too', () => {
+test('a nested brand whose enclosing repo ignores *.tgz still pushes its staged tarballs', () => {
   const { repo, brandRoot, bare } = buildFixture();
-  const calls = [];
-
-  // A file pattern leaves the staging folder itself un-ignored and hides every
-  // tarball in it: the rule a nested brand inherits from an enclosing repo
+  // A file pattern the brand inherits from the repo around it, never its own
   jetpack.append(path.join(repo, '.gitignore'), '*.tgz\n');
 
-  assert.throws(
-    () => pushSnapshot({
-      brandRoot,
-      owner: 'acme',
-      repo: 'acme-omega',
-      ref: 'main',
-      token: TOKEN,
-      require: ['omega_modules', 'package-lock.json'],
-      execFn: localRemote(bare, calls),
-    }),
-    (error) => {
-      assert.match(error.message, /omega_modules\/omega\.js-liba-1\.0\.0\.tgz/, 'the error names the hidden file');
-      assert.match(error.message, /`!omega_modules\/\*`/, 'and the one line that un-ignores every file in the folder');
-      return true;
-    },
-  );
+  pushStaged(brandRoot, bare);
 
-  assert.equal(calls.some((call) => call.args[0] === 'push'), false, 'nothing was pushed');
+  assert.ok(treeOf(bare, 'main').includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode');
+});
+
+test('a required path that does not exist is skipped, and the push still lands', () => {
+  const { brandRoot, bare } = buildFixture();
+  jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
+  jetpack.remove(path.join(brandRoot, 'package-lock.json'));
+
+  const sha = pushStaged(brandRoot, bare);
+
+  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), sha, 'the push landed');
+  const tree = treeOf(bare, 'main');
+  assert.equal(tree.includes('package-lock.json'), false, 'the tree simply lacks the missing path');
+  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'and the present one still rode');
+});
+
+test('an ignored file nobody required stays home', () => {
+  const { brandRoot, bare } = buildFixture();
+  jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\nsecret.txt\n');
+  jetpack.write(path.join(brandRoot, 'secret.txt'), 'never rides\n');
+
+  pushStaged(brandRoot, bare);
+
+  const tree = treeOf(bare, 'main');
+  assert.equal(tree.includes('secret.txt'), false, 'the brand\'s own ignore rule still decides');
+  assert.equal(tree.includes('dist/out.js'), false, 'and so does every other one');
+  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'beside the forced staged set');
 });
 
 // ─── The resolved company layer (#677) ───
 
-test('the resolved company layer is generated for the push and gone after it', () => {
-  const { base, repo, brandRoot, bare } = buildFixture();
-
+/**
+ * Give the fixture brand a company layer and push it under that machine's home.
+ * @param {{ base: string, brandRoot: string, bare: string }} fixture - From buildFixture().
+ */
+function pushWithCompany({ base, brandRoot, bare }) {
   // A parent brand carrying a company/ tree, plus the machine registry line its
   // own runs write: exactly what the dispatching machine has and a runner lacks.
   const parentRoot = path.join(base, 'parent');
@@ -354,6 +353,13 @@ test('the resolved company layer is generated for the push and gone after it', (
     if (previousHome === undefined) delete process.env.OMEGA_HOME;
     else process.env.OMEGA_HOME = previousHome;
   }
+}
+
+test('the resolved company layer is generated for the push and gone after it', () => {
+  const fixture = buildFixture();
+  const { repo, brandRoot, bare } = fixture;
+
+  pushWithCompany(fixture);
 
   // It rode the mirror...
   assert.ok(treeOf(bare, 'main').includes('config/company-resolved.json5'), 'the runner receives what this machine resolved');
@@ -367,6 +373,15 @@ test('the resolved company layer is generated for the push and gone after it', (
   // ...and the developer's tree is clean again.
   assert.equal(jetpack.exists(path.join(brandRoot, 'config', 'company-resolved.json5')), false);
   assert.equal(run('git', ['status', '--porcelain'], repo).includes('company-resolved'), false);
+});
+
+test('the resolved company layer rides even when an ignore rule hides it', () => {
+  const fixture = buildFixture();
+  jetpack.append(path.join(fixture.brandRoot, '.gitignore'), 'config/company-resolved.json5\n');
+
+  pushWithCompany(fixture);
+
+  assert.ok(treeOf(fixture.bare, 'main').includes('config/company-resolved.json5'), 'the runner still receives what this machine resolved');
 });
 
 test('a brand with no company generates nothing', () => {

@@ -54,7 +54,7 @@ function stageBrand() {
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-    repo: { provider: 'github', org: 'Acme-Org' },
+    repo: { provider: 'github', owner: 'Acme-Org' },
     targets: { web: { type: 'web' } },
   }));
   fs.writeFileSync(path.join(brandRoot, 'package.json'), '{"name":"acme-brand","version":"0.0.0"}');

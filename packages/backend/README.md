@@ -141,7 +141,7 @@ Create `config/omega.json5` in your functions directory (the first verb scaffold
       measurementId: 'G-XXXXXXXXXX',
     },
   },
-  repo: { provider: 'github', org: 'your-org' }, // the CMS commits to <brand.id>-omega under it
+  repo: { provider: 'github', owner: 'your-org' }, // the CMS commits to <brand.id>-omega under it
   targets: {
     backend: {
       type: 'backend',

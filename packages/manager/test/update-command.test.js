@@ -193,20 +193,22 @@ test('cli routes `update` through ALIASES to the command file', () => {
  * packument (no registry) and a recording exec (no install). What comes back is
  * the exact command npm would have run.
  */
-function withOfflineUpdate(fn) {
+function withOfflineUpdate(fn, {
+  now = '2026-09-03T00:00:00Z',
+  packument = {
+    latest: '0.5.0',
+    versions: ['0.4.0', '0.5.0'],
+    times: { '0.5.0': '2026-01-01T00:00:00Z', '0.4.0': '2025-12-01T00:00:00Z' },
+  },
+} = {}) {
   const original = devkitUpdate.runUpdate;
   const commands = [];
 
   devkitUpdate.runUpdate = (options) => original({
     ...options,
     hasNpu: false,
-    now: Date.parse('2026-09-03T00:00:00Z'),
-    lookup: async (name) => ({
-      latest: '0.5.0',
-      versions: ['0.4.0', '0.5.0'],
-      times: { '0.5.0': '2026-01-01T00:00:00Z', '0.4.0': '2025-12-01T00:00:00Z' },
-      name,
-    }),
+    now: Date.parse(now),
+    lookup: async (name) => ({ ...packument, name }),
     execFn: (command) => commands.push(command),
   });
 
@@ -258,4 +260,142 @@ test('a picked run leaves the brand root alone — --target= names targets', asy
 
   assert.deepEqual(commands, [], 'nothing ran for the root');
   assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
+});
+
+// ─── The by-hand steps the manager move crossed ─────────────────────────────
+
+const REGISTER = `# Breaking changes
+
+## 2026-10-01: the update quarantine exempts the family ([#1046](https://github.com/Omega-JS-Stack/omega/issues/1046))
+
+Nothing to do.
+
+## 2026-09-30: the backend and the router have exports maps ([#1009](https://github.com/Omega-JS-Stack/omega/issues/1009))
+
+Load \`defineCases\` from \`@omega.js/backend/test\`.
+
+## 2026-09-20: an older shape
+
+An older step.
+
+## ultimate-jekyll-manager → @omega.js/web
+
+The legacy section.
+`;
+
+// 0.54.1 published 2026-09-30, 0.55.0 the next day, both long aged by `now`
+const MANAGER_PACKUMENT = {
+  latest: '0.55.0',
+  versions: ['0.54.1', '0.55.0'],
+  time: { '0.54.1': '2026-09-30T12:00:00.000Z', '0.55.0': '2026-10-01T09:00:00.000Z' },
+};
+const REGISTRY_NOW = '2026-10-20T00:00:00Z';
+
+/** The staged brand with its root pinned to `pin` and the installed manager carrying `register`. */
+function stageManagerBrand({ pin = '0.54.1', register = REGISTER } = {}) {
+  const { brand } = stageBrand();
+  write(path.join(brand, 'package.json'), JSON.stringify({
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+    devDependencies: { '@omega.js/manager': pin },
+  }));
+  const manager = path.join(brand, 'node_modules', '@omega.js', 'manager');
+  write(path.join(manager, 'package.json'), JSON.stringify({ name: '@omega.js/manager', version: pin }));
+  const file = path.join(manager, 'docs', 'shared', 'breaking-changes.md');
+  write(file, register);
+  return { brand, file };
+}
+
+/** Every console line printed while `fn` runs, ANSI stripped. */
+async function captureLines(fn) {
+  const lines = [];
+  const originals = {};
+  for (const method of ['log', 'info', 'warn', 'error']) {
+    originals[method] = console[method];
+    console[method] = (...args) => lines.push(args.map(String).join(' ').replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
+  }
+  try {
+    await fn();
+  } finally {
+    Object.assign(console, originals);
+  }
+  return lines.join('\n').split('\n');
+}
+
+/** The lines printed after the "Update summary" heading. */
+function afterSummary(lines) {
+  const start = lines.findIndex((line) => line.includes('Update summary'));
+  assert.ok(start >= 0, `the run prints its summary:\n${lines.join('\n')}`);
+  return lines.slice(start + 1);
+}
+
+test('a root leg that moved the manager pin ends on the by-hand steps since the old version', async () => {
+  const { brand, file } = stageManagerBrand();
+
+  let commands;
+  const lines = await captureLines(async () => {
+    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+  });
+  assert.deepEqual(commands, ['npm install @omega.js/manager@0.55.0 --save-dev --save-exact'], 'the pin moved');
+
+  const tail = afterSummary(lines);
+  const at = (text) => tail.findIndex((line) => line.includes(text));
+  const header = at('By-hand steps since 0.54.1 (2):');
+  const newest = at('  2026-10-01: the update quarantine exempts the family');
+  const older = at('  2026-09-30: the backend and the router have exports maps');
+  const register = at(`Each entry's step is in: ${file}`);
+
+  assert.ok(header >= 0, `the block opens after the summary:\n${lines.join('\n')}`);
+  assert.ok(header < newest && newest < older && older < register, `entries newest first, then the register path:\n${tail.join('\n')}`);
+  assert.equal(at('2026-09-20'), -1, 'an entry older than the publish day is not due');
+  assert.ok(!tail.some((line) => line.includes('ultimate-jekyll-manager')), 'an undated section is never an entry');
+});
+
+test('a moved pin with no publish time for the old version prints the one line naming the register', async () => {
+  const { brand, file } = stageManagerBrand();
+  const packument = { ...MANAGER_PACKUMENT, time: { '0.55.0': '2026-10-01T09:00:00.000Z' } };
+
+  const lines = await captureLines(() => withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument }));
+
+  const tail = afterSummary(lines);
+  assert.ok(tail.some((line) => line.includes(`By-hand steps for every shape OMEGA changed since 0.54.1: ${file}`)), tail.join('\n'));
+  assert.ok(!tail.some((line) => line.includes('By-hand steps since')), 'no counted header');
+  assert.ok(!tail.some((line) => /\s{2}2026-\d\d-\d\d: /.test(line)), 'no entry line');
+});
+
+test('--dry-run prints no by-hand block', async () => {
+  const { brand } = stageManagerBrand();
+
+  const lines = await captureLines(() => withOfflineUpdate(
+    () => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }),
+    { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT },
+  ));
+
+  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
+  assert.ok(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n'));
+});
+
+test('a run that did not move the manager pin prints no by-hand block', async () => {
+  const { brand } = stageManagerBrand({ pin: '0.55.0' });
+
+  let commands;
+  const lines = await captureLines(async () => {
+    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+  });
+
+  assert.deepEqual(commands, [], 'the pin is already current');
+  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
+});
+
+test('a moved pin with no due entry in the register prints no by-hand block', async () => {
+  const register = '# Breaking changes\n\n## 2026-09-20: an older shape\n\nAn older step.\n\n## ultimate-jekyll-manager → @omega.js/web\n\nThe legacy section.\n';
+  const { brand } = stageManagerBrand({ register });
+
+  let commands;
+  const lines = await captureLines(async () => {
+    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+  });
+
+  assert.deepEqual(commands, ['npm install @omega.js/manager@0.55.0 --save-dev --save-exact'], 'the pin moved');
+  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
+  assert.ok(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n'));
 });

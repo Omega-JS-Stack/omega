@@ -14,7 +14,8 @@ const { setPromptStreams } = require('@omega.js/devkit/prompt');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { makeStreams } = require('@omega.js/devkit/test/prompt-streams');
 const JSON5 = require('json5');
-const { resolveConfigValue, sortChoicesForBrand } = require('../src/lib/config-flow.js');
+const { stripVTControlCharacters } = require('node:util');
+const { resolveConfigValue, sortChoicesForBrand, isAuthored } = require('../src/lib/config-flow.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
@@ -40,6 +41,22 @@ afterEach(() => {
   setPromptStreams(null);
   setBrowserOpener(null);
 });
+
+/** Run fn with console.log captured; returns the joined lines, colors stripped. */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return stripVTControlCharacters(lines.join('\n'));
+}
+
+const CHATSY_HEADLESS_LINE = '→ Set inbound.chat.providers.chatsy.agentId in config/omega.json5, or run manage in a terminal to answer';
+const CHATSY_DRY_RUN_LINE = '→ Set inbound.chat.providers.chatsy.agentId in config/omega.json5, or run manage without --dry-run to answer';
 
 // ─── sortChoicesForBrand (pure) ──────────────────────────────────────────────
 
@@ -90,34 +107,116 @@ test('config-flow: an existing config value is returned untouched, no prompts', 
   assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE); // byte-identical
 });
 
-test('config-flow: non-interactive returns null and writes nothing', async () => {
+test('config-flow: non-interactive returns null, writes nothing, and prints the headless line', async () => {
   setPromptStreams(makeStreams({ tty: false }));
   const context = makeContext();
+  let value;
 
-  const value = await resolveConfigValue(context, {
-    path: 'inbound.chat.providers.chatsy.agentId',
-    label: 'Chatsy chat agent',
-    entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
-  });
-
-  assert.equal(value, null);
-  assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE);
-});
-
-test('config-flow: dry-run returns null without prompting, even with a TTY', async () => {
-  const tty = openTtyPrompt();
-  try {
-    const context = makeContext({ options: { dryRun: true } });
-    const value = await resolveConfigValue(context, {
+  const printed = await captureLogAsync(async () => {
+    value = await resolveConfigValue(context, {
       path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     });
+  });
+
+  assert.equal(value, null);
+  assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE);
+  assert.ok(printed.includes(CHATSY_HEADLESS_LINE), `headless line missing from: ${printed}`);
+});
+
+test('config-flow: dry-run returns null without prompting, even with a TTY, and names the rerun without --dry-run', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const context = makeContext({ options: { dryRun: true } });
+    let value;
+    const printed = await captureLogAsync(async () => {
+      value = await resolveConfigValue(context, {
+        path: 'inbound.chat.providers.chatsy.agentId',
+        label: 'Chatsy chat agent',
+        entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
+      });
+    });
     assert.equal(value, null);
+    assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE);
+    assert.ok(printed.includes(CHATSY_DRY_RUN_LINE), `dry-run line missing from: ${printed}`);
+    assert.ok(!printed.includes('run manage in a terminal'), printed);
+  } finally {
+    tty.close();
+  }
+});
+
+// ─── spec.present: what counts as already answered ──────────────────────────
+
+const REGISTRARS = ['namecheap', 'squarespace'];
+
+function registrarSpec() {
+  return {
+    path: 'domain.providers',
+    label: 'Domain registrar',
+    choices: async () => REGISTRARS,
+    getName: (name) => name,
+    getValue: (name) => name,
+    present: (value) => Object.keys(value).length > 0,
+  };
+}
+
+test('config-flow: present() says an empty pick is unanswered, so a terminal run prompts', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const config = JSON5.parse(CONFIG_SOURCE);
+    config.domain = { providers: {} };
+    const context = makeContext({ config });
+
+    const run = resolveConfigValue(context, registrarSpec());
+    await tty.answer('Set up now?', `${DOWN}\r`); // Skip for now: the gate opening is the proof
+    assert.equal(await run, null);
     assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE);
   } finally {
     tty.close();
   }
+});
+
+test('config-flow: present() accepts a real pick, returned untouched with no prompt', async () => {
+  const tty = openTtyPrompt(); // interactive: a gate here would hang
+  try {
+    const config = JSON5.parse(CONFIG_SOURCE);
+    config.domain = { providers: { namecheap: {} } };
+    const context = makeContext({ config });
+
+    const value = await resolveConfigValue(context, registrarSpec());
+
+    assert.deepEqual(value, { namecheap: {} });
+    assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE);
+  } finally {
+    tty.close();
+  }
+});
+
+// ─── isAuthored: the brand's own file, never the merged view ─────────────────
+
+test('config-flow: isAuthored is true when the brand file holds the path, false-valued included', () => {
+  const brandRoot = makeBrandRoot(`{
+  brand: { id: 'fixture-brand' },
+  cloud: { shared: false }, // answered once
+}
+`);
+  const context = { brandId: BRAND.id, brandRoot, brandConfig: { cloud: { shared: false } }, options: {} };
+
+  assert.equal(isAuthored(context, 'cloud.shared'), true);
+});
+
+test('config-flow: isAuthored is false when only the merged config holds the path', () => {
+  const brandRoot = makeBrandRoot(`{
+  brand: { id: 'fixture-brand' },
+  cloud: { supportEmail: 'help@fixture-brand.test' },
+}
+`);
+  // The merged view carries the schema default the file never wrote
+  const context = { brandId: BRAND.id, brandRoot, brandConfig: { cloud: { shared: false } }, options: {} };
+
+  assert.equal(isAuthored(context, 'cloud.shared'), false);
+  assert.equal(isAuthored(context, 'domain.providers'), false); // no section at all
 });
 
 // ─── Entry mode (paste-back) ─────────────────────────────────────────────────

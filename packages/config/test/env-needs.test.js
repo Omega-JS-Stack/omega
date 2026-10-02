@@ -9,7 +9,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { missingEnvKeys, ENV_VERBS } = require('../src/index.js');
+const { missingEnvKeys, missingConfigKeys, baseMissingKeys, ENV_VERBS } = require('../src/index.js');
 
 /**
  * The rows as sorted, unique [key, need] pairs, the shape most cases compare.
@@ -34,6 +34,9 @@ const GA_ID = { analytics: { providers: { google: { id: 'G-ACME123' } } } };
 const MINTED = ['OMEGA_ADMIN_KEY', 'OMEGA_NAMESPACE', 'OMEGA_WEBHOOK_KEY', 'UNSUBSCRIBE_HMAC_KEY'];
 const MINTED_ENV = Object.fromEntries(MINTED.map((key) => [key, 'minted']));
 const AZURE = ['AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID', 'AZURE_TRUSTED_SIGNING_ENDPOINT'];
+const SNAP = 'SNAPCRAFT_STORE_CREDENTIALS';
+const SELF_HOSTED = ['WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+const DEFAULT_SHIP = [SNAP, ...SELF_HOSTED];
 
 // Every key whose entry names the backend as its one reader (the key map's
 // "Targets: backend" rows), hard-coded so the case never reads the schema.
@@ -181,13 +184,79 @@ test('case 5: publish needs the four Azure keys to ship, and manage asks for the
   assert.deepEqual(pairsFor(manage, others), []);
 });
 
-test('case 5: a declared snap needs its store login to ship, and a dropped one does not', () => {
-  const snap = (value) => ({ ...AZURE_BRAND, targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: value } } } } } });
+// ─── A default desktop format owes its keys ─────────────────────────────────
 
-  assert.deepEqual(pairsFor(missingEnvKeys(snap({ channels: ['stable'] }), {}, { target: 'desktop', verb: 'publish' }), ['SNAPCRAFT_STORE_CREDENTIALS']), [
-    ['SNAPCRAFT_STORE_CREDENTIALS', 'ship'],
-  ]);
-  assert.deepEqual(pairsFor(missingEnvKeys(snap(false), {}, { target: 'desktop', verb: 'publish' }), ['SNAPCRAFT_STORE_CREDENTIALS']), []);
+/**
+ * A brand with one desktop target carrying the given platforms block.
+ * @param {object} [platforms] - The target's platforms block; none when absent.
+ * @returns {object} The config.
+ */
+const desktopBrand = (platforms) => ({
+  brand: { id: 'acme', name: 'Acme' },
+  cloud: REAL_PROJECT,
+  targets: { desktop: platforms ? { type: 'desktop', platforms } : { type: 'desktop' } },
+});
+
+test('a desktop target that declares no platforms owes the snap login and the self-hosted pair, on publish, deploy and manage', () => {
+  const config = desktopBrand();
+
+  assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target: 'desktop', verb: 'publish' }), DEFAULT_SHIP), DEFAULT_SHIP.map((key) => [key, 'ship']));
+  assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target: 'desktop', verb: 'deploy' }), DEFAULT_SHIP), DEFAULT_SHIP.map((key) => [key, 'required']));
+  assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { verb: 'manage' }), DEFAULT_SHIP), DEFAULT_SHIP.map((key) => [key, 'asked']));
+
+  // A snap row names the format's path, the one a refusal points at
+  const snap = missingEnvKeys(config, {}, { target: 'desktop', verb: 'publish' }).find((row) => row.key === SNAP);
+  assert.equal(snap.path, 'platforms.linux.formats.snap');
+
+  // Set, they are not missing
+  const env = Object.fromEntries(DEFAULT_SHIP.map((key) => [key, 'set']));
+  assert.deepEqual(pairsFor(missingEnvKeys(config, env, { target: 'desktop', verb: 'publish' }), DEFAULT_SHIP), []);
+});
+
+test('a declared snap owes its login the same as a default one', () => {
+  const declared = desktopBrand({ linux: { formats: { snap: { channels: ['stable'] } } } });
+  assert.deepEqual(pairsFor(missingEnvKeys(declared, {}, { target: 'desktop', verb: 'publish' }), [SNAP]), [[SNAP, 'ship']]);
+});
+
+test('the snap login is not owed once the snap or the whole of linux is turned off', () => {
+  for (const platforms of [{ linux: { formats: { snap: false } } }, { linux: false }]) {
+    const config = desktopBrand(platforms);
+    for (const [verb, target] of [['publish', 'desktop'], ['deploy', 'desktop'], ['manage', undefined]]) {
+      assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target, verb }), [SNAP]), [], `${JSON.stringify(platforms)} on ${verb}`);
+    }
+    // Turning the snap off leaves the Windows pair owed
+    assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target: 'desktop', verb: 'publish' }), SELF_HOSTED), SELF_HOSTED.map((key) => [key, 'ship']));
+  }
+});
+
+test('neither self-hosted Windows key is owed once Windows or its installer is turned off', () => {
+  for (const platforms of [{ windows: false }, { windows: { formats: { nsis: false } } }]) {
+    const config = desktopBrand(platforms);
+    for (const [verb, target] of [['publish', 'desktop'], ['deploy', 'desktop'], ['manage', undefined]]) {
+      assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target, verb }), SELF_HOSTED), [], `${JSON.stringify(platforms)} on ${verb}`);
+    }
+    // The snap is still on, so its login is still owed
+    assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target: 'desktop', verb: 'publish' }), [SNAP]), [[SNAP, 'ship']]);
+  }
+});
+
+test('the cloud strategy with Azure owes the four Azure keys and neither self-hosted key', () => {
+  const config = desktopBrand({ windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } });
+
+  const publish = missingEnvKeys(config, {}, { target: 'desktop', verb: 'publish' });
+  assert.deepEqual(pairsFor(publish, SELF_HOSTED), []);
+  assert.deepEqual(pairsFor(publish, AZURE), AZURE.map((key) => [key, 'ship']));
+  assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target: 'desktop', verb: 'deploy' }), SELF_HOSTED), []);
+});
+
+test('a brand with no desktop target owes none of the three default-format keys, on any verb', () => {
+  const config = brand({ web: { type: 'web' }, backend: { type: 'backend' }, extension: { type: 'extension' } });
+
+  for (const verb of ENV_VERBS) {
+    for (const target of [undefined, 'web', 'backend', 'extension']) {
+      assert.deepEqual(pairsFor(missingEnvKeys(config, {}, { target, verb }), DEFAULT_SHIP), [], `${verb}${target ? ` on ${target}` : ''}`);
+    }
+  }
 });
 
 test('case 5: an extension that ships to one store needs that store\'s keys only', () => {
@@ -214,6 +283,38 @@ test('case 6: an absent key OMEGA makes is required for the backend\'s start, a 
   const oneGone = { ...MINTED_ENV };
   delete oneGone.OMEGA_NAMESPACE;
   assert.deepEqual(pairs(missingEnvKeys(config, oneGone, { target: 'backend', verb: 'start' })), [['OMEGA_NAMESPACE', 'required']]);
+});
+
+// ─── What every brand owes ──────────────────────────────────────────────────
+
+test('baseMissingKeys: an empty env owes the backend\'s start exactly the minted four', () => {
+  const rows = baseMissingKeys({}, { target: 'backend', verb: 'start' });
+
+  assert.deepEqual(pairs(rows), MINTED.map((key) => [key, 'required']));
+  // The same rows the one answer gives for a config that says nothing
+  assert.deepEqual(rows, missingEnvKeys({}, {}, { target: 'backend', verb: 'start' }));
+});
+
+test('baseMissingKeys: one function, exported from env-needs.js and the package index', () => {
+  assert.equal(typeof baseMissingKeys, 'function');
+  assert.equal(require('../src/env-needs.js').baseMissingKeys, baseMissingKeys);
+});
+
+test('baseMissingKeys: an env holding the minted four owes nothing', () => {
+  assert.deepEqual(baseMissingKeys(MINTED_ENV, { target: 'backend', verb: 'start' }), []);
+});
+
+test('baseMissingKeys: a website\'s start owes nothing', () => {
+  assert.deepEqual(baseMissingKeys({}, { target: 'web', verb: 'start' }), []);
+});
+
+test('missingConfigKeys: the key a config adds, and none of the keys every brand owes', () => {
+  const config = { ...CAPTCHA_BRAND, ...SITE_KEY };
+  const added = missingConfigKeys(config, {}, { target: 'backend', verb: 'start' });
+
+  assert.deepEqual(pairs(added), [['RECAPTCHA_SECRET_KEY', 'required']]);
+  const base = new Set(baseMissingKeys({}, { target: 'backend', verb: 'start' }).map((row) => row.key));
+  assert.deepEqual(added.filter((row) => base.has(row.key)), []);
 });
 
 // ─── Case 7: the delivery name ──────────────────────────────────────────────
@@ -265,14 +366,13 @@ test('case 8: onboarding asks for no key at all', () => {
 
 test('the Windows signing strategy owes its own credentials and no other\'s', () => {
   const signing = (value) => ({ brand: { id: 'acme', name: 'Acme' }, cloud: REAL_PROJECT, targets: { desktop: { type: 'desktop', platforms: { windows: { signing: value } } } } });
-  const selfHosted = ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD'];
+  const owed = SELF_HOSTED.map((key) => [key, 'required']);
 
-  assert.deepEqual(pairsFor(missingEnvKeys(signing({ strategy: 'self-hosted' }), {}, { target: 'desktop', verb: 'deploy' }), selfHosted), [
-    ['WIN_CSC_KEY_PASSWORD', 'required'],
-    ['WIN_EV_TOKEN_PATH', 'required'],
-  ]);
+  assert.deepEqual(pairsFor(missingEnvKeys(signing({ strategy: 'self-hosted' }), {}, { target: 'desktop', verb: 'deploy' }), SELF_HOSTED), owed);
+  // Self-hosted is the default, so a desktop target that writes no strategy owes the same pair
+  assert.deepEqual(pairsFor(missingEnvKeys(signing({}), {}, { target: 'desktop', verb: 'deploy' }), SELF_HOSTED), owed);
   // A brand on the cloud strategy owes no EV token
-  assert.deepEqual(pairsFor(missingEnvKeys(signing({ strategy: 'cloud', cloud: { provider: 'azure' } }), {}, { target: 'desktop', verb: 'deploy' }), selfHosted), []);
+  assert.deepEqual(pairsFor(missingEnvKeys(signing({ strategy: 'cloud', cloud: { provider: 'azure' } }), {}, { target: 'desktop', verb: 'deploy' }), SELF_HOSTED), []);
 });
 
 test('the Sentry token is asked once Sentry is chosen, before any Sentry project exists', () => {

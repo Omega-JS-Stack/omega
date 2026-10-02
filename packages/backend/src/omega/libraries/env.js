@@ -25,7 +25,7 @@
  *
  * Values are never printed. Errors name the KEY and the fix.
  */
-const { envSchemaEntry, missingEnvKeys, missingConfigKeys } = require('@omega.js/config');
+const { envSchemaEntry, baseMissingKeys, missingConfigKeys } = require('@omega.js/config');
 const { getEnvironment } = require('@omega.js/config/environment');
 
 /** How a missing key gets fixed, by who is supposed to provide it. */
@@ -98,8 +98,7 @@ function require_(name) {
  * @throws {Error} MissingEnvKeysError (code 500) listing every missing key.
  */
 function assertRequired(target = 'backend') {
-  // An empty config makes no key mandatory, so it answers what EVERY brand owes
-  const missing = missingEnvKeys({}, process.env, { target, verb: 'start' }).map((row) => row.key);
+  const missing = baseMissingKeys(process.env, { target, verb: 'start' }).map((row) => row.key);
   if (missing.length === 0) { return; }
 
   const lines = missing.map((name) => `  - ${name}: ${envSchemaEntry(name).description}`);

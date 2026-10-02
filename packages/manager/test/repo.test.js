@@ -23,6 +23,7 @@ require('@omega.js/devkit/test/temp-home');
 const devkit = require('@omega.js/devkit/github-repo');
 const { OPERATIONS } = require('../src/config.js');
 const service = require('../src/services/repo/index.js');
+const { createGh } = require('./lib/fake-gh.js');
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ function brandConfig(extra = {}) {
       url: 'https://fixture-brand.test',
       description: 'A fixture brand',
     },
-    repo: { provider: 'github', org: 'fixture-org' },
+    repo: { provider: 'github', owner: 'fixture-org' },
     targets: { web: { type: 'web' } },
     ...extra,
   };
@@ -60,79 +61,19 @@ function brandRoot(isPrivate) {
 }
 
 /**
- * A fake `gh` exec: every call is recorded as its argv, and the reads answer
- * from a small world of repos, branches, pages and one org plan.
+ * The fake `gh` signed in to an account that sees the fixture org, answering
+ * from a small world of repos, branches and pages (test/lib/fake-gh.js).
  *
- * @param {object} [world]
- * @param {object} [world.repos] - slug -> repo json (absent = a 404).
- * @param {object} [world.pages] - slug -> pages json (absent = Pages off).
- * @param {object} [world.branches] - slug -> branch names that exist.
- * @param {string} [world.plan] - The org's plan name (default free).
- * @param {boolean} [world.userOwner] - The owner is a user: `orgs/<owner>` 404s.
- * @returns {function} An execFn for devkit's gh(), carrying `.calls`.
+ * @param {object} [world] - The account keys: `repos`, `pages`, `branches`, `plan`.
+ * @returns {function} An execFn for devkit's gh(), carrying `.calls` and `.mutations()`.
  */
-function fakeGh(world = {}) {
-  const repos = world.repos || {};
-  const pages = world.pages || {};
-  const branches = world.branches || {};
-
-  const notFound = () => {
-    const error = new Error('HTTP 404: Not Found');
-    error.stderr = 'gh: Not Found (HTTP 404)';
-    throw error;
-  };
-
-  const execFn = (file, args) => {
-    execFn.calls.push(args);
-
-    if (args[0] === 'repo' && args[1] === 'create') return '';
-    if (args[0] !== 'api') return '';
-
-    const endpoint = args[1];
-    const method = args.includes('-X') ? args[args.indexOf('-X') + 1] : 'GET';
-    const org = /^orgs\/([^/]+)$/.exec(endpoint);
-    const repo = /^repos\/([^/]+\/[^/]+)$/.exec(endpoint);
-    const branch = /^repos\/([^/]+\/[^/]+)\/branches\/(.+)$/.exec(endpoint);
-    const page = /^repos\/([^/]+\/[^/]+)\/pages$/.exec(endpoint);
-
-    if (org) {
-      if (world.userOwner) return notFound();
-      return JSON.stringify({ plan: { name: world.plan || 'free' } });
-    }
-    if (repo) {
-      if (method !== 'GET') return '{}';
-      return repos[repo[1]] ? JSON.stringify(repos[repo[1]]) : notFound();
-    }
-    if (branch) {
-      return (branches[branch[1]] || []).includes(branch[2]) ? JSON.stringify({ name: branch[2] }) : notFound();
-    }
-    if (page) {
-      if (method !== 'GET') return '{}';
-      return pages[page[1]] ? JSON.stringify(pages[page[1]]) : notFound();
-    }
-
-    return '{}';
-  };
-
-  execFn.calls = [];
-  return execFn;
-}
-
-/**
- * Every gh call that WRITES: a dry run must issue none of them.
- * @param {function} execFn - From fakeGh().
- * @returns {Array<string[]>} The mutating argvs.
- */
-function mutations(execFn) {
-  return execFn.calls.filter((args) => (
-    (args[0] === 'repo' && args[1] === 'create')
-    || args.includes('-X')
-  ));
+function ghWorld(world = {}) {
+  return createGh({ user: 'fixture-user', orgs: ['fixture-org'], ...world });
 }
 
 /**
  * The gh api endpoints the run touched, in order.
- * @param {function} execFn - From fakeGh().
+ * @param {function} execFn - From ghWorld().
  * @returns {string[]} The endpoints.
  */
 function endpoints(execFn) {
@@ -143,7 +84,7 @@ function endpoints(execFn) {
  * The service's GitHub client: devkit's real functions bound to the fake exec,
  * plus stubs for the three org-Actions reads.
  *
- * @param {function} execFn - From fakeGh().
+ * @param {function} execFn - From ghWorld().
  * @param {object} [runners] - { user, groups, groupsError, repositories, repositoriesError }.
  * @returns {object} The client shape src/services/repo/lib/github.js builds.
  */
@@ -191,7 +132,7 @@ function run(config, api, { root, options = {} } = {}) {
 /**
  * The converged world: both repos exist as configured, gh-pages is pushed and
  * Pages serves the site from it.
- * @returns {object} A fakeGh world.
+ * @returns {object} A ghWorld() world.
  */
 function convergedWorld() {
   return {
@@ -206,20 +147,20 @@ function convergedWorld() {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('repo service: a config with no repo block skips, naming repo.org', async () => {
+test('repo service: a config with no repo block skips, naming repo.owner', async () => {
   const config = brandConfig();
   delete config.repo;
 
-  const result = await run(config, client(fakeGh()));
+  const result = await run(config, client(ghWorld()));
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /repo\.org/);
+  assert.match(result.reason, /repo\.owner/);
 });
 
-test('repo service: an org with no brand.id fails loudly instead of ensuring half an address', async () => {
+test('repo service: an owner with no brand.id fails loudly instead of ensuring half an address', async () => {
   const config = brandConfig();
   delete config.brand.id;
 
-  await assert.rejects(() => run(config, client(fakeGh())), /brand\.id/);
+  await assert.rejects(() => run(config, client(ghWorld())), /brand\.id/);
 });
 
 test('repo service: an origin that is not the derived source repo REFUSES before anything is ensured (#934)', async () => {
@@ -231,12 +172,12 @@ test('repo service: an origin that is not the derived source repo REFUSES before
   execFileSync('git', ['-C', root, 'init', '-q']);
   execFileSync('git', ['-C', root, 'remote', 'add', 'origin', 'https://github.com/fixture-org/fixture-brand-site.git']);
 
-  const execFn = fakeGh();
+  const execFn = ghWorld();
 
   await assert.rejects(
     () => run(brandConfig(), client(execFn), { root }),
     (error) => {
-      assert.equal(error.message, `origin is fixture-org/fixture-brand-site but config derives ${SOURCE}: fix repo.org in config/omega.json5 or move the repo`);
+      assert.equal(error.message, `origin is fixture-org/fixture-brand-site but config derives ${SOURCE}: fix repo.owner in config/omega.json5 or move the repo`);
       return true;
     },
   );
@@ -251,11 +192,11 @@ test('repo service: the operations are the two roles, the runner check, then the
 // ─── The plan (dry run) ──────────────────────────────────────────────────────
 
 test('dry run: the plan names the private source repo and the public website repo, and mutates nothing', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(mutations(execFn), []);
+  assert.deepEqual(execFn.mutations(), []);
 
   assert.deepEqual(result.output.repo.planned, [`create ${SOURCE} (private)`]);
   assert.deepEqual(result.output.website.planned, [`create ${WEBSITE} (public: free plan)`]);
@@ -263,7 +204,7 @@ test('dry run: the plan names the private source repo and the public website rep
 });
 
 test('dry run: a private brand on a PAID org plans a private website repo, saying which plan', async () => {
-  const execFn = fakeGh({ plan: 'team' });
+  const execFn = ghWorld({ plan: 'team' });
   const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
 
   assert.deepEqual(result.output.website.planned, [`create ${WEBSITE} (private: fixture-org is on the team plan)`]);
@@ -271,7 +212,7 @@ test('dry run: a private brand on a PAID org plans a private website repo, sayin
 });
 
 test('dry run: a PUBLIC brand publishes both repos, the plan never asked about', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const api = client(execFn);
   const result = await run(brandConfig(), api, { root: brandRoot(false), options: { dryRun: true } });
 
@@ -281,7 +222,7 @@ test('dry run: a PUBLIC brand publishes both repos, the plan never asked about',
 });
 
 test('visibility: a brand root with no `private` key at all is private (#883)', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const result = await run(brandConfig(), client(execFn), { root: brandRoot(undefined), options: { dryRun: true } });
 
   assert.deepEqual(result.output.repo.planned, [`create ${SOURCE} (private)`]);
@@ -290,7 +231,7 @@ test('visibility: a brand root with no `private` key at all is private (#883)', 
 // ─── The source role ─────────────────────────────────────────────────────────
 
 test('source: the repo is created private, with no homepage and no initial commit', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const result = await run(brandConfig(), client(execFn));
 
   assert.equal(result.output.repo.created, true);
@@ -302,7 +243,7 @@ test('source: the repo is created private, with no homepage and no initial commi
 test('source: visibility drift is patched back to what the brand root states', async () => {
   const world = convergedWorld();
   world.repos[SOURCE] = { private: false, homepage: '' };
-  const execFn = fakeGh(world);
+  const execFn = ghWorld(world);
 
   const result = await run(brandConfig(), client(execFn));
 
@@ -315,20 +256,20 @@ test('source: visibility drift is patched back to what the brand root states', a
 test('source: Pages still serving the source repo is a warning with the by-hand steps, never a delete', async () => {
   const world = convergedWorld();
   world.pages[SOURCE] = { source: { branch: 'gh-pages' }, cname: 'fixture-brand.test' };
-  const execFn = fakeGh(world);
+  const execFn = ghWorld(world);
 
   const result = await run(brandConfig(), client(execFn));
 
   assert.equal(result.status, 'warned');
   assert.deepEqual(result.warned, [{ operation: 'repo', reason: `${SOURCE} still serves GitHub Pages: the website moved to its own repo (#883)` }]);
-  assert.deepEqual(mutations(execFn), [], 'the walk never retires Pages on its own');
+  assert.deepEqual(execFn.mutations(), [], 'the walk never retires Pages on its own');
 });
 
 test('source: Pages is never CONFIGURED on the source repo, converged or fresh', async () => {
-  const converged = fakeGh(convergedWorld());
+  const converged = ghWorld(convergedWorld());
   await run(brandConfig(), client(converged));
 
-  const fresh = fakeGh();
+  const fresh = ghWorld();
   await run(brandConfig(), client(fresh));
 
   for (const execFn of [converged, fresh]) {
@@ -340,7 +281,7 @@ test('source: Pages is never CONFIGURED on the source repo, converged or fresh',
 // ─── The website role ────────────────────────────────────────────────────────
 
 test('website: a fresh repo is created public with the target url, and Pages waits for the first deploy', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const result = await run(brandConfig(), client(execFn));
 
   const create = execFn.calls.find((args) => args[0] === 'repo' && args[1] === 'create' && args[2] === WEBSITE);
@@ -356,7 +297,7 @@ test('website: a fresh repo is created public with the target url, and Pages wai
 });
 
 test('website: once gh-pages exists, Pages is pointed at it and at the target host', async () => {
-  const execFn = fakeGh({
+  const execFn = ghWorld({
     repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' } },
     branches: { [WEBSITE]: ['gh-pages'] },
   });
@@ -371,7 +312,7 @@ test('website: once gh-pages exists, Pages is pointed at it and at the target ho
 
 test('website: two web targets get two repos, one per NAME, off ONE plan read', async () => {
   const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const api = client(execFn);
 
   const result = await run(config, api, { options: { dryRun: true } });
@@ -386,7 +327,7 @@ test('website: two web targets get two repos, one per NAME, off ONE plan read', 
 
 test('website: the second target\'s Pages domain is its OWN subdomain', async () => {
   const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
-  const execFn = fakeGh({
+  const execFn = ghWorld({
     repos: {
       [SOURCE]: { private: true },
       [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' },
@@ -408,7 +349,7 @@ test('website: the second target\'s Pages domain is its OWN subdomain', async ()
 test('website: a *.github.io brand claims NO custom domain', async () => {
   const config = brandConfig();
   config.brand.url = 'https://fixture-org.github.io/fixture-brand-web/';
-  const execFn = fakeGh({
+  const execFn = ghWorld({
     repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-org.github.io/fixture-brand-web/' } },
     branches: { [WEBSITE]: ['gh-pages'] },
   });
@@ -421,7 +362,7 @@ test('website: a *.github.io brand claims NO custom domain', async () => {
 });
 
 test('website: a brand with no web target owns no website repo', async () => {
-  const execFn = fakeGh();
+  const execFn = ghWorld();
   const result = await run(brandConfig({ targets: { backend: { type: 'backend' } } }), client(execFn));
 
   assert.equal(result.output.website.skipped, 'no GitHub-hosted web target');
@@ -431,11 +372,11 @@ test('website: a brand with no web target owns no website repo', async () => {
 // ─── Idempotency ─────────────────────────────────────────────────────────────
 
 test('a fully converged brand is a zero-mutation no-op', async () => {
-  const execFn = fakeGh(convergedWorld());
+  const execFn = ghWorld(convergedWorld());
   const result = await run(brandConfig(), client(execFn));
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(mutations(execFn), []);
+  assert.deepEqual(execFn.mutations(), []);
   assert.deepEqual(result.output.website.planned, []);
 });
 
@@ -456,7 +397,7 @@ function publicWorld() {
 }
 
 async function runDesktop(runners, { config = desktopBrand(), isPrivate = false, workflows = {} } = {}) {
-  const execFn = fakeGh(publicWorld());
+  const execFn = ghWorld(publicWorld());
   const api = client(execFn, runners);
   const root = brandRoot(isPrivate);
 
@@ -760,7 +701,7 @@ function brandWithTarget({ target, brandEnv = '', extra = {} }) {
   jetpack.write(path.join(root, 'package.json'), { name: 'fixture-brand', private: true, workspaces: ['targets/*'] });
   jetpack.write(path.join(root, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-    repo: { provider: 'github', org: 'fixture-org' },
+    repo: { provider: 'github', owner: 'fixture-org' },
     targets: { [target]: { type: target } },
     ...extra,
   }));
@@ -780,8 +721,8 @@ function brandWithTarget({ target, brandEnv = '', extra = {} }) {
 
 test('secrets: a dry run plans the target\'s key NAMES and issues no gh call', async () => {
   const { root, targets } = brandWithTarget({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
-  const execFn = fakeGh(convergedWorld());
-  const ghCalls = [];
+  const execFn = ghWorld(convergedWorld());
+  const secretsGh = ghWorld(convergedWorld());
 
   const result = await service.run({
     brandId: 'fixture-brand',
@@ -793,12 +734,12 @@ test('secrets: a dry run plans the target\'s key NAMES and issues no gh call', a
     options: { dryRun: true },
     serviceData: {},
     githubApi: client(execFn),
-    execFn: (file, args) => { ghCalls.push(args); return ''; },
+    execFn: secretsGh,
   });
 
   assert.equal(result.status, 'success');
   assert.deepEqual(result.output.secrets.extension.planned, ['CHROME_CLIENT_ID']);
-  assert.deepEqual(ghCalls, [], 'a dry run sends nothing');
+  assert.deepEqual(secretsGh.calls, [], 'a dry run sends nothing');
 });
 
 test('secrets: a REFUSED target is the operation\'s error, with the key and its fix', async () => {
@@ -809,7 +750,7 @@ test('secrets: a REFUSED target is the operation\'s error, with the key and its 
     brandEnv: 'CSC_KEY_PASSWORD=pw\n',
     extra: { certificates: { providers: { apple: { teamId: 'TEAMTEST12' } } } },
   });
-  const ghCalls = [];
+  const secretsGh = ghWorld(convergedWorld());
 
   const result = await service.run({
     brandId: 'fixture-brand',
@@ -820,12 +761,12 @@ test('secrets: a REFUSED target is the operation\'s error, with the key and its 
     operations: OPERATIONS.repo,
     options: {},
     serviceData: {},
-    githubApi: client(fakeGh(convergedWorld())),
-    execFn: (file, args) => { ghCalls.push(args); return ''; },
+    githubApi: client(ghWorld(convergedWorld())),
+    execFn: secretsGh,
   });
 
   assert.equal(result.status, 'error');
   assert.match(result.error, /CSC_LINK/);
   assert.match(result.error, /omega manage --service certificates/);
-  assert.deepEqual(ghCalls, [], 'a refusal publishes nothing');
+  assert.deepEqual(secretsGh.calls, [], 'a refusal publishes nothing');
 });

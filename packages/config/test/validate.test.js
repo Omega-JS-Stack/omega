@@ -191,7 +191,7 @@ test('the six manager-level sections are shared keys: a website-only brand carri
   const websiteOnly = {
     ...VALID,
     targets: { web: { type: 'web' } },
-    repo: { org: 'itw-creative-works' },
+    repo: { owner: 'itw-creative-works' },
     reviews: { enabled: true, sites: ['trustpilot.com'] },
     marketing: { campaigns: { enabled: true, providers: { sendgrid: { listId: 'lst_1' } } }, prune: { enabled: true } },
     blog: { enabled: false },
@@ -583,28 +583,39 @@ test('#564: `targets.web.meta.index` is LIVE, the site-wide default of the page 
 
 // ─── one repo block, one hosting key (#883) ───────────────────────────────
 
-// `repo: { provider, org }` is the whole declaration, and the org is the owner
-// of every repo the brand's names derive under. A block with no org would let
+// `repo: { provider, owner }` is the whole declaration, and the owner holds
+// every repo the brand's names derive under. A block with no owner would let
 // every derivation answer null and every reader skip in its own quiet way.
-test('#883: the repo block is provider + org, and the org is required when the block is there', () => {
-  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { org: 'Acme-Org' } }).errors, []);
-  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { provider: 'github', org: 'Acme-Org' } }).errors, []);
+test('#883: the repo block is provider + owner, and the owner is required when the block is there', () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { owner: 'Acme-Org' } }).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { provider: 'github', owner: 'Acme' } }).errors, []);
 
   const { errors } = validateConfig({ ...VALID, repo: { provider: 'github' } });
   assert.ok(
-    errors.some((e) => e.includes('config.repo.org is required when the repo block is present')),
-    `an org-less block must bounce: ${errors.join(' | ')}`,
+    errors.some((e) => e.includes('config.repo.owner is required when the repo block is present')),
+    `an owner-less block must bounce: ${errors.join(' | ')}`,
   );
 
   assert.ok(
-    validateConfig({ ...VALID, repo: { org: '   ' } }).errors
-      .some((e) => e.includes('config.repo.org is required')),
-    'whitespace is not an org',
+    validateConfig({ ...VALID, repo: { owner: '   ' } }).errors
+      .some((e) => e.includes('config.repo.owner is required')),
+    'whitespace is not an owner',
+  );
+});
+
+// The retired key is no alias: the strict schema refuses it and points at the
+// one code that converts it.
+test('repo.org is refused, naming the path and npx omega migrate', () => {
+  const { errors } = validateConfig({ ...VALID, repo: { provider: 'github', org: 'Acme' } });
+
+  assert.ok(
+    errors.some((e) => e.startsWith('config.repo.org ') && e.includes('npx omega migrate')),
+    `repo.org must fail the load: ${errors.join(' | ')}`,
   );
 });
 
 test('#883: repo.provider names a host OMEGA builds for', () => {
-  const { errors } = validateConfig({ ...VALID, repo: { provider: 'gitlab', org: 'Acme-Org' } });
+  const { errors } = validateConfig({ ...VALID, repo: { provider: 'gitlab', owner: 'Acme-Org' } });
 
   assert.ok(
     errors.some((e) => e.includes('config.repo.provider "gitlab" is not a host OMEGA builds for')
@@ -620,7 +631,7 @@ test('#883: hosting is a WEB target key, and its provider is table-checked', () 
   assert.deepStrictEqual(
     validateConfig({
       ...VALID,
-      repo: { org: 'Acme-Org' },
+      repo: { owner: 'Acme-Org' },
       targets: { web: { type: 'web', hosting: { provider: 'github' } }, community: { type: 'web' } },
     }).errors,
     [],
@@ -651,7 +662,7 @@ test('#883: a bare releases block still validates, with no repo to name', () => 
   assert.deepStrictEqual(
     validateConfig({
       ...VALID,
-      repo: { org: 'Acme-Org' },
+      repo: { owner: 'Acme-Org' },
       targets: { web: { type: 'web' }, desktop: { type: 'desktop', releases: {} } },
     }).errors,
     [],
@@ -669,7 +680,7 @@ test('the new homes themselves validate clean — the provider keeps its own nam
     edge: { providers: { cloudflare: { zone: 'zone-id' } } },
     captcha: { providers: { recaptcha: { siteKey: 'key' } } },
     search: { providers: { searchConsole: { submitSitemap: false } } },
-    repo: { org: 'Acme-Org' },
+    repo: { owner: 'Acme-Org' },
     cloud: { provider: 'firebase', config: { projectId: 'acme' }, organizationId: false, billingAccount: false },
     advertising: { providers: { adsense: { client: 'ca-pub-1', displaySlot: '1' } } },
   };
@@ -925,7 +936,7 @@ test('a retired path or a typo inside a container section fails the load', () =>
     [{ marketing: { campaigns: { provider: 'sendgrid' } } }, undefined, 'marketing.campaigns.provider'],
     [{ blog: { provider: 'ghostii' } }, undefined, 'blog.provider'],
     [{ seo: { index: false } }, undefined, 'seo.index'],
-    [{ repo: { org: 'Acme-Org', providers: { github: { org: 'Acme-Org' } } } }, undefined, 'repo.providers.github.org'],
+    [{ repo: { owner: 'Acme-Org', providers: { github: { org: 'Acme-Org' } } } }, undefined, 'repo.providers.github.org'],
     [{ meta: { title: 'Site' } }, 'web', 'meta.title'],
     [{ platforms: { win: { arch: ['x64'] } } }, 'desktop', 'platforms.win.arch'],
     [{ platforms: { linux: { snap: { enabled: true } } } }, 'desktop', 'platforms.linux.snap.enabled'],

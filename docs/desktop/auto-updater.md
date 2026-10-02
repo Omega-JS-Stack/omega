@@ -224,7 +224,7 @@ The submenu is dev-only (same gate as `view/developer/toggle-devtools`) and is a
 
 ```
 provider: github
-owner:    <repo.org>
+owner:    <repo.owner>
 repo:     `${brand.id}-releases`
 releaseType: release
 ```
@@ -233,7 +233,7 @@ So your private app repo and your public release repo are completely decoupled �
 
 ## Failure modes
 
-- **Update repo isn't public** → `electron-updater` gets 404 or 401 against a private repo. Fix: ensure the releases repo (`<repo.org>/<brand.id>-releases`) is public; `omega deploy`'s precheck creates it that way.
+- **Update repo isn't public** → `electron-updater` gets 404 or 401 against a private repo. Fix: ensure the releases repo (`<repo.owner>/<brand.id>-releases`) is public; `omega deploy`'s precheck creates it that way.
 - **Token rotates / expires for `releases` repo** — `electron-updater` doesn't authenticate downloads (anonymous public reads). So tokens don't apply on the consumer side.
 - **`app-update.yml` missing in the packaged app** → look at the build log for `electron-builder`'s "creating updates yml" line. If it's skipped, your `publish` block didn't materialize correctly into `dist/electron-builder.yml`.
 - **`error` status with code `ERR_UPDATER_CHANNEL_FILE_NOT_FOUND`** → there's no `latest-mac.yml` (or `latest.yml` / `latest-linux.yml`) at the configured channel. Run a release first.

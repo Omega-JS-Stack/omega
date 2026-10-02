@@ -395,6 +395,8 @@ const NO_BACKEND_TARGET = [
   'brand:naked-brand', 'synthetic:no-backend', 'synthetic:desktop-azure', 'synthetic:desktop-snap',
   'synthetic:extension-chrome', 'synthetic:extension-firefox', 'synthetic:extension-edge',
 ];
+// The desktop ship, publish, deploy and manage callers, and the format table
+const DEFAULT_FORMAT_CALLERS = /^(desktop\.assertShipKeys|devkit\.missingShipKeys|devkit\.missingRequiredSecrets|config\.formatKeys)@desktop$|^manager\.(publishing\.keys|runPreflight)$/;
 
 // The answers the move changes, and nothing else may. Where the two old lists
 // disagreed (reCAPTCHA, Sentry, Apple, ship keys) no caller's answer moved: each
@@ -412,6 +414,20 @@ const DISAGREEMENTS = [
     callers: /^manager\.runPreflight$/,
     keys: BACKEND_ONLY,
     change: 'removed',
+  },
+  {
+    why: 'a default desktop format owes its keys: a desktop target ships the snap unless it is turned off',
+    configs: ['brand:playground-omega', 'synthetic:desktop-azure'],
+    callers: DEFAULT_FORMAT_CALLERS,
+    keys: ['SNAPCRAFT_STORE_CREDENTIALS'],
+    change: 'added',
+  },
+  {
+    why: 'a default desktop format owes its keys: a desktop target signs its Windows installer self-hosted unless it writes another strategy or turns Windows off',
+    configs: ['brand:playground-omega', 'synthetic:desktop-snap'],
+    callers: DEFAULT_FORMAT_CALLERS,
+    keys: ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD'],
+    change: 'added',
   },
 ];
 
@@ -502,6 +518,14 @@ test('the comparison lets through a named change and stops any other', () => {
     'synthetic:real-project: removed /manager.runPreflight/empty/captcha SENDGRID_API_KEY',
   ]);
 
+  // A default desktop format's keys may be added on the named configs only, never dropped
+  const ship = (keys) => ({ 'devkit.missingShipKeys@desktop': { empty: keys } });
+  const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+  assert.deepEqual(unexplainedChanges('brand:playground-omega', ship([]), ship(owed)), []);
+  assert.deepEqual(unexplainedChanges('brand:playground-omega', ship(owed), ship([])), owed.map((key) => `brand:playground-omega: removed /devkit.missingShipKeys@desktop/empty ${key}`));
+  assert.deepEqual(unexplainedChanges('synthetic:desktop-azure', ship([]), ship(['WIN_EV_TOKEN_PATH'])), [
+    'synthetic:desktop-azure: added /devkit.missingShipKeys@desktop/empty WIN_EV_TOKEN_PATH',
+  ], 'the cloud strategy owes no self-hosted key');
 });
 
 test('every named disagreement names schema keys', () => {
@@ -521,3 +545,15 @@ for (const [name, build] of Object.entries(CONFIGS)) {
     }
   });
 }
+
+test('brand:playground-omega ships the default desktop formats, so its desktop rows hold their three keys', () => {
+  const answers = recorded['brand:playground-omega'];
+  assert.ok(answers, 'the playground brand was recorded above');
+  const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+
+  for (const caller of ['desktop.assertShipKeys@desktop', 'devkit.missingShipKeys@desktop', 'devkit.missingRequiredSecrets@desktop', 'manager.publishing.keys']) {
+    assert.deepEqual(owed.filter((key) => !answers[caller].empty.includes(key)), [], caller);
+  }
+  assert.deepEqual(answers['config.formatKeys@desktop']['linux.snap'], ['SNAPCRAFT_STORE_CREDENTIALS']);
+  assert.deepEqual(answers['config.formatKeys@desktop']['windows.nsis'], ['WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH']);
+});

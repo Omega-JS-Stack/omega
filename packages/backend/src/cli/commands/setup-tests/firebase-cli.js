@@ -1,5 +1,6 @@
 const BaseTest = require('./base-test');
-const powertools = require('node-powertools');
+const { missingBackendTools } = require('../../utils/project-type');
+const { machineToolLine } = require('@omega.js/devkit/machine-tools');
 
 class FirebaseCliTest extends BaseTest {
   getName() {
@@ -7,19 +8,12 @@ class FirebaseCliTest extends BaseTest {
   }
 
   getWarning() {
-    return [
-      'Firebase CLI is not installed.',
-      'Install with: npm install -g firebase-tools',
-    ];
+    return [machineToolLine(this.miss)];
   }
 
   async run() {
-    try {
-      await powertools.execute('firebase --version', { log: false });
-      return true;
-    } catch (error) {
-      return 'warn';
-    }
+    this.miss = missingBackendTools(this.self.firebaseProjectPath).find((miss) => miss.name === 'firebase');
+    return this.miss ? 'warn' : true;
   }
 }
 

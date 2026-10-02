@@ -43,14 +43,14 @@ const TARGETS = { targets: { web: { type: 'web' } } };
 const STANDALONE = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-prefix-standalone-'));
 
 test('brand.url set → the domain root: a CNAME cannot carry a path', () => {
-  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://omegajs.dev' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://omegajs.dev' }, repo: { owner: 'Org' }, ...TARGETS }, {}, STANDALONE), '/');
   assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'http://www.example.com/landing' } }, {}, STANDALONE), '/');
 });
 
 test('brand.url unset → the Pages project address, named by the WEBSITE repo (#883)', () => {
-  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/b-web/');
-  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'my-brand' }, ...TARGETS }, {}, STANDALONE), '/my-brand-web/', 'the same repo the direct plan pushes to');
-  assert.equal(deployPathPrefix({ brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/', 'no org, no repo to name a path with: the #355 default');
+  assert.equal(deployPathPrefix({ repo: { owner: 'Org' }, brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/b-web/');
+  assert.equal(deployPathPrefix({ repo: { owner: 'Org' }, brand: { id: 'my-brand' }, ...TARGETS }, {}, STANDALONE), '/my-brand-web/', 'the same repo the direct plan pushes to');
+  assert.equal(deployPathPrefix({ brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/', 'no owner, no repo to name a path with: the #355 default');
 });
 
 // #366 — a *.github.io brand.url is the PROJECT ADDRESS, not a custom domain:
@@ -58,8 +58,8 @@ test('brand.url unset → the Pages project address, named by the WEBSITE repo (
 // move the build to the domain root.
 test('a *.github.io brand.url names its own mount — the path it carries IS the base path (#366)', () => {
   assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, {}, STANDALONE), '/workkit/');
-  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io/workkit/' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/workkit/', 'the URL names the mount, not the repo');
-  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/b-web/', 'a bare Pages host names no project: the website repo does');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io/workkit/' }, repo: { owner: 'Org' }, ...TARGETS }, {}, STANDALONE), '/workkit/', 'the URL names the mount, not the repo');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io' }, repo: { owner: 'Org' }, ...TARGETS }, {}, STANDALONE), '/b-web/', 'a bare Pages host names no project: the website repo does');
   assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, { OMEGA_PATH_PREFIX: '/other' }, STANDALONE), '/other', 'an explicit export still wins');
 });
 
@@ -69,12 +69,12 @@ test('a *.github.io brand.url names its own mount — the path it carries IS the
 // source repo's name and 404 every asset.
 test('GITHUB_REPOSITORY names the source repo, so it names nothing here (#883)', () => {
   assert.equal(deployPathPrefix({ brand: { id: 'b' }, ...TARGETS }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/b-omega' }, STANDALONE), '/');
-  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/b-omega' }, STANDALONE), '/b-web/', 'the website repo names it instead');
+  assert.equal(deployPathPrefix({ repo: { owner: 'Org' }, brand: { id: 'b' }, ...TARGETS }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/b-omega' }, STANDALONE), '/b-web/', 'the website repo names it instead');
   assert.equal(deployPathPrefix({ ...TARGETS }, {}, STANDALONE), '/', 'nothing to derive → the domain root, the #355 default');
 });
 
 test('an explicitly exported OMEGA_PATH_PREFIX wins the autofill; a blank one is unset', () => {
-  const project = { repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS };
+  const project = { repo: { owner: 'Org' }, brand: { id: 'b' }, ...TARGETS };
   assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/workkit' }, STANDALONE), '/workkit', 'the publisher value wins');
   assert.equal(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, { OMEGA_PATH_PREFIX: '/workkit' }, STANDALONE), '/workkit');
   assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/' }, STANDALONE), '/', 'an explicit root is a value, not an absence');
@@ -83,16 +83,16 @@ test('an explicitly exported OMEGA_PATH_PREFIX wins the autofill; a blank one is
 });
 
 test('the value normalizes through resolvePathPrefix — ONE normalizer (#355 owns it)', () => {
-  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: '  spaced  ' }, ...TARGETS }, {}, STANDALONE), '/spaced-web/');
+  assert.equal(deployPathPrefix({ repo: { owner: 'Org' }, brand: { id: '  spaced  ' }, ...TARGETS }, {}, STANDALONE), '/spaced-web/');
 
   // What the build receives is what #355 normalizes: the two agree exactly.
-  const derived = deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'site' }, ...TARGETS }, {}, STANDALONE);
+  const derived = deployPathPrefix({ repo: { owner: 'Org' }, brand: { id: 'site' }, ...TARGETS }, {}, STANDALONE);
   assert.equal(resolvePathPrefix(derived), '/site-web', 'the build mounts the site under /site-web');
   assert.equal(resolvePathPrefix(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, {}, STANDALONE)), '', 'a domain-root deploy runs no prefix pass at all');
 });
 
 test('targetPathPrefix: the target-dir entry point loads the composed config (the CI lane calls this)', () => {
-  const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, repo: { org: 'Acme-Org' }, targets: { web: { type: 'web' } } }\n");
+  const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, repo: { owner: 'Acme-Org' }, targets: { web: { type: 'web' } } }\n");
   assert.equal(targetPathPrefix(project, {}), '/acme-web/', 'no brand.url → the project address of the website repo');
   fs.rmSync(project, { recursive: true, force: true });
 

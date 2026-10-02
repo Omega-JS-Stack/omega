@@ -112,7 +112,7 @@ const BRAND_MONOREPO = {
     monitoring: { providers: { sentry: { dsn: 'https://brand-shared.example.com' } } },
     probe: { value: 'brand-shared', fromBrandShared: true },
     targets: {
-      backend: { type: 'backend', probe: { value: 'brand-target', fromBrandTarget: true }, repo: { org: 'acme-org' } },
+      backend: { type: 'backend', probe: { value: 'brand-target', fromBrandTarget: true }, repo: { owner: 'acme-org' } },
       web: { type: 'web' },
     },
   }`,
@@ -151,7 +151,7 @@ test('five-layer chain: defaults < brand shared < brand target < local shared < 
 
   // Brand identity flows down; target-section keys land at the top level
   assert.strictEqual(config.brand.id, 'acme');
-  assert.strictEqual(config.repo.org, 'acme-org');
+  assert.strictEqual(config.repo.owner, 'acme-org');
 });
 
 test('any shared key inside a target entry overrides the shared value for that surface', (t) => {
@@ -170,7 +170,7 @@ test('the six manager-level sections resolve shared, and a targets.backend block
     'config/omega.json5': `{
       brand: { id: 'acme', name: 'Acme' },
       directory: { enabled: true },
-      repo: { org: 'acme-org' },
+      repo: { owner: 'acme-org' },
       reviews: { enabled: true, sites: ['trustpilot.com'] },
       marketing: { campaigns: { enabled: true, providers: { sendgrid: { listId: 'lst_shared' } } } },
       blog: { enabled: false },
@@ -203,7 +203,7 @@ test('the six manager-level sections resolve shared, and a targets.backend block
   assert.strictEqual(backendView.config.marketing.campaigns.providers.sendgrid.listId, 'lst_backend');
   // ...and the shared keys the override did not touch survive it
   assert.strictEqual(backendView.config.marketing.campaigns.enabled, true);
-  assert.strictEqual(backendView.config.repo.org, 'acme-org');
+  assert.strictEqual(backendView.config.repo.owner, 'acme-org');
 });
 
 test('resolved config keeps the merged targets map — enablement survives resolution', (t) => {
@@ -329,7 +329,7 @@ test('no target: whole files merge (targets map included) — the disperse shape
   assert.strictEqual(enabled, null);
   assert.strictEqual(config.probe.value, 'local-shared');
   assert.strictEqual(config.targets.backend.probe.value, 'local-target');
-  assert.strictEqual(config.targets.backend.repo.org, 'acme-org');
+  assert.strictEqual(config.targets.backend.repo.owner, 'acme-org');
   assert.deepStrictEqual(config.targets.web, { type: 'web' });
 });
 
@@ -345,7 +345,7 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
       targets: { backend: { type: 'backend' } },
     }`,
     'targets/backend/config/omega.json5': `{
-      targets: { backend: { type: 'backend', repo: { org: 'acme-org' } } },
+      targets: { backend: { type: 'backend', repo: { owner: 'acme-org' } } },
     }`,
   });
   cleanup(t, root);
@@ -357,7 +357,7 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
   const fromFunctions = loadConfig(functionsDir, 'backend');
   assert.strictEqual(fromFunctions.files.brand, path.join(root, 'config', 'omega.json5'));
   assert.strictEqual(fromFunctions.config.cloud.config.projectId, 'acme-prod');
-  assert.strictEqual(fromFunctions.config.repo.org, 'acme-org');
+  assert.strictEqual(fromFunctions.config.repo.owner, 'acme-org');
   assert.strictEqual(fromFunctions.enabled, true);
 
   // Same resolution from the target root — both entry points agree
@@ -370,7 +370,7 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
   fs.mkdirSync(path.join(functionsDir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(functionsDir, 'config', 'omega.json5'), JSON.stringify(composed, null, 2));
   const staged = loadConfig(functionsDir, 'backend');
-  assert.strictEqual(staged.config.repo.org, 'acme-org');
+  assert.strictEqual(staged.config.repo.owner, 'acme-org');
   assert.strictEqual(staged.config.cloud.config.projectId, 'acme-prod');
   // ...while the target-root view IGNORES the staged file (never a local layer)
   assert.strictEqual(loadConfig(targetRoot, 'backend').files.local, path.join(targetRoot, 'config', 'omega.json5'));

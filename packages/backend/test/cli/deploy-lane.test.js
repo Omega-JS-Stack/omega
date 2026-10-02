@@ -57,7 +57,7 @@ function targetDir({ brandRoot, version = '0.0.0', shared } = {}) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-lane-')));
   const config = JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    repo: { provider: 'github', org: 'Fixture-Org' },
+    repo: { provider: 'github', owner: 'Fixture-Org' },
     ...(shared ? { cloud: { shared: true } } : {}),
     targets: { backend: { type: 'backend' } },
   });

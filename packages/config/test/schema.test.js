@@ -167,7 +167,7 @@ test('the de-branded role sections are declared (#23)', () => {
     'edge.providers.cloudflare.zone',
     'captcha.providers.recaptcha.siteKey',
     'search.providers.searchConsole.submitSitemap',
-    'repo.org',
+    'repo.owner',
     // the gcp/firebase fold — one cloud home, projectId only under cloud.config
     'cloud.organizationId',
     'cloud.billingAccount',
@@ -520,15 +520,15 @@ test('the client keys a brand authors are declared (#650)', () => {
 // lands. `github` (the old identity block), `repo.providers.github.*` and the
 // desktop releases owner/repo are gone from the schema entirely: each is a
 // retired row instead, so a brand still carrying one hears about it.
-test('the repo block is provider + org, and nothing else is declared (#883)', () => {
+test('the repo block is provider + owner, and nothing else is declared (#883)', () => {
   const { SHARED_SCHEMA, REPO_PROVIDERS } = require('../src/schema.js');
   const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
   const repoPaths = [...rules.keys()].filter((path) => path === 'repo' || path.startsWith('repo.'));
 
-  assert.deepStrictEqual(repoPaths, ['repo', 'repo.provider', 'repo.org']);
+  assert.deepStrictEqual(repoPaths, ['repo', 'repo.provider', 'repo.owner']);
   assert.deepStrictEqual(rules.get('repo.provider').enum, REPO_PROVIDERS);
   assert.equal(rules.get('repo.provider').type, 'string');
-  assert.equal(rules.get('repo.org').type, 'string');
+  assert.equal(rules.get('repo.owner').type, 'string');
 
   // The presence-gate exclusion (docs/shared/config.md, Defaults &
   // self-healing): the BLOCK's presence is the switch, so a defaulted provider
@@ -560,8 +560,8 @@ test('the desktop releases block is a presence switch, with no repo to name (#88
 
   assert.ok(paths.includes('releases'));
   assert.ok(paths.includes('releases.enabled'));
-  assert.ok(!paths.includes('releases.owner'), 'the releases repo derives: `<brand.id>-releases` under repo.org');
-  assert.ok(!paths.includes('releases.repo'), 'the releases repo derives: `<brand.id>-releases` under repo.org');
+  assert.ok(!paths.includes('releases.owner'), 'the releases repo derives: `<brand.id>-releases` under repo.owner');
+  assert.ok(!paths.includes('releases.repo'), 'the releases repo derives: `<brand.id>-releases` under repo.owner');
 });
 
 // #911: the schema was behind the desktop runtime. Every key the annotated

@@ -46,24 +46,6 @@ function shellEscape(str) {
   return str.replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 }
 
-/**
- * Verify gh CLI is installed and authenticated (default auth — per-item
- * tokens are validated by their own API calls).
- */
-function verifyGhCli() {
-  try {
-    execSync('gh --version', { encoding: 'utf8', stdio: 'pipe' });
-  } catch {
-    throw new Error('GitHub CLI (gh) is not installed. Install from: https://cli.github.com/');
-  }
-
-  try {
-    execSync('gh auth status', { encoding: 'utf8', stdio: 'pipe' });
-  } catch {
-    throw new Error('GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env)');
-  }
-}
-
 /** Repo details, or null when it doesn't exist. */
 function getRepo(slug, token) {
   try {
@@ -146,7 +128,6 @@ function starRepo(slug, token) {
 }
 
 module.exports = {
-  verifyGhCli,
   getRepo,
   createRepo,
   getTree,

@@ -1,30 +1,8 @@
 /**
  * runPreludes: the BOOT PRELUDE list every verb but a read-only one passes through.
- *
- * One seam already sits above every verb on all five CLIs: the `freshnessBoot`
- * call that heals a stale locally-linked dist before anything runs. Anything
- * else the whole CLI surface must settle first had nowhere to live, so it lived
- * nowhere: a brand clone pointing at a redirected GitHub repo was checked by no
- * verb at all. This is that place: the preludes run right after the freshness
- * boot, in list order, before the verb.
- *
- * Each prelude is ONE file with one concern, exporting `{ name, verbs, run }`,
- * and declares what it targets: `'all'`, one verb name, or a list of them. The
- * runner filters by the verb about to run, as TYPED, before a framework's
- * alias table resolves it, since the tables are the frameworks' and this runs
- * above them, so an `'all'` prelude is the one that covers `-v` and a bare
- * `omega` too.
- *
- * A prelude is CHEAP and NON-INTERACTIVE: local reads, at most one network
- * call, never a prompt. Anything heavier is a manage op in its own service,
- * where a walk reports it. A prelude that stops the run THROWS with one line of
- * why, which this runner prints before exiting 1, the same presentation the
- * freshness boot's loud stops use, so a refused boot reads the same whichever
- * step refused it.
- *
- * Nothing here caches per process: a dispatcher hop that re-enters a `run()`
- * runs the preludes again, and every prelude being idempotent, the second pass
- * is a local read that finds its work already done.
+ * A prelude is CHEAP, NON-INTERACTIVE and idempotent (it runs again on every
+ * re-entry); one that stops the run THROWS one line of why. The contract:
+ * docs/devkit/index.md, Boot preludes.
  */
 
 const { isReadOnlyVerb } = require('../verbs.js');

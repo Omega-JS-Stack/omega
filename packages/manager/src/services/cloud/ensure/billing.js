@@ -82,7 +82,6 @@ module.exports = async function ensureBilling(context) {
   }
 
   if (!billingAccountName) {
-    console.log(`      ${chalk.dim('→')} Set cloud.billingAccount ("billingAccounts/XXXXXX-XXXXXX-XXXXXX") in company/brand config to auto-upgrade`);
     console.log(`      ${chalk.dim('→')} Or upgrade manually: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/usage/details`)}`);
     return needsInteractiveSkip(
       'billing',

@@ -136,18 +136,27 @@ test('publishing: the ask list follows the brand DECLARATION, not a typed list',
     sorted(['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']),
   );
 
-  // A desktop brand owes the snap login only where it DECLARES the snap, and
-  // the Windows set only for the strategy it configured
-  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop' } } }), []);
+  // A desktop brand ships the snap and the self-hosted-signed installer by
+  // default, so it owes their keys whether it declares them or not
+  const defaults = sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS']);
+  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop' } } }), defaults);
   assert.deepEqual(
     asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: { signing: { strategy: 'self-hosted' } } } } } }),
-    sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS']),
+    defaults,
+  );
+
+  // Turning a format off drops its keys, and the Windows set follows the strategy in force
+  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } }), []);
+  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: false } } } } } }), sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']));
+  assert.deepEqual(
+    asked({ targets: { desktop: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } } } }),
+    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT']),
   );
 
   // Two targets in one brand: the union
   assert.deepEqual(
     asked({ targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false } }, desktop: { type: 'desktop', platforms: { linux: { formats: { snap: true } } } } } }),
-    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']),
+    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']),
   );
 });
 
@@ -184,13 +193,13 @@ test('publishing: publishing.enabled = false skips the whole service', async () 
 
 test('publishing: PROVIDE opens the mint page and lands the key in the brand .env', async () => {
   cleanup();
-  // A desktop brand that DECLARES the snap owes exactly one credential, and
-  // the Snap Store has no listing id to collect
-  const source = `{\n  brand: { id: 'b' },\n  // keep me\n  targets: {\n    desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } } } },\n  },\n}\n`;
+  // A desktop brand that ships the snap and no Windows installer owes exactly
+  // one credential, and the Snap Store has no listing id to collect
+  const source = `{\n  brand: { id: 'b' },\n  // keep me\n  targets: {\n    desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } },\n  },\n}\n`;
   const brandRoot = makeBrandRoot(source);
   const brandConfig = {
     brand: { id: 'b' },
-    targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } } } } },
+    targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } } },
   };
   fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
 
@@ -346,10 +355,29 @@ test('publishing: a headless run with the keys present WARNS on the missing list
   }
 });
 
-test('publishing: a brand that ships no store and declares no signing has nothing to collect', async () => {
+test('publishing: a headless run FAILS on a desktop target\'s default formats, naming the snap\'s path', async () => {
   cleanup();
   const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
   const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop' } } };
+
+  try {
+    const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
+
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /SNAPCRAFT_STORE_CREDENTIALS \(required by platforms\.linux\.formats\.snap\b/);
+    assert.match(result.error, /on by default/);
+    assert.match(result.error, /WIN_EV_TOKEN_PATH/);
+    assert.match(result.error, /WIN_CSC_KEY_PASSWORD/);
+    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
+  } finally {
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
+test('publishing: a desktop brand that turns off the snap and Windows has nothing to collect', async () => {
+  cleanup();
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+  const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } };
 
   try {
     const result = await run(context(brandRoot, brandConfig, { dryRun: true }));

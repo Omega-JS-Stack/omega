@@ -29,7 +29,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, type, font, color, contact: { email, phone, person: {…}, carbonCopy: […] }, address: {…}, images: {…} },   // #524: type = the schema.org type the JSON-LD stamps ('Organization' unset), font = the display face the assets service renders the wordmark from. contact.person = the human who signs "personal" email (name, firstName, image, url, urlText), ASKED for by `omega onboard` ([#770](https://github.com/Omega-JS-Stack/omega/issues/770)) with the git user name (`git config user.name`) as the default: the wizard prompt writes name + the optional image/url, `--contactName`/`--contactImage`/`--contactUrl` answer it non-interactively, a run with no terminal and no flag takes the git user name, and nothing is written only when there is no git user name; contact.carbonCopy = audit BCCs
   cloud:          { enabled, provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, consentAudience, apiSubdomain, organizationId, billingAccount, oauthRedirectsConfigured },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design. shared: true limits the manage cycle to the per-brand operations AND skips the backend deploy whole (#882, deploys.md)
-  repo:           { provider: 'github', org },   // ONE block (#883): where the brand hosts its SOURCE. Presence enables the repo service, `provider` defaults to `github`, and `org` is the only typed value: every repo name derives from `<brand.id>-<role>` and visibility is the brand root package.json's `private` field, so neither is configurable here
+  repo:           { provider: 'github', owner },   // ONE block (#883): where the brand hosts its SOURCE. Presence enables the repo service, `provider` defaults to `github`, and `owner` is the only typed value: every repo name derives from `<brand.id>-<role>` and visibility is the brand root package.json's `private` field, so neither is configurable here
   edge:           { providers: { cloudflare: { enabled, zone, dns, settings, rules, cacheRules, speedTest, workers } } },   // rules.redirect: the ORDERED dynamic-redirect ruleset — [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }], `expression`/`targetUrl` in Cloudflare's own filter language. The ONE home for a TEMPLATED redirect, whose destination is computed from the request path (#466); the manager's edge service reconciles them by `name` (docs/manager/edge.md)
   captcha:        { providers: { recaptcha: { enabled, project, siteKey, domainsConfirmed: [] } } },   // domainsConfirmed: machine-written. The classic key's domain list has no API, so the captcha service records the owner's confirmation here and stops asking
   search:         { providers: { searchConsole: { enabled, submitSitemap, sitemapPaths, gaLinked } } },   // #546: each `enabled` is the service's own switch, default ON — false skips that whole service. gaLinked: machine-written — the Search Console ↔ GA association has no API, so the confirmation is the record
@@ -50,7 +50,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // `targets.backend` to hold them (presence there would enable the target). A
   // `targets.backend.<same key>` block still overrides any of them.
   company:        { id: '<parent brand.id>' | 'self', webhooks: true },   // #677: the ONE key joining a brand to its company, OUTSIDE `brand`. `id` and `webhooks` are the only typed keys; the loader FILLS the same key with { id, name, url, images: { wordmark }, webhooks } from the parent's own config, and a brand with no company resolves to its own name/url under a null id, so no reader carries a fallback. `webhooks: false` says the provider ACCOUNT (SendGrid Event Webhook, Beehiiv webhook) is somebody else's and the walk never repoints its one webhook. See "The company" below
-  domain:         { enabled, providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips
+  domain:         { enabled, providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips; `false` at either email key means none
   certificates:   { enabled, providers: { apple: { bundleIdPrefix, capabilities: [], profiles: [], certificates: [] } } },   // Apple signing for desktop/mobile targets. bundleIdPrefix is the brand's own answer ('com.mycompany' + brand.id composes the bundle id); the credentials live in .env (APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID)
   reviews:        { enabled, sites: [] },
   marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: docs/backend/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
@@ -283,7 +283,10 @@ targets: {
   the ids the walk asks for, with a "not yet" skip.
 - **`requires` names ENV keys, and the env schema owns them.** A key with a `requiredWhen`
   applies only when that rule holds, so the Windows nsis format asks for the credentials of
-  the strategy the brand actually picked and no other's. The schema is also where each key's
+  the strategy the brand actually signs with and no other's. The rules read what the target
+  ships, defaults included: a desktop target that never mentions the snap owes
+  `SNAPCRAFT_STORE_CREDENTIALS`, and one that names no signing strategy owes the two
+  self-hosted Windows keys, until the format is turned off with `false`. The schema is also where each key's
   `label`, `url` (the page that mints it) and `hint` live: one home for what a key is and
   where it comes from (see "The env schema" below).
 - **The one translation points.** Node's `darwin`/`win32` becomes OMEGA's word in
@@ -714,6 +717,8 @@ own list derives from it, so a new key is **one entry**, never four edits.
   | `onUnlessOff(path)` | the switch is not `false`, at the path or any section above it: absent means on |
   | `chosen(path, name)` | the provider is the chosen one: a `providers` map picks by presence, a plain value by equality (`chosen('platforms.windows.signing.cloud.provider', 'azure')`) |
   | `hasTarget(...types)` | the brand declares a target of one of those types |
+  | `ships(platform, format)` | a desktop target ships the format: on by default, so it holds until `platforms.<platform>` or `platforms.<platform>.formats.<format>` is `false`, judged per target view |
+  | `signsWith(strategy)` | a desktop target ships `windows.nsis` and signs it with that strategy, the default (`self-hosted`) included when none is written |
   | `realProject()` | `cloud.config.projectId` is not a `demo-` id: a demo project is local only, so the cloud service asks for nothing there. No id yet is "not chosen", not demo: the cloud service asks for the Google client so it can pick one |
   | `all(...rules)`, `any(...rules)` | every rule, or one of them |
   | `asks({ service: rule })` | the shape of an `askedWhen`: any service asks; `.services` keeps each service's own rule |
@@ -731,11 +736,13 @@ own list derives from it, so a new key is **one entry**, never four edits.
   "which keys is this brand missing".** It returns `[{ key, need, service, path, text }]`,
   where `need` is `required`, `asked` or `ship`, `path` is what requires the key (the
   config statement, or the declared format for a ship key; null for a key every brand
-  owes), `text` is the one line a refusal names it by (`KEY (required by <path>)`), and a
+  owes), `text` is the one line a refusal names it by (`KEY (required by <path>)`, then the
+  rule's `note` when it has one: a default format's says it is on until set to `false`), and a
   ship row also carries its format's `label`. Every caller decides only what a miss costs.
-  Two helpers beside it: `missingConfigKeys` (what THIS config adds beyond what every
-  brand owes) and `serviceAskedKeys(config, service)` (the keys `manage` asks of one
-  service, as a set):
+  Three helpers beside it: `baseMissingKeys(env, { target, verb })` (what EVERY brand owes:
+  the rows an empty config returns, the backend boot guard's and fixture env's answer),
+  `missingConfigKeys` (what THIS config adds beyond that) and
+  `serviceAskedKeys(config, service)` (the keys `manage` asks of one service, as a set):
 
   | Verb (`ENV_VERBS`) | Answers | Who calls it |
   |---|---|---|
@@ -816,7 +823,7 @@ Who derives from it:
 | `@omega.js/manager` `lib/env-order.js` (the brand and company `.env` marker template) | `envFileGroups()` + `envKeysByGroup()`: the groups of the `Default Values` section, their comments, their keys |
 | `@omega.js/config` `composeTargetEnv()` (the delivery composition every verb runs) | `ENV_SCHEMA` + `envFileGroups()`: a DECLARED brand key rides down when its entry claims it (by `name` or by `match`), its `targets` include the target, and its group renders into a file; a key no entry knows at all is the consumer's own and rides down to every target ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)); `deliverAs` is applied on arrival, and each layer's `.env.<environment>` overlay composes above its own base (#586) |
 | `@omega.js/config` `envKeysForTarget(target)` (the rendering lane's list) | `ENV_SCHEMA` + `envFileGroups()` — the NAMED keys a target reads, which placeholders a brand `.env` carries |
-| `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `missingEnvKeys(…, { verb: 'start' })` for the boot guard, and `getEnvironment()` re-exported under its own name ([docs/backend/index.md](../backend/index.md)) |
+| `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `baseMissingKeys(…, { verb: 'start' })` for the boot guard, and `getEnvironment()` re-exported under its own name ([docs/backend/index.md](../backend/index.md)) |
 | `@omega.js/manager` `lib/scaffold.js` (the onboard stub) + `lib/gitignore.js` (the brand `.gitignore` template and its heal) | `ENV_ENVIRONMENTS`: one empty `.env.<environment>` per name, and the `.env.*` ignore |
 | `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest`, plus the target's COMPOSED production values for the keys the schema cannot name (`match` families and custom keys, #835/#876): each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, backend's composed `deploy.yml` renders both its secrets block and the KEY LIST its node `.env` writer reads out of the runner env ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and all secret publishers send exactly its set |
 | `@omega.js/config` `env-needs.js` (`missingEnvKeys`, the one answer) | `targets` + `delivery` + `deliverAs` + `required` + `requiredWhen` + `askedWhen`, and the format table for the ship keys: what every verb's caller acts on, each at its own severity |
@@ -1362,8 +1369,9 @@ config-flow engine (`packages/manager/src/lib/config-flow.js`):
 
 | Value | Meaning |
 |-------|---------|
-| missing / `null` | ASK in an interactive run — the answer lands in omega.json5; without a TTY: warn + skip, aggregated in the run summary |
-| `false` | The user opted OUT — silent skip, never prompt or warn again. `false` on an ancestor section (`inbound.chat.providers.chatsy: false`) opts out every key under it |
+| missing / `null` | ASK in an interactive run: the answer lands in omega.json5; without a TTY: warn + skip, aggregated in the run summary |
+| a default the caller's `present` rejects | Not an answer, so ASK like missing. A caller passes `present` where a default would otherwise read as answered: an empty pick `{}` or an empty list `[]` is not an answer, and `cloud.shared` (schema default `false`) is asked once while the brand's own file does not author it |
+| `false` | The user opted OUT: silent skip, never prompt or warn again. `false` on an ancestor section (`inbound.chat.providers.chatsy: false`) opts out every key under it. At the two email keys (`domain.email.providers`, `domain.email.forwarding`) `false` means none |
 | anything else | Use it |
 
 Every ask offers the opt-out (the gate's "Disable" and, in selection flows, an inline
@@ -1404,9 +1412,9 @@ the strict load, and `omega migrate` names the block it derives from and drops i
   [repo.js](../../packages/config/src/repo.js): the brand's ONE public releases repo
   ([#799](https://github.com/Omega-JS-Stack/omega/issues/799),
   [#883](https://github.com/Omega-JS-Stack/omega/issues/883)). It is always
-  `<brand.id>-releases` under `repo.org`, with no override key left anywhere;
+  `<brand.id>-releases` under `repo.owner`, with no override key left anywhere;
   `targets.desktop.releases` presence is only the opt-in. Nothing addressable, no URL
-  (no org, no brand id). That helper is the ONE
+  (no owner, no brand id). That helper is the ONE
   home of the address: @omega.js/desktop's electron-builder publish block, its releases-repo
   provisioning and its `finalize-release` uploads read the same call, so the feed a shipped
   app polls and the link a download button carries cannot disagree.
@@ -1536,7 +1544,7 @@ needs surface.
 ONE block says where a brand hosts its code, and it is two keys:
 
 ```json5
-repo: { provider: 'github', org: 'Acme-Org' }
+repo: { provider: 'github', owner: 'Acme-Org' }
 ```
 
 - **Presence is the switch.** A brand with no `repo` block hosts its source somewhere the
@@ -1544,8 +1552,9 @@ repo: { provider: 'github', org: 'Acme-Org' }
   means that target is not enabled. There is no `enabled` key.
 - **`provider`** defaults to `github` and must be one of `REPO_PROVIDERS` (`['github']`).
   A second provider is one table row plus its own helper, never a reshape of the block.
-- **`org`** is the only typed value, and it is required whenever the block is present: it
-  owns every repo the brand's names derive under.
+- **`owner`** is the only typed value, and it is required whenever the block is present:
+  the GitHub user or org that owns every repo the brand's names derive under. Onboarding
+  writes it from the wizard's pick, `--owner`, or the clone's origin.
 
 **Every repo NAME derives from the `<brand.id>-<role>` rule** (Ian 2026-09-07,
 [#809](https://github.com/Omega-JS-Stack/omega/issues/809)), one function per role in
@@ -1554,14 +1563,14 @@ of any kind exists: a repo name that must differ is a brand id that must differ.
 
 | Role | Derivation | Visibility | Holds |
 |---|---|---|---|
-| Source monorepo | `sourceRepo(config)` → `<repo.org>/<brand.id>-omega` | the brand root package.json `private` field | the brand's code, its scaffolded workflows and their Actions secrets, and the CMS's content commits. Every dispatch addresses this one |
-| Releases | `releasesRepo(config)` → `<repo.org>/<brand.id>-releases` | always public (the desktop updater polls it with no token) | every target's built artifacts: desktop installers, the extension's zips, tagged per target |
-| Website, one per GitHub-hosted web target | `websiteRepo(config, name)` → `<repo.org>/<brand.id>-<target name>` | private only when the brand is private AND the org's plan allows Pages from a private repo, else public, and the manage walk says which | the BUILT site only, one force-orphan commit on `gh-pages`, served by Pages at the target's url |
+| Source monorepo | `sourceRepo(config)` → `<repo.owner>/<brand.id>-omega` | the brand root package.json `private` field | the brand's code, its scaffolded workflows and their Actions secrets, and the CMS's content commits. Every dispatch addresses this one |
+| Releases | `releasesRepo(config)` → `<repo.owner>/<brand.id>-releases` | always public (the desktop updater polls it with no token) | every target's built artifacts: desktop installers, the extension's zips, tagged per target |
+| Website, one per GitHub-hosted web target | `websiteRepo(config, name)` → `<repo.owner>/<brand.id>-<target name>` | private only when the brand is private AND the owner's plan allows Pages from a private repo, else public, and the manage walk says which | the BUILT site only, one force-orphan commit on `gh-pages`, served by Pages at the target's url |
 
 **`repoDrift(originSlug, config)`** is the one comparison of a checkout's `origin` with
 the source repo ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): the whole
 slug, case-insensitive, null when they agree or the config derives no source repo, else
-the line `origin is <slug> but config derives <derived>: fix repo.org in
+the line `origin is <slug> but config derives <derived>: fix repo.owner in
 config/omega.json5 or move the repo`. The boot prelude prints it; `omega manage` and
 `omega deploy` refuse with it ([deploys.md](deploys.md#the-origin-gate-934)).
 
@@ -1741,7 +1750,7 @@ The by-hand steps (and the rest of the register) are in
 
 The brand's repo hosting used to be spelled in four places: `repo.providers.github`, a
 separate top-level `github` identity, a `targets.<name>.github.repo` override, and the
-desktop releases owner/repo. One block says it now (`repo: { provider, org }`), every repo
+desktop releases owner/repo. One block says it now (`repo: { provider, owner }`), every repo
 name derives from `<brand.id>-<role>`, and visibility is the brand root package.json's
 `private` field. Each retired key is undeclared, so a brand still carrying one fails the
 strict load instead of silently addressing a repo nothing publishes to, and each is a
@@ -1751,16 +1760,16 @@ steps are the register's
 
 | Retired path | New home |
 |---|---|
-| `repo.providers.github.org` | **`repo.org`** |
+| `repo.providers.github.org` | **`repo.owner`** |
 | `repo.providers.github.repo` | nothing: the source repo IS `<brand.id>-omega`. A name that must differ is a brand id that must differ |
 | `repo.providers.github.private` | the brand root `package.json` `private` field (absent = private) |
 | `repo.providers.github.shared` | nothing: an org may host many brands, and no brand rewrites an org profile |
 | `repo.providers.github.enabled` | the PRESENCE of the `repo` block |
-| `github.user` | nothing: the org is `repo.org` |
+| `github.user` | nothing: the owner is `repo.owner` |
 | `github.website` | nothing: a web target's site repo is `<brand.id>-<target name>` |
 | `targets.<name>.github.repo` (every type) | nothing: the CMS commits to the SOURCE repo `<brand.id>-omega` |
-| `targets.desktop.releases.owner` | nothing: `<brand.id>-releases` under `repo.org` |
-| `targets.desktop.releases.repo` | nothing: `<brand.id>-releases` under `repo.org` (`releases: {}` stays the presence switch) |
+| `targets.desktop.releases.owner` | nothing: `<brand.id>-releases` under `repo.owner` |
+| `targets.desktop.releases.repo` | nothing: `<brand.id>-releases` under `repo.owner` (`releases: {}` stays the presence switch) |
 
 **Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142),
 [#859](https://github.com/Omega-JS-Stack/omega/issues/859)): a retired key is undeclared,
@@ -1946,7 +1955,7 @@ Registered per KEY at its authored path, never by name: the curated
 | Retired path | New home |
 |---|---|
 | `targets.desktop.downloads.enabled` | **`targets.desktop.releases`**: one public releases repo per brand, and its versionless assets ARE the permanent download links |
-| `targets.desktop.downloads.owner` | nothing: there is no second repo to own, and the releases repo derives as `<brand.id>-releases` under `repo.org` (#883) |
+| `targets.desktop.downloads.owner` | nothing: there is no second repo to own, and the releases repo derives as `<brand.id>-releases` under `repo.owner` (#883) |
 | `targets.desktop.downloads.repo` | nothing: the releases repo derives as `<brand.id>-releases` (#883) |
 | `targets.desktop.downloads.tag` | nothing: `/releases/latest/download/<asset>` is what the stable mirror tag was for |
 

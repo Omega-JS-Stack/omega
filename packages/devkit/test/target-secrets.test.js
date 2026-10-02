@@ -27,17 +27,17 @@ const noExec = () => { throw new Error('the boundary must not run'); };
 
 /**
  * A brand root with one target under targets/<target>, the brand .env holding
- * `brandEnv`, and the brand's repo ORG declared when `org` is given (the SOURCE
+ * `brandEnv`, and the brand's repo OWNER declared when `owner` is given (the SOURCE
  * repo derives from it as `my-brand-omega`, #883). `parent` places it inside
  * another directory (a nested brand's enclosing checkout); default the tmpdir.
  */
-function tmpBrand({ target, brandEnv, org, parent }) {
+function tmpBrand({ target, brandEnv, owner, parent }) {
   const brand = fs.mkdtempSync(path.join(parent || os.tmpdir(), 'devkit-target-secrets-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), [
     '{',
     "  brand: { id: 'my-brand', name: 'My Brand', url: 'https://my.brand' },",
-    ...(org ? [`  repo: { org: '${org}' },`] : []),
+    ...(owner ? [`  repo: { owner: '${owner}' },`] : []),
     `  targets: { ${target}: {} },`,
     '}',
   ].join('\n'));
@@ -162,7 +162,7 @@ test('publish: the collected keys go to the declared repo, values on stdin', () 
   const { brand, targetDir } = tmpBrand({
     target: 'web',
     brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\nGOOGLE_ANALYTICS_SECRET_WEB=mp-secret\n',
-    org: 'acme',
+    owner: 'acme',
   });
   const gh = [];
 
@@ -173,17 +173,17 @@ test('publish: the collected keys go to the declared repo, values on stdin', () 
       target: 'web',
       logger: quiet,
       env: {},
-      execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ file, args, input: (options || {}).input }); return ''; },
     });
 
     assert.deepStrictEqual(result.published, ['GOOGLE_ANALYTICS_SECRET', 'OMEGA_LICENSE_KEY']);
     assert.deepStrictEqual(gh.map((call) => call.args.join(' ')), [
-      'auth status',
+      '--version', 'api user',
       'secret set GOOGLE_ANALYTICS_SECRET --repo acme/my-brand-omega',
       'secret set OMEGA_LICENSE_KEY --repo acme/my-brand-omega',
     ]);
     // Values travel on stdin, never in argv.
-    assert.deepStrictEqual(gh.slice(1).map((call) => call.input), ['mp-secret', 'omg_live_fixture']);
+    assert.deepStrictEqual(gh.slice(2).map((call) => call.input), ['mp-secret', 'omg_live_fixture']);
     assert.ok(gh.every((call) => !call.args.join(' ').includes('omg_live_fixture')));
   } finally {
     fs.rmSync(brand, { recursive: true, force: true });
@@ -197,7 +197,7 @@ test('publish: a resolveValue seam transforms each value, and a falsy return dro
   const { brand, targetDir } = tmpBrand({
     target: 'web',
     brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\nGOOGLE_ANALYTICS_SECRET_WEB=mp-secret\n',
-    org: 'acme',
+    owner: 'acme',
   });
   const gh = [];
 
@@ -215,16 +215,16 @@ test('publish: a resolveValue seam transforms each value, and a falsy return dro
       logger: quiet,
       env: {},
       resolveValue: (value, key) => (key === 'OMEGA_LICENSE_KEY' ? Buffer.from(value).toString('base64') : null),
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
     // The dropped key never reaches gh; the kept one travels transformed.
     assert.deepStrictEqual(result.published, ['OMEGA_LICENSE_KEY']);
     assert.deepStrictEqual(gh.map((call) => call.args.join(' ')), [
-      'auth status',
+      '--version', 'api user',
       'secret set OMEGA_LICENSE_KEY --repo acme/my-brand-omega',
     ]);
-    assert.deepStrictEqual(gh.slice(1).map((call) => call.input), [Buffer.from('omg_live_fixture').toString('base64')]);
+    assert.deepStrictEqual(gh.slice(2).map((call) => call.input), [Buffer.from('omg_live_fixture').toString('base64')]);
   } finally {
     fs.rmSync(brand, { recursive: true, force: true });
   }
@@ -236,8 +236,8 @@ test('publish: the four skips are loud, and none of them touches gh', () => {
 
   // A key the schema DECLARES for another target: nothing composes for web.
   // (A key the schema does not know at all would compose here now, #835.)
-  const empty = tmpBrand({ target: 'web', brandEnv: 'CHROME_CLIENT_ID=chrome-id\n', org: 'acme' });
-  const keyed = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n', org: 'acme' });
+  const empty = tmpBrand({ target: 'web', brandEnv: 'CHROME_CLIENT_ID=chrome-id\n', owner: 'acme' });
+  const keyed = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n', owner: 'acme' });
   const undeclared = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n' });
 
   try {
@@ -285,7 +285,7 @@ test('publish: the four skips are loud, and none of them touches gh', () => {
 // been its own and is not (#872): publishing would arm a repo that is not the
 // derived one, which is the harm, so it REFUSES on the one drift line.
 test('publish: an origin that is not the derived source repo REFUSES with the one drift line, and publishes nothing (#934)', () => {
-  const keyed = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n', org: 'acme' });
+  const keyed = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n', owner: 'acme' });
   const gh = [];
   checkout(keyed.brand, 'git@github.com:Omega-JS-Stack/omega.git');
 
@@ -296,7 +296,7 @@ test('publish: an origin that is not the derived source repo REFUSES with the on
         execFn: (file, args) => { gh.push(args.join(' ')); return ''; },
       }),
       (error) => {
-        assert.strictEqual(error.message, 'origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.org in config/omega.json5 or move the repo');
+        assert.strictEqual(error.message, 'origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.owner in config/omega.json5 or move the repo');
         return true;
       },
     );
@@ -320,7 +320,7 @@ test('publish: a NESTED brand publishes to its DECLARED repo, remote mismatch an
   const { targetDir } = tmpBrand({
     target: 'web',
     brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n',
-    org: 'Omega-JS-Stack',
+    owner: 'Omega-JS-Stack',
     parent: outer,
   });
   const gh = [];
@@ -331,12 +331,12 @@ test('publish: a NESTED brand publishes to its DECLARED repo, remote mismatch an
       target: 'web',
       logger: quiet,
       env: {},
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
     assert.deepStrictEqual(result.published, ['OMEGA_LICENSE_KEY']);
     assert.deepStrictEqual(gh.map((call) => call.args.join(' ')), [
-      'auth status',
+      '--version', 'api user',
       'secret set OMEGA_LICENSE_KEY --repo Omega-JS-Stack/my-brand-omega',
     ]);
   } finally {
@@ -352,7 +352,7 @@ test('publish: extraSecrets ride the publish, over the composed values and past 
   const { brand, targetDir } = tmpBrand({
     target: 'web',
     brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\nGOOGLE_ANALYTICS_SECRET_WEB=mp-secret\n',
-    org: 'acme',
+    owner: 'acme',
   });
   const gh = [];
 
@@ -372,16 +372,16 @@ test('publish: extraSecrets ride the publish, over the composed values and past 
       },
       // The value seam is the COMPOSED half's: an extra is published verbatim
       resolveValue: (value) => `resolved:${value}`,
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
     assert.deepStrictEqual(result.published, ['GOOGLE_ANALYTICS_SECRET', 'OMEGA_LICENSE_KEY', 'OMEGA_SERVICE_ACCOUNT_JSON']);
-    assert.deepStrictEqual(gh.slice(1).map((call) => call.args.join(' ')), [
+    assert.deepStrictEqual(gh.slice(2).map((call) => call.args.join(' ')), [
       'secret set GOOGLE_ANALYTICS_SECRET --repo acme/my-brand-omega',
       'secret set OMEGA_LICENSE_KEY --repo acme/my-brand-omega',
       'secret set OMEGA_SERVICE_ACCOUNT_JSON --repo acme/my-brand-omega',
     ]);
-    assert.deepStrictEqual(gh.slice(1).map((call) => call.input), [
+    assert.deepStrictEqual(gh.slice(2).map((call) => call.input), [
       'resolved:mp-secret',
       'omg_live_from_the_caller',
       '{"type":"service_account"}',
@@ -394,7 +394,7 @@ test('publish: extraSecrets ride the publish, over the composed values and past 
 test('publish: an extra secret ALONE is a publish, never the empty-set skip', () => {
   // Another target's DECLARED key, so the composed set for web is empty (#835:
   // a key the schema does not know would compose for every target).
-  const { brand, targetDir } = tmpBrand({ target: 'web', brandEnv: 'CHROME_CLIENT_ID=chrome-id\n', org: 'acme' });
+  const { brand, targetDir } = tmpBrand({ target: 'web', brandEnv: 'CHROME_CLIENT_ID=chrome-id\n', owner: 'acme' });
   const gh = [];
 
   checkout(brand, 'git@github.com:acme/my-brand-omega.git');
@@ -405,12 +405,12 @@ test('publish: an extra secret ALONE is a publish, never the empty-set skip', ()
       logger: quiet,
       env: {},
       extraSecrets: { OMEGA_SERVICE_ACCOUNT_JSON: '{"type":"service_account"}' },
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
     assert.deepStrictEqual(result.published, ['OMEGA_SERVICE_ACCOUNT_JSON']);
     assert.deepStrictEqual(gh.map((call) => call.args.join(' ')), [
-      'auth status',
+      '--version', 'api user',
       'secret set OMEGA_SERVICE_ACCOUNT_JSON --repo acme/my-brand-omega',
     ]);
   } finally {
@@ -423,7 +423,7 @@ test('publish: an extra secret ALONE is a publish, never the empty-set skip', ()
 // devkit brings that type's own shape differences. These prove each entry.
 
 test('seams: desktop base64s a file-path secret, and an ABSOLUTE tree path resolves as given', () => {
-  const { brand, targetDir } = tmpBrand({ target: 'desktop', org: 'acme' });
+  const { brand, targetDir } = tmpBrand({ target: 'desktop', owner: 'acme' });
   const gh = [];
 
   checkout(brand, 'git@github.com:acme/my-brand-omega.git');
@@ -449,10 +449,10 @@ test('seams: desktop base64s a file-path secret, and an ABSOLUTE tree path resol
       target: 'desktop',
       logger: quiet,
       env: {},
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
-    const sent = new Map(gh.slice(1).map((call) => [call.args[2], call.input]));
+    const sent = new Map(gh.slice(2).map((call) => [call.args[2], call.input]));
     assert.ok(result.published.includes('APPLE_API_KEY'));
     assert.strictEqual(sent.get('APPLE_API_KEY'), Buffer.from('authkey-bytes').toString('base64'), 'the absolute path publishes as bytes');
     assert.strictEqual(sent.get('CSC_LINK'), Buffer.from('p12-bytes').toString('base64'), 'a relative path still resolves under the target');
@@ -468,7 +468,7 @@ test('seams: backend brings the service-account key as an extra secret, from the
     // The unconditional backend requirements, so the refusal guard has nothing
     // to say and the EXTRA is what this case is about.
     brandEnv: 'GH_TOKEN=ghp_fixture\nOMEGA_ADMIN_KEY=admin\nOMEGA_WEBHOOK_KEY=hook\nOMEGA_NAMESPACE=ns\nUNSUBSCRIBE_HMAC_KEY=hmac\n',
-    org: 'acme',
+    owner: 'acme',
   });
   const gh = [];
 
@@ -482,11 +482,11 @@ test('seams: backend brings the service-account key as an extra secret, from the
       target: 'backend',
       logger: quiet,
       env: {},
-      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+      execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
     });
 
     assert.ok(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'));
-    const sent = new Map(gh.slice(1).map((call) => [call.args[2], call.input]));
+    const sent = new Map(gh.slice(2).map((call) => [call.args[2], call.input]));
     assert.strictEqual(sent.get('OMEGA_SERVICE_ACCOUNT_JSON'), '{"type":"service_account"}');
   } finally {
     fs.rmSync(brand, { recursive: true, force: true });
@@ -498,7 +498,7 @@ test('seams: web and the extension bring none, so a value travels verbatim', () 
     const { brand, targetDir } = tmpBrand({
       target,
       brandEnv: target === 'web' ? 'OMEGA_LICENSE_KEY=omg_live_fixture\n' : 'CHROME_CLIENT_ID=client-id\n',
-      org: 'acme',
+      owner: 'acme',
     });
     const gh = [];
 
@@ -509,10 +509,10 @@ test('seams: web and the extension bring none, so a value travels verbatim', () 
         target,
         logger: quiet,
         env: {},
-        execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+        execFn: (file, args, options) => { gh.push({ args, input: (options || {}).input }); return ''; },
       });
 
-      const sent = new Map(gh.slice(1).map((call) => [call.args[2], call.input]));
+      const sent = new Map(gh.slice(2).map((call) => [call.args[2], call.input]));
       assert.strictEqual(sent.get(target === 'web' ? 'OMEGA_LICENSE_KEY' : 'CHROME_CLIENT_ID'), target === 'web' ? 'omg_live_fixture' : 'client-id');
     } finally {
       fs.rmSync(brand, { recursive: true, force: true });
@@ -526,7 +526,7 @@ test('dry run: the key NAMES print and nothing reaches gh', () => {
   const { brand, targetDir } = tmpBrand({
     target: 'extension',
     brandEnv: 'CHROME_CLIENT_ID=client-id\nCHROME_CLIENT_SECRET=client-secret\n',
-    org: 'acme',
+    owner: 'acme',
   });
   const lines = [];
 
@@ -553,7 +553,7 @@ test('dry run: the key NAMES print and nothing reaches gh', () => {
 });
 
 test('dry run: a refusal still THROWS, because a plan that cannot be made is loud', () => {
-  const { brand, targetDir } = tmpBrand({ target: 'desktop', brandEnv: 'CSC_KEY_PASSWORD=pw\n', org: 'acme' });
+  const { brand, targetDir } = tmpBrand({ target: 'desktop', brandEnv: 'CSC_KEY_PASSWORD=pw\n', owner: 'acme' });
 
   try {
     // The brand DECLARES Apple signing, so the mac set is required, and no
@@ -561,7 +561,7 @@ test('dry run: a refusal still THROWS, because a plan that cannot be made is lou
     fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), [
       '{',
       "  brand: { id: 'my-brand', name: 'My Brand', url: 'https://my.brand' },",
-      "  repo: { org: 'acme' },",
+      "  repo: { owner: 'acme' },",
       '  certificates: { providers: { apple: { teamId: "TEAMTEST12" } } },',
       '  targets: { desktop: {} },',
       '}',
@@ -586,7 +586,7 @@ test('dry run: a refusal still THROWS, because a plan that cannot be made is lou
 // against the ambient overlay instead, a developer machine's
 // `config/omega.development.json5` decided whether the publish refused.
 test('refusals are judged against the PRODUCTION config, never this shell\'s overlay', () => {
-  const { brand, targetDir } = tmpBrand({ target: 'desktop', brandEnv: 'CSC_KEY_PASSWORD=pw\n', org: 'acme' });
+  const { brand, targetDir } = tmpBrand({ target: 'desktop', brandEnv: 'CSC_KEY_PASSWORD=pw\n', owner: 'acme' });
   const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
 
   try {
@@ -595,7 +595,7 @@ test('refusals are judged against the PRODUCTION config, never this shell\'s ove
     fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), [
       '{',
       "  brand: { id: 'my-brand', name: 'My Brand', url: 'https://my.brand' },",
-      "  repo: { org: 'acme' },",
+      "  repo: { owner: 'acme' },",
       '  certificates: { providers: { apple: { teamId: "TEAMTEST12" } } },',
       '  targets: { desktop: {} },',
       '}',
@@ -632,7 +632,7 @@ test('refusals are judged against the PRODUCTION config, never this shell\'s ove
 // send are reads, so a plan that names keys the real run would never publish is
 // a promise the deploy cannot keep.
 test('dry run: a guard that would SKIP or REFUSE the publish does the same to the plan', () => {
-  const mismatched = tmpBrand({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n', org: 'acme' });
+  const mismatched = tmpBrand({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n', owner: 'acme' });
   const silent = tmpBrand({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
   const lines = [];
   const logger = { log: (line) => lines.push(line), warn: (line) => lines.push(line), error: (line) => lines.push(line) };

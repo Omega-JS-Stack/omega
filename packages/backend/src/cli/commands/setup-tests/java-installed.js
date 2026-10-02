@@ -1,6 +1,6 @@
 const BaseTest = require('./base-test');
-const powertools = require('node-powertools');
-const { javaInstallHint } = require('./helpers');
+const { missingBackendTools } = require('../../utils/project-type');
+const { machineToolLine } = require('@omega.js/devkit/machine-tools');
 
 class JavaInstalledTest extends BaseTest {
   getName() {
@@ -8,19 +8,12 @@ class JavaInstalledTest extends BaseTest {
   }
 
   getWarning() {
-    return [
-      'Java is required by the Firebase Firestore emulator (used for testing).',
-      `Install with: ${javaInstallHint()}`,
-    ];
+    return [machineToolLine(this.miss)];
   }
 
   async run() {
-    try {
-      await powertools.execute('java -version', { log: false });
-      return true;
-    } catch (error) {
-      return 'warn';
-    }
+    this.miss = missingBackendTools(this.self.firebaseProjectPath).find((miss) => miss.name === 'java');
+    return this.miss ? 'warn' : true;
   }
 }
 

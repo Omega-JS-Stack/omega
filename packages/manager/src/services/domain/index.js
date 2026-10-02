@@ -14,13 +14,14 @@
  * Missing credentials → the service skips with guidance.
  */
 const chalk = require('chalk').default;
-const { serviceAskedKeys, envSchemaEntry } = require('@omega.js/config');
+const { serviceAskedKeys, envSchemaEntry, chosenProvider } = require('@omega.js/config');
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
+const { resolveConfigValue } = require('../../lib/config-flow.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
-const { DOMAIN_PROVIDERS, resolveRegistrar } = require('./lib/providers.js');
+const { DOMAIN_PROVIDERS, presencePick, resolveRegistrar } = require('./lib/providers.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -30,6 +31,15 @@ module.exports.run = createServiceRunner({
     if (domainConfig.enabled === false) {
       return { skip: true, reason: 'domain.enabled = false' };
     }
+
+    await resolveConfigValue(context, {
+      path: 'domain.providers',
+      label: 'Domain registrar',
+      disablePath: 'domain.enabled',
+      instructions: ['The registrar that holds the domain, so its nameservers can point at Cloudflare.'],
+      present: (providers) => chosenProvider(providers) !== null,
+      ...presencePick('registrar'),
+    });
 
     const provider = resolveRegistrar(context.brandConfig);
     if (!provider) {

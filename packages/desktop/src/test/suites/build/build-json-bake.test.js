@@ -43,7 +43,7 @@ const CONFIG = () => ({
   platforms: { windows: { signing: 'cloud' } },
   certificates: { providers: { apple: { teamId: 'TEAM' } } },
   account: { admins: [{ email: 'root@paperloom.com' }] },
-  repo: { provider: 'github', org: 'Paperloom' },
+  repo: { provider: 'github', owner: 'Paperloom' },
 });
 
 const MODE = { environment: 'production', build: true, publish: false, server: false };

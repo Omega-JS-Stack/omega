@@ -13,7 +13,8 @@
  */
 
 const chalk = require('chalk').default;
-const { loadEnvRoots, resolveCompany } = require('@omega.js/config');
+const { loadEnvRoots, resolveCompany, targetEntries } = require('@omega.js/config');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
 
 const { SERVICE_ORDER, BOOT_SERVICES, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
@@ -102,7 +103,7 @@ async function runService(serviceName, brand, options = {}) {
  *   gate — without it the run only audits), limit?, ids? (migrations service),
  *   resetAssets? (true = both kinds, string = 'logos'/'templates'; assets
  *   service), force? (ignore the update service's incremental cache and
- *   rebuild every target) }
+ *   rebuild every target), execFn? (the machine-tool probe; tests inject it) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}
  */
 async function runManage(startDir, options = {}) {
@@ -209,6 +210,14 @@ async function runManage(startDir, options = {}) {
   console.log(`  ${chalk.dim('Company:')}  ${company.id ? `${company.id} (${company.root || 'not on this machine'})` : 'none'}`);
   console.log(`  ${chalk.dim('Enabled:')}  ${brand.enabledTargets.join(', ') || chalk.yellow('none enabled')}`);
   console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.map((entry) => `${entry.name}${entry.target ? chalk.dim(`→${entry.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
+  // A missing machine tool is named here, and the walk goes on. The boot lane
+  // leaves it to the dev leg skip, so `omega dev` prints it once. An invalid
+  // config is the workspace service's report, so it names no tools.
+  if (options.lane !== 'boot' && brand.configErrors.length === 0) {
+    for (const miss of missingMachineTools(targetEntries(brand.config), { execFn: options.execFn })) {
+      console.log(`  ${chalk.yellow('⚠')} ${machineToolLine(miss)}`);
+    }
+  }
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
 
   // Lockstep (#794): the @omega.js family ships ONE version, so a brand

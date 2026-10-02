@@ -33,7 +33,7 @@
  * exist yet. WHICH repo those links address is not decided here: it is
  * [repo.js](repo.js)'s `releasesRepo`, the one home of the brand's public
  * releases repo (#799/#883): `<brand.id>-releases` under the brand's one
- * `repo.org`, with no override key anywhere.
+ * `repo.owner`, with no override key anywhere.
  *
  * Beside the hub sits `downloads` ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)):
  * one DIRECT-download URL per FORMAT, so a download button hands over a file

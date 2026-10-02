@@ -167,7 +167,7 @@ test('all five CLI entries run the preludes right after the freshness boot, the 
 
 // ---- The origin heal: the decision
 
-const CONFIG = { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Acme-Org' } };
+const CONFIG = { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Acme-Org' } };
 // Where the repo lives NOW (what GitHub answers), and the stale slug a clone
 // made before the move still carries.
 const CURRENT = 'Acme-Org/acme-omega';
@@ -233,7 +233,7 @@ test('a redirected origin is rewritten to the repo GitHub redirects to, and says
     calls.find((call) => call.includes('set-url')),
     ['git', '-C', root, 'remote', 'set-url', 'origin', `https://github.com/${CURRENT}.git`],
   );
-  assert.equal(lines.length, 1, 'the heal line, and no drift line: the config org is where GitHub says it lives');
+  assert.equal(lines.length, 1, 'the heal line, and no drift line: the config owner is where GitHub says it lives');
   assert.match(lines[0], /origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
   assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT });
 });
@@ -281,7 +281,7 @@ test('no config at all: the heal is GitHub\'s answer, config or no config', (t) 
   assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT });
 });
 
-test('no repo block: the heal still runs, and nothing can drift from an org nobody typed', (t) => {
+test('no repo block: the heal still runs, and nothing can drift from an owner nobody typed', (t) => {
   const { calls, lines, seams: injected } = seams({
     origin: `https://github.com/${STALE}.git\n`,
     resolved: { full_name: CURRENT },
@@ -302,12 +302,12 @@ test('drift: an origin GitHub serves under another owner than the derived source
 
   const result = originHeal.run({
     brandRoot: brandRoot(t),
-    config: { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Other-Org' } },
+    config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
     ...injected,
   });
 
   assert.deepEqual(calls.filter((call) => call.includes('set-url')), [], 'the remote is right: it is the config that is wrong');
-  assert.deepEqual(lines, ['omega: origin is Acme-Org/acme-omega but config derives Other-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo']);
+  assert.deepEqual(lines, ['omega: origin is Acme-Org/acme-omega but config derives Other-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo']);
   assert.deepEqual(result, { healed: false, reason: 'converged', drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
 });
 
@@ -323,7 +323,7 @@ test('drift: a RENAME is drift too, the whole slug compared, not the owner alone
 
   assert.equal(lines.length, 2);
   assert.match(lines[0], /origin healed from Acme-Org\/acme-omega to Acme-Org\/acme-site/);
-  assert.equal(lines[1], 'omega: origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+  assert.equal(lines[1], 'omega: origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo');
   assert.deepEqual(result.drift, { origin: 'Acme-Org/acme-site', derived: CURRENT });
 });
 
@@ -335,7 +335,7 @@ test('a heal and a drift are two lines, the heal first', (t) => {
 
   const result = originHeal.run({
     brandRoot: brandRoot(t),
-    config: { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Other-Org' } },
+    config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
     ...injected,
   });
 
@@ -414,7 +414,7 @@ test('a real CLI boot heals a redirected origin before the verb runs', (t) => {
   // its own would be a repo inside a repo and a real remote to rewrite.
   const dir = scratch(t, 'omega-prelude-boot-');
   const config = JSON5.parse(fs.readFileSync(path.join(MONOREPO, 'brands', 'sandbox-brand', 'config', 'omega.json5'), 'utf8'));
-  config.repo = { provider: 'github', org: 'Omega-JS-Stack' };
+  config.repo = { provider: 'github', owner: 'Omega-JS-Stack' };
   jetpack.write(path.join(dir, 'config', 'omega.json5'), `${JSON5.stringify(config, null, 2)}\n`);
   jetpack.write(path.join(dir, 'package.json'), '{ "name": "sandbox-brand", "private": true }\n');
 

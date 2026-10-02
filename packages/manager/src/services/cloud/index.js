@@ -25,6 +25,7 @@ const chalk = require('chalk').default;
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
+const { resolveConfigValue, isAuthored } = require('../../lib/config-flow.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { FirebaseAPI } = require('./lib/firebase-api.js');
@@ -107,6 +108,19 @@ module.exports.run = createServiceRunner({
     if (access.healed) {
       console.log(`    ${chalk.green('✓')} Access healed — ${chalk.cyan(access.grantor)} granted ${chalk.cyan(access.manageEmail)} ${chalk.cyan(access.roles.join(' + '))} on ${chalk.cyan(projectId)}`);
     }
+
+    // The schema's `false` default is no answer, so a brand that never wrote
+    // the key is asked once and the answer lands either way
+    await resolveConfigValue(context, {
+      path: 'cloud.shared',
+      label: 'Shared Firebase project',
+      gate: false,
+      message: `Is ${projectId} shared with another brand?`,
+      present: (shared) => shared === true || isAuthored(context, 'cloud.shared'),
+      choices: () => [false, true],
+      getName: (shared) => (shared ? 'Yes, only per-brand operations run' : 'No, this brand owns it'),
+      defaultValue: false,
+    });
 
     const shared = cloud.shared === true;
     console.log(`    Project: ${chalk.cyan(projectId)}${shared ? chalk.dim(' (shared)') : ''}`);

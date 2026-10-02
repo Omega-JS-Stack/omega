@@ -19,8 +19,10 @@
  * flows may offer an inline opt-out choice via `spec.optOut`.
  */
 const chalk = require('chalk').default;
-const { setAtPath } = require('@omega.js/config');
-const { input, select } = require('@omega.js/devkit/prompt');
+const jetpack = require('fs-jetpack');
+const JSON5 = require('json5');
+const { setAtPath, getAtPath, resolveConfigPath } = require('@omega.js/config');
+const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('./config-write.js');
 const { canPrompt } = require('./run-gates.js');
@@ -44,6 +46,19 @@ function readTriState(obj, path) {
     node = node[key];
   }
   return { optedOut: node === false, value: node === false ? undefined : node };
+}
+
+/**
+ * Whether the brand's own config/omega.json5 holds a dot path, whatever the
+ * merged config says: the one way to tell a schema default from an answer.
+ *
+ * @param {Object} context - Service context (brandRoot)
+ * @param {string} path - Dot path
+ * @returns {boolean}
+ */
+function isAuthored(context, path) {
+  const file = resolveConfigPath(context.brandRoot);
+  return Boolean(file) && getAtPath(JSON5.parse(jetpack.read(file)), path) !== undefined;
 }
 
 /**
@@ -235,64 +250,63 @@ async function runSelection(context, spec) {
 }
 
 /**
- * Entry flow: open the dashboard and take a pasted-back value.
+ * Entry flow: open the dashboard and take a pasted-back value. An array of
+ * entries asks each in turn, and `spec.getValue` turns the answers into the
+ * one value that lands.
  */
 async function runEntry(context, spec) {
-  const { url, message, validate } = spec.entry;
+  const answers = [];
 
-  if (url) {
-    await openBrowser(url);
+  for (const { url, message, validate } of [].concat(spec.entry)) {
+    if (url) {
+      await openBrowser(url);
+    }
+
+    const value = await input({
+      message,
+      validate: validate || ((val) => (val?.trim() ? true : 'Required')),
+    });
+    answers.push(value.trim());
   }
 
-  const value = await input({
-    message,
-    validate: validate || ((val) => (val?.trim() ? true : 'Required')),
-  });
-
-  return value.trim();
+  return Array.isArray(spec.entry) ? spec.getValue(answers) : answers[0];
 }
 
 /**
- * Resolve a required config value interactively and land it in omega.json5.
- *
- * Tri-state (#33): returns the value already in config if present
- * (idempotent); returns null WITHOUT prompting when the value — or any
- * ancestor section — is `false` (the user opted out); returns null without
- * prompting when non-interactive or dry-run, and when the user skips or
- * disables — callers keep their existing clean-skip handling.
- *
- * @param {Object} context - Service context (brandConfig, brandRoot, options)
- * @param {Object} spec
- * @param {string} spec.path - omega.json5 dot path the value lands at
- * @param {string} spec.label - Human name ("GA4 property", "Chatsy chat agent")
- * @param {string[]} [spec.instructions] - Numbered guidance lines shown before the gate
- * @param {string} [spec.message] - Selection prompt (default "Select <label>:")
- * @param {Function} [spec.choices] - async (context) → items (selection mode)
- * @param {Function} [spec.getName] - item → display name
- * @param {Function} [spec.getValue] - item → value
- * @param {*} [spec.defaultValue] - Sorts its item to the top of the list
- * @param {Object} [spec.createNew] - { label, handler } (API) or { label, url, refreshChoices } (browser)
- * @param {Object} [spec.entry] - { url, message, validate } (paste-back mode)
- * @param {Object} [spec.optOut] - { label } inline selection choice → lands `false`
- * @param {string} [spec.disablePath] - Where Disable/opt-out writes `false`
- *   (defaults to spec.path — section paths let one opt-out cover a service)
- * @param {boolean} [spec.gate] - false = skip the Yes/Skip/Disable gate (a
- *   chained value whose flow the user already said Yes to)
- * @returns {Promise<*>} - The landed value, or null
+ * Resolve a config value and land it in omega.json5. Returns what is there, or null without
+ * asking when it or an ancestor is `false` or the run cannot prompt, or when the user skips.
+ * @param {object} context - Service context (brandConfig, brandRoot, options)
+ * @param {object} spec - `path` (the dot path the value lands at), `label`, `instructions`
+ * @param {string} [spec.disablePath] - Where Disable/opt-out writes `false` (default `path`)
+ * @param {boolean} [spec.gate] - false skips the Yes/Skip/Disable gate (a chained ask)
+ * @param {Function} [spec.choices] - Selection mode, with `getName`, `getValue`, `defaultValue`, `createNew`, `optOut`
+ * @param {object|object[]} [spec.entry] - Paste-back mode (an array asks each, `getValue` joins)
+ * @param {Function} [spec.present] - value → whether it answers, `false` included (an empty pick or list is none)
+ * @returns {Promise<*>} The landed value, or null (undefined and null in config never answer)
  */
 async function resolveConfigValue(context, spec) {
   const { path, label } = spec;
   const disablePath = spec.disablePath || path;
 
-  const { optedOut, value: existing } = readTriState(context.brandConfig, path);
-  if (optedOut) {
+  const parent = path.slice(0, Math.max(path.lastIndexOf('.'), 0));
+  if (parent && readTriState(context.brandConfig, parent).optedOut) {
     return null;
   }
-  if (existing !== undefined && existing !== null) {
+
+  // readTriState folds the path's own `false` into optedOut
+  const { optedOut, value: current } = readTriState(context.brandConfig, path);
+  const existing = optedOut ? false : current;
+  if (existing === false && !spec.present) {
+    return null;
+  }
+  if (existing !== undefined && existing !== null && (!spec.present || spec.present(existing))) {
     return existing;
   }
 
   if (!canPrompt(context.options)) {
+    // A terminal that cannot prompt is a dry run
+    const rerun = isInteractive() ? 'run manage without --dry-run' : 'run manage in a terminal';
+    console.log(`    ${chalk.dim(`→ Set ${path} in config/omega.json5, or ${rerun} to answer`)}`);
     return null;
   }
 
@@ -329,6 +343,7 @@ module.exports = {
   resolveConfigValue,
   confirmSetup,
   readTriState,
+  isAuthored,
   sortChoicesForBrand,
   landValue,
 };

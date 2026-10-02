@@ -1,8 +1,9 @@
 /**
  * The machine half of the omega plugin: what Claude Code on this machine has
  * registered, installed and turned on for the user. Every call into Claude
- * Code goes through `exec(args)`, which returns stdout and throws on a failed
- * command; the default runs the real `claude`. The developer default is set in
+ * Code goes through the injected runner `execFn(file, args, options)`, which
+ * returns stdout and throws on a failed command; the default is execFileSync
+ * on the real `claude`. The developer default is set in
  * the user settings file, in the same shape a linked brand's private file
  * carries. No `claude` on the machine means nothing to read or change.
  */
@@ -31,13 +32,14 @@ const {
 const INSTALL_HINT = `Claude plugin not installed on this machine. Run: claude plugin marketplace add ${PLUGIN_REPO} && claude plugin install ${PLUGIN_ID}`;
 
 /**
- * Run the real `claude` CLI.
+ * Run `claude` on the injected runner.
  *
+ * @param {Function} execFn - The runner: `(file, args, options) => stdout`
  * @param {string[]} args - Arguments after `claude`
  * @returns {string} - stdout
  */
-function runClaude(args) {
-  return execFileSync('claude', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+function claude(execFn, args) {
+  return execFn('claude', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 /**
@@ -49,9 +51,9 @@ function userSettingsFile() {
   return join(process.env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude'), 'settings.json');
 }
 
-function hasClaude(exec) {
+function hasClaude(execFn) {
   try {
-    exec(['--version']);
+    claude(execFn, ['--version']);
     return true;
   } catch {
     return false;
@@ -62,15 +64,15 @@ function hasClaude(exec) {
  * Every record the machine reads: the marketplace records, the user-scope
  * installs, and whether the user default is the local copy.
  *
- * @param {Function} exec - The `claude` runner
+ * @param {Function} execFn - The runner
  * @returns {{ claude: boolean, marketplaces: object[], installs: object[], localDefault: boolean }}
  */
-function readMachine(exec) {
-  if (!hasClaude(exec)) {
+function readMachine(execFn) {
+  if (!hasClaude(execFn)) {
     return { claude: false, marketplaces: [], installs: [], localDefault: false };
   }
-  const marketplaces = JSON.parse(exec(['plugin', 'marketplace', 'list', '--json']));
-  const installs = JSON.parse(exec(['plugin', 'list', '--json'])).filter((entry) => entry.scope === 'user');
+  const marketplaces = JSON.parse(claude(execFn, ['plugin', 'marketplace', 'list', '--json']));
+  const installs = JSON.parse(claude(execFn, ['plugin', 'list', '--json'])).filter((entry) => entry.scope === 'user');
   const { settings } = readSettings(userSettingsFile());
   const localDefault = Boolean(settings
     && settings[MARKETPLACE_KEY]?.[LOCAL_MARKETPLACE_NAME]
@@ -89,21 +91,21 @@ function findInstall(machine, id) {
 /**
  * The machine-wide state of the omega plugin for this user.
  *
- * @param {{ exec?: Function }} [options] - exec: the `claude` runner
- * @returns {{ claude: boolean, source: string|null, version: string|null, localDefault: boolean }}
+ * @param {{ execFn?: Function }} [options] - execFn: the runner
+ * @returns {{ claude: boolean, source: string|null, version: string|null, localDefault: boolean, marketplaces: object[], installs: object[] }}
  *   source: where the `omega` record points (`github`, `directory`, ...);
  *   version: the user-scope `omega@omega` install; localDefault: the user
- *   settings turn the local copy on
+ *   settings turn the local copy on; marketplaces and installs: the records
+ *   read, so the state can be handed to ensureMachinePlugin as `machine`
  */
-function machinePluginState({ exec = runClaude } = {}) {
-  const machine = readMachine(exec);
+function machinePluginState({ execFn = execFileSync } = {}) {
+  const machine = readMachine(execFn);
   const record = findRecord(machine, MARKETPLACE_NAME);
   const install = findInstall(machine, PLUGIN_ID);
   return {
-    claude: machine.claude,
+    ...machine,
     source: record ? record.source : null,
     version: install ? install.version : null,
-    localDefault: machine.localDefault,
   };
 }
 
@@ -113,15 +115,15 @@ function machinePluginState({ exec = runClaude } = {}) {
  * declaration goes first (taking its install with it); a record only a
  * project declared moves on the add itself.
  */
-function registerMarketplace(exec, name, record, addArgs) {
+function registerMarketplace(execFn, name, record, addArgs) {
   if (record) {
     try {
-      exec(['plugin', 'marketplace', 'remove', name, '--scope', 'user']);
+      claude(execFn, ['plugin', 'marketplace', 'remove', name, '--scope', 'user']);
     } catch {
       // Not declared at user scope: the add below moves the record itself.
     }
   }
-  exec(['plugin', 'marketplace', 'add', ...addArgs]);
+  claude(execFn, ['plugin', 'marketplace', 'add', ...addArgs]);
 }
 
 function isPublishedRecord(record) {
@@ -132,10 +134,10 @@ function isPublishedRecord(record) {
  * Install the published copy for the user. An install turns it on for the
  * user, so on a machine whose default is the local copy it goes off again.
  */
-function installPublished(exec, machine) {
-  exec(['plugin', 'install', PLUGIN_ID, '--scope', 'user']);
+function installPublished(execFn, machine) {
+  claude(execFn, ['plugin', 'install', PLUGIN_ID, '--scope', 'user']);
   if (machine.localDefault) {
-    exec(['plugin', 'disable', PLUGIN_ID, '--scope', 'user']);
+    claude(execFn, ['plugin', 'disable', PLUGIN_ID, '--scope', 'user']);
   }
 }
 
@@ -143,20 +145,20 @@ function installPublished(exec, machine) {
  * The one move of `omega` onto GitHub: the record re-registered from the
  * published repo, and an install the move took with it put back.
  *
- * @param {Function} exec - The `claude` runner
+ * @param {Function} execFn - The runner
  * @param {object} machine - What readMachine read before the move
  * @returns {string[]} - `registered` or `moved`, then `installed` when put back
  */
-function movePublished(exec, machine) {
+function movePublished(execFn, machine) {
   const record = findRecord(machine, MARKETPLACE_NAME);
-  registerMarketplace(exec, MARKETPLACE_NAME, record, [PLUGIN_REPO, '--sparse', ...SPARSE_PATHS]);
+  registerMarketplace(execFn, MARKETPLACE_NAME, record, [PLUGIN_REPO, '--sparse', ...SPARSE_PATHS]);
   if (!record) {
     return ['registered'];
   }
   if (!findInstall(machine, PLUGIN_ID)) {
     return ['moved'];
   }
-  installPublished(exec, machine);
+  installPublished(execFn, machine);
   return ['moved', 'installed'];
 }
 
@@ -173,28 +175,30 @@ function isBehind(installed, familyVersion) {
  * GitHub (moving a record that points anywhere else), `omega@omega` installed,
  * and an install older than the family updated with the two update commands.
  *
- * @param {{ exec?: Function, familyVersion?: string }} options
+ * @param {{ execFn?: Function, familyVersion?: string, machine?: object }} options
+ *   machine: the state already read (machinePluginState's), so the call acts
+ *   on it and reads again only after a move
  * @returns {{ claude: boolean, actions: string[] }} - actions: `registered`, `moved`, `installed`, `updated`
  */
-function ensureMachinePlugin({ exec = runClaude, familyVersion }) {
-  let machine = readMachine(exec);
+function ensureMachinePlugin({ execFn = execFileSync, familyVersion, machine: read }) {
+  let machine = read || readMachine(execFn);
   if (!machine.claude) {
     return { claude: false, actions: [] };
   }
 
   const actions = [];
   if (!isPublishedRecord(findRecord(machine, MARKETPLACE_NAME))) {
-    actions.push(...movePublished(exec, machine));
-    machine = readMachine(exec);
+    actions.push(...movePublished(execFn, machine));
+    machine = readMachine(execFn);
   }
 
   const install = findInstall(machine, PLUGIN_ID);
   if (!install) {
-    installPublished(exec, machine);
+    installPublished(execFn, machine);
     actions.push('installed');
   } else if (familyVersion && isBehind(install.version, familyVersion)) {
-    exec(['plugin', 'marketplace', 'update', MARKETPLACE_NAME]);
-    exec(['plugin', 'update', PLUGIN_ID, '--scope', 'user']);
+    claude(execFn, ['plugin', 'marketplace', 'update', MARKETPLACE_NAME]);
+    claude(execFn, ['plugin', 'update', PLUGIN_ID, '--scope', 'user']);
     actions.push('updated');
   }
 
@@ -208,13 +212,13 @@ function ensureMachinePlugin({ exec = runClaude, familyVersion }) {
  * and `omega@omega` off. A live brand still loads the published copy, because
  * its committed settings turn it on over the user default.
  *
- * @param {{ exec?: Function, monorepoRoot: string }} options
+ * @param {{ execFn?: Function, monorepoRoot: string }} options
  * @returns {{ claude: boolean, actions: string[], settings: 'written'|'present'|'invalid'|null, warning?: string }}
  *   actions: `moved`, `installed` (the published copy), `registered-local`;
  *   warning: the first line of a failed `claude` call
  */
-function ensureLocalDefault({ exec = runClaude, monorepoRoot }) {
-  const machine = readMachine(exec);
+function ensureLocalDefault({ execFn = execFileSync, monorepoRoot }) {
+  const machine = readMachine(execFn);
   if (!machine.claude) {
     return { claude: false, actions: [], settings: null };
   }
@@ -224,12 +228,12 @@ function ensureLocalDefault({ exec = runClaude, monorepoRoot }) {
   try {
     const published = findRecord(machine, MARKETPLACE_NAME);
     if (published && !isPublishedRecord(published)) {
-      actions.push(...movePublished(exec, machine));
+      actions.push(...movePublished(execFn, machine));
     }
     const manifest = join(monorepoRoot, LOCAL_MANIFEST);
     const local = findRecord(machine, LOCAL_MARKETPLACE_NAME);
     if (!local || local.source !== 'file' || local.path !== manifest) {
-      registerMarketplace(exec, LOCAL_MARKETPLACE_NAME, local, [manifest]);
+      registerMarketplace(execFn, LOCAL_MARKETPLACE_NAME, local, [manifest]);
       actions.push('registered-local');
     }
   } catch (error) {
@@ -263,7 +267,6 @@ function writeLocalDefault(monorepoRoot) {
 
 module.exports = {
   INSTALL_HINT,
-  runClaude,
   machinePluginState,
   ensureMachinePlugin,
   ensureLocalDefault,

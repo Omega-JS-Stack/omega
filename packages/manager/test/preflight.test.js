@@ -4,7 +4,7 @@
 // against the token store's granted-scopes record. Plus the run/skip/strict
 // verdicts, the walkthrough content, and the runManage wiring.
 
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -22,6 +22,20 @@ const { REQUIRES, SERVICE_ORDER } = require('../src/config.js');
 const { runPreflight, readTokenStore } = require('../src/lib/preflight.js');
 const { runManage } = require('../src/manage.js');
 const { googleTokenStorePath } = require('../src/lib/google-auth.js');
+const { createMachine } = require('./lib/fake-claude.js');
+
+// The workspace op reaches for `claude`. File-wide that is a fake machine that
+// already has the plugin, so no walk below spawns the real one or touches ~/.claude.
+const MANAGER_VERSION = require('../package.json').version;
+let restoreClaude;
+before(() => {
+  restoreClaude = createMachine({
+    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+    installed: { 'omega@omega': MANAGER_VERSION },
+    published: MANAGER_VERSION,
+  }).activate();
+});
+after(() => restoreClaude());
 
 // Preflight checks must be deterministic regardless of the shell's exports
 delete process.env.CLOUDFLARE_TOKEN;

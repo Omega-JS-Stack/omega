@@ -78,7 +78,7 @@ async function waitForRepo(api, slug, token, attempts = 3) {
  * Reconcile one content item to its repo. Returns the item status:
  * 'created' | 'updated' | 'synced' | 'planned'.
  */
-async function reconcileItem(api, slug, org, item, brandConfig, token, dryRun) {
+async function reconcileItem(api, slug, owner, item, brandConfig, token, dryRun) {
   let repo = await api.getRepo(slug, token);
   let created = false;
 
@@ -92,7 +92,7 @@ async function reconcileItem(api, slug, org, item, brandConfig, token, dryRun) {
     repo = await waitForRepo(api, slug, token);
     if (!repo) {
       throw new Error(
-        `repo not created at ${slug} — is "${org}" an org (or user) this token can create repos in? `
+        `repo not created at ${slug}: is "${owner}" an org (or user) this token can create repos in? `
         + `it may have been created under the authenticated account instead`,
       );
     }
@@ -100,7 +100,7 @@ async function reconcileItem(api, slug, org, item, brandConfig, token, dryRun) {
   }
 
   const template = loadTemplate(item.template || 'developer-tool');
-  const data = { ...item, org, brand: brandConfig.brand };
+  const data = { ...item, owner, brand: brandConfig.brand };
   const templatePaths = new Set(template.files.map((f) => f.path));
 
   // Collision guard: inspect the tree BEFORE modifying anything
@@ -225,26 +225,26 @@ module.exports = async (context) => {
   const { seoApi: api, seoContent: content, brandConfig } = context;
   const dryRun = context.options?.dryRun || false;
 
-  const defaultOrg = repoBlock(brandConfig)?.org;
+  const defaultOwner = repoBlock(brandConfig)?.owner;
   const results = [];
 
   for (let i = 0; i < content.length; i++) {
     const item = content[i];
-    const org = item.org || defaultOrg;
+    const owner = item.owner || defaultOwner;
     const name = item.name;
 
-    if (!org || !name) {
-      console.log(`      ${chalk.red('✗')} [${i + 1}/${content.length}] Missing org or name — skipping`);
-      results.push({ repo: `${org || '?'}/${name || '?'}`, status: 'error', error: 'missing org or name (set item.org or repo.org)' });
+    if (!owner || !name) {
+      console.log(`      ${chalk.red('✗')} [${i + 1}/${content.length}] Missing owner or name, skipping`);
+      results.push({ repo: `${owner || '?'}/${name || '?'}`, status: 'error', error: 'missing owner or name (set item.owner or repo.owner)' });
       continue;
     }
 
-    const slug = `${org}/${name}`;
+    const slug = `${owner}/${name}`;
     console.log(`      [${i + 1}/${content.length}] ${chalk.cyan(slug)}`);
 
     try {
       const token = resolveToken(item.author?.token);
-      const status = await reconcileItem(api, slug, org, item, brandConfig, token, dryRun);
+      const status = await reconcileItem(api, slug, owner, item, brandConfig, token, dryRun);
       console.log(`        ${chalk.green('✓')} ${status}`);
       results.push({ repo: slug, status });
     } catch (error) {

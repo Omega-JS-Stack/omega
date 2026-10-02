@@ -33,35 +33,9 @@ function hasContent(object) {
   return Object.keys(object).length > 0;
 }
 
-/**
- * The install line for the JDK the Firebase emulators need, for THIS host.
- * Every platform gets openjdk from a different manager — Homebrew on macOS,
- * winget on Windows, apt on Linux — so the one string the java-installed check
- * and `omega test`'s preflight both print lives here.
- *
- * Same rule as devkit's `mkcertInstallHint`: the line OPENS with something
- * pasteable, and an alternative goes in a sentence after it, never spliced into
- * the command a reader will copy.
- *
- * @param {string} [platform] - Host platform (test seam)
- * @returns {string} The command to run, then any alternative
- */
-function javaInstallHint(platform = process.platform) {
-  if (platform === 'darwin') {
-    return 'brew install openjdk';
-  }
-
-  if (platform === 'win32') {
-    return 'winget install Microsoft.OpenJDK.21. Chocolatey works too: choco install openjdk.';
-  }
-
-  return 'sudo apt install default-jdk';
-}
-
 module.exports = {
   omegaAllRulesRegex,
   loadJSON,
   saveJSON5,
   hasContent,
-  javaInstallHint,
 };

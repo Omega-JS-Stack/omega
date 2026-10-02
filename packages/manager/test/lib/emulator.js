@@ -19,12 +19,13 @@
  * The lanes SKIP (never fail) without the firebase CLI or a JVM, matching how
  * every other emulator-dependent lane in this repo handles a missing tool.
  */
-const { execFileSync, spawn, spawnSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { realpathSync } = require('node:fs');
 const net = require('node:net');
 const { join } = require('node:path');
 const { setTimeout: sleep } = require('node:timers/promises');
 const jetpack = require('fs-jetpack');
+const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
 
 const LOG_TAG = '[@omega.js/manager:test:emulator]';
 
@@ -38,17 +39,8 @@ const COLLECT_KILL_TIMEOUT_MS = 2000;
 
 /** @returns {string|null} Why an emulator lane cannot run, or null when it can. */
 function missingTool() {
-  const firebase = spawnSync('firebase', ['--version'], { stdio: 'ignore' });
-  if (firebase.error || firebase.status !== 0) {
-    return 'the firebase CLI is not on PATH';
-  }
-
-  const java = spawnSync('java', ['-version'], { stdio: 'ignore' });
-  if (java.error || java.status !== 0) {
-    return 'no JVM is installed (the Firestore emulator is a java process)';
-  }
-
-  return null;
+  const misses = missingMachineTools([{ name: 'backend', type: 'backend' }]);
+  return misses.length > 0 ? misses.map(machineToolLine).join('; ') : null;
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

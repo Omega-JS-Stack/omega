@@ -37,6 +37,7 @@
  */
 
 const { ENV_SCHEMA } = require('./env-schema.js');
+const { formatShips } = require('./env-when.js');
 
 // What each target can ship to, in the order it offers them. The FIRST platform
 // entry's first format is what a bare `/download/<platform>` leads with.
@@ -124,13 +125,10 @@ const FORMATS = {
 };
 
 /**
- * The keys one format needs, optionally narrowed to a brand.
- *
- * With no config the whole declared set comes back. With one, a `requires` key
- * whose schema entry carries a `requiredWhen` that does NOT hold for that
- * config is dropped: the EV token belongs to the self-hosted Windows strategy,
- * never to the cloud one, and the schema is where that is written down.
- *
+ * The keys one format needs: the whole declared set, or with a config, only
+ * the keys whose schema `requiredWhen` holds for it (the EV token belongs to
+ * the self-hosted Windows strategy, never the cloud one). Those rules read
+ * what the target ships, defaults included, so an unwritten snap still owes.
  * @param {string} target - Target type ('desktop' | 'extension').
  * @param {string} platform - Platform key ('mac', 'chrome', ...).
  * @param {string} format - Format key ('dmg', 'store', ...).
@@ -169,18 +167,13 @@ function formatKeys(target, platform, format, config) {
  *   none).
  */
 function enabledFormats(config, target) {
-  const declared = config?.platforms;
   const enabled = [];
 
   for (const platform of PLATFORMS[target] || []) {
-    const platformDeclaration = declared?.[platform];
-    if (platformDeclaration === false) continue;
-
-    const formatDeclarations = platformDeclaration?.formats;
     for (const format of Object.keys(FORMATS[target][platform])) {
-      const declaration = formatDeclarations?.[format];
-      if (declaration === false) continue;
+      if (!formatShips(config, platform, format)) continue;
 
+      const declaration = config?.platforms?.[platform]?.formats?.[format];
       enabled.push({ platform, format, options: declaration && typeof declaration === 'object' ? declaration : {} });
     }
   }

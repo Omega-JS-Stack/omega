@@ -69,14 +69,14 @@ jobs:
           echo "NPM: $(npm -v)"
           echo "Omega: $(node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" version)"
 
-      # Optimized-image cache (the cache-uj-imagemin branch successor):
-      # content-addressed, reproducible binaries, never committed. An exact
-      # key hit skips all image processing; a prefix hit re-processes only
-      # changed images.
+      # Optimized-image cache, never committed: the build writes it under the
+      # BRAND root's .omega, which on the runner is the workspace root, so the
+      # path names that root. An exact key hit skips all image processing; a
+      # prefix hit re-processes only changed images.
       - name: Restore optimized-image cache
         uses: actions/cache@v6
         with:
-          path: .omega/cache/imagemin
+          path: ${{ github.workspace }}/.omega/cache/imagemin
           key: omega-imagemin-${{ hashFiles('src/assets/images/**') }}
           restore-keys: |
             omega-imagemin-

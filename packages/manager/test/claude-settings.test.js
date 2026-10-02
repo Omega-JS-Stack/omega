@@ -314,19 +314,24 @@ test('#971: the op under --dry-run plans the writes and writes nothing', async (
 // ─── The machine, from the manage walk ───────────────────────────────────────
 
 /** Run the op with its console lines captured, against a fake machine for this test. */
-async function opOnMachine(t, seed) {
+async function opOnMachine(t, seed, options = {}) {
   const machine = createMachine(seed);
   t.after(machine.activate());
+  const dir = liveBrand();
   const lines = [];
   const log = console.log;
   console.log = (...parts) => lines.push(parts.join(' '));
   try {
-    await claudeSettingsOp({ brandRoot: liveBrand(), brand: { id: 'fixture', config: {} } });
+    await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options });
   } finally {
     console.log = log;
   }
-  return { machine, lines: lines.join('\n') };
+  return { machine, dir, lines: lines.join('\n') };
 }
+
+// The three reads one walk makes of the machine, as the words after `claude`
+const MACHINE_READS = ['--version', 'plugin marketplace list --json', 'plugin list --json'];
+const sortedCalls = (calls) => calls.map((argv) => argv.join(' ')).sort();
 
 const ON_GITHUB = { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } };
 
@@ -358,8 +363,48 @@ test('the op runs claude through the runner the manage context injects, never th
   const injected = createMachine({ marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
   const onPath = PATH_MACHINE.calls().length;
 
-  await claudeSettingsOp({ brandRoot: liveBrand(), brand: { id: 'fixture', config: {} }, claudeExec: injected.exec });
+  await claudeSettingsOp({ brandRoot: liveBrand(), brand: { id: 'fixture', config: {} }, execFn: injected.exec });
 
   assert.equal(injected.mutations().length, 2, `the injected runner ran the update: ${JSON.stringify(injected.calls())}`);
   assert.equal(PATH_MACHINE.calls().length, onPath, 'nothing reached the claude on PATH');
+});
+
+// ─── The machine check is the full walk's, and one walk reads it once ───────
+
+test('#1042 the boot lane writes the settings files and never runs claude', async (t) => {
+  const { machine, dir } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { lane: 'boot' });
+
+  assertPublishedOn(read(dir, COMMITTED));
+  assert.deepEqual(machine.calls(), [], 'npm start spawns no claude at all');
+});
+
+test('#1042 a full walk on a current plugin reads the machine once: three calls, no mutation', async (t) => {
+  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '999.0.0' } });
+
+  assert.deepEqual(sortedCalls(machine.calls()), [...MACHINE_READS].sort());
+  assert.deepEqual(machine.mutations(), []);
+});
+
+test('#1042 a full walk on a plugin behind the family version reads once, then runs the two updates', async (t) => {
+  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+
+  const calls = machine.calls();
+  assert.equal(calls.length, 5, JSON.stringify(calls));
+  assert.deepEqual(sortedCalls(calls.slice(0, 3)), [...MACHINE_READS].sort(), 'the three reads come first, once');
+  const updates = calls.slice(3).map((argv) => argv.join(' '));
+  assert.ok(updates.some((line) => line.includes('marketplace update omega')), updates.join(' | '));
+  assert.ok(updates.some((line) => !line.includes('marketplace') && line.includes('update') && line.includes('omega@omega')), updates.join(' | '));
+});
+
+test('#1042 a full walk with no plugin installed prints the install hint off one read of the machine', async (t) => {
+  const { machine, lines } = await opOnMachine(t, {});
+
+  assert.ok(lines.includes('Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega'), lines);
+  assert.deepEqual(sortedCalls(machine.calls()), [...MACHINE_READS].sort());
+});
+
+test('#1042 a dry run never runs claude', async (t) => {
+  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { dryRun: true });
+
+  assert.deepEqual(machine.calls(), []);
 });

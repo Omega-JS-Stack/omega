@@ -216,7 +216,7 @@ module.exports = defineCases({
         }`);
 
         // The fixture is an offline demo brand and declares no `repo` block, so
-        // the org is supplied here: the TARGETS half, which is what decides the
+        // the owner is supplied here: the TARGETS half, which is what decides the
         // path, is the fixture's own.
         let resolved;
         try {
@@ -225,7 +225,7 @@ module.exports = defineCases({
           jetpack.remove(root);
         }
 
-        const config = { ...resolved, repo: { provider: 'github', org: 'Demo-Org' } };
+        const config = { ...resolved, repo: { provider: 'github', owner: 'Demo-Org' } };
         const run = await writeAgainst(config, { path: 'src/_posts/2026/guest/2026-01-14-a-post.md', content: 'post' });
 
         assert.equal(run.sent.code, 200, `the write should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);

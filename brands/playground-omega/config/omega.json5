@@ -92,13 +92,13 @@
     enabled: true,
   },
 
-  // One repo block (#883): the org that holds every derived repo. Source
+  // One repo block (#883): the owner that holds every derived repo. Source
   // `playground-omega` (public, from package.json `private: false`, so Actions do not count against the org storage), `playground-releases`
   // (public, the artifact channel), `playground-web` (the built site, public on a
   // free org). Nothing else about repos is typed here.
   repo: {
     provider: "github",
-    org: "Omega-JS-Stack",
+    owner: "Omega-JS-Stack",
   },
 
   // Registrar of the PARENT omegajs.dev (subdomain project — the domain

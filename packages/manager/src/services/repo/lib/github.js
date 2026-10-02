@@ -1,18 +1,12 @@
 /**
  * The repo service's GitHub surface: @omega.js/devkit's github-repo module
- * (the ONE wrapper, #883) plus the three org-Actions reads only this service
- * makes.
- *
- * The manager used to carry its own `gh` client beside devkit's, which is two
- * answers to one question; the transport lives in devkit now and this file is
- * the manager's thin extension of it. Everything below goes through devkit's
- * `gh(args)` (execFile with an argv array, never a shell), so a brand-config
- * value can never inject a command.
+ * (the ONE wrapper) plus the three org-Actions reads only this service makes.
+ * Everything goes through devkit's `gh(args)` (execFile with an argv array,
+ * never a shell), so a brand-config value can never inject a command.
  *
  * Auth is the ambient `gh auth` session or a GH_TOKEN/GITHUB_TOKEN in the
  * brand .env, which the walk loads before any service runs; gh honors both.
- * The check runs once, at construction, so the walk names a missing or
- * unauthenticated CLI instead of failing four calls deep.
+ * The gh check before the first call is lib/gh-gate.js.
  */
 const {
   gh,
@@ -41,24 +35,6 @@ function isNotFound(error) {
 function read(endpoint) {
   const out = gh(['api', endpoint]);
   return out ? JSON.parse(out) : null;
-}
-
-/**
- * Verify the gh CLI is installed and authenticated.
- * @throws {Error} With the one command that fixes it.
- */
-function verifyGhCli() {
-  try {
-    gh(['--version']);
-  } catch {
-    throw new Error('GitHub CLI (gh) is not installed. Install from: https://cli.github.com/');
-  }
-
-  try {
-    gh(['auth', 'status']);
-  } catch {
-    throw new Error('GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env)');
-  }
 }
 
 /**
@@ -102,13 +78,11 @@ function getRunnerGroupRepositories(org, groupId) {
 }
 
 /**
- * The GitHub surface the repo service's steps call, verified at construction.
+ * The GitHub surface the repo service's steps call, built once the gh gate passed.
  * Tests pass their own object of the same shape through `context.githubApi`.
  * @returns {object} `{ getRepo, ensureRepo, getPages, ensurePages, ownerPlan, getUser, getRunnerGroups, getRunnerGroupRepositories }`.
  */
 function createGitHub() {
-  verifyGhCli();
-
   return {
     getRepo,
     ensureRepo,
@@ -121,4 +95,4 @@ function createGitHub() {
   };
 }
 
-module.exports = { createGitHub, verifyGhCli };
+module.exports = { createGitHub };

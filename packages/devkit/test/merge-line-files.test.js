@@ -289,6 +289,57 @@ test('unmarked file holding exactly the framework lines converges to the templat
   assert.equal(mergeLineBasedFiles('', incoming, '.gitattributes'), incoming);
 });
 
+// ─── test/README.md: the texts the frameworks shipped before the markers ─────
+
+const jetpack = require('fs-jetpack');
+const path = require('path');
+
+const REPO = path.join(__dirname, '..', '..', '..');
+const shippedReadme = (name) => jetpack.read(path.join(__dirname, 'fixtures', 'shipped-readme', `${name}.md`));
+const readmeTemplate = (framework) => jetpack.read(path.join(REPO, 'packages', framework, 'src', 'defaults', 'test', 'README.md'));
+const README_CUSTOM = sectionMarkers('README.md').customMarker;
+
+// The Default part of a merged README (through the Custom marker line), and what follows it.
+function splitReadme(content) {
+  const at = content.indexOf(`${README_CUSTOM}\n`) + README_CUSTOM.length + 1;
+  return { head: content.slice(0, at), custom: content.slice(at) };
+}
+
+test('unmarked README: backend\'s old shipped text at b9d9aeda converges to the template with an empty Custom section', () => {
+  const template = readmeTemplate('backend');
+  const merged = mergeLineBasedFiles(shippedReadme('backend-b9d9aeda'), template, 'README.md');
+  const { head, custom } = splitReadme(merged);
+  assert.equal(head, splitReadme(template).head, 'the Default section is the template\'s');
+  assert.equal(custom.trim(), '', `no old framework line lands under Custom: ${JSON.stringify(custom)}`);
+});
+
+test('unmarked README: every other old shipped text converges against its own template with an empty Custom section', () => {
+  for (const [fixture, framework] of [['backend-6c7d9c96', 'backend'], ['desktop-b9d9aeda', 'desktop'], ['extension-b9d9aeda', 'extension']]) {
+    const merged = mergeLineBasedFiles(shippedReadme(fixture), readmeTemplate(framework), 'README.md');
+    const { custom } = splitReadme(merged);
+    assert.equal(custom.trim(), '', `${fixture}: ${JSON.stringify(custom)}`);
+  }
+});
+
+test('unmarked README: an old shipped text plus a paragraph the brand wrote keeps exactly that paragraph under Custom', () => {
+  const paragraph = 'Our staging suites need the VPN up.\nRun `npm run seed` before `npm test`.';
+  const existing = `${shippedReadme('backend-b9d9aeda').trimEnd()}\n\n${paragraph}\n`;
+  const merged = mergeLineBasedFiles(existing, readmeTemplate('backend'), 'README.md');
+  assert.equal(splitReadme(merged).custom.trim(), paragraph);
+});
+
+test('marked README: a Custom section holding an old shipped line stays verbatim', () => {
+  const template = readmeTemplate('backend');
+  const existing = `${template}Drop your project test suites here. The framework auto-runs them alongside its own when you run \`npx mgr test\`.\n| \`test/routes/\` | Custom HTTP route handlers (\`functions/routes/<verb>/<path>.js\`) |\n`;
+  assert.equal(mergeLineBasedFiles(existing, template, 'README.md'), existing);
+});
+
+test('the shipped README lines apply only to README.md: a .gitignore keeps one', () => {
+  const incoming = `${DEFAULT_MARKER}\nnode_modules/\n\n${CUSTOM_MARKER}\n`;
+  const existing = 'node_modules/\n\n# Project tests\ntest/.output/\n';
+  assert.equal(mergeLineBasedFiles(existing, incoming, '.gitignore'), `${incoming}# Project tests\ntest/.output/\n`);
+});
+
 // ─── .env: the value dotenv reads never changes ──────────────────────────────
 
 const dotenv = require('dotenv');

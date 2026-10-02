@@ -6,9 +6,9 @@
  *
  * In the brand-monorepo world every brand writes its code in ONE repo,
  * addressed by `@omega.js/config`'s `sourceRepo`: `<brand.id>-omega` under
- * `repo.org`, the ONE derivation the repo service reads too (#883);
+ * `repo.owner`, the ONE derivation the repo service reads too (#883);
  * omega-manager's per-target + subdomain repo fan-out collapsed at the
- * redesign. Brands that declare no `repo.org` are skipped (the repo service
+ * redesign. Brands that declare no `repo.owner` are skipped (the repo service
  * skips them too).
  */
 

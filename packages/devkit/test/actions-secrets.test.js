@@ -7,12 +7,10 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const {
-  buildSecretArgs,
-  assertGhReady,
-  setActionsSecret,
-  publishActionsSecrets,
-} = require('../src/actions-secrets.js');
+const actionsSecrets = require('../src/actions-secrets.js');
+const { assertGhReady } = require('../src/github-repo.js');
+
+const { buildSecretArgs, setActionsSecret, publishActionsSecrets } = actionsSecrets;
 
 const quiet = { log() {}, warn() {}, error() {} };
 
@@ -44,21 +42,12 @@ test('setActionsSecret: the value is delivered on stdin, not argv', () => {
   assert.ok(!calls[0].args.some((a) => a.includes('ghp_supersecret')), 'value never appears in argv');
 });
 
-test('assertGhReady: `gh auth status` is the probe; a throw becomes install/auth instructions', () => {
-  const calls = [];
-  assertGhReady({ execFn: (file, args) => { calls.push([file, ...args]); return 'Logged in'; } });
-  assert.deepStrictEqual(calls[0], ['gh', 'auth', 'status']);
+test('assertGhReady: its one home is github-repo.js, and it proves the login with `gh api user`', () => {
+  assert.strictEqual(actionsSecrets.assertGhReady, undefined, 'actions-secrets keeps no copy of its own');
 
-  // Missing binary (ENOENT) and a signed-out CLI (non-zero exit) are the same
-  // loud failure — with instructions, and never a silent skip.
-  for (const boom of ['spawnSync gh ENOENT', 'exit status 1']) {
-    assert.throws(
-      () => assertGhReady({ execFn: () => { throw new Error(boom); } }),
-      (e) => /GitHub CLI is required/.test(e.message)
-        && /gh auth login/.test(e.message)
-        && /--no-secrets/.test(e.message),
-    );
-  }
+  const calls = [];
+  assertGhReady({ execFn: (file, args) => { calls.push([file, ...args]); return ''; } });
+  assert.deepStrictEqual(calls, [['gh', '--version'], ['gh', 'api', 'user']]);
 });
 
 test('publishActionsSecrets: every key set once, in order, each value on stdin', () => {
@@ -67,20 +56,21 @@ test('publishActionsSecrets: every key set once, in order, each value on stdin',
     repo: 'acme/site',
     secrets: { GH_TOKEN: 'tok', OPENAI_API_KEY: 'sk-1' },
     logger: quiet,
-    execFn: (file, args, options) => { calls.push({ args, input: options.input }); return ''; },
+    execFn: (file, args, options) => { calls.push({ args, input: (options || {}).input }); return ''; },
   });
 
   assert.deepStrictEqual(result.published, ['GH_TOKEN', 'OPENAI_API_KEY']);
   assert.deepStrictEqual(result.failed, []);
   assert.deepStrictEqual(calls.map((c) => c.args.join(' ')), [
-    'auth status',
+    '--version',
+    'api user',
     'secret set GH_TOKEN --repo acme/site',
     'secret set OPENAI_API_KEY --repo acme/site',
   ]);
-  assert.deepStrictEqual(calls.slice(1).map((c) => c.input), ['tok', 'sk-1']);
+  assert.deepStrictEqual(calls.slice(2).map((c) => c.input), ['tok', 'sk-1']);
 });
 
-test('publishActionsSecrets: no gh → throws before any secret is attempted', () => {
+test('publishActionsSecrets: no gh → throws the install line before any secret is attempted', () => {
   const calls = [];
   assert.throws(
     () => publishActionsSecrets({
@@ -92,9 +82,27 @@ test('publishActionsSecrets: no gh → throws before any secret is attempted', (
         throw new Error('spawnSync gh ENOENT');
       },
     }),
-    /GitHub CLI is required/,
+    (error) => /GitHub CLI \(gh\) is not installed/.test(error.message) && /--no-secrets/.test(error.message),
   );
-  assert.deepStrictEqual(calls, ['auth status'], 'nothing was published');
+  assert.deepStrictEqual(calls, ['--version'], 'nothing was published');
+});
+
+test('publishActionsSecrets: a signed-out gh throws the sign-in line before any secret is written', () => {
+  const calls = [];
+  assert.throws(
+    () => publishActionsSecrets({
+      repo: 'acme/site',
+      secrets: { A: '1' },
+      logger: quiet,
+      execFn: (file, args) => {
+        calls.push(args.join(' '));
+        if (args[0] === 'api' && args[1] === 'user') throw new Error('gh: Bad credentials (HTTP 401)');
+        return '';
+      },
+    }),
+    (error) => /gh auth login \(or set GH_TOKEN in the brand \.env\)/.test(error.message) && /--no-secrets/.test(error.message),
+  );
+  assert.ok(!calls.some((call) => call.startsWith('secret set')), `nothing was published: ${calls.join(' | ')}`);
 });
 
 test('publishActionsSecrets: one bad key is reported, the rest still publish', () => {

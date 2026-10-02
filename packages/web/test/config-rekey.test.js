@@ -169,7 +169,7 @@ test('#894: the page bakes the ONE wrapper, and no credential section reaches it
     cloud: { provider: 'firebase', config: { apiKey: 'AIza-rekey', projectId: 'demo-rekey' }, billingAccount: '01ABCD-234567-89EFGH', organizationId: '123456789' },
     captcha: { providers: { recaptcha: { siteKey: 'site-key-rekey' } } },
     // …and the sections that provision the brand, which never do
-    repo: { provider: 'github', org: 'Rekey-Org' },
+    repo: { provider: 'github', owner: 'Rekey-Org' },
     certificates: { providers: { apple: { teamId: 'TEAMREKEY' } } },
     account: { enabled: true, admins: [{ email: 'root@rekey.example.com' }] },
     edge: { providers: { cloudflare: { zone: 'rekey.example.com' } } },

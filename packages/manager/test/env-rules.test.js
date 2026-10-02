@@ -243,6 +243,11 @@ const APPLE_ENV = {
   CSC_KEY_PASSWORD: SIGNING_PASSWORD,
   CSC_LINK: null,
   APPLE_API_KEY: null,
+  // A desktop target ships the Windows installer and the snap by default,
+  // so their keys are served here and only the Apple pair is in question.
+  WIN_EV_TOKEN_PATH: 'fixture-token-path',
+  WIN_CSC_KEY_PASSWORD: 'fixture-pin',
+  SNAPCRAFT_STORE_CREDENTIALS: 'fixture-credentials',
 };
 
 test('env-rules op: a signing tree ANSWERS CSC_LINK and APPLE_API_KEY, so neither is owed (#910)', async () => {

@@ -19,11 +19,13 @@ convention: big content sections get their own file). `seo.enabled: false` skips
 and no content at all is a clean skip — this service never WRITES config, so nothing is
 auto-created for a brand that declared nothing.
 
-Per item, `author.token` (`env:VAR_NAME` or a literal) overrides the `gh` auth for that item's
+Per item, `owner` names the GitHub user or org its repo lives under (default: the brand's
+`repo.owner`), `author.token` (`env:VAR_NAME` or a literal) overrides the `gh` auth for that item's
 API calls, and `author.git` rides the Contents API commits as author and committer — parasite
 repos owned by separate accounts.
 
-**Credentials**: the default `gh` CLI auth, plus those per-item author overrides.
+**Credentials**: the default `gh` CLI auth, plus those per-item author overrides. A headless walk
+with a signed-out `gh` skips the service like a missing key, naming `GH_TOKEN`.
 
 ## Gotcha: the collision guardrail
 

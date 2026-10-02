@@ -88,7 +88,7 @@ module.exports = defineCases({
         const finalizeRelease = require(path.join(__dirname, '..', '..', '..', 'commands', 'finalize-release.js'));
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme' },
-          repo: { provider: 'github', org: 'Acme-Org' },
+          repo: { provider: 'github', owner: 'Acme-Org' },
           targets: { desktop: { type: 'desktop', releases: {} } },
         });
         fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-desktop', version: '1.2.3' }));

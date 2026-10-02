@@ -108,7 +108,8 @@ module.exports = defineCases({
       name: 'publish refuses a declared format with no ship credential, naming the key and the walk (#867)',
       run: (ctx) => {
         const { assertShipKeys } = require(path.join(__dirname, '..', '..', '..', 'utils', 'ship-keys.js'));
-        const config = { platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } };
+        const config = { targets: { desktop: { type: 'desktop' } }, platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } };
+        const shipEnv = { SNAPCRAFT_STORE_CREDENTIALS: 'blob', WIN_EV_TOKEN_PATH: '/token', WIN_CSC_KEY_PASSWORD: 'secret' };
 
         let message = '';
         try {
@@ -117,14 +118,32 @@ module.exports = defineCases({
           message = error.message;
         }
 
-        ctx.expect(message).toContain('SNAPCRAFT_STORE_CREDENTIALS (required by platforms.linux.formats.snap)');
+        ctx.expect(message).toContain('SNAPCRAFT_STORE_CREDENTIALS (required by platforms.linux.formats.snap');
         ctx.expect(message).toContain('omega manage --service publishing');
 
-        // With the credential, the same declaration ships
-        ctx.expect(assertShipKeys({ config, env: { SNAPCRAFT_STORE_CREDENTIALS: 'blob' } }).length > 0).toBe(true);
+        // With the snap login and the default self-hosted pair, the same declaration ships
+        ctx.expect(assertShipKeys({ config, env: shipEnv }).length > 0).toBe(true);
+      },
+    },
+    {
+      name: 'publish refuses the default formats of a desktop target with an empty env, and passes a brand with no desktop target',
+      run: (ctx) => {
+        const { assertShipKeys } = require(path.join(__dirname, '..', '..', '..', 'utils', 'ship-keys.js'));
 
-        // And a brand that never mentions the snap owes nothing: the default
-        // format is on, but nothing in its config makes the credential due
+        let message = '';
+        try {
+          assertShipKeys({ config: { targets: { desktop: { type: 'desktop' } } }, env: {} });
+        } catch (error) {
+          message = error.message;
+        }
+
+        // The snap and the signed installer are on by default, so their keys are owed
+        ctx.expect(message).toContain('platforms.linux.formats.snap');
+        ctx.expect(message).toContain('SNAPCRAFT_STORE_CREDENTIALS');
+        ctx.expect(message).toContain('WIN_EV_TOKEN_PATH');
+        ctx.expect(message).toContain('WIN_CSC_KEY_PASSWORD');
+
+        // A config with no desktop target owes none of them
         ctx.expect(assertShipKeys({ config: {}, env: {} }).length > 0).toBe(true);
       },
     },

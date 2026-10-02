@@ -64,7 +64,7 @@ function dispatchRepo(config) {
   const source = sourceRepo(config);
 
   if (!source) {
-    throw new Error('Could not determine the brand repo to dispatch on. Set repo.org (and brand.id) in config/omega.json5: the source repo is <brand.id>-omega under that org.');
+    throw new Error('Could not determine the brand repo to dispatch on. Set repo.owner (and brand.id) in config/omega.json5: the source repo is <brand.id>-omega under that owner.');
   }
 
   return { owner: source.owner, repo: source.name };
@@ -239,7 +239,7 @@ const LANE_STEPS = {
  * @param {object} lane - The resolved lane.
  * @param {object} steps - The lane steps (`origin` is the gate).
  * @returns {void}
- * @throws {Error} The drift line, naming `repo.org`.
+ * @throws {Error} The drift line, naming `repo.owner`.
  */
 function checkLaneOrigin(lane, steps) {
   steps.origin({ root: lane.brandRoot });
@@ -391,7 +391,7 @@ async function deliverLane(options) {
       token: options.token,
       message: options.message,
       // What the stage just wrote has to reach the runner, so the push
-      // refuses a tree whose ignore rules would drop it.
+      // force-adds it past any ignore rule.
       require: staging ? [STAGING_DIR, 'package-lock.json'] : [],
     });
   } finally {
@@ -635,7 +635,7 @@ function resolveDeployLane(options = {}) {
     // A linked brand has to SNAPSHOT (the packed tarballs travel no other way),
     // and a snapshot is built out of a git index, so no repo is no lane. Said
     // by name HERE, because the push would otherwise die a step later on a raw
-    // `fatal: not a git repository` out of `git check-ignore` (#872).
+    // `fatal: not a git repository`.
     throw new Error(`${brandRoot} is not inside a git repo, and a linked brand needs a git repo to snapshot from: \`git init\` the brand, or restore registry versions with \`omega i live\`.`);
   }
   if (!repo) {

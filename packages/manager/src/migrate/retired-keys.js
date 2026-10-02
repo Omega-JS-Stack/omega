@@ -294,9 +294,14 @@ const RETIRED_PATHS = {
     why: 'one public releases repo per brand (#620/#799): a stable mirror tag is what `/releases/latest/download/<asset>` replaced, so no tag is configured anywhere',
   },
 
+  'repo.org': {
+    replacement: 'repo.owner',
+    why: 'a repo is owned by a user or an org, and GitHub\'s word is owner (#1041): `repo: { provider: \'github\', owner }` is the whole block, so the value moves unchanged',
+    convert: (value) => value,
+  },
   'repo.providers.github.org': {
-    replacement: 'repo.org',
-    why: 'ONE repo block (#883): `repo: { provider: \'github\', org }` is the whole declaration, and the org owns every repo the brand derives',
+    replacement: 'repo.owner',
+    why: 'ONE repo block (#883): `repo: { provider: \'github\', owner }` is the whole declaration, and the owner owns every repo the brand derives',
   },
   'repo.providers.github.repo': {
     replacement: 'nothing: the source repo IS `<brand.id>-omega`',
@@ -315,8 +320,8 @@ const RETIRED_PATHS = {
     why: 'presence is the switch (#883), exactly as a target key\'s presence enables that target: a brand that hosts its source somewhere the manager does not touch omits the block',
   },
   'github.user': {
-    replacement: 'nothing: the org is `repo.org`',
-    why: 'the separate GitHub identity block is gone (#883): nothing read `user`, and every repo address derives from `repo.org` plus `brand.id`',
+    replacement: 'nothing: the owner is `repo.owner`',
+    why: 'the separate GitHub identity block is gone (#883): nothing read `user`, and every repo address derives from `repo.owner` plus `brand.id`',
   },
   'github.website': {
     replacement: 'nothing: a web target\'s site repo is `<brand.id>-<target name>`',
@@ -360,11 +365,11 @@ const RETIRED_PATHS = {
   },
 
   'targets.desktop.releases.owner': {
-    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.org`',
+    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.owner`',
     why: 'one public releases repo per brand (#883), with no override: `releases: {}` stays the presence switch for the site\'s download links',
   },
   'targets.desktop.releases.repo': {
-    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.org`',
+    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.owner`',
     why: 'one public releases repo per brand (#883), with no override: `releases: {}` stays the presence switch for the site\'s download links',
   },
 
@@ -382,7 +387,7 @@ const RETIRED_PATHS = {
 // by hand is covered too.
 for (const type of TARGET_TYPES) {
   RETIRED_PATHS[`targets.${type}.github.repo`] = {
-    replacement: 'nothing: every repo the brand owns is `<brand.id>-<role>` under `repo.org`',
+    replacement: 'nothing: every repo the brand owns is `<brand.id>-<role>` under `repo.owner`',
     why: 'no repo NAME is configurable anywhere (#883): the CMS commits to the SOURCE repo `<brand.id>-omega`, so a content repo of its own is a brand of its own',
   };
 }

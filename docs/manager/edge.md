@@ -45,6 +45,16 @@ addresses, the BIMI logo, extra CSP hosts) belong in the company or brand layer.
 **Credential**: `CLOUDFLARE_TOKEN` in the brand `.env`, asked for through the shared setup
 contract. No `brand.url` → the service skips.
 
+**The email asks.** `email-routing` asks for the mailbox provider when none is picked
+(`domain.email.providers`, a choice from the registry's mailbox providers, landed as the
+presence pick). When the picked provider routes mail (cloudflare) and `domain.email.forwarding`
+is empty, it then asks for the first rule: the address to forward (`support`, or `*` for all)
+and the inbox it goes to, landed as one `{ from, to }` entry. Disable at either ask writes
+`false` at that key, and every reader takes `false` as none: no MX or SPF include, no rules.
+`dns-records` runs before this operation, so the MX records of a provider picked here land on
+the next walk. A headless or dry run never asks: it prints the one line naming the key and
+`config/omega.json5`.
+
 ## Cache lifetimes: /assets for a year, HTML for a minute
 
 The schema's defaults carry the whole `cacheRules` set, so a brand that declares no rules

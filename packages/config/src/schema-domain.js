@@ -26,9 +26,9 @@ const DOMAIN_RULES = [
   },
   {
     path:        'domain.email.providers',
-    type:        'object',
+    type:        'object|boolean',
     required:    false,
-    description: "The brand's MAILBOX provider, named as the one KEY under it. The accepted providers are the rows below, one per mailbox provider in the manager's domain provider registry (services/domain/lib/providers.js), which owns each one's MX records and SPF include. Presence picks it; no entry leaves the MX/SPF records and the edge service's email-routing operations off.",
+    description: "The brand's MAILBOX provider, named as the one KEY under it. The accepted providers are the rows below, one per mailbox provider in the manager's domain provider registry (services/domain/lib/providers.js), which owns each one's MX records and SPF include. Presence picks it; no entry leaves the MX/SPF records and the edge service's email-routing operations off, and the manage walk asks for one. `false` = none, and stop asking.",
   },
   {
     path:        'domain.email.providers.cloudflare',
@@ -50,9 +50,9 @@ const DOMAIN_RULES = [
   },
   {
     path:        'domain.email.forwarding',
-    type:        'array',
+    type:        'array|boolean',
     required:    false,
-    description: "Address forwarding rules ([{ from: 'support' | '*', to: 'inbox@example.com' }]) the mailbox provider reconciles. Role-level and provider-agnostic.",
+    description: "Address forwarding rules ([{ from: 'support' | '*', to: 'inbox@example.com' }]) the mailbox provider reconciles. Role-level and provider-agnostic. An empty list under a provider that routes mail is asked for by the manage walk; `false` = none, and stop asking.",
   },
 ];
 

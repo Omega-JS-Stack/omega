@@ -55,7 +55,7 @@ const RESOLVED = () => ({
 
   // sections the browser never sees
   account: { enabled: true, admins: [{ email: 'root@acme.com' }] },
-  repo: { provider: 'github', org: 'Acme-Org' },
+  repo: { provider: 'github', owner: 'Acme-Org' },
   edge: { providers: { cloudflare: { zone: 'acme.com' } } },
   certificates: { providers: { apple: { teamId: 'TEAM' } } },
   domain: { namecheap: {} },

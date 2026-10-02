@@ -778,7 +778,7 @@ const SHARED_SCHEMA = [
     path:        'repo',
     type:        'object',
     required:    false,
-    description: 'Where the brand hosts its source. Presence enables the repo service; the block is provider + org and nothing else, since every repo name derives from `<brand.id>-<role>`.',
+    description: 'Where the brand hosts its source. Presence enables the repo service; the block is provider + owner and nothing else, since every repo name derives from `<brand.id>-<role>`.',
   },
   {
     path:        'repo.provider',
@@ -794,10 +794,10 @@ const SHARED_SCHEMA = [
     description: 'Which host serves the brand source (default `github`, the only one built). A second provider is a new row here plus its own helper, never a reshape of this block.',
   },
   {
-    path:        'repo.org',
+    path:        'repo.owner',
     type:        'string',
     required:    false,
-    description: "GitHub org/user every repo the brand owns lives in: `<brand.id>-omega` (source), `<brand.id>-releases` (public artifacts), `<brand.id>-<name>` (one per GitHub-hosted web target). No org → the repo service skips and the site's desktop release URLs stay underived.",
+    description: "GitHub owner (org or user) every repo the brand owns lives under: `<brand.id>-omega` (source), `<brand.id>-releases` (public artifacts), `<brand.id>-<name>` (one per GitHub-hosted web target). No owner → the repo service skips and the site's desktop release URLs stay underived.",
   },
 
   // ── domain (two roles: registrar + mailbox; provider-keyed) ────────────────
@@ -1572,13 +1572,13 @@ const TARGET_SCHEMAS = {
       path:        'platforms.linux.formats.snap',
       type:        'object|boolean',
       required:    false,
-      description: "The Snap Store publish (never a release asset: the store holds the file, and `/download/linux/snap` is the listing). Needs SNAPCRAFT_STORE_CREDENTIALS, which the env schema gates on this very key, so declaring it is what makes the walk ask.",
+      description: "The Snap Store publish (never a release asset: the store holds the file, and `/download/linux/snap` is the listing). On by default like every format, so a desktop target owes SNAPCRAFT_STORE_CREDENTIALS (the walk asks, a publish refuses) until this is `false`.",
     },
     {
       path:        'platforms.linux.formats.snap.channels',
       type:        'array',
       required:    false,
-      description: "Snap Store channels the publish pushes to. Unset, the publish uses ['stable']; ['edge'] is the pre-release lane. No schema `default:` on any of these four: materializing one would declare the snap format on every brand that never mentioned it, and the declaration is what makes its credentials mandatory.",
+      description: "Snap Store channels the publish pushes to. Unset, the publish uses ['stable']; ['edge'] is the pre-release lane. No schema `default:` on any of these four: materializing one would write a snap block into every brand that never mentioned it.",
     },
     {
       path:        'platforms.linux.formats.snap.confinement',

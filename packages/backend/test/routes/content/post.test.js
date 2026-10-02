@@ -2,7 +2,7 @@
  * Test: GET /content/post
  * Tests the content fetch post endpoint
  * Fetches blog post content from GitHub
- * Requires GitHub API key and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
+ * Requires GitHub API key and a resolvable source repo (repo.owner + brand.id -> <brand.id>-omega)
  */
 
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');

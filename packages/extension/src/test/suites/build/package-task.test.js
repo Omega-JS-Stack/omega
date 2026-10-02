@@ -433,7 +433,7 @@ module.exports = defineCases({
             const calls = [];
             const publish = require(PUBLISH_TASK_PATH);
             await publish.publishToGitHubRelease({
-              config: { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Acme-Org' } },
+              config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Acme-Org' } },
               execFn: (file, args) => {
                 calls.push(args);
                 if (args[1] === 'view') throw new Error('release not found (HTTP 404)');

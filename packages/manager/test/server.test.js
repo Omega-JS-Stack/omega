@@ -17,7 +17,7 @@ const service = require('../src/services/server/index.js');
 delete process.env.SERVER_SERVICE_ACCOUNT;
 
 const BRAND = { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' };
-const REPO = { provider: 'github', org: 'fixture-org' };
+const REPO = { provider: 'github', owner: 'fixture-org' };
 const SPONSORSHIPS = {
   acceptable: ['tech', 'marketing'],
   unacceptable: ['spam'],
@@ -137,7 +137,7 @@ test('server: key order differences are not drift', async () => {
         unacceptable: ['spam'],
         acceptable: ['tech', 'marketing'],
       },
-      repo: { org: 'fixture-org', provider: 'github' },
+      repo: { owner: 'fixture-org', provider: 'github' },
       brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
   });

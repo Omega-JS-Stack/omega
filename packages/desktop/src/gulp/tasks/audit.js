@@ -60,9 +60,9 @@ module.exports = function audit(done) {
   }
   // Publishing needs an ADDRESS for the releases repo, and no repo name is ever
   // typed: @omega.js/config's releasesRepo derives `<brand.id>-releases` under
-  // the brand's org, so only a missing org (or brand.id) leaves it unaddressable.
+  // the brand's owner, so only a missing owner (or brand.id) leaves it unaddressable.
   if (build.isPublishMode() && config.releases?.enabled !== false && !releasesRepo(config)) {
-    errors.push('the releases repo is unaddressable: set repo.org and brand.id. The repo is always "<brand.id>-releases" under that org');
+    errors.push('the releases repo is unaddressable: set repo.owner and brand.id. The repo is always "<brand.id>-releases" under that owner');
   }
 
   // 3. Soft warnings — not fatal but worth surfacing.

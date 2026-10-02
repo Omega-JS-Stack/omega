@@ -5,7 +5,8 @@
  * root is @omega.js/config's, the template mark is template-marker.js's, the
  * files a brand owes are the scaffold plan's, a retired key is the migrate
  * rule set's, a missing env key is missingEnvKeys's, and whether that key is
- * optional is serviceInputs's (`gates: false`), the answer preflight reads.
+ * optional is serviceInputs's (`gates: false`), the answer preflight reads,
+ * and a missing machine tool is devkit's machine-tools list's.
  */
 
 const fs = require('node:fs');
@@ -14,6 +15,7 @@ const { spawnSync } = require('node:child_process');
 const JSON5 = require('json5');
 const { missingEnvKeys, loadEnvRoots, resolveCompany, resolveConfigPath } = require('@omega.js/config');
 const { resolvePackageDir } = require('@omega.js/devkit/local');
+const { missingMachineTools } = require('@omega.js/devkit/machine-tools');
 
 const { resolveBrandRoot, loadBrand, discoverTargets, APPS_SHAPE } = require('./brand.js');
 const { buildScaffoldPlan } = require('./scaffold.js');
@@ -171,9 +173,11 @@ function brandNext(missing) {
  * The brand load skips its machine registry line.
  *
  * @param {string} cwd - The folder to judge.
- * @returns {{ state: string, brandRoot: string|null, inTarget: string|null, brand: { id: string, name: string }|null, targets: Array<{ name: string, type: string }>, missing: { files: string[], targets: string[], config: string[], install: string[], env: Array<{ key: string, service: string, optional: boolean }> }, next: string }}
+ * @param {object} [options]
+ * @param {function} [options.execFn] - The machine-tool probe (test seam)
+ * @returns {{ state: string, brandRoot: string|null, inTarget: string|null, brand: { id: string, name: string }|null, targets: Array<{ name: string, type: string }>, missing: { files: string[], targets: string[], config: string[], install: string[], env: Array<{ key: string, service: string, optional: boolean }>, tools: string[] }, next: string }}
  */
-function brandState(cwd) {
+function brandState(cwd, { execFn } = {}) {
   const dir = path.resolve(cwd);
   const brandRoot = resolveBrandRoot(dir);
   const report = (state, fields = {}) => ({
@@ -182,7 +186,7 @@ function brandState(cwd) {
     inTarget: null,
     brand: null,
     targets: [],
-    missing: { files: [], targets: [], config: [], install: [], env: [] },
+    missing: { files: [], targets: [], config: [], install: [], env: [], tools: [] },
     next: NEXT[state],
     ...fields,
   });
@@ -200,14 +204,16 @@ function brandState(cwd) {
   const brand = loadBrand(brandRoot, { record: false });
   const { answers, missing } = brandGaps(brandRoot, brand);
   const gaps = Object.values(missing).some((list) => list.length > 0);
-  // Keys for going live are listed, but a brand runs locally without them: they never make it half-done
+  // Keys for going live are listed, but a brand runs locally without them: they never make it half-done.
+  // Nor does a missing machine tool: `npm start` skips the target that needs it and boots the rest
   const env = answers ? missingEnv(brandRoot, brand.config) : [];
+  const tools = answers ? [...new Set(missingMachineTools(answers.targets, { execFn }).map((miss) => miss.name))] : [];
 
   return report(gaps ? 'half-done' : 'brand', {
     inTarget,
     brand: answers ? { id: answers.id, name: answers.name } : null,
     targets: answers ? answers.targets.map((entry) => ({ name: entry.name, type: entry.type })) : [],
-    missing: { ...missing, env },
+    missing: { ...missing, env, tools },
     next: brandNext(missing),
   });
 }

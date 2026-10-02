@@ -3,7 +3,7 @@
  * Birth clones the brand template and runs the REAL onboard (flags mode) in it;
  * link is one `omega i local` at the brand root; boot is `omega dev` plus a
  * homepage probe; manage runs headless, judged by its run file. Spec-driven,
- * heavy by design: unmet preconditions (network, java) SKIP unless { strict }.
+ * heavy by design: unmet preconditions (network, machine tools) SKIP unless { strict }.
  * Install legs keep the machine env; runtime legs run credential-scrubbed.
  *
  * Layering: bins are spawned by path and @omega.js/manager is never required
@@ -21,6 +21,7 @@ const { afterExit } = require('./boot-child.js');
 const { createStepsLog } = require('./steps-log.js');
 const { targetOfType } = require('./target-of-type.js');
 const { resolvePackageRealDir } = require('../local.js');
+const { missingMachineTools, machineToolLine } = require('../machine-tools.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real target builds dominate; a warm rerun finishes far inside them.
@@ -47,20 +48,35 @@ const DEV_SERVER_URL = /Dev server: (https?:\/\/localhost:\d+)/;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Every CLI the manage walk can spawn, and the variable naming its config home
+// (where its stored login lives). A scrubbed run points each at an empty dir.
+const CLI_CONFIG_HOMES = [
+  { cli: 'gh', env: 'GH_CONFIG_DIR', dir: 'gh' },
+  { cli: 'firebase-tools', env: 'XDG_CONFIG_HOME', dir: 'xdg' },
+  { cli: 'gcloud', env: 'CLOUDSDK_CONFIG', dir: 'gcloud' },
+];
+
 /**
- * Strip credential-shaped variables from an env copy — the runtime legs of
+ * Strip credential-shaped variables from an env copy: the runtime legs of
  * the journey (dev boot, manage) must prove themselves without any machine
- * credentials in reach.
+ * credentials in reach. Given a home root, every CLI_CONFIG_HOMES variable is
+ * also pointed at `<homeRoot>/<dir>`, so each CLI's own stored login is out of reach.
  *
  * @param {Object} env - Source environment (not mutated)
+ * @param {string} [homeRoot] - Throwaway root for the CLI config homes
  * @returns {Object} Scrubbed copy
  */
-function scrubCredentialEnv(env) {
+function scrubCredentialEnv(env, homeRoot) {
   const CREDENTIAL_SHAPE = /(TOKEN|SECRET|PASSWORD|PASSPHRASE|API_KEY|APIKEY|_KEY$|CLIENT_ID|CLIENT_SECRET|ACCESS_KEY|PRIVATE_KEY|CREDENTIALS|AUTH)/i;
   const scrubbed = {};
   for (const [name, value] of Object.entries(env)) {
     if (!CREDENTIAL_SHAPE.test(name)) {
       scrubbed[name] = value;
+    }
+  }
+  if (homeRoot) {
+    for (const home of CLI_CONFIG_HOMES) {
+      scrubbed[home.env] = path.join(homeRoot, home.dir);
     }
   }
   return scrubbed;
@@ -81,7 +97,7 @@ function reachable(url) {
 /**
  * Journey preconditions: the npm registry (framework dep trees install for
  * real), the brand template's host (the brand is born from a clone) and
- * java (the Firestore/Database emulators).
+ * the machine tools its backend needs (devkit's machine-tools list).
  *
  * @param {string} templateUrl - The brand template repo the birth step clones
  * @returns {Promise<{ ok: boolean, missing: string[] }>}
@@ -96,10 +112,8 @@ async function checkPreconditions(templateUrl) {
     missing.push(`brand template unreachable (network): ${templateUrl}`);
   }
 
-  const java = spawnSync('java', ['-version'], { stdio: 'ignore' });
-  if (java.status !== 0) {
-    missing.push('java (firestore/database emulators)');
-  }
+  // The brand the journey births has a Firebase backend, the emulators' host
+  missing.push(...missingMachineTools([{ name: 'backend', type: 'backend' }]).map(machineToolLine));
 
   return { ok: missing.length === 0, missing };
 }
@@ -294,13 +308,11 @@ class JourneyRun {
   }
 
   childEnv(extra, { scrub = false } = {}) {
-    const base = scrub ? scrubCredentialEnv(process.env) : { ...process.env };
+    const base = scrub ? scrubCredentialEnv(process.env, this.tempRoot) : { ...process.env };
     // A throwaway Claude Code config: the plugin steps of onboard, `i local`
     // and manage never reach the developer's own.
-    // The runtime legs also get an empty gh config: gh signed out, never the machine's login.
     const claudeConfig = path.join(this.tempRoot, 'claude');
-    const ghConfig = scrub ? { GH_CONFIG_DIR: path.join(this.tempRoot, 'gh') } : {};
-    return { ...base, OMEGA_MONOREPO: this.monorepoRoot, CLAUDE_CONFIG_DIR: claudeConfig, ...ghConfig, ...extra };
+    return { ...base, OMEGA_MONOREPO: this.monorepoRoot, CLAUDE_CONFIG_DIR: claudeConfig, ...extra };
   }
 }
 
@@ -622,4 +634,4 @@ async function runJourney(options) {
 
 // JourneyRun is exported for its unit pins — the step recorder is testable
 // without a two-hour brand birth; nothing else constructs one.
-module.exports = { runJourney, JourneyRun, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandTargets };
+module.exports = { runJourney, JourneyRun, CLI_CONFIG_HOMES, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandTargets };

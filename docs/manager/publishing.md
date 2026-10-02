@@ -25,10 +25,11 @@ targets: {
 @omega.js/config's format table ([platforms.js](../shared/config.md#the-shipping-declaration))
 says what each of those formats requires, and devkit's `ship-plan` narrows it to this brand:
 the Chrome and Firefox store keys (Edge is dropped, so its two keys are never asked for), and
-`SNAPCRAFT_STORE_CREDENTIALS`, which a desktop brand owes only where it DECLARES the snap. The
-Windows signing set narrows the same way, to the keys the configured
-`platforms.windows.signing.strategy` uses. Add a store to the table and the walk asks for its
-keys the same day, with no edit here.
+`SNAPCRAFT_STORE_CREDENTIALS`, which every desktop brand owes while it ships the snap: the
+format is on by default, so only `platforms.linux.formats.snap: false` drops the ask. The
+Windows signing set narrows to the keys the brand's `platforms.windows.signing.strategy` uses,
+and a brand that names none signs `self-hosted`, so the walk asks for the two self-hosted keys.
+Add a store to the table and the walk asks for its keys the same day, with no edit here.
 
 The human half of each ask (what the key is, the page that mints it, what to make there) is
 the env schema's, its one home, reached through `describeServiceInputs()`. The walk opens that

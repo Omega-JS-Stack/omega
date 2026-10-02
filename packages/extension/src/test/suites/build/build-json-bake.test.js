@@ -280,7 +280,7 @@ module.exports = defineCases({
             cloud: { config: { apiKey: 'AIza-staged' }, billingAccount: '01ABCD-234567-89EFGH' },
             certificates: { providers: { apple: { bundleIdPrefix: 'com.staged' } } },
             account: { admins: [{ email: 'root@staged.com' }] },
-            repo: { provider: 'github', org: 'Staged-Org' },
+            repo: { provider: 'github', owner: 'Staged-Org' },
             targets: { extension: { type: 'extension', listings: { chrome: { id: 'abcdefghijklmnopqrstuvwxyzabcdef' } } } },
           }`,
         });

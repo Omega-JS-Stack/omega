@@ -2,13 +2,14 @@
  * Ensure the brand's Claude settings name the right copy of the omega plugin:
  * the committed `.claude/settings.json` the published copy, the private
  * `.claude/settings.local.json` the local copy while the brand is linked.
- * Then the machine: one line when the published copy is not installed, and
- * the two update commands when it is older than this OMEGA.
+ * Then, outside the boot lane, the machine: one line when the published copy
+ * is not installed, and the two update commands when it is older than this
+ * OMEGA.
  */
 const chalk = require('chalk').default;
 
 const { ensureClaudeSettings, SETTINGS_FILE, LOCAL_SETTINGS_FILE, PLUGIN_ID, LOCAL_PLUGIN_ID } = require('../../../lib/claude-settings.js');
-const { INSTALL_HINT, runClaude, machinePluginState, ensureMachinePlugin } = require('../../../lib/claude-machine.js');
+const { INSTALL_HINT, machinePluginState, ensureMachinePlugin } = require('../../../lib/claude-machine.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const FAMILY_VERSION = require('../../../../package.json').version;
@@ -32,14 +33,15 @@ const PLANS = {
 
 /**
  * The published copy on this machine: a hint while it is not installed, an
- * update while it is behind. A failing `claude` is the machine's, never the
+ * update while it is behind. The machine is read once, and that state is
+ * what the update acts on. A failing `claude` is the machine's, never the
  * brand's, so it warns and the walk goes on.
  *
- * @param {Function} exec - The `claude` runner
+ * @param {Function} [execFn] - The runner (execFileSync by default)
  */
-function ensureMachine(exec) {
+function ensureMachine(execFn) {
   try {
-    const state = machinePluginState({ exec });
+    const state = machinePluginState({ execFn });
     if (!state.claude) {
       return null;
     }
@@ -47,7 +49,7 @@ function ensureMachine(exec) {
       console.log(`      ${chalk.yellow('⚠')} ${INSTALL_HINT}`);
       return 'not-installed';
     }
-    const { actions } = ensureMachinePlugin({ exec, familyVersion: FAMILY_VERSION });
+    const { actions } = ensureMachinePlugin({ execFn, familyVersion: FAMILY_VERSION, machine: state });
     if (actions.length > 0) {
       console.log(`      ${chalk.green('✓')} Claude plugin on this machine: ${actions.join(', ')} (${PLUGIN_ID}, OMEGA ${FAMILY_VERSION})`);
     }
@@ -58,8 +60,8 @@ function ensureMachine(exec) {
   }
 }
 
-// Tests inject `claudeExec` so the real machine is never touched.
-module.exports = async ({ brandRoot, options = {}, claudeExec = runClaude }) => {
+// Tests inject `execFn` so the real machine is never touched.
+module.exports = async ({ brandRoot, options = {}, execFn }) => {
   const result = ensureClaudeSettings(brandRoot, { dryRun: options.dryRun });
 
   const invalid = [
@@ -83,7 +85,8 @@ module.exports = async ({ brandRoot, options = {}, claudeExec = runClaude }) => 
     console.log(`      ${chalk.green('✓')} ${label}`);
   }
 
-  const machine = ensureMachine(claudeExec);
+  // The boot lane runs on every `npm start`: it writes the files and spawns no `claude`
+  const machine = options.lane === 'boot' ? null : ensureMachine(execFn);
   const changed = result.committed !== 'present' || !['present', 'absent'].includes(result.local) || machine !== null;
   const output = changed ? { output: { claudeSettings: { ...result, ...(machine ? { machine } : {}) } } } : null;
   if (invalid.length > 0) {

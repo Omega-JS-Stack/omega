@@ -7,11 +7,10 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
-const { javaInstallHint } = require('./setup-tests/helpers');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
-const { isCustomProject } = require('../utils/project-type');
+const { isCustomProject, refuseWhenToolsMissing } = require('../utils/project-type');
 const { runTargetChecks } = require('../utils/target-checks');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
@@ -586,13 +585,12 @@ class TestCommand extends BaseCommand {
    * Emulator-only values, gitignored like the service account, never committed.
    */
   ensureFixtureEnv(fixture) {
-    const { missingEnvKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
+    const { baseMissingKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
     const envPath = path.join(fixture, '.env');
     const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
     const present = require('dotenv').parse(existing);
 
-    // An empty config makes no key mandatory, so it answers what EVERY brand owes
-    const values = Object.fromEntries(missingEnvKeys({}, present, { target: 'backend', verb: 'start' })
+    const values = Object.fromEntries(baseMissingKeys(present, { target: 'backend', verb: 'start' })
       .map(({ key }) => [key, process.env[key] || `fixture-${key.toLowerCase().replace(/_/g, '-')}`]));
 
     if (Object.keys(values).length === 0) {
@@ -844,11 +842,7 @@ class TestCommand extends BaseCommand {
    *   - `test.log`     — the test-runner subprocess stdout/stderr (managed here)
    */
   async runEmulatorTests(testConfig, functionsDir) {
-    try {
-      await powertools.execute('java -version', { log: false });
-    } catch (e) {
-      this.logError(`Java is required to run tests (Firebase emulators depend on it).`);
-      this.logError(`Install with: ${javaInstallHint()}`);
+    if (refuseWhenToolsMissing(this.main.firebaseProjectPath, 'test', ['java', 'firebase'])) {
       process.exit(1);
     }
 

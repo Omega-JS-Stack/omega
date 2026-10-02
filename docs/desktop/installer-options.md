@@ -10,7 +10,7 @@ Single source of truth for everything that controls how your app is packaged + d
 |---|---|---|
 | **macOS** | `dmg` + `zip` | DMG is the user-facing installer, zip is what `electron-updater` consumes for the auto-update feed. Universal binary (one .dmg works on Intel + Apple Silicon). |
 | **Windows** | `nsis` | The only target that integrates with `electron-updater` for delta updates. Squirrel.Windows works too but installs to a weird per-user location with no Add/Remove Programs entry. MSI uses Windows Installer's own update mechanism (no electron-updater). |
-| **Linux** | `deb` + `AppImage` (+ optional `snap`) | `deb` for Ubuntu/Debian/Mint users, `AppImage` for distro-agnostic distribution. `snap` opt-in for Snap Store distribution. |
+| **Linux** | `deb` + `AppImage` + `snap` | `deb` for Ubuntu/Debian/Mint users, `AppImage` for distro-agnostic distribution, `snap` for the Snap Store. `snap` ships by default; `platforms.linux.formats.snap: false` turns it off. |
 
 If you genuinely need a different target (Squirrel for "no installer UI" UX, MSI for enterprise, MAS for App Store), use the raw `electronBuilder` override block in `omega.json5` — that's an escape hatch into electron-builder's full config surface. We just don't expose those choices in the consumer-facing API to keep the default path safe.
 
@@ -89,7 +89,7 @@ Reference plists from a working MAS-published Electron app (Slapform) are archiv
 | `platforms.linux.arch` | `['x64']` | Architectures. ia32 is essentially extinct on modern Linux. |
 | `platforms.linux.formats.deb` | on | The Debian package. `false` drops it. |
 | `platforms.linux.formats.appimage` | on | The AppImage. `false` drops it. |
-| `platforms.linux.formats.snap` | on | Snap Store publishing. Presence is the switch ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): `false` drops it, and a BUILD auto-skips it when `SNAPCRAFT_STORE_CREDENTIALS` is unset. A publish refuses instead when the brand WROTE the format down. |
+| `platforms.linux.formats.snap` | on | Snap Store publishing. Presence is the switch ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): `false` drops it. On by default, it owes `SNAPCRAFT_STORE_CREDENTIALS`: a publish refuses without it, while a plain local BUILD skips the snap target. |
 | `platforms.linux.formats.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
 | `platforms.linux.formats.snap.grade` | `'stable'` | `stable` or `devel`. |
 | `platforms.linux.formats.snap.autoStart` | `true` | Register the snap to auto-start on login. |
@@ -99,10 +99,9 @@ Reference plists from a working MAS-published Electron app (Slapform) are archiv
 
 Behavior, since the snap became a declared FORMAT (#867):
 
-- **Nothing declared** → the snap SHIPS, like every other format: presence is the switch and the default is on.
-- **Defaulted (nothing written) + no `SNAPCRAFT_STORE_CREDENTIALS`** → skipped, with a build-time log line naming the credential and how to get it. A fresh scaffold produces a working `.deb + .AppImage` build out of the box without failing on a missing publish credential.
-- **WRITTEN in config + no `SNAPCRAFT_STORE_CREDENTIALS`** → a BUILD still skips it as above, but `omega publish` REFUSES in its first step, naming the credential, `platforms.linux.formats.snap` and `omega manage --service publishing` ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)). Writing the format down is saying this brand ships it, and a release that silently drops it is the failure this replaced.
-- **Declared + `SNAPCRAFT_STORE_CREDENTIALS` set** → the snap target emits and publishes on release.
+- **Nothing declared** → the snap SHIPS, like every other format: presence is the switch and the default is on, so the brand owes `SNAPCRAFT_STORE_CREDENTIALS` and `omega manage` asks for it.
+- **Shipped (written or defaulted) + no `SNAPCRAFT_STORE_CREDENTIALS`** → a plain local BUILD skips the snap target, with a log line naming the credential and how to get it, so a fresh scaffold still builds `.deb + .AppImage`. `omega publish` REFUSES in its first step, naming the credential, `platforms.linux.formats.snap` (on by default until set to `false`) and `omega manage --service publishing`. A release that silently drops a format it ships is the failure this replaced.
+- **Shipped + `SNAPCRAFT_STORE_CREDENTIALS` set** → the snap target emits and publishes on release.
 - **`platforms.linux.formats.snap: false`** → off, regardless of credentials. The explicit opt-out.
 
 To turn snap publishing on for a project that ships the format:

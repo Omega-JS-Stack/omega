@@ -1,6 +1,6 @@
 /**
  * The repo derivations ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)):
- * ONE `repo: { provider, org }` block, every repo name derived from
+ * ONE `repo: { provider, owner }` block, every repo name derived from
  * `<brand.id>-<role>` (#809), and visibility read off the brand root's
  * package.json rather than any config key.
  */
@@ -8,6 +8,7 @@ const assert = require('node:assert');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const {
   REPO_PROVIDERS,
@@ -24,7 +25,7 @@ const {
 
 const BRAND = {
   brand: { id: 'acme', url: 'https://acme.com' },
-  repo: { org: 'Acme-Org' },
+  repo: { owner: 'Acme-Org' },
   targets: {
     web: { type: 'web' },
     community: { type: 'web' },
@@ -38,23 +39,30 @@ test('the provider tables name what OMEGA builds for', () => {
   assert.deepEqual(HOSTING_PROVIDERS, ['github']);
 });
 
-test('repoBlock: the provider defaults to github, and the org comes back trimmed', () => {
-  assert.deepEqual(repoBlock({ repo: { org: 'Acme-Org' } }), { provider: 'github', org: 'Acme-Org' });
-  assert.deepEqual(repoBlock({ repo: { provider: 'github', org: '  Acme-Org  ' } }), { provider: 'github', org: 'Acme-Org' });
+test('repoBlock: the provider defaults to github, and the owner comes back trimmed', () => {
+  assert.deepEqual(repoBlock({ repo: { owner: 'Acme-Org' } }), { provider: 'github', owner: 'Acme-Org' });
+  assert.deepEqual(repoBlock({ repo: { provider: 'github', owner: '  Acme-Org  ' } }), { provider: 'github', owner: 'Acme-Org' });
 });
 
-test('repoBlock: no block, and a block naming no org, address nothing', () => {
+test('repo.owner: the whole block reads back as { provider, owner }, and the source repo lives under that owner', () => {
+  const config = { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Acme' } };
+  assert.deepEqual(repoBlock(config), { provider: 'github', owner: 'Acme' });
+  assert.deepEqual(sourceRepo(config), { owner: 'Acme', name: 'acme-omega', slug: 'Acme/acme-omega' });
+});
+
+test('repoBlock: no block, and a block naming no owner, address nothing', () => {
   assert.equal(repoBlock({}), null);
-  assert.equal(repoBlock({ repo: { provider: 'github' } }), null, 'the validator fails an org-less block; nothing derives from it');
+  assert.equal(repoBlock({ repo: { provider: 'github' } }), null, 'the validator fails an owner-less block; nothing derives from it');
+  assert.equal(repoBlock({ repo: { provider: 'github', org: 'Acme-Org' } }), null, 'the retired org key is no alias for owner');
   assert.equal(repoBlock({ repo: 'Acme-Org' }), null);
   assert.equal(repoBlock(undefined), null);
 });
 
-test('sourceRepo: the SOURCE monorepo is `<brand.id>-omega` under the org', () => {
+test('sourceRepo: the SOURCE monorepo is `<brand.id>-omega` under the owner', () => {
   // Hard-coded on purpose: the rule is a NAME, not a recipe to recompute here.
   assert.deepEqual(sourceRepo(BRAND), { owner: 'Acme-Org', name: 'acme-omega', slug: 'Acme-Org/acme-omega' });
   assert.deepEqual(
-    sourceRepo({ brand: { id: '  spaced  ' }, repo: { org: 'Org' } }),
+    sourceRepo({ brand: { id: '  spaced  ' }, repo: { owner: 'Org' } }),
     { owner: 'Org', name: 'spaced-omega', slug: 'Org/spaced-omega' },
     'the id is trimmed before the role joins it',
   );
@@ -73,10 +81,10 @@ test('releasesRepo: the public release channel is `<brand.id>-releases`, with no
 
 test('sourceRepo/releasesRepo: half an address addresses nothing', () => {
   assert.equal(sourceRepo({ brand: { id: 'acme' } }), null);
-  assert.equal(sourceRepo({ repo: { org: 'Acme-Org' } }), null);
+  assert.equal(sourceRepo({ repo: { owner: 'Acme-Org' } }), null);
   assert.equal(sourceRepo({}), null);
   assert.equal(releasesRepo({ brand: { id: 'acme' } }), null);
-  assert.equal(releasesRepo({ repo: { org: 'Acme-Org' } }), null);
+  assert.equal(releasesRepo({ repo: { owner: 'Acme-Org' } }), null);
 });
 
 test('repoDrift: an origin that IS the derived source repo is no drift, compared case-insensitively (#934)', () => {
@@ -88,19 +96,19 @@ test('repoDrift: another owner OR another name is the one drift line, naming bot
   // A transfer: the name agrees, the owner does not.
   assert.equal(
     repoDrift('Other-Org/acme-omega', BRAND),
-    'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo',
+    'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo',
   );
   // A rename: the owner agrees, the name does not. The owner-only compare this
   // replaced let this one through silently.
   assert.equal(
     repoDrift('Acme-Org/acme-site', BRAND),
-    'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo',
+    'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo',
   );
 });
 
 test('repoDrift: a config that derives no source repo has nothing to disagree with (#934)', () => {
-  assert.equal(repoDrift('Acme-Org/acme-omega', { brand: { id: 'acme' } }), null, 'no org');
-  assert.equal(repoDrift('Acme-Org/acme-omega', { repo: { org: 'Acme-Org' } }), null, 'no brand id');
+  assert.equal(repoDrift('Acme-Org/acme-omega', { brand: { id: 'acme' } }), null, 'no owner');
+  assert.equal(repoDrift('Acme-Org/acme-omega', { repo: { owner: 'Acme-Org' } }), null, 'no brand id');
 });
 
 test('websiteRepo: a web target publishes to `<brand.id>-<its name>`', () => {
@@ -113,8 +121,8 @@ test('websiteRepo: a web target publishes to `<brand.id>-<its name>`', () => {
 });
 
 test('websiteRepo: null when the config addresses no repo at all', () => {
-  const noOrg = { brand: { id: 'acme' }, targets: { web: { type: 'web' } } };
-  assert.equal(websiteRepo(noOrg, 'web'), null);
+  const noOwner = { brand: { id: 'acme' }, targets: { web: { type: 'web' } } };
+  assert.equal(websiteRepo(noOwner, 'web'), null);
 });
 
 test('websiteRepo: only a WEB target is served from its own repo', () => {
@@ -192,4 +200,19 @@ test('brandVisibility: a manifest that does not parse fails LOUDLY, never as pri
 
   fs.writeFileSync(path.join(root, 'package.json'), '{ "name": "acme", ');
   assert.throws(() => brandVisibility(root), SyntaxError);
+});
+
+// The rename leaves no reader behind: only the migrate table (which converts
+// the old key) and the breaking-changes register may still say it.
+test('repo.owner: no source, doc, brand config or plugin file names repo.org or --org', () => {
+  const root = path.join(__dirname, '..', '..', '..');
+  const scopes = ['packages/*/src/**', 'docs/**', 'brands/*/config/**', 'agent-plugins/**'].map((glob) => `:(glob)${glob}`);
+  const allowed = (file) => file.startsWith('packages/manager/src/migrate/') || file === 'docs/shared/breaking-changes.md';
+  const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...scopes], { cwd: root, encoding: 'utf8' })
+    .split('\0')
+    .filter((file) => file && !allowed(file) && fs.existsSync(path.join(root, file)));
+  const hits = files.flatMap((file) => fs.readFileSync(path.join(root, file), 'utf8')
+    .split('\n')
+    .flatMap((line, index) => (/\brepo\.org\b|--org\b/.test(line) ? [`${file}:${index + 1}: ${line.trim()}`] : [])));
+  assert.deepEqual(hits, []);
 });

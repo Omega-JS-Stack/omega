@@ -196,13 +196,6 @@ function run(configDir, args) {
 
 // ─── The two doors ───────────────────────────────────────────────────────────
 
-/** The words of one call, in any of the runner shapes: `'claude a b'`, `['a', 'b']`, `('claude', ['a', 'b'])`. */
-function words(first, second) {
-  if (Array.isArray(first)) return first;
-  if (Array.isArray(second)) return [first, ...second];
-  return String(first).match(/"[^"]*"|'[^']*'|\S+/g).map((word) => word.replace(/^["']|["']$/g, ''));
-}
-
 /**
  * A fresh machine in a temp config folder.
  * @param {object} [seed]
@@ -248,26 +241,23 @@ function createMachine({ missing = false, marketplaces = {}, installed = {}, ena
     fs.writeFileSync(script, `#!/bin/sh\nexec "${process.execPath}" "${__filename}" "${configDir}" "$@"\n`, { mode: 0o755 });
   }
 
-  /** The injected runner: stdout as a string, a throw on a non-zero exit (the execSync contract). */
-  function exec(first, second, third) {
-    const callback = [second, third].find((arg) => typeof arg === 'function');
-    const argv = words(first, typeof second === 'function' ? undefined : second);
-    const settle = (error, stdout) => {
-      if (callback) return callback(error, stdout, error ? error.stderr : '');
-      if (error) throw error;
-      return stdout;
-    };
-    const lookup = argv[0] === 'which' || (argv[0] === 'command' && argv[1] === '-v');
+  /**
+   * The injected runner, called `(file, args, options)` with `file` 'claude':
+   * stdout as a string, a throw on a non-zero exit (the execFileSync contract).
+   * Any other call form throws.
+   */
+  function exec(file, args) {
+    if (file !== 'claude' || !Array.isArray(args)) {
+      throw new Error(`fake claude: call as ('claude', args), got (${JSON.stringify(file)}, ${JSON.stringify(args)})`);
+    }
     if (missing) {
-      const error = Object.assign(new Error(`spawn ${lookup ? argv.at(-1) : argv[0]} ENOENT`), { code: 'ENOENT', errno: -2, status: 127, stdout: '', stderr: 'command not found: claude\n' });
-      return settle(error);
+      throw Object.assign(new Error('spawnSync claude ENOENT'), { code: 'ENOENT', errno: -2, status: null, stdout: '', stderr: '' });
     }
-    if (lookup) return settle(null, `${path.join(binDir, 'claude')}\n`);
-    const result = run(configDir, argv[0] === 'claude' ? argv.slice(1) : argv);
+    const result = run(configDir, args.map(String));
     if (result.status !== 0) {
-      return settle(Object.assign(new Error(`Command failed: claude ${argv.join(' ')}\n${result.stderr}`), result));
+      throw Object.assign(new Error(`Command failed: claude ${args.join(' ')}\n${result.stderr}`), result);
     }
-    return settle(null, result.stdout);
+    return result.stdout;
   }
 
   /** Every call so far, as the words after `claude`. */

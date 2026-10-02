@@ -131,20 +131,25 @@ test('each store names its own developer keys, and snap names its login', () => 
   assert.deepStrictEqual(FORMATS.extension.chrome.zip.requires, []);
 });
 
-const signing = (value) => ({ platforms: { windows: { signing: value } } });
+const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
+const signing = (value) => ({ ...DESKTOP, platforms: { windows: { signing: value } } });
 const SIGNING_CONFIGS = {
   'self-hosted': signing({ strategy: 'self-hosted' }),
   ...Object.fromEntries(WINDOWS_CLOUD_PROVIDERS.map((provider) => [provider, signing({ strategy: 'cloud', cloud: { provider } })])),
 };
 
 /**
- * The signing configs a key's requiredWhen holds on.
+ * The signing configs a key's requiredWhen holds on. A key owed on every
+ * signing choice (the default snap's login) hangs off none of them.
  * @param {object} entry - An env schema entry.
  * @returns {string[]} The strategy or cloud provider names.
  */
-const gatedOn = (entry) => Object.entries(SIGNING_CONFIGS)
-  .filter(([, config]) => typeof entry.requiredWhen === 'function' && entry.requiredWhen(config))
-  .map(([name]) => name);
+const gatedOn = (entry) => {
+  const names = Object.entries(SIGNING_CONFIGS)
+    .filter(([, config]) => typeof entry.requiredWhen === 'function' && entry.requiredWhen(config))
+    .map(([name]) => name);
+  return names.length === Object.keys(SIGNING_CONFIGS).length ? [] : names;
+};
 
 test('the Windows signing keys come FROM the schema\'s own gates, never a second list', () => {
   const nsis = FORMATS.desktop.windows.nsis.requires;
@@ -154,15 +159,19 @@ test('the Windows signing keys come FROM the schema\'s own gates, never a second
   for (const key of nsis) {
     const entry = ENV_SCHEMA.find((candidate) => candidate.name === key);
     assert.equal(gatedOn(entry).length, 1, key);
-    assert.equal(entry.requiredWhen({}), false, `${key}: a config that says nothing owes nothing`);
+    assert.equal(entry.requiredWhen({}), false, `${key}: a brand with no desktop target owes nothing`);
+  }
+  // Self-hosted is the default strategy, so its pair is owed by a desktop target that writes none
+  for (const key of ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']) {
+    assert.equal(ENV_SCHEMA.find((candidate) => candidate.name === key).requiredWhen(DESKTOP), true, key);
   }
   // SIGNTOOL_PATH is the runner's own path, gated by nothing, so it is never a ship key
   assert.ok(!nsis.includes('SIGNTOOL_PATH'));
 });
 
 test('formatKeys with a config keeps only the keys that config actually owes', () => {
-  const selfHosted = { platforms: { windows: { signing: { strategy: 'self-hosted' } } } };
-  const cloud = { platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } };
+  const selfHosted = signing({ strategy: 'self-hosted' });
+  const cloud = signing({ strategy: 'cloud', cloud: { provider: 'azure' } });
 
   assert.deepStrictEqual(
     formatKeys('desktop', 'windows', 'nsis', selfHosted).requires,
@@ -172,12 +181,24 @@ test('formatKeys with a config keeps only the keys that config actually owes', (
     formatKeys('desktop', 'windows', 'nsis', cloud).requires,
     ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT'],
   );
+  // The default strategy owes the same pair as the written one
+  assert.deepStrictEqual(formatKeys('desktop', 'windows', 'nsis', DESKTOP).requires, ['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']);
   // No config = the whole declared set, and the listing paths ride along
   assert.equal(formatKeys('desktop', 'windows', 'nsis').requires.length, FORMATS.desktop.windows.nsis.requires.length);
   assert.deepStrictEqual(formatKeys('extension', 'edge', 'store').listing, ['listings.edge.id']);
   // An unconditional key is never filtered away: the store keys carry no gate
   assert.deepStrictEqual(formatKeys('extension', 'firefox', 'store', {}).requires, ['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']);
   assert.deepStrictEqual(formatKeys('desktop', 'linux', 'nope'), { requires: [], listing: [] });
+});
+
+test('formatKeys: a desktop target owes the snap login for the default snap, until the snap or linux is turned off', () => {
+  assert.deepStrictEqual(formatKeys('desktop', 'linux', 'snap', DESKTOP).requires, ['SNAPCRAFT_STORE_CREDENTIALS']);
+  assert.deepStrictEqual(formatKeys('desktop', 'linux', 'snap', { ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }).requires, []);
+  assert.deepStrictEqual(formatKeys('desktop', 'linux', 'snap', { ...DESKTOP, platforms: { linux: false } }).requires, []);
+  assert.deepStrictEqual(formatKeys('desktop', 'windows', 'nsis', { ...DESKTOP, platforms: { windows: false } }).requires, []);
+  // A brand with no desktop target owes none of it
+  assert.deepStrictEqual(formatKeys('desktop', 'linux', 'snap', {}).requires, []);
+  assert.deepStrictEqual(formatKeys('desktop', 'windows', 'nsis', {}).requires, []);
 });
 
 test('the Windows signing strategies and cloud providers are the ones the env schema gates on', () => {
