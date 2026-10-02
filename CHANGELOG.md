@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#984](../../issues/984) - A `test/_init.js` hook that fails to load, or whose factory or `setup` throws, fails the run naming the file on web, desktop and extension, where it used to print the error and run the suites anyway.
 
 ### Fixed
+- [#1045](../../issues/1045) - The in-repo brands deploy again: the monorepo's `*.tgz` ignore rule hid their staged framework tarballs from the snapshot, and the runner's install failed. The root `.gitignore` un-ignores them, and the guard now checks the staged files themselves, so any other nested brand is refused before the push.
 - [#769](../../issues/769) - Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#212](../../issues/212) - The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) - The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.

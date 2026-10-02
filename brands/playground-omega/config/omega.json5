@@ -79,6 +79,18 @@
     linkedin: "itwcreativeworks",
     discord: "itwcreativeworks",
   },
+  // Managed Firebase Auth accounts (@omega.js/manager account service): enabled
+  // + admins ([{ email, account, marketing }]; '{domain}' templates to the
+  // brand domain). Owner-defined, typically set once in the COMPANY omega.json5
+  // (arrays replace, so the company list wins whole). Passwords NEVER live
+  // here: per-account OMEGA_ACCOUNT_PASSWORD__* env vars, the
+  // config/hooks/account/password.js hook, or the ACCOUNT_PASSWORD_SEED
+  // derivation.
+  account: {
+    // false (or `account: false`) skips the manager's account service: no
+    // managed accounts are created or converged in the brand's Firebase Auth.
+    enabled: true,
+  },
 
   // One repo block (#883): the org that holds every derived repo. Source
   // `playground-omega` (public, from package.json `private: false`, so Actions do not count against the org storage), `playground-releases`
@@ -416,6 +428,14 @@
       enabled: true,
     },
   },
+  // Parasite-SEO content: seo.github.content is the @omega.js/manager seo
+  // service's repos, and big content blocks may live in the config/seo.json5
+  // sidecar. The indexing switch is NOT here: it is `targets.web.meta.index`,
+  // the same name a page writes.
+  seo: {
+    // false (or `seo: false`) skips the manager's seo service.
+    enabled: true,
+  },
   search: {
     providers: {
       searchConsole: {
@@ -531,6 +551,11 @@
         bundleIdPrefix: "com.itwcreativeworks",
       },
     },
+    // false (or `certificates: false`) skips the manager's certificates
+    // service: no bundle ids, no signing certificates, no provisioning profiles
+    // for this brand. A brand with no desktop or mobile target is skipped
+    // either way.
+    enabled: true,
   },
 
   // Project-owned theme — seeded at onboarding, yours to change.

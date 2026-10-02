@@ -16,6 +16,9 @@ test/e2e/.logs/
 .env
 .env.*
 
+# Claude Code settings for this machine alone (a linked brand's local omega plugin)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 

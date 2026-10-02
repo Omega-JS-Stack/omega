@@ -1,0 +1,19 @@
+{
+  "extraKnownMarketplaces": {
+    "omega": {
+      "source": {
+        "source": "github",
+        "repo": "Omega-JS-Stack/omega",
+        "sparsePaths": [
+          ".claude-plugin",
+          "agent-plugins/claude"
+        ]
+      },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "omega@omega": true,
+    "omega@omega-local": false
+  }
+}

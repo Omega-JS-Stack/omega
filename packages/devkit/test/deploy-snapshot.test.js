@@ -285,6 +285,7 @@ test('a brand whose ignore rules hide the staged tarballs fails BEFORE the push 
       assert.match(error.message, /omega_modules/, 'the error names the path that cannot ride');
       assert.match(error.message, /package-lock\.json/, 'and every other one');
       assert.match(error.message, /\.gitignore/, 'and where the rule lives');
+      assert.match(error.message, /`!omega_modules` and `!package-lock\.json`/, 'and the lines that un-ignore them');
       return true;
     },
   );
@@ -293,6 +294,34 @@ test('a brand whose ignore rules hide the staged tarballs fails BEFORE the push 
   assert.equal(run('git', ['for-each-ref'], bare).trim(), '', 'the mirror is untouched');
   // The staged files are untouched: cleaning them up is the caller's restore.
   assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
+});
+
+test('an ignore rule that matches the staged FILES, not their folder, fails before the push too', () => {
+  const { repo, brandRoot, bare } = buildFixture();
+  const calls = [];
+
+  // A file pattern leaves the staging folder itself un-ignored and hides every
+  // tarball in it: the rule a nested brand inherits from an enclosing repo
+  jetpack.append(path.join(repo, '.gitignore'), '*.tgz\n');
+
+  assert.throws(
+    () => pushSnapshot({
+      brandRoot,
+      owner: 'acme',
+      repo: 'acme-omega',
+      ref: 'main',
+      token: TOKEN,
+      require: ['omega_modules', 'package-lock.json'],
+      execFn: localRemote(bare, calls),
+    }),
+    (error) => {
+      assert.match(error.message, /omega_modules\/omega\.js-liba-1\.0\.0\.tgz/, 'the error names the hidden file');
+      assert.match(error.message, /`!omega_modules\/\*`/, 'and the one line that un-ignores every file in the folder');
+      return true;
+    },
+  );
+
+  assert.equal(calls.some((call) => call.args[0] === 'push'), false, 'nothing was pushed');
 });
 
 // ─── The resolved company layer (#677) ───

@@ -25,6 +25,8 @@ firebase.resolved.json
 # npm pack tarballs and the Firebase CLI's deploy cache
 *.tgz
 .firebase/
+# A nested brand's deploy stages its linked frameworks here, and the snapshot has to carry them
+!/brands/*/omega_modules/*.tgz
 
 _attic/
 

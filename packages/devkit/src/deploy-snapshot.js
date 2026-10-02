@@ -137,7 +137,7 @@ function pushSnapshot(options) {
     // succeed and `npm ci` would die minutes later, a machine away, on a file:
     // spec pointing at nothing. Checked BEFORE the push, so the deploy stops
     // here with the fix in its hand.
-    assertNotIgnored({ git, paths: [...(options.require || []), ...(companyLayer ? [COMPANY_RESOLVED_FILE] : [])] });
+    assertNotIgnored({ git, brandRoot, paths: [...(options.require || []), ...(companyLayer ? [COMPANY_RESOLVED_FILE] : [])] });
 
     const toplevel = git('rev-parse', '--show-toplevel').trim();
     // Index paths are always repo-root relative, so the prefix is what turns
@@ -216,23 +216,35 @@ function writeCompanyLayer(brandRoot) {
 }
 
 /**
- * Refuse a snapshot whose ignore rules would drop the files it exists to carry
- * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
- *
- * A brand that ignores build output by name (`omega_modules/`, a committed-by-
- * nobody `package-lock.json`) catches the staged packages with it, and the
- * snapshot then carries `file:` specs pointing at tarballs that never travelled.
+ * Refuse a snapshot whose ignore rules would drop the files it exists to carry:
+ * the runner would get `file:` specs pointing at tarballs that never travelled.
+ * A folder is judged by the files in it, since a file pattern (`*.tgz`, which a
+ * nested brand inherits from the enclosing repo) hides them and never the folder.
  *
  * @param {object} options - Options.
  * @param {Function} options.git - The bound git runner (cwd = the brand root).
+ * @param {string} options.brandRoot - The brand folder the paths sit in.
  * @param {string[]} options.paths - Brand-relative paths that must ride.
- * @throws {Error} Naming every ignored path and the rule to drop.
+ * @throws {Error} Naming every ignored path and the line that un-ignores it.
  */
-function assertNotIgnored({ git, paths }) {
-  const ignored = paths.filter((entry) => isIgnored(git, entry));
+function assertNotIgnored({ git, brandRoot, paths }) {
+  const hidden = paths.flatMap((entry) => {
+    // A rule on the path itself is undone by naming the path: no line re-includes a file under an ignored folder
+    if (isIgnored(git, entry)) {
+      return [{ path: entry, unignore: `!${entry}` }];
+    }
 
-  if (ignored.length) {
-    throw new Error(`This brand's git ignore rules hide ${ignored.join(' and ')}, which the deploy just staged and the snapshot has to carry. A pushed snapshot without them installs nothing on the runner (every linked package is a file: spec pointing at a tarball that never travelled). Drop the rule from the .gitignore that matches (\`git check-ignore -v ${ignored[0]}\` names the file and line), or un-ignore it with a \`!${ignored[0]}\` line, then re-run the deploy.`);
+    const full = path.join(brandRoot, entry);
+    const inside = jetpack.exists(full) === 'dir' ? jetpack.list(full) : [];
+    return inside
+      .map((name) => `${entry}/${name}`)
+      .filter((file) => isIgnored(git, file))
+      .map((file) => ({ path: file, unignore: `!${entry}/*` }));
+  });
+
+  if (hidden.length) {
+    const lines = [...new Set(hidden.map((item) => `\`${item.unignore}\``))].join(' and ');
+    throw new Error(`This brand's git ignore rules hide ${hidden.map((item) => item.path).join(' and ')}, which the deploy just staged and the snapshot has to carry. A pushed snapshot without them installs nothing on the runner (every linked package is a file: spec pointing at a tarball that never travelled). Drop the rule from the .gitignore that matches (\`git check-ignore -v ${hidden[0].path}\` names the file and line), or un-ignore with ${lines} at the end of the brand's own .gitignore, then re-run the deploy.`);
   }
 }
 
