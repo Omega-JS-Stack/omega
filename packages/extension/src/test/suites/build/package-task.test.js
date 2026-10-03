@@ -96,6 +96,33 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'the packaged copy ships the bundles without their source maps, which stay in dist',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
+          files: {
+            'dist/manifest.json': MANIFEST(`description: 'a packageable extension'`),
+            'dist/assets/js/x.js': `globalThis.probe = 1;\n//# sourceMappingURL=x.js.map\n`,
+            'dist/assets/js/x.js.map': `{"version":3,"sources":[],"mappings":""}`,
+            'dist/_locales/en/messages.json': `{ "appName": { "message": "Staged" } }`,
+          },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            const failure = await new Promise((resolve) => task.packageFn(resolve));
+            ctx.expect(failure).toBe(undefined);
+
+            const raw = path.join(tmp, 'packaged', 'chrome', 'raw');
+            ctx.expect(fs.existsSync(path.join(raw, 'assets', 'js', 'x.js'))).toBe(true);
+            ctx.expect(fs.existsSync(path.join(raw, 'assets', 'js', 'x.js.map'))).toBe(false);
+            ctx.expect(fs.existsSync(path.join(tmp, 'dist', 'assets', 'js', 'x.js.map'))).toBe(true);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'the manifest\'s dev origin is the RESOLVED website origin, never a baked literal (#262)',
       run: async (ctx) => {
         // Same staging as the dev.ports test: a brand with a live website app

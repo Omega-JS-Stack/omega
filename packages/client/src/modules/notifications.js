@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { pushSupported } from './firebase-services.js';
 
 const logger = createLogger('push');
 const syncLogger = createLogger('push:sync');
@@ -39,7 +40,7 @@ class Notifications {
 
     // Listen for foreground messages (tab is focused)
     if (permission === 'granted') {
-      logger.log('Setting up foreground listener...', { supported: this.isSupported(), hasMessaging: !!this.omega.firebaseMessaging });
+      logger.log('Setting up foreground listener...', { supported: this.isSupported() });
       this.onMessage((payload) => {
         logger.log('Foreground message received:', payload);
       }).then(unsub => {
@@ -67,11 +68,12 @@ class Notifications {
     document.addEventListener('click', handleClick);
   }
 
-  // Check if notifications are supported
+  // Check if notifications are supported: the browser's own support and a
+  // configured Firebase, answered without loading the messaging SDK
   isSupported() {
     return 'Notification' in window &&
-           'serviceWorker' in navigator &&
-           !!this.omega.firebaseMessaging;
+           pushSupported() &&
+           !!this.omega.firebaseApp;
   }
 
   // Check if user is subscribed to notifications
@@ -102,7 +104,7 @@ class Notifications {
       this._requestInProgress = true;
 
       // Get Firebase messaging
-      const messaging = this.omega.firebaseMessaging;
+      const messaging = await this.omega.loadFirebaseMessaging();
       if (!messaging) {
         throw new Error('Firebase Messaging not initialized');
       }
@@ -162,8 +164,8 @@ class Notifications {
         return false;
       }
 
+      const messaging = await this.omega.loadFirebaseMessaging();
       const { deleteToken } = await import('firebase/messaging');
-      const messaging = this.omega.firebaseMessaging;
 
       if (messaging) {
         await deleteToken(messaging);
@@ -233,7 +235,7 @@ class Notifications {
         return null;
       }
 
-      const messaging = this.omega.firebaseMessaging;
+      const messaging = await this.omega.loadFirebaseMessaging();
       if (!messaging) {
         return null;
       }
@@ -257,8 +259,8 @@ class Notifications {
         return () => {};
       }
 
+      const messaging = await this.omega.loadFirebaseMessaging();
       const { onMessage } = await import('firebase/messaging');
-      const messaging = this.omega.firebaseMessaging;
 
       if (!messaging) {
         return () => {};

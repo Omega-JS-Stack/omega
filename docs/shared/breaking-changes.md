@@ -30,6 +30,38 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-02: source maps ship in `dist` ([#1064](https://github.com/Omega-JS-Stack/omega/issues/1064))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A production bundle's source map | None: `bundle()` wrote a map in a dev build only | A `<file>.js.map` beside every bundle and chunk in every mode, each `.js` ending in its `sourceMappingURL` comment. A web deploy publishes them with the site, public; the extension package and the desktop packager leave `*.map` out ([devkit](../devkit/index.md)) | None. A brand whose browser source must stay unreadable on its live site has no switch to turn them off |
+
+## 2026-10-02: a user can link several accounts of one connection provider ([#1061](https://github.com/Omega-JS-Stack/omega/issues/1061))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The stored connection record | `users/{uid}.connections.<provider>`: one record `{ type, token, identity, updated }` per provider | `users/{uid}.connections.<provider>.<identityId>`: the same record one level down, keyed by the account's `identity.id`, so a user can hold up to `connections.<provider>.max` accounts of a provider (default 1) ([connections.md](../backend/connections.md)) | Run the manager's `users` migration (`--execute`) BEFORE or WITH the backend deploy: it moves each one-level record under its `identity.id` and leaves a keyed provider alone. Until it runs, a user still in the old shape shows no linked account and can connect again; the migration keeps an account connected meanwhile, and drops the old record when that account is the same identity. A legacy record with no `identity.id` has nothing to key it under and is dropped, one log line naming the uid and the provider (the audit run lists them first). Brand code that reads `connections.<provider>.token` reads `connections.<provider>.<identityId>.token` |
+| `status`, `refresh` and `DELETE` on `/omega/user/connections` | `provider` alone named the one record | `provider` plus `id` (the identity id). Without `id`, the one account a user holds serves the call; several answer a 400 naming `id`, and `status` lists them all as `{ connections: [{ id, identity, status }] }` | A brand page or service that calls these for a provider whose `max` is above 1 passes `id`. One-account brands need nothing |
+
+## 2026-10-02: the edge service owns the zone's Cloudflare Web Analytics ([#1070](https://github.com/Omega-JS-Stack/omega/issues/1070))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| Cloudflare Web Analytics on the brand zone | A dashboard switch only; the manager never touched it | `edge.providers.cloudflare.webAnalytics.enabled`, default `true`, reconciled by the edge service's `web-analytics` operation. The first manage run of a brand whose zone has no Web Analytics site CREATES one with automatic install, so the zone starts injecting the beacon, which sits outside the consent gate. Every update sends `auto_install: true`, so a site set up for a hand-installed snippet becomes an automatic one ([edge.md](../manager/edge.md)) | A brand that must not carry the beacon sets `edge.providers.cloudflare.webAnalytics.enabled: false` in `config/omega.json5` before its next manage run. Add "Account Settings Write" to `CLOUDFLARE_TOKEN`, or the operation warns and skips |
+
+## 2026-10-02: the backend refuses a connection provider that is not enabled ([#1071](https://github.com/Omega-JS-Stack/omega/issues/1071))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `connections.<provider>.enabled` | Decided only whether the account page offered the provider's card; the backend never read it, so a brand page could drive `authorize`, `tokenize` and `refresh` for a provider that resolved `false` | The backend refuses `authorize`, `tokenize` and `refresh` with a 400 naming the key to set when the resolved value is `false`, and the five packaged providers (Google, Discord, Spotify, Twitch, Kick) resolve `false` by default. `status` and the delete still answer ([connections.md](../backend/connections.md)). Affects a brand that set a packaged provider's `CONNECTIONS_<PROVIDER>_*` credentials, never set `enabled: true`, and drives the routes from its own page | Set `connections.<name>.enabled: true` in `config/omega.json5` for every packaged provider the brand uses. A brand's own provider needs nothing: it is on unless its entry sets `false` |
+
+## 2026-10-02: Firestore and messaging load on first use ([#1062](https://github.com/Omega-JS-Stack/omega/issues/1062))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The client's Firestore instance | `omega.firebaseFirestore`, a sync getter filled at boot | `await omega.loadFirebaseFirestore()`: one memoized promise of the instance, the SDK imported on the first call (the emulator connected inside it on a local stack). It rejects on a page with no Firebase app, so gate on `omega.firebaseApp` first ([client architecture](../client/architecture.md#what-boot-loads-and-what-waits-for-first-use)) | In page code, replace each `omega.firebaseFirestore` read with `await omega.loadFirebaseFirestore()` inside an async function, and a truthiness check on it with `omega.firebaseApp`. The `omega.firestore` wrapper needs no change |
+| The client's Messaging instance | `omega.firebaseMessaging`, a sync getter filled at boot (null without service worker or push support) | `await omega.loadFirebaseMessaging()`: one memoized promise of the instance, null without service worker or push support. `omega.notifications.isSupported()` stays sync | Replace each `omega.firebaseMessaging` read with `await omega.loadFirebaseMessaging()`, gated on `omega.firebaseApp`; a support check reads `omega.notifications.isSupported()` |
+
 ## 2026-10-02: a seo item's token is named, never written ([#1059](https://github.com/Omega-JS-Stack/omega/issues/1059))
 
 | Contract | Old form | New form | Manual migration step |

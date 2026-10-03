@@ -121,7 +121,7 @@ async function runManage(startDir, options = {}) {
   // walked — discovery fails loud on the old shape and every service below
   // reads targets/ — so this ONE migration runs ALONE, ahead of the load that
   // would throw on it, and stops there. It is registered like every other
-  // migration too (config.js OPERATIONS.migrations), so a bare `--migration`
+  // migration too (operations.js OPERATIONS.migrations), so a bare `--migration`
   // walk re-checks it on a converged brand.
   if (options.migration === ensureTargetsRename.MIGRATION_NAME) {
     console.log('');

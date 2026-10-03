@@ -14,6 +14,7 @@ const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 const { cacheRead } = require('../lib/read-cache.js');
+const { accountId: resolveAccountId } = require('../lib/account-id.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { DOMAIN_PROVIDERS, resolveEmailProvider } = require('../../domain/lib/providers.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
@@ -22,21 +23,17 @@ function isUnverifiedError(error) {
   return error.message.includes('2054') || error.message.toLowerCase().includes('not verified');
 }
 
-async function getAccountId(api, zoneId) {
-  const zone = await api.makeRequest(`/zones/${zoneId}`);
-  return zone.result.account.id;
-}
-
 /**
  * Send a verification email for the destination; interactive runs then open
  * the dashboard and retry the rule write until the address verifies.
  *
  * @returns {boolean} - true when the rule landed after verification
  */
-async function handleUnverified(api, zoneId, destination, retryWrite, options = {}) {
+async function handleUnverified(context, destination, retryWrite) {
+  const { cloudflareApi: api, options = {} } = context;
   console.log(`      ${chalk.yellow('⚠')} Destination ${chalk.cyan(destination)} is not verified in Cloudflare`);
 
-  const accountId = await getAccountId(api, zoneId);
+  const accountId = await resolveAccountId(context);
   try {
     await api.makeRequest(`/accounts/${accountId}/email/routing/addresses`, {
       method: 'POST',
@@ -196,7 +193,7 @@ module.exports = async function ensureEmailRouting(context) {
         updated++;
       } catch (error) {
         if (!isUnverifiedError(error)) throw error;
-        const resolved = await handleUnverified(api, zoneId, desiredCatchAll.to, putCatchAll, options);
+        const resolved = await handleUnverified(context, desiredCatchAll.to, putCatchAll);
         if (resolved) {
           updated++;
         } else {
@@ -249,7 +246,7 @@ module.exports = async function ensureEmailRouting(context) {
       created++;
     } catch (error) {
       if (!isUnverifiedError(error)) throw error;
-      const resolved = await handleUnverified(api, zoneId, desired.to, postRule, options);
+      const resolved = await handleUnverified(context, desired.to, postRule);
       if (resolved) {
         created++;
       } else {

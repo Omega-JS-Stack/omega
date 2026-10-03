@@ -145,19 +145,24 @@ module.exports = defineCases({
         const user = createUser({
           connections: {
             google: {
-              token: googleToken,
-              identity: { email: 'g@gmail.com', name: 'Test' },
+              'google-sub-1': {
+                token: googleToken,
+                identity: { id: 'google-sub-1', email: 'g@gmail.com', name: 'Test' },
+              },
             },
             microsoft: {
-              token: msToken,
+              'ms-1': {
+                token: msToken,
+                identity: { id: 'ms-1' },
+              },
             },
           },
         });
 
-        assert.equal(user.connections.google.token.access_token, 'ya29.xxx', 'google access_token preserved');
-        assert.equal(user.connections.google.token.refresh_token, '1//xxx', 'google refresh_token preserved');
-        assert.equal(user.connections.google.identity.email, 'g@gmail.com', 'google identity preserved');
-        assert.equal(user.connections.microsoft.token.access_token, 'eyJ.xxx', 'microsoft token preserved');
+        assert.equal(user.connections.google['google-sub-1'].token.access_token, 'ya29.xxx', 'google access_token preserved');
+        assert.equal(user.connections.google['google-sub-1'].token.refresh_token, '1//xxx', 'google refresh_token preserved');
+        assert.equal(user.connections.google['google-sub-1'].identity.email, 'g@gmail.com', 'google identity preserved');
+        assert.equal(user.connections.microsoft['ms-1'].token.access_token, 'eyJ.xxx', 'microsoft token preserved');
       },
     },
 
@@ -733,8 +738,10 @@ module.exports = defineCases({
           api: { clientId: 'uuid-123', privateKey: 'key-456' },
           connections: {
             google: {
-              token: { access_token: 'ya29.real', refresh_token: '1//real', expiry_date: 1700000000 },
-              identity: { email: 'ian@gmail.com', name: 'Ian W', picture: 'https://photo.url' },
+              'google-sub-ian': {
+                token: { access_token: 'ya29.real', refresh_token: '1//real', expiry_date: 1700000000 },
+                identity: { id: 'google-sub-ian', email: 'ian@gmail.com', name: 'Ian W', picture: 'https://photo.url' },
+              },
             },
           },
           usage: {
@@ -760,8 +767,8 @@ module.exports = defineCases({
         assert.equal(user.affiliate.code, 'IAN7', 'affiliate code preserved');
         assert.deepEqual(user.affiliate.referrals, ['ref1', 'ref2'], 'referrals preserved');
         assert.equal(user.api.clientId, 'uuid-123', 'api clientId preserved');
-        assert.equal(user.connections.google.token.access_token, 'ya29.real', 'connections token preserved');
-        assert.equal(user.connections.google.identity.email, 'ian@gmail.com', 'connections identity preserved');
+        assert.equal(user.connections.google['google-sub-ian'].token.access_token, 'ya29.real', 'connections token preserved');
+        assert.equal(user.connections.google['google-sub-ian'].identity.email, 'ian@gmail.com', 'connections identity preserved');
         assert.equal(user.usage.emails.monthly, 42, 'usage emails preserved');
         assert.equal(user.personal.name.first, 'Ian', 'name preserved');
         assert.equal(user.personal.company.name, 'ITW Creative Works', 'company preserved');

@@ -87,7 +87,7 @@ function initControls() {
 // Load stat card counts
 async function loadStatCards() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 

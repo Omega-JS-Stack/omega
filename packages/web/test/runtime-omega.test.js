@@ -100,7 +100,7 @@ test('#945: sw/omega.js default export is an instance with initialize()', () => 
     bundle: true,
     format: 'cjs',
     write: false,
-    define: { __OMEGA_FIREBASE_VERSION__: '"0.0.0"' },
+    define: { __OMEGA_FIREBASE_VERSION__: '"0.0.0"', __OMEGA_BUILD_STAMP__: '"1700000000000"' },
     logLevel: 'silent',
   });
 

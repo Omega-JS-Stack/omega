@@ -1,33 +1,14 @@
 /**
- * bundle — the ONE esbuild wrapper every OMEGA framework builds through (#736,
- * part of #128).
+ * bundle: the ONE esbuild wrapper every OMEGA framework builds through. It owns
+ * the shared composition: the framework-deps resolve hook, the production
+ * `@dev-only` strip, the browser floor (`BROWSER_TARGET`) for a browser build
+ * naming no target, minify by mode, an external source map in every mode,
+ * `bundle` + `metafile` on, one timing line per build, and `import.meta.url`
+ * kept answering in CommonJS output.
  *
- * Bundling was three shapes for one job: web called esbuild directly with its
- * own private plugins, desktop and extension each ran webpack, and the
- * `@dev-only` strip existed once per bundler. This module is the single place
- * the SHARED parts live, so a framework's own build code is only its entries
- * and the plugins that are genuinely its own:
- *
- *   - the framework-deps resolve hook (#87/#2) — a consumer imports anything the
- *     framework declares by BARE specifier and gets the FRAMEWORK's copy
- *   - the `@dev-only` strip (#18), registered for PRODUCTION builds only
- *   - minify / sourcemap by mode, and `bundle` + `metafile` on
- *   - one timing line per build, watch rebuilds included
- *   - `import.meta.url`, kept answering in CommonJS output (#906), so an
- *     ESM-only dependency runs bundled
- *
- * esbuild is REQUIRED LAZILY, from the CALLING FRAMEWORK's installation rather
- * than devkit's. Devkit is vendored into each framework's dist at prepare time
- * (tools/vendor.js), so this file runs as `<framework>/dist/vendor/devkit/
- * bundle.js` with no node_modules of its own — and the framework is where the
- * pinned esbuild lives. Same shape as the rest of devkit's cross-package
- * resolution (`createRequire` anchored on the target's package.json, as in
- * local.js and omega-bin.js): the require happens per call, so a framework that
- * never bundles never pays for it and never needs esbuild installed.
- *
- * `frameworkRoot` is REQUIRED for the same reason — it is both where esbuild is
- * resolved from and where the declared-dependency set is read — so a missing
- * one throws instead of silently resolving out of devkit's own tree.
+ * esbuild is required LAZILY from the CALLING framework (`frameworkRoot`, so a
+ * missing one throws): this file runs vendored in each framework's dist with no
+ * node_modules of its own, and the framework is where the pinned esbuild lives.
  */
 
 const path = require('path');
@@ -36,17 +17,13 @@ const { createRequire } = require('module');
 const Logger = require('./logger.js');
 const { frameworkDependencyNames, frameworkDepsPattern } = require('./framework-deps.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks-plugin.js');
+const { BROWSER_TARGET } = require('./browser-floor.js');
 
 const logger = new Logger('bundle');
 
-// The esbuild options bundle() OWNS. Every one of them IS the composition —
-// `bundle`/`metafile` are the contract callers read results through, `minify`/
-// `sourcemap` are the mode rules, `plugins` is the shared chain, `entryPoints`
-// is `entries` — so a caller passing its own would get a build that silently
-// is not a bundle() build (an unbundled or unminified artifact that still
-// looks like one). That is a programmer error, so it crashes rather than
-// quietly winning: the passthrough spread cannot express "override the
-// composition".
+// The esbuild options bundle() OWNS: `minify` is the mode rule, `sourcemap` is
+// on in every mode, and the rest are the composition itself. A caller passing
+// one would get a build that silently is not a bundle() build, so it crashes.
 const RESERVED_OPTIONS = ['bundle', 'metafile', 'minify', 'sourcemap', 'plugins', 'entryPoints'];
 
 // The lanes. A typo'd mode used to fall through to the one-shot branch and
@@ -190,28 +167,15 @@ function describe(message) {
 
 /**
  * Bundle with esbuild through the shared composition.
- *
- * @param {object} options
- * @param {string} options.frameworkRoot - the calling framework's package root (required)
- * @param {string[]|Object<string, string>} options.entries - esbuild entry points
- * @param {string} [options.outdir] - output directory — one of `outdir` / `outfile` is required
- * @param {string} [options.outfile] - output FILE, for a single-entry build that owns its name
- *   (@omega.js/web's service worker must land at exactly `/service-worker.js`)
- * @param {string|string[]} [options.target] - esbuild target
- * @param {string} [options.format] - esbuild output format
- * @param {boolean} [options.splitting] - esbuild code splitting
- * @param {'build'|'watch'} [options.mode] - one-shot build (default) or a watching context
- * @param {boolean} [options.dev] - the OUTPUT rules: no minify + sourcemap + dev blocks kept.
- *   Defaults to `mode === 'watch'`, and is separate from `mode` because a dev lane is not
- *   always a watching one: @omega.js/web's `omega dev` drives one-shot rebuilds from its own
- *   source watcher (it watches layer roots the bundle graph never sees), so it is `mode: 'build'`
- *   with `dev: true`.
- * @param {object} [options.define] - esbuild define map
- * @param {object[]} [options.plugins] - the CALLER's own plugins, composed first
- * @returns {Promise<object>} in `'build'` mode, esbuild's result (metafile on). In `'watch'`
- *   mode, `{ context, dispose }` instead — the startup build is the watcher's own and lands
- *   after this resolves, so there is no result to hand back; watch results arrive through a
- *   caller plugin's `onEnd`.
+ * @param {object} options - `frameworkRoot` (required), `entries`, exactly one of `outdir` or
+ *   `outfile` (a single entry that owns its name), and esbuild's `target` (a non-node build
+ *   naming none gets `BROWSER_TARGET`), `format`, `splitting`, `define`; `plugins` are the
+ *   caller's own, composed first. `mode` is the lane, `'build'` (default) or `'watch'`; `dev`
+ *   is the OUTPUT rule (no minify, dev blocks kept), defaulting to `mode === 'watch'`, since a
+ *   dev lane is not always a watching one (web's `omega dev` is `mode: 'build'`, `dev: true`).
+ * @returns {Promise<object>} in `'build'` mode, esbuild's result (metafile on); in `'watch'`
+ *   mode, `{ context, dispose }`: the startup build lands after this resolves, so its results
+ *   arrive through a caller plugin's `onEnd`.
  */
 async function bundle(options) {
   const {
@@ -242,7 +206,7 @@ async function bundle(options) {
   }
   const reserved = RESERVED_OPTIONS.filter((key) => key in passthrough);
   if (reserved.length) {
-    throw new Error(`[devkit bundle] ${reserved.join(', ')} ${reserved.length === 1 ? 'is' : 'are'} owned by bundle() and cannot be passed through — it composes them (see RESERVED_OPTIONS). Use \`dev\` for the minify/sourcemap rules, \`plugins\` for your own plugins, and \`entries\` for the entry points`);
+    throw new Error(`[devkit bundle] ${reserved.join(', ')} ${reserved.length === 1 ? 'is' : 'are'} owned by bundle() and cannot be passed through: it composes them (see RESERVED_OPTIONS). Use \`dev\` for the minify rule (source maps are always on), \`plugins\` for your own plugins, and \`entries\` for the entry points`);
   }
 
   const esbuild = requireEsbuild(frameworkRoot);
@@ -253,7 +217,9 @@ async function bundle(options) {
     bundle: true,
     metafile: true,
     minify: !dev,
-    sourcemap: dev,
+    // An external map beside every output, linked by its `sourceMappingURL`
+    // comment, in every mode: production stack traces read the real source.
+    sourcemap: true,
     // esbuild's own printer is off and the timing plugin reports its findings
     // instead, so every framework's build output is ONE voice — the devkit
     // logger, with the `[@omega.js/<package>:bundle]` tag — rather than a mix
@@ -293,6 +259,9 @@ async function bundle(options) {
   for (const [key, value] of Object.entries({ outdir, outfile, target, format, splitting, define })) {
     if (value != null) config[key] = value;
   }
+  // A browser build naming no syntax floor gets the one floor; a node build
+  // runs on a runtime its caller knows, so it keeps esbuild's own default.
+  if (config.target == null && config.platform !== 'node') config.target = BROWSER_TARGET;
 
   keepImportMetaUrl(config);
 

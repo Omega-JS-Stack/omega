@@ -94,6 +94,14 @@ test('#762: a head comment that mentions <script keeps every tag that follows it
   assert.ok(!out.includes('Analytics origins'), 'the ordinary comments are still eaten');
 });
 
+test('minifyHtml: an inline script holding an es2021 form ships in its es2020 form', () => {
+  const out = minifyHtml('<p>x</p><script>window.omegaFloor ??= "FLOOR_SENTINEL";</script>');
+
+  assert.ok(out.includes('FLOOR_SENTINEL'), 'the script was minified, not dropped');
+  assert.ok(!out.includes('??='), 'the logical assignment is lowered');
+  assert.ok(out.includes('??'), 'into the es2020 nullish form');
+});
+
 test('engine: production builds minify .html outputs; dev builds and meta-files stay readable', async () => {
   const prod = await buildWith(miniData, { environment: 'production' }, 'minify-prod');
   const dev = await buildWith(miniData, {}, 'minify-dev');

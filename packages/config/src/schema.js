@@ -737,36 +737,41 @@ const SHARED_SCHEMA = [
     default: {
       google: {
         enabled: false,
+        max: 1,
         name: 'Google',
         logo: 'google',
         description: 'Enable single sign-on with your Google account',
       },
       discord: {
         enabled: false,
+        max: 1,
         name: 'Discord',
         logo: 'discord',
         description: 'Connect to access Discord community features',
       },
       spotify: {
         enabled: false,
+        max: 1,
         name: 'Spotify',
         logo: 'spotify',
         description: 'Connect your Spotify listening account',
       },
       twitch: {
         enabled: false,
+        max: 1,
         name: 'Twitch',
         logo: 'twitch',
         description: 'Connect your Twitch channel',
       },
       kick: {
         enabled: false,
+        max: 1,
         name: 'Kick',
         logo: 'kick',
         description: 'Connect your Kick channel',
       },
     },
-    description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`), public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false, so set it true to offer one; a brand's own provider is on unless this is false), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws; the CONFIG is the only card list, and `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. docs/backend/connections.md",
+    description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`), public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false, so set it true to offer one; a brand's own provider is on unless this is false), `max` (a positive whole number, default 1: the most accounts of this provider one user may link, the default a brand's own provider reads too), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws; the CONFIG is the only card list, and `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. docs/backend/connections.md",
   },
 
   // ── repo (where the brand hosts its source; #883) ───────────────────────
@@ -1625,7 +1630,7 @@ const TARGET_SCHEMAS = {
       path:        'protocol.singleInstance',
       type:        'boolean',
       required:    false,
-      description: 'Whether the app takes the single-instance lock, so a later launch hands its argv (and any deep link) to the running copy and quits. Unset reads as true; `false` suits a CLI-shaped app whose every launch is its own short process, and gives up second-instance forwarding.',
+      description: 'Whether the app takes the single-instance lock, so a later launch hands its argv (and any deep link) to the running copy and quits. Unset reads as true; `false` suits a CLI-shaped app whose every launch is its own short process, and gives up second-instance forwarding; with it off, boots append to runtime.log and every line carries `[pid <n>]`.',
     },
     // ── the auto-updater block (#911) ────────────────────────────────────
     // Its runtime answers live in the lib's own DEFAULTS, which every

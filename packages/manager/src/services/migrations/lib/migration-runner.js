@@ -95,6 +95,18 @@ function buildPatch(mergedUpdates) {
 }
 
 /**
+ * Whether a run writes: `--execute`, unless the manage-wide `--dry-run` vetoes
+ * it (passing both means "don't write"). The one home of the rule, read by the
+ * runner and by a fix that words its own `__logs__` lines.
+ *
+ * @param {Object} context - Handler context (its `options`)
+ * @returns {boolean} True when the run writes
+ */
+function isExecute(context) {
+  return (context.options?.execute && !context.options?.dryRun) || false;
+}
+
+/**
  * Run a migration over a collection.
  *
  * @param {Object} context - Handler context (brandId, brandRoot, firestore, options)
@@ -108,8 +120,7 @@ function buildPatch(mergedUpdates) {
 async function runMigration(context, options) {
   const { brandRoot, firestore } = context;
   const { collection, fixes = [], validate } = options;
-  // The manage-wide --dry-run vetoes --execute: passing both means "don't write"
-  const execute = (context.options?.execute && !context.options?.dryRun) || false;
+  const execute = isExecute(context);
   const verbose = context.options?.verbose || false;
   // A CLI value arrives as a STRING, and `--limit 0` means "no limit": the bare
   // read made "0" truthy and capped the batch at zero documents (#920).
@@ -472,4 +483,4 @@ async function runMigration(context, options) {
   return result;
 }
 
-module.exports = { runMigration, FieldValue };
+module.exports = { runMigration, isExecute, FieldValue };

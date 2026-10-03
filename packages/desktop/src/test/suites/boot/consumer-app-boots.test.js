@@ -97,13 +97,10 @@ module.exports = defineCases({
     },
 
     {
-      // #925: the lane spawns this child with OMEGA_ENVIRONMENT=testing and the
-      // artifact it boots was BUILT production, so the booted app used to answer
-      // `production` and every isTesting() gate in it was silently off. The proof
-      // is a gate that writes to the log: auth persistence resolves to `none` in a
-      // test run alone, and that is the line the booted app records. (The emulator
-      // line the bridge logs next is out of reach here, because the fixture's
-      // `cloud.config` is empty and this boot never initializes Firebase auth.)
+      // The lane spawns this child with OMEGA_ENVIRONMENT=testing, and the artifact
+      // it boots was BUILT production. The proof is a gate that writes to the log:
+      // main.js moves userData to its `(Testing)` path in a test run alone, and
+      // records the move as `(testing mode, ...)`.
       description: 'the booted app runs in the lane environment, not the one baked into its bundle (#925)',
       inspect: async ({ omega, expect, projectRoot }) => {
         const fs = require('fs');
@@ -113,7 +110,21 @@ module.exports = defineCases({
         expect(omega.config.environment).toBe('production');   // the artifact IS a production build
 
         const log = fs.readFileSync(path.join(projectRoot, 'logs', 'runtime.log'), 'utf8');
-        expect(log.includes('auth persistence: none (test mode)')).toBe(true);
+        expect(log.includes('(testing mode, ')).toBe(true);
+      },
+    },
+
+    {
+      // The fixture's `cloud.config` carries no apiKey: a brand with no cloud.
+      // Auth skips Firebase there, so the booted app's log holds no error from it.
+      description: 'a boot with no cloud apiKey writes no error line from auth',
+      inspect: async ({ expect, projectRoot }) => {
+        const fs = require('fs');
+        const path = require('path');
+
+        const log = fs.readFileSync(path.join(projectRoot, 'logs', 'runtime.log'), 'utf8');
+        const authErrors = log.split('\n').filter((line) => /\[error\]\s+\(auth\)/.test(line));
+        expect(authErrors).toEqual([]);
       },
     },
 

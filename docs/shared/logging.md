@@ -144,7 +144,7 @@ surface attaches it at its entry point.
 | `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
 | firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
 | **Desktop extras** | | |
-| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; kept across boots, rotating at 10 MB — `docs/desktop/logging.md` |
+| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; with the single-instance lock on (the default) emptied of earlier launches' lines by the launch that holds the lock (a duplicate launch leaves it alone), appended by every launch with each line tagged `[pid <n>]` when `protocol.singleInstance: false`, rotating at 10 MB: `docs/desktop/logging.md` |
 | `npx omega logs [runtime\|dev\|build\|test]` (desktop's own verb — read, not write) | tails whichever of the four `<targetRoot>/logs/` files was named, `runtime` by default | the print/follow/open surface for all of the above; backend's `omega logs` is a different verb (the Cloud Logging tail, one row up) |
 | `omega release` (the same dispatch `omega deploy` delegates to) | `<targetRoot>/logs/deploy.log` | the GH Actions release run, streamed locally: one name for every target's deploy ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), where this was `logs/ci.log` |
 | Windows code-signing | `<targetRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
@@ -188,9 +188,11 @@ grep '^FAIL' .temp/*/steps.log brands/*/test/e2e/.logs/steps.log
 
 ### Retention (ruled 2026-08-05)
 
-**Clear on launch, sweep what is stale.** Every log truncates when its surface starts;
-nothing rotates and no history is kept — the question a log answers is "what did the
-run that just happened do?". The backend additionally sweeps its own stale `dist/*.log`
+**Clear on launch, sweep what is stale.** Every other log truncates when its surface
+starts and never rotates, and no history is kept: the question a log answers is "what
+did the run that just happened do?". The one exception is desktop's `runtime.log`: it
+rotates at 10 MB in both lock modes, and with the single-instance lock off launches
+also append and tag each line `[pid <n>]` (the desktop row of the table above). The backend additionally sweeps its own stale `dist/*.log`
 files and reset sentinels at every verb start, and deliberately leaves firebase-tools'
 `*-debug.log` files alone (a crashed run is diagnosed from them). `logs/` is gitignored
 everywhere, scaffolded brands included.

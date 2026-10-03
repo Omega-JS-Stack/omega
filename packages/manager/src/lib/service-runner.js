@@ -4,7 +4,7 @@
  * services port over without semantic drift.
  *
  * All services use this same pattern:
- * 1. Operations are declared in src/config.js OPERATIONS[serviceName]
+ * 1. Operations are declared in src/operations.js OPERATIONS[serviceName]
  * 2. Handlers live in ensure/, read/, transform/, write/ directories
  * 3. This runner loads and executes handlers in operation order
  *

@@ -78,7 +78,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 
 | File | What | Lifetime |
 |---|---|---|
-| `runtime.log` | Your packaged app's runtime — main + preload + renderer all converge here via electron-log | Persistent, rotates at 10 MB |
+| `runtime.log` | Your packaged app's runtime: main + preload + renderer all converge here via electron-log | With the single-instance lock on (the default), the launch that holds the lock empties it of earlier launches' lines and a duplicate launch leaves it alone; with `protocol.singleInstance: false` every launch appends and tags its lines `[pid <n>]`. Rotates at 10 MB |
 | `dev.log` | Gulp pipeline output — sass, bundle, html, electron child stdout from `npm start` | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail, harness boot lines) | Truncated each test run |

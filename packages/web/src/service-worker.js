@@ -23,6 +23,7 @@ const { execFileSync } = require('node:child_process');
 const { sourceRepo } = require('@omega.js/config');
 const { bundle } = require('@omega.js/devkit/bundle');
 const { getEnvironment } = require('@omega.js/config/environment');
+const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 
 const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
 
@@ -142,6 +143,8 @@ async function buildServiceWorker(options) {
     define: {
       'process.env.NODE_ENV': options.dev ? '"development"' : '"production"',
       __OMEGA_FIREBASE_VERSION__: JSON.stringify(resolveFirebaseVersion(options.clientEntry)),
+      // The head's `/build.js?cb=` value: one per build process, so page and worker agree
+      __OMEGA_BUILD_STAMP__: JSON.stringify(CACHE_TIMESTAMP),
     },
   });
 

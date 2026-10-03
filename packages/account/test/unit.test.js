@@ -107,12 +107,12 @@ test('array type: non-array input falls back to default', () => {
 test('$passthrough keeps unknown keys; plain branches strip them', () => {
   const account = resolveAccount({
     roles: { admin: true, customRole: true },
-    connections: { google: { token: 'tok' } },
+    connections: { google: { 'google-sub-1': { token: 'tok' } } },
     unknownTopLevel: { stripped: true },
   });
 
   assert.strictEqual(account.roles.customRole, true);
-  assert.deepStrictEqual(account.connections, { google: { token: 'tok' } });
+  assert.deepStrictEqual(account.connections, { google: { 'google-sub-1': { token: 'tok' } } });
   assert.strictEqual('unknownTopLevel' in account, false);
 });
 

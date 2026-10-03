@@ -48,6 +48,9 @@ const PROVIDER_ID = 'lease-fixture-783';
 const PROVIDER_ENV_KEY = 'LEASE_FIXTURE_783';
 const USER_UID = 'user-783';
 
+// The one linked account: the record is keyed by the identity the fixture answers
+const IDENTITY_ID = 'fixture-user';
+
 // The one sentinel a merge removes a field with — `FieldValue.delete()` is a
 // singleton, so the store below compares it by identity.
 const DELETE = FieldValue.delete();
@@ -116,9 +119,12 @@ function storedRecord(extra) {
     id: USER_UID,
     connections: {
       [PROVIDER_ID]: {
-        type: 'oauth2',
-        token: { access_token: 'access-old', refresh_token: 'refresh-783' },
-        ...extra,
+        [IDENTITY_ID]: {
+          type: 'oauth2',
+          token: { access_token: 'access-old', refresh_token: 'refresh-783' },
+          identity: { id: IDENTITY_ID },
+          ...extra,
+        },
       },
     },
   };
@@ -250,7 +256,7 @@ function answered(responses) {
 
 /** The connection record as it stands in the store. */
 function recordIn(docs) {
-  return docs[`users/${USER_UID}`]?.connections?.[PROVIDER_ID] || {};
+  return docs[`users/${USER_UID}`]?.connections?.[PROVIDER_ID]?.[IDENTITY_ID] || {};
 }
 
 module.exports = defineCases({
@@ -291,7 +297,7 @@ module.exports = defineCases({
           [`users/${USER_UID}`]: storedRecord({ updated: { timestamp: 'then', timestampUNIX: 1700000000 } }),
         });
 
-        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID });
+        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
         assert.equal(lease.won, true, 'nobody holds the record, so this caller refreshes');
         assert.equal(lease.updatedUNIX, 1700000000, 'and it carries the updated stamp seen at entry, for a loser to watch');
@@ -322,7 +328,7 @@ module.exports = defineCases({
           [`users/${USER_UID}`]: storedRecord({ refreshing: stale }),
         });
 
-        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID });
+        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
         assert.equal(lease.won, true, `a lease older than ${LEASE_TTL_SECONDS}s is stale — the instance holding it died, and the record cannot stay locked forever`);
         assert.equal(recordIn(docs).refreshing.instance, INSTANCE_ID, 'and the note is now this process\'s');
@@ -340,7 +346,7 @@ module.exports = defineCases({
           [`users/${USER_UID}`]: storedRecord({ refreshing: held, updated: { timestamp: 'then', timestampUNIX: 1700000000 } }),
         });
 
-        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID });
+        const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
         assert.equal(lease.won, false, 'another instance is spending the refresh token right now');
         assert.equal(lease.lease.instance, held.instance, 'and the loser is told which one');
@@ -358,7 +364,7 @@ module.exports = defineCases({
           [`users/${USER_UID}`]: storedRecord({ refreshing: heldLease(1, INSTANCE_ID) }),
         });
 
-        await clearRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID });
+        await clearRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
         assert.equal('refreshing' in recordIn(docs), false, 'the note is gone, so the next caller wins immediately');
         assert.equal(recordIn(docs).token.refresh_token, 'refresh-783', 'and the token it was taken over is still stored');
@@ -380,6 +386,7 @@ module.exports = defineCases({
           admin,
           uid: USER_UID,
           provider: PROVIDER_ID,
+          id: IDENTITY_ID,
           since: 1700000000,
           pollMs: 10,
           timeoutMs: 50,
@@ -422,7 +429,7 @@ module.exports = defineCases({
         const storeWrite = writes.find((entry) => entry.verb === 'set');
 
         assert.ok(storeWrite, 'the token landed in a plain merge write');
-        assert.equal(storeWrite.payload.connections[PROVIDER_ID].refreshing, DELETE, 'which removes the lease in the SAME write — the record is never one write away from consistent');
+        assert.equal(storeWrite.payload.connections[PROVIDER_ID][IDENTITY_ID].refreshing, DELETE, 'which removes the lease in the SAME write — the record is never one write away from consistent');
         assert.equal(writes.filter((entry) => entry.verb === 'set').length, 1, 'and there is no second write to clear it');
       },
     },
@@ -441,7 +448,7 @@ module.exports = defineCases({
         // still carries the superseded one
         const rotated = storedRecord();
 
-        rotated.connections[PROVIDER_ID].token = { access_token: 'access-newer', refresh_token: 'rotated-elsewhere-783' };
+        rotated.connections[PROVIDER_ID][IDENTITY_ID].token = { access_token: 'access-newer', refresh_token: 'rotated-elsewhere-783' };
 
         const { ctx, docs, responses } = lane({ docs: { [`users/${USER_UID}`]: rotated } });
 
@@ -533,8 +540,8 @@ module.exports = defineCases({
           },
           onRead: (count, docs) => {
             if (count === 2) {
-              docs[`users/${USER_UID}`].connections[PROVIDER_ID].token = { access_token: 'refreshed-elsewhere-783', refresh_token: 'rotated-783' };
-              docs[`users/${USER_UID}`].connections[PROVIDER_ID].updated = { timestamp: 'now', timestampUNIX: since + 30 };
+              docs[`users/${USER_UID}`].connections[PROVIDER_ID][IDENTITY_ID].token = { access_token: 'refreshed-elsewhere-783', refresh_token: 'rotated-783' };
+              docs[`users/${USER_UID}`].connections[PROVIDER_ID][IDENTITY_ID].updated = { timestamp: 'now', timestampUNIX: since + 30 };
             }
           },
         });
@@ -573,7 +580,7 @@ module.exports = defineCases({
           onRead: (count, docs) => {
             // The winner's failure path: the note goes, the stamp does not move
             if (count === 2) {
-              delete docs[`users/${USER_UID}`].connections[PROVIDER_ID].refreshing;
+              delete docs[`users/${USER_UID}`].connections[PROVIDER_ID][IDENTITY_ID].refreshing;
             }
           },
         });

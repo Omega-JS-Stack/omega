@@ -4,7 +4,8 @@
  * PRESENT value; schema.js has the rule format). validateConfig() adds the
  * target's refinements, the `targets` sanity (each key a dir-safe NAME, each
  * entry a known `type`), the `repo` block and web-only `hosting`, the brand's
- * own authDomain, the price and feature shapes, and secret-shaped keys. The
+ * own authDomain, the price and feature shapes, each connection provider's
+ * `max`, and secret-shaped keys. The
  * schema is STRICT: a path no rule declares is an error, one line per path,
  * naming `omega migrate`. The validator knows only the present shape; the
  * migrate verb is the one code that knows an old name.
@@ -409,6 +410,27 @@ function validateFeatures(config) {
 }
 
 /**
+ * `connections.<provider>.max` on every provider entry. The provider set is
+ * open (a brand ships its own), so no schema row can name the path: the rule
+ * walks the map instead. An absent value is the default, 1.
+ *
+ * @param {object} config - The resolved config object.
+ * @returns {string[]} Errors; empty when the config passes.
+ */
+function validateConnectionLimits(config) {
+  const connections = config ? getPath(config, 'connections') : undefined;
+
+  if (!isPlainObject(connections)) {
+    return [];
+  }
+
+  return Object.entries(connections)
+    .filter(([, entry]) => isPlainObject(entry) && entry.max !== undefined)
+    .filter(([, entry]) => !Number.isInteger(entry.max) || entry.max < 1)
+    .map(([provider, entry]) => `config.connections.${provider}.max must be a positive whole number (the most ${provider} accounts one user may link), got ${JSON.stringify(entry.max)}`);
+}
+
+/**
  * The LEAF paths of a config the schema does not declare. A rule declares its
  * own path; an `object`/`array` rule opens its whole subtree only when no rule
  * is declared beneath it (or it says `open: true`), so a section with typed
@@ -636,6 +658,9 @@ function validateConfig(config, options) {
 
   // ─── the features catalog and the values products name (#647) ──────────
   validateFeatures(config).forEach((error) => errors.push(error));
+
+  // ─── each connection provider's account limit ──────────────────────────
+  validateConnectionLimits(config).forEach((error) => errors.push(error));
 
   // ─── the schema is strict ──────────────────────────────────────────────
   // A key nothing declares is a key nothing reads: a typo or a legacy shape.

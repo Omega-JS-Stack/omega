@@ -11,6 +11,8 @@ const {
   validateConfig,
   runSchema,
   formatErrors,
+  schemaDefaults,
+  missingDefaults,
   TARGETS,
   AMO_CATEGORIES,
 } = require('../src/index.js');
@@ -113,6 +115,37 @@ test('auth.signup.maxPerIpPerDay is a positive integer (backend rule, #133)', ()
 
   const { errors } = validateConfig({ ...VALID, auth: { signup: { maxPerIpPerDay: '2' } } }, opts);
   assert.ok(errors.some((e) => e.includes('config.auth.signup.maxPerIpPerDay has wrong type') && e.includes('integer')));
+});
+
+test('#1061: connections.<provider>.max is a positive whole number, on a packaged provider and a brand\'s own', () => {
+  for (const provider of ['google', 'house-sso']) {
+    for (const max of [0, 1.5]) {
+      const { errors } = validateConfig({ ...VALID, connections: { [provider]: { enabled: true, max } } });
+
+      assert.ok(
+        errors.some((e) => e.includes(`connections.${provider}.max`)),
+        `max: ${max} on ${provider} is refused naming the key: ${errors.join(' | ')}`,
+      );
+    }
+  }
+
+  const raised = validateConfig({ ...VALID, connections: { google: { enabled: true, max: 2 }, 'house-sso': { enabled: true, max: 2 } } });
+
+  assert.deepStrictEqual(raised.errors, [], 'max: 2 passes');
+});
+
+test('#1061: the max default is 1, and it resolves without being written into a brand file', () => {
+  const connections = schemaDefaults().connections;
+
+  for (const [provider, entry] of Object.entries(connections)) {
+    assert.equal(entry.max, 1, `${provider} resolves one account per user unless the brand raises it`);
+  }
+
+  for (const authored of [{}, { connections: { google: { enabled: true } } }]) {
+    const paths = missingDefaults({ ...VALID, ...authored }).map((entry) => entry.path);
+
+    assert.ok(!paths.some((dotted) => dotted.startsWith('connections')), `no max is ever written into a brand file: ${paths.join(', ')}`);
+  }
 });
 
 test('match/enum only run on present values — null/empty ids are silent', () => {

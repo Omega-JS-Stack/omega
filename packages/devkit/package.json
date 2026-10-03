@@ -61,6 +61,7 @@
     "./empty-modules-plugin": "./src/empty-modules-plugin.js",
     "./brand-tokens": "./src/brand-tokens.js",
     "./bundle": "./src/bundle.js",
+    "./browser-floor": "./src/browser-floor.js",
     "./build-json": "./src/build-json.js",
     "./test/runner-core": "./src/test/runner-core.js",
     "./test/init-hooks": "./src/test/init-hooks.js",

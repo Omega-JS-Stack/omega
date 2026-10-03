@@ -113,6 +113,9 @@ see the harness README for the honest before/after numbers.
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
 | [overrides.js](src/overrides.js) | The layered override map (#94): `buildOverrideMap()` — every shadowable section/include/css/page with its owning layer and the consumer's shadows, read out of the SAME layer chains the build resolves through (`collectProviders`), and `materializeOverride()` — one file copied to its shadow path with a provenance header. The css lane lists ONLY what sass layers by — `main.scss` and the page sheets (`isPageEntry`, base bucket) — never the partials a bare relative `@use` resolves against the importing file, which a consumer copy could never win |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass (content scan = `dist/**/*.html` + `dist/**/*.js`, so classes that live only in JS-built markup survive — #66), critical-css extraction (the first-paint subset the head inlines so the main sheet stops render-blocking, #750) |
+| [entry-outputs.js](src/entry-outputs.js) | `readEntryOutputs()`: esbuild's metafile into the manifest's js block, each entry's URL and `js.imports` (every chunk an entry's STATIC import chain reaches; a dynamic `import()` ends the walk) |
+| [page-assets.js](src/page-assets.js) | What one page loads, registered by the engine as computed data: `pageAssets` (by URL), `layoutAssets` (by layout chain), `modulePreloads` (entry URL → the chunks to preload beside it, each shared chunk once) |
+| [live-manifest.js](src/live-manifest.js) | `refreshLiveManifest()`: `omega dev` folds a rebuild's content lists (the font preloads, `js.imports`) into the live manifest the engine renders from |
 | [path-prefix.js](src/path-prefix.js) | Base-path support (#355): `resolvePathPrefix()` normalizes the publisher's `OMEGA_PATH_PREFIX`, and the emit lanes mount root-relative URLs under it — `prefixHtml()` (the engine's `omega-path-prefix` transform: href/src/srcset/action plus the `<html data-omega-path-prefix>` stamp the browser half reads) and `prefixCss()` (the theme sheets' `url()` targets). Unset = no pass runs |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — the build manifest at `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`, the `/status` page shows the rest: theme, package versions, repo, commit) |
 | [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
@@ -307,7 +310,10 @@ script served from there can claim — and hands the prefix to the worker as the
 read the `data-omega-path-prefix` stamp from. The worker mounts every site URL
 it builds (`/build.js`, the default notification icon, the default click
 target) under it; at the domain root nothing changes. Pinned by
-`test/service-worker-mount.test.js`. Push (FCM background messages) rides it —
+`test/service-worker-mount.test.js`. Its `/build.js` import carries the same
+`?cb=` stamp as the page's head tag, baked into the worker at build
+(`__OMEGA_BUILD_STAMP__`), which is why the edge can cache `/build.js` for a
+year. Pinned by `test/service-worker-stamp.test.js`. Push (FCM background messages) rides it —
 `notifications.getToken({ serviceWorkerRegistration })` uses THIS
 registration. **Cross-project safety on one localhost port**: registering
 replaces whatever worker last claimed the origin (one registration per
@@ -378,7 +384,8 @@ example, and the four questions to read a page against them:
   shares one copy (one chunk) with core's own users of the library — the
   framework's copy wins even if the consumer declares its own; anything the
   framework does not declare the consumer declares itself. Manifest:
-  `{ js: { main, firstPaint, pages, layouts }, css: { main, critical, pages, layouts } }`; each `css.pages`/`css.layouts` entry is `{ inline }` (a sheet of 8 KB or less, printed as a `<style>` block) or `{ href }`.
+  `{ js: { main, firstPaint, pages, layouts, imports }, css: { main, critical, pages, layouts }, fontPreloads }`
+  (`js.imports`: each entry URL → the chunks its static import chain loads, the page's modulepreload list); each `css.pages`/`css.layouts` entry is `{ inline }` (a sheet of 8 KB or less, printed as a `<style>` block) or `{ href }`.
   **One rule for page and layout assets, JS and CSS alike: every layer's file
   loads, in layer order** (core → theme → consumer), so each key holds a LIST —
   a framework page script always runs, the theme decorates, the consumer adds,

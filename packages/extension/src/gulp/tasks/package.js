@@ -388,6 +388,9 @@ const PACKAGE_EXCLUDE_PATTERNS = [
   '**/*.sass',
   '**/*.ts',
   '**/.DS_Store',
+  // Maps stay in dist for local reading: they carry the remote-script URLs the
+  // redaction strips, and the post-build rewrites leave their positions stale.
+  '**/*.map',
 ];
 
 // Package raw for a specific target (chrome or firefox)

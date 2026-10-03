@@ -51,7 +51,8 @@ async function main() {
       if (!back || new URL(back).pathname !== '/notes') {
         throw new Error(`authReturnUrl is ${back}, not the /notes page the visitor asked for`);
       }
-      if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Emulators connected'))) {
+      // Auth connects at boot; Firestore connects inside its loader, on first use
+      if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Connecting the auth emulator'))) {
         throw new Error('the verdict did not come from this stack: the client never connected to the emulators');
       }
       return `${landed.pathname}?authReturnUrl=${new URL(back).pathname}`;

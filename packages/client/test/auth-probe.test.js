@@ -63,7 +63,9 @@ describe('Auth Module: the session probe (#798)', () => {
     const omega = {
       config: {},
       firebaseAuth: { currentUser: user },
-      firebaseFirestore: {},
+      // Firebase is configured (the app exists), and Firestore loads through the loader
+      firebaseApp: {},
+      loadFirebaseFirestore: async () => ({}),
       _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
       bindings: { update: () => {} },
       storage: { set: () => {}, get: () => ({}) },

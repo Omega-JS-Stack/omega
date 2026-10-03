@@ -1,7 +1,7 @@
 /**
  * bundle (#736): the ONE esbuild wrapper every framework builds through. What
- * it owns is COMPOSITION — the shared plugins in one order, the minify/
- * sourcemap rules by mode, esbuild resolved from the calling framework — so
+ * it owns is COMPOSITION (the shared plugins in one order, minify by mode and
+ * a sourcemap in every mode, esbuild resolved from the calling framework), so
  * these tests assert the composed build, not esbuild itself.
  *
  * Every fixture framework root lives under `.temp/` rather than os.tmpdir():
@@ -168,7 +168,7 @@ test('the strip corpus survives the round trip: production cuts every marked blo
   assert.match(dev, /DEV_ONLY_SENTINEL_B/);
 });
 
-test('production minifies with no sourcemap; a dev build does the reverse', async () => {
+test('production minifies and a dev build does not; both write a sourcemap', async () => {
   const frameworkRoot = makeFramework();
   const sources = makeSources({ 'entry.js': 'const aVeryLongLocalName = "SENTINEL";\nexport default aVeryLongLocalName;\n' });
 
@@ -181,7 +181,7 @@ test('production minifies with no sourcemap; a dev build does the reverse', asyn
   const prodDir = await build(false);
   const prod = fs.readFileSync(path.join(prodDir, 'entry.js'), 'utf8');
   assert.doesNotMatch(prod, /aVeryLongLocalName/, 'production is minified');
-  assert.ok(!fs.existsSync(path.join(prodDir, 'entry.js.map')), 'production ships no sourcemap');
+  assert.ok(fs.existsSync(path.join(prodDir, 'entry.js.map')), 'production ships a sourcemap');
 
   const devDir = await build(true);
   const dev = fs.readFileSync(path.join(devDir, 'entry.js'), 'utf8');
@@ -429,7 +429,7 @@ test('an outfile build still gets the composition — minify by mode, the strip,
   assert.match(out, /PROD_SENTINEL/);
   assert.doesNotMatch(out, /DEV_ONLY_SENTINEL/, 'the strip ran');
   assert.doesNotMatch(out, /aVeryLongLocalName/, 'production is minified');
-  assert.ok(!fs.existsSync(`${outfile}.map`), 'production ships no sourcemap');
+  assert.ok(fs.existsSync(`${outfile}.map`), 'production ships a sourcemap');
   assert.ok(
     lines.some((line) => line.includes(':bundle]') && line.includes('worker.js')),
     `the timing line names the outfile, got ${JSON.stringify(lines)}`,

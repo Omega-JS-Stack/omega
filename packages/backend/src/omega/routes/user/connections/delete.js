@@ -1,5 +1,5 @@
 const { FieldValue } = require('firebase-admin/firestore');
-const { buildContext } = require('./_context.js');
+const { buildContext, resolveConnection } = require('./_context.js');
 const { buildGrantContext, runStep, REVOKE_UNSUPPORTED } = require('./_grant.js');
 
 /**
@@ -20,7 +20,13 @@ module.exports = async ({ ctx, user, data }) => {
 
   ctx.log('Connections DELETE request', { provider: data.provider });
 
-  const storedToken = targetUser?.connections?.[data.provider]?.token;
+  const connection = resolveConnection(targetUser, data);
+
+  if (connection.error) {
+    return ctx.respond(connection.error.message, { code: connection.error.code });
+  }
+
+  const storedToken = connection.record?.token;
 
   // Revoking is BEST EFFORT and never gates the delete
   // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): the default
@@ -45,11 +51,14 @@ module.exports = async ({ ctx, user, data }) => {
     ctx.log('Connections revoke', { provider: data.provider, outcome });
   }
 
-  // Delete the connection record from the user document
-  await admin.firestore().doc(`users/${targetUid}`).update({
-    [`connections.${data.provider}`]: FieldValue.delete(),
-    metadata: ctx.metadata({ tag: 'user/connections' }),
-  });
+  // Delete that one account's record; the provider's other accounts stay. With
+  // no record stored there is nothing to delete, and the answer is the same
+  if (connection.id) {
+    await admin.firestore().doc(`users/${targetUid}`).set({
+      connections: { [data.provider]: { [connection.id]: FieldValue.delete() } },
+      metadata: ctx.metadata({ tag: 'user/connections' }),
+    }, { merge: true });
+  }
 
   return ctx.respond({ success: true });
 };

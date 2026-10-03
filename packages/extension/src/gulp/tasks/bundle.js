@@ -5,15 +5,16 @@
 // it — a task named after a bundler it no longer runs is a lie every reader has
 // to unlearn. @babel/preset-env went with webpack: esbuild's `target` IS the
 // syntax floor, stated once below.
-//
+
 // Every shared part comes from @omega.js/devkit's ONE bundle wrapper: the
-// framework-deps resolve hook (#87 — a consumer requires a framework dependency
-// by bare name and gets the FRAMEWORK's copy), the production `@dev-only` strip
-// (#18), the minify/sourcemap rules by mode, and one timing line per build.
+// framework-deps resolve hook (a bare-name framework dependency gets the
+// FRAMEWORK's copy), the production `@dev-only` strip, a source map in every
+// mode with minify by mode, and one timing line per build.
+
 // What lives here is only what is genuinely the extension's: the entry
 // discovery, the browser syntax floor, the asset/theme aliases, the Node-builtin
 // shim, the `%%%key%%%` substitution, and the OMEGA_BUILD_JSON bake.
-//
+
 // The bake ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)) is ONE
 // file: @omega.js/devkit composes the snapshot and writes `dist/build.js`, the
 // page template loads it with one script tag and background.js with one
@@ -211,7 +212,7 @@ async function runBundle() {
   // What each entry cost, from the metafile the wrapper turns on. Printed
   // BEFORE the substitution below, because the metafile's byte counts are what
   // esbuild emitted — reading them after a rewrite would report stale numbers.
-  Object.entries(result.metafile.outputs).forEach(([file, meta]) => {
+  Object.entries(result.metafile.outputs).filter(([file]) => !file.endsWith('.map')).forEach(([file, meta]) => {
     logger.log(`  ${path.relative(process.cwd(), file)} (${formatBytes(meta.bytes)})`);
   });
 

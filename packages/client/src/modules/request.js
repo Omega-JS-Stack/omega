@@ -89,39 +89,50 @@ function createRequest(deps) {
     // authorizedFetch callers relied on (tries, timeout).
     const tries = Math.max(1, options.tries || 1);
     let response;
+    let properties;
+    let data;
+    // The last attempt's signal stays armed through the body read, as the
+    // native timeout signal does, and is dropped once the request settles.
+    let timeout = null;
 
-    for (let attempt = 1; ; attempt++) {
-      try {
-        response = await fetch(target, {
-          ...options,
-          // A body with no explicit method infers POST — fetch throws a
-          // TypeError on GET/HEAD carrying a body, so the GET default is
-          // never right there.
-          method: options.method || (options.body ? 'POST' : 'GET'),
-          headers,
-          body,
-          ...(options.timeout ? { signal: AbortSignal.timeout(options.timeout) } : {}),
-        });
+    try {
+      for (let attempt = 1; ; attempt++) {
+        timeout = options.timeout ? timeoutSignal(options.timeout) : null;
+        try {
+          response = await fetch(target, {
+            ...options,
+            // A body with no explicit method infers POST: fetch throws a
+            // TypeError on GET/HEAD carrying a body, so the GET default is
+            // never right there.
+            method: options.method || (options.body ? 'POST' : 'GET'),
+            headers,
+            body,
+            ...(timeout ? { signal: timeout.signal } : {}),
+          });
 
-        if (response.status < 500 || attempt >= tries) {
-          break;
+          if (response.status < 500 || attempt >= tries) {
+            break;
+          }
+        } catch (e) {
+          if (attempt >= tries) {
+            throw e;
+          }
         }
-      } catch (e) {
-        if (attempt >= tries) {
-          throw e;
-        }
+
+        timeout?.clear();
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-    }
+      // omega-properties rides EVERY assistant response (success and error)
+      properties = parseProperties(response.headers.get(PROPERTIES_HEADER));
+      if (properties && deps.onProperties) {
+        deps.onProperties(properties);
+      }
 
-    // omega-properties rides EVERY assistant response (success and error)
-    const properties = parseProperties(response.headers.get(PROPERTIES_HEADER));
-    if (properties && deps.onProperties) {
-      deps.onProperties(properties);
+      data = await parseBody(response);
+    } finally {
+      timeout?.clear();
     }
-
-    const data = await parseBody(response);
 
     if (!response.ok) {
       // A 401 on an authenticated call is a moment of doubt
@@ -206,6 +217,19 @@ async function parseBody(response) {
 // it from the request data it merges the query string into.
 function withWakeupParam(url) {
   return `${url}${url.includes('?') ? '&' : '?'}wakeup=true`;
+}
+
+// One attempt's abort signal. The native timeout signal is newer than the
+// es2020 floor, so a browser without it gets a controller a timer aborts with
+// the same TimeoutError; `clear` drops that timer once the attempt settles.
+function timeoutSignal(ms) {
+  if (typeof AbortSignal.timeout === 'function') {
+    return { signal: AbortSignal.timeout(ms), clear: () => {} };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('signal timed out', 'TimeoutError')), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
 }
 
 function hasHeader(headers, name) {

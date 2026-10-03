@@ -51,7 +51,7 @@ module.exports = defineCases({
     },
 
     {
-      name: 'a binary that cannot be run answers nulls and warns once — the build keeps going with no floor',
+      name: 'a binary that cannot be run answers nulls and warns once: no floor for the node pair, the browser floor for the renderer',
       run: (ctx) => {
         const binary = bogusBinary('warns');
         const { logger, lines, receivers } = collectWarnings();
@@ -59,7 +59,7 @@ module.exports = defineCases({
         ctx.expect(electronTargets(binary, { logger })).toEqual({ node: null, chrome: null, electron: null });
         ctx.expect(lines.length).toBe(1);
         ctx.expect(lines[0]).toContain(binary);
-        ctx.expect(lines[0]).toContain('no syntax floor');
+        ctx.expect(lines[0]).toContain('main and preload compile with no syntax floor, the renderer to the es2020 browser floor');
         // The warn is called ON the logger, so a real Logger keeps its tag.
         ctx.expect(receivers[0]).toBe(logger);
       },

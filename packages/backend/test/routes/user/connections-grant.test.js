@@ -361,7 +361,7 @@ module.exports = defineCases({
             authenticated: true,
             auth: { uid: 'user-793' },
             roles: { admin: false },
-            connections: { 'unrevokable-793': { token: { access_token: 'access-793' } } },
+            connections: { 'unrevokable-793': { x: { token: { access_token: 'access-793' }, identity: { id: 'x' } } } },
           },
           data: { provider: 'unrevokable-793' },
         });
@@ -369,10 +369,11 @@ module.exports = defineCases({
         assert.equal(responses[0].message.success, true, 'the disconnect succeeds');
         assert.ok(logged.some((line) => line.includes('unsupported')), `and the log says the provider could not be told: ${logged.join(' | ')}`);
 
-        const deleted = writes.find((write) => write.path === 'users/user-793' && write.verb === 'update');
+        const deleted = writes.find((write) => write.path === 'users/user-793');
+        const removed = deleted && (deleted.payload.connections?.['unrevokable-793']?.x ?? deleted.payload['connections.unrevokable-793.x']);
 
         assert.ok(deleted, 'the record is deleted');
-        assert.equal('connections.unrevokable-793' in deleted.payload, true, 'and it is the provider entry that went');
+        assert.equal(removed?.methodName, 'FieldValue.delete', `and it is the one account's record that went: ${JSON.stringify(deleted?.payload)}`);
       },
     },
 

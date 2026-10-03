@@ -16,11 +16,8 @@
 
 OMEGA calls your project a **brand**: one name, one look, and every app that carries them. You need Node 22 or newer and a GitHub account.
 
-1. Click **Use this template** above. Name your new repo `<your-brand>-omega`, for example `acme-omega`.
-2. Clone it and step inside:
-   ```bash
-   git clone https://github.com/<you>/acme-omega.git && cd acme-omega
-   ```
+1. [**Use this template**](https://github.com/Omega-JS-Stack/brand-template/generate). Name your new repo `<your-brand>-omega`, for example `acme-omega`.
+2. Clone your new repo and step inside it.
 3. Start it:
    ```bash
    npm start

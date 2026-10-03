@@ -1,8 +1,8 @@
 /**
  * WHO a call acts on, and the two 400s that decide it
  * ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): the
- * authenticated caller, the target user an admin may name, and the destination
- * an authorize leg may come back to.
+ * authenticated caller, the target user an admin may name, the stored record a
+ * call names, and the destination an authorize leg may come back to.
  *
  * One concern, one file: the provider lookup is `_providers.js`, the secrets
  * are `_state.js`, the steps are `_grant.js`.
@@ -87,6 +87,58 @@ function returnUrlError(data) {
     message: `The returnUrl parameter must be ${RETURN_PATH_RULE}.`,
     code: 400,
   };
+}
+
+/**
+ * Which stored record a `refresh`, `status` or `delete` call names. A user may
+ * hold several accounts of one provider (`connections.<provider>.<identityId>`),
+ * so `id` picks one; without it, the ONE record there is serves the call, and
+ * several answer a 400 naming `id`. No record at all is `{ id: null, record: null }`.
+ *
+ * @param {object} targetUser - The user the call acts on
+ * @param {object} data - The resolved route input (`provider`, optional `id`)
+ * @returns {object} `{ id, record }`, or `{ error }` when several records and no id
+ */
+function resolveConnection(targetUser, data) {
+  const records = connectionRecords(targetUser, data.provider);
+
+  if (data.id) {
+    return { id: data.id, record: records[data.id] || null };
+  }
+
+  const ids = Object.keys(records);
+
+  if (ids.length > 1) {
+    return { error: { message: `Several ${data.provider} connections exist: pass id.`, code: 400 } };
+  }
+
+  return ids.length ? { id: ids[0], record: records[ids[0]] } : { id: null, record: null };
+}
+
+/**
+ * Every stored account of one provider on a user, keyed by identity id: the
+ * ONE reading of the map every listing and every count toward `max` goes
+ * through. An account is an entry holding a `token` object, so an old one-level
+ * record's own keys and a lease left with no token are never accounts.
+ *
+ * @param {object} targetUser - The user document's data
+ * @param {string} provider - The provider key
+ * @returns {object} The records, or {}
+ */
+function connectionRecords(targetUser, provider) {
+  const entries = Object.entries(targetUser?.connections?.[provider] || {});
+
+  return Object.fromEntries(entries.filter(([, entry]) => isAccount(entry)));
+}
+
+/**
+ * Whether one entry under `connections.<provider>` is a stored account.
+ *
+ * @param {*} entry - The entry
+ * @returns {boolean} True when it holds a `token` object
+ */
+function isAccount(entry) {
+  return !!entry && typeof entry === 'object' && !!entry.token && typeof entry.token === 'object';
 }
 
 /**
@@ -189,6 +241,8 @@ async function buildContext({ ctx, user, data, requireProvider = true, honorUid 
 
 module.exports = {
   buildContext,
+  connectionRecords,
+  resolveConnection,
   droppedUidError,
   returnUrlError,
 };

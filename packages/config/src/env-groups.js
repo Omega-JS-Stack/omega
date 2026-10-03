@@ -23,7 +23,7 @@ const ENV_GROUPS = [
     ],
   },
   { id: 'github', comment: 'GitHub (repo + seo services): `gh auth login` works instead of a token' },
-  { id: 'cloudflare', comment: 'Cloudflare (edge service + every DNS-writing flow): API token with Zone edit' },
+  { id: 'cloudflare', comment: 'Cloudflare (edge service + every DNS-writing flow): API token with Zone edit, plus Account Settings Write for Web Analytics' },
   { id: 'namecheap', comment: 'Namecheap registrar (domain service)' },
   { id: 'google-oauth', comment: 'Google OAuth client (cloud, analytics, search, advertising services)' },
   { id: 'captcha', comment: "Classic reCAPTCHA SECRET key - the brand's own, from its GCP reCAPTCHA console (captcha service); the public site key is config, captcha.providers.recaptcha.siteKey" },

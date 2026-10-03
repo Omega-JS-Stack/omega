@@ -62,7 +62,7 @@ Full schema: [config.md](config.md).
 | `./core` | everything | Pure policy: config resolution, release tag, user scrub, the bundle filter. No `process`, no SDK, no DOM — it is safe inside a page bundle. |
 | `./env` | Node/Electron hosts | The `process.env` half of core's gate seam: the four switches below. |
 | `./node` | `@omega.js/backend` | Boots `@sentry/node` and hands the module back (or `null`). |
-| `./browser` | `@omega.js/client` | Builds the `@sentry/browser` init options — integrations plus the ONE `beforeSend` that decides what leaves a page. |
+| `./browser` | `@omega.js/client`, `@omega.js/web`'s head | Builds the `@sentry/browser` init options (integrations plus the ONE `beforeSend` that decides what leaves a page), and owns the early-error buffer ([When Sentry starts](#when-sentry-starts)). |
 | `./main` `./renderer` `./preload` | `@omega.js/desktop` | The `@sentry/electron` per-context wrappers. |
 | `.` | `@omega.js/desktop` | The Electron context delegator: `process.type === 'renderer'` picks the renderer module, anything else the main one. |
 
@@ -124,7 +124,34 @@ by hand. Nothing tags a build stamp by design.
 | Backend payment webhooks | the REFUSAL family's shared seam (`acknowledgeRefusal()` in `events/firestore/payments-webhooks/on-write.js`) captures ONE `warning` per refused event, tagged with the reason and the provider. A refusal is a decision, not a fault, so it never reports as an exception; a processed event reports nothing; and only IDS ride — the refusal stamp's own fields plus the event's ([#550](https://github.com/Omega-JS-Stack/omega/issues/550)). |
 | Desktop main | `@sentry/electron/main`'s own `OnUncaughtException` + `onUnhandledRejection` integrations. Desktop's process handlers log to `runtime.log` and are ADDITIVE — never a second capture. |
 | Desktop renderer | the SDK's window `error` / `unhandledrejection` handlers |
-| Browser (web, extension) | the SDK's global handlers, filtered by `beforeSend` to our bundles |
+| Browser (web, extension) | the SDK's global handlers, filtered by `beforeSend` to our bundles; before the SDK loads, the early-error buffer, replayed through the same filter ([When Sentry starts](#when-sentry-starts)) |
+
+**Web stack traces read the public source maps.** Every web bundle ships its `.map` beside it ([devkit's `bundle`](../devkit/index.md)), so Sentry fetches the map from the live site. A packaged extension or desktop app ships none, and nothing uploads maps at build or deploy.
+
+## When Sentry starts
+
+In a browser the SDK never sits on the boot path. With Sentry on, @omega.js/client's `initialize()`
+installs the early-error buffer and returns without awaiting the SDK; `@sentry/browser` loads once
+the page is idle (after the window's `load`, or 10 seconds when `load` never fires, at the next
+`requestIdleCallback`, a timer where the browser has none). With Sentry off there is no buffer and
+no SDK import.
+
+- **The buffer** has ONE home, `installEarlyErrorBuffer(window)` in `./browser`: it creates
+  `window.__OMEGA_EARLY_ERRORS` and pushes every `error` and `unhandledrejection` event into it.
+  It is idempotent: a page that already has the array gains no second set of listeners.
+- **@omega.js/web's head inlines it** when `monitoring.providers.sentry.dsn` is set, right after
+  `build.js`, printed from that function's source (the `earlyErrorBuffer` global in
+  `packages/web/src/head-globals.js`), so it also catches errors from before the main script runs.
+  The client's own install is then a no-op; on a surface with no inline copy (desktop, the
+  extension) the client's install is the buffer.
+- **The replay**: when the SDK has initialized, the client hands every buffered entry to
+  `Sentry.captureException`, so `beforeSend` and the bundle filter below apply as to any event,
+  then stops the buffer's listeners and empties it. From then on the SDK's own handlers capture,
+  so each error is captured once. An `omega.sentry.captureException()` call made before the SDK
+  loads waits in the same buffer.
+- **A failed SDK load** (the import rejects, say) is logged, and the client stops the buffer's
+  listeners and empties it for good, so nothing grows on a page that will never report;
+  `captureException()` calls after that are logged and dropped.
 
 ## The browser filter
 

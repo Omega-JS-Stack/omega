@@ -1,50 +1,18 @@
 /**
- * motion — the ONE animation engine (C3 classy v2), shared by every browser
- * surface the same way icon-renderer is: web pages today, desktop/extension
- * at C4. It drives the `data-omega-*` motion attributes that the core motion
- * stylesheet (web: core/css/motion/_index.scss) styles:
+ * motion: the ONE animation engine, shared by every browser surface. It drives
+ * the `data-omega-*` attributes the core motion stylesheet styles (reveal,
+ * reveal-stagger, countup, rotate, marquee, scroll-watch, segmented, dotfield);
+ * their contract is docs/shared/theming.md and docs/client/modules.md § Motion.
+ * The dotfield's loop starts once first paint has settled (dom.js's whenSettled).
  *
- *   [data-omega-reveal="up|fade|left|right|scale"] — reveal once on scroll-in
- *   [data-omega-reveal-stagger="60"]  — parent staggers child reveals (ms step)
- *   [data-omega-countup]              — number counts up from 0 on first view
- *                                       (markup carries the FINAL text: "12,400+")
- *   [data-omega-rotate="2600"]        — children cycle via data-omega-active (ms)
- *   [data-omega-marquee]              — the logo set is cloned until half the
- *                                       track covers the container, then that
- *                                       half is doubled so the -50% CSS loop is
- *                                       seamless and NEVER runs dry; speed is a
- *                                       constant px/s (attr value overrides)
- *   [data-omega-scroll-watch="24"]    — stamps data-omega-scrolled="true|false"
- *                                       when window scrolls past the threshold
- *   [data-omega-segmented]            — gliding-thumb segmented control: the
- *                                       engine injects .omega-segmented__thumb
- *                                       and keeps it under the checked/.active
- *                                       segment (CSS transitions do the glide)
- *   [data-omega-dotfield="22"]        — canvas dot grid (value = px spacing):
- *                                       dots breathe on a slow traveling wave
- *                                       and tint along ONE rainbow gradient
- *                                       that drifts across the field; the
- *                                       pointer brightens/grows nearby dots
- *                                       (tracked window-level so fixed
- *                                       overlays like the nav can't blind it).
- *                                       The loop starts only once first paint
- *                                       has settled and repaints at 30fps
- *                                       (#752); see whenSettled below
- *
- * Resilience contract (mirrors the stylesheet):
- *   - The page stamps html[data-omega-motion] via an inline head script; the
- *     stylesheet only hides reveal targets under that stamp, so no-JS pages
- *     render fully visible.
- *   - prefers-reduced-motion: reveals resolve instantly, countups render their
- *     final value, rotators hold the first word, marquees stay static,
- *     dotfields paint ONE still grid and never loop, and any `video[autoplay]`
- *     parks paused with its controls on (CSS cannot pause a video, so this
- *     lane owns it for every autoplaying band).
- *   - start() is idempotent; a MutationObserver picks up inserted content, and
- *     scan(root) is exposed for callers that render into detached roots.
+ * Resilience: no-JS pages render visible (the stylesheet hides only under the
+ * head's html[data-omega-motion] stamp); prefers-reduced-motion resolves every
+ * effect to its still final state; start() is idempotent, and scan(root) covers
+ * detached roots.
  */
 
 import { applyStagger } from './reveal-stagger.js';
+import { whenSettled, replaceChildren } from './dom.js';
 
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
 const COUNTUP_DURATION = 1200;
@@ -61,31 +29,6 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia(REDUCED_QUERY).matches;
-}
-
-/**
- * Run `fn` once first paint has settled: the first idle callback after the
- * load event, or the load event itself where requestIdleCallback is missing
- * (Safari). Ambient canvas work is never worth a frame of the LCP window
- * ([#752](https://github.com/Omega-JS-Stack/omega/issues/752)).
- * @param {Document} doc - the target's own document
- * @param {function} fn - the work that waits for the settle signal
- */
-function whenSettled(doc, fn) {
-  const idle = () => {
-    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(fn, { timeout: SETTLE_TIMEOUT });
-      return;
-    }
-    fn();
-  };
-
-  if (doc && doc.readyState !== 'complete') {
-    window.addEventListener('load', idle, { once: true });
-    return;
-  }
-
-  idle();
 }
 
 /**
@@ -336,7 +279,7 @@ function createMotion() {
     // measure waits for the NEXT frame: reading geometry in the tick that just
     // replaced the children forces a synchronous reflow (#752).
     const build = () => {
-      track.replaceChildren(...setItems);
+      replaceChildren(track, ...setItems);
 
       requestAnimationFrame(() => {
         if (track.children.length !== setItems.length) {
@@ -584,7 +527,7 @@ function createMotion() {
 
     // Nothing measures, reads styles or paints until first paint has settled:
     // an ambient field is never worth a frame of the LCP window (#752).
-    whenSettled(doc, () => {
+    whenSettled(() => {
       settled = true;
       readColors();
       resize();
@@ -595,7 +538,7 @@ function createMotion() {
       }
 
       startLoop();
-    });
+    }, { doc, timeout: SETTLE_TIMEOUT });
 
     if (reduced) {
       // A visitor who asked for stillness gets the field, still: no pointer

@@ -48,9 +48,7 @@ const protocol = {
     // arrives untouched as the fourth argument of second-instance, so every brand
     // gets the duplicate's real command line, in order, for free.
 
-    // `protocol.singleInstance: false` is for a CLI-shaped app whose every launch is
-    // its own short process: no lock is requested, so no launch is ever a duplicate.
-    const lockOff = omega.config.protocol?.singleInstance === false;
+    const lockOff = protocol.singleInstanceOff(omega.config);
     protocol._hasLock = lockOff || app.requestSingleInstanceLock({ argv: process.argv, cwd: process.cwd() });
     if (lockOff) {
       logger.log('single-instance lock off by config');
@@ -77,6 +75,13 @@ const protocol = {
     logger.log(`registered schemes=${JSON.stringify(schemes)}`);
 
     protocol._initialized = true;
+  },
+
+  // The one reader of the lock switch: the boot's runtime.log rule asks it too.
+  // `protocol.singleInstance: false` is for a CLI-shaped app whose every launch is
+  // its own short process: no lock is requested, so no launch is ever a duplicate.
+  singleInstanceOff(config) {
+    return config.protocol?.singleInstance === false;
   },
 
   hasSingleInstanceLock() {

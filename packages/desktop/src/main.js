@@ -172,18 +172,15 @@ class Omega {
     }
 
     {
-      const fs = require('fs');
-      const _path = require('path');
       const _app = require('electron').app;
 
+      // The name comes first: the log path (app.getPath('logs')) is derived from it.
       const _productName = this.config.app?.productName || this.config.brand?.name;
       if (_productName) {
         _app.setName(_productName);
       }
-      const _logPath = _app.isPackaged
-        ? _path.join(_app.getPath('logs'), 'runtime.log')
-        : _path.join(process.cwd(), 'logs', 'runtime.log');
-      try { fs.writeFileSync(_logPath, ''); } catch (e) {}
+      // The format first, so every line from boot on carries the lock-off pid tag
+      LoggerLite.setSingleInstanceOff(this.protocol.singleInstanceOff(this.config));
     }
 
     this.logger.log(`Initializing @omega.js/desktop (main)... pid=${process.pid} platform=${process.platform} arch=${process.arch} packaged=${require('electron').app.isPackaged} argv=${JSON.stringify(process.argv.slice(1))}`);
@@ -345,6 +342,9 @@ class Omega {
 
     // 5. Protocol (single-instance lock + custom URL scheme)
     this.protocol.initialize(this);
+
+    // Only the lock's holder clears runtime.log, so a duplicate never erases the running copy's lines
+    LoggerLite.clearEarlierLaunches(this.protocol.hasSingleInstanceLock());
 
     if (!this.protocol.hasSingleInstanceLock()) {
       // Quit the duplicate AND halt the boot: returning normally would resolve

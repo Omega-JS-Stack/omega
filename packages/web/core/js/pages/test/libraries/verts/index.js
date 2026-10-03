@@ -9,6 +9,7 @@
  */
 
 // Libraries
+import { replaceChildren } from '@omega.js/client/modules/dom.js';
 import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -58,7 +59,7 @@ function reloadUnit($host) {
     unit.destroy();
   }
 
-  $host.replaceChildren();
+  replaceChildren($host);
   $host.__omegaVertUnit = null;
   $host.__omegaVertMounted = false;
 

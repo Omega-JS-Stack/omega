@@ -257,13 +257,13 @@ module.exports = defineCases({
         const uid = accounts.basic.uid;
         const db = rules.asAccount('basic');
 
-        // Should fail - a planted `connections.<provider>` is a connection the
-        // account page renders as real, and the status route hands its
-        // refresh_token straight to the provider.
+        // Should fail - a planted `connections.<provider>.<identityId>` is a
+        // connection the account page renders as real, and the status route
+        // hands its refresh_token straight to the provider.
         await rules.expectFailure(
           db.doc(`users/${uid}`).set({
             connections: {
-              github: { token: { refresh_token: 'forged-refresh-token' } },
+              github: { 'forged-identity': { token: { refresh_token: 'forged-refresh-token' }, identity: { id: 'forged-identity' } } },
             },
           }, { merge: true })
         );

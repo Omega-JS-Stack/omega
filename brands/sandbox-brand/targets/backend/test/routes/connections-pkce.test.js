@@ -1,24 +1,12 @@
 /**
- * The brand-defined connection provider, end to end against the emulator
- * ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)).
+ * This brand's own provider (`src/connections/sandbox-pkce.js`), end to end
+ * over the real routes: the lane loads it, `pkce: 'S256'` puts the challenge
+ * on the authorize URL and keeps the verifier in `usage/<uid>`, the exchange
+ * posts that verifier, and the record lands at `users/<uid>.connections
+ * ['sandbox-pkce'][<identity id>]` with the one-time session deleted.
  *
- * `src/connections/sandbox-pkce.js` is this brand's own provider file — the
- * framework ships nothing for it. What this proves, over the real routes:
- *
- *   1. the lane LOADS a provider the framework never heard of (the brand dir
- *      is searched before the package's);
- *   2. `pkce: 'S256'` is enough: the authorize URL carries `code_challenge` +
- *      `code_challenge_method`, and the verifier is stored beside the CSRF
- *      token in `usage/<uid>` instead of travelling;
- *   3. the exchange sends `code_verifier`, and it is the one that hashes to
- *      the challenge the authorize leg published;
- *   4. the record lands at `users/<uid>.connections['sandbox-pkce']` and the
- *      one-time session entry is deleted.
- *
- * The one stand-in is the AUTHORIZATION SERVER: `sandbox-pkce.js` points at
- * `http://127.0.0.1:5310`, and this file boots a plain node server there for
- * the run. Nothing leaves the machine, and the request body it records is the
- * only way to see what the exchange actually posted.
+ * The one stand-in is the authorization server: a plain node server on
+ * `http://127.0.0.1:5310`, booted here, recording what the exchange posted.
  *
  * Run (from this target, with the emulator up): npx omega test routes/connections-pkce
  */
@@ -148,9 +136,9 @@ module.exports = defineCases({
         assert.equal(exchange.body.code, 'sandbox-authorization-code', 'carrying the code');
 
         const user = await firestore.get(`users/${accounts.basic.uid}`);
-        const record = user?.connections?.[PROVIDER_ID];
+        const record = user?.connections?.[PROVIDER_ID]?.[TOKEN_RESPONSE.user_id];
 
-        assert.ok(record, 'the connection is recorded under the user');
+        assert.ok(record, 'the connection is recorded under the user, keyed by its identity id');
         assert.equal(record.token.access_token, TOKEN_RESPONSE.access_token, 'with the access token');
         assert.equal(record.token.refresh_token, TOKEN_RESPONSE.refresh_token, 'and the refresh token');
         assert.equal(record.identity.id, TOKEN_RESPONSE.user_id, "and the provider's own identity");

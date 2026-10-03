@@ -13,6 +13,9 @@ let connectionsConfig = null;
 let accountData = null;
 const connectionForms = new Map();
 
+// The account cards drawn so far: provider id → (identity id → card element)
+const accountCards = new Map();
+
 // What a provider id may be — the same rule the backend's confined provider
 // loader enforces (`libraries/load-provider.js`). A key outside it can never
 // resolve to a provider, so its card would only ever fail on connect.
@@ -55,7 +58,6 @@ function displayConnections() {
   }
 
   const availableProviders = connectionsConfig;
-  const userConnections = accountData?.connections || {};
 
   let hasEnabledProviders = false;
 
@@ -87,11 +89,10 @@ function displayConnections() {
     }
 
     if ($providerElement) {
-      $providerElement.classList.remove('d-none');
-
       initializeProviderForm(providerId);
 
-      updateProviderStatus(providerId, userConnections[providerId], providerSettings);
+      renderAccountCards(providerId);
+      updateConnectCard(providerId, providerSettings);
       return;
     }
 
@@ -146,15 +147,32 @@ function renderUnconfiguredCard(providerId, reason) {
   document.getElementById('connections-list').appendChild($warning);
 }
 
-// Update provider status display
-function updateProviderStatus(providerId, userConnection, providerSettings) {
+// The user's linked accounts of one provider, keyed by identity id. An account
+// holds a `token` object, the backend's rule: an old one-level record's own keys
+// and a lease left with no token are never accounts
+function linkedAccounts(providerId) {
+  const entries = Object.entries(accountData?.connections?.[providerId] || {});
+
+  return Object.fromEntries(entries.filter(([, entry]) => entry?.token && typeof entry.token === 'object'));
+}
+
+// The most accounts of a provider one user may link. 1 is the config schema's
+// default, which a brand's own provider reads when its entry names no `max`
+function connectionLimit(providerSettings) {
+  return providerSettings?.max ?? 1;
+}
+
+// The provider's own card is the Connect control: shown while the user holds
+// fewer accounts than `max`, hidden at it. Each linked account is its own card
+function updateConnectCard(providerId, providerSettings) {
+  const $card = document.getElementById(`connection-${providerId}`);
   const $status = document.getElementById(`${providerId}-connection-status`);
   const $description = document.getElementById(`${providerId}-connection-description`);
   const $form = document.getElementById(`connection-form-${providerId}`);
   const $connectButton = $form?.querySelector('button[data-action="connect"]');
   const $disconnectButton = $form?.querySelector('button[data-action="disconnect"]');
 
-  const isConnected = userConnection && userConnection.identity;
+  const canConnect = Object.keys(linkedAccounts(providerId)).length < connectionLimit(providerSettings);
 
   // Set description. The CONFIG is the only source
   // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): the framework's
@@ -168,40 +186,112 @@ function updateProviderStatus(providerId, userConnection, providerSettings) {
     $description.classList.remove('d-none');
   }
 
-  // Set status
   if ($status) {
-    if (isConnected) {
-      const displayName = getConnectionDisplayName(userConnection);
-      let statusText = `Connected: ${displayName}`;
-
-      if (userConnection.updated && userConnection.updated.timestamp) {
-        const date = new Date(userConnection.updated.timestamp);
-        const dateStr = date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        });
-        statusText = `${displayName} • ${dateStr}`;
-      }
-
-      $status.textContent = statusText;
-      $status.classList.remove('d-none');
-    } else {
-      $status.textContent = '';
-      $status.classList.add('d-none');
-    }
+    $status.textContent = '';
+    $status.classList.add('d-none');
   }
 
-  // Toggle buttons
   if ($connectButton && $disconnectButton) {
-    if (isConnected) {
-      $connectButton.classList.add('d-none');
-      $disconnectButton.classList.remove('d-none');
-    } else {
+    if (canConnect) {
       $connectButton.classList.remove('d-none');
-      $disconnectButton.classList.add('d-none');
+    } else {
+      $connectButton.classList.add('d-none');
     }
+
+    $disconnectButton.classList.add('d-none');
   }
+
+  if (canConnect) {
+    $card.classList.remove('d-none');
+  } else {
+    $card.classList.add('d-none');
+  }
+}
+
+// One card per linked account, each a copy of the provider's card with its ids
+// suffixed by the account's identity id, placed right below the provider's card
+function renderAccountCards(providerId) {
+  const accounts = linkedAccounts(providerId);
+  const drawn = accountCards.get(providerId) || new Map();
+  const $providerCard = document.getElementById(`connection-${providerId}`);
+  let $anchor = $providerCard;
+
+  accountCards.set(providerId, drawn);
+
+  drawn.forEach(($card, accountId) => {
+    if (!Object.prototype.hasOwnProperty.call(accounts, accountId)) {
+      $card.remove();
+      drawn.delete(accountId);
+    }
+  });
+
+  Object.entries(accounts).forEach(([accountId, connection]) => {
+    const suffix = `${providerId}-${accountId}`;
+
+    if (!drawn.has(accountId)) {
+      const $card = buildAccountCard($providerCard, providerId, accountId);
+
+      $anchor.after($card);
+      drawn.set(accountId, $card);
+      initializeAccountForm(document.getElementById(`connection-form-${suffix}`));
+    }
+
+    $anchor = drawn.get(accountId);
+    fillAccountCard(suffix, connection);
+  });
+}
+
+// A copy of the provider's card for one account: its own ids, its own
+// Disconnect (which passes the account's id), and no Connect
+function buildAccountCard($providerCard, providerId, accountId) {
+  const suffix = `${providerId}-${accountId}`;
+  const $card = $providerCard.cloneNode(true);
+  const byId = (id) => $card.querySelector(`[id="${id}"]`);
+
+  $card.id = `connection-${suffix}`;
+  $card.classList.add('border-top');
+  $card.classList.remove('d-none');
+
+  byId(`${providerId}-connection-description`).id = `${suffix}-connection-description`;
+  byId(`${providerId}-connection-status`).id = `${suffix}-connection-status`;
+
+  const $form = byId(`connection-form-${providerId}`);
+  const $id = document.createElement('input');
+
+  $form.id = `connection-form-${suffix}`;
+  $form.setAttribute('data-form-state', 'initializing');
+  $id.type = 'hidden';
+  $id.name = 'id';
+  $id.value = accountId;
+  $form.prepend($id);
+  $form.querySelector('button[data-action="connect"]').remove();
+  $form.querySelector('button[data-action="disconnect"]').classList.remove('d-none');
+
+  return $card;
+}
+
+// The account's display name under the provider's, and when it was linked
+function fillAccountCard(suffix, connection) {
+  const $description = document.getElementById(`${suffix}-connection-description`);
+  const $status = document.getElementById(`${suffix}-connection-status`);
+
+  $description.textContent = getConnectionDisplayName(connection);
+  $description.classList.remove('d-none');
+
+  if (!connection?.updated?.timestamp) {
+    $status.textContent = '';
+    $status.classList.add('d-none');
+    return;
+  }
+
+  const dateStr = new Date(connection.updated.timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  $status.textContent = `Connected ${dateStr}`;
+  $status.classList.remove('d-none');
 }
 
 // Get display name for connection
@@ -239,26 +329,27 @@ function initializeProviderForm(providerId) {
 
   formManager.on('statechange', ({ state }) => {
     if (state === 'ready') {
-      const userConnection = accountData?.connections?.[providerId];
-      const providerSettings = connectionsConfig?.[providerId];
-      updateProviderStatus(providerId, userConnection, providerSettings);
+      updateConnectCard(providerId, connectionsConfig?.[providerId]);
     }
   });
 
-  formManager.on('submit', async ({ data, $submitButton }) => {
-    const provider = data.provider;
-    const action = $submitButton?.getAttribute('data-action');
+  // The provider's card only connects: each account card carries its own Disconnect
+  formManager.on('submit', async ({ data }) => {
+    await handleConnect(data.provider);
+  });
+}
 
-    if (action === 'connect') {
-      await handleConnect(provider);
-    } else if (action === 'disconnect') {
-      const success = await handleDisconnect(provider);
+// Initialize FormManager for one account card's Disconnect
+function initializeAccountForm($form) {
+  const formManager = new FormManager(omega, $form, {
+    submittingText: 'Disconnecting...',
+  });
 
-      if (success) {
-        const providerSettings = connectionsConfig?.[provider];
-        updateProviderStatus(provider, null, providerSettings);
-      }
-    }
+  formManager.on('submit', async ({ data }) => {
+    await handleDisconnect(data.provider, data.id);
+
+    renderAccountCards(data.provider);
+    updateConnectCard(data.provider, connectionsConfig?.[data.provider]);
   });
 }
 
@@ -294,19 +385,21 @@ async function handleConnect(providerId) {
   }
 }
 
-// Handle disconnect action
-async function handleDisconnect(providerId) {
+// Handle disconnect action: one account, named by its identity id
+async function handleDisconnect(providerId, accountId) {
   const providerName = providerId.charAt(0).toUpperCase() + providerId.slice(1);
+  const displayName = getConnectionDisplayName(linkedAccounts(providerId)[accountId]);
 
   await new Promise(resolve => setTimeout(resolve, 1));
 
-  if (!confirm(`Are you sure you want to disconnect your ${providerName} account?`)) {
+  if (!confirm(`Are you sure you want to disconnect your ${providerName} account ${displayName}?`)) {
     throw new Error('Disconnection cancelled');
   }
 
   // Build URL with query params for DELETE request
   const url = new URL(getApiUrl());
   url.searchParams.set('provider', providerId);
+  url.searchParams.set('id', accountId);
 
   const response = await omega.request(url.toString(), {
     method: 'DELETE',
@@ -315,9 +408,8 @@ async function handleDisconnect(providerId) {
   });
 
   if (response.success) {
-    if (accountData.connections && accountData.connections[providerId]) {
-      delete accountData.connections[providerId];
-    }
+    // From the stored map itself: linkedAccounts() answers a filtered copy
+    delete accountData.connections[providerId][accountId];
 
     return true;
   }

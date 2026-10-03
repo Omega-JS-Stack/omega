@@ -6,14 +6,15 @@
 // and the file, the gulp task, the log tag and `npm run gulp -- bundle` were
 // renamed off `webpack` with it — a task named after a bundler it no longer
 // runs is a lie every reader has to unlearn.
-//
+
 // Every shared part comes from @omega.js/devkit's ONE bundle wrapper: the
-// framework-deps resolve hook (#87 — a consumer requires a framework
-// dependency by bare name and gets the FRAMEWORK's copy), the production
-// `@dev-only` strip (#18), the minify/sourcemap rules by mode, and one timing
-// line per build. What lives here is only what is genuinely desktop's: the
-// three entry shapes, the Electron platform/target pair, the externals, the
-// renderer's Node-builtin shim, and the OMEGA_BUILD_JSON bake.
+// framework-deps resolve hook (a bare-name framework dependency gets the
+// FRAMEWORK's copy), the production `@dev-only` strip, a source map in every
+// mode with minify by mode, and one timing line per build.
+
+// What lives here is only what is genuinely desktop's: the three entry shapes,
+// the Electron platform/target pair, the externals, the renderer's Node-builtin
+// shim, and the OMEGA_BUILD_JSON bake.
 
 const build = require('../../build.js');
 const logger = build.logger('bundle');
@@ -24,6 +25,7 @@ const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, readSiblingOrigin, 
 const { bakeKeys } = require('@omega.js/config/env-delivery');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const { bundle, formatBytes } = require('@omega.js/devkit/bundle');
+const { BROWSER_TARGET } = require('@omega.js/devkit/browser-floor');
 const buildJsonKit = require('@omega.js/devkit/build-json');
 const { emptyModulesPlugin } = require('@omega.js/devkit/empty-modules-plugin');
 const electronTargets = require('../../utils/electron-targets.js');
@@ -211,22 +213,21 @@ async function runBundles(buildJson, isProd) {
   // bundle produced, and how big.
   results.forEach(({ name, result }) => {
     logger.log(`built ${name}:`);
-    Object.entries(result.metafile.outputs).forEach(([file, meta]) => {
+    Object.entries(result.metafile.outputs).filter(([file]) => !file.endsWith('.map')).forEach(([file, meta]) => {
       logger.log(`  ${path.basename(file)} (${formatBytes(meta.bytes)})`);
     });
   });
 }
 
 // The Electron the CONSUMER pinned decides the syntax floor of all three
-// bundles — see utils/electron-targets.js. The binary is resolved from the
-// FRAMEWORK's module context, which is the same lookup build-config pins
-// `electronVersion` with: the version that ends up RUNNING the bundles is the
-// version they must compile for.
+// bundles (utils/electron-targets.js), resolved from the FRAMEWORK's module
+// context like build-config's `electronVersion`: the Electron that RUNS them.
+// Unprobed, the node pair gets no floor and the renderer devkit's browser one.
 function resolveTargets() {
   try {
     return electronTargets(require('electron'), { logger });
   } catch (e) {
-    logger.warn(`Could not resolve electron (${e.message}) — bundles compile with no syntax floor.`);
+    logger.warn(`Could not resolve electron (${e.message}): main and preload compile with no syntax floor, the renderer to the ${BROWSER_TARGET} browser floor.`);
     return { node: null, chrome: null, electron: null };
   }
 }

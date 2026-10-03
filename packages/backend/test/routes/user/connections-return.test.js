@@ -26,6 +26,7 @@ const getRoute = require('../../../dist/omega/routes/user/connections/get.js');
 const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
 const { decryptState } = require('../../../dist/omega/routes/user/connections/_state.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const { recordingFirestore } = require('../../helpers/_recording-firestore.js');
 
 const PROVIDER_ID = 'return-fixture-784';
 const PROVIDER_ENV_KEY = 'RETURN_FIXTURE_784';
@@ -64,35 +65,13 @@ const PROVIDER_SOURCE = [
   '};',
 ].join('\n');
 
-/** A Firestore stand-in that answers per PATH and records every write. */
-function recordingFirestore(docs) {
-  const writes = [];
-
-  const snapshot = (docPath) => ({ exists: !!docs[docPath], data: () => docs[docPath] });
-
-  const firestore = {
-    doc: (docPath) => ({
-      path: docPath,
-      get: async () => snapshot(docPath),
-      update: async (payload) => writes.push({ verb: 'update', path: docPath, payload }),
-      set: async (payload) => writes.push({ verb: 'set', path: docPath, payload }),
-    }),
-    // The uniqueness query tokenize runs on the identity
-    // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)); nobody else
-    // holds this fixture's identity, so it matches nothing
-    collection: () => ({ where: () => ({ get: async () => ({ docs: [], size: 0 }) }) }),
-  };
-
-  return { admin: { firestore: () => firestore }, writes };
-}
-
 /** The lane, wired: a brand provider dir, a recording Firestore, and a ctx. */
 function lane(docs) {
   const cwd = jetpack.tmpDir({ prefix: 'omega-connections-784' }).path();
 
   jetpack.write(path.join(cwd, 'connections', `${PROVIDER_ID}.js`), PROVIDER_SOURCE);
 
-  const { admin, writes } = recordingFirestore(docs || {});
+  const { admin, writes } = recordingFirestore({ docs: docs || {} });
 
   const omega = {
     cwd,

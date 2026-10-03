@@ -54,7 +54,7 @@ A non-empty credential value enables a feature — there is no separate `enabled
 |---|---|---|
 | Sentry | `monitoring.providers.sentry.dsn = 'https://...'` | `monitoring.providers.sentry.dsn = ''` |
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
-| Firebase Auth (renderer) | `cloud.config.projectId = '...'` (etc.) | empty `cloud.config` |
+| Firebase Auth (main and renderer) | `cloud.config.apiKey = '...'` | no `cloud.config.apiKey` (`''` or missing) |
 
 **Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`. (`platforms.linux.snap.enabled` was one until [#867](https://github.com/Omega-JS-Stack/omega/issues/867): the snap is a declared FORMAT now, so its presence is the switch and `platforms.linux.formats.snap: false` is the off.) These toggle BEHAVIOR, not credentials: a fork can keep the brand's `repo.owner` and still want releases off, for example.
 

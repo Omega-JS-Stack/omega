@@ -95,6 +95,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
+    "@omega.js/monitoring": "*",
     "@omega.js/template-kit": "*",
     "prepare-package": "^2.2.1"
   },

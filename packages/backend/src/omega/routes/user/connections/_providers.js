@@ -1,7 +1,7 @@
 /**
- * Provider modules: where they are found, whether they can run a grant, and the
- * credentials the brand registered them with
- * ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)).
+ * Provider modules: where they are found, whether they can run a grant, whether
+ * the brand has turned them off, how many accounts of one a user may link, and
+ * the credentials the brand registered them with.
  *
  * One concern, one file: nothing here knows what a grant step does, what the
  * state cipher is, or which user the route is acting on.
@@ -158,6 +158,53 @@ function loadProvider(providerName, omega) {
 }
 
 /**
+ * The 400 `authorize`, `tokenize` and `refresh` answer when the resolved
+ * `connections.<name>.enabled` is exactly false, the schema's rule. `status` and
+ * `delete` never ask: a user can still see and remove a connection to a
+ * provider the brand later turned off.
+ *
+ * @param {string} providerName - The provider key
+ * @param {object} omega - The Omega instance (its resolved `config`)
+ * @returns {object|null} The error, or null when the provider is enabled
+ */
+function disabledProviderError(providerName, omega) {
+  if (omega.config.connections?.[providerName]?.enabled !== false) {
+    return null;
+  }
+
+  return {
+    message: `Connection provider ${providerName} is not enabled: set connections.${providerName}.enabled to true in the brand config.`,
+    code: 400,
+  };
+}
+
+/**
+ * The 400 `tokenize` answers when the user already holds `max` accounts of the
+ * provider and the identity is a NEW one. The same identity reconnecting
+ * replaces its own record, so it is never counted against the limit.
+ *
+ * @param {string} providerName - The provider key
+ * @param {object} omega - The Omega instance (its resolved `config`)
+ * @param {object} records - The user's stored records of this provider, by identity id
+ * @param {string} identityId - The identity the grant belongs to
+ * @returns {object|null} The error, or null when the account may be stored
+ */
+function connectionLimitError(providerName, omega, records, identityId) {
+  // 1 is the schema's default, which a brand's own provider reads when its
+  // entry names no `max`
+  const max = omega.config.connections?.[providerName]?.max ?? 1;
+
+  if (Object.hasOwn(records, identityId) || Object.keys(records).length < max) {
+    return null;
+  }
+
+  return {
+    message: `Connection limit reached for ${providerName}: connections.${providerName}.max is ${max}.`,
+    code: 400,
+  };
+}
+
+/**
  * The ONE line a provider's identity step may log
  * ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
  *
@@ -187,5 +234,7 @@ module.exports = {
   assertProviderShape,
   resolveProvider,
   loadProvider,
+  disabledProviderError,
+  connectionLimitError,
   logIdentityCheck,
 };

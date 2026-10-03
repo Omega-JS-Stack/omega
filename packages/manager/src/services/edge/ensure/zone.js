@@ -20,6 +20,7 @@
 const chalk = require('chalk').default;
 const { openBrowserAndPoll, pollWithSpinner } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
+const { accountId: resolveAccountId } = require('../lib/account-id.js');
 const { DOMAIN_PROVIDERS, resolveRegistrar } = require('../../domain/lib/providers.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
@@ -107,11 +108,8 @@ module.exports = async function ensureZone(context) {
   const { cloudflareApi: api, brandRoot, zoneDomain, isSubdomainProject, options = {} } = context;
 
   // === READ ===
-  const accounts = await api.makeRequest('/accounts');
-  if (!accounts.result || accounts.result.length === 0) {
-    throw new Error('No Cloudflare account found for this token');
-  }
-  const accountId = accounts.result[0].id;
+  // The account comes first: a missing zone is created under it
+  const accountId = await resolveAccountId(context, null);
 
   const allZones = await api.getAllZones();
   let zone = allZones.find((z) => z.name === zoneDomain);

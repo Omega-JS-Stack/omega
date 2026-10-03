@@ -26,7 +26,7 @@ export default function () {
       cleared = true;
 
       document.documentElement.removeAttribute('data-page-loading');
-      document.documentElement.setAttribute('aria-busy', 'false');
+      document.body.setAttribute('aria-busy', 'false');
     };
 
     // Use requestAnimationFrame for smooth transition: on a drawing renderer

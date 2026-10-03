@@ -183,7 +183,7 @@ test('own keys and serialized bytes match resolveAccount, key order included', (
     {},
     {
       roles: { admin: true, customRole: true },
-      connections: { google: { token: 'tok' } },
+      connections: { google: { 'google-sub-1': { token: 'tok' } } },
       unknownTopLevel: { stripped: true },
     },
     {

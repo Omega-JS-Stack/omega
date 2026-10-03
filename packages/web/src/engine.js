@@ -34,7 +34,7 @@ const { applyCollectionLimits } = require('./limit-collections.js');
 const { readCollections, collectionPages, applyDocumentData } = require('./dynamic-pages.js');
 const { readSocials, socialPages } = require('./social-pages.js');
 const { readTargetShortlinks, targetShortlinkPages } = require('./target-shortlinks.js');
-const { resolvePageAsset } = require('./assets.js');
+const { pageAssets, layoutAssets, modulePreloads } = require('./page-assets.js');
 const { resolvePathPrefix, prefixHtml } = require('./path-prefix.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
@@ -58,7 +58,7 @@ const logger = new Logger('engine');
 const RESOLVED_OMIT = new Set([
   'collections', 'content', 'page', 'eleventy', 'pkg', 'eleventyComputed',
   'resolved', 'permalink', 'layout', 'tags', 'pagination', 'site', 'assetManifest',
-  'paginator', 'pageAssets', 'layoutAssets', 'jekyll', 'sectionLibrary',
+  'paginator', 'pageAssets', 'layoutAssets', 'modulePreloads', 'jekyll', 'sectionLibrary',
 ]);
 
 // Build-fact keys that do NOT seed `resolved` (bulk/runtime values templates
@@ -907,34 +907,12 @@ function buildConfig(eleventyConfig, options) {
         next_page_path: (p.href && p.href.next) || null,
       };
     },
-    // Per-page asset lookups against the content-hash manifest, keyed by URL
-    // alone (spec §7 — the asset_path frontmatter override is dead): `<key>`
-    // for flat entries (js/pages/pricing.js), `<key>/index` for per-page dirs
-    // (js/pages/pricing/index.js), and [name] wildcard segments for generated
-    // page families (js/pages/blog/[slug].js serves every /blog/<slug> post).
-    // Each answer is a LIST — every layer that ships a file for this URL, in
-    // load order (#624), because page assets never replace one another.
-    pageAssets: (data) => {
-      const manifest = data.assetManifest || {};
-      const trimmed = (data.page.url || '/').replace(/^\/|\/$/g, '');
-      const base = trimmed === '' ? 'index' : trimmed;
-      return {
-        js: resolvePageAsset(manifest.js && manifest.js.pages, base) || [],
-        css: resolvePageAsset(manifest.css && manifest.css.pages, base) || [],
-      };
-    },
-    // The same lookup, keyed by LAYOUT instead of URL (#624): a page gets every
-    // asset of every layout in its chain, outermost first — the chain, not just
-    // `data.layout`, because a blueprint that sits on the redirect layout
-    // (blueprint/careers) must still get the redirect layout's script.
-    layoutAssets: (data) => {
-      const manifest = data.assetManifest || {};
-      const chain = layoutChain(data.layout);
-      return {
-        js: chain.flatMap((name) => resolvePageAsset(manifest.js && manifest.js.layouts, name) || []),
-        css: chain.flatMap((name) => resolvePageAsset(manifest.css && manifest.css.layouts, name) || []),
-      };
-    },
+    // What this page loads, off the content-hash manifest (src/page-assets.js):
+    // its own assets keyed by URL, its layout chain's, and the modulepreload
+    // links beside each module entry.
+    pageAssets: (data) => pageAssets(data.assetManifest, data.page.url),
+    layoutAssets: (data) => layoutAssets(data.assetManifest, layoutChain(data.layout)),
+    modulePreloads: (data) => modulePreloads(data.assetManifest, data.page.url, layoutChain(data.layout)),
     resolved: (data) => {
       // inject-properties.rb parity: resolved = build facts ← layout chain ←
       // page data, PLUS the config namespace (#607).

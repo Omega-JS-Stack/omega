@@ -20,13 +20,12 @@ class Firestore {
 
   async _initializeFirestore() {
     try {
-      // Check if Firebase app is initialized
-      if (!this.omega._firebaseApp) {
-        throw new Error('Firebase app not initialized. Please initialize Firebase first.');
-      }
+      // The one instance, from the client's loader (which rejects by name when
+      // the page has no Firebase app, and connects the emulator on a local stack)
+      const db = await this.omega.loadFirebaseFirestore();
 
       // Dynamically import Firestore
-      const { getFirestore, doc: firestoreDoc, collection: firestoreCollection, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, startAt, endAt, onSnapshot } = await import('firebase/firestore');
+      const { doc: firestoreDoc, collection: firestoreCollection, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, startAt, endAt, onSnapshot } = await import('firebase/firestore');
 
       // Store references for later use
       this._firestoreMethods = {
@@ -46,9 +45,7 @@ class Firestore {
         onSnapshot,
       };
 
-      // Reuse the Firestore instance already initialized in index.js — emulator
-      // connection (when enabled) already happened there, at creation time.
-      this._db = getFirestore(this.omega._firebaseApp);
+      this._db = db;
 
       this._initialized = true;
 

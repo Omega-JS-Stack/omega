@@ -11,11 +11,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const JSON5 = require('json5');
 
 // The machine registry is per-machine state: this file's fixtures record into a temp home.
 require('@omega.js/devkit/test/temp-home');
 
-const { schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath, loadConfig, validateConfig } = require('../src/index.js');
+const {
+  schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath, loadConfig, validateConfig, writeConfigValues,
+} = require('../src/index.js');
 const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
@@ -322,6 +325,25 @@ test('#793: a `materialize: false` default feeds resolution and is never written
   const rule = SHARED_SCHEMA.find((entry) => entry.path === 'connections');
 
   assert.equal(rule.materialize, false, 'the flag lives on the rule, beside the default it governs');
+});
+
+test('edge.providers.cloudflare.webAnalytics.enabled resolves true and is never written into a brand file', (t) => {
+  const root = makeBrand('web-analytics', `{
+  brand: { id: 'mini', name: 'MiniCo', url: 'https://mini.test' },
+  edge: { providers: { cloudflare: { zone: 'zone-1' } } },
+  targets: { web: { type: 'web' } },
+}
+`);
+  cleanup(t, root);
+
+  assert.equal(loadConfig(root, 'web').config.edge.providers.cloudflare.webAnalytics.enabled, true);
+
+  // The heal writes every missing default through the editor; this one is not among them
+  const file = path.join(root, 'config', 'omega.json5');
+  const raw = JSON5.parse(fs.readFileSync(file, 'utf8'));
+  writeConfigValues(root, Object.fromEntries(missingDefaults(raw).map((entry) => [entry.path, entry.value])));
+
+  assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /webAnalytics/);
 });
 
 test('#793: a brand that authored a connections block still heals its OTHER holes', () => {

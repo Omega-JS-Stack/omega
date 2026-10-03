@@ -23,6 +23,7 @@ function makeHost() {
     children: [],
     styles,
     appendChild(child) { this.children.push(child); },
+    replaceChildren(...nodes) { this.children = nodes; },
     querySelector: () => null,
     style: {
       setProperty: (key, value) => { styles[key] = value; },

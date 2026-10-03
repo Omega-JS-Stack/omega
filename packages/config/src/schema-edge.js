@@ -121,13 +121,21 @@ const EDGE_RULES = [
     description: "The zone's scheduled speed test ({ frequency, region }), reconciled by its own operation.",
   },
   {
+    path:        'edge.providers.cloudflare.webAnalytics.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    materialize: false,
+    description: "Cloudflare Web Analytics for the zone: the beacon Cloudflare injects at the edge (static.cloudflareinsights.com), outside the consent gate. The edge service's `web-analytics` operation turns the account's RUM site for the zone on or off to match; the token needs \"Account Settings Write\".",
+  },
+  {
     path:        'edge.providers.cloudflare.cacheRules',
     type:        'array',
     required:    false,
     default:     [
       {
         name: 'Assets: Cache for 1 Year',
-        expression: '(http.request.uri.path wildcard r"/assets/*") or (http.request.uri.path eq "/__/auth/iframe.js")',
+        expression: '(http.request.uri.path wildcard r"/assets/*") or (http.request.uri.path eq "/__/auth/iframe.js") or (http.request.uri.path eq "/build.js")',
         edgeTtl: 31536000,
         browserTtl: 31536000,
         enabled: true,
@@ -149,7 +157,7 @@ const EDGE_RULES = [
       },
     ],
     materialize: false,
-    description: "The zone's cache rules ([{ name, expression, edgeTtl, browserTtl, enabled, priority }]). The web build content-hashes every bundle under /assets, so those bytes cache for a year; HTML keeps its URL, so browsers hold it a minute and the edge copy is what a deploy purges. The HTML rule excludes /assets so one path has one lifetime, and it guards by host because a cache rule is zone-scoped: the api host (`api.` plus the target's own domain at every shape) answers extensionless user-scoped GETs (/authorize, /token, /omega/**, /mcp/**), and emailurl.<domain> is the proxied SendGrid link-tracking CNAME whose click and open URLs must reach SendGrid every time.",
+    description: "The zone's cache rules ([{ name, expression, edgeTtl, browserTtl, enabled, priority }]). The web build content-hashes every bundle under /assets, so those bytes cache for a year, and /build.js rides the same rule because every loader of it carries the build stamp (`?cb=`); HTML keeps its URL, so browsers hold it a minute and the edge copy is what a deploy purges. The HTML rule excludes /assets so one path has one lifetime, and it guards by host because a cache rule is zone-scoped: the api host (`api.` plus the target's own domain at every shape) answers extensionless user-scoped GETs (/authorize, /token, /omega/**, /mcp/**), and emailurl.<domain> is the proxied SendGrid link-tracking CNAME whose click and open URLs must reach SendGrid every time.",
   },
   {
     path:        'edge.providers.cloudflare.rules.managedTransforms',

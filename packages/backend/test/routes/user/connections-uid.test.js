@@ -33,6 +33,7 @@ const { encryptState } = require('../../../dist/omega/routes/user/connections/_s
 const { validate } = require('../../../dist/omega/helpers/schema.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const { frameworkDoc } = require('../../helpers/_framework-doc.js');
+const { recordingFirestore } = require('../../helpers/_recording-firestore.js');
 
 const PROVIDER_ID = 'uid-fixture-782';
 const PROVIDER_ENV_KEY = 'UID_FIXTURE_782';
@@ -73,54 +74,32 @@ const PROVIDER_SOURCE = [
   '};',
 ].join('\n');
 
+// The one linked account, keyed by the identity the fixture provider answers
+const IDENTITY_ID = 'fixture-user';
+
 /** The stored connection record a refresh or a delete acts on. */
 function storedUser(uid) {
   return {
     id: uid,
     connections: {
       [PROVIDER_ID]: {
-        type: 'oauth2',
-        token: { access_token: 'access-old', refresh_token: 'refresh-782' },
+        [IDENTITY_ID]: {
+          type: 'oauth2',
+          token: { access_token: 'access-old', refresh_token: 'refresh-782' },
+          identity: { id: IDENTITY_ID },
+        },
       },
     },
   };
 }
 
-/**
- * A Firestore stand-in that answers per PATH and records every write — a case
- * about acting on ANOTHER user's document has to see which document was written.
- */
-function recordingFirestore(docs) {
-  const writes = [];
-
-  const snapshot = (docPath) => ({ exists: !!docs[docPath], data: () => docs[docPath] });
-
-  const firestore = {
-    doc: (docPath) => ({
-      path: docPath,
-      get: async () => snapshot(docPath),
-      update: async (payload) => writes.push({ verb: 'update', path: docPath, payload }),
-      set: async (payload) => writes.push({ verb: 'set', path: docPath, payload }),
-    }),
-
-    // A refresh takes its lease in a TRANSACTION on the user document
-    // ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)); these cases
-    // are about WHICH document is acted on, so the transaction's write records
-    // like every other one. The lease itself is pinned in
-    // connections-refresh-lease.test.js.
-    runTransaction: (fn) => fn({
-      get: async (ref) => snapshot(ref.path),
-      set: (ref, payload) => writes.push({ verb: 'transaction.set', path: ref.path, payload }),
-    }),
-
-    // The uniqueness query tokenize runs on the identity
-    // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)); nobody else
-    // holds this fixture's identity, so it matches nothing
-    collection: () => ({ where: () => ({ get: async () => ({ docs: [], size: 0 }) }) }),
-  };
-
-  return { admin: { firestore: () => firestore }, writes };
+/** The account record a write carries, whether set as a nested map or by a dotted key. */
+function writtenRecord(write) {
+  return write.payload.connections?.[PROVIDER_ID]?.[IDENTITY_ID] ?? write.payload[`connections.${PROVIDER_ID}.${IDENTITY_ID}`];
 }
+
+/** A write that stores (or deletes) a user record: a plain write or one inside the transaction. */
+const STORING = ['set', 'update', 'transaction.set', 'transaction.update'];
 
 /** The lane, wired: a brand provider dir, a recording Firestore, and a ctx. */
 function lane(docs) {
@@ -128,7 +107,7 @@ function lane(docs) {
 
   jetpack.write(path.join(cwd, 'connections', `${PROVIDER_ID}.js`), PROVIDER_SOURCE);
 
-  const { admin, writes } = recordingFirestore(docs || {});
+  const { admin, writes } = recordingFirestore({ docs: docs || {} });
 
   const omega = {
     cwd,
@@ -276,7 +255,7 @@ module.exports = defineCases({
         const write = writes.find((entry) => entry.path === `users/${OTHER_UID}` && entry.verb === 'set');
 
         assert.ok(write, "the new token landed on the PASSED user's document");
-        assert.equal(write.payload.connections[PROVIDER_ID].token.access_token, 'refreshed-782', 'and it is the refreshed token');
+        assert.equal(writtenRecord(write).token.access_token, 'refreshed-782', 'and it is the refreshed token');
         assert.equal(writes.some((entry) => entry.path === `users/${CALLER_UID}`), false, "and nothing landed on the admin's own — not even the lease");
       },
     },
@@ -300,7 +279,7 @@ module.exports = defineCases({
         const write = writes.find((entry) => entry.path === `users/${OTHER_UID}`);
 
         assert.ok(write, "the deletion hit the PASSED user's document");
-        assert.equal(`connections.${PROVIDER_ID}` in write.payload, true, 'and it is the provider entry that went');
+        assert.equal(writtenRecord(write)?.methodName, 'FieldValue.delete', `and it is the one account's record that went: ${JSON.stringify(write.payload)}`);
         assert.equal(writes.some((entry) => entry.path === `users/${CALLER_UID}`), false, "and nothing touched the admin's own");
       },
     },
@@ -406,10 +385,10 @@ module.exports = defineCases({
         assert.equal(tokenized.options.code, undefined, `the callback page's call still completes: ${tokenized.message}`);
         assert.equal(tokenized.message.success, true, 'reporting success');
 
-        const record = tokenizeLane.writes.find((entry) => entry.path === `users/${CALLER_UID}` && entry.verb === 'set');
+        const record = tokenizeLane.writes.find((entry) => entry.path === `users/${CALLER_UID}` && STORING.includes(entry.verb) && writtenRecord(entry));
 
-        assert.ok(record, "and the record landed on the state's user");
-        assert.equal(record.payload.connections[PROVIDER_ID].token.access_token, 'access-782', 'carrying the exchanged token');
+        assert.ok(record, "and the record landed on the state's user, under the identity id");
+        assert.equal(writtenRecord(record).token.access_token, 'access-782', 'carrying the exchanged token');
 
         // The refresh reads the record in its lease TRANSACTION
         // ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)), so the

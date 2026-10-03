@@ -14,13 +14,9 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { templateObject } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
+const { accountId: resolveAccountId } = require('../lib/account-id.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
-
-async function getAccountId(api, zoneId) {
-  const zone = await api.makeRequest(`/zones/${zoneId}`);
-  return zone.result.account.id;
-}
 
 function buildScriptFormData(scriptContent, env) {
   const formData = new FormData();
@@ -48,7 +44,7 @@ module.exports = async function ensureWorkers(context) {
   }
 
   // === READ ===
-  const accountId = await getAccountId(api, zoneId);
+  const accountId = await resolveAccountId(context);
   const workersResponse = await api.makeRequest(`/accounts/${accountId}/workers/scripts`);
   const existingWorkers = workersResponse.result || [];
   const routesResponse = await api.makeRequest(`/zones/${zoneId}/workers/routes`);

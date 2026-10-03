@@ -65,6 +65,7 @@ const { collectHeroAnimations } = require('./hero-animations.js');
 const { resolvePathPrefix, prefixCss } = require('./path-prefix.js');
 const { checkThemeVocabulary } = require('./theme-vocabulary.js');
 const { readFontMetricsFile, systemFontMetrics } = require('./font-metrics.js');
+const { readEntryOutputs } = require('./entry-outputs.js');
 
 // Variables
 const logger = new Logger('assets');
@@ -374,12 +375,10 @@ async function buildAssets(options) {
       },
     };
 
-    // The ONE esbuild wrapper (#736): @omega.js/devkit composes the shared parts
-    // — the framework-deps resolve hook, the production `@dev-only` strip, the
-    // minify/sourcemap rules, the timing line — so only web's own boot plugin
-    // and entry shape live here. `omega dev` rebuilds one-shot from its own
-    // source watcher (it watches layer roots the bundle graph never sees), so
-    // this is always mode 'build' with dev as the OUTPUT rule.
+    // devkit's bundle() composes the shared parts (deps hook, `@dev-only` strip,
+    // minify by mode, a source map in every mode, the timing line), so only the
+    // boot plugin and entry shape live here. `omega dev` rebuilds one-shot from
+    // its own source watcher: always mode 'build', with dev as the OUTPUT rule.
     const result = await bundle({
       frameworkRoot: FRAMEWORK_ROOT,
       entries: entryPoints,
@@ -403,16 +402,9 @@ async function buildAssets(options) {
       define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
     });
 
-    for (const [outFile, meta] of Object.entries(result.metafile.outputs)) {
-      if (!meta.entryPoint) continue;
-      const abs = meta.entryPoint.replace(/^omega-boot:/, '');
-      const spec = keyBySpecifier.get(path.resolve(abs)) || keyBySpecifier.get(abs);
-      if (!spec) continue;
-      const url = `/${path.relative(options.outDir, outFile)}`;
-      if (spec[0] === 'main') manifest.js.main = url;
-      else if (spec[0] === 'firstPaint') manifest.js.firstPaint = url;
-      else manifest.js[spec[0]][spec[1]][spec[2]] = url;
-    }
+    // Entry URLs, and `js.imports`: each entry's static chunks, the page's
+    // modulepreload list.
+    readEntryOutputs(result.metafile, options.outDir, keyBySpecifier, manifest.js);
 
     // ---- Orphaned page modules (#469): a consumer `js/pages/` file that is
     // neither an ENTRY nor an INPUT of one is dead code — the build stays green

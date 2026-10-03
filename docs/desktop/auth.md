@@ -177,7 +177,7 @@ keeps the user signed in; renderers then re-resolve the account and re-push it.
 }
 ```
 
-If `cloud.config` is empty/missing, `omega.auth` logs a warning and runs in no-op mode (`user` stays the signed-out `User`, everything else returns harmless defaults).
+Firebase boots only when `cloud.config` carries an `apiKey`, the rule @omega.js/client follows in every renderer. With no `apiKey` (a missing config, or the all-empty blob the default config ships), `omega.auth` logs one plain line at log level that Firebase is skipped, never loads or initializes Firebase, and runs in no-op mode (`user` stays the signed-out `User`, every IPC handler still answers, everything else returns harmless defaults).
 
 ## Firebase (bundled)
 

@@ -62,7 +62,9 @@ function createHarness() {
   const omega = {
     config: {},
     firebaseAuth: { currentUser: null },
-    firebaseFirestore: {},
+    // Firebase is configured (the app exists), and Firestore loads through the loader
+    firebaseApp: {},
+    loadFirebaseFirestore: async () => ({}),
     _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
     bindings: { update: (payload) => bindingsUpdates.push(payload) },
     storage: { set: (key, value) => storageWrites.push([key, value]), get: () => ({}) },
@@ -513,7 +515,9 @@ describe('Auth Module — pending vs denied account reads (#700)', () => {
     const omega = {
       config: {},
       firebaseAuth: { currentUser: null },
-      firebaseFirestore: {},
+      // Firebase is configured (the app exists), and Firestore loads through the loader
+      firebaseApp: {},
+      loadFirebaseFirestore: async () => ({}),
       _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
       bindings: { update: () => {} },
       storage: { set: () => {}, get: () => ({}) },

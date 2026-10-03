@@ -234,8 +234,8 @@ const ENV_SCHEMA = [
     delivery:    { web: 'ci', backend: 'env' },
     label:       'Cloudflare API token',
     url:         'https://dash.cloudflare.com/profile/api-tokens',
-    hint:        'Create a token with Zone edit on the brand zone; the DNS-writing flows and the zone nameserver read both use it',
-    description: 'Cloudflare API token with Zone edit — the edge service and every DNS-writing flow, plus the backend\'s cache-purge calls. The web build workflow\'s post-publish purge step reads it from the runner env, so the publish lane pushes it as a repo secret.',
+    hint:        'Create a token with Zone edit on the brand zone, plus Account Settings Write for Web Analytics; the DNS-writing flows and the zone nameserver read both use it',
+    description: 'Cloudflare API token with Zone edit, plus Account Settings Write for the edge service\'s Web Analytics site: the edge service and every DNS-writing flow use it, plus the backend\'s cache-purge calls. The web build workflow\'s post-publish purge step reads it from the runner env, so the publish lane pushes it as a repo secret.',
   },
   {
     name:        'NAMECHEAP_USERNAME',
@@ -353,7 +353,7 @@ const ENV_SCHEMA = [
     label:       'Sentry personal auth token',
     url:         'https://sentry.io/settings/account/api/auth-tokens/',
     hint:        'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write (organization tokens cannot create projects)',
-    description: 'Personal Sentry auth token with project+team write scopes — the monitoring service provisions projects and uploads source maps with it.',
+    description: 'Personal Sentry auth token with project+team write scopes: the monitoring service provisions projects with it. Source maps upload nowhere; they ship public beside the bundles.',
   },
   {
     name:        'SENDGRID_API_KEY',

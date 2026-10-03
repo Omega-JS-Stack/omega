@@ -86,7 +86,8 @@ async function main() {
       // A client that fails to boot never flips isReady; the boot's own
       // `Page module error:` line in page.log is the diagnosis
       await page.waitForFunction('window.__omega && window.__omega.isReady', { timeout: 30000 });
-      if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Emulators connected'))) {
+      // Auth connects at boot; Firestore connects inside its loader, on first use
+      if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Connecting the auth emulator'))) {
         throw new Error('client did not auto-connect to the emulators (dev mode must connect with zero flags — check [@omega.js/client:firebase] lines in page.log)');
       }
     });

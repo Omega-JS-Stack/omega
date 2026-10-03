@@ -123,12 +123,9 @@ function redactDataForLog(data) {
  * rendered by `redactSecret()`, at any depth and whatever its case.
  *
  * The route logger's `Sending response` line stringifies whatever a route
- * answers, and `GET /omega/user` answers the whole user record: every
- * `connections.<provider>.token` plus `api.privateKey` landed in Cloud Logging
- * on every read ([#796](https://github.com/Omega-JS-Stack/omega/issues/796)).
- * [#275](https://github.com/Omega-JS-Stack/omega/issues/275) gave the request
- * side of that line this treatment; this is the response side. A copy because
- * the object is what `res.json()` sends next.
+ * answers, and `GET /omega/user` answers the whole user record, every
+ * `connections.<provider>.<id>.token` and `api.privateKey` included. A copy,
+ * because the object is what `res.json()` sends next.
  * @param {*} response - Whatever respond() is about to send.
  * @returns {*} A copy safe to log; anything that is not an object passes through.
  */

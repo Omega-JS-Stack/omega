@@ -27,6 +27,7 @@
  */
 const { minify } = require('@minify-html/node');
 const esbuild = require('esbuild');
+const { BROWSER_TARGET } = require('@omega.js/devkit/browser-floor');
 
 // The option set. minify_js stays OFF: inline scripts are
 // extracted and esbuild-minified instead (minify-html's JS pass is buggy).
@@ -124,7 +125,7 @@ function minifyHtml(html) {
         return match;
       }
       try {
-        const minified = esbuild.transformSync(body, { minify: true }).code.trimEnd();
+        const minified = esbuild.transformSync(body, { minify: true, target: BROWSER_TARGET }).code.trimEnd();
         return `<script${attrs}>${minified}</script>`;
       } catch (error) {
         return match;

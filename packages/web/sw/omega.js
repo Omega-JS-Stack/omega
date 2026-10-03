@@ -43,8 +43,10 @@ function sitePath(url) {
 // this single flag re-enables it if an offline/caching lane ever lands.
 const CACHE_WARMING_ENABLED = false;
 
-// Build config — synchronous, top-level (importScripts cannot run later)
-importScripts(sitePath('/build.js'));
+// Build config: synchronous, top-level (importScripts cannot run later).
+// The stamp is the head's `?cb=` value, baked at build: the edge caches
+// /build.js for a year, so every loader must name its build.
+importScripts(`${sitePath('/build.js')}?cb=${__OMEGA_BUILD_STAMP__}`);
 
 // ⚠️ Global listeners BEFORE the Firebase imports — firebase-messaging
 // registers its own notificationclick handler, and ours must come first:

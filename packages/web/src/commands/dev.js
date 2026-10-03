@@ -34,6 +34,7 @@ const http = require('node:http');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
+const { refreshLiveManifest } = require('../live-manifest.js');
 const {
   CLASSIC_PORTS, isPortFree, resolvePorts, envPort,
   readSiblingPorts, writePortsFile, clearPortsFile,
@@ -232,11 +233,9 @@ module.exports = async function (options) {
     path.join(paths.src, '_components'),
   ].filter((dir) => fs.existsSync(dir));
 
-  // The rebuild folds back into the LIVE manifest (#765): the theme layers are
-  // watched here, so a theme's @font-face edit rebuilds the sheet — and the
-  // preload list it carries has to reach the served head, not wait for an
-  // unrelated template edit. The manifest file is the courier (see the
-  // watch target registered with Eleventy below).
+  // A rebuild folds its content lists (the font preloads, `js.imports`) into
+  // the LIVE manifest, so the served head never waits on an unrelated edit.
+  // The manifest file is the courier (the watch target registered below).
   watchAssetSources({
     dirs: watchDirs,
     clientDist: path.dirname(clientEntry),
@@ -279,11 +278,9 @@ module.exports = async function (options) {
     configPath: false,
     config: (eleventyConfig) => {
       eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts));
-      // The asset manifest is a template INPUT (the head reads its css/js URLs
-      // and its font preloads), and the asset watcher rewrites it when the
-      // preload list moves (#765). Watching the file is what re-renders the
-      // head then — no config reset, because the engine holds the manifest
-      // object by reference and the rebuild already updated it.
+      // The asset manifest is a template INPUT (its URLs, font preloads and
+      // `js.imports`), rewritten when a rebuild moves either list. Watching the
+      // file re-renders with no config reset: the engine holds the object.
       eleventyConfig.addWatchTarget(paths.manifest);
       // Arms the watch registration for the config build below — the engine's
       // captured reads are what fill it in (#200). The reset union goes to
@@ -499,28 +496,16 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
 }
 
 /**
- * The ASSET lane's source watchers: one recursive fs.watch per asset source
- * dir, all feeding ONE debounced rebuild.
- *
- * Narrowed rebuilds: a css-only change set rebuilds just the stylesheets — no
- * js files are rewritten, so the dev server HOT-SWAPS the css without a page
- * reload. js changes rebuild js (full reload — scripts need one), and an
- * unknown/mixed set rebuilds everything.
- *
- * @omega.js/client's dist rides the same lane (#378). It reaches the bundle
- * through the `@omega.js/client` alias, resolved once at boot — so without it
- * here a client edit rebuilt the client's dist and stopped, and the site served
- * its boot-time bytes until an unrelated asset edit or a stack restart.
+ * The ASSET lane's source watchers: one recursive fs.watch per asset source dir
+ * and the @omega.js/client dist, feeding ONE debounced rebuild. A css-only
+ * change set hot-swaps the stylesheets; anything else rebuilds js and reloads.
  * @param {object} options
  * @param {string[]} options.dirs - the asset source dirs (existing ones only)
  * @param {string} [options.clientDist] - the resolved @omega.js/client dist dir
  * @param {function} options.build - (only) => Promise, the dev asset rebuild
- * @param {object} [options.manifest] - the LIVE manifest the engine renders
- *   from; given with manifestPath, a rebuild that moved the font preload list
- *   folds into it and rewrites the file (#765)
- * @param {string} [options.manifestPath] - where that manifest is written
- * @returns {{ close: function }} the live watchers (the dev loop keeps them for
- *   the life of the process; tests close them)
+ * @param {object} [options.manifest] - the LIVE manifest: a moved font preload or `js.imports` list folds in
+ * @param {string} [options.manifestPath] - where that manifest is written, again on a fold
+ * @returns {{ close: function }} the live watchers (tests close them)
  */
 function watchAssetSources(options) {
   let timer = null;
@@ -539,12 +524,9 @@ function watchAssetSources(options) {
       const only = kinds.size === 1 && !kinds.has('other') ? kinds.values().next().value : undefined;
       options.build(only)
         .then((next) => {
-          // #765: the head's font preloads are manifest CONTENT, not a stable
-          // dev URL, so a rebuild that moved them has to reach the browser.
-          // The list folds into the live manifest (the engine holds it by
-          // reference) and the manifest FILE is rewritten — Eleventy watches
-          // that file, so its re-render happens AFTER this build rather than
-          // racing it, and only when the head's list actually moved.
+          // The font preloads and `js.imports` are manifest CONTENT: a moved list
+          // folds into the live manifest and the FILE is rewritten, so Eleventy
+          // re-renders after this build, never racing it, and only on a change.
           if (options.manifest && options.manifestPath && refreshLiveManifest(options.manifest, next)) {
             jetpack.write(options.manifestPath, JSON.stringify(options.manifest, null, 2));
           }
@@ -570,32 +552,6 @@ function watchAssetSources(options) {
       watchers.forEach((watcher) => watcher.close());
     },
   };
-}
-
-/**
- * Fold a rebuild's manifest back into the LIVE one the engine renders from
- * (#765). Dev hands Eleventy the boot manifest by reference, which is right
- * for every asset URL — dev names are stable, so a rebuilt bundle keeps its
- * URL. The font preload list is different: it is CONTENT (the first-paint
- * faces the compiled sheet declares), so a theme's @font-face edit has to
- * reach the next render instead of the boot capture.
- *
- * A js-only rebuild returns before the css lane and carries no list, so it
- * leaves the live one alone; a css rebuild replaces it, an emptied list
- * included. The answer is whether the list MOVED — the caller rewrites the
- * manifest file on a change, and that file is what makes Eleventy re-render
- * (see watchAssetSources), so an unchanged list must not trigger one.
- * @param {object} manifest - the live manifest the engine holds
- * @param {object} next - what the rebuild returned
- * @returns {boolean} whether the preload list changed
- */
-function refreshLiveManifest(manifest, next) {
-  const preloads = next && next.fontPreloads;
-  if (!preloads || JSON.stringify(preloads) === JSON.stringify(manifest.fontPreloads)) return false;
-
-  manifest.fontPreloads = preloads;
-
-  return true;
 }
 
 /**
@@ -1056,7 +1012,6 @@ module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
 module.exports.watchAssetSources = watchAssetSources;
 module.exports.watchEnvSources = watchEnvSources;
-module.exports.refreshLiveManifest = refreshLiveManifest;
 module.exports.watchRescanTargets = watchRescanTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 module.exports.devWebsiteOrigin = devWebsiteOrigin;

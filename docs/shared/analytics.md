@@ -318,6 +318,9 @@ which is what changing what a category COVERS requires.
   consent system and the raw-API recovery lane (which mints orders with no client anywhere
   near them) carry no snapshot at all, and refusing to report their revenue would be a
   silent accounting hole rather than a privacy win.
+- **Cloudflare Web Analytics sits OUTSIDE this gate.** Its beacon is injected by the edge, not
+  loaded by the page, so no consent answer reaches it; it is on or off per zone through
+  `edge.providers.cloudflare.webAnalytics.enabled` ([docs/manager/edge.md](../manager/edge.md)).
 
 **The `consent` name is taken.** `consent` in storage and in the signup payload is the
 signup form's LEGAL record (`{ legal, marketing }`, captured by

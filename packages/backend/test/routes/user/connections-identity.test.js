@@ -34,6 +34,7 @@ const spotify = require('../../../dist/omega/routes/user/connections/providers/s
 const twitch = require('../../../dist/omega/routes/user/connections/providers/twitch.js');
 const kick = require('../../../dist/omega/routes/user/connections/providers/kick.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const { recordingFirestore } = require('../../helpers/_recording-firestore.js');
 
 const PROVIDER_ID = 'identity-fixture-793';
 const OWNER_UID = 'owner-793';
@@ -51,33 +52,6 @@ function providerSource({ identity = `{ id: '${IDENTITY_ID}', name: 'Fixture Use
     `  async identity() { return ${identity}; },`,
     '};',
   ].join('\n');
-}
-
-/**
- * A Firestore stand-in: documents by path, a recorded `where` query over
- * `users`, and every write kept.
- */
-function recordingFirestore({ docs = {}, matches = [] } = {}) {
-  const writes = [];
-  const queries = [];
-
-  const firestore = {
-    doc: (docPath) => ({
-      path: docPath,
-      get: async () => ({ exists: !!docs[docPath], data: () => docs[docPath] }),
-      update: async (payload) => writes.push({ verb: 'update', path: docPath, payload }),
-      set: async (payload) => writes.push({ verb: 'set', path: docPath, payload }),
-    }),
-    collection: (name) => ({
-      where: (field, operator, value) => {
-        queries.push({ collection: name, field, operator, value });
-
-        return { get: async () => ({ docs: matches, size: matches.length }) };
-      },
-    }),
-  };
-
-  return { admin: { firestore: () => firestore }, writes, queries };
 }
 
 /** The lane, wired: a brand provider dir, a recording Firestore, and a ctx. */
@@ -131,7 +105,7 @@ async function tokenize(options) {
 
 /** A matched user document, as a query snapshot carries it. */
 function matchedDoc(uid) {
-  return { id: uid, data: () => ({ connections: { [PROVIDER_ID]: { identity: { id: IDENTITY_ID } } } }) };
+  return { id: uid, data: () => ({ connections: { [PROVIDER_ID]: { [IDENTITY_ID]: { identity: { id: IDENTITY_ID } } } } }) };
 }
 
 /** A JWT with the given payload — Google's id_token, as jwt-decode reads it. */
@@ -157,10 +131,10 @@ module.exports = defineCases({
         assert.equal(run.answer.options.code, undefined, `a user reconnecting is not a conflict: ${run.answer.message}`);
         assert.equal(run.answer.message.success, true, 'the exchange completes');
 
-        const stored = run.writes.find((write) => write.path === `users/${OWNER_UID}` && write.verb === 'set');
+        const stored = run.writes.find((write) => write.path === `users/${OWNER_UID}` && write.payload.connections);
 
         assert.ok(stored, 'and the record is written');
-        assert.equal(stored.payload.connections[PROVIDER_ID].identity.id, IDENTITY_ID, 'with the identity the provider answered');
+        assert.equal(stored.payload.connections[PROVIDER_ID][IDENTITY_ID].identity.id, IDENTITY_ID, 'under the identity the provider answered');
       },
     },
 
@@ -171,12 +145,15 @@ module.exports = defineCases({
         const run = await tokenize({ matches: [] });
 
         assert.equal(run.queries.length, 1, `ONE query, whatever the answer: ${JSON.stringify(run.queries)}`);
-        assert.deepEqual(run.queries[0], {
-          collection: 'users',
-          field: `connections.${PROVIDER_ID}.identity.id`,
-          operator: '==',
-          value: IDENTITY_ID,
-        }, 'on the stored identity id, per provider');
+        // The id is a map key, so the field is a FieldPath (an id may carry a `.`)
+        const { field, ...rest } = run.queries[0];
+
+        assert.deepEqual(rest, { collection: 'users', operator: '==', value: IDENTITY_ID }, 'an equality on the identity id');
+        assert.deepEqual(
+          typeof field === 'string' ? field.split('.') : field.segments,
+          ['connections', PROVIDER_ID, IDENTITY_ID, 'identity', 'id'],
+          'on the stored identity id, at its own record under the provider',
+        );
       },
     },
 

@@ -204,4 +204,38 @@ function buildInitOptions(params) {
   };
 }
 
-module.exports = { buildInitOptions, isLighthouse, isAutomatedBrowser, scrubAuthParams };
+/**
+ * Install the early-error buffer on a window: `win.__OMEGA_EARLY_ERRORS` keeps
+ * every `error` and `unhandledrejection` event until the SDK loads and the
+ * client replays it. Idempotent: a page that already has the array keeps it
+ * and gains no second set of listeners. `buffer.stop()` removes the listeners.
+ *
+ * Self-contained on purpose: the web head inlines this function's source text,
+ * so it reads nothing from this module's scope.
+ *
+ * @param {Window} win - the window to listen on
+ * @returns {Array} the buffer
+ */
+function installEarlyErrorBuffer(win) {
+  if (win.__OMEGA_EARLY_ERRORS) {
+    return win.__OMEGA_EARLY_ERRORS;
+  }
+
+  const buffer = [];
+  const record = (event) => buffer.push(event);
+
+  win.addEventListener('error', record);
+  win.addEventListener('unhandledrejection', record);
+  Object.defineProperty(buffer, 'stop', {
+    value: () => {
+      win.removeEventListener('error', record);
+      win.removeEventListener('unhandledrejection', record);
+    },
+  });
+
+  win.__OMEGA_EARLY_ERRORS = buffer;
+
+  return buffer;
+}
+
+module.exports = { buildInitOptions, isLighthouse, isAutomatedBrowser, scrubAuthParams, installEarlyErrorBuffer };

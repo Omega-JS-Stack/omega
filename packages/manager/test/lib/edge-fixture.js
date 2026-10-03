@@ -11,6 +11,8 @@ const { makeBrandRoot } = require('./config-fixture.js');
 const DOMAIN = 'fixture-brand.test';
 const ZONE = { id: 'zone-1', name: DOMAIN, status: 'active' };
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const ACCOUNT_ID = 'acct-1';
+const RUM_SITES = `/accounts/${ACCOUNT_ID}/rum/site_info`;
 
 // The zone ensure lands the resolved zone id in omega.json5, so a fixture
 // root has to be a real brand root
@@ -35,6 +37,14 @@ function brandConfig(url = `https://${DOMAIN}`) {
   return templateObject(config, { domain: url.replace(/^https?:\/\//, '') });
 }
 
+/** A paged list answer: fakeApi returns its `result_info` beside the result. */
+class Page {
+  constructor(result, resultInfo) {
+    this.result = result;
+    this.resultInfo = resultInfo;
+  }
+}
+
 /**
  * Recording fake CloudflareAPI. `responses` maps "METHOD endpoint" to a
  * result (or a function: throw inside it to simulate API errors). Missing
@@ -56,7 +66,11 @@ function fakeApi({ zones = [], responses = {} } = {}) {
     if (responder === undefined) {
       throw new Error(`fakeApi: no response for "${method} ${endpoint}"`);
     }
-    return { success: true, result: typeof responder === 'function' ? responder() : responder };
+    const answer = typeof responder === 'function' ? responder() : responder;
+    if (answer instanceof Page) {
+      return { success: true, result: answer.result, result_info: answer.resultInfo };
+    }
+    return { success: true, result: answer };
   };
 
   api.getZoneByName = async (name) => zones.find((z) => z.name === name) || null;
@@ -97,6 +111,78 @@ function runService(config, api, options = {}, brandRoot = tmpRoot()) {
   });
 }
 
+/**
+ * A Web Analytics site in the shape Cloudflare's list returns: the zone it
+ * serves and its on/off switch live on its `ruleset`, not at the top level.
+ */
+function rumSite({ siteTag, zoneTag = ZONE.id, zoneName = DOMAIN, enabled }) {
+  return {
+    site_tag: siteTag,
+    site_token: `${siteTag}-token`,
+    auto_install: true,
+    created: '2026-01-01T00:00:00Z',
+    rules: [],
+    ruleset: { id: `${siteTag}-ruleset`, enabled, zone_name: zoneName, zone_tag: zoneTag },
+    snippet: '',
+  };
+}
+
+// A Cloudflare failure as the real client throws it: the errors array in the
+// message, the HTTP status on `status`
+function apiError(errors, status) {
+  const error = new Error(`Cloudflare API Error: ${JSON.stringify(errors)}`);
+  error.status = status;
+  return error;
+}
+
+// A token missing a permission: Cloudflare answers 403 with code 10000
+function forbidden() {
+  throw apiError([{ code: 10000, message: 'Authentication error' }], 403);
+}
+
+// A 403 known only by its HTTP status, with no code 10000 text
+function forbiddenByStatus() {
+  throw apiError([{ code: 9109, message: 'Unauthorized to access requested resource' }], 403);
+}
+
+function serverError() {
+  throw apiError([{ code: 10001, message: 'Internal server error' }], 500);
+}
+
+/**
+ * The three account-level Web Analytics endpoints: the list, the create, and
+ * an update per listed site. `pages` (arrays of sites) pages the list by
+ * `?page=N` with Cloudflare's `result_info`, in place of a one-page `sites`.
+ * `forbidden` makes all three answer 403: `true` with code 10000, 'status'
+ * with another code. `writeError` makes the create and updates answer 500.
+ */
+function rumResponses({ sites = [], pages = null, forbidden: denied = false, writeError = false } = {}) {
+  const denial = denied === 'status' ? forbiddenByStatus : forbidden;
+  const answer = (value) => (denied ? denial : () => structuredClone(value));
+  const write = (value) => (writeError && !denied ? serverError : answer(value));
+  const responses = {
+    [`POST ${RUM_SITES}`]: write(rumSite({ siteTag: 'site-created', enabled: true })),
+  };
+
+  if (pages) {
+    const total = pages.flat().length;
+    pages.forEach((page, i) => {
+      const info = { page: i + 1, per_page: page.length, count: page.length, total_count: total, total_pages: pages.length };
+      // structuredClone drops the class, so each answer builds its own Page
+      const listed = denied ? denial : () => new Page(structuredClone(page), info);
+      responses[`GET ${RUM_SITES}/list?page=${i + 1}`] = listed;
+      if (i === 0) responses[`GET ${RUM_SITES}/list`] = listed;
+    });
+  } else {
+    responses[`GET ${RUM_SITES}/list`] = answer(sites);
+  }
+
+  for (const site of pages ? pages.flat() : sites) {
+    responses[`PUT ${RUM_SITES}/${site.site_tag}`] = write(site);
+  }
+  return responses;
+}
+
 /** Every read a fully-converged default-config zone answers. */
 function convergedResponses(config) {
   const cacheRules = config.edge.providers.cloudflare.cacheRules;
@@ -105,7 +191,10 @@ function convergedResponses(config) {
   const csp = config.edge.providers.cloudflare.rules.responseHeaders[0].headers['Content-Security-Policy'];
 
   return {
-    'GET /accounts': [{ id: 'acct-1' }],
+    'GET /accounts': [{ id: ACCOUNT_ID }],
+    'GET /zones/zone-1': { ...ZONE, account: { id: ACCOUNT_ID, name: 'Fixture Account' } },
+    // The framework default keeps Web Analytics on, so the zone's site is enabled
+    [`GET ${RUM_SITES}/list`]: [rumSite({ siteTag: 'site-1', enabled: true })],
     'GET /zones/zone-1/dns_records': [
       { id: 'r1', type: 'A', name: DOMAIN, content: '185.199.108.153', proxied: true, comment: 'GitHub Pages IP' },
       { id: 'r2', type: 'AAAA', name: DOMAIN, content: '2606:50c0:8000::153', proxied: true, comment: 'GitHub Pages IP' },
@@ -178,4 +267,7 @@ function convergedResponses(config) {
   };
 }
 
-module.exports = { DOMAIN, ZONE, tmpRoot, brandConfig, fakeApi, handlerContext, runService, convergedResponses };
+module.exports = {
+  DOMAIN, ZONE, ACCOUNT_ID, RUM_SITES, tmpRoot, brandConfig, fakeApi, handlerContext, runService,
+  convergedResponses, rumSite, rumResponses,
+};

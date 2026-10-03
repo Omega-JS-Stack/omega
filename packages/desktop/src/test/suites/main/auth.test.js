@@ -7,6 +7,74 @@
 const { User } = require('@omega.js/account');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
+// The identity tag LoggerLite puts first on every console line the auth logger writes
+const AUTH_TAG = '[@omega.js/desktop:auth]';
+
+// The two cloud configs that carry no apiKey: an empty object, and the
+// default config's all-empty-strings shape
+const NO_API_KEY_CONFIGS = [
+  {},
+  {
+    apiKey:            '',
+    authDomain:        '',
+    databaseURL:       '',
+    projectId:         '',
+    storageBucket:     '',
+    messagingSenderId: '',
+    appId:             '',
+    measurementId:     '',
+  },
+];
+
+// Re-run auth.initialize on the real omega with `cloudConfig` as cloud.config,
+// from a fresh state (uninitialized, Firebase unloaded), then put every field back.
+// Answers the warn- and error-level lines the auth logger wrote during initialize,
+// what it left in `_firebase` and `_firebaseAuth`, and handleToken('x') in that state.
+async function initializeWithCloudConfig(ctx, cloudConfig) {
+  const auth = ctx.omega.auth;
+  const cloud = ctx.omega.config.cloud;
+  const saved = {
+    config:       cloud.config,
+    initialized:  auth._initialized,
+    firebase:     auth._firebase,
+    firebaseAuth: auth._firebaseAuth,
+    module:       auth._firebaseModule,
+  };
+  const realWarn = console.warn;
+  const realError = console.error;
+  const lines = [];
+  const capture = (level) => (...args) => {
+    if (args[0] === AUTH_TAG) lines.push(`${level}: ${args.slice(1).join(' ')}`);
+  };
+
+  auth._initialized = false;
+  auth._firebase = null;
+  auth._firebaseAuth = null;
+  auth._firebaseModule = null;
+  cloud.config = cloudConfig;
+  console.warn = capture('warn');
+  console.error = capture('error');
+  try {
+    await auth.initialize(ctx.omega);
+    console.warn = realWarn;
+    console.error = realError;
+    return {
+      lines,
+      firebase:     auth._firebase,
+      firebaseAuth: auth._firebaseAuth,
+      token:        await auth.handleToken('x'),
+    };
+  } finally {
+    console.warn = realWarn;
+    console.error = realError;
+    cloud.config = saved.config;
+    auth._initialized = saved.initialized;
+    auth._firebase = saved.firebase;
+    auth._firebaseAuth = saved.firebaseAuth;
+    auth._firebaseModule = saved.module;
+  }
+}
+
 module.exports = defineCases({
   type: 'suite',
   layer: 'main',
@@ -22,6 +90,29 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'initialize with no cloud apiKey writes no warn or error line',
+      run: async (ctx) => {
+        for (const cloudConfig of NO_API_KEY_CONFIGS) {
+          const { lines } = await initializeWithCloudConfig(ctx, cloudConfig);
+          ctx.expect(lines, `cloud.config ${JSON.stringify(cloudConfig)}`).toEqual([]);
+        }
+      },
+    },
+    {
+      name: 'initialize with no cloud apiKey never loads Firebase',
+      run: async (ctx) => {
+        for (const cloudConfig of NO_API_KEY_CONFIGS) {
+          const label = `cloud.config ${JSON.stringify(cloudConfig)}`;
+          const { firebase, firebaseAuth, token } = await initializeWithCloudConfig(ctx, cloudConfig);
+          ctx.expect(firebase == null, `${label}: _firebase`).toBe(true);
+          ctx.expect(firebaseAuth, `${label}: _firebaseAuth`).toBeNull();
+          ctx.expect(token, label).toEqual({ success: false, reason: 'firebase-not-loaded' });
+        }
+      },
+    },
+    {
+      // The harness booted on the default config, which has no apiKey, so these
+      // are the handlers the no-apiKey branch of initialize registered
       name: 'IPC handlers are registered',
       run: (ctx) => {
         ctx.expect(ctx.omega.ipc.hasHandler('desktop:auth:sync-request')).toBe(true);
@@ -68,7 +159,7 @@ module.exports = defineCases({
     {
       name: 'handleToken returns no-op result when firebase not loaded',
       run: async (ctx) => {
-        // Default config has empty cloud.config → firebase fails to init → _firebaseAuth=null.
+        // The default config has no apiKey, so the harness boot skipped Firebase: _firebaseAuth=null.
         if (ctx.omega.auth._firebaseAuth) {
           ctx.skip('firebase did load (cloud.config was set) — covered by integration tests');
         }

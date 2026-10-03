@@ -89,12 +89,22 @@
 <!-- JS bundles: ESM with code splitting — @omega.js/client + the boot runtime live
      in a shared chunk both bundles import, so the singleton initializes once.
      Module scripts are deferred and execute in document order: main (bootMain)
-     always runs before the page module (bootPage). -->
+     always runs before the page module (bootPage).
+     Each entry's static chunks are preloaded beside it (modulePreloads, from
+     the manifest's js.imports), so the browser fetches the whole chain at once
+     instead of one hop per round trip; a chunk two entries share is linked
+     once, and a chunk only import() reaches is never linked. -->
+{% for chunk in modulePreloads[assetManifest.js.main] %}
+<link rel="modulepreload" href="{{ chunk }}"/>
+{% endfor %}
 <script type="module" src="{{ assetManifest.js.main }}"></script>
 
 <!-- Layout modules: one per layout in this page's chain, outermost first
      (js/layouts/<layout>.js) -->
 {% for layoutJs in layoutAssets.js %}
+  {% for chunk in modulePreloads[layoutJs] %}
+  <link rel="modulepreload" href="{{ chunk }}"/>
+  {% endfor %}
   <script type="module" src="{{ layoutJs }}"></script>
 {% endfor %}
 
@@ -103,6 +113,9 @@
      always runs, the theme decorates, the consumer adds; module scripts execute
      in document order, so the list order IS the run order. -->
 {% for pageJs in pageAssets.js %}
+  {% for chunk in modulePreloads[pageJs] %}
+  <link rel="modulepreload" href="{{ chunk }}"/>
+  {% endfor %}
   <script type="module" src="{{ pageJs }}"></script>
 {% endfor %}
 

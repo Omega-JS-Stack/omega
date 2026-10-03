@@ -61,6 +61,28 @@ let _electronLog = null;
 let _logFilePath = null;
 let _initAttempted = false;
 
+// With the single-instance lock off, several launches append to one runtime.log,
+// so every file line carries its process id. Main sets this once the config resolves.
+let _lockOff = false;
+
+function fileFormat() {
+  const pid = _lockOff ? ` [pid ${process.pid}]` : '';
+  return `[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]${pid} {scope} {text}`;
+}
+
+// runtime.log's size before this launch wrote to it: the bytes past it are this
+// launch's own, which the lock holder keeps when it clears earlier launches.
+let _bootSize = 0;
+
+function recordBootSize() {
+  try {
+    _bootSize = require('fs').statSync(_logFilePath).size;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    _bootSize = 0;
+  }
+}
+
 // Attempt to wire up the file transport. Lazy + idempotent — first log() call from
 // main triggers init. Renderer skips this entirely.
 function ensureMainFileTransport() {
@@ -103,6 +125,7 @@ function ensureMainFileTransport() {
   }
 
   _logFilePath = path.join(logsDir, 'runtime.log');
+  recordBootSize();
 
   // Configure electron-log:
   //   - file transport writes to runtime.log (resolved above)
@@ -115,7 +138,7 @@ function ensureMainFileTransport() {
 
   // Time format: 24-hour HH:MM:SS.ms — readable + grep-friendly. electron-log
   // accepts moment-style tokens; this matches what we already print interactively.
-  log.transports.file.format    = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {scope} {text}';
+  log.transports.file.format    = fileFormat();
   log.transports.console.format = '[{h}:{i}:{s}.{ms}] [{level}] {scope} {text}';
 
   // Listen for renderer/preload log forwards. The preload-side LoggerLite sends an
@@ -243,6 +266,40 @@ Logger.getLogFilePath = function () {
   return _logFilePath;
 };
 
+// Main tells the logger the lock state once the config resolves (the answer of
+// protocol.singleInstanceOff). A transport already set up takes the new format at once.
+Logger.setSingleInstanceOff = function (off) {
+  _lockOff = off;
+  if (_electronLog) {
+    _electronLog.transports.file.format = fileFormat();
+  }
+};
+
+// Main calls this once the lock is answered. Lock on and held: this launch owns
+// runtime.log, so earlier launches' lines go and its own, from boot on, stay.
+// A duplicate (lock not held) or a lock-off launch leaves the file alone.
+Logger.clearEarlierLaunches = function (lockHeld) {
+  const filePath = Logger.getLogFilePath();
+  if (_lockOff || !lockHeld || !_electronLog) return;
+
+  // A missing logs folder means nothing to clear; any other failure is said.
+  const fs = require('fs');
+  try {
+    const content = fs.readFileSync(filePath);
+    // Shorter than the boot point: the file rotated since boot, so it is all this launch's
+    const own = content.subarray(content.length < _bootSize ? 0 : _bootSize);
+    // The transport's clear also resets its size count for rotation, and says its own failure
+    if (_electronLog.transports.file.getFile().clear()) {
+      fs.appendFileSync(filePath, own);
+      _bootSize = 0;
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      new Logger('logger-lite').warn(`runtime.log not cleared at boot: ${e.message}`);
+    }
+  }
+};
+
 // IPC channel name — exposed for tests + preload's contextBridge wiring.
 Logger.FORWARD_CHANNEL = FORWARD_CHANNEL;
 
@@ -250,6 +307,7 @@ Logger.FORWARD_CHANNEL = FORWARD_CHANNEL;
 // without simulating Electron startup.
 Logger._internals = {
   ensureMainFileTransport,
+  recordBootSize,
   serializeArgs,
   tryForwardToMain,
   isMain,

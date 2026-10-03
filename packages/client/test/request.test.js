@@ -1,5 +1,9 @@
 const { describe, it, before, afterEach } = require('node:test');
+const http = require('node:http');
 const { assert } = require('./helpers.js');
+
+// Node's own fetch, kept before any case swaps or deletes the global.
+const realFetch = global.fetch;
 
 // createRequest is pure wiring (deps-injected) — testable without the singleton.
 // The real-wire proof (live emulator, real backend, real omega-properties) is
@@ -166,6 +170,64 @@ describe('Request Module', () => {
     });
 
     await request('/omega/payments/intent', { wakeup: true });
+  });
+
+  it('a browser with no AbortSignal.timeout still aborts a timed-out request, on time', async () => {
+    // A real server that takes the request and never answers it.
+    const received = [];
+    const server = http.createServer((req) => received.push(req.url));
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${server.address().port}/never`;
+
+    const original = AbortSignal.timeout;
+    delete AbortSignal.timeout;
+    global.fetch = realFetch;
+    try {
+      const request = createRequest({ getApiUrl: () => 'unused', getIdToken: () => null });
+      const started = Date.now();
+      const error = await request(url, { auth: false, timeout: 200 }).catch((e) => e);
+      const elapsed = Date.now() - started;
+
+      assert(error instanceof Error, 'the request rejected');
+      assert(['AbortError', 'TimeoutError'].includes(error.name), `an abort, not a ${error.name}: ${error.message}`);
+      assert.deepStrictEqual(received, ['/never'], 'the request reached the server before it aborted');
+      assert(elapsed >= 150 && elapsed < 2000, `aborted at the timeout, took ${elapsed}ms`);
+    } finally {
+      AbortSignal.timeout = original;
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  it('a browser with no AbortSignal.timeout still aborts a body that never finishes, on time', async () => {
+    // Headers at once, then a body that never ends: the fetch resolves, and
+    // only the signal still armed through the body read can end the request.
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.write('partial');
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${server.address().port}/stalled`;
+
+    const original = AbortSignal.timeout;
+    delete AbortSignal.timeout;
+    global.fetch = realFetch;
+    let hang;
+    try {
+      const request = createRequest({ getApiUrl: () => 'unused', getIdToken: () => null });
+      const started = Date.now();
+      const stalled = new Promise((resolve) => { hang = setTimeout(() => resolve(new Error('HUNG')), 3000); });
+      const error = await Promise.race([request(url, { auth: false, timeout: 200 }).then(() => new Error('RESOLVED'), (e) => e), stalled]);
+      const elapsed = Date.now() - started;
+
+      assert(['AbortError', 'TimeoutError'].includes(error.name), `an abort, not ${error.name}: ${error.message}`);
+      assert(elapsed >= 150 && elapsed < 2000, `aborted at the timeout, took ${elapsed}ms`);
+    } finally {
+      clearTimeout(hang);
+      AbortSignal.timeout = original;
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
   it('should throw on non-ok responses with code, message, and data attached', async () => {

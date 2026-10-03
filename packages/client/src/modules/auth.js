@@ -212,10 +212,10 @@ class Auth {
     let document = {};
     let denied = false;
 
-    // Fetch the account document if the user is logged in and Firestore is
-    // available (every failure but a denied read is captured inside
+    // Fetch the account document if the user is logged in and Firebase is
+    // configured (every failure but a denied read is captured inside
     // _getAccountData and degrades to null)
-    if (firebaseUser && this.omega.firebaseFirestore) {
+    if (firebaseUser && this.omega.firebaseApp) {
       try {
         document = (await this._getAccountData(firebaseUser.uid)) || {};
       } catch (error) {
@@ -423,13 +423,14 @@ class Auth {
   // the User constructor)
   async _getAccountData(uid) {
     try {
-      if (!this.omega.firebaseFirestore) {
+      if (!this.omega.firebaseApp) {
         return null;
       }
 
+      const firestore = await this.omega.loadFirebaseFirestore();
       const { doc, getDoc } = await import('firebase/firestore');
 
-      const accountDoc = doc(this.omega.firebaseFirestore, 'users', uid);
+      const accountDoc = doc(firestore, 'users', uid);
       const snapshot = await getDoc(accountDoc);
 
       if (snapshot.exists()) {

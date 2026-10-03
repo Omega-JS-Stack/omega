@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildInitOptions, scrubAuthParams } = require('../src/browser.js');
+const { buildInitOptions, scrubAuthParams, installEarlyErrorBuffer } = require('../src/browser.js');
 
 const DSN = 'https://key@o1.ingest.sentry.io/1';
 
@@ -188,4 +188,79 @@ test('a host can add its own tags per event', () => {
 
   const sent = quiet(() => options.beforeSend(frameworkEvent(), {}));
   assert.strictEqual(sent.tags['page.id'], 'checkout');
+});
+
+// A page's window that records its listeners, set as the global for the call,
+// since the head inlines the same function to run against the real one.
+function onPage(fn) {
+  const listeners = {};
+  const page = {
+    addEventListener: (type, handler) => { (listeners[type] = listeners[type] || []).push(handler); },
+    removeEventListener: (type, handler) => {
+      listeners[type] = (listeners[type] || []).filter((registered) => registered !== handler);
+    },
+  };
+  const saved = globalThis.window;
+
+  globalThis.window = page;
+  try {
+    return fn(page, listeners);
+  } finally {
+    globalThis.window = saved;
+  }
+}
+
+// Whether a buffered entry holds the thrown value, itself or one level down
+const holds = (entry, value) => entry === value || Object.values(entry || {}).some((field) => (
+  field === value || (field !== null && typeof field === 'object' && Object.values(field).includes(value))
+));
+
+test('the early-error buffer fills window.__OMEGA_EARLY_ERRORS with errors and rejections', () => {
+  onPage((page, listeners) => {
+    installEarlyErrorBuffer(page);
+
+    assert.ok(Array.isArray(page.__OMEGA_EARLY_ERRORS), 'the buffer is an array on the window');
+    assert.strictEqual(page.__OMEGA_EARLY_ERRORS.length, 0);
+
+    const thrown = new Error('thrown early');
+    const rejected = new Error('rejected early');
+    (listeners.error || []).forEach((handler) => handler({ type: 'error', error: thrown, message: thrown.message }));
+    (listeners.unhandledrejection || []).forEach((handler) => handler({ type: 'unhandledrejection', reason: rejected }));
+
+    assert.strictEqual(page.__OMEGA_EARLY_ERRORS.length, 2, 'one entry per event');
+    assert.ok(page.__OMEGA_EARLY_ERRORS.some((entry) => holds(entry, thrown)), 'the error is kept');
+    assert.ok(page.__OMEGA_EARLY_ERRORS.some((entry) => holds(entry, rejected)), 'the rejection is kept');
+  });
+});
+
+test('a second install of the early-error buffer adds no second listener set', () => {
+  onPage((page, listeners) => {
+    installEarlyErrorBuffer(page);
+    const buffer = page.__OMEGA_EARLY_ERRORS;
+    buffer.push('already caught');
+
+    installEarlyErrorBuffer(page);
+
+    assert.strictEqual((listeners.error || []).length, 1, 'one error listener');
+    assert.strictEqual((listeners.unhandledrejection || []).length, 1, 'one rejection listener');
+    assert.strictEqual(page.__OMEGA_EARLY_ERRORS, buffer, 'and the buffer, with what it caught, is kept');
+    assert.deepEqual(buffer, ['already caught']);
+  });
+});
+
+test('a stopped early-error buffer hears no more events', () => {
+  onPage((page, listeners) => {
+    installEarlyErrorBuffer(page);
+    const buffer = page.__OMEGA_EARLY_ERRORS;
+
+    buffer.stop();
+
+    const thrown = new Error('thrown after the stop');
+    (listeners.error || []).forEach((handler) => handler({ type: 'error', error: thrown, message: thrown.message }));
+    (listeners.unhandledrejection || []).forEach((handler) => handler({ type: 'unhandledrejection', reason: thrown }));
+
+    assert.strictEqual((listeners.error || []).length, 0, 'no error listener is left');
+    assert.strictEqual((listeners.unhandledrejection || []).length, 0, 'no rejection listener is left');
+    assert.strictEqual(buffer.length, 0, 'and nothing reached the buffer');
+  });
 });

@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { buildWith, miniData } = require('./lib/build.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const ENTRY = path.join(CORE_DIR, 'js', 'core', 'complete.js');
@@ -62,9 +63,15 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** The <html> the module touches, mid-load, recording every attribute write. */
-function makeDocumentElement() {
-  const attributes = { 'data-page-loading': 'true', 'aria-busy': 'true' };
+/**
+ * An element the module touches, mid-load, recording every attribute removal:
+ * the <html> carries the loading state, the <body> the busy flag.
+ *
+ * @param {object} initial - The attributes the root layout renders on it.
+ * @returns {object} The element.
+ */
+function makeElement(initial) {
+  const attributes = { ...initial };
   const removed = [];
 
   return {
@@ -85,15 +92,16 @@ function makeDocumentElement() {
  *
  * @param {object} options - The renderer to run under.
  * @param {boolean} options.framesFire - Whether a requested frame calls back on its own.
- * @returns {Promise<object>} The document element and the frame callbacks.
+ * @returns {Promise<object>} The document element, the body and the frame callbacks.
  */
 async function runCompletion({ framesFire }) {
   await bundleOnce();
 
-  const documentElement = makeDocumentElement();
+  const documentElement = makeElement({ 'data-page-loading': 'true' });
+  const body = makeElement({ 'aria-busy': 'true' });
   const frames = [];
 
-  globalThis.document = { readyState: 'complete', documentElement: documentElement };
+  globalThis.document = { readyState: 'complete', documentElement: documentElement, body: body };
   globalThis.window = { addEventListener: () => {} };
   globalThis.requestAnimationFrame = (callback) => {
     frames.push(callback);
@@ -113,11 +121,24 @@ async function runCompletion({ framesFire }) {
   // One turn of the loop: enough for a fired frame, nowhere near the fallback.
   await delay(0);
 
-  return { documentElement: documentElement, frames: frames };
+  return { documentElement: documentElement, body: body, frames: frames };
+}
+
+/**
+ * Assert the busy flag is down on the <body>, its one home, and was never
+ * stamped onto the <html>.
+ *
+ * @param {object} documentElement - The <html>.
+ * @param {object} body - The <body>.
+ * @param {string} message - What the case expects.
+ */
+function assertBusyCleared(documentElement, body, message) {
+  assert.equal(body.getAttribute('aria-busy'), 'false', message);
+  assert.equal(documentElement.getAttribute('aria-busy'), null, 'the <html> carries no busy flag at all');
 }
 
 test('#803: the page-loading state clears even when no frame ever fires', async () => {
-  const { documentElement, frames } = await runCompletion({ framesFire: false });
+  const { documentElement, body, frames } = await runCompletion({ framesFire: false });
 
   assert.equal(frames.length, 1, 'the frame was still asked for, so the paint boundary is unchanged');
   assert.equal(documentElement.getAttribute('data-page-loading'), 'true', 'and nothing clears the state in the frame window');
@@ -125,15 +146,15 @@ test('#803: the page-loading state clears even when no frame ever fires', async 
   await delay(PAST_DELAY);
 
   assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the timer cleared the state the frame never did');
-  assert.equal(documentElement.getAttribute('aria-busy'), 'false', 'the page tells assistive tech it is done, too');
+  assertBusyCleared(documentElement, body, 'the page tells assistive tech it is done, too');
 });
 
 test('#803: on a drawing renderer the FRAME clears the state, well before the timer', async () => {
-  const { documentElement, frames } = await runCompletion({ framesFire: true });
+  const { documentElement, body, frames } = await runCompletion({ framesFire: true });
 
   assert.equal(frames.length, 1, 'one frame requested');
   assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the paint boundary is what cleared it, not the fallback');
-  assert.equal(documentElement.getAttribute('aria-busy'), 'false', 'and the busy flag is down');
+  assertBusyCleared(documentElement, body, 'and the busy flag is down');
 
   await delay(PAST_DELAY);
 
@@ -141,7 +162,7 @@ test('#803: on a drawing renderer the FRAME clears the state, well before the ti
 });
 
 test('#803: a frame that arrives after the timer is a no-op, not a second clear', async () => {
-  const { documentElement, frames } = await runCompletion({ framesFire: false });
+  const { documentElement, body, frames } = await runCompletion({ framesFire: false });
 
   await delay(PAST_DELAY);
 
@@ -151,5 +172,37 @@ test('#803: a frame that arrives after the timer is a no-op, not a second clear'
   frames[0]();
 
   assert.deepEqual(documentElement.removed, ['data-page-loading'], 'and the late frame clears nothing a second time');
-  assert.equal(documentElement.getAttribute('aria-busy'), 'false', 'the busy flag stays down');
+  assertBusyCleared(documentElement, body, 'the busy flag stays down');
+});
+
+/**
+ * The opening tag of one element in a rendered page.
+ *
+ * @param {string} html - The rendered page.
+ * @param {string} name - The tag name.
+ * @returns {string} The tag, `<name` through its closing `>`.
+ */
+function openingTag(html, name) {
+  const match = html.match(new RegExp(`<${name}\\b[^>]*>`));
+  assert.ok(match, `the page renders a <${name}>`);
+
+  return match[0];
+}
+
+// The root layout's two tags as a build renders them: the loading state on the
+// <html>, the busy flag on the <body> only.
+test('#1063: the root layout renders the busy flag on the body, the loading state on the html', async () => {
+  const pages = await buildWith(miniData, {}, 'page-loading-test');
+
+  for (const url of ['/', '/signup']) {
+    const html = pages.get(url);
+    assert.ok(html, `${url} built`);
+
+    const htmlTag = openingTag(html, 'html');
+    const bodyTag = openingTag(html, 'body');
+
+    assert.match(htmlTag, /\sdata-page-loading="true"/, `${url}: the <html> starts in the loading state`);
+    assert.ok(!/\saria-busy=/.test(htmlTag), `${url}: the <html> carries no aria-busy`);
+    assert.match(bodyTag, /\saria-busy="true"/, `${url}: the <body> starts busy`);
+  }
 });

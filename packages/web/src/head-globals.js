@@ -5,6 +5,7 @@
  */
 const { ogLocale } = require('@omega.js/devkit/translate');
 const { applyStagger } = require('@omega.js/client/modules/reveal-stagger.js');
+const { installEarlyErrorBuffer } = require('@omega.js/monitoring/browser');
 
 /**
  * Register the head's computed globals.
@@ -19,6 +20,10 @@ function registerHeadGlobals(eleventyConfig, { language }) {
   // The inline first-paint starter cannot import the motion engine, so it runs
   // the engine's own applyStagger, printed from its source.
   eleventyConfig.addGlobalData('revealStagger', String(applyStagger));
+  // The early-error buffer the head inlines when Sentry is on, printed from its
+  // one home in the monitoring package, so it catches errors from before the
+  // main script runs.
+  eleventyConfig.addGlobalData('earlyErrorBuffer', String(installEarlyErrorBuffer));
 }
 
 module.exports = { registerHeadGlobals };

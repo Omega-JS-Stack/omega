@@ -340,7 +340,10 @@ test('the real bundler splits the library into its own chunk — the page entry 
 
   // The library's own default palette — present in its bundle, nowhere else.
   const MARKER = 'var(--ts-chart-1, #2563eb)';
-  const files = fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks')).map((name) => path.join(outDir, 'assets', 'js', 'chunks', name));
+  // Only the bundles: a chunk's source map sits beside it and quotes the source
+  const files = fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks'))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => path.join(outDir, 'assets', 'js', 'chunks', name));
   // A manifest key holds EVERY layer's bundle for that page (#624), and each
   // one is an entry the browser loads — so the claim is about all of them.
   const entries = manifest.js.pages.index.map((url) => path.join(outDir, url.slice(1)));

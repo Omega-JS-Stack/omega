@@ -34,7 +34,10 @@ class CloudflareAPI {
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(`Cloudflare API Error: ${JSON.stringify(data.errors)}`);
+      const error = new Error(`Cloudflare API Error: ${JSON.stringify(data.errors)}`);
+      error.status = response.status;
+      error.errors = data.errors;
+      throw error;
     }
 
     return data;

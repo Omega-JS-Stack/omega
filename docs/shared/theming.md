@@ -498,8 +498,10 @@ Resilience rules (load-bearing):
   - **The settle signal.** No measure, no style read and no paint until the
     first `requestIdleCallback` AFTER the load event (a 2s timeout, so a
     permanently busy page still gets its field), or the load event itself where
-    idle callbacks do not exist. The `whenSettled(doc, fn)` helper in
-    `motion.js` is the one implementation.
+    idle callbacks do not exist. The wait for the load event has a ceiling:
+    after 10 seconds it starts even if the window's load never fires. The
+    `whenSettled(fn, options)` helper in `packages/client/src/modules/dom.js`
+    is the one implementation, shared with the Sentry start.
   - **The handoff stamp rides the first painted grid.** classy fades its CSS
     fallback dots out on `.omega-dotgrid[data-omega-dotfield-ready]::before`,
     so `data-omega-dotfield-ready` lands with the grid that replaces them and

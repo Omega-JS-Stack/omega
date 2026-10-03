@@ -564,7 +564,7 @@ export default class CalendarCore {
   async _loadRecurringTemplates() {
     try {
       const { collection, query, where, getDocs, onSnapshot } = await import('firebase/firestore');
-      const db = omega.firebaseFirestore;
+      const db = await omega.loadFirebaseFirestore();
       const colRef = collection(db, 'marketing-campaigns');
 
       const recurringDocs = await getDocs(query(
@@ -617,7 +617,7 @@ export default class CalendarCore {
 
     try {
       const { collection, query, where, orderBy, onSnapshot } = await import('firebase/firestore');
-      const db = omega.firebaseFirestore;
+      const db = await omega.loadFirebaseFirestore();
 
       const rangeQuery = query(
         collection(db, 'marketing-campaigns'),

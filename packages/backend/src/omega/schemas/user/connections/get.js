@@ -7,6 +7,9 @@ module.exports = () => ({
   // for a stale caller's value to reach the 400.
   uid: { type: 'string' },
   provider: { type: 'string', required: true },
+  // `status` only: the linked account's identity id. Without it, a user holding
+  // several accounts of the provider gets every one listed
+  id: { type: 'string' },
   action: { type: 'string', default: 'authorize', enum: ['authorize', 'status'] },
   // Where the callback page lands after this connect
   // ([#784](https://github.com/Omega-JS-Stack/omega/issues/784)). No default:

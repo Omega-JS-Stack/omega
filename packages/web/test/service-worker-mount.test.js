@@ -49,6 +49,7 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
     },
     // esbuild define + the compat CDN libraries, both stubbed
     __OMEGA_FIREBASE_VERSION__: '12.14.0',
+    __OMEGA_BUILD_STAMP__: '1700000000000',
     firebase: {
       initializeApp: () => {},
       messaging: () => ({ onBackgroundMessage: (handler) => { backgroundMessage = handler; } }),
@@ -57,7 +58,7 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
       importedScripts.push(...urls);
       // What the emitted /build.js does: assign the ONE snapshot every OMEGA
       // browser surface loads (#743), wrapper and all.
-      if (urls.some((url) => url.endsWith('build.js'))) {
+      if (urls.some((url) => url.includes('/build.js?cb='))) {
         sw.OMEGA_BUILD_JSON = {
           config: {
             brand: { id: 'test' },
@@ -98,7 +99,7 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
 test('service worker at the domain root: today’s URLs, unchanged', () => {
   const worker = loadWorker('https://example.com/service-worker.js');
 
-  assert.equal(worker.importedScripts[0], '/build.js', 'the config transport is fetched root-relative');
+  assert.equal(worker.importedScripts[0], '/build.js?cb=1700000000000', 'the config transport is fetched root-relative');
 
   worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
   assert.equal(worker.notifications[0].options.icon, '/assets/images/favicon/favicon-192x192.png');
@@ -110,7 +111,7 @@ test('service worker at the domain root: today’s URLs, unchanged', () => {
 test('service worker under a mount: every site URL it builds carries the prefix', () => {
   const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit');
 
-  assert.equal(worker.importedScripts[0], '/workkit/build.js', 'the config transport lives under the mount');
+  assert.equal(worker.importedScripts[0], '/workkit/build.js?cb=1700000000000', 'the config transport lives under the mount');
 
   worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
   assert.equal(worker.notifications[0].options.icon, '/workkit/assets/images/favicon/favicon-192x192.png');

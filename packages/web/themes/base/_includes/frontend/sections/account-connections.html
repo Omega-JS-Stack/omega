@@ -11,7 +11,9 @@
   A configured provider with no name+logo gets the connections section's
   "unsupported connection" card at runtime, which says what is missing.
   Visibility is the JS's alone: every card renders hidden and the section shows
-  the enabled ones.
+  the enabled ones. Each linked account is drawn at runtime as a copy of its
+  provider's card, ids suffixed with the account's identity id; the provider's
+  own card is then the Connect control, hidden once the user holds `max` accounts.
 {% endcomment %}
 <div id="connections-list">
   <!-- Loading state -->

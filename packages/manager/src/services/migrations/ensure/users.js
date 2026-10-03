@@ -9,7 +9,9 @@
  */
 const { randomUUID, randomBytes } = require('node:crypto');
 
-const { runMigration, FieldValue } = require('../lib/migration-runner.js');
+const chalk = require('chalk').default;
+
+const { runMigration, isExecute, FieldValue } = require('../lib/migration-runner.js');
 const { createMetadataFix } = require('../lib/ensure-metadata.js');
 const { validateDocument } = require('../lib/schema-validator.js');
 const { createSanitizeFix } = require('../lib/sanitize-strings.js');
@@ -79,6 +81,34 @@ function deepEqual(a, b) {
   }
 
   return false;
+}
+
+/**
+ * Whether one provider's `connections` entry is a record in the OLD one-level
+ * shape: its own top level holds a `type` string and a `token` object. Anything
+ * else is the map keyed by identity id, and is left as it is.
+ */
+function isOneLevelConnection(entry) {
+  return typeof entry.type === 'string' && !!entry.token && typeof entry.token === 'object';
+}
+
+// The fields an old one-level record holds at the provider's own top level. An
+// account connected before the migration ran sits keyed BESIDE them
+const ONE_LEVEL_FIELDS = ['type', 'token', 'identity', 'updated', 'refreshing'];
+
+/**
+ * Split one provider's entry into the old record's own fields and everything
+ * else beside them (keyed accounts written since), each a copy.
+ */
+function splitOneLevelConnection(entry) {
+  const old = {};
+  const beside = {};
+
+  for (const [key, value] of Object.entries(entry)) {
+    (ONE_LEVEL_FIELDS.includes(key) ? old : beside)[key] = value;
+  }
+
+  return { old, beside };
 }
 
 /**
@@ -276,6 +306,56 @@ module.exports = async function ensureUsers(context) {
         }
 
         return { connections: moved, oauth2: FieldValue.delete() };
+      },
+
+      // Fix 4b: one record per provider → a map keyed by identity id, so a user
+      // can hold several accounts of one provider. Only the old record's own
+      // fields move (an account keyed beside them stays put), and a provider
+      // already keyed is left alone, so a second run writes nothing.
+      (data, doc) => {
+        const existing = (data.connections && typeof data.connections === 'object') ? data.connections : {};
+        const keyed = { ...existing };
+        const logs = [];
+        let changed = false;
+
+        const logDrop = (provider, reason) => {
+          const what = `connections.${provider} of ${data.auth?.uid || doc.id}: ${reason}`;
+
+          logs.push(isExecute(context)
+            ? `          ${chalk.red('🗑')} ${chalk.red(`Dropped ${what}`)}`
+            : `          ${chalk.yellow('~')} ${chalk.yellow(`Would drop ${what}`)}`);
+        };
+
+        for (const [provider, record] of Object.entries(existing)) {
+          if (!record || typeof record !== 'object' || !isOneLevelConnection(record)) {
+            continue;
+          }
+
+          const { old, beside } = splitOneLevelConnection(record);
+          const id = old.identity?.id;
+          const reconnected = beside[id]?.token && typeof beside[id].token === 'object';
+
+          // Fix 4 has already filled every id a record can yield, so one still
+          // missing has nothing to key it under and no route could address it.
+          // A record already keyed under the same id is the user's reconnect: it wins
+          if (typeof id !== 'string' || !id) {
+            logDrop(provider, 'no identity.id to key it under');
+          } else if (reconnected) {
+            logDrop(provider, `a newer record already sits under ${id}`);
+          } else {
+            beside[id] = old;
+          }
+
+          if (Object.keys(beside).length) {
+            keyed[provider] = beside;
+          } else {
+            delete keyed[provider];
+          }
+
+          changed = true;
+        }
+
+        return changed ? { connections: keyed, __logs__: logs } : null;
       },
 
       // Fix 5: Remove deprecated fields

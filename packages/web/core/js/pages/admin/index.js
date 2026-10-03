@@ -65,7 +65,7 @@ async function loadDashboard() {
 // ============================================
 async function loadStatCards() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 
@@ -91,7 +91,7 @@ async function loadStatCards() {
 // ============================================
 async function loadAttention() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
   const now = Math.floor(Date.now() / 1000);
   const sevenDaysOut = now + (7 * 24 * 60 * 60);
 
@@ -132,7 +132,7 @@ function setAttentionCount(id, settled) {
 // ============================================
 async function loadSignupsTrend() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
 
   const DAYS = 14;
   const dayMs = 24 * 60 * 60 * 1000;
@@ -164,7 +164,7 @@ async function loadSignupsTrend() {
 // ============================================
 async function loadSubscriberData() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
 
   // Get product list from _config.yml (available instantly via omega.config)
   const products = getProducts().filter((p) => p.id !== 'basic');

@@ -20,6 +20,6 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 
 - **Read the guide before editing.** Which process owns a concern (main is the auth source of truth; renderers reflect via IPC) is the first thing to get right.
 - **🚫 Never start the user's long-running processes** (`npm start`, a packaged app's dev loop) — assume they are running.
-- **Grep the logs FIRST.** The app's `logs/` holds `dev.log` (the gulp run + the Electron child), `build.log`, `test.log`, and `runtime.log` — the running app's own main/preload/renderer lines. All truncated per launch. Read them instead of relaunching the app to see what it already printed (`docs/shared/logging.md`).
+- **Grep the logs FIRST.** The app's `logs/` holds `dev.log` (the gulp run + the Electron child), `build.log`, `test.log`, and `runtime.log`: the running app's own main/preload/renderer lines. All truncated per launch, except `runtime.log`: with the lock on, the launch that holds the lock empties it of earlier launches' lines and a duplicate launch leaves it alone; with `protocol.singleInstance: false` every launch appends to it with its lines tagged `[pid <n>]`. Read them instead of relaunching the app to see what it already printed (`docs/shared/logging.md`).
 - **Secrets never enter `config/omega.json5`** — `.env` and the OS keychain only.
 - **Deploys are deliberate** — only `omega deploy` / `omega publish` ship a release; a commit never does (`docs/shared/deploys.md`).

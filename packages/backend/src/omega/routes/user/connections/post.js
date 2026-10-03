@@ -1,6 +1,6 @@
-const { FieldValue } = require('firebase-admin/firestore');
-const { buildContext, droppedUidError } = require('./_context.js');
-const { loadProvider } = require('./_providers.js');
+const { FieldPath, FieldValue } = require('firebase-admin/firestore');
+const { buildContext, connectionRecords, resolveConnection, droppedUidError } = require('./_context.js');
+const { loadProvider, disabledProviderError, connectionLimitError } = require('./_providers.js');
 const { decryptState, pkceChallenge, STATE_TTL_MINUTES } = require('./_state.js');
 const { buildGrantContext, runStep } = require('./_grant.js');
 const {
@@ -94,6 +94,14 @@ async function processTokenize({ ctx, data }) {
 
   const { connectionProvider, clientId, clientSecret } = providerResult;
 
+  // The provider is known only now, out of the state: a brand that turned it
+  // off between the authorize leg and this one gets no exchange
+  const disabled = disabledProviderError(stateData.provider, omega);
+
+  if (disabled) {
+    return ctx.respond(disabled.message, { code: disabled.code });
+  }
+
   // Retrieve stored CSRF token from user's usage document
   const usageDocRef = admin.firestore().doc(`usage/${stateData.uid}`);
   const usageDoc = await usageDocRef.get();
@@ -182,9 +190,10 @@ async function processTokenize({ ctx, data }) {
   // in every provider ([#791](https://github.com/Omega-JS-Stack/omega/issues/791)):
   // the copies each matched the CONNECTING user's own document too, so
   // reconnecting — to widen a scope, or after a failed refresh left the record —
-  // told the owner their account belonged to somebody else.
+  // told the owner their account belonged to somebody else. The path is a
+  // FieldPath because the id is a map key now, and an id may carry a `.`
   const matches = await admin.firestore().collection('users')
-    .where(`connections.${stateData.provider}.identity.id`, '==', identity.id)
+    .where(new FieldPath('connections', stateData.provider, identity.id, 'identity', 'id'), '==', identity.id)
     .get();
 
   const takenBy = matches.docs.find((doc) => doc.id !== stateData.uid);
@@ -203,30 +212,31 @@ async function processTokenize({ ctx, data }) {
     );
   }
 
-  // Store tokens (only necessary fields, no raw settings)
-  await admin.firestore().doc(`users/${stateData.uid}`).set({
-    connections: {
-      [stateData.provider]: {
-        // Every connection record names its KIND ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)):
-        // a connection will not always be an OAuth grant — an API key or a bot
-        // token is a connection too — so the shape says which one this is.
-        type: 'oauth2',
-        token: {
-          access_token: tokenResponse.access_token,
-          refresh_token: tokenResponse.refresh_token,
-          token_type: tokenResponse.token_type,
-          expires_in: tokenResponse.expires_in,
-          scope: tokenResponse.scope,
-        },
-        identity: identity,
-        updated: {
-          timestamp: ctx.meta.startTime.timestamp,
-          timestampUNIX: ctx.meta.startTime.timestampUNIX,
-        },
-      },
+  // Only necessary fields, no raw settings
+  const record = {
+    // Every connection record names its KIND: a connection will not always be
+    // an OAuth grant (an API key or a bot token is a connection too), so the
+    // shape says which one this is.
+    type: 'oauth2',
+    token: {
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token,
+      token_type: tokenResponse.token_type,
+      expires_in: tokenResponse.expires_in,
+      scope: tokenResponse.scope,
     },
-    metadata: ctx.metadata({ tag: 'user/connections' }),
-  }, { merge: true });
+    identity: identity,
+    updated: {
+      timestamp: ctx.meta.startTime.timestamp,
+      timestampUNIX: ctx.meta.startTime.timestampUNIX,
+    },
+  };
+
+  const overLimit = await storeConnection({ ctx, omega, admin, uid: stateData.uid, provider: stateData.provider, record });
+
+  if (overLimit) {
+    return ctx.respond(overLimit.message, { code: overLimit.code });
+  }
 
   ctx.log('Connections tokenize complete');
 
@@ -242,6 +252,46 @@ async function processTokenize({ ctx, data }) {
   });
 }
 
+/**
+ * Store one account's record at `connections.<provider>.<identityId>`, counted
+ * against the brand's `max` in the SAME transaction as the write, so two
+ * simultaneous connects cannot both pass the cap. The record REPLACES what sat
+ * at that id: a reconnect leaves none of an older identity's fields behind.
+ *
+ * @param {object} options - `ctx`, `omega`, `admin`, the `uid`, the `provider` key and the full `record`
+ * @returns {Promise<object|null>} The limit error, or null once stored
+ */
+async function storeConnection({ ctx, omega, admin, uid, provider, record }) {
+  const firestore = admin.firestore();
+  const docRef = firestore.doc(`users/${uid}`);
+  const metadata = ctx.metadata({ tag: 'user/connections' });
+
+  return firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef);
+    const records = connectionRecords(snapshot.data(), provider);
+    const overLimit = connectionLimitError(provider, omega, records, record.identity.id);
+
+    if (overLimit) {
+      return overLimit;
+    }
+
+    // An update at the record's own path replaces it whole (a FieldPath: the id
+    // may carry a `.`). Metadata goes key by key so `metadata.created` stays
+    if (snapshot.exists) {
+      transaction.update(
+        docRef,
+        new FieldPath('connections', provider, record.identity.id), record,
+        new FieldPath('metadata', 'updated'), metadata.updated,
+        new FieldPath('metadata', 'tag'), metadata.tag,
+      );
+    } else {
+      transaction.set(docRef, { connections: { [provider]: { [record.identity.id]: record } }, metadata });
+    }
+
+    return null;
+  });
+}
+
 async function processRefresh({ ctx, user, data }) {
   // An admin may pass `uid`: a refresh happens AT THE PROVIDER, on the user's
   // behalf, and needs no browser ([#782](https://github.com/Omega-JS-Stack/omega/issues/782))
@@ -253,8 +303,20 @@ async function processRefresh({ ctx, user, data }) {
 
   const { omega, admin, connectionProvider, targetUid, targetUser, clientId, clientSecret } = context;
 
-  const storedToken = targetUser?.connections?.[data.provider]?.token;
-  const refreshToken = storedToken?.refresh_token;
+  const disabled = disabledProviderError(data.provider, omega);
+
+  if (disabled) {
+    return ctx.respond(disabled.message, { code: disabled.code });
+  }
+
+  const connection = resolveConnection(targetUser, data);
+
+  if (connection.error) {
+    return ctx.respond(connection.error.message, { code: connection.error.code });
+  }
+
+  const { id } = connection;
+  const refreshToken = connection.record?.token?.refresh_token;
 
   if (!refreshToken) {
     return ctx.respond('No refresh token found', { code: 400 });
@@ -264,7 +326,12 @@ async function processRefresh({ ctx, user, data }) {
   // ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)): a refresh
   // token is one-time at providers that rotate it (Twitch), so two instances
   // refreshing at once spend it twice and the loser stores a dead token.
-  const { won, lease, updatedUNIX, token: leasedToken } = await acquireRefreshLease({ admin, uid: targetUid, provider: data.provider });
+  const { won, missing, lease, updatedUNIX, token: leasedToken } = await acquireRefreshLease({ admin, uid: targetUid, provider: data.provider, id });
+
+  // The record vanished between the read above and the lease: nothing to spend
+  if (missing) {
+    return ctx.respond('No refresh token found', { code: 400 });
+  }
 
   // The LOSER touches the provider not at all — it waits for the winner's write
   // and answers the token that landed
@@ -275,6 +342,7 @@ async function processRefresh({ ctx, user, data }) {
       admin,
       uid: targetUid,
       provider: data.provider,
+      id,
       since: updatedUNIX,
     });
 
@@ -342,13 +410,15 @@ async function processRefresh({ ctx, user, data }) {
     await admin.firestore().doc(`users/${targetUid}`).set({
       connections: {
         [data.provider]: {
-          type: 'oauth2',
-          token,
-          updated: {
-            timestamp: ctx.meta.startTime.timestamp,
-            timestampUNIX: ctx.meta.startTime.timestampUNIX,
+          [id]: {
+            type: 'oauth2',
+            token,
+            updated: {
+              timestamp: ctx.meta.startTime.timestamp,
+              timestampUNIX: ctx.meta.startTime.timestampUNIX,
+            },
+            refreshing: FieldValue.delete(),
           },
-          refreshing: FieldValue.delete(),
         },
       },
       metadata: ctx.metadata({ tag: 'user/connections' }),
@@ -363,7 +433,7 @@ async function processRefresh({ ctx, user, data }) {
     if (!released) {
       // The lease expires on its own in 30 seconds; a clear that fails on the
       // way out of a failure must not replace the failure being reported
-      await clearRefreshLease({ admin, uid: targetUid, provider: data.provider })
+      await clearRefreshLease({ admin, uid: targetUid, provider: data.provider, id })
         .catch((e) => ctx.log('Connections refresh lease clear failed', { provider: data.provider, message: e.message }));
     }
   }

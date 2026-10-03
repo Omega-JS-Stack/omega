@@ -15,14 +15,14 @@
 // `ELECTRON_RUN_AS_NODE` runs the binary as plain Node: no window, no dock icon,
 // no focus stolen. The probe costs one spawn per build and is memoized per
 // binary path.
-//
+
 // A binary that cannot be run is an EXPECTED external condition, not a broken
-// invariant: a CI job with ELECTRON_SKIP_BINARY_DOWNLOAD set has a package and
-// no executable. That build gets `null` targets, which the caller reads as "no
-// syntax floor" (esbuild's default), and a warn line saying so — never a
-// silently-invented version.
+// invariant (a CI job with ELECTRON_SKIP_BINARY_DOWNLOAD has no executable). It
+// gets `null` targets: the node pair keeps esbuild's default, the renderer
+// devkit's browser floor, and a warn line says so, never an invented version.
 
 const { execFileSync } = require('child_process');
+const { BROWSER_TARGET } = require('@omega.js/devkit/browser-floor');
 
 const cache = new Map();
 
@@ -63,7 +63,7 @@ module.exports = function electronTargets(binary, options) {
     // reads its `[@omega.js/<package>:<module>]` tag off `this`, so a bare
     // `const warn = logger.warn` prints `[undefined:undefined]`.
     if (options && options.logger) {
-      options.logger.warn(`Could not read the Electron runtime versions from ${binary} (${e.message}) — bundles compile with no syntax floor.`);
+      options.logger.warn(`Could not read the Electron runtime versions from ${binary} (${e.message}): main and preload compile with no syntax floor, the renderer to the ${BROWSER_TARGET} browser floor.`);
     }
   }
 

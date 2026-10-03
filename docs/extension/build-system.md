@@ -60,7 +60,7 @@ Auto-loaded from [src/gulp/tasks/](../../packages/extension/src/gulp/tasks/) via
 
 [src/gulp/tasks/bundle.js](../../packages/extension/src/gulp/tasks/bundle.js) discovers component entry points (`src/assets/js/components/<name>/index.js`) and bundles each to `dist/assets/js/components/<name>.bundle.js`.
 
-The bundler is esbuild through @omega.js/devkit's ONE `bundle()` wrapper ([#738](https://github.com/Omega-JS-Stack/omega/issues/738) — webpack, `babel-loader` and `@babel/preset-env` left with it, and the gulp task, the file and the log tag were renamed off `webpack` at the same time). The wrapper supplies what every framework shares: the framework-deps resolve hook ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)), the production `@dev-only` strip ([#18](https://github.com/Omega-JS-Stack/omega/issues/18)), the minify/sourcemap rules by mode, and one timing line per build.
+The bundler is esbuild through @omega.js/devkit's ONE `bundle()` wrapper ([#738](https://github.com/Omega-JS-Stack/omega/issues/738) — webpack, `babel-loader` and `@babel/preset-env` left with it, and the gulp task, the file and the log tag were renamed off `webpack` at the same time). The wrapper supplies what every framework shares: the framework-deps resolve hook ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)), the production `@dev-only` strip ([#18](https://github.com/Omega-JS-Stack/omega/issues/18)), minify by mode with a source map in every mode, and one timing line per build.
 
 ### One call, every lane
 
@@ -129,7 +129,7 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 
 1. **Pre-hook** — runs `hooks/build/pre.js` if present (the flat `hooks/build:pre.js` still resolves as a transition fallback)
 2. **Per-browser manifest normalization** — converts JSON5 → strict JSON for Chrome/Edge/Opera (Firefox tolerates JSON5 but normalized anyway)
-3. **Per-browser asset copy** to `packaged/<browser>/raw/`: `dist/build.js` rides along with everything else, so the package lane composes no snapshot of its own and writes no `build.json` sidecar ([#743](https://github.com/Omega-JS-Stack/omega/issues/743))
+3. **Per-browser asset copy** to `packaged/<browser>/raw/`: `dist/build.js` rides along with everything else, so the package lane composes no snapshot of its own and writes no `build.json` sidecar ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)). Source maps stay behind ([#1064](https://github.com/Omega-JS-Stack/omega/issues/1064)): every bundle's `.map` sits beside it in `dist` for local reading, and the raw copy drops `**/*.map`, because a map carries the remote-script URLs the redaction strips from the `.js` and its positions predate the post-build rewrites
 4. **Zip** to `packaged/<browser>/<name>.zip`
 5. **Post-hook** — runs `hooks/build/post.js`
 6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
@@ -150,7 +150,7 @@ The compiled manifest is the source manifest merged with the framework defaults 
 
 Env vars that drive the pipeline:
 
-- `OMEGA_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
+- `OMEGA_BUILD_MODE=true`: production build (minified, dev-blocks stripped; source maps beside the bundles in `dist`, as in every mode)
 - `OMEGA_IS_PUBLISH=true` — also publish to extension stores after packaging
 - `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
 - `OMEGA_TEST_MODE=true`: running in @omega.js/extension's test framework. Powers `omega.isTesting()` in the test harness (see [test-framework.md](test-framework.md)).

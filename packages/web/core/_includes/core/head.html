@@ -177,6 +177,13 @@
      response (#346), so a page built before the emulator came up still gets the
      map of the stack running right now. -->
 <script src="/build.js?cb={{ site.omega.cache_breaker }}"></script>
+{% iftruthy resolved.config.monitoring.providers.sentry.dsn %}
+<!-- Early-error buffer (Sentry on only): the client loads the Sentry SDK once
+     the page is idle, so errors until then wait in window.__OMEGA_EARLY_ERRORS
+     and replay when it lands. Printed from its one home,
+     @omega.js/monitoring/browser's installEarlyErrorBuffer. -->
+<script>({{ earlyErrorBuffer }})(window);</script>
+{% endiftruthy %}
 {%- assign page-build-config = resolved.config | omega_page_config: config -%}
 {% if page-build-config %}
 <!-- This page's own `config:` block (#607), over the site's snapshot: the chat
@@ -257,7 +264,11 @@
      the moment the DOM is parsed — ahead of the main bundle's module in the
      foot, and independent of images, fonts and firebase. Booting reveals from
      the main bundle meant the hero stayed blank for the whole JS download.
-     core/js/first-paint.js is the seam; keep it small. -->
+     core/js/first-paint.js is the seam; keep it small. Its static chunks, when
+     it has any, are preloaded beside it like every foot entry's. -->
+{% for chunk in modulePreloads[assetManifest.js.firstPaint] %}
+<link rel="modulepreload" href="{{ chunk }}"/>
+{% endfor %}
 <script type="module" src="{{ assetManifest.js.firstPaint }}"></script>
 
 <meta name="viewport" content="{{ page-viewport }}"/>

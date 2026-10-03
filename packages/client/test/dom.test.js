@@ -25,4 +25,24 @@ describe('DOM Module', () => {
       assert(e.message.includes('source is required'));
     }
   });
+
+  it('replaceChildren clears and appends where the browser has no native replaceChildren', () => {
+    const calls = [];
+    const el = {
+      children: ['stale'],
+      set innerHTML(value) {
+        calls.push(`innerHTML=${JSON.stringify(value)}`);
+        this.children = [];
+      },
+      append(...nodes) {
+        calls.push('append');
+        this.children.push(...nodes);
+      },
+    };
+
+    getOmega().dom.replaceChildren(el, 'a', 'b');
+
+    assert.deepStrictEqual(calls, ['innerHTML=""', 'append']);
+    assert.deepStrictEqual(el.children, ['a', 'b']);
+  });
 });

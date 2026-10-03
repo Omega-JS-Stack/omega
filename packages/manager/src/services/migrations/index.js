@@ -27,7 +27,7 @@
  * runManage; here it only ever re-checks a converged brand.
  *
  * Add new migrations by creating handlers in ensure/ and registering them
- * in config.js OPERATIONS.migrations.
+ * in operations.js OPERATIONS.migrations.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');

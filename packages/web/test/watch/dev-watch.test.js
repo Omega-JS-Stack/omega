@@ -19,7 +19,8 @@ const { test } = require('node:test');
 
 const { configureOmega } = require('../../src/index.js');
 const { buildAssets } = require('../../src/assets.js');
-const { refreshLiveManifest, registerTemplateWatchTargets, watchAssetSources } = require('../../src/commands/dev.js');
+const { registerTemplateWatchTargets, watchAssetSources } = require('../../src/commands/dev.js');
+const { refreshLiveManifest } = require('../../src/live-manifest.js');
 
 // A rebuild is chokidar's write-settle window (150ms) plus one build of the
 // fixture; the deadline is the point at which "the edit never landed" is the
@@ -395,6 +396,30 @@ test('a css rebuild folds its font preloads into the live manifest', () => {
   assert.equal(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js' } }), false, 'a js rebuild leaves the list alone');
   assert.deepEqual(manifest.fontPreloads, []);
   assert.equal(manifest.css.main, '/assets/css/main.css', 'and nothing else in the manifest moves');
+});
+
+test('a js rebuild folds its entry imports into the live manifest', () => {
+  const before = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js'] };
+  const after = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js', '/assets/js/chunks/chunk-MMMM.js'] };
+  const manifest = { js: { main: '/assets/js/main.js', imports: before }, css: { main: '/assets/css/main.css' } };
+
+  assert.equal(
+    refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: after } }),
+    true,
+    'a moved map is reported: that answer is what rewrites the manifest file',
+  );
+  assert.deepEqual(manifest.js.imports, after, 'and it is written into the live object in place, the one the engine holds');
+
+  assert.equal(
+    refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: structuredClone(after) } }),
+    false,
+    'the SAME map is no change: an unchanged page must not trigger a re-render',
+  );
+
+  // A css-only rebuild returns before the js lane, so it carries no map.
+  assert.equal(refreshLiveManifest(manifest, { css: { main: '/assets/css/main.css' } }), false, 'a css rebuild leaves the map alone');
+  assert.deepEqual(manifest.js.imports, after);
+  assert.equal(manifest.js.main, '/assets/js/main.js', 'and nothing else in the manifest moves');
 });
 
 test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {

@@ -1,20 +1,14 @@
 /**
- * Test: the response line the route logger writes
- * ([#796](https://github.com/Omega-JS-Stack/omega/issues/796)).
+ * Test: the response line the route logger writes.
  *
- * `ctx.respond()` logged `JSON.stringify(response)` for every route, and
- * `GET /omega/user` answers the whole user record: every connected provider's
- * `connections.<provider>.token` (access and refresh) plus `api.privateKey`.
- * That put a live third-party token and the caller's own key into Cloud
- * Logging on every read of the account page, where log retention keeps them.
- * [#275](https://github.com/Omega-JS-Stack/omega/issues/275) closed the request
- * side of the same line; this is the response side.
+ * `GET /omega/user` answers the whole user record: every connected account's
+ * `connections.<provider>.<id>.token` (access and refresh) plus `api.privateKey`,
+ * and the logged line carries neither.
  *
  * Run: npx omega test backend:helpers/response-log-redaction
  *
- * The redaction is pure (a response in, a copy out), so it runs here directly.
- * The wiring half is proven by the emulator: every route suite still
- * round-trips green through this same line.
+ * The redaction is pure, so it runs here directly; the wiring half is proven by
+ * every emulator route suite round-tripping through this same line.
  */
 const redaction = require('../../dist/omega/helpers/log-redaction.js');
 const { methods } = require('../../dist/omega/context/respond.js');
@@ -44,18 +38,24 @@ function userRecord(overrides) {
     api: { clientId: 'client-796', privateKey: PRIVATE_KEY },
     connections: {
       twitch: {
-        type: 'oauth2',
-        token: { access_token: TWITCH_ACCESS, refresh_token: TWITCH_REFRESH, expires_in: 14400 },
-        profile: { displayName: DISPLAY_NAME, id: '796796' },
+        796796: {
+          type: 'oauth2',
+          token: { access_token: TWITCH_ACCESS, refresh_token: TWITCH_REFRESH, expires_in: 14400 },
+          profile: { displayName: DISPLAY_NAME, id: '796796' },
+        },
       },
       youtube: {
-        type: 'oauth2',
-        token: { access_token: YOUTUBE_ACCESS },
+        'yt-796': {
+          type: 'oauth2',
+          token: { access_token: YOUTUBE_ACCESS },
+        },
       },
       // A provider whose `token` is the credential STRING itself, not a pair.
       kick: {
-        type: 'oauth2',
-        token: KICK_TOKEN,
+        'kick-796': {
+          type: 'oauth2',
+          token: KICK_TOKEN,
+        },
       },
     },
   }, overrides);
@@ -131,8 +131,8 @@ module.exports = defineCases({
         redactResponseForLog(response);
 
         assert.deepEqual(response, before, 'the response object was mutated');
-        assert.equal(response.connections.twitch.token.access_token, TWITCH_ACCESS, 'a connection token was rewritten');
-        assert.equal(response.connections.kick.token, KICK_TOKEN, 'a string connection token was rewritten');
+        assert.equal(response.connections.twitch['796796'].token.access_token, TWITCH_ACCESS, 'a connection token was rewritten');
+        assert.equal(response.connections.kick['kick-796'].token, KICK_TOKEN, 'a string connection token was rewritten');
         assert.equal(response.api.privateKey, PRIVATE_KEY, 'the private key was rewritten');
       },
     },
@@ -239,7 +239,7 @@ module.exports = defineCases({
 
         assert.equal(line.includes(EMAIL), true, `the line lost its trace value: ${line}`);
         assert.deepEqual(sent.json[0], userRecord(), 'res.json received a rewritten body');
-        assert.equal(sent.json[0].connections.twitch.token.access_token, TWITCH_ACCESS, 'the token on the wire was redacted');
+        assert.equal(sent.json[0].connections.twitch['796796'].token.access_token, TWITCH_ACCESS, 'the token on the wire was redacted');
       },
     },
 

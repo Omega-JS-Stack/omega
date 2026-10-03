@@ -56,6 +56,15 @@ const auth = {
     auth._omega = omega;
     auth.state = { user: auth.user };
 
+    // Firebase boots only when the config carries an apiKey, @omega.js/client's rule:
+    // the default config ships an all-empty blob, and a brand with no cloud is a no-op.
+    if (!omega.config.cloud?.config?.apiKey) {
+      logger.log('Skipped Firebase: cloud.config has no apiKey, auth running in no-op mode');
+      auth._registerIpc();
+      auth._initialized = true;
+      return;
+    }
+
     // Try to load firebase. If it's not installed, run in no-op mode.
     const ok = await auth._tryLoadFirebase();
     if (!ok) {
@@ -108,9 +117,6 @@ const auth = {
     if (auth._firebaseAuth) return auth._firebaseAuth;
 
     const firebaseConfig = auth._omega.config.cloud?.config;
-    if (!firebaseConfig || !Object.keys(firebaseConfig).length) {
-      throw new Error('cloud.config is empty: cannot initialize auth.');
-    }
 
     const { initializeApp, getApp } = auth._firebase;
     const { getAuth, initializeAuth } = auth._firebaseModule;

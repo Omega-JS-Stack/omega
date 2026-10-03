@@ -654,6 +654,55 @@ test('cache-rules: the framework defaults cache built assets for a year and keep
   assert.ok(html.expression.includes('not starts_with(http.request.uri.path, "/assets/")'));
 });
 
+// Every loader of /build.js carries the build stamp, so the file caches like a
+// hashed asset: an exact-path clause on the year rule, beside the two it had.
+test('cache-rules: the year-long assets rule also matches /build.js', () => {
+  const assets = DEFAULTS.edge.providers.cloudflare.cacheRules.find((rule) => rule.name === 'Assets: Cache for 1 Year');
+
+  assert.ok(assets.expression.includes('(http.request.uri.path eq "/build.js")'));
+  assert.ok(assets.expression.includes('(http.request.uri.path wildcard r"/assets/*")'));
+  assert.ok(assets.expression.includes('(http.request.uri.path eq "/__/auth/iframe.js")'));
+});
+
+test('cache-rules: a zone holding the old assets expression is updated to the new one in one PUT', async () => {
+  const ensureCacheRules = require('../src/services/edge/ensure/cache-rules.js');
+  const OLD_ASSETS_EXPRESSION = '(http.request.uri.path wildcard r"/assets/*") or (http.request.uri.path eq "/__/auth/iframe.js")';
+  const config = brandConfig();
+  const rules = config.edge.providers.cloudflare.cacheRules;
+  const assets = rules.find((rule) => rule.name === 'Assets: Cache for 1 Year');
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': {
+        id: 'rs-cache', kind: 'zone', phase: 'http_request_cache_settings', name: 'Cache Rules', description: 'managed',
+        rules: rules.map((rule, i) => ({
+          id: `cr${i + 1}`,
+          description: rule.name,
+          expression: rule === assets ? OLD_ASSETS_EXPRESSION : rule.expression,
+          enabled: rule.enabled,
+          action: 'set_cache_settings',
+          action_parameters: {
+            cache: true,
+            edge_ttl: { mode: 'override_origin', default: rule.edgeTtl },
+            browser_ttl: { mode: 'override_origin', default: rule.browserTtl },
+          },
+        })),
+      },
+      'PUT /zones/zone-1/rulesets/rs-cache': {},
+    },
+  });
+
+  const result = await ensureCacheRules(handlerContext(config, api));
+
+  assert.ok(result, 'the reconcile saw a stale rule and wrote');
+  assert.equal(result.output.cacheRules.updated, true);
+  assert.deepEqual(api.mutations().map((call) => `${call.method} ${call.endpoint}`), ['PUT /zones/zone-1/rulesets/rs-cache']);
+  const written = api.mutations()[0].body.rules.find((rule) => rule.description === 'Assets: Cache for 1 Year');
+  assert.notEqual(written.expression, OLD_ASSETS_EXPRESSION);
+  assert.equal(written.expression, assets.expression);
+  assert.ok(written.expression.includes('(http.request.uri.path eq "/build.js")'));
+});
+
 test('cache-rules: a brand declaring no rules still reconciles the framework defaults (#751)', async () => {
   const ensureCacheRules = require('../src/services/edge/ensure/cache-rules.js');
   const { config } = loadBrand(makeBrandRoot(`{

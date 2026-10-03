@@ -82,6 +82,67 @@ export function loadScript(options) {
   });
 }
 
+// The longest a settle waits for the window's load event: a page whose load
+// never fires still starts its deferred work
+const LOAD_CEILING_MS = 10000;
+
+/**
+ * Run `fn` once first paint has settled: after the window's load event (or
+ * LOAD_CEILING_MS, whichever comes first), at the next idle callback. The ONE
+ * scheduler for work kept out of the first-paint window (the motion dotfield,
+ * the Sentry SDK).
+ * @param {Function} fn - the work that waits for the settle signal
+ * @param {object} options
+ * @param {number} options.timeout - the idle callback's deadline, in ms
+ * @param {number} [options.fallbackDelay] - where requestIdleCallback is missing, the ms to wait; omitted, `fn` runs at once
+ * @param {Document} [options.doc] - the document whose readyState counts; none means settled already
+ */
+export function whenSettled(fn, { timeout, fallbackDelay, doc } = {}) {
+  const idle = () => {
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(fn, { timeout });
+    } else if (fallbackDelay === undefined) {
+      fn();
+    } else {
+      setTimeout(fn, fallbackDelay);
+    }
+  };
+
+  if (!doc || doc.readyState === 'complete') {
+    idle();
+    return;
+  }
+
+  // Whichever of the load event and the ceiling comes first starts the wait
+  let started = false;
+  let ceiling = null;
+  const start = () => {
+    if (started) {
+      return;
+    }
+    started = true;
+    clearTimeout(ceiling);
+    idle();
+  };
+
+  ceiling = setTimeout(start, LOAD_CEILING_MS);
+  window.addEventListener('load', start, { once: true });
+}
+
+/**
+ * Swap an element's children for `nodes`: the native replaceChildren where the
+ * browser has it (newer than the browser floor), else a clear and an append.
+ */
+export function replaceChildren(el, ...nodes) {
+  if (typeof el.replaceChildren === 'function') {
+    el.replaceChildren(...nodes);
+    return;
+  }
+
+  el.innerHTML = '';
+  el.append(...nodes);
+}
+
 // Return promise that resolves when DOM is ready
 export function ready() {
   return new Promise((resolve) => {

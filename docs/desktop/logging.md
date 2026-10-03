@@ -6,7 +6,7 @@
 
 - **One log file**, `runtime.log`, populated by all three Electron processes (main / preload / renderer)
 - **Live console output** during development (DevTools console for renderer, terminal stdout for main)
-- **Kept across boots** — never truncated; it rotates by size instead (see the lifetime table below), unlike `dev.log`/`build.log`/`test.log`
+- **Cleared per boot, or kept, by the single-instance lock**: with the lock on (the default) the launch that holds the lock empties `runtime.log` of earlier launches' lines once it wins the lock, keeping its own lines from boot on, while a duplicate launch (one that loses the lock and quits) leaves the file alone. With `protocol.singleInstance: false` launches overlap, so a boot never empties it: every launch appends and every file line carries `[pid <n>]` after the level. Either way it rotates at 10 MB (see the lifetime table below)
 - **Cross-process timestamps** so log lines from main + preload + renderer interleave in arrival order
 
 ## Where the file lives
@@ -47,20 +47,28 @@ window.desktop.logger.warn('IPC slow');
 window.desktop.logger.error(new Error('ui blew up'));
 ```
 
-All three end up in the same `runtime.log`, prefixed with their scope (`main`, `preload`, `renderer`):
+All three end up in the same `runtime.log`, prefixed with their scope in parentheses (`(main)`, `(preload)`, `(renderer)`). electron-log pads the level and, once a longer scope has been written, the scope:
 
 ```
-[2026-05-05 14:32:11.045] [info] main omega.initialize
-[2026-05-05 14:32:11.122] [info] main ipc ready
-[2026-05-05 14:32:11.187] [info] preload contextBridge exposed
-[2026-05-05 14:32:11.401] [info] renderer auth.listen attached
-[2026-05-05 14:32:12.998] [warn] main auto-updater check failed: network
+[2026-05-05 14:32:11.045] [info]   (main) omega.initialize
+[2026-05-05 14:32:11.122] [info]   (main) ipc ready
+[2026-05-05 14:32:11.187] [info]   (preload) contextBridge exposed
+[2026-05-05 14:32:11.401] [info]   (renderer) auth.listen attached
+[2026-05-05 14:32:12.998] [warn]   (main)     auto-updater check failed: network
+```
+
+With the single-instance lock off, every file line carries the writing process's id after the level, so overlapping launches can be told apart:
+
+```
+[2026-05-05 14:32:11.045] [info]  [pid 12345]  (main) omega.initialize
+[2026-05-05 14:32:11.187] [info]  [pid 12345]  (preload) contextBridge exposed
+[2026-05-05 14:32:11.402] [info]  [pid 12388]  (main) omega.initialize
 ```
 
 Grep one context with:
 
 ```bash
-grep ' main ' logs/runtime.log
+grep '(main)' logs/runtime.log
 ```
 
 ## CLI: `npx omega logs`
@@ -213,7 +221,7 @@ Five separate logs in `<projectRoot>/logs/`:
 
 | File | Source | Lifetime |
 |---|---|---|
-| `runtime.log` | Packaged-app runtime in dev mode | Persistent, rotates at 10 MB to `runtime.old.log` (one archive generation) |
+| `runtime.log` | Packaged-app runtime in dev mode | Lock on (the default): emptied of earlier launches' lines by the launch that holds the lock; a duplicate launch leaves it alone. Lock off (`protocol.singleInstance: false`): appended by every launch, each line tagged `[pid <n>]`. Both rotate at 10 MB to `runtime.old.log` (one archive generation) |
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |

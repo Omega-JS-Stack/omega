@@ -1,18 +1,14 @@
 /**
- * Edge service — reconciles the brand's zone to `edge.providers.cloudflare`
- * in omega.json5: zone existence, DNS records, email routing, zone settings,
- * rulesets (cache/redirect/configuration/response-headers/security/managed-
- * transforms), speed tests, and workers. Ported from omega-manager; every
- * handler follows read → diff → write because Cloudflare requires fetching
- * current state before patching.
+ * Edge service: reconciles the brand's zone to `edge.providers.cloudflare`
+ * in omega.json5: zone, DNS records, email routing, zone settings, rulesets
+ * (cache/redirect/configuration/response-headers/security/managed-transforms),
+ * speed tests, Web Analytics, and workers. Every handler follows read → diff →
+ * write (Cloudflare requires current state before patching) and caches its
+ * read step to .omega/cache/cloudflare/{op}.json.
  *
  * Auth: CLOUDFLARE_TOKEN in the brand .env. No token → the service skips.
- *
- * Subdomain projects (brand.url is not an apex domain) use the parent zone
- * and only run zone + dns-records — zone-level settings belong to the parent
- * brand.
- *
- * Each handler caches its read step to .omega/cache/cloudflare/{op}.json.
+ * Subdomain projects (brand.url not an apex) use the parent zone and run only
+ * zone + dns-records; zone-level settings belong to the parent brand.
  */
 const chalk = require('chalk').default;
 const { serviceInputSpec } = require('../../config.js');

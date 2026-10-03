@@ -215,8 +215,14 @@ const USER_SCHEMA = {
       national: { type: 'number', default: 0 },
     },
   },
+  // Two levels, provider then the linked account's identity id
+  // (`connections.<provider>.<identityId>`): the record below that is the
+  // backend route's, stored as it wrote it.
   connections: {
     $passthrough: true,
+    $template: {
+      $passthrough: true,
+    },
   },
   attribution: {
     affiliate: {

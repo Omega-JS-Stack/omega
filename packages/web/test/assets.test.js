@@ -283,6 +283,22 @@ test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runti
   assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
 });
 
+test('a production build writes a .map beside the main bundle, and the manifest names no map', async () => {
+  const manifest = await build(['classy', 'base']);
+  assert.ok(fs.existsSync(path.join(OUT, `${manifest.js.main.slice(1)}.map`)), 'main.js.map sits beside the main bundle');
+
+  // Every string the js block holds, entry URLs and the `imports` keys and lists alike.
+  const urls = [];
+  const collect = (value) => {
+    if (typeof value === 'string') urls.push(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => { urls.push(key); collect(inner); });
+  };
+  collect(manifest.js);
+  assert.ok(Object.keys(manifest.js.imports).length > 0, 'the imports map was read');
+  assert.deepStrictEqual(urls.filter((url) => url.endsWith('.map')), [], 'no source map is an entry or a preload');
+});
+
 test('tooltips: one shared initializer on the core layer, wired by every theme (#99)', async () => {
   // The initializer had a byte-identical copy under every theme's js/ — a fix
   // had to be made three times. One home on the core layer, imported through

@@ -56,6 +56,7 @@
  */
 
 import { createLogger } from './logger.js';
+import { replaceChildren } from './dom.js';
 import {
   renderVertDocument,
   applyVertUtm,
@@ -935,9 +936,7 @@ class Verts {
    * @returns {{ lane: string, unit: PromoUnit }}
    */
   renderPromo($el, options = {}) {
-    if (typeof $el.replaceChildren === 'function') {
-      $el.replaceChildren();
-    }
+    replaceChildren($el);
 
     // A previous lane may have hidden, capped or clipped the host; the promo
     // unit re-applies its own ceiling when the slot is sized

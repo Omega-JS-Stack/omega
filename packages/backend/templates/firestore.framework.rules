@@ -172,7 +172,7 @@ service cloud.firestore {
     // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
     // `connections` is a CREDENTIAL STORE, not a record: the account page renders
     // whatever sits there as a live connection, and the status route hands
-    // `connections.<provider>.token.refresh_token` straight to the provider, so a
+    // `connections.<provider>.<id>.token.refresh_token` straight to the provider, so a
     // client write forges a connection AND plants a token the server then
     // spends ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)).
     // `activity` is the sign-in/security trail (IP, user agent, locale) the

@@ -2,7 +2,7 @@
 
 The `edge` service reconciles the brand's zone to `edge.providers.cloudflare` in
 `config/omega.json5`: the zone itself, DNS records, email routing, zone settings, the five
-rulesets, scheduled speed tests, and workers. It runs early — third in the walk — because
+rulesets, scheduled speed tests, Web Analytics, and workers. It runs early — third in the walk — because
 every DNS-dependent service after it needs the zone to exist. Every handler follows
 read → diff → write (Cloudflare requires fetching current state before patching), and each
 read step is cached to `.omega/cache/cloudflare/{op}.json` as a debugging aid.
@@ -22,6 +22,7 @@ read step is cached to `.omega/cache/cloudflare/{op}.json` as a debugging aid.
 | `rules-response-headers` | The `http_response_headers_transform` ruleset (always PUT — at the ruleset's id when it exists, at the phase entrypoint when it does not). |
 | `rules-security` | Custom firewall rules in `http_request_firewall_custom`. |
 | `speed-scheduled-tests` | The homepage's Speed Test schedule (a create-or-replace POST on the custom Speed API endpoint). |
+| `web-analytics` | Cloudflare Web Analytics, the beacon Cloudflare injects at the edge. It is ACCOUNT-level: the operation lists the account's RUM sites, finds the one for this zone, and makes its `enabled` match `webAnalytics.enabled` (a missing site is created with automatic install only when the key is `true`). A 403 (a token without "Account Settings Write") returns **warned** naming that permission, and the walk goes on; any other error, on the list or a write, fails the walk. |
 | `workers` | Worker scripts + routes from `edge.providers.cloudflare.workers` — `script` names a file in the service's own `workers/` dir, `route` supports `{ domain }` templating. Unconfigured workers and routes are removed. |
 
 ## Config
@@ -37,13 +38,20 @@ Everything sits under `edge.providers.cloudflare`:
 - `settings` — the zone-settings map, keyed by Cloudflare's setting IDs exactly.
 - `cacheRules[]`, `rules.{managedTransforms,redirect,configuration,responseHeaders,security}`,
   `speedTest.{frequency,region}`, `workers[]`.
+- `webAnalytics.enabled`: default `true`, so the zone carries the beacon unless a brand or
+  company layer says `false`. The beacon sits outside the consent gate
+  ([docs/shared/analytics.md](../shared/analytics.md)). So the first manage run of a brand
+  whose zone has no Web Analytics site creates one with automatic install, and the zone starts
+  injecting the beacon on that run. Every update sends `auto_install: true`, so a site set up
+  for a hand-installed snippet becomes an automatic one.
 
 The schema's defaults hold PLATFORM answers only, resolved but never written into a brand file
 (`materialize: false`, docs/shared/config.md); company-specific values (DMARC report
 addresses, the BIMI logo, extra CSP hosts) belong in the company or brand layer.
 
 **Credential**: `CLOUDFLARE_TOKEN` in the brand `.env`, asked for through the shared setup
-contract. No `brand.url` → the service skips.
+contract, with Zone edit on the brand zone plus "Account Settings Write" (the `web-analytics`
+operation's RUM endpoints are account-level). No `brand.url` → the service skips.
 
 **The email asks.** The service's setup asks for the mailbox provider when none is picked
 (`domain.email.providers`, a choice from the registry's mailbox providers, landed as the
@@ -62,14 +70,14 @@ nothing deleted. A headless or dry run never asks: it prints the one line naming
 `config/omega.json5`. A subdomain project is never asked, since its parent brand owns the
 apex mail records.
 
-## Cache lifetimes: /assets for a year, HTML for a minute
+## Cache lifetimes: /assets and /build.js for a year, HTML for a minute
 
 The schema's defaults carry the whole `cacheRules` set, so a brand that declares no rules
 still reconciles both of them ([#751](https://github.com/Omega-JS-Stack/omega/issues/751)):
 
 | Rule | Matches | Edge TTL | Browser TTL |
 |---|---|---|---|
-| `Assets: Cache for 1 Year` | `/assets/*` plus `/__/auth/iframe.js`, on any host | 1 year | 1 year |
+| `Assets: Cache for 1 Year` | `/assets/*` plus `/__/auth/iframe.js` and `/build.js`, on any host | 1 year | 1 year |
 | `HTML: Short Browser Cache` | a SITE host (not `api.`), outside `/assets`, with no file extension or ending `.html` | 2 hours | 1 minute |
 
 The safety in the one-year rule is the CONTENT HASH, and only the CSS and JS bundles carry
@@ -80,6 +88,13 @@ stable names by design (`assets/fonts/inter-normal-latin.woff2`,
 theme CSS. So replacing a font file or a logo in place pins the OLD file in visitors'
 browsers for up to a year, and a purge cannot reach a browser copy: ship such a replacement
 under a new filename, or accept the year.
+
+`/build.js`, the build snapshot every page and the service worker load, keeps ONE URL on
+purpose, so its safety is the BUILD STAMP instead of a hash: every loader of it names the
+build in its query string. The head writes `/build.js?cb=<stamp>`, and the service worker's
+`importScripts` carries the same stamp, baked into the worker bundle at build
+(`__OMEGA_BUILD_STAMP__`). A new build is a new URL at every loader, so the old copy can be
+held for a year.
 
 HTML is the opposite of a hashed bundle: its URL never changes, so whatever a browser holds
 IS what a returning visitor sees until it expires. One minute is short enough that a deploy
@@ -98,7 +113,7 @@ are the non-site hosts the stack creates, at every shape it builds (`api.brand.c
 `api.app.brand.com` — `packages/manager/src/services/cloud/ensure/hosting.js`;
 `emailurl.<domain>` — `packages/manager/src/services/edge/lib/dns-records-helpers.js`). A
 hand-added `dns.records` host for some other service is not covered; declare your own
-`cacheRules` in that case. The assets rule needs no guard: both of its paths are static files
+`cacheRules` in that case. The assets rule needs no guard: all three of its paths are static files
 wherever they are served from.
 
 The two rules cannot both match one request — the HTML expression excludes `/assets` across

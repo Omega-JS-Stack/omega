@@ -9,6 +9,7 @@
 // merged into a built-in section when it reuses its id.
 
 // Libraries
+import { replaceChildren } from '@omega.js/client/modules/dom.js';
 import omega from '@omega.js/web/runtime';
 import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
@@ -463,7 +464,7 @@ export default function devPalette() {
   const renderStorage = () => {
     const keys = Object.keys(omega.storage.get() || {});
     const previous = storageTarget.value;
-    storageTarget.replaceChildren();
+    replaceChildren(storageTarget);
 
     const all = doc.createElement('option');
     all.value = '';

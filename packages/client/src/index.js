@@ -16,6 +16,7 @@ import { createMotion } from './modules/motion.js';
 import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
 import { createLogger } from './modules/logger.js';
 import { pathPrefix } from './modules/path-prefix.js';
+import { loadOnce, loadFirestore, loadMessaging } from './modules/firebase-services.js';
 // The environment is the ONE module's, vendored in at prepare time like every
 // other shared contract this runtime hosts
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). Its one input in
@@ -135,6 +136,12 @@ class Omega {
       // Set platform and runtime on HTML element
       this._setHtmlDataAttributes();
 
+      // Sentry starts once the page is idle, never on the boot path: the early-
+      // error buffer goes in now, and the SDK replays it when it has loaded
+      if (this.config.sentry?.enabled) {
+        this.sentry.schedule(this.config.sentry.config);
+      }
+
       // Initialize Firebase if a config blob is present (presence-driven — matches @omega.js/backend
       // convention). Reads `cloud.config` (the omega.json5 canonical shape — desktop passes its
       // resolved config through) and falls back to nested `firebase.app.config` (the web/extension
@@ -146,11 +153,6 @@ class Omega {
         await this._initializeFirebase();
       } else {
         firebaseLogger.log('Skipped: config has no apiKey (Firebase-less site or empty framework merge blob)');
-      }
-
-      // Initialize Sentry if enabled
-      if (this.config.sentry?.enabled) {
-        await this.sentry.init(this.config.sentry.config);
       }
 
       // Initialize Analytics when the google provider is configured
@@ -570,8 +572,6 @@ class Omega {
     // Dynamically import Firebase v12
     const { initializeApp } = await import('firebase/app');
     const { getAuth, onAuthStateChanged } = await import('firebase/auth');
-    const { initializeFirestore } = await import('firebase/firestore');
-    const { getMessaging } = await import('firebase/messaging');
 
     // If we're in devmode, set the firebase config authDomain to the current host
     // if (this.isDevelopment() && firebaseConfig) {
@@ -587,43 +587,17 @@ class Omega {
     // Store Firebase references
     this._firebaseApp = app;
     this._firebaseAuth = getAuth(app);
-    this._firebaseFirestore = initializeFirestore(app, {});
 
-    // Connect to the local emulator suite whenever this page runs against a LOCAL
-    // stack (`_localStack()`), ZERO flags (N5): development means LOCAL Firebase,
-    // period, so `omega dev` pages mutate data, test rules instantly and seed the
-    // frontend; a testing run handed a dev port map (the desktop boot lane, the
-    // extension's emulator run, whose renderers answer the running word since #925)
-    // connects the same way, as the desktop client-bridge and the extension worker
-    // already do for their own auth. Production builds (environment=production)
-    // never connect. There is deliberately NO live-Firebase opt-out for dev: build
-    // production locally if you truly need live. Ports come from the resolved dev
-    // map, and ONLY
-    // from it (#834): the `dev.ports` chrome, then `window.__OMEGA_DEV_PORTS__`
-    // for the keys it omits. A key nobody resolved throws by name.
-    // Both connects live HERE, immediately after the instances are created: the auth
-    // module reads accounts via the instance's `firebaseFirestore` directly, so connecting
-    // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
-    // Auth warnings banner disabled: it injects a DOM overlay that interferes with
-    // page content in automated flows.
+    // A LOCAL stack (`_localStack()`: development, or a testing run handed a dev
+    // port map) talks to the emulators, never live Firebase; production never
+    // connects. Auth connects here, at creation; Firestore connects inside its
+    // loader, before any read. Ports come from the resolved dev map only.
     if (this._localStack()) {
-      const firestorePort = this._devPort('firestore');
       const authEmulatorUrl = this._authEmulatorUrl();
-      firebaseLogger.log(`Connecting to emulators (auth ${authEmulatorUrl}, firestore :${firestorePort})`);
+      firebaseLogger.log(`Connecting the auth emulator (${authEmulatorUrl})`);
       const { connectAuthEmulator } = await import('firebase/auth');
-      const { connectFirestoreEmulator } = await import('firebase/firestore');
+      // No warnings banner: its DOM overlay gets in the way of automated flows
       connectAuthEmulator(this._firebaseAuth, authEmulatorUrl, { disableWarnings: true });
-      connectFirestoreEmulator(this._firebaseFirestore, '127.0.0.1', firestorePort);
-      firebaseLogger.log('Emulators connected');
-    }
-
-    // Only initialize messaging if service workers AND push are supported —
-    // getMessaging() floats an unhandled unsupported-browser rejection otherwise
-    if ('serviceWorker' in navigator && typeof window !== 'undefined' && 'PushManager' in window) {
-      this._firebaseMessaging = getMessaging(app);
-    } else {
-      console.warn('Service workers or push not available - Firebase Messaging disabled');
-      this._firebaseMessaging = null;
     }
 
     // Initialize Firebase App Check if enabled
@@ -696,8 +670,17 @@ class Omega {
   // Getters for Firebase services
   get firebaseApp() { return this._firebaseApp; }
   get firebaseAuth() { return this._firebaseAuth; }
-  get firebaseFirestore() { return this._firebaseFirestore; }
-  get firebaseMessaging() { return this._firebaseMessaging; }
+
+  // Firestore and messaging load on first use, never at boot: ONE memoized
+  // promise of each instance (modules/firebase-services.js). A caller gates on
+  // `firebaseApp` first; a call on a page with no Firebase rejects by name.
+  loadFirebaseFirestore() {
+    return loadOnce(this, '_firestoreLoad', loadFirestore);
+  }
+
+  loadFirebaseMessaging() {
+    return loadOnce(this, '_messagingLoad', loadMessaging);
+  }
 
   // The environment surface (#817): ONE implementation, shared with every other
   // OMEGA target, reading ONE input. In this runtime that input is

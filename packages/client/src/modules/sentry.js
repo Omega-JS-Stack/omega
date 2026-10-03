@@ -15,8 +15,25 @@
 import monitoring from '@omega.js/monitoring/browser';
 import monitoringCore from '@omega.js/monitoring/core';
 import { createLogger } from './logger.js';
+import { whenSettled } from './dom.js';
 
 const logger = createLogger('sentry');
+
+// How long an idle wait may take: the idle callback's deadline, and the timer
+// a browser with no requestIdleCallback waits instead
+const IDLE_WAIT_MS = 3000;
+
+// What a replayed event was caught by, marked the way the SDK's own global
+// handlers mark theirs: unhandled, never a deliberate capture
+const EARLY_ERROR_MECHANISMS = {
+  error: 'auto.browser.global_handlers.onerror',
+  unhandledrejection: 'auto.browser.global_handlers.onunhandledrejection',
+};
+
+// The page's early-error buffer, when one was installed (reporting is on)
+function earlyErrorBuffer() {
+  return typeof window !== 'undefined' ? window.__OMEGA_EARLY_ERRORS : null;
+}
 
 class Sentry {
   constructor(omega) {
@@ -24,6 +41,24 @@ class Sentry {
     this.initialized = false;
     this.Sentry = null;
     this.config = null;
+    this._earlyErrorsClosed = false;
+  }
+
+  /**
+   * Start error tracking off the boot path: install the early-error buffer
+   * now, and load the SDK once the page is idle.
+   * @param {Object} config - the resolved Sentry settings for this surface
+   */
+  schedule(config) {
+    monitoring.installEarlyErrorBuffer(window);
+
+    // init() logs its own failure; a scheduled start has no caller to rethrow to.
+    // Where requestIdleCallback is missing, a timer stands in for it.
+    whenSettled(() => this.init(config).catch(() => {}), {
+      doc: window.document,
+      timeout: IDLE_WAIT_MS,
+      fallbackDelay: IDLE_WAIT_MS,
+    });
   }
 
   /**
@@ -75,18 +110,56 @@ class Sentry {
 
         sdk.init(this.config);
         this.initialized = true;
+        this._replayEarlyErrors();
 
         return { initialized: true };
       })
       .catch((error) => {
         logger.error('Failed to initialize:', error);
+        // No SDK will ever replay the buffer: let go of it rather than grow it
+        this._closeEarlyErrors();
         throw error;
       });
   }
 
   /**
+   * Hand everything the early-error buffer kept to the SDK's capture path, so
+   * the filters apply: from here on the SDK's own handlers capture, and each
+   * error is captured once.
+   */
+  _replayEarlyErrors() {
+    this._closeEarlyErrors().forEach((entry) => {
+      if (entry.type === 'capture') {
+        this.Sentry.captureException(entry.error, entry.context);
+        return;
+      }
+
+      const error = entry.type === 'unhandledrejection' ? entry.reason : (entry.error || entry.message);
+      this.Sentry.captureException(error, { mechanism: { handled: false, type: EARLY_ERROR_MECHANISMS[entry.type] } });
+    });
+  }
+
+  /**
+   * Stop the early-error buffer's listeners and empty it, for good: after a
+   * replay, or after an SDK load that failed.
+   * @returns {Array} the entries it held
+   */
+  _closeEarlyErrors() {
+    const buffer = earlyErrorBuffer();
+    this._earlyErrorsClosed = true;
+
+    if (!buffer) {
+      return [];
+    }
+
+    buffer.stop();
+    return buffer.splice(0);
+  }
+
+  /**
    * Capture an exception and send to Sentry
-   * Safe to call even if Sentry is not initialized
+   * Safe to call even if Sentry is not initialized: before the SDK has loaded,
+   * the capture waits in the early-error buffer (when reporting is on)
    * @param {Error} error - The error to capture
    * @param {Object} captureContext - Additional context for the error
    * @returns {string|null} Event ID if successful, null otherwise
@@ -97,6 +170,14 @@ class Sentry {
 
     // Safe to call - won't throw if not initialized
     if (!this.initialized) {
+      const buffer = this._earlyErrorsClosed ? null : earlyErrorBuffer();
+
+      if (buffer) {
+        logger.log('Not initialized, buffered for replay');
+        buffer.push({ type: 'capture', error, context: captureContext });
+        return null;
+      }
+
       logger.log('Not initialized, skipping capture');
       return null;
     }

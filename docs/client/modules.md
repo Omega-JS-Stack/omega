@@ -75,11 +75,14 @@ const { user } = omega.auth;
 - **Key Methods**: `doc(path)`, `collection(path)`
 - **Doc Methods**: `.get()`, `.set()`, `.update()`, `.delete()`
 - **Query Methods**: `.where()`, `.orderBy()`, `.limit()`, `.startAt()`, `.endAt()`
+- **Instance**: the first read awaits `omega.loadFirebaseFirestore()`, the one Firestore instance (emulator already connected on a local stack); there is no second `getFirestore` path. Code that needs the raw instance (the admin pages' count queries) awaits the same loader. See [architecture.md § What boot loads](architecture.md#what-boot-loads-and-what-waits-for-first-use)
 
 ## Notifications (`notifications.js`)
 
 - **Class**: `Notifications`
 - **Key Methods**: `isSupported()`, `isSubscribed()`, `subscribe()`, `unsubscribe()`, `getToken()`, `onMessage()`
+- **`isSupported()`**: synchronous. True when the browser has Notification, a service worker and the Push API, and Firebase is configured (`omega.firebaseApp`). It never loads the messaging SDK
+- **Messaging instance**: every method that needs it awaits `omega.loadFirebaseMessaging()`, so the SDK loads at the first subscribe, token read or foreground listener, once per page
 - **Storage**: Saves to localStorage and Firestore
 - **VAPID key**: resolved from `config.cloud.messaging.vapidKey` (the omega.json5 home; the web engine bridges it into the `firebase.messaging.config.vapidKey` contract shape too). Public by design.
 
@@ -118,12 +121,18 @@ const { user } = omega.auth;
 ## Sentry (`sentry.js`)
 
 - **Class**: `Sentry` (`omega.sentry`)
-- **Key Methods**: `init(config)`, `captureException(error, context)`
+- **Key Methods**: `schedule(config)`, `init(config)`, `captureException(error, context)`
+- **Start**: `initialize()` calls `schedule()` when Sentry is on and never awaits the SDK. `schedule()` installs the early-error buffer (`@omega.js/monitoring/browser`'s `installEarlyErrorBuffer`), then hands `init()` to `dom.js`'s `whenSettled`, with a timer standing in where `requestIdleCallback` is missing. A test drives the window's `requestIdleCallback` (or its `load` event). The sequence and its timings: [monitoring.md § When Sentry starts](../shared/monitoring.md#when-sentry-starts)
+- **Replay**: when `init()` has initialized the SDK it captures every buffered entry through `Sentry.captureException` (so `beforeSend`'s filters apply), stops the buffer's listeners and empties it: each early error is captured once. A buffered `error` or `unhandledrejection` rides the SDK's own global-handler mechanism (`handled: false`, `auto.browser.global_handlers.onerror` / `.onunhandledrejection`); a buffered `captureException()` call keeps its own context
+- **Before init**: `captureException()` pushes `{ type: 'capture', error, context }` to the buffer instead of dropping it; with Sentry off (no buffer) it logs and returns null
+- **Failed load**: when `init()` rejects (the SDK import failed), the buffer's listeners stop and it empties for good, and `captureException()` stops pushing
 - **Filtering**: Blocks dev mode, Lighthouse, Selenium/Puppeteer
 
 ## DOM (`dom.js`)
 
-- **Exports**: `loadScript(options)`, `ready()`
+- **Exports**: `loadScript(options)`, `ready()`, `whenSettled(fn, options)`, `replaceChildren(el, ...nodes)`
+- **`replaceChildren(el, ...nodes)`**: the ONE way browser code swaps an element's children. It calls the native `replaceChildren` where the browser has it, else clears `innerHTML` and appends, because the native method is newer than the browser floor ([devkit](../devkit/index.md)'s `NEWER_BROWSER_APIS`). Every other site calls this helper (motion's marquee, verts' promo, web's dev palette and the verts test page)
+- **`whenSettled(fn, { timeout, fallbackDelay, doc })`**: the ONE scheduler for work kept out of the first-paint window (the motion dotfield, the Sentry SDK). Once `doc` is complete (no `doc` counts as complete), or at the window's `load`, or after a 10 s ceiling when `load` never fires, it asks `requestIdleCallback` with `timeout`; where that is missing it runs `fn` after `fallbackDelay` ms, or at once when none is given
 - **loadScript Options**: src, async, defer, crossorigin, integrity, timeout, retries
 
 ## Utilities (`utilities.js`)

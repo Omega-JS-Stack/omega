@@ -46,47 +46,45 @@ const INSTANCE_ID = crypto.randomBytes(8).toString('hex');
  *
  * @param {object} snapshot - A Firestore document snapshot
  * @param {string} provider - The provider key
+ * @param {string} id - The linked account's identity id
  * @returns {object} The record, or {}
  */
-function connectionRecord(snapshot, provider) {
-  return (snapshot.data() || {}).connections?.[provider] || {};
+function connectionRecord(snapshot, provider, id) {
+  return (snapshot.data() || {}).connections?.[provider]?.[id] || {};
 }
 
 /**
- * Take the refresh lease on `users/<uid>.connections.<provider>`, in a
- * transaction so two instances reading the same absent lease cannot both write
- * one.
+ * Take the refresh lease on `users/<uid>.connections.<provider>.<id>` in a
+ * transaction. The WINNER refreshes and clears the lease (its own write, or
+ * clearRefreshLease() on failure); a LOSER waits in awaitRefreshedToken(); an
+ * id with no stored token is `missing` and nothing is written.
  *
- * The caller that WINS runs the provider refresh and is the one that clears the
- * lease (in its own write, or through clearRefreshLease() when it fails). The
- * caller that LOSES touches the provider not at all — it waits for the winner's
- * token with awaitRefreshedToken().
- *
- * @param {object} options
- * @param {object} options.admin - The firebase-admin library (the route's own handle)
- * @param {string} options.uid - The user the connection belongs to
- * @param {string} options.provider - The provider key
- * @returns {Promise<{won: boolean, lease: object, updatedUNIX: number, token: object|undefined}>}
- *   Whether this caller holds the lease, the lease note (this caller's, or the
- *   holder's when it lost), the `updated.timestampUNIX` the record carried at
- *   entry — the value a loser watches for movement past — and the stored token
- *   AS THE TRANSACTION SAW IT, which is the one a winner refreshes with
+ * @param {object} options - `admin`, the `uid`, the `provider` key and the account's `id`
+ * @returns {Promise<{won: boolean, missing: boolean, lease: object|null, updatedUNIX: number, token: object|undefined}>}
+ *   The lease note (this caller's, or the holder's), the `updated.timestampUNIX`
+ *   seen at entry (what a loser watches), and the token the TRANSACTION saw
  */
-async function acquireRefreshLease({ admin, uid, provider }) {
+async function acquireRefreshLease({ admin, uid, provider, id }) {
   const firestore = admin.firestore();
   const docRef = firestore.doc(`users/${uid}`);
 
   return firestore.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(docRef);
-    const record = connectionRecord(snapshot, provider);
+    const record = connectionRecord(snapshot, provider, id);
 
     const nowMs = Date.now();
     const nowUNIX = Math.floor(nowMs / 1000);
     const updatedUNIX = record.updated?.timestampUNIX || 0;
     const held = record.refreshing;
 
+    // No stored account at that id: nothing to refresh, and a lease note
+    // written there would plant a record with no token
+    if (!record.token) {
+      return { won: false, missing: true, lease: null, updatedUNIX, token: undefined };
+    }
+
     if (held && nowUNIX - (held.timestampUNIX || 0) < LEASE_TTL_SECONDS) {
-      return { won: false, lease: held, updatedUNIX, token: record.token };
+      return { won: false, missing: false, lease: held, updatedUNIX, token: record.token };
     }
 
     const lease = {
@@ -96,10 +94,10 @@ async function acquireRefreshLease({ admin, uid, provider }) {
     };
 
     transaction.set(docRef, {
-      connections: { [provider]: { refreshing: lease } },
+      connections: { [provider]: { [id]: { refreshing: lease } } },
     }, { merge: true });
 
-    return { won: true, lease, updatedUNIX, token: record.token };
+    return { won: true, missing: false, lease, updatedUNIX, token: record.token };
   });
 }
 
@@ -112,11 +110,12 @@ async function acquireRefreshLease({ admin, uid, provider }) {
  * @param {object} options.admin - The firebase-admin library
  * @param {string} options.uid - The user the connection belongs to
  * @param {string} options.provider - The provider key
+ * @param {string} options.id - The linked account's identity id
  * @returns {Promise<void>}
  */
-async function clearRefreshLease({ admin, uid, provider }) {
+async function clearRefreshLease({ admin, uid, provider, id }) {
   await admin.firestore().doc(`users/${uid}`).set({
-    connections: { [provider]: { refreshing: FieldValue.delete() } },
+    connections: { [provider]: { [id]: { refreshing: FieldValue.delete() } } },
   }, { merge: true });
 }
 
@@ -142,20 +141,21 @@ async function clearRefreshLease({ admin, uid, provider }) {
  * @param {object} options.admin - The firebase-admin library
  * @param {string} options.uid - The user the connection belongs to
  * @param {string} options.provider - The provider key
+ * @param {string} options.id - The linked account's identity id
  * @param {number} options.since - The `updated.timestampUNIX` seen at entry
  * @param {number} [options.pollMs] - Milliseconds between reads
  * @param {number} [options.timeoutMs] - Milliseconds before giving up
  * @returns {Promise<{outcome: 'refreshed'|'abandoned'|'timeout', token: object|null}>}
  *   The outcome, and the stored token on `refreshed` alone
  */
-async function awaitRefreshedToken({ admin, uid, provider, since, pollMs = LEASE_POLL_MS, timeoutMs = LEASE_WAIT_MS }) {
+async function awaitRefreshedToken({ admin, uid, provider, id, since, pollMs = LEASE_POLL_MS, timeoutMs = LEASE_WAIT_MS }) {
   const docRef = admin.firestore().doc(`users/${uid}`);
   const startTime = Date.now();
 
   while (true) {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
 
-    const record = connectionRecord(await docRef.get(), provider);
+    const record = connectionRecord(await docRef.get(), provider, id);
 
     // The winner writes the token, the stamp and the note's removal in ONE
     // write, so a moved stamp is checked first: it is the only success

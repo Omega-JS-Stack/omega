@@ -549,8 +549,8 @@ test('users: sparse doc gets the full @omega.js/account backfill with auth-recon
 test('#788: users: oauth2 moves to connections, each record stamped with its kind', async () => {
   const doc = convergedUser();
   doc.data.oauth2 = {
-    google: { token: { refresh_token: 'r-1' }, identity: { email: 'g@example.com' } },
-    discord: { token: { refresh_token: 'r-2' } },
+    google: { token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1', email: 'g@example.com' } },
+    discord: { token: { refresh_token: 'r-2' }, identity: { id: 'discord-1' } },
   };
   delete doc.data.connections;
   const firestore = collectionOf([doc]);
@@ -564,8 +564,8 @@ test('#788: users: oauth2 moves to connections, each record stamped with its kin
     'users/uid-1',
     {
       connections: {
-        google: { token: { refresh_token: 'r-1' }, identity: { email: 'g@example.com' }, type: 'oauth2' },
-        discord: { token: { refresh_token: 'r-2' }, type: 'oauth2' },
+        google: { 'google-sub-1': { token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1', email: 'g@example.com' }, type: 'oauth2' } },
+        discord: { 'discord-1': { token: { refresh_token: 'r-2' }, identity: { id: 'discord-1' }, type: 'oauth2' } },
       },
     },
     ['connections', 'oauth2'],
@@ -596,9 +596,9 @@ test('#793: users: a moved record gets the identity.id the connections route mat
     'users/uid-1',
     {
       connections: {
-        google: { token: { refresh_token: 'r-1' }, identity: { sub: 'google-sub-1', email: 'g@example.com', id: 'google-sub-1' }, type: 'oauth2' },
-        kick: { token: { refresh_token: 'r-2' }, identity: { user_id: 8675309, name: 'ianwieds', id: '8675309' }, type: 'oauth2' },
-        twitch: { token: { refresh_token: 'r-3' }, identity: { id: 'twitch-1', login: 'ianwieds' }, type: 'oauth2' },
+        google: { 'google-sub-1': { token: { refresh_token: 'r-1' }, identity: { sub: 'google-sub-1', email: 'g@example.com', id: 'google-sub-1' }, type: 'oauth2' } },
+        kick: { 8675309: { token: { refresh_token: 'r-2' }, identity: { user_id: 8675309, name: 'ianwieds', id: '8675309' }, type: 'oauth2' } },
+        twitch: { 'twitch-1': { token: { refresh_token: 'r-3' }, identity: { id: 'twitch-1', login: 'ianwieds' }, type: 'oauth2' } },
       },
     },
     ['connections', 'oauth2'],
@@ -607,7 +607,7 @@ test('#793: users: a moved record gets the identity.id the connections route mat
 
 test('#788: users: a document already moved is a zero-mutation no-op', async () => {
   const doc = convergedUser();
-  doc.data.connections = { google: { token: { refresh_token: 'r-1' }, type: 'oauth2' } };
+  doc.data.connections = { google: { 'google-sub-1': { token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1' }, type: 'oauth2' } } };
   const firestore = collectionOf([doc]);
 
   const result = await runService(brandConfig(), {
@@ -640,19 +640,19 @@ test('#793: users: a document already at connections still gains the identity.id
     'users/uid-1',
     {
       connections: {
-        google: { token: { refresh_token: 'r-1' }, identity: { sub: 'google-sub-1', email: 'g@example.com', id: 'google-sub-1' }, type: 'oauth2' },
-        kick: { token: { refresh_token: 'r-2' }, identity: { user_id: 8675309, id: '8675309' }, type: 'oauth2' },
-        twitch: { token: { refresh_token: 'r-3' }, identity: { id: 'twitch-1' }, type: 'oauth2' },
+        google: { 'google-sub-1': { token: { refresh_token: 'r-1' }, identity: { sub: 'google-sub-1', email: 'g@example.com', id: 'google-sub-1' }, type: 'oauth2' } },
+        kick: { 8675309: { token: { refresh_token: 'r-2' }, identity: { user_id: 8675309, id: '8675309' }, type: 'oauth2' } },
+        twitch: { 'twitch-1': { token: { refresh_token: 'r-3' }, identity: { id: 'twitch-1' }, type: 'oauth2' } },
       },
     },
     ['connections'],
-  ]], 'only `connections` is written — there is no oauth2 key to delete');
+  ]], 'only `connections` is written: there is no oauth2 key to delete');
 });
 
 test('#793: users: a document whose connections need nothing is a zero-mutation no-op', async () => {
   const doc = convergedUser();
   doc.data.connections = {
-    google: { token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1', sub: 'google-sub-1' }, type: 'oauth2' },
+    google: { 'google-sub-1': { token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1', sub: 'google-sub-1' }, type: 'oauth2' } },
   };
   const firestore = collectionOf([doc]);
 
@@ -666,8 +666,11 @@ test('#793: users: a document whose connections need nothing is a zero-mutation 
 
 test('#788: users: both keys present keeps connections and deletes oauth2 only', async () => {
   const doc = convergedUser();
-  doc.data.connections = { google: { token: { refresh_token: 'current' }, type: 'oauth2' } };
-  doc.data.oauth2 = { google: { token: { refresh_token: 'stale' } }, discord: { token: { refresh_token: 'r-2' } } };
+  doc.data.connections = { google: { 'google-sub-1': { token: { refresh_token: 'current' }, identity: { id: 'google-sub-1' }, type: 'oauth2' } } };
+  doc.data.oauth2 = {
+    google: { token: { refresh_token: 'stale' }, identity: { id: 'google-sub-1' } },
+    discord: { token: { refresh_token: 'r-2' }, identity: { id: 'discord-1' } },
+  };
   const firestore = collectionOf([doc]);
 
   const result = await runService(brandConfig(), {
@@ -679,12 +682,178 @@ test('#788: users: both keys present keeps connections and deletes oauth2 only',
     'users/uid-1',
     {
       connections: {
-        google: { token: { refresh_token: 'current' }, type: 'oauth2' },
-        discord: { token: { refresh_token: 'r-2' }, type: 'oauth2' },
+        google: { 'google-sub-1': { token: { refresh_token: 'current' }, identity: { id: 'google-sub-1' }, type: 'oauth2' } },
+        discord: { 'discord-1': { token: { refresh_token: 'r-2' }, identity: { id: 'discord-1' }, type: 'oauth2' } },
       },
     },
     ['connections', 'oauth2'],
   ]]);
+});
+
+// ─── connections keyed by identity id ───
+
+const GOOGLE_RECORD = () => ({ type: 'oauth2', token: { refresh_token: 'r-1' }, identity: { id: 'google-sub-1', sub: 'google-sub-1', email: 'g@example.com' } });
+const KICK_RECORD = () => ({ type: 'oauth2', token: { refresh_token: 'r-2' }, identity: { user_id: 8675309, name: 'ianwieds' } });
+
+/** The document one patchDoc leaves: every masked path set from the body, or deleted. */
+function patched(data, [, sets, mask]) {
+  const after = structuredClone(data);
+
+  for (const dotted of mask) {
+    const parts = dotted.split('.');
+    const leaf = parts.pop();
+    const parent = parts.reduce((node, part) => (node[part] ??= {}), after);
+    const value = parts.reduce((node, part) => node?.[part], sets)?.[leaf];
+
+    if (value === undefined) {
+      delete parent[leaf];
+    } else {
+      parent[leaf] = structuredClone(value);
+    }
+  }
+
+  return after;
+}
+
+async function runUsers(doc, { execute = true } = {}) {
+  const firestore = collectionOf([doc]);
+  const result = await runService(brandConfig(), {
+    auth: fakeAuth({ getUser: USER_RECORD }), firestore, options: { migration: 'users', execute },
+  });
+
+  return { result, firestore };
+}
+
+test('#1061: users: an old one-level connection record moves under its identity id', async () => {
+  // Kick's record predates `identity.id`: the earlier backfill fills it in, and
+  // the move keys the record by it in the same run
+  const doc = convergedUser();
+  doc.data.connections = { google: GOOGLE_RECORD(), kick: KICK_RECORD() };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+
+  const patches = firestore.of('patchDoc').map((c) => c.args);
+
+  assert.equal(patches.length, 1, 'one write for the document');
+  assert.equal(patches[0][0], 'users/uid-1');
+  assert.deepEqual(patched(doc.data, patches[0]).connections, {
+    google: { 'google-sub-1': GOOGLE_RECORD() },
+    kick: { 8675309: { ...KICK_RECORD(), identity: { user_id: 8675309, name: 'ianwieds', id: '8675309' } } },
+  }, 'each record sits one level down, under its identity id, its shape unchanged');
+});
+
+test('#1061: users: a second run of the connections move changes nothing', async () => {
+  const doc = convergedUser();
+  doc.data.connections = { google: GOOGLE_RECORD(), kick: KICK_RECORD() };
+
+  const first = await runUsers(doc);
+  const moved = { ...doc, data: patched(doc.data, first.firestore.of('patchDoc')[0].args) };
+
+  assert.deepEqual(Object.keys(moved.data.connections.google), ['google-sub-1'], 'the first run keyed the records');
+
+  const { result, firestore } = await runUsers(moved);
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(firestore.mutations(), [], 'a document in the keyed shape is never rewritten');
+});
+
+test('#1061: users: a record already keyed by its identity id is left alone', async () => {
+  const doc = convergedUser();
+  doc.data.connections = {
+    google: { 'google-sub-1': GOOGLE_RECORD(), 'google-sub-2': { ...GOOGLE_RECORD(), identity: { id: 'google-sub-2' } } },
+    discord: { type: 'oauth2', token: { refresh_token: 'r-3' }, identity: { id: 'discord-1', username: 'ian' } },
+  };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+  assert.equal(firestore.of('patchDoc').length, 1, 'the old record beside them is written');
+
+  const after = patched(doc.data, firestore.of('patchDoc')[0].args).connections;
+
+  assert.deepEqual(after.google, doc.data.connections.google, 'the keyed accounts are untouched');
+  assert.deepEqual(after.discord, { 'discord-1': doc.data.connections.discord }, 'while the old record beside them moves');
+});
+
+test('#1061: users: an old record with no identity id is dropped, and the log names the user and the provider', async (t) => {
+  const printed = t.mock.method(console, 'log', () => {});
+  const doc = convergedUser();
+  doc.data.connections = { google: GOOGLE_RECORD(), discord: { type: 'oauth2', token: { refresh_token: 'r-3' } } };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+  assert.equal(firestore.of('patchDoc').length, 1, 'one write for the document');
+  assert.deepEqual(patched(doc.data, firestore.of('patchDoc')[0].args).connections, {
+    google: { 'google-sub-1': GOOGLE_RECORD() },
+  }, 'the record no route could address is gone, never keyed and never left one level up');
+
+  const lines = () => printed.mock.calls.map((call) => call.arguments.join(' ').replace(/\x1b\[[0-9;]*m/g, ''));
+  const dropLines = () => lines().filter((line) => line.includes('uid-1') && line.includes('discord'));
+
+  assert.equal(dropLines().length, 1, `one log line names the user and the provider: ${lines().join(' | ')}`);
+  assert.ok(dropLines()[0].includes('Dropped connections.discord'), `with --execute it says the record was dropped: ${dropLines()[0]}`);
+
+  // The audit computes the same drop and says it only would
+  printed.mock.resetCalls();
+  const audit = convergedUser();
+  audit.data.connections = { discord: { type: 'oauth2', token: { refresh_token: 'r-3' } } };
+
+  const audited = await runUsers(audit, { execute: false });
+
+  assert.deepEqual(audited.firestore.mutations(), [], 'the audit writes nothing');
+  assert.equal(dropLines().length, 1, `the audit names the user and the provider too: ${lines().join(' | ')}`);
+  assert.ok(dropLines()[0].includes('Would drop connections.discord'), `in the audit's own words: ${dropLines()[0]}`);
+});
+
+test('#1061: users: a ghost entry with no token beside a keyed account keeps the account', async () => {
+  const doc = convergedUser();
+  const ghost = { refreshing: { instance: 'gone-instance', timestampUNIX: 1 } };
+  doc.data.connections = { google: { 'google-sub-1': GOOGLE_RECORD(), 'google-sub-2': ghost } };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+
+  const patches = firestore.of('patchDoc');
+  const after = patches.length ? patched(doc.data, patches[0].args).connections : doc.data.connections;
+
+  assert.deepEqual(after.google['google-sub-1'], GOOGLE_RECORD(), 'the valid account is kept where it is');
+});
+
+test('#1061: users: an account connected beside the old fields before the migration ends as a sibling', async () => {
+  // A user still in the old shape can connect again before the migration runs:
+  // the new account lands keyed, beside the old record's own top-level fields
+  const doc = convergedUser();
+  const fresh = { type: 'oauth2', token: { refresh_token: 'fresh-2' }, identity: { id: 'google-sub-2' } };
+  doc.data.connections = { google: { ...GOOGLE_RECORD(), 'google-sub-2': fresh } };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(patched(doc.data, firestore.of('patchDoc')[0].args).connections, {
+    google: { 'google-sub-1': GOOGLE_RECORD(), 'google-sub-2': fresh },
+  }, 'the old record moves under its id, and the fresh account stays its sibling');
+});
+
+test('#1061: users: the same identity reconnected before the migration keeps only the fresh record', async (t) => {
+  const printed = t.mock.method(console, 'log', () => {});
+  const doc = convergedUser();
+  const fresh = { type: 'oauth2', token: { refresh_token: 'fresh-1' }, identity: { id: 'google-sub-1' } };
+  doc.data.connections = { google: { ...GOOGLE_RECORD(), 'google-sub-1': fresh } };
+
+  const { result, firestore } = await runUsers(doc);
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(patched(doc.data, firestore.of('patchDoc')[0].args).connections, {
+    google: { 'google-sub-1': fresh },
+  }, 'the reconnect wins, and none of the stale fields survive');
+
+  const lines = printed.mock.calls.map((call) => call.arguments.join(' ').replace(/\x1b\[[0-9;]*m/g, ''));
+
+  assert.ok(lines.some((line) => line.includes('Dropped connections.google') && line.includes('uid-1')), `the stale record's drop is logged: ${lines.join(' | ')}`);
 });
 
 test('users: usage period → monthly migration and zero-total cleanup in one pinned patch', async () => {

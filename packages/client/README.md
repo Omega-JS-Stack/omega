@@ -267,10 +267,10 @@ omega.getApiUrl();                              // Get API URL (api.<brand.url h
 omega.isValidRedirectUrl('https://...');        // Validate redirect URL
 
 // Firebase instances (after initialization)
-omega.firebaseApp;       // Firebase App instance
-omega.firebaseAuth;      // Firebase Auth instance
-omega.firebaseFirestore; // Firestore instance
-omega.firebaseMessaging; // FCM instance
+omega.firebaseApp;                     // Firebase App instance (present = Firebase is configured)
+omega.firebaseAuth;                    // Firebase Auth instance
+await omega.loadFirebaseFirestore();   // Firestore instance, loaded on first use
+await omega.loadFirebaseMessaging();   // FCM instance on first use, null without service worker or push support
 
 // Configuration
 omega.config;            // Access full configuration
@@ -530,7 +530,7 @@ The skeleton automatically:
 
 ### Firestore
 
-Simplified Firestore wrapper with chainable queries:
+Simplified Firestore wrapper with chainable queries. The Firestore SDK loads on the first read, through `omega.loadFirebaseFirestore()`, never at boot:
 
 ```javascript
 const db = omega.firestore;
@@ -689,7 +689,7 @@ try {
 - Session duration tracking
 - Filters out Lighthouse and automated browsers (Selenium, Puppeteer)
 - Blocks sending in development mode
-- Dynamic import to reduce bundle size
+- Starts once the page is idle, never on the boot path: errors before then wait in the early-error buffer (`window.__OMEGA_EARLY_ERRORS`) and are captured once when the SDK loads, and so is a `captureException()` call made before it
 
 ### DOM Utilities
 

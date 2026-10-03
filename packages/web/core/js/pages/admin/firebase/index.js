@@ -133,7 +133,7 @@ function initRefresh() {
 // ============================================
 async function loadCollectionCounts() {
   const { collection, getCountFromServer } = await import('firebase/firestore');
-  const db = omega.firebaseFirestore;
+  const db = await omega.loadFirebaseFirestore();
 
   const $links = document.querySelectorAll('#collection-links [data-collection]');
   const promises = [];

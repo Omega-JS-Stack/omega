@@ -81,7 +81,7 @@ exports.default = series(exports.build, exports.serve);
 
 All bundled in production for source protection. `app.asar` alone is not obfuscation (anyone can `npx asar extract` it) — minification and name mangling are what protect framework + app source.
 
-Every bundle goes through @omega.js/devkit's ONE `bundle()` wrapper ([docs/devkit/index.md](../devkit/index.md)), which composes the shared parts: the framework-deps resolve hook (#87), the production `@dev-only` strip (#18), the minify/sourcemap rules by mode, and one timing line per build. `src/gulp/tasks/bundle.js` holds only what is desktop's own.
+Every bundle goes through @omega.js/devkit's ONE `bundle()` wrapper ([docs/devkit/index.md](../devkit/index.md)), which composes the shared parts: the framework-deps resolve hook (#87), the production `@dev-only` strip (#18), minify by mode with a source map in every mode, and one timing line per build. `src/gulp/tasks/bundle.js` holds only what is desktop's own.
 
 | Bundle | Entry | Output | Platform / format | Externals |
 |---|---|---|---|---|
@@ -135,7 +135,7 @@ Environment variables (set in-process by the `omega build` / `omega package` / `
 
 | Var | Effect |
 |---|---|
-| `OMEGA_BUILD_MODE=true` | Production bundles (minified, name-mangled, no sourcemaps, `@dev-only` blocks stripped) |
+| `OMEGA_BUILD_MODE=true` | Production bundles (minified, name-mangled, `@dev-only` blocks stripped; source maps beside them in `dist`, as in every mode, and never packaged) |
 | `OMEGA_BUILD_OUTPUT=<path>` | The boot-test seam: redirect the gulp BUILD output away from `<project>/dist` (absolute, or relative to the project root). Resolved by [src/utils/dist-root.js](../../packages/desktop/src/utils/dist-root.js), which every build task's output path goes through — but `omega clean` and the generated `electron-builder.yml` stay project-relative, so this is NOT a general relocation switch; packaging under it is unsupported. Used by the boot-test runner so a test build never collides with the `npm start` watcher's `dist/` ([test-boot-layer.md](test-boot-layer.md#isolated-build-output)) |
 | `OMEGA_IS_PUBLISH=true` | electron-builder runs with `--publish always` |
 | `OMEGA_IS_SERVER=true` | Running in CI |
