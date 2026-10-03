@@ -10,8 +10,7 @@
  *
  * Run: node --test scripts/repo-guidance.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -45,25 +44,40 @@ function sourceFiles() {
     .filter((file) => file && !EXEMPT_PATH.test(file.split('/src/')[1]) && fs.existsSync(path.join(ROOT, file)));
 }
 
-test('the hand-typed guidance pattern catches every spelling the copies used', () => {
-  assert.match('GitHub repo not configured (set repo.owner and brand.id in config/omega.json5)', HAND_TYPED);
-  assert.match('Set repo.owner (and brand.id) in config/omega.json5', HAND_TYPED);
-  assert.match('Direct deploy needs repo.owner and brand.id in config/omega.json5', HAND_TYPED);
-  assert.doesNotMatch('fix repo.owner in config/omega.json5 or move the repo', HAND_TYPED, 'the drift line says something else');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'repo-guidance',
+  tests: [
+    {
+      name: 'the hand-typed guidance pattern catches every spelling the copies used',
+      run: (ctx) => {
+        ctx.expect('GitHub repo not configured (set repo.owner and brand.id in config/omega.json5)').toMatch(HAND_TYPED);
+        ctx.expect('Set repo.owner (and brand.id) in config/omega.json5').toMatch(HAND_TYPED);
+        ctx.expect('Direct deploy needs repo.owner and brand.id in config/omega.json5').toMatch(HAND_TYPED);
+        ctx.expect('fix repo.owner in config/omega.json5 or move the repo', 'the drift line says something else').not.toMatch(HAND_TYPED);
+      },
+    },
 
-test('no file under packages/*/src but repo.js types the repo.owner and brand.id guidance', () => {
-  const hits = sourceFiles().filter((file) => HAND_TYPED.test(fs.readFileSync(path.join(ROOT, file), 'utf8')));
+    {
+      name: 'no file under packages/*/src but repo.js types the repo.owner and brand.id guidance',
+      run: (ctx) => {
+        const hits = sourceFiles().filter((file) => HAND_TYPED.test(fs.readFileSync(path.join(ROOT, file), 'utf8')));
 
-  // repo.js must be a hit itself, so a scan that finds nothing never passes.
-  assert.deepEqual(hits, [HOME]);
-});
+        // repo.js must be a hit itself, so a scan that finds nothing never passes.
+        ctx.expect(hits).toEqual([HOME]);
+      },
+    },
 
-test('each of the nine refusals quotes repoMissing for its repo\'s role', () => {
-  const missing = Object.entries(REFUSALS).flatMap(([file, role]) => {
-    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
-    return new RegExp(`\\brepoMissing\\(\\s*['"\`]${role}['"\`]\\s*\\)`).test(source) ? [] : [`${file} (${role})`];
-  });
+    {
+      name: 'each of the nine refusals quotes repoMissing for its repo\'s role',
+      run: (ctx) => {
+        const missing = Object.entries(REFUSALS).flatMap(([file, role]) => {
+          const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+          return new RegExp(`\\brepoMissing\\(\\s*['"\`]${role}['"\`]\\s*\\)`).test(source) ? [] : [`${file} (${role})`];
+        });
 
-  assert.deepEqual(missing, []);
+        ctx.expect(missing).toEqual([]);
+      },
+    },
+  ],
 });

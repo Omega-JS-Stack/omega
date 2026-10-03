@@ -5,8 +5,7 @@
  * proves nothing about the parse that the manager walk and the desktop's
  * validate-certs step now both depend on.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -47,43 +46,61 @@ function formatAsn1(daysFromNow) {
   return `${new Date(Date.now() + daysFromNow * 24 * 3600 * 1000).toISOString().replace(/[-:T]/g, '').split('.')[0]}Z`;
 }
 
-test('certificateExpiry: a .cer reports its expiry date and the days left', (t) => {
-  const { certPath } = stageCert(t, { days: 365 });
+module.exports = defineCases({
+  type: 'group',
+  description: 'certificate-expiry',
+  tests: [
+    {
+      name: 'certificateExpiry: a .cer reports its expiry date and the days left',
+      run: (ctx) => {
+        const { certPath } = stageCert(ctx, { days: 365 });
 
-  const { expiresAt, daysLeft } = certificateExpiry(certPath);
+        const { expiresAt, daysLeft } = certificateExpiry(certPath);
 
-  assert.ok(expiresAt instanceof Date);
-  assert.ok(daysLeft >= 363 && daysLeft <= 365, `daysLeft was ${daysLeft}`);
-  assert.equal(Math.round((expiresAt - new Date()) / 86400000), 365);
-});
+        ctx.expect(expiresAt instanceof Date).toBeTruthy();
+        ctx.expect(daysLeft >= 363 && daysLeft <= 365, `daysLeft was ${daysLeft}`).toBeTruthy();
+        ctx.expect(Math.round((expiresAt - new Date()) / 86400000)).toBe(365);
+      },
+    },
 
-test('certificateExpiry: a .p12 reads through its password, the same answer as its .cer', (t) => {
-  const { certPath, p12Path } = stageCert(t, { days: 90 });
+    {
+      name: 'certificateExpiry: a .p12 reads through its password, the same answer as its .cer',
+      run: (ctx) => {
+        const { certPath, p12Path } = stageCert(ctx, { days: 90 });
 
-  const fromP12 = certificateExpiry(p12Path, { password: PASSWORD });
-  const fromCer = certificateExpiry(certPath);
+        const fromP12 = certificateExpiry(p12Path, { password: PASSWORD });
+        const fromCer = certificateExpiry(certPath);
 
-  assert.equal(fromP12.expiresAt.getTime(), fromCer.expiresAt.getTime());
-  assert.ok(fromP12.daysLeft >= 88 && fromP12.daysLeft <= 90, `daysLeft was ${fromP12.daysLeft}`);
-});
+        ctx.expect(fromP12.expiresAt.getTime()).toBe(fromCer.expiresAt.getTime());
+        ctx.expect(fromP12.daysLeft >= 88 && fromP12.daysLeft <= 90, `daysLeft was ${fromP12.daysLeft}`).toBeTruthy();
+      },
+    },
 
-test('certificateExpiry: an expired certificate reports negative days, never an error', (t) => {
-  const { certPath } = stageCert(t, { days: -30 });
+    {
+      name: 'certificateExpiry: an expired certificate reports negative days, never an error',
+      run: (ctx) => {
+        const { certPath } = stageCert(ctx, { days: -30 });
 
-  const { daysLeft, expiresAt } = certificateExpiry(certPath);
+        const { daysLeft, expiresAt } = certificateExpiry(certPath);
 
-  assert.ok(daysLeft < 0, `daysLeft was ${daysLeft}`);
-  assert.ok(expiresAt < new Date());
-});
+        ctx.expect(daysLeft < 0, `daysLeft was ${daysLeft}`).toBeTruthy();
+        ctx.expect(expiresAt < new Date()).toBeTruthy();
+      },
+    },
 
-test('certificateExpiry: an unreadable file THROWS, it is never zero days left', (t) => {
-  const { dir, p12Path } = stageCert(t);
+    {
+      name: 'certificateExpiry: an unreadable file THROWS, it is never zero days left',
+      run: (ctx) => {
+        const { dir, p12Path } = stageCert(ctx);
 
-  assert.throws(() => certificateExpiry(path.join(dir, 'nope.cer')), /no file at/);
+        ctx.expect(() => certificateExpiry(path.join(dir, 'nope.cer'))).toThrow(/no file at/);
 
-  const garbage = path.join(dir, 'garbage.cer');
-  fs.writeFileSync(garbage, 'not a certificate');
-  assert.throws(() => certificateExpiry(garbage), /could not read/);
+        const garbage = path.join(dir, 'garbage.cer');
+        fs.writeFileSync(garbage, 'not a certificate');
+        ctx.expect(() => certificateExpiry(garbage)).toThrow(/could not read/);
 
-  assert.throws(() => certificateExpiry(p12Path, { password: 'wrong-password' }), /could not read/);
+        ctx.expect(() => certificateExpiry(p12Path, { password: 'wrong-password' })).toThrow(/could not read/);
+      },
+    },
+  ],
 });

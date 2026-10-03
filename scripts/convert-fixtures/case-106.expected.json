@@ -1,0 +1,10 @@
+{
+  "description": "case-106",
+  "fileLacks": ["node:test"],
+  "tests": [
+    { "name": "a", "has": [
+      "ctx.after(() => x())",
+      "ctx.diagnostic"
+    ], "runLacks": ["\\bt\\b"] }
+  ]
+}

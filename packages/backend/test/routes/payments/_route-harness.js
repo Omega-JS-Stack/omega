@@ -98,13 +98,13 @@ async function withEnvironment(vars, fn) {
 
 /**
  * The environment overrides that make getEnvironment() resolve to production.
- * Testing wins over everything else, so it has to come off too.
+ * The one input overwrites the test lane's `testing`, and the ambient signals
+ * come off.
  */
 const PRODUCTION_ENVIRONMENT = {
   // The ONE environment input (#817): a deployed production run names it, and
   // the ambient signals come off so nothing is ambiguous.
   OMEGA_ENVIRONMENT: 'production',
-  OMEGA_TEST_MODE: null,
   TERM_PROGRAM: null,
   FUNCTIONS_EMULATOR: null,
   ENVIRONMENT: 'production',

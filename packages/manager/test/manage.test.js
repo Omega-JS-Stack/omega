@@ -4,8 +4,7 @@
  * workspace → update → testing loop, idempotent rerun, and hard failure on
  * an unloadable brand config (secret-shaped keys).
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -23,20 +22,10 @@ const { SERVICE_ORDER, BOOT_SERVICES } = require('../src/config.js');
 const { createMachine } = require('./lib/fake-claude.js');
 const { toolProbe } = require('./lib/tool-probe.js');
 
-const { before, after } = test;
-
 // The workspace op reaches for `claude`. File-wide that is a fake machine that
 // already has the plugin, so no walk below spawns the real one or touches ~/.claude.
 const MANAGER_VERSION = require('../package.json').version;
 let restoreClaude;
-before(() => {
-  restoreClaude = createMachine({
-    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
-    installed: { 'omega@omega': MANAGER_VERSION },
-    published: MANAGER_VERSION,
-  }).activate();
-});
-after(() => restoreClaude());
 
 // Fixture brands must never reach a real Cloudflare/Namecheap/Google account
 // via shell-exported credentials — those services must skip in every e2e run
@@ -115,105 +104,6 @@ function stageBrand({ config = BRAND_CONFIG, targets = true } = {}) {
   return root;
 }
 
-// ─── Brand root resolution ───────────────────────────────────────────────────
-
-test('resolveBrandRoot: from the root, from inside a target, from a nested dir', () => {
-  const root = stageBrand();
-  const nested = path.join(root, 'targets', 'web', 'src', 'deep');
-  fs.mkdirSync(nested, { recursive: true });
-
-  assert.equal(resolveBrandRoot(root), root);
-  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'web')), root);
-  assert.equal(resolveBrandRoot(nested), root);
-});
-
-test('resolveBrandRoot: a target\'s own config dir never masquerades as the brand root', () => {
-  const root = stageBrand();
-  // Give the target its own config/omega.json5 — resolution from inside it must
-  // still climb to the BRAND root
-  const targetConfig = path.join(root, 'targets', 'web', 'config');
-  fs.mkdirSync(targetConfig, { recursive: true });
-  fs.writeFileSync(path.join(targetConfig, 'omega.json5'), `{ targets: { web: { type: 'web' } } }`);
-
-  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'web')), root);
-});
-
-test('resolveBrandRoot: a brand nested in a parent workspace\'s targets/ dir still resolves (sandbox-brand case)', () => {
-  // {outer}/targets/my-brand/{config,targets/web}: no config above my-brand,
-  // so my-brand is the brand root even though it sits under a targets/ dir
-  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-outer-'));
-  const brandRoot = path.join(outer, 'targets', 'my-brand');
-  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), BRAND_CONFIG);
-  const web = path.join(brandRoot, 'targets', 'web');
-  fs.mkdirSync(web, { recursive: true });
-
-  assert.equal(resolveBrandRoot(brandRoot), brandRoot);
-  assert.equal(resolveBrandRoot(web), brandRoot);
-});
-
-test('resolveBrandRoot: null outside any brand', () => {
-  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-empty-'));
-  assert.equal(resolveBrandRoot(empty), null);
-});
-
-// ─── Target dir → target mapping ─────────────────────────────────────────────
-
-test('discoverTargets: the brand\'s own declaration types the dir, whatever the dir is named (#886)', () => {
-  const root = stageBrand({
-    config: `{
-      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
-      targets: { web: { type: 'web' }, docs: { type: 'web' } },
-    }`,
-  });
-  fs.mkdirSync(path.join(root, 'targets', 'docs'), { recursive: true });
-
-  const byName = Object.fromEntries(discoverTargets(root).map((entry) => [entry.name, entry.target]));
-  assert.equal(byName.web, 'web');
-  assert.equal(byName.docs, 'web', 'a second web-typed target needs no naming convention');
-});
-
-test('loadBrand: a dir the brand never declares maps via its own config, and nothing else is unmapped', () => {
-  const root = stageBrand();
-
-  // targets/api declares targets.backend in its target-root config/omega.json5
-  // (ONE authored location for every target since the src/dist pillar —
-  // functions/config is staged output now) and the brand file never names it
-  const apiConfig = path.join(root, 'targets', 'api', 'config');
-  fs.mkdirSync(apiConfig, { recursive: true });
-  fs.writeFileSync(path.join(apiConfig, 'omega.json5'), `{ targets: { backend: { type: 'backend' } } }`);
-
-  const brand = loadBrand(root);
-  assert.equal(brand.id, 'fixture-brand');
-  assert.deepEqual(brand.enabledTargets, ['web']);
-
-  const byName = Object.fromEntries(brand.targets.map((entry) => [entry.name, entry.target]));
-  assert.equal(byName.web, 'web');
-  assert.equal(byName.api, 'backend');
-});
-
-test('loadBrand: config load failure lands in configError, never throws', () => {
-  const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
-  });
-
-  const brand = loadBrand(root);
-  assert.match(brand.configError, /Secret-shaped keys/);
-  assert.deepEqual(brand.enabledTargets, []);
-});
-
-test('loadBrand: templates { domain } from brand.url', () => {
-  const root = stageBrand({
-    config: `{
-      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test', contact: { email: 'support@{ domain }' } },
-      targets: { web: { type: 'web' } },
-    }`,
-  });
-
-  const brand = loadBrand(root);
-  assert.equal(brand.config.brand.contact.email, 'support@fixture-brand.test');
-});
-
 // ─── One vocabulary (#443) ───────────────────────────────────────────────────
 
 /** A pre-#443 brand: its surfaces still under apps/, the glob still apps/*. */
@@ -230,244 +120,11 @@ function stageLegacyBrand() {
   return root;
 }
 
-test('discoverTargets: a brand still on apps/ fails LOUD with the migration pointer, never a zero-target walk', () => {
-  const root = stageLegacyBrand();
-
-  assert.throws(() => discoverTargets(root), /still carries apps\/ instead of targets\/ \(#443\)/);
-  assert.throws(() => loadBrand(root), /--migration=targets-rename --execute/);
-});
-
-test('runManage: --migration=targets-rename runs the rename ALONE — the one brand discovery refuses to walk', async () => {
-  const root = stageLegacyBrand();
-
-  const audit = await runManage(root, { migration: 'targets-rename' });
-  assert.equal(audit.hasErrors, false);
-  assert.equal(audit.results.migrations.output.targetsRename.audit, true);
-  assert.ok(fs.existsSync(path.join(root, 'apps', 'web')), 'the default run moved nothing');
-
-  const report = await runManage(root, { migration: 'targets-rename', execute: true });
-  assert.equal(report.hasErrors, false);
-  assert.ok(!fs.existsSync(path.join(root, 'apps')), 'apps/ is gone');
-  assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).workspaces,
-    ['targets/*'],
-  );
-
-  // …and the brand the migration fixed now loads like any other
-  assert.deepEqual(loadBrand(root).targets.map((entry) => entry.name), ['web']);
-});
-
 // ─── End-to-end manage ───────────────────────────────────────────────────────
 
 // Testing's live checks read fetch/retryDelayMs from runManage options — a
 // canned 200 keeps the full loop network-free (the fixture URL never resolves)
 const FAKE_FETCH_200 = { fetch: async () => ({ status: 200, json: async () => ({}) }), retryDelayMs: 0 };
-
-// #586 — the manage walk judges every key on the RESOLVED cascade (it mints a
-// missing one into the brand .env), so a value that lives only in an
-// environment overlay has to be visible to it. Without the overlay in the
-// chain, `.env.production` would read as absent and the mint lane would write
-// a second value over the top of it.
-//
-// The overlay it reads is PINNED to production: manage reconciles real
-// infrastructure with production credentials, so the shell's incidental
-// environment never decides which key the walk judges.
-test('runManage: the env chain reads the brand .env.production overlay, whatever the shell says', async () => {
-  const root = stageBrand();
-  const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
-
-  fs.writeFileSync(path.join(root, '.env'), 'FIXTURE_OVERLAY_KEY="from-the-base"\n');
-  fs.writeFileSync(path.join(root, '.env.development'), 'FIXTURE_OVERLAY_KEY="from-the-development-overlay"\n');
-  fs.writeFileSync(path.join(root, '.env.production'), 'FIXTURE_OVERLAY_KEY="from-the-production-overlay"\n');
-
-  try {
-    delete process.env.FIXTURE_OVERLAY_KEY;
-    delete process.env.OMEGA_TEST_MODE;
-    process.env.ENVIRONMENT = 'development';
-
-    await runManage(root, { ...FAKE_FETCH_200 });
-
-    assert.equal(process.env.FIXTURE_OVERLAY_KEY, 'from-the-production-overlay', 'the manage lane pins production — a development shell never swaps the overlay');
-  } finally {
-    delete process.env.FIXTURE_OVERLAY_KEY;
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('runManage: full loop — workspace, update (build), testing all pass; run output + gitignore written', async () => {
-  const root = stageBrand();
-
-  const report = await runManage(root, { ...FAKE_FETCH_200 });
-
-  assert.equal(report.hasErrors, false);
-  assert.equal(report.results.workspace.status, 'success');
-  // No repo block configured (its presence is the switch, #883) → clean skip
-  assert.equal(report.results.repo.status, 'skipped');
-  assert.match(report.results.repo.reason, /repo\.owner/);
-  // No CLOUDFLARE_TOKEN in the environment → clean skip
-  assert.equal(report.results.edge.status, 'skipped');
-  assert.match(report.results.edge.reason, /CLOUDFLARE_TOKEN/);
-  // No domain.providers registrar configured → clean skip
-  assert.equal(report.results.domain.status, 'skipped');
-  assert.match(report.results.domain.reason, /domain\.providers/);
-  // No project id means "not yet chosen", so cloud still asks for its Google
-  // client keys; none in the environment → clean skip naming them
-  assert.equal(report.results.cloud.status, 'skipped');
-  assert.match(report.results.cloud.reason, /GOOGLE_CLIENT_ID/);
-  // No reCAPTCHA secret in the environment → clean skip (the site key is
-  // config now, #893, so the env skip names the secret half alone)
-  assert.equal(report.results.captcha.status, 'skipped');
-  assert.match(report.results.captcha.reason, /RECAPTCHA_SECRET_KEY/);
-  // No analytics providers configured → clean skip
-  assert.equal(report.results.analytics.status, 'skipped');
-  assert.match(report.results.analytics.reason, /no analytics providers/);
-  // No Google credentials in the environment → clean skip
-  assert.equal(report.results.search.status, 'skipped');
-  assert.match(report.results.search.reason, /GOOGLE_CLIENT_ID/);
-  // No advertising provider authored → clean skip (wave-5 F10: through the
-  // REAL pipeline — proves the DEFAULTS merge doesn't resurrect the entry)
-  assert.equal(report.results.advertising.status, 'skipped');
-  assert.match(report.results.advertising.reason, /no advertising\.providers\.adsense/);
-  // No monitor CHOSEN → clean skip. The role-level switch is a schema default
-  // (#478) so `monitoring.enabled` is always present; the pick still is not —
-  // a default under `providers.sentry` would opt every brand in.
-  assert.equal(report.results.monitoring.status, 'skipped');
-  assert.match(report.results.monitoring.reason, /no monitoring\.providers entry/);
-  // No SendGrid API key in the environment → clean skip
-  assert.equal(report.results.campaigns.status, 'skipped');
-  assert.match(report.results.campaigns.reason, /SENDGRID_API_KEY/);
-  // No Beehiiv API key in the environment → clean skip
-  assert.equal(report.results.newsletter.status, 'skipped');
-  assert.match(report.results.newsletter.reason, /BEEHIIV_API_KEY/);
-  // Fixture has no priced products → clean skip before any provider check
-  assert.equal(report.results.payment.status, 'skipped');
-  assert.match(report.results.payment.reason, /no paid products/);
-  // No forms.providers.slapform.formId configured → clean skip
-  assert.equal(report.results.forms.status, 'skipped');
-  assert.match(report.results.forms.reason, /forms\.providers\.slapform\.formId/);
-  // No inbound.chat.providers.chatsy.agentId configured → clean skip
-  assert.equal(report.results.chat.status, 'skipped');
-  assert.match(report.results.chat.reason, /inbound\.chat\.providers\.chatsy\.agentId/);
-  // Web-only fixture → the email agent has no backend to answer for
-  assert.equal(report.results.email.status, 'skipped');
-  assert.match(report.results.email.reason, /no backend target/);
-  // No company-server service account → clean skip
-  assert.equal(report.results.server.status, 'skipped');
-  assert.match(report.results.server.reason, /SERVER_SERVICE_ACCOUNT/);
-  // Fixture has no logo sources → clean skip with guidance
-  assert.equal(report.results.assets.status, 'skipped');
-  assert.match(report.results.assets.reason, /brandmark\.svg/);
-  // Web-only fixture → no desktop/mobile target to sign for
-  assert.equal(report.results.certificates.status, 'skipped');
-  assert.match(report.results.certificates.reason, /no desktop or mobile target/);
-  // No OpenAI key in the environment and no TTY to paste it → clean skip
-  // naming it alone: the Anthropic key is asked only with a backend target
-  assert.equal(report.results.ai.status, 'skipped');
-  assert.match(report.results.ai.reason, /OPENAI_API_KEY/);
-  assert.doesNotMatch(report.results.ai.reason, /ANTHROPIC_API_KEY/);
-  // No parasite SEO content configured → clean skip with sidecar guidance
-  assert.equal(report.results.seo.status, 'skipped');
-  assert.match(report.results.seo.reason, /no SEO content configured/);
-  assert.equal(report.results.update.status, 'success');
-  // Web-only fixture → no backend whose Firebase Auth accounts to manage
-  assert.equal(report.results.account.status, 'skipped');
-  assert.match(report.results.account.reason, /no backend target/);
-  // Data migrations never run without the explicit --migration flag
-  assert.equal(report.results.migrations.status, 'skipped');
-  assert.match(report.results.migrations.reason, /--migration flag not set/);
-  assert.equal(report.results.testing.status, 'success');
-
-  // The build actually produced the site
-  assert.ok(fs.existsSync(path.join(root, 'targets', 'web', 'dist', 'index.html')));
-
-  // Install was resolution-gated and skipped (fixture has no deps) — no stray
-  // node_modules materialized
-  const rootSteps = report.results.update.output.results.root.steps;
-  assert.equal(rootSteps[0].phase, 'install');
-  assert.equal(rootSteps[0].skipped, true);
-  assert.ok(!fs.existsSync(path.join(root, 'node_modules')));
-
-  // Transient run output landed in .omega/runs/
-  const runsDir = path.join(root, '.omega', 'runs');
-  assert.equal(fs.readdirSync(runsDir).length, 1);
-  const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
-  assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'publishing', 'ai', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
-
-  // .omega/ got gitignored
-  const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-  assert.ok(gitignore.includes('.omega/'));
-});
-
-test('runManage: rerun is idempotent — same statuses, single gitignore entry', async () => {
-  const root = stageBrand();
-
-  await runManage(root, { ...FAKE_FETCH_200 });
-  const second = await runManage(root, { ...FAKE_FETCH_200 });
-
-  assert.equal(second.hasErrors, false);
-  assert.equal(second.results.workspace.status, 'success');
-  assert.equal(second.results.testing.status, 'success');
-
-  const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-  const entries = gitignore.split('\n').filter((line) => line.trim() === '.omega/');
-  assert.equal(entries.length, 1);
-});
-
-test('runManage: a service that ran carries its wall time, in the report and the run record', async () => {
-  const root = stageBrand();
-
-  const report = await runManage(root, { service: 'workspace' });
-
-  assert.equal(typeof report.results.workspace.durationMs, 'number');
-  assert.ok(report.results.workspace.durationMs >= 0);
-
-  const runsDir = path.join(root, '.omega', 'runs');
-  const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
-  assert.equal(typeof run.services[0].durationMs, 'number');
-});
-
-test('runManage: a service run() that hits a consent gate warns — the walk continues, the report stays clean (#228)', async () => {
-  const root = stageBrand();
-
-  // A dead Google grant surfaces as the coded throw from inside the service,
-  // past preflight (which only knows what the token store RECORDS).
-  const servicePath = require.resolve('../src/services/repo/index.js');
-  const original = require.cache[servicePath];
-  require.cache[servicePath] = {
-    id: servicePath,
-    filename: servicePath,
-    path: path.dirname(servicePath),
-    loaded: true,
-    exports: {
-      run: async () => {
-        const error = new Error('Google consent required (scopes: webmasters) — run the service once interactively to grant it');
-        error.code = CONSENT_REQUIRED;
-        throw error;
-      },
-    },
-  };
-
-  let report;
-  try {
-    report = await runManage(root, { ...FAKE_FETCH_200 });
-  } finally {
-    if (original) {
-      require.cache[servicePath] = original;
-    } else {
-      delete require.cache[servicePath];
-    }
-  }
-
-  assert.equal(report.results.repo.status, 'warned', 'a pending human gate is not a failure');
-  assert.match(report.results.repo.output.auth.needsInteractive, /Google consent required/);
-  assert.equal(report.results.testing.status, 'success', 'the walk ran on to the last service');
-  assert.equal(report.hasErrors, false, 'so the dev boot reading this report still starts the stack');
-});
 
 // ─── Lanes (#228) ────────────────────────────────────────────────────────────
 
@@ -484,183 +141,608 @@ async function captureLogAsync(fn) {
   return lines.join('\n');
 }
 
-test('config: the boot lane is the local slice — file work only, and every entry is a real service', () => {
-  assert.deepEqual([...BOOT_SERVICES], ['workspace', 'assets', 'disperse'],
-    'network/rebuild services stay out — a dev boot waits on this list');
-  for (const service of BOOT_SERVICES) {
-    assert.ok(SERVICE_ORDER.includes(service), `${service} is not in SERVICE_ORDER — a rename orphaned the lane list`);
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'manage',
+  setup: () => {
+    restoreClaude = createMachine({
+      marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+      installed: { 'omega@omega': MANAGER_VERSION },
+      published: MANAGER_VERSION,
+    }).activate();
+  },
+  cleanup: () => restoreClaude(),
+  tests: [
+    // ─── Brand root resolution ───────────────────────────────────────────────────
 
-test('runManage: lane boot walks exactly the boot services, in SERVICE_ORDER order (#228)', async () => {
-  const root = stageBrand();
+    {
+      name: 'resolveBrandRoot: from the root, from inside a target, from a nested dir',
+      run: (ctx) => {
+        const root = stageBrand();
+        const nested = path.join(root, 'targets', 'web', 'src', 'deep');
+        fs.mkdirSync(nested, { recursive: true });
 
-  const report = await runManage(root, { lane: 'boot' });
+        ctx.expect(resolveBrandRoot(root)).toBe(root);
+        ctx.expect(resolveBrandRoot(path.join(root, 'targets', 'web'))).toBe(root);
+        ctx.expect(resolveBrandRoot(nested)).toBe(root);
+      },
+    },
 
-  assert.deepEqual(Object.keys(report.results), ['workspace', 'assets', 'disperse'],
-    'the slow lane (cloud, campaigns, update, account…) never runs at boot');
-  assert.equal(report.hasErrors, false);
-});
+    {
+      name: 'resolveBrandRoot: a target\'s own config dir never masquerades as the brand root',
+      run: (ctx) => {
+        const root = stageBrand();
+        // Give the target its own config/omega.json5 — resolution from inside it must
+        // still climb to the BRAND root
+        const targetConfig = path.join(root, 'targets', 'web', 'config');
+        fs.mkdirSync(targetConfig, { recursive: true });
+        fs.writeFileSync(path.join(targetConfig, 'omega.json5'), `{ targets: { web: { type: 'web' } } }`);
 
-test('runManage: an unknown lane throws instead of silently walking everything', async () => {
-  const root = stageBrand();
+        ctx.expect(resolveBrandRoot(path.join(root, 'targets', 'web'))).toBe(root);
+      },
+    },
 
-  await assert.rejects(() => runManage(root, { lane: 'quick' }), /Unknown lane/);
-});
+    {
+      name: 'resolveBrandRoot: a brand nested in a parent workspace\'s targets/ dir still resolves (sandbox-brand case)',
+      run: (ctx) => {
+        // {outer}/targets/my-brand/{config,targets/web}: no config above my-brand,
+        // so my-brand is the brand root even though it sits under a targets/ dir
+        const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-outer-'));
+        const brandRoot = path.join(outer, 'targets', 'my-brand');
+        fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+        fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), BRAND_CONFIG);
+        const web = path.join(brandRoot, 'targets', 'web');
+        fs.mkdirSync(web, { recursive: true });
 
-test('runManage: --service still wins over a lane (the more specific ask)', async () => {
-  const root = stageBrand();
+        ctx.expect(resolveBrandRoot(brandRoot)).toBe(brandRoot);
+        ctx.expect(resolveBrandRoot(web)).toBe(brandRoot);
+      },
+    },
 
-  const report = await runManage(root, { service: 'workspace', lane: 'boot' });
+    {
+      name: 'resolveBrandRoot: null outside any brand',
+      run: (ctx) => {
+        const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-empty-'));
+        ctx.expect(resolveBrandRoot(empty)).toBe(null);
+      },
+    },
 
-  assert.deepEqual(Object.keys(report.results), ['workspace']);
-});
+    // ─── Target dir → target mapping ─────────────────────────────────────────────
 
-test('runManage: on a boot lane, preflight still names what MANAGE owes — without walking or failing it (#228)', async () => {
-  const root = stageBrand();
+    {
+      name: 'discoverTargets: the brand\'s own declaration types the dir, whatever the dir is named (#886)',
+      run: (ctx) => {
+        const root = stageBrand({
+          config: `{
+      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
+      targets: { web: { type: 'web' }, docs: { type: 'web' } },
+    }`,
+        });
+        fs.mkdirSync(path.join(root, 'targets', 'docs'), { recursive: true });
 
-  let report;
-  const log = await captureLogAsync(async () => {
-    report = await runManage(root, { lane: 'boot' });
-  });
+        const byName = Object.fromEntries(discoverTargets(root).map((entry) => [entry.name, entry.target]));
+        ctx.expect(byName.web).toBe('web');
+        ctx.expect(byName.docs, 'a second web-typed target needs no naming convention').toBe('web');
+      },
+    },
 
-  // The full setup's gaps are still reported…
-  assert.match(log, /⚑ Preflight/);
-  assert.match(log, /edge — missing CLOUDFLARE_TOKEN/);
-  // …but a manage-lane finding never becomes a result of THIS run
-  assert.equal(report.results.edge, undefined, 'an unwalked service records nothing');
-  assert.equal(report.hasErrors, false, 'and never fails the boot');
-});
+    {
+      name: 'loadBrand: a dir the brand never declares maps via its own config, and nothing else is unmapped',
+      run: (ctx) => {
+        const root = stageBrand();
 
-test('runManage: unloadable brand config fails the workspace service and stops the run', async () => {
-  const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
-  });
+        // targets/api declares targets.backend in its target-root config/omega.json5
+        // (ONE authored location for every target since the src/dist pillar —
+        // functions/config is staged output now) and the brand file never names it
+        const apiConfig = path.join(root, 'targets', 'api', 'config');
+        fs.mkdirSync(apiConfig, { recursive: true });
+        fs.writeFileSync(path.join(apiConfig, 'omega.json5'), `{ targets: { backend: { type: 'backend' } } }`);
 
-  const report = await runManage(root, {});
+        const brand = loadBrand(root);
+        ctx.expect(brand.id).toBe('fixture-brand');
+        ctx.expect(brand.enabledTargets).toEqual(['web']);
 
-  assert.equal(report.hasErrors, true);
-  assert.equal(report.results.workspace.status, 'error');
-  assert.match(report.results.workspace.error, /Secret-shaped keys/);
-  // stopOnError: update/testing never ran
-  assert.equal(report.results.update, undefined);
-  assert.equal(report.results.testing, undefined);
-});
+        const byName = Object.fromEntries(brand.targets.map((entry) => [entry.name, entry.target]));
+        ctx.expect(byName.web).toBe('web');
+        ctx.expect(byName.api).toBe('backend');
+      },
+    },
 
-test('runManage: a target with no type walks to the workspace report instead of throwing', async () => {
-  const root = stageBrand({
-    config: `{ brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: {} } }`,
-  });
+    {
+      name: 'loadBrand: config load failure lands in configError, never throws',
+      run: (ctx) => {
+        const root = stageBrand({
+          config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
+        });
 
-  const report = await runManage(root, { execFn: toolProbe() });
+        const brand = loadBrand(root);
+        ctx.expect(brand.configError).toMatch(/Secret-shaped keys/);
+        ctx.expect(brand.enabledTargets).toEqual([]);
+      },
+    },
 
-  assert.equal(report.results.workspace.status, 'error');
-  assert.match(report.results.workspace.error, /targets\.web must declare a type/);
-});
+    {
+      name: 'loadBrand: templates { domain } from brand.url',
+      run: (ctx) => {
+        const root = stageBrand({
+          config: `{
+      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test', contact: { email: 'support@{ domain }' } },
+      targets: { web: { type: 'web' } },
+    }`,
+        });
 
-test('runManage: enabled target with no dir is a structure error naming the dir to create', async () => {
-  const root = stageBrand({
-    config: `{
+        const brand = loadBrand(root);
+        ctx.expect(brand.config.brand.contact.email).toBe('support@fixture-brand.test');
+      },
+    },
+
+    {
+      name: 'discoverTargets: a brand still on apps/ fails LOUD with the migration pointer, never a zero-target walk',
+      run: (ctx) => {
+        const root = stageLegacyBrand();
+
+        ctx.expect(() => discoverTargets(root)).toThrow(/still carries apps\/ instead of targets\/ \(#443\)/);
+        ctx.expect(() => loadBrand(root)).toThrow(/--migration=targets-rename --execute/);
+      },
+    },
+
+    {
+      name: 'runManage: --migration=targets-rename runs the rename ALONE — the one brand discovery refuses to walk',
+      run: async (ctx) => {
+        const root = stageLegacyBrand();
+
+        const audit = await runManage(root, { migration: 'targets-rename' });
+        ctx.expect(audit.hasErrors).toBe(false);
+        ctx.expect(audit.results.migrations.output.targetsRename.audit).toBe(true);
+        ctx.expect(fs.existsSync(path.join(root, 'apps', 'web')), 'the default run moved nothing').toBeTruthy();
+
+        const report = await runManage(root, { migration: 'targets-rename', execute: true });
+        ctx.expect(report.hasErrors).toBe(false);
+        ctx.expect(!fs.existsSync(path.join(root, 'apps')), 'apps/ is gone').toBeTruthy();
+        ctx.expect(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).workspaces).toEqual(['targets/*']);
+
+        // …and the brand the migration fixed now loads like any other
+        ctx.expect(loadBrand(root).targets.map((entry) => entry.name)).toEqual(['web']);
+      },
+    },
+
+    // #586 — the manage walk judges every key on the RESOLVED cascade (it mints a
+    // missing one into the brand .env), so a value that lives only in an
+    // environment overlay has to be visible to it. Without the overlay in the
+    // chain, `.env.production` would read as absent and the mint lane would write
+    // a second value over the top of it.
+    //
+    // The overlay it reads is PINNED to production: manage reconciles real
+    // infrastructure with production credentials, so the shell's incidental
+    // environment never decides which key the walk judges.
+    {
+      name: 'runManage: the env chain reads the brand .env.production overlay, whatever the shell says',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT };
+
+        fs.writeFileSync(path.join(root, '.env'), 'FIXTURE_OVERLAY_KEY="from-the-base"\n');
+        fs.writeFileSync(path.join(root, '.env.development'), 'FIXTURE_OVERLAY_KEY="from-the-development-overlay"\n');
+        fs.writeFileSync(path.join(root, '.env.production'), 'FIXTURE_OVERLAY_KEY="from-the-production-overlay"\n');
+
+        try {
+          delete process.env.FIXTURE_OVERLAY_KEY;
+          delete process.env.OMEGA_ENVIRONMENT;
+          process.env.ENVIRONMENT = 'development';
+
+          await runManage(root, { ...FAKE_FETCH_200 });
+
+          ctx.expect(process.env.FIXTURE_OVERLAY_KEY, 'the manage lane pins production — a development shell never swaps the overlay').toBe('from-the-production-overlay');
+        } finally {
+          delete process.env.FIXTURE_OVERLAY_KEY;
+          for (const [key, value] of Object.entries(saved)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+          }
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'runManage: full loop — workspace, update (build), testing all pass; run output + gitignore written',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        const report = await runManage(root, { ...FAKE_FETCH_200 });
+
+        ctx.expect(report.hasErrors).toBe(false);
+        ctx.expect(report.results.workspace.status).toBe('success');
+        // No repo block configured (its presence is the switch, #883) → clean skip
+        ctx.expect(report.results.repo.status).toBe('skipped');
+        ctx.expect(report.results.repo.reason).toMatch(/repo\.owner/);
+        // No CLOUDFLARE_TOKEN in the environment → clean skip
+        ctx.expect(report.results.edge.status).toBe('skipped');
+        ctx.expect(report.results.edge.reason).toMatch(/CLOUDFLARE_TOKEN/);
+        // No domain.providers registrar configured → clean skip
+        ctx.expect(report.results.domain.status).toBe('skipped');
+        ctx.expect(report.results.domain.reason).toMatch(/domain\.providers/);
+        // No project id means "not yet chosen", so cloud still asks for its Google
+        // client keys; none in the environment → clean skip naming them
+        ctx.expect(report.results.cloud.status).toBe('skipped');
+        ctx.expect(report.results.cloud.reason).toMatch(/GOOGLE_CLIENT_ID/);
+        // No reCAPTCHA secret in the environment → clean skip (the site key is
+        // config now, #893, so the env skip names the secret half alone)
+        ctx.expect(report.results.captcha.status).toBe('skipped');
+        ctx.expect(report.results.captcha.reason).toMatch(/RECAPTCHA_SECRET_KEY/);
+        // No analytics providers configured → clean skip
+        ctx.expect(report.results.analytics.status).toBe('skipped');
+        ctx.expect(report.results.analytics.reason).toMatch(/no analytics providers/);
+        // No Google credentials in the environment → clean skip
+        ctx.expect(report.results.search.status).toBe('skipped');
+        ctx.expect(report.results.search.reason).toMatch(/GOOGLE_CLIENT_ID/);
+        // No advertising provider authored → clean skip (wave-5 F10: through the
+        // REAL pipeline — proves the DEFAULTS merge doesn't resurrect the entry)
+        ctx.expect(report.results.advertising.status).toBe('skipped');
+        ctx.expect(report.results.advertising.reason).toMatch(/no advertising\.providers\.adsense/);
+        // No monitor CHOSEN → clean skip. The role-level switch is a schema default
+        // (#478) so `monitoring.enabled` is always present; the pick still is not —
+        // a default under `providers.sentry` would opt every brand in.
+        ctx.expect(report.results.monitoring.status).toBe('skipped');
+        ctx.expect(report.results.monitoring.reason).toMatch(/no monitoring\.providers entry/);
+        // No SendGrid API key in the environment → clean skip
+        ctx.expect(report.results.campaigns.status).toBe('skipped');
+        ctx.expect(report.results.campaigns.reason).toMatch(/SENDGRID_API_KEY/);
+        // No Beehiiv API key in the environment → clean skip
+        ctx.expect(report.results.newsletter.status).toBe('skipped');
+        ctx.expect(report.results.newsletter.reason).toMatch(/BEEHIIV_API_KEY/);
+        // Fixture has no priced products → clean skip before any provider check
+        ctx.expect(report.results.payment.status).toBe('skipped');
+        ctx.expect(report.results.payment.reason).toMatch(/no paid products/);
+        // No forms.providers.slapform.formId configured → clean skip
+        ctx.expect(report.results.forms.status).toBe('skipped');
+        ctx.expect(report.results.forms.reason).toMatch(/forms\.providers\.slapform\.formId/);
+        // No inbound.chat.providers.chatsy.agentId configured → clean skip
+        ctx.expect(report.results.chat.status).toBe('skipped');
+        ctx.expect(report.results.chat.reason).toMatch(/inbound\.chat\.providers\.chatsy\.agentId/);
+        // Web-only fixture → the email agent has no backend to answer for
+        ctx.expect(report.results.email.status).toBe('skipped');
+        ctx.expect(report.results.email.reason).toMatch(/no backend target/);
+        // No company-server service account → clean skip
+        ctx.expect(report.results.server.status).toBe('skipped');
+        ctx.expect(report.results.server.reason).toMatch(/SERVER_SERVICE_ACCOUNT/);
+        // Fixture has no logo sources → clean skip with guidance
+        ctx.expect(report.results.assets.status).toBe('skipped');
+        ctx.expect(report.results.assets.reason).toMatch(/brandmark\.svg/);
+        // Web-only fixture → no desktop/mobile target to sign for
+        ctx.expect(report.results.certificates.status).toBe('skipped');
+        ctx.expect(report.results.certificates.reason).toMatch(/no desktop or mobile target/);
+        // No OpenAI key in the environment and no TTY to paste it → clean skip
+        // naming it alone: the Anthropic key is asked only with a backend target
+        ctx.expect(report.results.ai.status).toBe('skipped');
+        ctx.expect(report.results.ai.reason).toMatch(/OPENAI_API_KEY/);
+        ctx.expect(report.results.ai.reason).not.toMatch(/ANTHROPIC_API_KEY/);
+        // No parasite SEO content configured → clean skip with sidecar guidance
+        ctx.expect(report.results.seo.status).toBe('skipped');
+        ctx.expect(report.results.seo.reason).toMatch(/no SEO content configured/);
+        ctx.expect(report.results.update.status).toBe('success');
+        // Web-only fixture → no backend whose Firebase Auth accounts to manage
+        ctx.expect(report.results.account.status).toBe('skipped');
+        ctx.expect(report.results.account.reason).toMatch(/no backend target/);
+        // Data migrations never run without the explicit --migration flag
+        ctx.expect(report.results.migrations.status).toBe('skipped');
+        ctx.expect(report.results.migrations.reason).toMatch(/--migration flag not set/);
+        ctx.expect(report.results.testing.status).toBe('success');
+
+        // The build actually produced the site
+        ctx.expect(fs.existsSync(path.join(root, 'targets', 'web', 'dist', 'index.html'))).toBeTruthy();
+
+        // Install was resolution-gated and skipped (fixture has no deps) — no stray
+        // node_modules materialized
+        const rootSteps = report.results.update.output.results.root.steps;
+        ctx.expect(rootSteps[0].phase).toBe('install');
+        ctx.expect(rootSteps[0].skipped).toBe(true);
+        ctx.expect(!fs.existsSync(path.join(root, 'node_modules'))).toBeTruthy();
+
+        // Transient run output landed in .omega/runs/
+        const runsDir = path.join(root, '.omega', 'runs');
+        ctx.expect(fs.readdirSync(runsDir).length).toBe(1);
+        const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
+        ctx.expect(run.brandId).toBe('fixture-brand');
+        ctx.expect(run.services.map((s) => s.service)).toEqual(['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'publishing', 'ai', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
+
+        // .omega/ got gitignored
+        const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+        ctx.expect(gitignore.includes('.omega/')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'runManage: rerun is idempotent — same statuses, single gitignore entry',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        await runManage(root, { ...FAKE_FETCH_200 });
+        const second = await runManage(root, { ...FAKE_FETCH_200 });
+
+        ctx.expect(second.hasErrors).toBe(false);
+        ctx.expect(second.results.workspace.status).toBe('success');
+        ctx.expect(second.results.testing.status).toBe('success');
+
+        const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+        const entries = gitignore.split('\n').filter((line) => line.trim() === '.omega/');
+        ctx.expect(entries.length).toBe(1);
+      },
+    },
+
+    {
+      name: 'runManage: a service that ran carries its wall time, in the report and the run record',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        const report = await runManage(root, { service: 'workspace' });
+
+        ctx.expect(typeof report.results.workspace.durationMs).toBe('number');
+        ctx.expect(report.results.workspace.durationMs >= 0).toBeTruthy();
+
+        const runsDir = path.join(root, '.omega', 'runs');
+        const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
+        ctx.expect(typeof run.services[0].durationMs).toBe('number');
+      },
+    },
+
+    {
+      name: 'runManage: a service run() that hits a consent gate warns — the walk continues, the report stays clean (#228)',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        // A dead Google grant surfaces as the coded throw from inside the service,
+        // past preflight (which only knows what the token store RECORDS).
+        const servicePath = require.resolve('../src/services/repo/index.js');
+        const original = require.cache[servicePath];
+        require.cache[servicePath] = {
+          id: servicePath,
+          filename: servicePath,
+          path: path.dirname(servicePath),
+          loaded: true,
+          exports: {
+            run: async () => {
+              const error = new Error('Google consent required (scopes: webmasters) — run the service once interactively to grant it');
+              error.code = CONSENT_REQUIRED;
+              throw error;
+            },
+          },
+        };
+
+        let report;
+        try {
+          report = await runManage(root, { ...FAKE_FETCH_200 });
+        } finally {
+          if (original) {
+            require.cache[servicePath] = original;
+          } else {
+            delete require.cache[servicePath];
+          }
+        }
+
+        ctx.expect(report.results.repo.status, 'a pending human gate is not a failure').toBe('warned');
+        ctx.expect(report.results.repo.output.auth.needsInteractive).toMatch(/Google consent required/);
+        ctx.expect(report.results.testing.status, 'the walk ran on to the last service').toBe('success');
+        ctx.expect(report.hasErrors, 'so the dev boot reading this report still starts the stack').toBe(false);
+      },
+    },
+
+    {
+      name: 'config: the boot lane is the local slice — file work only, and every entry is a real service',
+      run: (ctx) => {
+        ctx.expect([...BOOT_SERVICES], 'network/rebuild services stay out — a dev boot waits on this list').toEqual(['workspace', 'assets', 'disperse']);
+        for (const service of BOOT_SERVICES) {
+          ctx.expect(SERVICE_ORDER.includes(service), `${service} is not in SERVICE_ORDER — a rename orphaned the lane list`).toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'runManage: lane boot walks exactly the boot services, in SERVICE_ORDER order (#228)',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        const report = await runManage(root, { lane: 'boot' });
+
+        ctx.expect(Object.keys(report.results), 'the slow lane (cloud, campaigns, update, account…) never runs at boot').toEqual(['workspace', 'assets', 'disperse']);
+        ctx.expect(report.hasErrors).toBe(false);
+      },
+    },
+
+    {
+      name: 'runManage: an unknown lane throws instead of silently walking everything',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        await ctx.expect((() => runManage(root, { lane: 'quick' }))()).rejects.toThrow(/Unknown lane/);
+      },
+    },
+
+    {
+      name: 'runManage: --service still wins over a lane (the more specific ask)',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        const report = await runManage(root, { service: 'workspace', lane: 'boot' });
+
+        ctx.expect(Object.keys(report.results)).toEqual(['workspace']);
+      },
+    },
+
+    {
+      name: 'runManage: on a boot lane, preflight still names what MANAGE owes — without walking or failing it (#228)',
+      run: async (ctx) => {
+        const root = stageBrand();
+
+        let report;
+        const log = await captureLogAsync(async () => {
+          report = await runManage(root, { lane: 'boot' });
+        });
+
+        // The full setup's gaps are still reported…
+        ctx.expect(log).toMatch(/⚑ Preflight/);
+        ctx.expect(log).toMatch(/edge — missing CLOUDFLARE_TOKEN/);
+        // …but a manage-lane finding never becomes a result of THIS run
+        ctx.expect(report.results.edge, 'an unwalked service records nothing').toBe(undefined);
+        ctx.expect(report.hasErrors, 'and never fails the boot').toBe(false);
+      },
+    },
+
+    {
+      name: 'runManage: unloadable brand config fails the workspace service and stops the run',
+      run: async (ctx) => {
+        const root = stageBrand({
+          config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
+        });
+
+        const report = await runManage(root, {});
+
+        ctx.expect(report.hasErrors).toBe(true);
+        ctx.expect(report.results.workspace.status).toBe('error');
+        ctx.expect(report.results.workspace.error).toMatch(/Secret-shaped keys/);
+        // stopOnError: update/testing never ran
+        ctx.expect(report.results.update).toBe(undefined);
+        ctx.expect(report.results.testing).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'runManage: a target with no type walks to the workspace report instead of throwing',
+      run: async (ctx) => {
+        const root = stageBrand({
+          config: `{ brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: {} } }`,
+        });
+
+        const report = await runManage(root, { execFn: toolProbe() });
+
+        ctx.expect(report.results.workspace.status).toBe('error');
+        ctx.expect(report.results.workspace.error).toMatch(/targets\.web must declare a type/);
+      },
+    },
+
+    {
+      name: 'runManage: enabled target with no dir is a structure error naming the dir to create',
+      run: async (ctx) => {
+        const root = stageBrand({
+          config: `{
       brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
       targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     }`,
-  });
+        });
 
-  const report = await runManage(root, { execFn: toolProbe() }); // every machine tool probe passes
+        const report = await runManage(root, { execFn: toolProbe() }); // every machine tool probe passes
 
-  assert.equal(report.hasErrors, true);
-  assert.match(report.results.workspace.error, /create targets\/backend\//);
-});
+        ctx.expect(report.hasErrors).toBe(true);
+        ctx.expect(report.results.workspace.error).toMatch(/create targets\/backend\//);
+      },
+    },
 
-test('#1032 case 8: a backend missing the Firebase CLI gets the line once, and the walk goes on', async () => {
-  const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
-  // The probe seam (options.execFn): only the Firebase CLI's probe fails
-  const execFn = toolProbe('firebase');
-  const line = machineToolLine(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform, execFn })[0]);
-  const root = stageBrand({
-    config: `{
+    {
+      name: '#1032 case 8: a backend missing the Firebase CLI gets the line once, and the walk goes on',
+      run: async (ctx) => {
+        const { missingMachineTools, machineToolLine } = require('@omega.js/devkit/machine-tools');
+        // The probe seam (options.execFn): only the Firebase CLI's probe fails
+        const execFn = toolProbe('firebase');
+        const line = machineToolLine(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform, execFn })[0]);
+        const root = stageBrand({
+          config: `{
       brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
       targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     }`,
-  });
-  fs.mkdirSync(path.join(root, 'targets', 'backend'));
-  fs.writeFileSync(path.join(root, 'targets', 'backend', 'package.json'), JSON.stringify({ name: 'fixture-backend', private: true }));
+        });
+        fs.mkdirSync(path.join(root, 'targets', 'backend'));
+        fs.writeFileSync(path.join(root, 'targets', 'backend', 'package.json'), JSON.stringify({ name: 'fixture-backend', private: true }));
 
-  let report;
-  const lines = [];
-  const methods = ['log', 'warn', 'error'];
-  const originals = methods.map((method) => console[method]);
-  methods.forEach((method) => { console[method] = (...args) => lines.push(args.join(' ')); });
-  try {
-    report = await runManage(root, { ...FAKE_FETCH_200, execFn });
-  } finally {
-    methods.forEach((method, i) => { console[method] = originals[i]; });
-  }
-  const output = lines.join('\n');
+        let report;
+        const lines = [];
+        const methods = ['log', 'warn', 'error'];
+        const originals = methods.map((method) => console[method]);
+        methods.forEach((method) => { console[method] = (...args) => lines.push(args.join(' ')); });
+        try {
+          report = await runManage(root, { ...FAKE_FETCH_200, execFn });
+        } finally {
+          methods.forEach((method, i) => { console[method] = originals[i]; });
+        }
+        const output = lines.join('\n');
 
-  assert.equal(output.split(line).length - 1, 1, `the line prints once: ${output}`);
-  assert.equal(Object.keys(report.results).pop(), SERVICE_ORDER.at(-1), 'the walk ran on to the last service');
-});
+        ctx.expect(output.split(line).length - 1, `the line prints once: ${output}`).toBe(1);
+        ctx.expect(Object.keys(report.results).pop(), 'the walk ran on to the last service').toBe(SERVICE_ORDER.at(-1));
+      },
+    },
 
-// #677: membership is a fact of the brand, so the header states it on EVERY
-// run: the id and where the company is, or that there is none.
-test('runManage: the header always states the company: none, here, or not on this machine', async () => {
-  const lines = [];
-  const log = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
-  const companyLine = () => lines.filter((line) => line.includes('Company:')).pop();
+    // #677: membership is a fact of the brand, so the header states it on EVERY
+    // run: the id and where the company is, or that there is none.
+    {
+      name: 'runManage: the header always states the company: none, here, or not on this machine',
+      run: async (ctx) => {
+        const lines = [];
+        const log = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
+        const companyLine = () => lines.filter((line) => line.includes('Company:')).pop();
 
-  try {
-    const standalone = stageBrand();
-    await runManage(standalone, { service: 'workspace' });
-    assert.match(companyLine(), /Company:\s+none$/);
+        try {
+          const standalone = stageBrand();
+          await runManage(standalone, { service: 'workspace' });
+          ctx.expect(companyLine()).toMatch(/Company:\s+none$/);
 
-    const orphan = stageBrand({
-      config: `{ brand: { id: 'fixture-brand' }, company: { id: 'nowhere-co' }, targets: { web: { type: 'web' } } }`,
-    });
-    await runManage(orphan, { service: 'workspace' });
-    assert.match(companyLine(), /Company:\s+nowhere-co \(not on this machine\)$/);
+          const orphan = stageBrand({
+            config: `{ brand: { id: 'fixture-brand' }, company: { id: 'nowhere-co' }, targets: { web: { type: 'web' } } }`,
+          });
+          await runManage(orphan, { service: 'workspace' });
+          ctx.expect(companyLine()).toMatch(/Company:\s+nowhere-co \(not on this machine\)$/);
 
-    const parent = stageBrand();
-    recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.test' });
-    const child = stageBrand({
-      config: `{ brand: { id: 'fixture-brand' }, company: { id: 'fixture-co' }, targets: { web: { type: 'web' } } }`,
-    });
-    await runManage(child, { service: 'workspace' });
-    assert.match(companyLine(), new RegExp(`Company:\\s+fixture-co \\(${parent.replace(/\//g, '\\/')}\\)$`));
-  } finally {
-    console.log = log;
-  }
-});
+          const parent = stageBrand();
+          recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.test' });
+          const child = stageBrand({
+            config: `{ brand: { id: 'fixture-brand' }, company: { id: 'fixture-co' }, targets: { web: { type: 'web' } } }`,
+          });
+          await runManage(child, { service: 'workspace' });
+          ctx.expect(companyLine()).toMatch(new RegExp(`Company:\\s+fixture-co \\(${parent.replace(/\//g, '\\/')}\\)$`));
+        } finally {
+          console.log = log;
+        }
+      },
+    },
 
-test('runManage: disabled brand is skipped whole', async () => {
-  const root = stageBrand({
-    config: `{ enabled: false, brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: { type: 'web' } } }`,
-  });
+    {
+      name: 'runManage: disabled brand is skipped whole',
+      run: async (ctx) => {
+        const root = stageBrand({
+          config: `{ enabled: false, brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: { type: 'web' } } }`,
+        });
 
-  const report = await runManage(root, {});
-  assert.equal(report.skipped, true);
-  assert.equal(report.hasErrors, false);
-});
+        const report = await runManage(root, {});
+        ctx.expect(report.skipped).toBe(true);
+        ctx.expect(report.hasErrors).toBe(false);
+      },
+    },
 
-test('runManage: --service runs exactly one service; unknown service throws', async () => {
-  const root = stageBrand();
+    {
+      name: 'runManage: --service runs exactly one service; unknown service throws',
+      run: async (ctx) => {
+        const root = stageBrand();
 
-  const report = await runManage(root, { service: 'workspace' });
-  assert.deepEqual(Object.keys(report.results), ['workspace']);
+        const report = await runManage(root, { service: 'workspace' });
+        ctx.expect(Object.keys(report.results)).toEqual(['workspace']);
 
-  await assert.rejects(() => runManage(root, { service: 'nope' }), /Unknown service/);
-});
+        await ctx.expect((() => runManage(root, { service: 'nope' }))()).rejects.toThrow(/Unknown service/);
+      },
+    },
 
-test('runManage: dry-run reports what update would do without building', async () => {
-  const root = stageBrand();
+    {
+      name: 'runManage: dry-run reports what update would do without building',
+      run: async (ctx) => {
+        const root = stageBrand();
 
-  const report = await runManage(root, { dryRun: true });
+        const report = await runManage(root, { dryRun: true });
 
-  assert.equal(report.results.update.status, 'success');
-  const webSteps = report.results.update.output.results.web.steps;
-  assert.equal(webSteps[0].skipped, true);
-  assert.ok(!fs.existsSync(path.join(root, 'targets', 'web', 'dist')));
-  // testing then honestly reports the missing build output
-  assert.equal(report.results.testing.status, 'error');
+        ctx.expect(report.results.update.status).toBe('success');
+        const webSteps = report.results.update.output.results.web.steps;
+        ctx.expect(webSteps[0].skipped).toBe(true);
+        ctx.expect(!fs.existsSync(path.join(root, 'targets', 'web', 'dist'))).toBeTruthy();
+        // testing then honestly reports the missing build output
+        ctx.expect(report.results.testing.status).toBe('error');
+      },
+    },
+  ],
 });

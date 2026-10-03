@@ -6,8 +6,7 @@
  *
  * Real files, real prompts over fake TTY streams — nothing mocked.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -39,53 +38,71 @@ function opContext(root, overrides = {}) {
   return { brandRoot: root, brandConfig: readConfig(root), options: {}, ...overrides };
 }
 
-test('company op: the answer lands as the top-level key, comments intact', async (t) => {
-  const root = stageBrand();
-  const tty = openTtyPrompt();
-  t.after(() => tty.close());
+module.exports = defineCases({
+  type: 'group',
+  description: 'workspace-company',
+  tests: [
+    {
+      name: 'company op: the answer lands as the top-level key, comments intact',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const tty = openTtyPrompt();
+        ctx.after(() => tty.close());
 
-  const run = companyOp(opContext(root));
-  await tty.answer('Company brand id', 'itw-creative-works\r');
-  const result = await run;
+        const run = companyOp(opContext(root));
+        await tty.answer('Company brand id', 'itw-creative-works\r');
+        const result = await run;
 
-  assert.deepEqual(result.output.company, { id: 'itw-creative-works' });
-  assert.deepEqual(readConfig(root).company, { id: 'itw-creative-works' });
+        ctx.expect(result.output.company).toEqual({ id: 'itw-creative-works' });
+        ctx.expect(readConfig(root).company).toEqual({ id: 'itw-creative-works' });
 
-  const file = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
-  assert.match(file, /^\/\/ Fixture Brand — the owner's own file/, 'the comment-preserving editor wrote it');
-});
+        const file = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
+        ctx.expect(file, 'the comment-preserving editor wrote it').toMatch(/^\/\/ Fixture Brand — the owner's own file/);
+      },
+    },
 
-test('company op: a blank answer is the standalone brand — nothing written', async (t) => {
-  const root = stageBrand();
-  const before = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
-  const tty = openTtyPrompt();
-  t.after(() => tty.close());
+    {
+      name: 'company op: a blank answer is the standalone brand — nothing written',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const before = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
+        const tty = openTtyPrompt();
+        ctx.after(() => tty.close());
 
-  const run = companyOp(opContext(root));
-  await tty.answer('Company brand id', '\r');
+        const run = companyOp(opContext(root));
+        await tty.answer('Company brand id', '\r');
 
-  assert.equal(await run, null);
-  assert.equal(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'), before);
-});
+        ctx.expect(await run).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8')).toBe(before);
+      },
+    },
 
-test('company op: an authored key is never re-asked, and a headless run never asks at all', async () => {
-  const answered = stageBrand(AUTHORED.replace('  brand:', "  company: { id: 'self' },\n  brand:"));
-  assert.equal(await companyOp(opContext(answered)), null, 'answered: nothing to do');
+    {
+      name: 'company op: an authored key is never re-asked, and a headless run never asks at all',
+      run: async (ctx) => {
+        const answered = stageBrand(AUTHORED.replace('  brand:', "  company: { id: 'self' },\n  brand:"));
+        ctx.expect(await companyOp(opContext(answered)), 'answered: nothing to do').toBe(null);
 
-  // No TTY here (and none in CI): the question is pending, the walk goes on
-  const unanswered = stageBrand();
-  const before = fs.readFileSync(path.join(unanswered, 'config', 'omega.json5'), 'utf8');
-  assert.equal(await companyOp(opContext(unanswered)), null);
-  assert.equal(fs.readFileSync(path.join(unanswered, 'config', 'omega.json5'), 'utf8'), before);
+        // No TTY here (and none in CI): the question is pending, the walk goes on
+        const unanswered = stageBrand();
+        const before = fs.readFileSync(path.join(unanswered, 'config', 'omega.json5'), 'utf8');
+        ctx.expect(await companyOp(opContext(unanswered))).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(unanswered, 'config', 'omega.json5'), 'utf8')).toBe(before);
 
-  // A brand with no config at all is the config operation's report, not ours
-  assert.equal(await companyOp(opContext(unanswered, { brandRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bare-')) })), null);
-});
+        // A brand with no config at all is the config operation's report, not ours
+        ctx.expect(await companyOp(opContext(unanswered, { brandRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bare-')) }))).toBe(null);
+      },
+    },
 
-test('company: the one answer rule — a brand id, "self", or blank', () => {
-  assert.equal(validateCompanyId('itw-creative-works'), true);
-  assert.equal(validateCompanyId('self'), true);
-  assert.equal(validateCompanyId('  '), true, 'blank is the standalone brand');
-  assert.match(validateCompanyId('Itw Creative Works'), /Must be a brand id/);
-  assert.match(validateCompanyId('9lives'), /"self", or blank/);
+    {
+      name: 'company: the one answer rule — a brand id, "self", or blank',
+      run: (ctx) => {
+        ctx.expect(validateCompanyId('itw-creative-works')).toBe(true);
+        ctx.expect(validateCompanyId('self')).toBe(true);
+        ctx.expect(validateCompanyId('  '), 'blank is the standalone brand').toBe(true);
+        ctx.expect(validateCompanyId('Itw Creative Works')).toMatch(/Must be a brand id/);
+        ctx.expect(validateCompanyId('9lives')).toMatch(/"self", or blank/);
+      },
+    },
+  ],
 });

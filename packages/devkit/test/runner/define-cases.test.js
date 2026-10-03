@@ -1,11 +1,12 @@
 /**
  * defineCases outside the runner: a suite file run by `node --test <file>` or
  * `node <file>` registers its own cases, a row that needs a driver fails
- * naming `npx omega test`, and with the runner active it only hands back the spec.
+ * naming `npx omega test`, and a case file a plain script requires only hands
+ * back the spec.
  */
 const fs = require('node:fs');
 const defineCases = require('../../src/test/define-cases.js');
-const { runNode, tempPath, removeAll } = require('./_fixtures/helpers.js');
+const { runNode, tempPath, removeAll, takeFile } = require('./_fixtures/helpers.js');
 
 const MIXED = 'test/mixed.test.js';
 
@@ -71,13 +72,16 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'case-40 with the runner active defineCases returns the spec and registers nothing',
+      name: 'case-101 a case file required by a plain node <script> returns the same spec and registers nothing',
       run(ctx) {
-        const run = runNode('runner-active', ['test/active.test.js'], { env: { OMEGA_CASE_RUNNER: 'true' } });
+        const marker = tempPath('plain-require.txt');
+        const run = runNode('plain-require', ['script.js'], { env: { FIXTURE_OUT: marker } });
+        const ran = takeFile(marker);
 
-        ctx.expect(run.stdout).toContain('returned:same');
+        ctx.expect(run.stdout, run.output).toContain('returned:same');
+        ctx.expect(ran, 'the case body never ran').toBeNull();
         ctx.expect(run.output, 'no case was registered or run').not.toContain('must never register');
-        ctx.expect(run.status).toBe(0);
+        ctx.expect(run.status, run.output).toBe(0);
       },
     },
   ],

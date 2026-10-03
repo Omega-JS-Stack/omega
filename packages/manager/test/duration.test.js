@@ -2,21 +2,32 @@
  * The shared wall-clock formatter behind the manage walk's per-service lines
  * and the run summary's total.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { formatDuration } = require('../src/lib/duration.js');
 
-test('formatDuration: sub-second stays in milliseconds', () => {
-  assert.equal(formatDuration(0), '0ms');
-  assert.equal(formatDuration(340), '340ms');
-  assert.equal(formatDuration(999.4), '999ms');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'duration',
+  tests: [
+    {
+      name: 'formatDuration: sub-second stays in milliseconds',
+      run: (ctx) => {
+        ctx.expect(formatDuration(0)).toBe('0ms');
+        ctx.expect(formatDuration(340)).toBe('340ms');
+        ctx.expect(formatDuration(999.4)).toBe('999ms');
+      },
+    },
 
-test('formatDuration: seconds, minutes, hours', () => {
-  assert.equal(formatDuration(1000), '1s');
-  assert.equal(formatDuration(14_200), '14s');
-  assert.equal(formatDuration(94_000), '1m 34s');
-  assert.equal(formatDuration(3_600_000), '1h 0m 0s');
-  assert.equal(formatDuration(3_723_000), '1h 2m 3s');
+    {
+      name: 'formatDuration: seconds, minutes, hours',
+      run: (ctx) => {
+        ctx.expect(formatDuration(1000)).toBe('1s');
+        ctx.expect(formatDuration(14_200)).toBe('14s');
+        ctx.expect(formatDuration(94_000)).toBe('1m 34s');
+        ctx.expect(formatDuration(3_600_000)).toBe('1h 0m 0s');
+        ctx.expect(formatDuration(3_723_000)).toBe('1h 2m 3s');
+      },
+    },
+  ],
 });

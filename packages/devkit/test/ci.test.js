@@ -2,18 +2,29 @@
  * isCI: the one answer to "is this a CI runner", read by every lane that acts
  * differently there. Real env objects, no process.env.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { isCI } = require('../src/ci.js');
 
-test('GITHUB_ACTIONS=true or CI=true is a CI runner (#1027)', () => {
-  assert.equal(isCI({ GITHUB_ACTIONS: 'true' }), true);
-  assert.equal(isCI({ CI: 'true' }), true);
-  assert.equal(isCI({ GITHUB_ACTIONS: 'true', CI: 'true' }), true);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'ci',
+  tests: [
+    {
+      name: 'GITHUB_ACTIONS=true or CI=true is a CI runner (#1027)',
+      run: (ctx) => {
+        ctx.expect(isCI({ GITHUB_ACTIONS: 'true' })).toBe(true);
+        ctx.expect(isCI({ CI: 'true' })).toBe(true);
+        ctx.expect(isCI({ GITHUB_ACTIONS: 'true', CI: 'true' })).toBe(true);
+      },
+    },
 
-test('neither variable is a local machine (#1027)', () => {
-  assert.equal(isCI({}), false);
-  assert.equal(isCI({ HOME: '/Users/dev', NODE_ENV: 'production' }), false);
+    {
+      name: 'neither variable is a local machine (#1027)',
+      run: (ctx) => {
+        ctx.expect(isCI({})).toBe(false);
+        ctx.expect(isCI({ HOME: '/Users/dev', NODE_ENV: 'production' })).toBe(false);
+      },
+    },
+  ],
 });

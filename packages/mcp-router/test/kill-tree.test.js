@@ -14,8 +14,7 @@
  * the whole tree ever named.
  */
 
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -40,48 +39,6 @@ const schema = { type: 'object', properties: {} };
 let client;
 let markerFile;
 let deepMarker;
-
-before(async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-tree-'));
-  const overlayDir = path.join(root, 'servers');
-  markerFile = path.join(root, 'pids.json');
-  deepMarker = path.join(root, 'deep.json');
-
-  const entries = {
-    // Every bundled default off, by the one-key overlay the layering promises.
-    ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
-    'fixture-tree': {
-      enabled: true,
-      command: 'node',
-      args: [TREE_SERVER],
-      env: { TREE_MARKER: markerFile },
-      tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
-    },
-    'fixture-deep': {
-      enabled: true,
-      command: 'node',
-      args: [DEEP_TREE_SERVER],
-      env: { DEEP_MARKER: deepMarker },
-      tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
-    },
-  };
-  for (const [name, config] of Object.entries(entries)) {
-    fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
-    fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
-  }
-
-  client = new Client({ name: 'router-tree-e2e', version: '1.0.0' }, { capabilities: {} });
-  await client.connect(new StdioClientTransport({
-    command: process.execPath,
-    args: [ROUTER],
-    env: { ...process.env, MCP_ROUTER_SERVERS_DIR: overlayDir },
-    stderr: 'ignore',
-  }));
-});
-
-after(async () => {
-  await client.close();
-});
 
 const callTool = async (name, args) => {
   const result = await client.callTool({ name, arguments: args });
@@ -117,62 +74,117 @@ const waitFor = async (condition, timeout) => {
   return answer;
 };
 
-test('killTree takes the descendants with the root', async () => {
-  // The shell reports its own children's pids, so the check never leans on the
-  // same `pgrep` walk the helper under test uses.
-  const root = spawn('sh', ['-c', 'sleep 30 & echo $!; sleep 30 & echo $!; wait'], {
-    stdio: ['ignore', 'pipe', 'ignore'],
-  });
-  const exited = new Promise((resolve) => root.once('exit', resolve));
+module.exports = defineCases({
+  type: 'group',
+  description: 'kill-tree',
+  setup: async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-tree-'));
+    const overlayDir = path.join(root, 'servers');
+    markerFile = path.join(root, 'pids.json');
+    deepMarker = path.join(root, 'deep.json');
 
-  let out = '';
-  root.stdout.on('data', (chunk) => { out += chunk; });
-  const children = await waitFor(() => {
-    const pids = out.trim().split('\n').filter(Boolean).map(Number);
-    return pids.length === 2 ? pids : null;
-  }, 5000);
+    const entries = {
+      // Every bundled default off, by the one-key overlay the layering promises.
+      ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
+      'fixture-tree': {
+        enabled: true,
+        command: 'node',
+        args: [TREE_SERVER],
+        env: { TREE_MARKER: markerFile },
+        tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
+      },
+      'fixture-deep': {
+        enabled: true,
+        command: 'node',
+        args: [DEEP_TREE_SERVER],
+        env: { DEEP_MARKER: deepMarker },
+        tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
+      },
+    };
+    for (const [name, config] of Object.entries(entries)) {
+      fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
+      fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+    }
 
-  assert.ok(children, `the shell never reported two children (got "${out}")`);
-  assert.ok(children.every(alive), 'both children are running');
+    client = new Client({ name: 'router-tree-e2e', version: '1.0.0' }, { capabilities: {} });
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [ROUTER],
+      env: { ...process.env, MCP_ROUTER_SERVERS_DIR: overlayDir },
+      stderr: 'ignore',
+    }));
+  },
+  cleanup: async () => {
+    await client.close();
+  },
+  tests: [
+    {
+      name: 'killTree takes the descendants with the root',
+      run: async (ctx) => {
+        // The shell reports its own children's pids, so the check never leans on the
+        // same `pgrep` walk the helper under test uses.
+        const root = spawn('sh', ['-c', 'sleep 30 & echo $!; sleep 30 & echo $!; wait'], {
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        const exited = new Promise((resolve) => root.once('exit', resolve));
 
-  killTree(root.pid, 'SIGKILL');
-  await exited;
+        let out = '';
+        root.stdout.on('data', (chunk) => { out += chunk; });
+        const children = await waitFor(() => {
+          const pids = out.trim().split('\n').filter(Boolean).map(Number);
+          return pids.length === 2 ? pids : null;
+        }, 5000);
 
-  assert.ok(await waitFor(() => children.every((pid) => !alive(pid)), 5000), `${children} outlived the tree kill`);
-  assert.equal(alive(root.pid), false, 'the root is gone too');
-});
+        ctx.expect(children, `the shell never reported two children (got "${out}")`).toBeTruthy();
+        ctx.expect(children.every(alive), 'both children are running').toBeTruthy();
 
-test('an upstream grandchild does not outlive router__disable_upstream', async () => {
-  const result = await callTool('fixture-tree__ping', {});
-  assert.equal(result.isError, false, result.text);
+        killTree(root.pid, 'SIGKILL');
+        await exited;
 
-  const pids = JSON.parse(fs.readFileSync(markerFile, 'utf8'));
-  assert.ok(alive(pids.server), 'the upstream child is running');
-  assert.ok(alive(pids.grandchild), 'the grandchild it started is running');
+        ctx.expect(await waitFor(() => children.every((pid) => !alive(pid)), 5000), `${children} outlived the tree kill`).toBeTruthy();
+        ctx.expect(alive(root.pid), 'the root is gone too').toBe(false);
+      },
+    },
 
-  const disabled = await callTool('router__disable_upstream', { name: 'fixture-tree' });
-  assert.equal(disabled.isError, false, disabled.text);
+    {
+      name: 'an upstream grandchild does not outlive router__disable_upstream',
+      run: async (ctx) => {
+        const result = await callTool('fixture-tree__ping', {});
+        ctx.expect(result.isError, result.text).toBe(false);
 
-  // The root goes on close(); the grandchild it orphaned is what the grace
-  // fallback exists for, so the window covers that grace plus a margin.
-  assert.ok(await waitFor(() => !alive(pids.server), 5000), `the upstream child ${pids.server} is still alive`);
-  assert.ok(await waitFor(() => !alive(pids.grandchild), 5000), `the grandchild ${pids.grandchild} is still alive`);
-});
+        const pids = JSON.parse(fs.readFileSync(markerFile, 'utf8'));
+        ctx.expect(alive(pids.server), 'the upstream child is running').toBeTruthy();
+        ctx.expect(alive(pids.grandchild), 'the grandchild it started is running').toBeTruthy();
 
-test('a whole tree goes with a disabled upstream, not just its top level', async () => {
-  const result = await callTool('fixture-deep__ping', {});
-  assert.equal(result.isError, false, result.text);
+        const disabled = await callTool('router__disable_upstream', { name: 'fixture-tree' });
+        ctx.expect(disabled.isError, disabled.text).toBe(false);
 
-  // The middle level writes the marker once it has started the leaf.
-  const deep = await waitFor(() => (fs.existsSync(deepMarker) ? JSON.parse(fs.readFileSync(deepMarker, 'utf8')) : null), 5000);
-  assert.ok(deep, 'the fixture never reported its tree');
-  assert.ok(alive(deep.mid) && alive(deep.leaf), 'both levels under the child are running');
+        // The root goes on close(); the grandchild it orphaned is what the grace
+        // fallback exists for, so the window covers that grace plus a margin.
+        ctx.expect(await waitFor(() => !alive(pids.server), 5000), `the upstream child ${pids.server} is still alive`).toBeTruthy();
+        ctx.expect(await waitFor(() => !alive(pids.grandchild), 5000), `the grandchild ${pids.grandchild} is still alive`).toBeTruthy();
+      },
+    },
 
-  const disabled = await callTool('router__disable_upstream', { name: 'fixture-deep' });
-  assert.equal(disabled.isError, false, disabled.text);
+    {
+      name: 'a whole tree goes with a disabled upstream, not just its top level',
+      run: async (ctx) => {
+        const result = await callTool('fixture-deep__ping', {});
+        ctx.expect(result.isError, result.text).toBe(false);
 
-  // The middle dies with the root, so at grace time the leaf is an orphan two
-  // levels from anything the router can walk to: only a capture of the whole
-  // tree, taken before the close, still names it.
-  assert.ok(await waitFor(() => !alive(deep.leaf), 5000), `the leaf ${deep.leaf} is still alive`);
+        // The middle level writes the marker once it has started the leaf.
+        const deep = await waitFor(() => (fs.existsSync(deepMarker) ? JSON.parse(fs.readFileSync(deepMarker, 'utf8')) : null), 5000);
+        ctx.expect(deep, 'the fixture never reported its tree').toBeTruthy();
+        ctx.expect(alive(deep.mid) && alive(deep.leaf), 'both levels under the child are running').toBeTruthy();
+
+        const disabled = await callTool('router__disable_upstream', { name: 'fixture-deep' });
+        ctx.expect(disabled.isError, disabled.text).toBe(false);
+
+        // The middle dies with the root, so at grace time the leaf is an orphan two
+        // levels from anything the router can walk to: only a capture of the whole
+        // tree, taken before the close, still names it.
+        ctx.expect(await waitFor(() => !alive(deep.leaf), 5000), `the leaf ${deep.leaf} is still alive`).toBeTruthy();
+      },
+    },
+  ],
 });

@@ -17,7 +17,7 @@
     "./transports/browser": "./src/transports/browser.js"
   },
   "scripts": {
-    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
+    "test": "node ../devkit/src/test/cli.js"
   },
   "dependencies": {
     "uuid": "^14.0.0"

@@ -23,8 +23,7 @@
  * Offline by construction: temp dirs, and every key it touches is deleted from
  * process.env before the case returns.
  */
-const { test, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -51,7 +50,6 @@ const RELOAD_CEILING_MS = 5000;
 // cascade's ownership snapshot counts it as shell-owned forever.
 const SHELL_KEY = `OMEGA_ENV_WATCH_SHELL_${process.pid}`;
 process.env[SHELL_KEY] = 'shell';
-after(() => { delete process.env[SHELL_KEY]; });
 
 /**
  * A standalone target dir with a `.env` — the smallest chain that reloads
@@ -83,67 +81,86 @@ async function afterReload(t, root, mutate) {
   }
 }
 
-test('a NEW key lands after the debounce', async (t) => {
-  const key = `OMEGA_ENV_WATCH_NEW_${process.pid}`;
-  const seed = `OMEGA_ENV_WATCH_SEED_${process.pid}`;
-  t.after(() => { delete process.env[key]; delete process.env[seed]; });
+module.exports = defineCases({
+  type: 'group',
+  description: 'env-watch',
+  cleanup: () => { delete process.env[SHELL_KEY]; },
+  tests: [
+    {
+      name: 'a NEW key lands after the debounce',
+      run: async (ctx) => {
+        const key = `OMEGA_ENV_WATCH_NEW_${process.pid}`;
+        const seed = `OMEGA_ENV_WATCH_SEED_${process.pid}`;
+        ctx.after(() => { delete process.env[key]; delete process.env[seed]; });
 
-  const root = targetFixture(t, `${seed}="seed"\n`);
-  assert.equal(process.env[key], undefined, 'the key must not exist before the reload, or the case proves nothing');
+        const root = targetFixture(ctx, `${seed}="seed"\n`);
+        ctx.expect(process.env[key], 'the key must not exist before the reload, or the case proves nothing').toBe(undefined);
 
-  await afterReload(t, root, () => {
-    fs.writeFileSync(path.join(root, '.env'), `${seed}="seed"\n${key}="landed"\n`);
-  });
+        await afterReload(ctx, root, () => {
+          fs.writeFileSync(path.join(root, '.env'), `${seed}="seed"\n${key}="landed"\n`);
+        });
 
-  assert.equal(process.env[key], 'landed', 'a key process.env did not already carry is claimed by the reload');
-});
+        ctx.expect(process.env[key], 'a key process.env did not already carry is claimed by the reload').toBe('landed');
+      },
+    },
 
-test('an EDITED value lands — the file layer owns the key, so the reload rewrites it', async (t) => {
-  const key = `OMEGA_ENV_WATCH_EDITED_${process.pid}`;
-  t.after(() => { delete process.env[key]; });
+    {
+      name: 'an EDITED value lands — the file layer owns the key, so the reload rewrites it',
+      run: async (ctx) => {
+        const key = `OMEGA_ENV_WATCH_EDITED_${process.pid}`;
+        ctx.after(() => { delete process.env[key]; });
 
-  const root = targetFixture(t, `${key}="original"\n`);
+        const root = targetFixture(ctx, `${key}="original"\n`);
 
-  // The boot load: what every dev lane's CLI/gulp start already did, and what
-  // puts the key in process.env — as a FILE-owned key — in the first place.
-  loadEnv(root);
-  assert.equal(process.env[key], 'original', 'the boot load must have claimed the key, or the case proves nothing');
+        // The boot load: what every dev lane's CLI/gulp start already did, and what
+        // puts the key in process.env — as a FILE-owned key — in the first place.
+        loadEnv(root);
+        ctx.expect(process.env[key], 'the boot load must have claimed the key, or the case proves nothing').toBe('original');
 
-  await afterReload(t, root, () => {
-    fs.writeFileSync(path.join(root, '.env'), `${key}="edited"\n`);
-  });
+        await afterReload(ctx, root, () => {
+          fs.writeFileSync(path.join(root, '.env'), `${key}="edited"\n`);
+        });
 
-  assert.equal(process.env[key], 'edited', 'a file layer owns what it loaded, so the reload drops it and re-reads the edit');
-});
+        ctx.expect(process.env[key], 'a file layer owns what it loaded, so the reload drops it and re-reads the edit').toBe('edited');
+      },
+    },
 
-test('a SHELL-set key survives an edited file value untouched', async (t) => {
-  const root = targetFixture(t, `${SHELL_KEY}="from-file"\n`);
+    {
+      name: 'a SHELL-set key survives an edited file value untouched',
+      run: async (ctx) => {
+        const root = targetFixture(ctx, `${SHELL_KEY}="from-file"\n`);
 
-  // The boot load: the file loses to the shell, the same no-override rule that
-  // has always made an exported value win.
-  loadEnv(root);
-  assert.equal(process.env[SHELL_KEY], 'shell', 'the shell must still win at boot, or the case proves nothing');
+        // The boot load: the file loses to the shell, the same no-override rule that
+        // has always made an exported value win.
+        loadEnv(root);
+        ctx.expect(process.env[SHELL_KEY], 'the shell must still win at boot, or the case proves nothing').toBe('shell');
 
-  await afterReload(t, root, () => {
-    fs.writeFileSync(path.join(root, '.env'), `${SHELL_KEY}="edited-in-file"\n`);
-  });
+        await afterReload(ctx, root, () => {
+          fs.writeFileSync(path.join(root, '.env'), `${SHELL_KEY}="edited-in-file"\n`);
+        });
 
-  assert.equal(process.env[SHELL_KEY], 'shell', 'the reload rewrites only file-owned keys — the shell owns this one forever');
-});
+        ctx.expect(process.env[SHELL_KEY], 'the reload rewrites only file-owned keys — the shell owns this one forever').toBe('shell');
+      },
+    },
 
-test('a key DROPPED from the file is dropped from the process', async (t) => {
-  const key = `OMEGA_ENV_WATCH_REMOVED_${process.pid}`;
-  const kept = `OMEGA_ENV_WATCH_KEPT_${process.pid}`;
-  t.after(() => { delete process.env[key]; delete process.env[kept]; });
+    {
+      name: 'a key DROPPED from the file is dropped from the process',
+      run: async (ctx) => {
+        const key = `OMEGA_ENV_WATCH_REMOVED_${process.pid}`;
+        const kept = `OMEGA_ENV_WATCH_KEPT_${process.pid}`;
+        ctx.after(() => { delete process.env[key]; delete process.env[kept]; });
 
-  const root = targetFixture(t, `${key}="original"\n${kept}="kept"\n`);
+        const root = targetFixture(ctx, `${key}="original"\n${kept}="kept"\n`);
 
-  loadEnv(root);
-  assert.equal(process.env[key], 'original', 'the boot load must have claimed the key, or the case proves nothing');
+        loadEnv(root);
+        ctx.expect(process.env[key], 'the boot load must have claimed the key, or the case proves nothing').toBe('original');
 
-  await afterReload(t, root, () => {
-    fs.writeFileSync(path.join(root, '.env'), `${kept}="kept"\n`);
-  });
+        await afterReload(ctx, root, () => {
+          fs.writeFileSync(path.join(root, '.env'), `${kept}="kept"\n`);
+        });
 
-  assert.equal(process.env[key], undefined, 'a file-owned key the file no longer declares is gone — the reload re-reads the file, it does not merge onto the old set');
+        ctx.expect(process.env[key], 'a file-owned key the file no longer declares is gone — the reload re-reads the file, it does not merge onto the old set').toBe(undefined);
+      },
+    },
+  ],
 });

@@ -7,8 +7,7 @@
  *
  * Run: node --test scripts/private-refs.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -41,35 +40,50 @@ function fixtureTree() {
   return dir;
 }
 
-test('PRIVATE_REFERENCE: every whitespace form is a hit', () => {
-  for (const [name, contents] of Object.entries(WHITESPACE_FORMS)) {
-    assert.match(contents, PRIVATE_REFERENCE, `${name} is invisible to the export`);
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'private-refs',
+  tests: [
+    {
+      name: 'PRIVATE_REFERENCE: every whitespace form is a hit',
+      run: (ctx) => {
+        for (const [name, contents] of Object.entries(WHITESPACE_FORMS)) {
+          ctx.expect(contents, `${name} is invisible to the export`).toMatch(PRIVATE_REFERENCE);
+        }
+      },
+    },
 
-test('scanTree: every whitespace form is a hit, reported at its line; published refs and prose are not', (t) => {
-  const dir = fixtureTree();
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    {
+      name: 'scanTree: every whitespace form is a hit, reported at its line; published refs and prose are not',
+      run: (ctx) => {
+        const dir = fixtureTree();
+        ctx.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  const { hits, files } = scanTree(dir);
+        const { hits, files } = scanTree(dir);
 
-  assert.deepEqual(hits.sort(), ['from-newline.mjs:1', 'spaced-import.cjs:1', 'spaced-require.js:1']);
-  assert.equal(files, 4);
-});
+        ctx.expect(hits.sort()).toEqual(['from-newline.mjs:1', 'spaced-import.cjs:1', 'spaced-require.js:1']);
+        ctx.expect(files).toBe(4);
+      },
+    },
 
-test('CLI (the CI step): a tree with raw private references exits 1 naming each; a clean tree exits 0', (t) => {
-  const dir = fixtureTree();
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    {
+      name: 'CLI (the CI step): a tree with raw private references exits 1 naming each; a clean tree exits 0',
+      run: (ctx) => {
+        const dir = fixtureTree();
+        ctx.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  const dirty = spawnSync(process.execPath, [SCRIPT, dir], { encoding: 'utf8' });
-  assert.equal(dirty.status, 1, dirty.stdout + dirty.stderr);
-  for (const name of Object.keys(WHITESPACE_FORMS)) {
-    assert.match(dirty.stderr, new RegExp(`raw private ref: ${name.replace('.', '\\.')}:1`));
-  }
+        const dirty = spawnSync(process.execPath, [SCRIPT, dir], { encoding: 'utf8' });
+        ctx.expect(dirty.status, dirty.stdout + dirty.stderr).toBe(1);
+        for (const name of Object.keys(WHITESPACE_FORMS)) {
+          ctx.expect(dirty.stderr).toMatch(new RegExp(`raw private ref: ${name.replace('.', '\\.')}:1`));
+        }
 
-  for (const name of Object.keys(WHITESPACE_FORMS)) {
-    fs.rmSync(path.join(dir, name));
-  }
-  const clean = spawnSync(process.execPath, [SCRIPT, dir], { encoding: 'utf8' });
-  assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+        for (const name of Object.keys(WHITESPACE_FORMS)) {
+          fs.rmSync(path.join(dir, name));
+        }
+        const clean = spawnSync(process.execPath, [SCRIPT, dir], { encoding: 'utf8' });
+        ctx.expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+      },
+    },
+  ],
 });

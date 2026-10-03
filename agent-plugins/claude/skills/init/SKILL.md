@@ -51,7 +51,13 @@ In the clone (or the template copy), run in the background, because the dev stac
 
 `OMEGA_NON_INTERACTIVE=1 npm start -- --id=<brand-id> --name="<name>" --tagline="<tagline>" --description="<description>" --targets=<targets> --owner=<owner>`
 
-Flags after `npm start --` reach the onboarding wizard. Add `--company=<company-id>` or `--admins=<emails>` only when the person named them. Follow the run in its output or `<brandRoot>/logs/dev.log` until the local site answers, then open it in the browser. The skill ends here, on a running local site.
+Flags after `npm start --` reach the onboarding wizard. Add `--company=<company-id>` or `--admins=<emails>` only when the person named them. Follow the run in its output or `<brandRoot>/logs/dev.log` until the local site answers, then open it in the browser.
+
+Then commit the scaffold, so the brand has a clean starting point before any work begins. The brand's `.gitignore` already keeps `.env*`, `.omega/` and `logs/` out; check `git status` shows no secret, then at the brand root:
+
+`git add -A && git commit -m "chore: scaffold the <name> brand with omega onboard"`
+
+The skill ends here, on a running local site and one commit holding the scaffold. The port of an existing site, or any feature, is the work that comes AFTER this commit, never part of it.
 
 ## 5. Going live, each step on its own yes
 

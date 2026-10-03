@@ -4,8 +4,7 @@
  * and brandmark asked for; a miss fails naming the URL, and a dry run lists
  * the probes instead of making them.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
@@ -30,48 +29,69 @@ async function runAssetProbes({ logo = ['brandmark.svg'], responses = {}, option
   return { report, fetch };
 }
 
-test('testing: a brandmark source → the live favicon and brandmark are probed after the homepage, 200 passes', async () => {
-  const { report, fetch } = await runAssetProbes({ responses: { [FAVICON]: { status: 200 }, [BRANDMARK]: { status: 200 } } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'testing-brand-assets',
+  tests: [
+    {
+      name: 'testing: a brandmark source → the live favicon and brandmark are probed after the homepage, 200 passes',
+      run: async (ctx) => {
+        const { report, fetch } = await runAssetProbes({ responses: { [FAVICON]: { status: 200 }, [BRANDMARK]: { status: 200 } } });
 
-  assert.equal(report.status, 'success');
-  assert.deepEqual([fetch.calls[0], ...fetch.calls.slice(1).sort()], [HOMEPAGE, BRANDMARK, FAVICON], 'the homepage first');
-});
+        ctx.expect(report.status).toBe('success');
+        ctx.expect([fetch.calls[0], ...fetch.calls.slice(1).sort()], 'the homepage first').toEqual([HOMEPAGE, BRANDMARK, FAVICON]);
+      },
+    },
 
-test('testing: a live brand asset answering 404 fails the service, naming the URL', async () => {
-  const { report } = await runAssetProbes({ responses: { [FAVICON]: { status: 200 }, [BRANDMARK]: { status: 404 } } });
+    {
+      name: 'testing: a live brand asset answering 404 fails the service, naming the URL',
+      run: async (ctx) => {
+        const { report } = await runAssetProbes({ responses: { [FAVICON]: { status: 200 }, [BRANDMARK]: { status: 404 } } });
 
-  assert.equal(report.status, 'error');
-  const { failed } = report.output.results;
-  assert.ok(failed.length === 1 && failed[0].error.includes(BRANDMARK), JSON.stringify(failed));
-});
+        ctx.expect(report.status).toBe('error');
+        const { failed } = report.output.results;
+        ctx.expect(failed.length === 1 && failed[0].error.includes(BRANDMARK), JSON.stringify(failed)).toBeTruthy();
+      },
+    },
 
-test('testing: no logo sources → neither asset is probed', async () => {
-  const { report, fetch } = await runAssetProbes({ logo: [] });
+    {
+      name: 'testing: no logo sources → neither asset is probed',
+      run: async (ctx) => {
+        const { report, fetch } = await runAssetProbes({ logo: [] });
 
-  assert.equal(report.status, 'success');
-  assert.deepEqual(fetch.calls, [HOMEPAGE]);
-});
+        ctx.expect(report.status).toBe('success');
+        ctx.expect(fetch.calls).toEqual([HOMEPAGE]);
+      },
+    },
 
-test('testing: a wordmark with no brandmark source → neither asset is probed', async () => {
-  const { report, fetch } = await runAssetProbes({ logo: ['wordmark.svg'] });
+    {
+      name: 'testing: a wordmark with no brandmark source → neither asset is probed',
+      run: async (ctx) => {
+        const { report, fetch } = await runAssetProbes({ logo: ['wordmark.svg'] });
 
-  assert.equal(report.status, 'success');
-  assert.deepEqual(fetch.calls, [HOMEPAGE]);
-});
+        ctx.expect(report.status).toBe('success');
+        ctx.expect(fetch.calls).toEqual([HOMEPAGE]);
+      },
+    },
 
-test('testing: dry-run with a brandmark source lists both asset probes and fetches nothing', async () => {
-  const lines = [];
-  const originalLog = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
-  let fetch;
-  try {
-    ({ fetch } = await runAssetProbes({ options: { dryRun: true } }));
-  } finally {
-    console.log = originalLog;
-  }
+    {
+      name: 'testing: dry-run with a brandmark source lists both asset probes and fetches nothing',
+      run: async (ctx) => {
+        const lines = [];
+        const originalLog = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
+        let fetch;
+        try {
+          ({ fetch } = await runAssetProbes({ options: { dryRun: true } }));
+        } finally {
+          console.log = originalLog;
+        }
 
-  assert.deepEqual(fetch.calls, []);
-  for (const url of [FAVICON, BRANDMARK]) {
-    assert.ok(lines.some((line) => line.includes('would') && line.includes(url)), `a would-line for ${url}`);
-  }
+        ctx.expect(fetch.calls).toEqual([]);
+        for (const url of [FAVICON, BRANDMARK]) {
+          ctx.expect(lines.some((line) => line.includes('would') && line.includes(url)), `a would-line for ${url}`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

@@ -13,8 +13,7 @@
  *
  * Run: node --test scripts/skill-descriptions.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 
@@ -65,67 +64,100 @@ function skillNames() {
     .map((item) => item.name);
 }
 
-// --- parser self-tests ---
+module.exports = defineCases({
+  type: 'group',
+  description: 'skill-descriptions',
+  tests: [
+    // --- parser self-tests ---
 
-test('parser: a plain inline description is read', () => {
-  const source = '---\nname: web\ndescription: Use when working on a website app.\nuser-invocable: true\n---\n\nBody.\n';
-  assert.equal(readDescription(source), 'Use when working on a website app.');
-});
+    {
+      name: 'parser: a plain inline description is read',
+      run: (ctx) => {
+        const source = '---\nname: web\ndescription: Use when working on a website app.\nuser-invocable: true\n---\n\nBody.\n';
+        ctx.expect(readDescription(source)).toBe('Use when working on a website app.');
+      },
+    },
 
-test('parser: a folded block scalar is joined into one line', () => {
-  const source = '---\nname: web\ndescription: >-\n  Use when working on a\n  website app.\nuser-invocable: true\n---\n';
-  assert.equal(readDescription(source), 'Use when working on a website app.');
-});
+    {
+      name: 'parser: a folded block scalar is joined into one line',
+      run: (ctx) => {
+        const source = '---\nname: web\ndescription: >-\n  Use when working on a\n  website app.\nuser-invocable: true\n---\n';
+        ctx.expect(readDescription(source)).toBe('Use when working on a website app.');
+      },
+    },
 
-test('parser: a literal block scalar is joined into one line', () => {
-  const source = '---\nname: web\ndescription: |\n  Use when working on a\n  website app.\n---\n';
-  assert.equal(readDescription(source), 'Use when working on a website app.');
-});
+    {
+      name: 'parser: a literal block scalar is joined into one line',
+      run: (ctx) => {
+        const source = '---\nname: web\ndescription: |\n  Use when working on a\n  website app.\n---\n';
+        ctx.expect(readDescription(source)).toBe('Use when working on a website app.');
+      },
+    },
 
-test('parser: an indented continuation of an inline value is joined', () => {
-  const source = '---\nname: web\ndescription: Use when working\n  on a website app.\n---\n';
-  assert.equal(readDescription(source), 'Use when working on a website app.');
-});
+    {
+      name: 'parser: an indented continuation of an inline value is joined',
+      run: (ctx) => {
+        const source = '---\nname: web\ndescription: Use when working\n  on a website app.\n---\n';
+        ctx.expect(readDescription(source)).toBe('Use when working on a website app.');
+      },
+    },
 
-test('parser: the body is never read as frontmatter', () => {
-  const source = '---\nname: web\ndescription: Short.\n---\n\ndescription: not this one\n';
-  assert.equal(readDescription(source), 'Short.');
-});
+    {
+      name: 'parser: the body is never read as frontmatter',
+      run: (ctx) => {
+        const source = '---\nname: web\ndescription: Short.\n---\n\ndescription: not this one\n';
+        ctx.expect(readDescription(source)).toBe('Short.');
+      },
+    },
 
-test('parser: a file with no frontmatter has no description', () => {
-  assert.equal(readDescription('# Just a heading\n'), null);
-});
+    {
+      name: 'parser: a file with no frontmatter has no description',
+      run: (ctx) => {
+        ctx.expect(readDescription('# Just a heading\n')).toBe(null);
+      },
+    },
 
-// --- the live scan ---
+    // --- the live scan ---
 
-test('skills: every SKILL.md carries a description', () => {
-  const missing = skillNames().filter((skill) => {
-    const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
-    return !readDescription(source);
-  });
+    {
+      name: 'skills: every SKILL.md carries a description',
+      run: (ctx) => {
+        const missing = skillNames().filter((skill) => {
+          const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
+          return !readDescription(source);
+        });
 
-  assert.deepEqual(missing, [], `SKILL.md files with no frontmatter description: ${missing.join(', ')}`);
-});
+        ctx.expect(missing, `SKILL.md files with no frontmatter description: ${missing.join(', ')}`).toEqual([]);
+      },
+    },
 
-test('skills: omega:init ships, and its description is one sentence', () => {
-  const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
-  assert.ok(fs.existsSync(file), 'agent-plugins/claude/skills/init/SKILL.md exists');
+    {
+      name: 'skills: omega:init ships, and its description is one sentence',
+      run: (ctx) => {
+        const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
+        ctx.expect(fs.existsSync(file), 'agent-plugins/claude/skills/init/SKILL.md exists').toBeTruthy();
 
-  const description = readDescription(fs.readFileSync(file, 'utf8')) || '';
-  assert.match(description, /[.!?]$/, `one sentence ends the description: ${description}`);
-  assert.doesNotMatch(description, /[.!?]\s/, `no second sentence starts inside it: ${description}`);
-});
+        const description = readDescription(fs.readFileSync(file, 'utf8')) || '';
+        ctx.expect(description, `one sentence ends the description: ${description}`).toMatch(/[.!?]$/);
+        ctx.expect(description, `no second sentence starts inside it: ${description}`).not.toMatch(/[.!?]\s/);
+      },
+    },
 
-test(`skills: no description exceeds ${MAX_DESCRIPTION} characters`, () => {
-  const over = [];
+    {
+      name: `skills: no description exceeds ${MAX_DESCRIPTION} characters`,
+      run: (ctx) => {
+        const over = [];
 
-  for (const skill of skillNames()) {
-    const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
-    const description = readDescription(source);
-    if (description && description.length > MAX_DESCRIPTION) {
-      over.push(`${skill}: ${description.length} chars`);
-    }
-  }
+        for (const skill of skillNames()) {
+          const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
+          const description = readDescription(source);
+          if (description && description.length > MAX_DESCRIPTION) {
+            over.push(`${skill}: ${description.length} chars`);
+          }
+        }
 
-  assert.deepEqual(over, [], `descriptions over the ${MAX_DESCRIPTION}-char cap:\n  ${over.join('\n  ')}`);
+        ctx.expect(over, `descriptions over the ${MAX_DESCRIPTION}-char cap:\n  ${over.join('\n  ')}`).toEqual([]);
+      },
+    },
+  ],
 });

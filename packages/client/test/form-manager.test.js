@@ -6,166 +6,229 @@
  * `@omega.js/client/modules/form-manager.js` now. Real import under the
  * test DOM shim plus source-shape pins that keep the move honest.
  */
-const { describe, it, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { assert, getOmega } = require('./helpers.js');
+const { getOmega, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 const SRC_PATH = path.join(__dirname, '..', 'src', 'modules', 'form-manager.js');
 const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'form-manager.js');
 const SOURCE = fs.readFileSync(SRC_PATH, 'utf8');
 
-describe('FormManager Module', () => {
-  let FormManager;
+module.exports = defineCases({
+  type: 'group',
+  description: 'form-manager',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let FormManager;
 
-  before(async () => {
-    ({ FormManager } = await import(pathToFileURL(DIST_PATH)));
-  });
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        ({ FormManager } = await import(pathToFileURL(DIST_PATH)));
+      })()));
 
-  it('imports under the client runtime and exports the FormManager class', () => {
-    assert(typeof FormManager === 'function');
-    assert(FormManager.name === 'FormManager');
-  });
+      cases.push({
+        name: 'FormManager Module > imports under the client runtime and exports the FormManager class',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          ctx.expect(typeof FormManager === 'function').toBeTruthy();
+          ctx.expect(FormManager.name === 'FormManager').toBeTruthy();
+        },
+      });
 
-  it('constructor fails loud when the form is missing', () => {
-    try {
-      new FormManager(getOmega(), '#definitely-not-a-form');
-      assert.fail('Should have thrown');
-    } catch (e) {
-      assert(e.message.includes('Form not found'));
-    }
-  });
+      cases.push({
+        name: 'FormManager Module > constructor fails loud when the form is missing',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          try {
+            new FormManager(getOmega(), '#definitely-not-a-form');
+            ctx.expect.fail('Should have thrown');
+          } catch (e) {
+            ctx.expect(e.message.includes('Form not found')).toBeTruthy();
+          }
+        },
+      });
 
-  it('lives on client primitives only — relative imports, no self-name or web-alias refs', () => {
-    assert(SOURCE.includes("from './dom.js'"), 'dom module imported relatively');
-    assert(!SOURCE.includes("from '../index.js'"), 'no instance imported: the form receives omega when built');
-    assert(!SOURCE.includes('@omega.js/client'), 'no self-name imports (pre-publish safe)');
-    assert(!SOURCE.includes('__main_assets__'), 'no web-only alias refs survived the move');
-  });
+      cases.push({
+        name: 'FormManager Module > lives on client primitives only — relative imports, no self-name or web-alias refs',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          ctx.expect(SOURCE.includes("from './dom.js'"), 'dom module imported relatively').toBeTruthy();
+          ctx.expect(!SOURCE.includes("from '../index.js'"), 'no instance imported: the form receives omega when built').toBeTruthy();
+          ctx.expect(!SOURCE.includes('@omega.js/client'), 'no self-name imports (pre-publish safe)').toBeTruthy();
+          ctx.expect(!SOURCE.includes('__main_assets__'), 'no web-only alias refs survived the move').toBeTruthy();
+        },
+      });
 
-  it('keeps the web-era surface: honeypot guard + unsaved-changes unload guard', () => {
-    assert(SOURCE.includes('HONEYPOT_SELECTOR'));
-    assert(SOURCE.includes('warnOnUnsavedChanges'));
-  });
+      cases.push({
+        name: 'FormManager Module > keeps the web-era surface: honeypot guard + unsaved-changes unload guard',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          ctx.expect(SOURCE.includes('HONEYPOT_SELECTOR')).toBeTruthy();
+          ctx.expect(SOURCE.includes('warnOnUnsavedChanges')).toBeTruthy();
+        },
+      });
 
-  it('ships in dist for consumers (exports map ./modules/*)', () => {
-    assert(fs.existsSync(DIST_PATH), 'dist/modules/form-manager.js exists after prepare');
-  });
-});
+      cases.push({
+        name: 'FormManager Module > ships in dist for consumers (exports map ./modules/*)',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          ctx.expect(fs.existsSync(DIST_PATH), 'dist/modules/form-manager.js exists after prepare').toBeTruthy();
+        },
+      });
+      return cases;
+    })(),
 
-describe('FormManager gates (#637)', () => {
-  let FormManager;
+    ...(() => {
+      const cases = [];
+      let FormManager;
 
-  before(async () => {
-    ({ FormManager } = await import(pathToFileURL(DIST_PATH)));
-  });
+      let beforeHook2Run;
+      const beforeHook2 = (ctx) => (beforeHook2Run ||= Promise.resolve().then(() => (async () => {
+        ({ FormManager } = await import(pathToFileURL(DIST_PATH)));
+      })()));
 
-  // The client suite's DOM shim has no parser, so the form is hand-built: the
-  // only surface FormManager touches on it is attributes, listeners and the two
-  // querySelector forms. A submit button is what a gate actually guards.
-  function makeForm() {
-    const attributes = {};
-    const $submit = {
-      type: 'submit',
-      name: '',
-      disabled: false,
-      matches: () => false,
-      addEventListener: () => {},
-    };
+      // The client suite's DOM shim has no parser, so the form is hand-built: the
+      // only surface FormManager touches on it is attributes, listeners and the two
+      // querySelector forms. A submit button is what a gate actually guards.
+      function makeForm() {
+        const attributes = {};
+        const $submit = {
+          type: 'submit',
+          name: '',
+          disabled: false,
+          matches: () => false,
+          addEventListener: () => {},
+        };
 
-    const $form = {
-      $submit,
-      isConnected: true,
-      setAttribute: (name, value) => { attributes[name] = String(value); },
-      getAttribute: (name) => attributes[name] ?? null,
-      addEventListener: () => {},
-      querySelector: () => null,
-      querySelectorAll: (selector) => (selector.includes('button') ? [$submit] : []),
-    };
+        const $form = {
+          $submit,
+          isConnected: true,
+          setAttribute: (name, value) => { attributes[name] = String(value); },
+          getAttribute: (name) => attributes[name] ?? null,
+          addEventListener: () => {},
+          querySelector: () => null,
+          querySelectorAll: (selector) => (selector.includes('button') ? [$submit] : []),
+        };
 
-    return $form;
-  }
+        return $form;
+      }
 
-  it('holds ready() until every gate resolves, with the submit control disabled meanwhile', () => {
-    const $form = makeForm();
-    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
+      cases.push({
+        name: 'FormManager gates (#637) > holds ready() until every gate resolves, with the submit control disabled meanwhile',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const $form = makeForm();
+          const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
-    formManager.addGate('eligibility');
-    formManager.addGate('recaptcha');
-    formManager.ready();
+          formManager.addGate('eligibility');
+          formManager.addGate('recaptcha');
+          formManager.ready();
 
-    assert(formManager.state === 'initializing', 'a gated ready() leaves the form initializing');
-    assert($form.$submit.disabled === true, 'and the submit control cannot be pressed');
+          ctx.expect(formManager.state === 'initializing', 'a gated ready() leaves the form initializing').toBeTruthy();
+          ctx.expect($form.$submit.disabled === true, 'and the submit control cannot be pressed').toBeTruthy();
 
-    formManager.resolveGate('eligibility');
-    assert(formManager.state === 'initializing', 'one answer is not both answers');
-    assert($form.$submit.disabled === true);
+          formManager.resolveGate('eligibility');
+          ctx.expect(formManager.state === 'initializing', 'one answer is not both answers').toBeTruthy();
+          ctx.expect($form.$submit.disabled === true).toBeTruthy();
 
-    formManager.resolveGate('recaptcha');
-    assert(formManager.state === 'ready', 'the last gate is what arms the form');
-    assert($form.$submit.disabled === false, 'and the submit control arms with it');
-  });
+          formManager.resolveGate('recaptcha');
+          ctx.expect(formManager.state === 'ready', 'the last gate is what arms the form').toBeTruthy();
+          ctx.expect($form.$submit.disabled === false, 'and the submit control arms with it').toBeTruthy();
+        },
+      });
 
-  it('resolving a gate before ready() is called still leaves the caller in charge of arming', () => {
-    const $form = makeForm();
-    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
+      cases.push({
+        name: 'FormManager gates (#637) > resolving a gate before ready() is called still leaves the caller in charge of arming',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const $form = makeForm();
+          const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
-    formManager.addGate('eligibility');
-    formManager.resolveGate('eligibility');
+          formManager.addGate('eligibility');
+          formManager.resolveGate('eligibility');
 
-    assert(formManager.state === 'initializing', 'no ready() was ever asked for');
+          ctx.expect(formManager.state === 'initializing', 'no ready() was ever asked for').toBeTruthy();
 
-    formManager.ready();
-    assert(formManager.state === 'ready', 'and an ungated ready() arms at once');
-  });
+          formManager.ready();
+          ctx.expect(formManager.state === 'ready', 'and an ungated ready() arms at once').toBeTruthy();
+        },
+      });
 
-  it('resolving a gate nobody opened fails loud', () => {
-    const $form = makeForm();
-    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
+      cases.push({
+        name: 'FormManager gates (#637) > resolving a gate nobody opened fails loud',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const $form = makeForm();
+          const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
-    formManager.addGate('eligibility');
+          formManager.addGate('eligibility');
 
-    try {
-      formManager.resolveGate('recaptcha');
-      assert.fail('Should have thrown');
-    } catch (e) {
-      assert(e.message.includes('resolveGate'), 'the error names the call that was wrong');
-      assert(e.message.includes('recaptcha'), 'and the gate it could not find');
-    }
+          try {
+            formManager.resolveGate('recaptcha');
+            ctx.expect.fail('Should have thrown');
+          } catch (e) {
+            ctx.expect(e.message.includes('resolveGate'), 'the error names the call that was wrong').toBeTruthy();
+            ctx.expect(e.message.includes('recaptcha'), 'and the gate it could not find').toBeTruthy();
+          }
 
-    // A typo must not have armed the form behind the gate that IS open
-    assert(formManager.state === 'initializing');
+          // A typo must not have armed the form behind the gate that IS open
+          ctx.expect(formManager.state === 'initializing').toBeTruthy();
 
-    formManager.resolveGate('eligibility');
+          formManager.resolveGate('eligibility');
 
-    try {
-      formManager.resolveGate('eligibility');
-      assert.fail('Should have thrown');
-    } catch (e) {
-      assert(e.message.includes('resolveGate'), 'a second resolve of the same gate is the same mistake');
-    }
-  });
+          try {
+            formManager.resolveGate('eligibility');
+            ctx.expect.fail('Should have thrown');
+          } catch (e) {
+            ctx.expect(e.message.includes('resolveGate'), 'a second resolve of the same gate is the same mistake').toBeTruthy();
+          }
+        },
+      });
 
-  it('a gate added after the form armed fails loud', () => {
-    const $form = makeForm();
-    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
+      cases.push({
+        name: 'FormManager gates (#637) > a gate added after the form armed fails loud',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const $form = makeForm();
+          const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
-    formManager.ready();
+          formManager.ready();
 
-    try {
-      formManager.addGate('too-late');
-      assert.fail('Should have thrown');
-    } catch (e) {
-      assert(e.message.includes('addGate') && e.message.includes('ready'), 'the error names the call that was wrong and the state it found');
-    }
-  });
-});
+          try {
+            formManager.addGate('too-late');
+            ctx.expect.fail('Should have thrown');
+          } catch (e) {
+            ctx.expect(e.message.includes('addGate') && e.message.includes('ready'), 'the error names the call that was wrong and the state it found').toBeTruthy();
+          }
+        },
+      });
+      return cases;
+    })(),
 
-describe('FormManager teardown (wave-4 F10)', () => {
-  it('ships a destroy() that leaves the shared registry, and the beforeunload handler skips disconnected forms', () => {
-    assert(SOURCE.includes('destroy()'), 'destroy() method exists');
-    assert(SOURCE.includes('_instances.delete(this)'), 'destroy leaves the shared instance Set');
-    assert(SOURCE.includes('isConnected'), 'shared beforeunload handler skips forms no longer in the DOM');
-  });
+    {
+      name: 'FormManager teardown (wave-4 F10) > ships a destroy() that leaves the shared registry, and the beforeunload handler skips disconnected forms',
+      run: async (ctx) => {
+        await beforeEachHook();
+        ctx.expect(SOURCE.includes('destroy()'), 'destroy() method exists').toBeTruthy();
+        ctx.expect(SOURCE.includes('_instances.delete(this)'), 'destroy leaves the shared instance Set').toBeTruthy();
+        ctx.expect(SOURCE.includes('isConnected'), 'shared beforeunload handler skips forms no longer in the DOM').toBeTruthy();
+      },
+    },
+  ],
 });

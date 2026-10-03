@@ -227,7 +227,7 @@ Deep references live in `docs/client/`, beside this guide. Treat docs as a first
 - [docs/client/modules.md](modules.md): full module quick reference (Storage, Auth + `auth.user` + one state per auth change, Bindings, Firestore, Notifications, ServiceWorker, Sentry, DOM, Utilities)
 - [docs/client/bindings.md](bindings.md) — `data-omega-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
 - [docs/client/build-system.md](build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
-- [docs/client/testing.md](testing.md) — Mocha test setup
+- [docs/client/testing.md](testing.md): the `defineCases` suites, the `setup.js` preload, the shared-instance helpers, running one file
 - [docs/client/cdp-debugging.md](cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omega.js/client inside a consuming site
 - [docs/client/common-tasks.md](common-tasks.md) — adding a utility, adding a module, modifying config defaults, payment config (OMEGA SSOT shape), adding a binding action
 - [docs/client/dependencies.md](dependencies.md) — dependencies table + important notes (no TypeScript, prefer fs-jetpack, no backwards-compat requirement, etc.)

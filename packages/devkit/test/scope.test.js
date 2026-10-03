@@ -1,120 +1,167 @@
 /**
  * parseTestScope — the C5 test-scoping grammar (one meaning everywhere).
  */
-const { test } = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { parseTestScope, isPathTargeted, noMatchMessage, noMatchExitCode, NO_MATCH_EXIT_CODE, FANOUT_ENV } = require('../src/test/scope.js');
 
-test('no targets in consumer context → project only', () => {
-  const scope = parseTestScope([]);
-  assert.deepStrictEqual(scope.sources, ['project']);
-  assert.deepStrictEqual(scope.filters, { framework: [], project: [] });
-  assert.deepStrictEqual(scope.invalid, []);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'scope',
+  tests: [
+    {
+      name: 'no targets in consumer context → project only',
+      run: (ctx) => {
+        const scope = parseTestScope([]);
+        ctx.expect(scope.sources).toEqual(['project']);
+        ctx.expect(scope.filters).toEqual({ framework: [], project: [] });
+        ctx.expect(scope.invalid).toEqual([]);
+      },
+    },
 
-test('no targets in framework self context → framework only', () => {
-  const scope = parseTestScope([], { selfTest: true });
-  assert.deepStrictEqual(scope.sources, ['framework']);
-});
+    {
+      name: 'no targets in framework self context → framework only',
+      run: (ctx) => {
+        const scope = parseTestScope([], { selfTest: true });
+        ctx.expect(scope.sources).toEqual(['framework']);
+      },
+    },
 
-test('bare path binds to project source', () => {
-  const scope = parseTestScope(['pages/pricing']);
-  assert.deepStrictEqual(scope.sources, ['project']);
-  assert.deepStrictEqual(scope.filters.project, ['pages/pricing']);
-  assert.deepStrictEqual(scope.filters.framework, []);
-});
+    {
+      name: 'bare path binds to project source',
+      run: (ctx) => {
+        const scope = parseTestScope(['pages/pricing']);
+        ctx.expect(scope.sources).toEqual(['project']);
+        ctx.expect(scope.filters.project).toEqual(['pages/pricing']);
+        ctx.expect(scope.filters.framework).toEqual([]);
+      },
+    },
 
-test('framework:/omega:/mgr: select the framework suite', () => {
-  for (const prefix of ['framework', 'omega', 'mgr']) {
-    const scope = parseTestScope([`${prefix}:`]);
-    assert.deepStrictEqual(scope.sources, ['framework'], prefix);
-  }
-});
+    {
+      name: 'framework:/omega:/mgr: select the framework suite',
+      run: (ctx) => {
+        for (const prefix of ['framework', 'omega', 'mgr']) {
+          const scope = parseTestScope([`${prefix}:`]);
+          ctx.expect(scope.sources, prefix).toEqual(['framework']);
+        }
+      },
+    },
 
-test('per-framework alias (backend:, em:) via frameworkAliases', () => {
-  const scope = parseTestScope(['backend:routes/'], { frameworkAliases: ['backend'] });
-  assert.deepStrictEqual(scope.sources, ['framework']);
-  assert.deepStrictEqual(scope.filters.framework, ['routes/']);
-});
+    {
+      name: 'per-framework alias (backend:, em:) via frameworkAliases',
+      run: (ctx) => {
+        const scope = parseTestScope(['backend:routes/'], { frameworkAliases: ['backend'] });
+        ctx.expect(scope.sources).toEqual(['framework']);
+        ctx.expect(scope.filters.framework).toEqual(['routes/']);
+      },
+    },
 
-test('project:/brand: are explicit project aliases', () => {
-  for (const prefix of ['project', 'brand']) {
-    const scope = parseTestScope([`${prefix}:auth/`]);
-    assert.deepStrictEqual(scope.sources, ['project'], prefix);
-    assert.deepStrictEqual(scope.filters.project, ['auth/'], prefix);
-  }
-});
+    {
+      name: 'project:/brand: are explicit project aliases',
+      run: (ctx) => {
+        for (const prefix of ['project', 'brand']) {
+          const scope = parseTestScope([`${prefix}:auth/`]);
+          ctx.expect(scope.sources, prefix).toEqual(['project']);
+          ctx.expect(scope.filters.project, prefix).toEqual(['auth/']);
+        }
+      },
+    },
 
-test('full: selects both sources, path applies to both', () => {
-  const bare = parseTestScope(['full:']);
-  assert.deepStrictEqual(bare.sources, ['framework', 'project']);
+    {
+      name: 'full: selects both sources, path applies to both',
+      run: (ctx) => {
+        const bare = parseTestScope(['full:']);
+        ctx.expect(bare.sources).toEqual(['framework', 'project']);
 
-  const scoped = parseTestScope(['full:auth']);
-  assert.deepStrictEqual(scoped.filters.framework, ['auth']);
-  assert.deepStrictEqual(scoped.filters.project, ['auth']);
-});
+        const scoped = parseTestScope(['full:auth']);
+        ctx.expect(scoped.filters.framework).toEqual(['auth']);
+        ctx.expect(scoped.filters.project).toEqual(['auth']);
+      },
+    },
 
-test('mixed targets union sources with per-source filters', () => {
-  const scope = parseTestScope(['framework:admin/', 'checkout'], { frameworkAliases: ['backend'] });
-  assert.deepStrictEqual(scope.sources, ['framework', 'project']);
-  assert.deepStrictEqual(scope.filters.framework, ['admin/']);
-  assert.deepStrictEqual(scope.filters.project, ['checkout']);
-});
+    {
+      name: 'mixed targets union sources with per-source filters',
+      run: (ctx) => {
+        const scope = parseTestScope(['framework:admin/', 'checkout'], { frameworkAliases: ['backend'] });
+        ctx.expect(scope.sources).toEqual(['framework', 'project']);
+        ctx.expect(scope.filters.framework).toEqual(['admin/']);
+        ctx.expect(scope.filters.project).toEqual(['checkout']);
+      },
+    },
 
-test('unknown prefix is reported invalid, not silently dropped', () => {
-  const scope = parseTestScope(['framwork:oops']);
-  assert.deepStrictEqual(scope.invalid, ['framwork:oops']);
-  // Falls back to the consumer default rather than matching nothing.
-  assert.deepStrictEqual(scope.sources, ['project']);
-});
+    {
+      name: 'unknown prefix is reported invalid, not silently dropped',
+      run: (ctx) => {
+        const scope = parseTestScope(['framwork:oops']);
+        ctx.expect(scope.invalid).toEqual(['framwork:oops']);
+        // Falls back to the consumer default rather than matching nothing.
+        ctx.expect(scope.sources).toEqual(['project']);
+      },
+    },
 
-test('windows-style path with drive colon is not treated as a prefix', () => {
-  // `C:` would match `<word>:` — the prefix grammar is lowercase-only, so
-  // an uppercase drive letter stays a bare path.
-  const scope = parseTestScope(['C:/tests/x']);
-  assert.deepStrictEqual(scope.sources, ['project']);
-  assert.deepStrictEqual(scope.filters.project, ['C:/tests/x']);
-});
+    {
+      name: 'windows-style path with drive colon is not treated as a prefix',
+      run: (ctx) => {
+        // `C:` would match `<word>:` — the prefix grammar is lowercase-only, so
+        // an uppercase drive letter stays a bare path.
+        const scope = parseTestScope(['C:/tests/x']);
+        ctx.expect(scope.sources).toEqual(['project']);
+        ctx.expect(scope.filters.project).toEqual(['C:/tests/x']);
+      },
+    },
 
-test('FRAMEWORK_IDS covers exactly the dispatcher\'s frameworks with the cp94a id sets', () => {
-  const { FRAMEWORK_IDS } = require('../src/test/scope.js');
-  const { FRAMEWORKS } = require('../src/omega-bin.js');
+    {
+      name: 'FRAMEWORK_IDS covers exactly the dispatcher\'s frameworks with the cp94a id sets',
+      run: (ctx) => {
+        const { FRAMEWORK_IDS } = require('../src/test/scope.js');
+        const { FRAMEWORKS } = require('../src/omega-bin.js');
 
-  assert.deepStrictEqual(Object.keys(FRAMEWORK_IDS).sort(), [...FRAMEWORKS].sort());
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/web'], ['web']);
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/backend'], ['backend']);
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/desktop'], ['desktop']);
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/extension'], ['extension']);
-});
+        ctx.expect(Object.keys(FRAMEWORK_IDS).sort()).toEqual([...FRAMEWORKS].sort());
+        ctx.expect(FRAMEWORK_IDS['@omega.js/web']).toEqual(['web']);
+        ctx.expect(FRAMEWORK_IDS['@omega.js/backend']).toEqual(['backend']);
+        ctx.expect(FRAMEWORK_IDS['@omega.js/desktop']).toEqual(['desktop']);
+        ctx.expect(FRAMEWORK_IDS['@omega.js/extension']).toEqual(['extension']);
+      },
+    },
 
-test('a path filter means the run asked for files BY NAME (#814)', () => {
-  // The no-match rule keys off this: a named path that selects nothing is a
-  // typo, while a bare run (or a bare prefix) asked for a source, not a file.
-  assert.strictEqual(isPathTargeted(parseTestScope(['build/config'])), true);
-  assert.strictEqual(isPathTargeted(parseTestScope(['project:build/config'])), true);
-  assert.strictEqual(isPathTargeted(parseTestScope(['desktop:build/config'], { frameworkAliases: ['desktop'] })), true);
-  assert.strictEqual(isPathTargeted(parseTestScope(['full:build/config'])), true);
+    {
+      name: 'a path filter means the run asked for files BY NAME (#814)',
+      run: (ctx) => {
+        // The no-match rule keys off this: a named path that selects nothing is a
+        // typo, while a bare run (or a bare prefix) asked for a source, not a file.
+        ctx.expect(isPathTargeted(parseTestScope(['build/config']))).toBe(true);
+        ctx.expect(isPathTargeted(parseTestScope(['project:build/config']))).toBe(true);
+        ctx.expect(isPathTargeted(parseTestScope(['desktop:build/config'], { frameworkAliases: ['desktop'] }))).toBe(true);
+        ctx.expect(isPathTargeted(parseTestScope(['full:build/config']))).toBe(true);
 
-  assert.strictEqual(isPathTargeted(parseTestScope([])), false);
-  assert.strictEqual(isPathTargeted(parseTestScope(['project:'])), false);
-  assert.strictEqual(isPathTargeted(parseTestScope(['mgr:'])), false);
-  assert.strictEqual(isPathTargeted(parseTestScope(['full:'])), false);
-});
+        ctx.expect(isPathTargeted(parseTestScope([]))).toBe(false);
+        ctx.expect(isPathTargeted(parseTestScope(['project:']))).toBe(false);
+        ctx.expect(isPathTargeted(parseTestScope(['mgr:']))).toBe(false);
+        ctx.expect(isPathTargeted(parseTestScope(['full:']))).toBe(false);
+      },
+    },
 
-test('the no-match line is one sentence naming the target (#814)', () => {
-  assert.strictEqual(noMatchMessage('renderer/does-not-exist'), 'No test file matches "renderer/does-not-exist".');
-  assert.strictEqual(noMatchMessage('desktop:build/typo'), 'No test file matches "desktop:build/typo".');
-});
+    {
+      name: 'the no-match line is one sentence naming the target (#814)',
+      run: (ctx) => {
+        ctx.expect(noMatchMessage('renderer/does-not-exist')).toBe('No test file matches "renderer/does-not-exist".');
+        ctx.expect(noMatchMessage('desktop:build/typo')).toBe('No test file matches "desktop:build/typo".');
+      },
+    },
 
-test('a no-match exits 1 alone and with a distinct code inside a brand-root fan-out (#814)', () => {
-  // The brand root forwards ONE target to every target, where a target that
-  // does not carry it is a no-op rather than a typo. The code is how the
-  // fan-out tells a miss from a failure.
-  assert.strictEqual(NO_MATCH_EXIT_CODE, 3);
-  assert.strictEqual(FANOUT_ENV, 'OMEGA_TEST_FANOUT');
+    {
+      name: 'a no-match exits 1 alone and with a distinct code inside a brand-root fan-out (#814)',
+      run: (ctx) => {
+        // The brand root forwards ONE target to every target, where a target that
+        // does not carry it is a no-op rather than a typo. The code is how the
+        // fan-out tells a miss from a failure.
+        ctx.expect(NO_MATCH_EXIT_CODE).toBe(3);
+        ctx.expect(FANOUT_ENV).toBe('OMEGA_TEST_FANOUT');
 
-  assert.strictEqual(noMatchExitCode({}), 1);
-  assert.strictEqual(noMatchExitCode({ OMEGA_TEST_FANOUT: '' }), 1);
-  assert.strictEqual(noMatchExitCode({ OMEGA_TEST_FANOUT: '1' }), 3);
+        ctx.expect(noMatchExitCode({})).toBe(1);
+        ctx.expect(noMatchExitCode({ OMEGA_TEST_FANOUT: '' })).toBe(1);
+        ctx.expect(noMatchExitCode({ OMEGA_TEST_FANOUT: '1' })).toBe(3);
+      },
+    },
+  ],
 });

@@ -13,8 +13,7 @@
  * outlives a leader-only signal. The proof is the symptom itself: a node
  * process that boots one, tears it down with the helper, and EXITS.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const { setTimeout: sleep } = require('node:timers/promises');
@@ -94,8 +93,6 @@ const DRIVER_PATH = join(scripts.cwd(), 'driver.js');
 const SLEEPER_PATH = join(scripts.cwd(), 'sleeper.js');
 const STRAY_STUB_PATH = join(scripts.cwd(), 'stray-stub.js');
 
-test.after(() => jetpack.remove(scripts.cwd()));
-
 /** @returns {Promise<boolean>} True once no process in the group answers. */
 async function groupGone(pid) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -110,52 +107,6 @@ async function groupGone(pid) {
   return false;
 }
 
-test('teardown: node exits after a stop, with the pipe-holding grandchild gone', async () => {
-  const driver = spawn(process.execPath, [DRIVER_PATH, HELPER, STUB_PATH], { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
-
-  let log = '';
-  driver.stderr.on('data', (chunk) => { log += String(chunk); });
-
-  const exited = once(driver, 'exit').then(([code]) => code);
-  // ref: false — a won race must not hold THIS process open for the rest of
-  // the window either. The live driver keeps the loop alive while it matters.
-  const hung = sleep(20000, 'HUNG', { ref: false });
-  const outcome = await Promise.race([exited, hung]);
-
-  if (outcome === 'HUNG') {
-    // Never leave a group behind for the next lane to trip over — the driver's
-    // own, and the stub group it left holding the pipes.
-    for (const pid of [driver.pid, Number(log.match(/group (\d+)/)?.[1])]) {
-      try {
-        process.kill(-pid, 'SIGKILL');
-      } catch { /* already gone */ }
-    }
-  }
-
-  assert.notEqual(outcome, 'HUNG', `node never exited after the teardown — a pipe is still held:\n${log}`);
-  assert.equal(outcome, 0, `the driver died instead of exiting cleanly:\n${log}`);
-  assert.match(log, /stopped/, 'the teardown resolved');
-
-  const group = Number(log.match(/group (\d+)/)[1]);
-  assert.equal(await groupGone(group), true, 'the child that inherited the pipes was signalled too, not just the leader');
-});
-
-test('teardown: a group that ignores SIGTERM is SIGKILLed inside the backstop window', async () => {
-  const child = spawn(process.execPath, [STUB_PATH, 'hold-sigterm'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
-
-  child.stderr.on('data', () => {});
-  await once(child.stdout, 'data');
-
-  const started = Date.now();
-  await stopProcessGroup(child, { hardKillAfterMs: 300 });
-  const elapsed = Date.now() - started;
-
-  assert.ok(elapsed < 5000, `the teardown returned in ${elapsed}ms, not inside its backstop window`);
-  assert.equal(child.stdout.destroyed, true, 'the readable pipe was released');
-  assert.equal(child.stderr.destroyed, true, 'the error pipe was released');
-  assert.equal(await groupGone(child.pid), true, 'SIGKILL reached the whole group');
-});
-
 // ─── The collection pass (#460) ──────────────────────────────────────────────
 
 // Every process THIS file spawned, so nothing here can ever outlive the lane —
@@ -163,18 +114,6 @@ test('teardown: a group that ignores SIGTERM is SIGKILLed inside the backstop wi
 // this machine (other lanes, Ian's) are never touched by anything below.
 const spawned = new Set();
 const laneDirs = new Set();
-
-test.after(() => {
-  for (const pid of spawned) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch { /* already gone */ }
-  }
-
-  for (const dir of laneDirs) {
-    jetpack.remove(dir);
-  }
-});
 
 /** @returns {boolean} True while the pid still answers. */
 function alive(pid) {
@@ -224,48 +163,126 @@ function spawnFakeEmulator({ projectId, rules }) {
   return child.pid;
 }
 
-test('collection: the detached emulator a dead CLI left behind is collected', async () => {
-  const projectId = 'demo-omega-collect-test';
-  const { dir, rules } = laneDir('omega-collect-lane');
+module.exports = defineCases({
+  type: 'group',
+  description: 'emulator-teardown',
+  cleanup: async (ctx) => {
+    await (() => jetpack.remove(scripts.cwd()))();
+    await (() => {
+      for (const pid of spawned) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch { /* already gone */ }
+      }
 
-  // The CLI stub leaks its emulator and exits, exactly as firebase-tools does
-  // when it dies before its own graceful shutdown finishes.
-  const cli = spawn(
-    process.execPath,
-    [STRAY_STUB_PATH, SLEEPER_PATH, projectId, rules],
-    { stdio: ['ignore', 'pipe', 'pipe'], detached: true },
-  );
-  spawned.add(cli.pid);
+      for (const dir of laneDirs) {
+        jetpack.remove(dir);
+      }
+    })();
+  },
+  tests: [
+    {
+      name: 'teardown: node exits after a stop, with the pipe-holding grandchild gone',
+      run: async (ctx) => {
+        const driver = spawn(process.execPath, [DRIVER_PATH, HELPER, STUB_PATH], { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
 
-  const [chunk] = await once(cli.stdout, 'data');
-  const strayPid = Number(String(chunk).match(/stray (\d+)/)[1]);
-  spawned.add(strayPid);
+        let log = '';
+        driver.stderr.on('data', (chunk) => { log += String(chunk); });
 
-  await once(cli, 'exit');
-  assert.equal(alive(strayPid), true, 'the stub leaked its emulator, which is the shape under test');
+        const exited = once(driver, 'exit').then(([code]) => code);
+        // ref: false — a won race must not hold THIS process open for the rest of
+        // the window either. The live driver keeps the loop alive while it matters.
+        const hung = sleep(20000, 'HUNG', { ref: false });
+        const outcome = await Promise.race([exited, hung]);
 
-  const report = await stopProcessGroup(cli, { collect: { projectId, dir } });
+        if (outcome === 'HUNG') {
+          // Never leave a group behind for the next lane to trip over — the driver's
+          // own, and the stub group it left holding the pipes.
+          for (const pid of [driver.pid, Number(log.match(/group (\d+)/)?.[1])]) {
+            try {
+              process.kill(-pid, 'SIGKILL');
+            } catch { /* already gone */ }
+          }
+        }
 
-  assert.deepEqual(report.collected, [strayPid], 'the stop path reported the stray it collected');
-  assert.equal(await processGone(strayPid), true, 'the leaked emulator is dead after the stop path ran');
-});
+        ctx.expect(outcome, `node never exited after the teardown — a pipe is still held:\n${log}`).not.toBe('HUNG');
+        ctx.expect(outcome, `the driver died instead of exiting cleanly:\n${log}`).toBe(0);
+        ctx.expect(log, 'the teardown resolved').toMatch(/stopped/);
 
-test('collection: a process this lane cannot prove is its own is spared, not killed', async () => {
-  const projectId = 'demo-omega-collect-test';
-  const { dir, rules } = laneDir('omega-collect-lane');
+        const group = Number(log.match(/group (\d+)/)[1]);
+        ctx.expect(await groupGone(group), 'the child that inherited the pipes was signalled too, not just the leader').toBe(true);
+      },
+    },
 
-  // Another lane's emulator, in the same temp root: same shape, other project.
-  const otherProject = spawnFakeEmulator({ projectId: 'demo-omega-decoy-test', rules });
-  // This project's emulator, from some OTHER run — the strays already on this
-  // machine wear exactly this shape, and they are not this lane's to kill.
-  const otherLane = spawnFakeEmulator({ projectId, rules: laneDir('omega-collect-decoy').rules });
-  const mine = spawnFakeEmulator({ projectId, rules });
+    {
+      name: 'teardown: a group that ignores SIGTERM is SIGKILLed inside the backstop window',
+      run: async (ctx) => {
+        const child = spawn(process.execPath, [STUB_PATH, 'hold-sigterm'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
 
-  const report = await collectStrayEmulators({ projectId, dir });
+        child.stderr.on('data', () => {});
+        await once(child.stdout, 'data');
 
-  assert.deepEqual(report.collected, [mine], 'only the emulator this lane could prove was its own was collected');
-  assert.deepEqual(report.spared, [otherLane], 'the same project from another run was reported, not killed');
-  assert.equal(await processGone(mine), true, 'this lane collected its own');
-  assert.equal(alive(otherProject), true, 'a different project id survived the collection pass');
-  assert.equal(alive(otherLane), true, 'a different lane dir survived the collection pass');
+        const started = Date.now();
+        await stopProcessGroup(child, { hardKillAfterMs: 300 });
+        const elapsed = Date.now() - started;
+
+        ctx.expect(elapsed < 5000, `the teardown returned in ${elapsed}ms, not inside its backstop window`).toBeTruthy();
+        ctx.expect(child.stdout.destroyed, 'the readable pipe was released').toBe(true);
+        ctx.expect(child.stderr.destroyed, 'the error pipe was released').toBe(true);
+        ctx.expect(await groupGone(child.pid), 'SIGKILL reached the whole group').toBe(true);
+      },
+    },
+
+    {
+      name: 'collection: the detached emulator a dead CLI left behind is collected',
+      run: async (ctx) => {
+        const projectId = 'demo-omega-collect-test';
+        const { dir, rules } = laneDir('omega-collect-lane');
+
+        // The CLI stub leaks its emulator and exits, exactly as firebase-tools does
+        // when it dies before its own graceful shutdown finishes.
+        const cli = spawn(
+          process.execPath,
+          [STRAY_STUB_PATH, SLEEPER_PATH, projectId, rules],
+          { stdio: ['ignore', 'pipe', 'pipe'], detached: true },
+        );
+        spawned.add(cli.pid);
+
+        const [chunk] = await once(cli.stdout, 'data');
+        const strayPid = Number(String(chunk).match(/stray (\d+)/)[1]);
+        spawned.add(strayPid);
+
+        await once(cli, 'exit');
+        ctx.expect(alive(strayPid), 'the stub leaked its emulator, which is the shape under test').toBe(true);
+
+        const report = await stopProcessGroup(cli, { collect: { projectId, dir } });
+
+        ctx.expect(report.collected, 'the stop path reported the stray it collected').toEqual([strayPid]);
+        ctx.expect(await processGone(strayPid), 'the leaked emulator is dead after the stop path ran').toBe(true);
+      },
+    },
+
+    {
+      name: 'collection: a process this lane cannot prove is its own is spared, not killed',
+      run: async (ctx) => {
+        const projectId = 'demo-omega-collect-test';
+        const { dir, rules } = laneDir('omega-collect-lane');
+
+        // Another lane's emulator, in the same temp root: same shape, other project.
+        const otherProject = spawnFakeEmulator({ projectId: 'demo-omega-decoy-test', rules });
+        // This project's emulator, from some OTHER run — the strays already on this
+        // machine wear exactly this shape, and they are not this lane's to kill.
+        const otherLane = spawnFakeEmulator({ projectId, rules: laneDir('omega-collect-decoy').rules });
+        const mine = spawnFakeEmulator({ projectId, rules });
+
+        const report = await collectStrayEmulators({ projectId, dir });
+
+        ctx.expect(report.collected, 'only the emulator this lane could prove was its own was collected').toEqual([mine]);
+        ctx.expect(report.spared, 'the same project from another run was reported, not killed').toEqual([otherLane]);
+        ctx.expect(await processGone(mine), 'this lane collected its own').toBe(true);
+        ctx.expect(alive(otherProject), 'a different project id survived the collection pass').toBe(true);
+        ctx.expect(alive(otherLane), 'a different lane dir survived the collection pass').toBe(true);
+      },
+    },
+  ],
 });

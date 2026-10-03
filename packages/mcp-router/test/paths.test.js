@@ -6,8 +6,7 @@
  * module loads must still win.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -23,7 +22,7 @@ const {
 /**
  * Set an env seam for one test and restore it after.
  *
- * @param {object} t - The node:test context, for restore
+ * @param {object} t - The case's ctx, for restore
  * @param {string} key - The env var
  * @param {string|undefined} value - The value, or undefined to unset
  * @returns {void}
@@ -38,46 +37,67 @@ function withEnv(t, key, value) {
   });
 }
 
-test('PACKAGE_ROOT is the package itself — its package.json is the router', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'paths',
+  tests: [
+    {
+      name: 'PACKAGE_ROOT is the package itself — its package.json is the router',
+      run: (ctx) => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
 
-  assert.strictEqual(manifest.name, '@omega.js/mcp-router');
-});
+        ctx.expect(manifest.name).toBe('@omega.js/mcp-router');
+      },
+    },
 
-test('the bundled servers dir ships inside the package and the overlay never does', () => {
-  assert.strictEqual(BUNDLED_SERVERS_DIR, path.join(PACKAGE_ROOT, 'servers'));
-  assert.strictEqual(fs.existsSync(BUNDLED_SERVERS_DIR), true);
+    {
+      name: 'the bundled servers dir ships inside the package and the overlay never does',
+      run: (ctx) => {
+        ctx.expect(BUNDLED_SERVERS_DIR).toBe(path.join(PACKAGE_ROOT, 'servers'));
+        ctx.expect(fs.existsSync(BUNDLED_SERVERS_DIR)).toBe(true);
 
-  assert.strictEqual(OVERLAY_ROOT, path.join(os.homedir(), '.omega', 'mcp-router'));
-  assert.strictEqual(OVERLAY_ROOT.startsWith(PACKAGE_ROOT), false);
-});
+        ctx.expect(OVERLAY_ROOT).toBe(path.join(os.homedir(), '.omega', 'mcp-router'));
+        ctx.expect(OVERLAY_ROOT.startsWith(PACKAGE_ROOT)).toBe(false);
+      },
+    },
 
-test('unset seams fall back to the overlay layout', (t) => {
-  withEnv(t, 'MCP_ROUTER_SERVERS_DIR', undefined);
-  withEnv(t, 'MCP_ROUTER_ENV_FILE', undefined);
+    {
+      name: 'unset seams fall back to the overlay layout',
+      run: (ctx) => {
+        withEnv(ctx, 'MCP_ROUTER_SERVERS_DIR', undefined);
+        withEnv(ctx, 'MCP_ROUTER_ENV_FILE', undefined);
 
-  assert.strictEqual(overlayServersDir(), path.join(os.homedir(), '.omega', 'mcp-router', 'servers'));
-  assert.strictEqual(envFile(), path.join(os.homedir(), '.omega', 'mcp-router', '.env'));
-});
+        ctx.expect(overlayServersDir()).toBe(path.join(os.homedir(), '.omega', 'mcp-router', 'servers'));
+        ctx.expect(envFile()).toBe(path.join(os.homedir(), '.omega', 'mcp-router', '.env'));
+      },
+    },
 
-test('each seam overrides its own path and nothing else', (t) => {
-  withEnv(t, 'MCP_ROUTER_SERVERS_DIR', '/tmp/mcp-router-test/servers');
-  withEnv(t, 'MCP_ROUTER_ENV_FILE', undefined);
+    {
+      name: 'each seam overrides its own path and nothing else',
+      run: (ctx) => {
+        withEnv(ctx, 'MCP_ROUTER_SERVERS_DIR', '/tmp/mcp-router-test/servers');
+        withEnv(ctx, 'MCP_ROUTER_ENV_FILE', undefined);
 
-  assert.strictEqual(overlayServersDir(), '/tmp/mcp-router-test/servers');
-  assert.strictEqual(envFile(), path.join(os.homedir(), '.omega', 'mcp-router', '.env'));
+        ctx.expect(overlayServersDir()).toBe('/tmp/mcp-router-test/servers');
+        ctx.expect(envFile()).toBe(path.join(os.homedir(), '.omega', 'mcp-router', '.env'));
 
-  withEnv(t, 'MCP_ROUTER_SERVERS_DIR', undefined);
-  withEnv(t, 'MCP_ROUTER_ENV_FILE', '/tmp/mcp-router-test/.env');
+        withEnv(ctx, 'MCP_ROUTER_SERVERS_DIR', undefined);
+        withEnv(ctx, 'MCP_ROUTER_ENV_FILE', '/tmp/mcp-router-test/.env');
 
-  assert.strictEqual(overlayServersDir(), path.join(os.homedir(), '.omega', 'mcp-router', 'servers'));
-  assert.strictEqual(envFile(), '/tmp/mcp-router-test/.env');
-});
+        ctx.expect(overlayServersDir()).toBe(path.join(os.homedir(), '.omega', 'mcp-router', 'servers'));
+        ctx.expect(envFile()).toBe('/tmp/mcp-router-test/.env');
+      },
+    },
 
-test('seams are read per call, so a change mid-process takes effect', (t) => {
-  withEnv(t, 'MCP_ROUTER_SERVERS_DIR', '/tmp/mcp-router-first');
-  assert.strictEqual(overlayServersDir(), '/tmp/mcp-router-first');
+    {
+      name: 'seams are read per call, so a change mid-process takes effect',
+      run: (ctx) => {
+        withEnv(ctx, 'MCP_ROUTER_SERVERS_DIR', '/tmp/mcp-router-first');
+        ctx.expect(overlayServersDir()).toBe('/tmp/mcp-router-first');
 
-  process.env.MCP_ROUTER_SERVERS_DIR = '/tmp/mcp-router-second';
-  assert.strictEqual(overlayServersDir(), '/tmp/mcp-router-second');
+        process.env.MCP_ROUTER_SERVERS_DIR = '/tmp/mcp-router-second';
+        ctx.expect(overlayServersDir()).toBe('/tmp/mcp-router-second');
+      },
+    },
+  ],
 });

@@ -24,6 +24,7 @@
  *   { content, output, tokens, raw, toolCalls, stopReason }
  */
 const JSON5 = require('json5');
+const { isTesting } = require('@omega.js/config/environment');
 const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
 
 // The test provider bills nothing — counts are simulated, prices stay zero
@@ -220,7 +221,7 @@ function assertAllowedEnvironment(omega) {
   }
 
   // No Omega instance (pure unit tests) — allow only under explicit test/emulator signals
-  if (process.env.OMEGA_TEST_MODE === 'true' || process.env.FUNCTIONS_EMULATOR) {
+  if (process.env.FUNCTIONS_EMULATOR || isTesting()) {
     return;
   }
 

@@ -14,8 +14,7 @@
  * dist/ here (that is what a published install carries), so a monorepo checkout
  * needs its `npm run prepare` before this case is meaningful.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -46,24 +45,33 @@ function stageFreshClone() {
   return clone;
 }
 
-test('bin: `omega onboard` in a fresh clone reaches the MANAGER, even when the backend won the bin link (#908)', () => {
-  const clone = stageFreshClone();
+module.exports = defineCases({
+  type: 'group',
+  description: 'omega-bin-fresh-clone',
+  tests: [
+    {
+      name: 'bin: `omega onboard` in a fresh clone reaches the MANAGER, even when the backend won the bin link (#908)',
+      run: (ctx) => {
+        const clone = stageFreshClone();
 
-  // --help keeps the run print-only: the wizard itself prompts and writes.
-  const out = spawnSync(process.execPath, [path.join(clone, 'node_modules', '.bin', 'omega'), 'onboard', '--help'], {
-    cwd: clone,
-    encoding: 'utf8',
-    // The local-dist freshness heal can rebuild and re-exec; a monorepo-dev
-    // convenience, not part of this contract.
-    env: Object.assign({}, process.env, { OMEGA_SKIP_FRESHNESS: '1' }),
-  });
+        // --help keeps the run print-only: the wizard itself prompts and writes.
+        const out = spawnSync(process.execPath, [path.join(clone, 'node_modules', '.bin', 'omega'), 'onboard', '--help'], {
+          cwd: clone,
+          encoding: 'utf8',
+          // The local-dist freshness heal can rebuild and re-exec; a monorepo-dev
+          // convenience, not part of this contract.
+          env: Object.assign({}, process.env, { OMEGA_SKIP_FRESHNESS: '1' }),
+        });
 
-  assert.equal(out.status, 0, `the clone's omega bin exited ${out.status}\n${out.stderr}`);
-  assert.doesNotMatch(out.stderr, /Unknown command/, 'the backend CLI must never see a manager verb');
-  assert.doesNotMatch(out.stdout, /Unknown command/);
-  assert.match(out.stdout, /brand orchestration/, 'the manager\'s own help answered');
-  assert.match(out.stdout, /omega onboard/, 'the verb the template README tells a stranger to run');
-  assert.match(out.stderr, /no target context found from [\s\S]*running @omega\.js\/manager/);
+        ctx.expect(out.status, `the clone's omega bin exited ${out.status}\n${out.stderr}`).toBe(0);
+        ctx.expect(out.stderr, 'the backend CLI must never see a manager verb').not.toMatch(/Unknown command/);
+        ctx.expect(out.stdout).not.toMatch(/Unknown command/);
+        ctx.expect(out.stdout, 'the manager\'s own help answered').toMatch(/brand orchestration/);
+        ctx.expect(out.stdout, 'the verb the template README tells a stranger to run').toMatch(/omega onboard/);
+        ctx.expect(out.stderr).toMatch(/no target context found from [\s\S]*running @omega\.js\/manager/);
 
-  fs.rmSync(clone, { recursive: true, force: true });
+        fs.rmSync(clone, { recursive: true, force: true });
+      },
+    },
+  ],
 });

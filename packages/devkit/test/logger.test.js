@@ -1,7 +1,6 @@
 // Unit tests for src/logger.js — timestamped, tag-scoped console logger.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
@@ -23,100 +22,127 @@ function captureConsole(method, fn) {
   return captured.map((arg) => stripAnsi(String(arg))).join(' ');
 }
 
-test('exposes log/error/warn/info methods and chalk as .format', () => {
-  const logger = new Logger('unit');
-  ['log', 'error', 'warn', 'info'].forEach((method) => {
-    assert.equal(typeof logger[method], 'function');
-  });
-  assert.equal(logger.format, chalk);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'logger',
+  tests: [
+    {
+      name: 'exposes log/error/warn/info methods and chalk as .format',
+      run: (ctx) => {
+        const logger = new Logger('unit');
+        ['log', 'error', 'warn', 'info'].forEach((method) => {
+          ctx.expect(typeof logger[method]).toBe('function');
+        });
+        ctx.expect(logger.format).toBe(chalk);
+      },
+    },
 
-test('log() prints [HH:MM:SS] [@omega.js/<package>:name] message via console.log', () => {
-  const logger = new Logger('my-scope');
-  const line = captureConsole('log', () => logger.log('hello there'));
-  // Constructed from this file, so the package segment is devkit's own name.
-  assert.match(line, /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:my-scope\] /);
-  assert.match(line, /hello there/);
-});
+    {
+      name: 'log() prints [HH:MM:SS] [@omega.js/<package>:name] message via console.log',
+      run: (ctx) => {
+        const logger = new Logger('my-scope');
+        const line = captureConsole('log', () => logger.log('hello there'));
+        // Constructed from this file, so the package segment is devkit's own name.
+        ctx.expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:my-scope\] /);
+        ctx.expect(line).toMatch(/hello there/);
+      },
+    },
 
-test('the package segment comes from the CONSTRUCTING file\'s nearest package.json', () => {
-  const root = path.join(__dirname, '..', '.temp', `logger-${process.pid}`);
-  const dir = jetpack.dir(path.join(root, 'nested', 'deep')).cwd();
-  jetpack.write(path.join(root, 'package.json'), { name: '@omega.js/pretend' });
-  jetpack.write(path.join(dir, 'construct.js'), [
-    `const Logger = require(${JSON.stringify(require.resolve('../src/logger'))});`,
-    "module.exports = () => new Logger('watcher');",
-  ].join('\n'));
+    {
+      name: 'the package segment comes from the CONSTRUCTING file\'s nearest package.json',
+      run: (ctx) => {
+        const root = path.join(__dirname, '..', '.temp', `logger-${process.pid}`);
+        const dir = jetpack.dir(path.join(root, 'nested', 'deep')).cwd();
+        jetpack.write(path.join(root, 'package.json'), { name: '@omega.js/pretend' });
+        jetpack.write(path.join(dir, 'construct.js'), [
+          `const Logger = require(${JSON.stringify(require.resolve('../src/logger'))});`,
+          "module.exports = () => new Logger('watcher');",
+        ].join('\n'));
 
-  const logger = require(path.join(dir, 'construct.js'))();
-  const line = captureConsole('log', () => logger.log('from a pretend package'));
-  assert.match(line, /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/pretend:watcher\] /);
+        const logger = require(path.join(dir, 'construct.js'))();
+        const line = captureConsole('log', () => logger.log('from a pretend package'));
+        ctx.expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/pretend:watcher\] /);
 
-  jetpack.remove(root);
-});
+        jetpack.remove(root);
+      },
+    },
 
-test('derivation failure falls back to the devkit package segment', () => {
-  // No usable stack → no constructing file to walk up from.
-  const originalCapture = Error.captureStackTrace;
-  const originalLimit = Error.stackTraceLimit;
-  Error.stackTraceLimit = 0;
-  Error.captureStackTrace = () => {};
-  let logger;
-  try {
-    logger = new Logger('orphan');
-  } finally {
-    Error.captureStackTrace = originalCapture;
-    Error.stackTraceLimit = originalLimit;
-  }
-  const line = captureConsole('log', () => logger.log('still logs'));
-  assert.match(line, /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:orphan\] /);
-  assert.match(line, /still logs/);
-});
+    {
+      name: 'derivation failure falls back to the devkit package segment',
+      run: (ctx) => {
+        // No usable stack → no constructing file to walk up from.
+        const originalCapture = Error.captureStackTrace;
+        const originalLimit = Error.stackTraceLimit;
+        Error.stackTraceLimit = 0;
+        Error.captureStackTrace = () => {};
+        let logger;
+        try {
+          logger = new Logger('orphan');
+        } finally {
+          Error.captureStackTrace = originalCapture;
+          Error.stackTraceLimit = originalLimit;
+        }
+        const line = captureConsole('log', () => logger.log('still logs'));
+        ctx.expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:orphan\] /);
+        ctx.expect(line).toMatch(/still logs/);
+      },
+    },
 
-test('error() renders Error instances as their stack', () => {
-  const logger = new Logger('boom-scope');
-  const line = captureConsole('error', () => logger.error(new Error('boom')));
-  assert.match(line, /Error: boom/);
-  assert.match(line, /at /); // stack frames present
-});
+    {
+      name: 'error() renders Error instances as their stack',
+      run: (ctx) => {
+        const logger = new Logger('boom-scope');
+        const line = captureConsole('error', () => logger.error(new Error('boom')));
+        ctx.expect(line).toMatch(/Error: boom/);
+        ctx.expect(line).toMatch(/at /); // stack frames present
+      },
+    },
 
-test('non-string, non-Error args pass through untouched', () => {
-  const logger = new Logger('obj-scope');
-  const payload = { a: 1 };
-  const original = console.log;
-  let captured = null;
-  console.log = function () {
-    captured = Array.from(arguments);
-  };
-  try {
-    logger.log(payload, 42);
-  } finally {
-    console.log = original;
-  }
-  assert.equal(captured[1], payload);
-  assert.equal(captured[2], 42);
-});
+    {
+      name: 'non-string, non-Error args pass through untouched',
+      run: (ctx) => {
+        const logger = new Logger('obj-scope');
+        const payload = { a: 1 };
+        const original = console.log;
+        let captured = null;
+        console.log = function () {
+          captured = Array.from(arguments);
+        };
+        try {
+          logger.log(payload, 42);
+        } finally {
+          console.log = original;
+        }
+        ctx.expect(captured[1]).toBe(payload);
+        ctx.expect(captured[2]).toBe(42);
+      },
+    },
 
-test('debug() prints only while OMEGA_DEBUG is set, read live per line', (t) => {
-  const logger = new Logger('debug-scope');
-  const previous = process.env.OMEGA_DEBUG;
-  t.after(() => {
-    if (previous === undefined) delete process.env.OMEGA_DEBUG;
-    else process.env.OMEGA_DEBUG = previous;
-  });
+    {
+      name: 'debug() prints only while OMEGA_DEBUG is set, read live per line',
+      run: (ctx) => {
+        const logger = new Logger('debug-scope');
+        const previous = process.env.OMEGA_DEBUG;
+        ctx.after(() => {
+          if (previous === undefined) delete process.env.OMEGA_DEBUG;
+          else process.env.OMEGA_DEBUG = previous;
+        });
 
-  const lines = [];
-  const original = console.debug;
-  console.debug = (...args) => lines.push(args.map((arg) => stripAnsi(String(arg))).join(' '));
-  try {
-    delete process.env.OMEGA_DEBUG;
-    logger.debug('hidden');
-    process.env.OMEGA_DEBUG = '0';
-    logger.debug('shown');
-  } finally {
-    console.debug = original;
-  }
+        const lines = [];
+        const original = console.debug;
+        console.debug = (...args) => lines.push(args.map((arg) => stripAnsi(String(arg))).join(' '));
+        try {
+          delete process.env.OMEGA_DEBUG;
+          logger.debug('hidden');
+          process.env.OMEGA_DEBUG = '0';
+          logger.debug('shown');
+        } finally {
+          console.debug = original;
+        }
 
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:debug-scope\] shown$/);
+        ctx.expect(lines.length).toBe(1);
+        ctx.expect(lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:debug-scope\] shown$/);
+      },
+    },
+  ],
 });

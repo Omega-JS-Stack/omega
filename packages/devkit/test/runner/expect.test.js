@@ -8,6 +8,7 @@ const jetpack = require('fs-jetpack');
 const path = require('node:path');
 const defineCases = require('../../src/test/define-cases.js');
 const expect = require('../../src/test/expect.js');
+const { normalizeSpec, runSuite } = require('../../src/test/run-case.js');
 
 const SOURCE_DIR = path.join(__dirname, '..', '..', 'src', 'test');
 
@@ -508,6 +509,20 @@ module.exports = defineCases({
       run: async (ctx) => {
         await expect(Promise.reject('reason')).rejects.toBe('reason');
         await rejects(ctx, expect(Promise.reject('reason')).rejects.toBe('other'));
+      },
+    },
+
+    {
+      name: 'case-114 a case that calls ctx.expect.fail fails with an AssertionError carrying the message',
+      run: async (ctx) => {
+        const events = [];
+        const suite = normalizeSpec([{ name: 'fails on purpose', run: (inner) => inner.expect.fail('m-114') }], { file: __filename });
+        await runSuite(suite, { expect, extras: {}, defaultTimeout: 5000, report: (event) => events.push(event) });
+
+        ctx.expect(events.length).toBe(1);
+        ctx.expect(events[0].status).toBe('fail');
+        ctx.expect(events[0].error.name).toBe('AssertionError');
+        ctx.expect(events[0].error.message).toContain('m-114');
       },
     },
   ],

@@ -4,8 +4,7 @@
  * against a real build in the framework lane that has one today —
  * packages/web/test/framework-deps.test.js.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -19,29 +18,44 @@ function makeFramework(manifest) {
   return dir;
 }
 
-test('the declared set IS the list — `@omega.js/*` deps excluded, devDependencies never counted', () => {
-  const dir = makeFramework({
-    dependencies: { 'chart.js': '^4.5.1', 'fs-jetpack': '^5.1.0', '@omega.js/client': '^0.1.0' },
-    devDependencies: { webpack: '^5.0.0' },
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'framework-deps',
+  tests: [
+    {
+      name: 'the declared set IS the list — `@omega.js/*` deps excluded, devDependencies never counted',
+      run: (ctx) => {
+        const dir = makeFramework({
+          dependencies: { 'chart.js': '^4.5.1', 'fs-jetpack': '^5.1.0', '@omega.js/client': '^0.1.0' },
+          devDependencies: { webpack: '^5.0.0' },
+        });
 
-  assert.deepEqual(frameworkDependencyNames(dir), ['chart.js', 'fs-jetpack']);
-});
+        ctx.expect(frameworkDependencyNames(dir)).toEqual(['chart.js', 'fs-jetpack']);
+      },
+    },
 
-test('a package declaring no dependencies yields no names', () => {
-  const dir = makeFramework({});
+    {
+      name: 'a package declaring no dependencies yields no names',
+      run: (ctx) => {
+        const dir = makeFramework({});
 
-  assert.deepEqual(frameworkDependencyNames(dir), []);
-});
+        ctx.expect(frameworkDependencyNames(dir)).toEqual([]);
+      },
+    },
 
-test('the matcher takes the bare specifier and its subpaths, and nothing else', () => {
-  const pattern = frameworkDepsPattern(['chart.js', '@popperjs/core']);
+    {
+      name: 'the matcher takes the bare specifier and its subpaths, and nothing else',
+      run: (ctx) => {
+        const pattern = frameworkDepsPattern(['chart.js', '@popperjs/core']);
 
-  assert.ok(pattern.test('chart.js'), 'the bare specifier');
-  assert.ok(pattern.test('chart.js/auto'), 'a subpath');
-  assert.ok(pattern.test('@popperjs/core/lib/popper.js'), 'a scoped subpath');
-  assert.ok(!pattern.test('chart.js-extras'), 'a longer name that merely starts the same');
-  // The `.` is escaped — a regex-naive matcher would take `chartxjs` here.
-  assert.ok(!pattern.test('chartxjs'), 'the dot is a literal, not a wildcard');
-  assert.ok(!pattern.test('lodash'), 'an undeclared name');
+        ctx.expect(pattern.test('chart.js'), 'the bare specifier').toBeTruthy();
+        ctx.expect(pattern.test('chart.js/auto'), 'a subpath').toBeTruthy();
+        ctx.expect(pattern.test('@popperjs/core/lib/popper.js'), 'a scoped subpath').toBeTruthy();
+        ctx.expect(!pattern.test('chart.js-extras'), 'a longer name that merely starts the same').toBeTruthy();
+        // The `.` is escaped — a regex-naive matcher would take `chartxjs` here.
+        ctx.expect(!pattern.test('chartxjs'), 'the dot is a literal, not a wildcard').toBeTruthy();
+        ctx.expect(!pattern.test('lodash'), 'an undeclared name').toBeTruthy();
+      },
+    },
+  ],
 });

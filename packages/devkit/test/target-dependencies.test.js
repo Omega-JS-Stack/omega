@@ -6,8 +6,7 @@
  * The installer is injected, so nothing here touches npm or the network.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -25,75 +24,93 @@ function installer() {
   return { calls, safeInstall: async (command) => { calls.push(command); } };
 }
 
-test('readProject: both dependency sections are always objects', () => {
-  const dir = tmpTarget({ name: 'consumer' });
-  const project = readProject(dir);
+module.exports = defineCases({
+  type: 'group',
+  description: 'target-dependencies',
+  tests: [
+    {
+      name: 'readProject: both dependency sections are always objects',
+      run: (ctx) => {
+        const dir = tmpTarget({ name: 'consumer' });
+        const project = readProject(dir);
 
-  assert.equal(project.name, 'consumer');
-  assert.deepEqual(project.dependencies, {});
-  assert.deepEqual(project.devDependencies, {});
+        ctx.expect(project.name).toBe('consumer');
+        ctx.expect(project.dependencies).toEqual({});
+        ctx.expect(project.devDependencies).toEqual({});
 
-  // A target with no manifest at all reads as an empty project, never a throw.
-  assert.deepEqual(readProject(tmpTarget()), { dependencies: {}, devDependencies: {} });
-});
+        // A target with no manifest at all reads as an empty project, never a throw.
+        ctx.expect(readProject(tmpTarget())).toEqual({ dependencies: {}, devDependencies: {} });
+      },
+    },
 
-test('ensurePeerDependencies: a satisfied target installs nothing', async () => {
-  const dir = tmpTarget({ name: 'consumer', devDependencies: { gulp: '5.0.0' } });
-  const { calls, safeInstall } = installer();
-  const log = [];
+    {
+      name: 'ensurePeerDependencies: a satisfied target installs nothing',
+      run: async (ctx) => {
+        const dir = tmpTarget({ name: 'consumer', devDependencies: { gulp: '5.0.0' } });
+        const { calls, safeInstall } = installer();
+        const log = [];
 
-  await ensurePeerDependencies({
-    projectDir: dir,
-    package: { peerDependencies: { gulp: '^5.0.0' } },
-    log: (line) => log.push(line),
-    dependencyMap: { gulp: 'dev' },
-    safeInstall,
-  });
+        await ensurePeerDependencies({
+          projectDir: dir,
+          package: { peerDependencies: { gulp: '^5.0.0' } },
+          log: (line) => log.push(line),
+          dependencyMap: { gulp: 'dev' },
+          safeInstall,
+        });
 
-  assert.deepEqual(calls, [], 'a satisfied peer dep is never reinstalled — this runs on every verb');
-  assert.match(log.join('\n'), /gulp is up to date/);
-});
+        ctx.expect(calls, 'a satisfied peer dep is never reinstalled — this runs on every verb').toEqual([]);
+        ctx.expect(log.join('\n')).toMatch(/gulp is up to date/);
+      },
+    },
 
-test('ensurePeerDependencies: the map decides --save-dev vs --save', async () => {
-  const dir = tmpTarget({ name: 'consumer' });
-  const { calls, safeInstall } = installer();
+    {
+      name: 'ensurePeerDependencies: the map decides --save-dev vs --save',
+      run: async (ctx) => {
+        const dir = tmpTarget({ name: 'consumer' });
+        const { calls, safeInstall } = installer();
 
-  await ensurePeerDependencies({
-    projectDir: dir,
-    package: { peerDependencies: { gulp: '^5.0.0', 'some-runtime-dep': '^2.0.0' } },
-    log: () => {},
-    dependencyMap: { gulp: 'dev' },
-    safeInstall,
-  });
+        await ensurePeerDependencies({
+          projectDir: dir,
+          package: { peerDependencies: { gulp: '^5.0.0', 'some-runtime-dep': '^2.0.0' } },
+          log: () => {},
+          dependencyMap: { gulp: 'dev' },
+          safeInstall,
+        });
 
-  assert.deepEqual(calls, [
-    'npm install gulp@5.0.0 --save-dev',
-    'npm install some-runtime-dep@2.0.0 --save',
-  ]);
-});
+        ctx.expect(calls).toEqual([
+          'npm install gulp@5.0.0 --save-dev',
+          'npm install some-runtime-dep@2.0.0 --save',
+        ]);
+      },
+    },
 
-test('ensurePeerDependencies: a behind version reinstalls, either section counts', async () => {
-  const dir = tmpTarget({ name: 'consumer', dependencies: { gulp: '4.0.0' } });
-  const { calls, safeInstall } = installer();
+    {
+      name: 'ensurePeerDependencies: a behind version reinstalls, either section counts',
+      run: async (ctx) => {
+        const dir = tmpTarget({ name: 'consumer', dependencies: { gulp: '4.0.0' } });
+        const { calls, safeInstall } = installer();
 
-  await ensurePeerDependencies({
-    projectDir: dir,
-    package: { peerDependencies: { gulp: '^5.0.0' } },
-    log: () => {},
-    dependencyMap: {},
-    safeInstall,
-  });
+        await ensurePeerDependencies({
+          projectDir: dir,
+          package: { peerDependencies: { gulp: '^5.0.0' } },
+          log: () => {},
+          dependencyMap: {},
+          safeInstall,
+        });
 
-  assert.deepEqual(calls, ['npm install gulp@5.0.0 --save']);
-});
+        ctx.expect(calls).toEqual(['npm install gulp@5.0.0 --save']);
+      },
+    },
 
-test('updateManager: an uninstalled framework is a loud error, not a silent skip', async () => {
-  const dir = tmpTarget({ name: 'consumer' });
-  const { calls, safeInstall } = installer();
+    {
+      name: 'updateManager: an uninstalled framework is a loud error, not a silent skip',
+      run: async (ctx) => {
+        const dir = tmpTarget({ name: 'consumer' });
+        const { calls, safeInstall } = installer();
 
-  await assert.rejects(
-    () => updateManager({ projectDir: dir, package: { name: '@omega.js/desktop' }, log: () => {}, error: () => {}, safeInstall }),
-    /No installed version of @omega\.js\/desktop found/,
-  );
-  assert.deepEqual(calls, [], 'nothing is installed on the way out');
+        await ctx.expect((() => updateManager({ projectDir: dir, package: { name: '@omega.js/desktop' }, log: () => {}, error: () => {}, safeInstall }))()).rejects.toThrow(/No installed version of @omega\.js\/desktop found/);
+        ctx.expect(calls, 'nothing is installed on the way out').toEqual([]);
+      },
+    },
+  ],
 });

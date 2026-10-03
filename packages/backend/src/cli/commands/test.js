@@ -187,8 +187,8 @@ class TestCommand extends BaseCommand {
     // again inside startEmulators — idempotent and cheap; THIS call covers the
     // existing-emulator path, where nothing else would refresh the tree.
     // A test lane composes its .env for TESTING (#586): the run's own
-    // OMEGA_TEST_MODE is set on the emulator child, not on this process, so the
-    // environment is named here rather than sniffed.
+    // OMEGA_ENVIRONMENT=testing is set on the emulator child, not on this
+    // process, so the environment is named here rather than sniffed.
     this.ensureStaged({ environment: 'testing' });
 
     // Get test paths from CLI args (e.g., "bem test admin/" or "bem test general/generate-uuid")
@@ -684,11 +684,10 @@ class TestCommand extends BaseCommand {
       // ([#292](https://github.com/Omega-JS-Stack/omega/issues/292)).
       GCLOUD_PROJECT: testConfig.cloud.config.projectId,
       // GCLOUD_PROJECT alone makes the child's init-time environment read as
-      // production (nothing else marks it yet: runner.js stamps its own
-      // OMEGA_TEST_MODE only later, inside run()), which wakes the
-      // firebase-functions logger compat shim and turns every test line into
-      // JSON. Say what this process IS before omega.initialize() looks.
-      OMEGA_TEST_MODE: 'true',
+      // production, which wakes the firebase-functions logger compat shim and
+      // turns every test line into JSON. Name the one input before
+      // omega.initialize() looks.
+      OMEGA_ENVIRONMENT: 'testing',
       // An opt-in lane's own environment: the lane name the runner's discovery
       // gates on, plus whatever the lane brought up (the forwarder's signing
       // secret). Empty on every default run.

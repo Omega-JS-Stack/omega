@@ -28,12 +28,12 @@
  *   those failures are silent until a user finds them.
  *
  * Who SETS the one input is each target's own business, at the one place it
- * already resolves its config, through `setEnvironment()` below (the only
- * writer, so a fourth word can never reach the variable): the backend's boot
- * takes the .env cascade's ambient answer, the desktop and extension build
- * modules take `production` under their build-mode flag and the ambient answer
- * otherwise, and web's verbs name their own (`omega build` is production,
- * `omega dev` is development).
+ * resolves its config, through `setEnvironment()` below (the only writer in a
+ * running process, so a fourth word never reaches the variable; a lane spawning
+ * a child names it in the child env object it builds): the backend's boot takes
+ * the .env cascade's ambient answer, desktop and extension build modules take
+ * `production` under their build-mode flag and the ambient answer otherwise,
+ * and web's verbs name their own (`omega build` production, `omega dev` development).
  *
  * This module requires NOTHING. It is bundled into browser artifacts (the
  * desktop renderer, every extension bundle) and vendored into

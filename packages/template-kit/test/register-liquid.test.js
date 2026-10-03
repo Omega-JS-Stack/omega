@@ -7,8 +7,7 @@
  * collection-backed tags — the exact wiring the Eleventy spike will use.
  */
 
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('../src/register-liquid.js');
@@ -35,135 +34,168 @@ function makeEngine(overrides = {}) {
   return engine;
 }
 
-test('omega_ filters render through the engine', async () => {
-  const engine = makeEngine();
+module.exports = defineCases({
+  type: 'group',
+  description: 'register-liquid',
+  tests: [
+    {
+      name: 'omega_ filters render through the engine',
+      run: async (ctx) => {
+        const engine = makeEngine();
 
-  assert.strictEqual(await engine.parseAndRender('{{ "hello world" | omega_title_case }}'), 'Hello World');
-  assert.strictEqual(await engine.parseAndRender('{{ 10000 | omega_commaify }}'), '10,000');
-  assert.strictEqual(await engine.parseAndRender('{{ "hello" | omega_hash: 1000 }}'), '994');
-  assert.strictEqual(await engine.parseAndRender('{{ 5 | omega_pluralize: "post", "posts" }}'), 'posts');
-  assert.match(await engine.parseAndRender('{{ "https://x.com/a.png" | omega_cachebreak }}'), /a\.png\?cb=\d+$/);
-});
+        ctx.expect(await engine.parseAndRender('{{ "hello world" | omega_title_case }}')).toBe('Hello World');
+        ctx.expect(await engine.parseAndRender('{{ 10000 | omega_commaify }}')).toBe('10,000');
+        ctx.expect(await engine.parseAndRender('{{ "hello" | omega_hash: 1000 }}')).toBe('994');
+        ctx.expect(await engine.parseAndRender('{{ 5 | omega_pluralize: "post", "posts" }}')).toBe('posts');
+        ctx.expect(await engine.parseAndRender('{{ "https://x.com/a.png" | omega_cachebreak }}')).toMatch(/a\.png\?cb=\d+$/);
+      },
+    },
 
-test('omega_liquify recursively resolves through the render scope', async () => {
-  const engine = makeEngine();
-  const scope = { nested: '{{ inner }}', inner: 'DEEP', wrapper: 'A {{ nested }} Z' };
+    {
+      name: 'omega_liquify recursively resolves through the render scope',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const scope = { nested: '{{ inner }}', inner: 'DEEP', wrapper: 'A {{ nested }} Z' };
 
-  assert.strictEqual(await engine.parseAndRender('{{ wrapper | omega_liquify }}', scope), 'A DEEP Z');
-});
+        ctx.expect(await engine.parseAndRender('{{ wrapper | omega_liquify }}', scope)).toBe('A DEEP Z');
+      },
+    },
 
-test('omega_content_format markdownifies only for .md pages', async () => {
-  const markdown = (str) => `<md>${str}</md>`;
-  const engine = makeEngine({ markdown });
+    {
+      name: 'omega_content_format markdownifies only for .md pages',
+      run: async (ctx) => {
+        const markdown = (str) => `<md>${str}</md>`;
+        const engine = makeEngine({ markdown });
 
-  const mdScope = { page: { extension: '.md' }, body: 'hello {{ page.extension }}' };
-  assert.strictEqual(await engine.parseAndRender('{{ body | omega_content_format }}', mdScope), '<md>hello .md</md>');
+        const mdScope = { page: { extension: '.md' }, body: 'hello {{ page.extension }}' };
+        ctx.expect(await engine.parseAndRender('{{ body | omega_content_format }}', mdScope)).toBe('<md>hello .md</md>');
 
-  const htmlScope = { page: { extension: '.html' }, body: 'hello' };
-  assert.strictEqual(await engine.parseAndRender('{{ body | omega_content_format }}', htmlScope), 'hello');
-});
+        const htmlScope = { page: { extension: '.html' }, body: 'hello' };
+        ctx.expect(await engine.parseAndRender('{{ body | omega_content_format }}', htmlScope)).toBe('hello');
+      },
+    },
 
-test('omega_increment_return counts within one render and resets across renders', async () => {
-  const engine = makeEngine();
-  const tpl = '{{ 1 | omega_increment_return }}-{{ 1 | omega_increment_return }}-{{ 2 | omega_increment_return }}';
+    {
+      name: 'omega_increment_return counts within one render and resets across renders',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const tpl = '{{ 1 | omega_increment_return }}-{{ 1 | omega_increment_return }}-{{ 2 | omega_increment_return }}';
 
-  assert.strictEqual(await engine.parseAndRender(tpl), '1-2-4');
-  assert.strictEqual(await engine.parseAndRender(tpl), '1-2-4'); // fresh context => fresh counter
-});
+        ctx.expect(await engine.parseAndRender(tpl)).toBe('1-2-4');
+        ctx.expect(await engine.parseAndRender(tpl)).toBe('1-2-4'); // fresh context => fresh counter
+      },
+    },
 
-test('block tags work in-template with rendered inner content', async () => {
-  const engine = makeEngine();
-  const tpl = '{% iftruthy user %}Hi {{ user }}{% endiftruthy %}{% iffalsy user %}Guest{% endiffalsy %}';
+    {
+      name: 'block tags work in-template with rendered inner content',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const tpl = '{% iftruthy user %}Hi {{ user }}{% endiftruthy %}{% iffalsy user %}Guest{% endiffalsy %}';
 
-  assert.strictEqual(await engine.parseAndRender(tpl, { user: 'Ian' }), 'Hi Ian');
-  assert.strictEqual(await engine.parseAndRender(tpl, { user: '' }), 'Guest');
-  assert.strictEqual(await engine.parseAndRender(tpl, {}), 'Guest');
-});
+        ctx.expect(await engine.parseAndRender(tpl, { user: 'Ian' })).toBe('Hi Ian');
+        ctx.expect(await engine.parseAndRender(tpl, { user: '' })).toBe('Guest');
+        ctx.expect(await engine.parseAndRender(tpl, {})).toBe('Guest');
+      },
+    },
 
-test('iffile renders through the injected fileExists', async () => {
-  const engine = makeEngine({ fileExists: (p) => p === '/exists.png' });
-  const tpl = '{% iffile "/exists.png" %}YES{% endiffile %}{% iffile "/nope.png" %}NO{% endiffile %}';
+    {
+      name: 'iffile renders through the injected fileExists',
+      run: async (ctx) => {
+        const engine = makeEngine({ fileExists: (p) => p === '/exists.png' });
+        const tpl = '{% iffile "/exists.png" %}YES{% endiffile %}{% iffile "/nope.png" %}NO{% endiffile %}';
 
-  assert.strictEqual(await engine.parseAndRender(tpl), 'YES');
-});
+        ctx.expect(await engine.parseAndRender(tpl)).toBe('YES');
+      },
+    },
 
-test('urlmatches reads page.url from the render scope', async () => {
-  const engine = makeEngine();
-  const tpl = '{% urlmatches "/about", "current" %}';
+    {
+      name: 'urlmatches reads page.url from the render scope',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const tpl = '{% urlmatches "/about", "current" %}';
 
-  assert.strictEqual(await engine.parseAndRender(tpl, { page: { url: '/about/index.html' } }), 'current');
-  assert.strictEqual(await engine.parseAndRender(tpl, { page: { url: '/pricing' } }), '');
-});
+        ctx.expect(await engine.parseAndRender(tpl, { page: { url: '/about/index.html' } })).toBe('current');
+        ctx.expect(await engine.parseAndRender(tpl, { page: { url: '/pricing' } })).toBe('');
+      },
+    },
 
-test('omega_logo renders an inline SVG through the engine', async () => {
-  const engine = makeEngine();
+    {
+      name: 'omega_logo renders an inline SVG through the engine',
+      run: async (ctx) => {
+        const engine = makeEngine();
 
-  const logo = await engine.parseAndRender('{% omega_logo acme %}');
-  assert.match(logo, /id="acme-\d+-grad"/);
-});
+        const logo = await engine.parseAndRender('{% omega_logo acme %}');
+        ctx.expect(logo).toMatch(/id="acme-\d+-grad"/);
+      },
+    },
 
-test('omega_external uses the configured site.url', async () => {
-  const engine = makeEngine();
-  assert.strictEqual(
-    await engine.parseAndRender('{% omega_external "pricing" %}'),
-    'https://bakeoff.example.com/pricing'
-  );
-});
+    {
+      name: 'omega_external uses the configured site.url',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        ctx.expect(await engine.parseAndRender('{% omega_external "pricing" %}')).toBe('https://bakeoff.example.com/pricing');
+      },
+    },
 
-test('omega_translation_url uses the configured site.translation', async () => {
-  const engine = makeEngine();
-  assert.strictEqual(await engine.parseAndRender('{% omega_translation_url "es", "/pricing" %}'), '/es/pricing');
-  assert.strictEqual(await engine.parseAndRender('{% omega_translation_url "en", "/pricing" %}'), '/pricing');
-});
+    {
+      name: 'omega_translation_url uses the configured site.translation',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        ctx.expect(await engine.parseAndRender('{% omega_translation_url "es", "/pricing" %}')).toBe('/es/pricing');
+        ctx.expect(await engine.parseAndRender('{% omega_translation_url "en", "/pricing" %}')).toBe('/pricing');
+      },
+    },
 
-test('collection-backed tags resolve through injected accessors', async () => {
-  const team = [{ id: '/team/ian', url: '/team/ian', data: { member: { name: 'Ian' } } }];
-  const posts = [{ id: '/posts/2024-01-15-hello', url: '/blog/hello', data: { title: 'Hello World' } }];
-  const engine = makeEngine({
-    getCollection: (name) => (name === 'team' ? team : name === 'posts' ? posts : []),
-    getCollectionNames: () => ['team', 'posts'],
-  });
+    {
+      name: 'collection-backed tags resolve through injected accessors',
+      run: async (ctx) => {
+        const team = [{ id: '/team/ian', url: '/team/ian', data: { member: { name: 'Ian' } } }];
+        const posts = [{ id: '/posts/2024-01-15-hello', url: '/blog/hello', data: { title: 'Hello World' } }];
+        const engine = makeEngine({
+          getCollection: (name) => (name === 'team' ? team : name === 'posts' ? posts : []),
+          getCollectionNames: () => ['team', 'posts'],
+        });
 
-  assert.strictEqual(await engine.parseAndRender('{% omega_member "ian" %}'), 'Ian');
-  assert.strictEqual(await engine.parseAndRender('{% omega_post "hello" %}'), 'Hello World');
-  assert.strictEqual(
-    await engine.parseAndRender('{% omega_post "hello", "url" %}'),
-    'https://bakeoff.example.com/blog/hello'
-  );
-});
+        ctx.expect(await engine.parseAndRender('{% omega_member "ian" %}')).toBe('Ian');
+        ctx.expect(await engine.parseAndRender('{% omega_post "hello" %}')).toBe('Hello World');
+        ctx.expect(await engine.parseAndRender('{% omega_post "hello", "url" %}')).toBe('https://bakeoff.example.com/blog/hello');
+      },
+    },
 
-test('Jekyll-compat pack renders through the engine', async () => {
-  const engine = makeEngine({ markdown: (str) => `<p>${str.trim()}</p>` });
+    {
+      name: 'Jekyll-compat pack renders through the engine',
+      run: async (ctx) => {
+        const engine = makeEngine({ markdown: (str) => `<p>${str.trim()}</p>` });
 
-  assert.strictEqual(await engine.parseAndRender('{{ "Hello World & Friends" | slugify }}'), 'hello-world-friends');
-  assert.strictEqual(await engine.parseAndRender('{{ "# Hi" | markdownify }}'), '<p># Hi</p>');
-  assert.strictEqual(await engine.parseAndRender('{{ "/about" | relative_url }}'), '/about');
-  assert.strictEqual(
-    await engine.parseAndRender('{{ "/about" | absolute_url }}'),
-    'https://bakeoff.example.com/about'
-  );
-  assert.strictEqual(await engine.parseAndRender('{{ obj | jsonify }}', { obj: { a: 1 } }), '{"a":1}');
-  assert.strictEqual(await engine.parseAndRender('{{ "<b>hi</b> there" | strip_html }}'), 'hi there');
+        ctx.expect(await engine.parseAndRender('{{ "Hello World & Friends" | slugify }}')).toBe('hello-world-friends');
+        ctx.expect(await engine.parseAndRender('{{ "# Hi" | markdownify }}')).toBe('<p># Hi</p>');
+        ctx.expect(await engine.parseAndRender('{{ "/about" | relative_url }}')).toBe('/about');
+        ctx.expect(await engine.parseAndRender('{{ "/about" | absolute_url }}')).toBe('https://bakeoff.example.com/about');
+        ctx.expect(await engine.parseAndRender('{{ obj | jsonify }}', { obj: { a: 1 } })).toBe('{"a":1}');
+        ctx.expect(await engine.parseAndRender('{{ "<b>hi</b> there" | strip_html }}')).toBe('hi there');
 
-  const scope = { items: [{ type: 'post', n: 1 }, { type: 'page', n: 2 }, { type: 'post', n: 3 }] };
-  const filtered = await engine.parseAndRender(
-    '{% assign posts = items | where_exp: "item", "item.type == \'post\'" %}{{ posts | size }}',
-    scope
-  );
-  assert.strictEqual(filtered, '2');
+        const scope = { items: [{ type: 'post', n: 1 }, { type: 'page', n: 2 }, { type: 'post', n: 3 }] };
+        const filtered = await engine.parseAndRender(
+          '{% assign posts = items | where_exp: "item", "item.type == \'post\'" %}{{ posts | size }}',
+          scope
+        );
+        ctx.expect(filtered).toBe('2');
 
-  assert.strictEqual(
-    await engine.parseAndRender('{{ date | date_to_xmlschema }}', { date: new Date('2024-01-15T12:00:00Z') }),
-    '2024-01-15T12:00:00+00:00' // UTC, CI-Jekyll parity (OMEGA date convention)
-  );
-});
+        ctx.expect(await engine.parseAndRender('{{ date | date_to_xmlschema }}', { date: new Date('2024-01-15T12:00:00Z') })).toBe('2024-01-15T12:00:00+00:00');
+      },
+    },
 
-test('variable-resolver arguments flow through real tag markup', async () => {
-  const engine = makeEngine();
-  const scope = { platformName: 'es' };
+    {
+      name: 'variable-resolver arguments flow through real tag markup',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const scope = { platformName: 'es' };
 
-  // unquoted variable resolves; quoted literal stays literal (unknown codes
-  // echo back DOWNCASED — Ruby downcases before the lookup)
-  assert.strictEqual(await engine.parseAndRender('{% omega_language platformName %}', scope), 'Spanish');
-  assert.strictEqual(await engine.parseAndRender('{% omega_language "platformName" %}'), 'platformname');
+        // unquoted variable resolves; quoted literal stays literal (unknown codes
+        // echo back DOWNCASED — Ruby downcases before the lookup)
+        ctx.expect(await engine.parseAndRender('{% omega_language platformName %}', scope)).toBe('Spanish');
+        ctx.expect(await engine.parseAndRender('{% omega_language "platformName" %}')).toBe('platformname');
+      },
+    },
+  ],
 });

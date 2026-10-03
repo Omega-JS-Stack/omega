@@ -7,8 +7,7 @@
  * the converged zero-mutation byte-identical no-op, DSN drift patching,
  * and the dry-run zero-mutation guarantee.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SERVICE_ORDER, OPERATIONS } = require('../src/config.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
@@ -107,124 +106,148 @@ function runService(config, { sentry, options = {}, serviceData = {}, brandRoot 
   });
 }
 
-// ─── Registry / skip semantics ───────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'monitoring',
+  tests: [
+    // ─── Registry / skip semantics ───────────────────────────────────────────────
 
-test('monitoring: registered between advertising and campaigns with the two operations', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('advertising') + 1], 'monitoring');
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('monitoring') + 1], 'campaigns');
-  assert.deepEqual(OPERATIONS.monitoring.map((op) => op.name), ['projects', 'dsn']);
-});
+    {
+      name: 'monitoring: registered between advertising and campaigns with the two operations',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('advertising') + 1]).toBe('monitoring');
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('monitoring') + 1]).toBe('campaigns');
+        ctx.expect(OPERATIONS.monitoring.map((op) => op.name)).toEqual(['projects', 'dsn']);
+      },
+    },
 
-test('monitoring: skips without a monitoring section, when disabled, and on another provider', async () => {
-  const none = await runService(brandConfig({ monitoring: null }), { sentry: fakeSentry() });
-  assert.equal(none.status, 'skipped');
-  assert.match(none.reason, /no monitoring config/);
+    {
+      name: 'monitoring: skips without a monitoring section, when disabled, and on another provider',
+      run: async (ctx) => {
+        const none = await runService(brandConfig({ monitoring: null }), { sentry: fakeSentry() });
+        ctx.expect(none.status).toBe('skipped');
+        ctx.expect(none.reason).toMatch(/no monitoring config/);
 
-  const disabled = await runService(brandConfig({ monitoring: false }), { sentry: fakeSentry() });
-  assert.equal(disabled.status, 'skipped');
-  assert.match(disabled.reason, /disabled/);
+        const disabled = await runService(brandConfig({ monitoring: false }), { sentry: fakeSentry() });
+        ctx.expect(disabled.status).toBe('skipped');
+        ctx.expect(disabled.reason).toMatch(/disabled/);
 
-  const other = await runService(brandConfig({ monitoring: { providers: { other: {} } } }), { sentry: fakeSentry() });
-  assert.equal(other.status, 'skipped');
-  assert.match(other.reason, /monitoring\.providers\.other/);
+        const other = await runService(brandConfig({ monitoring: { providers: { other: {} } } }), { sentry: fakeSentry() });
+        ctx.expect(other.status).toBe('skipped');
+        ctx.expect(other.reason).toMatch(/monitoring\.providers\.other/);
 
-  // Empty providers block = none chosen, exactly what a null provider meant (#425)
-  const unchosen = await runService(brandConfig({ monitoring: { providers: {} } }), { sentry: fakeSentry() });
-  assert.equal(unchosen.status, 'skipped');
-  assert.match(unchosen.reason, /no monitoring\.providers entry/);
-});
+        // Empty providers block = none chosen, exactly what a null provider meant (#425)
+        const unchosen = await runService(brandConfig({ monitoring: { providers: {} } }), { sentry: fakeSentry() });
+        ctx.expect(unchosen.status).toBe('skipped');
+        ctx.expect(unchosen.reason).toMatch(/no monitoring\.providers entry/);
+      },
+    },
 
-test('monitoring: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingEnv)', async () => {
-  const result = await runService(brandConfig()); // no injected api → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /SENTRY_AUTH_TOKEN/);
-  assert.deepEqual(result.missingEnv, ['SENTRY_AUTH_TOKEN']);
-});
+    {
+      name: 'monitoring: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingEnv)',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected api → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/SENTRY_AUTH_TOKEN/);
+        ctx.expect(result.missingEnv).toEqual(['SENTRY_AUTH_TOKEN']);
+      },
+    },
 
-// ─── Create-on-missing ───────────────────────────────────────────────────────
+    // ─── Create-on-missing ───────────────────────────────────────────────────────
 
-test('monitoring: empty org — team + one project per target created, org and DSNs written back', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getTeams: [],
-    createTeam: { slug: 'fixture-brand' },
-    getProjects: [],
-    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
-    getProjectKeys: (org, slug) => keysFor(slug.replace('fixture-brand-', '')),
-  });
+    {
+      name: 'monitoring: empty org — team + one project per target created, org and DSNs written back',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getTeams: [],
+          createTeam: { slug: 'fixture-brand' },
+          getProjects: [],
+          createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+          getProjectKeys: (org, slug) => keysFor(slug.replace('fixture-brand-', '')),
+        });
 
-  const result = await runService(brandConfig(), { sentry: api, brandRoot });
+        const result = await runService(brandConfig(), { sentry: api, brandRoot });
 
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.projects.created, 4);
-  assert.equal(result.output.dsn.landed, 4);
-  assert.equal(result.state.org, 'fixture-org');
-  assert.equal(result.state.projectMap.backend.slug, 'fixture-brand-backend');
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.projects.created).toBe(4);
+        ctx.expect(result.output.dsn.landed).toBe(4);
+        ctx.expect(result.state.org).toBe('fixture-org');
+        ctx.expect(result.state.projectMap.backend.slug).toBe('fixture-brand-backend');
 
-  // Region repoint from the org record
-  assert.deepEqual(api.regionUrls, ['https://us.sentry.io']);
+        // Region repoint from the org record
+        ctx.expect(api.regionUrls).toEqual(['https://us.sentry.io']);
 
-  // One team ensure, then a create per target with the right platform
-  assert.equal(api.callsTo('createTeam').length, 1);
-  const createdPlatforms = Object.fromEntries(
-    api.callsTo('createProject').map(({ args }) => [args[2].slug.replace('fixture-brand-', ''), args[2].platform]),
-  );
-  assert.deepEqual(createdPlatforms, PLATFORMS);
+        // One team ensure, then a create per target with the right platform
+        ctx.expect(api.callsTo('createTeam').length).toBe(1);
+        const createdPlatforms = Object.fromEntries(
+          api.callsTo('createProject').map(({ args }) => [args[2].slug.replace('fixture-brand-', ''), args[2].platform]),
+        );
+        ctx.expect(createdPlatforms).toEqual(PLATFORMS);
 
-  // omega.json5 gained the org + all four per-target DSNs, comments intact
-  const written = readConfigSource(brandRoot);
-  assert.match(written, /org: "fixture-org"/);
-  for (const target of Object.keys(ALL_TARGETS)) {
-    assert.ok(written.includes(dsnOf(target)), `expected ${target} DSN in omega.json5`);
-  }
-  assert.match(written, /\/\/ stays single-quoted/);
-});
+        // omega.json5 gained the org + all four per-target DSNs, comments intact
+        const written = readConfigSource(brandRoot);
+        ctx.expect(written).toMatch(/org: "fixture-org"/);
+        for (const target of Object.keys(ALL_TARGETS)) {
+          ctx.expect(written.includes(dsnOf(target)), `expected ${target} DSN in omega.json5`).toBeTruthy();
+        }
+        ctx.expect(written).toMatch(/\/\/ stays single-quoted/);
+      },
+    },
 
-test('monitoring: only enabled targets get projects', async () => {
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getTeams: [{ slug: 'fixture-brand' }],
-    getProjects: [],
-    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
-    getProjectKeys: keysFor('web'),
-  });
+    {
+      name: 'monitoring: only enabled targets get projects',
+      run: async (ctx) => {
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getTeams: [{ slug: 'fixture-brand' }],
+          getProjects: [],
+          createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+          getProjectKeys: keysFor('web'),
+        });
 
-  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api });
+        const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api });
 
-  assert.equal(result.output.projects.created, 1);
-  assert.deepEqual(api.callsTo('createProject').map(({ args }) => args[2].slug), ['fixture-brand-web']);
-});
+        ctx.expect(result.output.projects.created).toBe(1);
+        ctx.expect(api.callsTo('createProject').map(({ args }) => args[2].slug)).toEqual(['fixture-brand-web']);
+      },
+    },
 
-// A target answers to the NAME its brand gave it (#886): the TYPE picks the
-// Sentry platform, the NAME is the project slug and the config key.
-test('monitoring: a web target named `site` gets its own project, and its DSN lands under targets.site', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getTeams: [{ slug: 'fixture-brand' }],
-    getProjects: [],
-    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
-    getProjectKeys: keysFor('site'),
-  });
+    // A target answers to the NAME its brand gave it (#886): the TYPE picks the
+    // Sentry platform, the NAME is the project slug and the config key.
+    {
+      name: 'monitoring: a web target named `site` gets its own project, and its DSN lands under targets.site',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getTeams: [{ slug: 'fixture-brand' }],
+          getProjects: [],
+          createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+          getProjectKeys: keysFor('site'),
+        });
 
-  const result = await runService(brandConfig({ targets: { site: { type: 'web' } } }), { sentry: api, brandRoot });
+        const result = await runService(brandConfig({ targets: { site: { type: 'web' } } }), { sentry: api, brandRoot });
 
-  assert.equal(result.status, 'success');
-  const [{ args }] = api.callsTo('createProject');
-  assert.equal(args[2].slug, 'fixture-brand-site', 'the project is named for the target');
-  assert.equal(args[2].platform, 'javascript', 'and platformed by its type');
-  assert.equal(result.state.projectMap.site.slug, 'fixture-brand-site');
+        ctx.expect(result.status).toBe('success');
+        const [{ args }] = api.callsTo('createProject');
+        ctx.expect(args[2].slug, 'the project is named for the target').toBe('fixture-brand-site');
+        ctx.expect(args[2].platform, 'and platformed by its type').toBe('javascript');
+        ctx.expect(result.state.projectMap.site.slug).toBe('fixture-brand-site');
 
-  const written = readConfigSource(brandRoot);
-  assert.match(written, /site: \{\s*\n\s*monitoring:/, 'the DSN lands under targets.site');
-  assert.ok(written.includes(dsnOf('site')));
-});
+        const written = readConfigSource(brandRoot);
+        ctx.expect(written, 'the DSN lands under targets.site').toMatch(/site: \{\s*\n\s*monitoring:/);
+        ctx.expect(written.includes(dsnOf('site'))).toBeTruthy();
+      },
+    },
 
-// ─── Convergence ─────────────────────────────────────────────────────────────
+    // ─── Convergence ─────────────────────────────────────────────────────────────
 
-test('monitoring: a fully converged brand is a zero-mutation no-op and the file stays byte-identical', async () => {
-  const configured = `// Converged fixture
+    {
+      name: 'monitoring: a fully converged brand is a zero-mutation no-op and the file stays byte-identical',
+      run: async (ctx) => {
+        const configured = `// Converged fixture
 {
   brand: { id: 'fixture-brand' },
   monitoring: { providers: { sentry: { org: "fixture-org" } } },
@@ -233,133 +256,154 @@ test('monitoring: a fully converged brand is a zero-mutation no-op and the file 
   },
 }
 `;
-  const brandRoot = makeBrandRoot(configured);
-  const config = brandConfig({
-    monitoring: { providers: { sentry: { org: 'fixture-org' } } },
-    targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: dsnOf('web') } } } } },
-  });
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getProjects: [projectRecord('web')],
-    getProjectKeys: keysFor('web'),
-  });
+        const brandRoot = makeBrandRoot(configured);
+        const config = brandConfig({
+          monitoring: { providers: { sentry: { org: 'fixture-org' } } },
+          targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: dsnOf('web') } } } } },
+        });
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getProjects: [projectRecord('web')],
+          getProjectKeys: keysFor('web'),
+        });
 
-  const result = await runService(config, { sentry: api, brandRoot });
+        const result = await runService(config, { sentry: api, brandRoot });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.mutations(), []);
-  assert.equal(result.output.projects.synced, 1);
-  assert.equal(result.output.dsn.landed, 0);
-  assert.equal(readConfigSource(brandRoot), configured);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(result.output.projects.synced).toBe(1);
+        ctx.expect(result.output.dsn.landed).toBe(0);
+        ctx.expect(readConfigSource(brandRoot)).toBe(configured);
+      },
+    },
 
-test('monitoring: a hand-set stale DSN is drift and gets patched', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const config = brandConfig({
-    monitoring: { providers: { sentry: { org: 'fixture-org' } } },
-    targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://stale@old.ingest.sentry.io/1' } } } } },
-  });
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getProjects: [projectRecord('web')],
-    getProjectKeys: keysFor('web'),
-  });
+    {
+      name: 'monitoring: a hand-set stale DSN is drift and gets patched',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const config = brandConfig({
+          monitoring: { providers: { sentry: { org: 'fixture-org' } } },
+          targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://stale@old.ingest.sentry.io/1' } } } } },
+        });
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getProjects: [projectRecord('web')],
+          getProjectKeys: keysFor('web'),
+        });
 
-  const result = await runService(config, { sentry: api, brandRoot });
+        const result = await runService(config, { sentry: api, brandRoot });
 
-  assert.equal(result.output.dsn.landed, 1);
-  assert.deepEqual(api.mutations(), []);
-  assert.ok(readConfigSource(brandRoot).includes(dsnOf('web')));
-});
+        ctx.expect(result.output.dsn.landed).toBe(1);
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(readConfigSource(brandRoot).includes(dsnOf('web'))).toBeTruthy();
+      },
+    },
 
-// ─── Org resolution ──────────────────────────────────────────────────────────
+    // ─── Org resolution ──────────────────────────────────────────────────────────
 
-test('monitoring: multiple orgs without monitoring.providers.sentry.org warns and mutates nothing', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({
-    getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b' }],
-  });
+    {
+      name: 'monitoring: multiple orgs without monitoring.providers.sentry.org warns and mutates nothing',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({
+          getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b' }],
+        });
 
-  const result = await runService(brandConfig(), { sentry: api, brandRoot });
+        const result = await runService(brandConfig(), { sentry: api, brandRoot });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.projects.orgUnresolved, true);
-  assert.deepEqual(api.mutations(), []);
-  assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.projects.orgUnresolved).toBe(true);
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(readConfigSource(brandRoot)).toBe(WRITEBACK_CONFIG);
+      },
+    },
 
-test('monitoring: an ambiguous org is ASKED for and the pick lands in omega.json5 (#635)', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({
-    getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b', links: { regionUrl: 'https://eu.sentry.io' } }],
-    getTeams: [{ slug: 'fixture-brand' }],
-    getProjects: [],
-    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
-    getProjectKeys: keysFor('web'),
-  });
+    {
+      name: 'monitoring: an ambiguous org is ASKED for and the pick lands in omega.json5 (#635)',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({
+          getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b', links: { regionUrl: 'https://eu.sentry.io' } }],
+          getTeams: [{ slug: 'fixture-brand' }],
+          getProjects: [],
+          createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+          getProjectKeys: keysFor('web'),
+        });
 
-  const tty = openTtyPrompt();
-  try {
-    const run = runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api, brandRoot });
-    await tty.answer('Select Sentry organization:', `${DOWN}\r`); // org-b
-    const result = await run;
+        const tty = openTtyPrompt();
+        try {
+          const run = runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api, brandRoot });
+          await tty.answer('Select Sentry organization:', `${DOWN}\r`); // org-b
+          const result = await run;
 
-    assert.equal(result.status, 'success');
-    assert.equal(result.state.org, 'org-b');
-    // The pick is the org every org-scoped call is then made against
-    assert.deepEqual(api.callsTo('createProject').map(({ args }) => args[0]), ['org-b']);
-    assert.deepEqual(api.regionUrls, ['https://eu.sentry.io']);
-    // ...and it landed in config (comments intact), so nothing asks again
-    const written = readConfigSource(brandRoot);
-    assert.match(written, /org: "org-b"/);
-    assert.match(written, /\/\/ stays single-quoted/);
-  } finally {
-    tty.close();
-  }
-});
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(result.state.org).toBe('org-b');
+          // The pick is the org every org-scoped call is then made against
+          ctx.expect(api.callsTo('createProject').map(({ args }) => args[0])).toEqual(['org-b']);
+          ctx.expect(api.regionUrls).toEqual(['https://eu.sentry.io']);
+          // ...and it landed in config (comments intact), so nothing asks again
+          const written = readConfigSource(brandRoot);
+          ctx.expect(written).toMatch(/org: "org-b"/);
+          ctx.expect(written).toMatch(/\/\/ stays single-quoted/);
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-test('monitoring: a token that sees NO org has nothing to ask about — the warn stands (#635)', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({ getOrganizations: [] });
+    {
+      name: 'monitoring: a token that sees NO org has nothing to ask about — the warn stands (#635)',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({ getOrganizations: [] });
 
-  const tty = openTtyPrompt();
-  try {
-    const result = await runService(brandConfig(), { sentry: api, brandRoot });
+        const tty = openTtyPrompt();
+        try {
+          const result = await runService(brandConfig(), { sentry: api, brandRoot });
 
-    assert.equal(result.status, 'warned');
-    assert.equal(result.output.projects.orgUnresolved, true);
-    assert.deepEqual(api.mutations(), []);
-    assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
-  } finally {
-    tty.close();
-  }
-});
+          ctx.expect(result.status).toBe('warned');
+          ctx.expect(result.output.projects.orgUnresolved).toBe(true);
+          ctx.expect(api.mutations()).toEqual([]);
+          ctx.expect(readConfigSource(brandRoot)).toBe(WRITEBACK_CONFIG);
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-test('monitoring: a configured org the token cannot see warns honestly', async () => {
-  const config = brandConfig({ monitoring: { providers: { sentry: { org: 'someone-elses-org' } } } });
-  const api = fakeSentry({ getOrganizations: [ORG] });
+    {
+      name: 'monitoring: a configured org the token cannot see warns honestly',
+      run: async (ctx) => {
+        const config = brandConfig({ monitoring: { providers: { sentry: { org: 'someone-elses-org' } } } });
+        const api = fakeSentry({ getOrganizations: [ORG] });
 
-  const result = await runService(config, { sentry: api });
+        const result = await runService(config, { sentry: api });
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(api.mutations(), []);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(api.mutations()).toEqual([]);
+      },
+    },
 
-// ─── Dry run ─────────────────────────────────────────────────────────────────
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
 
-test('monitoring: dry run on an empty org plans everything and mutates nothing', async () => {
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const api = fakeSentry({
-    getOrganizations: [ORG],
-    getProjects: [],
-  });
+    {
+      name: 'monitoring: dry run on an empty org plans everything and mutates nothing',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const api = fakeSentry({
+          getOrganizations: [ORG],
+          getProjects: [],
+        });
 
-  const result = await runService(brandConfig(), { sentry: api, brandRoot, options: { dryRun: true } });
+        const result = await runService(brandConfig(), { sentry: api, brandRoot, options: { dryRun: true } });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.projects.planned, [
-    'fixture-brand-web', 'fixture-brand-backend', 'fixture-brand-desktop', 'fixture-brand-extension',
-  ]);
-  assert.deepEqual(api.mutations(), []);
-  assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.projects.planned).toEqual([
+          'fixture-brand-web', 'fixture-brand-backend', 'fixture-brand-desktop', 'fixture-brand-extension',
+        ]);
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(readConfigSource(brandRoot)).toBe(WRITEBACK_CONFIG);
+      },
+    },
+  ],
 });

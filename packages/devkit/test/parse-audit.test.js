@@ -4,8 +4,7 @@
  * false-positives on valid CJS, ESM, or shebang'd sources, and without
  * descending into build-output dirs.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -28,43 +27,55 @@ function cleanup(t, root) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 }
 
-test('parse-audit: catches a rename-corrupted regex literal, passes valid CJS/ESM/shebang', (t) => {
-  const root = makeTree('parse-audit-mixed', {
-    // Valid CJS
-    'lib/good.js': `const path = require('path');\nmodule.exports = { p: path.sep };\n`,
-    // Valid ESM (would fail a CJS-wrap parse — must not be reported)
-    'web/module.js': `import path from 'node:path';\nexport const p = path.sep;\n`,
-    // Valid CJS with shebang
-    'bin/cli.js': `#!/usr/bin/env node\nconsole.log('ok');\n`,
-    // The motivating casualty: unescaped / injected into a regex literal
-    'cli/broken.js': `const re = /({{\\s*?@omega.js/backend\\s*?}})/sgm;\nmodule.exports = re;\n`,
-  });
-  cleanup(t, root);
+module.exports = defineCases({
+  type: 'group',
+  description: 'parse-audit',
+  tests: [
+    {
+      name: 'parse-audit: catches a rename-corrupted regex literal, passes valid CJS/ESM/shebang',
+      run: (ctx) => {
+        const root = makeTree('parse-audit-mixed', {
+          // Valid CJS
+          'lib/good.js': `const path = require('path');\nmodule.exports = { p: path.sep };\n`,
+          // Valid ESM (would fail a CJS-wrap parse — must not be reported)
+          'web/module.js': `import path from 'node:path';\nexport const p = path.sep;\n`,
+          // Valid CJS with shebang
+          'bin/cli.js': `#!/usr/bin/env node\nconsole.log('ok');\n`,
+          // The motivating casualty: unescaped / injected into a regex literal
+          'cli/broken.js': `const re = /({{\\s*?@omega.js/backend\\s*?}})/sgm;\nmodule.exports = re;\n`,
+        });
+        cleanup(ctx, root);
 
-  const { checked, failures } = parseAuditTree(root);
-  assert.equal(checked, 4);
-  assert.equal(failures.length, 1);
-  assert.equal(failures[0].file, path.join('cli', 'broken.js'));
-  assert.match(failures[0].error, /Invalid regular expression flags|Unexpected/);
-});
+        const { checked, failures } = parseAuditTree(root);
+        ctx.expect(checked).toBe(4);
+        ctx.expect(failures.length).toBe(1);
+        ctx.expect(failures[0].file).toBe(path.join('cli', 'broken.js'));
+        ctx.expect(failures[0].error).toMatch(/Invalid regular expression flags|Unexpected/);
+      },
+    },
 
-test('parse-audit: skips build-output dirs by default, honors custom skipDirs', (t) => {
-  const root = makeTree('parse-audit-skips', {
-    'src/ok.js': `module.exports = 1;\n`,
-    'node_modules/dep/broken.js': `syntax error here(((\n`,
-    'dist/broken.js': `also broken(((\n`,
-    '_backup/broken.js': `broken too(((\n`,
-  });
-  cleanup(t, root);
+    {
+      name: 'parse-audit: skips build-output dirs by default, honors custom skipDirs',
+      run: (ctx) => {
+        const root = makeTree('parse-audit-skips', {
+          'src/ok.js': `module.exports = 1;\n`,
+          'node_modules/dep/broken.js': `syntax error here(((\n`,
+          'dist/broken.js': `also broken(((\n`,
+          '_backup/broken.js': `broken too(((\n`,
+        });
+        cleanup(ctx, root);
 
-  // Defaults: node_modules + dist skipped; _backup is NOT in the default list
-  const withDefaults = parseAuditTree(root);
-  assert.equal(withDefaults.checked, 2);
-  assert.equal(withDefaults.failures.length, 1);
-  assert.equal(withDefaults.failures[0].file, path.join('_backup', 'broken.js'));
+        // Defaults: node_modules + dist skipped; _backup is NOT in the default list
+        const withDefaults = parseAuditTree(root);
+        ctx.expect(withDefaults.checked).toBe(2);
+        ctx.expect(withDefaults.failures.length).toBe(1);
+        ctx.expect(withDefaults.failures[0].file).toBe(path.join('_backup', 'broken.js'));
 
-  // Custom list replaces the defaults
-  const custom = parseAuditTree(root, { skipDirs: ['node_modules', 'dist', '_backup'] });
-  assert.equal(custom.checked, 1);
-  assert.equal(custom.failures.length, 0);
+        // Custom list replaces the defaults
+        const custom = parseAuditTree(root, { skipDirs: ['node_modules', 'dist', '_backup'] });
+        ctx.expect(custom.checked).toBe(1);
+        ctx.expect(custom.failures.length).toBe(0);
+      },
+    },
+  ],
 });

@@ -4,136 +4,174 @@
  * a function of the brand's config that answers true or false; each one here
  * meets a config that makes it hold and one that does not.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { holds, onUnlessOff, chosen, hasTarget, realProject, ships, signsWith, all, any } = require('../src/env-when.js');
 
-test('holds(path): a value at the path holds, an absent or empty one does not', () => {
-  const rule = holds('captcha.providers.recaptcha.siteKey');
-
-  assert.equal(rule({ captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } }), true);
-  assert.equal(rule({}), false);
-  assert.equal(rule({ captcha: { providers: { recaptcha: {} } } }), false);
-  assert.equal(rule({ captcha: { providers: { recaptcha: { siteKey: '' } } } }), false, 'an empty string is not a value');
-  assert.equal(rule({ captcha: { providers: { recaptcha: { siteKey: null } } } }), false);
-});
-
-test('holds(path): an object at the path holds, even an empty one, and false does not', () => {
-  const rule = holds('certificates.providers.apple');
-
-  assert.equal(rule({ certificates: { providers: { apple: { bundleIdPrefix: 'com.acme' } } } }), true);
-  assert.equal(rule({ certificates: { providers: { apple: {} } } }), true, 'an empty settings block is still a declared block');
-  assert.equal(rule({ certificates: { providers: { apple: false } } }), false, 'the block dropped');
-});
-
 const DESKTOP = { targets: { desktop: { type: 'desktop' } } };
 
-test('ships(platform, format): a desktop target ships the format unless the platform or the format is false', () => {
-  const rule = ships('linux', 'snap');
+module.exports = defineCases({
+  type: 'group',
+  description: 'env-when',
+  tests: [
+    {
+      name: 'holds(path): a value at the path holds, an absent or empty one does not',
+      run: (ctx) => {
+        const rule = holds('captcha.providers.recaptcha.siteKey');
 
-  assert.equal(rule(DESKTOP), true, 'no platforms block: the default formats ship');
-  assert.equal(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } }), true, 'declared');
-  assert.equal(rule({ ...DESKTOP, platforms: { linux: {} } }), true, 'the platform declared, the format left alone');
-  assert.equal(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }), false, 'the format turned off');
-  assert.equal(rule({ ...DESKTOP, platforms: { linux: false } }), false, 'the platform turned off');
-  assert.equal(rule({ ...DESKTOP, platforms: { windows: false } }), true, 'another platform off leaves this one on');
-  // Only a desktop brand ships a desktop format
-  assert.equal(rule({}), false);
-  assert.equal(rule({ targets: { web: { type: 'web' }, extension: { type: 'extension' } } }), false);
-  assert.equal(rule({ platforms: { linux: { formats: { snap: {} } } } }), false, 'a declaration with no desktop target');
+        ctx.expect(rule({ captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } })).toBe(true);
+        ctx.expect(rule({})).toBe(false);
+        ctx.expect(rule({ captcha: { providers: { recaptcha: {} } } })).toBe(false);
+        ctx.expect(rule({ captcha: { providers: { recaptcha: { siteKey: '' } } } }), 'an empty string is not a value').toBe(false);
+        ctx.expect(rule({ captcha: { providers: { recaptcha: { siteKey: null } } } })).toBe(false);
+      },
+    },
 
-  assert.equal(rule.path, 'platforms.linux.formats.snap');
-  assert.equal(ships('windows', 'nsis').path, 'platforms.windows.formats.nsis');
-});
+    {
+      name: 'holds(path): an object at the path holds, even an empty one, and false does not',
+      run: (ctx) => {
+        const rule = holds('certificates.providers.apple');
 
-test('signsWith(strategy): the desktop target ships the Windows installer and signs it with that strategy, the default included', () => {
-  const selfHosted = signsWith('self-hosted');
-  const cloud = signsWith('cloud');
-  const strategy = (name) => ({ ...DESKTOP, platforms: { windows: { signing: { strategy: name, ...(name === 'cloud' ? { cloud: { provider: 'azure' } } : {}) } } } });
+        ctx.expect(rule({ certificates: { providers: { apple: { bundleIdPrefix: 'com.acme' } } } })).toBe(true);
+        ctx.expect(rule({ certificates: { providers: { apple: {} } } }), 'an empty settings block is still a declared block').toBe(true);
+        ctx.expect(rule({ certificates: { providers: { apple: false } } }), 'the block dropped').toBe(false);
+      },
+    },
 
-  assert.equal(selfHosted(DESKTOP), true, 'no strategy written: self-hosted is the default');
-  assert.equal(selfHosted(strategy('self-hosted')), true);
-  assert.equal(selfHosted(strategy('cloud')), false);
-  assert.equal(cloud(strategy('cloud')), true);
-  assert.equal(cloud(DESKTOP), false, 'the default is not the cloud');
+    {
+      name: 'ships(platform, format): a desktop target ships the format unless the platform or the format is false',
+      run: (ctx) => {
+        const rule = ships('linux', 'snap');
 
-  assert.equal(selfHosted({ ...DESKTOP, platforms: { windows: false } }), false, 'Windows turned off');
-  assert.equal(selfHosted({ ...DESKTOP, platforms: { windows: { formats: { nsis: false } } } }), false, 'the installer turned off');
-  assert.equal(selfHosted({ ...DESKTOP, platforms: { linux: false } }), true, 'another platform off leaves Windows on');
-  assert.equal(selfHosted({}), false, 'no desktop target');
-  assert.equal(selfHosted({ platforms: { windows: { signing: { strategy: 'self-hosted' } } } }), false, 'a strategy with no desktop target');
-});
+        ctx.expect(rule(DESKTOP), 'no platforms block: the default formats ship').toBe(true);
+        ctx.expect(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } }), 'declared').toBe(true);
+        ctx.expect(rule({ ...DESKTOP, platforms: { linux: {} } }), 'the platform declared, the format left alone').toBe(true);
+        ctx.expect(rule({ ...DESKTOP, platforms: { linux: { formats: { snap: false } } } }), 'the format turned off').toBe(false);
+        ctx.expect(rule({ ...DESKTOP, platforms: { linux: false } }), 'the platform turned off').toBe(false);
+        ctx.expect(rule({ ...DESKTOP, platforms: { windows: false } }), 'another platform off leaves this one on').toBe(true);
+        // Only a desktop brand ships a desktop format
+        ctx.expect(rule({})).toBe(false);
+        ctx.expect(rule({ targets: { web: { type: 'web' }, extension: { type: 'extension' } } })).toBe(false);
+        ctx.expect(rule({ platforms: { linux: { formats: { snap: {} } } } }), 'a declaration with no desktop target').toBe(false);
 
-test('signsWith(strategy, provider): the cloud strategy also has to name that provider', () => {
-  const azure = signsWith('cloud', 'azure');
-  const cloud = (provider) => ({ windows: { signing: { strategy: 'cloud', cloud: { provider } } } });
+        ctx.expect(rule.path).toBe('platforms.linux.formats.snap');
+        ctx.expect(ships('windows', 'nsis').path).toBe('platforms.windows.formats.nsis');
+      },
+    },
 
-  assert.equal(azure({ ...DESKTOP, platforms: cloud('azure') }), true);
-  assert.equal(azure({ ...DESKTOP, platforms: cloud('sslcom') }), false, 'another provider');
-  assert.equal(azure({ ...DESKTOP, platforms: { windows: { signing: { cloud: { provider: 'azure' } } } } }), false, 'the provider written, the strategy left at its default');
-  assert.equal(azure({ ...DESKTOP, platforms: { windows: { ...cloud('azure').windows, formats: { nsis: false } } } }), false, 'the installer turned off');
-  assert.equal(azure({ platforms: cloud('azure') }), false, 'no desktop target');
-});
+    {
+      name: 'signsWith(strategy): the desktop target ships the Windows installer and signs it with that strategy, the default included',
+      run: (ctx) => {
+        const selfHosted = signsWith('self-hosted');
+        const cloud = signsWith('cloud');
+        const strategy = (name) => ({ ...DESKTOP, platforms: { windows: { signing: { strategy: name, ...(name === 'cloud' ? { cloud: { provider: 'azure' } } : {}) } } } });
 
-test('onUnlessOff(path): absent means on, and only a literal false turns it off', () => {
-  const rule = onUnlessOff('captcha.providers.recaptcha.enabled');
+        ctx.expect(selfHosted(DESKTOP), 'no strategy written: self-hosted is the default').toBe(true);
+        ctx.expect(selfHosted(strategy('self-hosted'))).toBe(true);
+        ctx.expect(selfHosted(strategy('cloud'))).toBe(false);
+        ctx.expect(cloud(strategy('cloud'))).toBe(true);
+        ctx.expect(cloud(DESKTOP), 'the default is not the cloud').toBe(false);
 
-  assert.equal(rule({}), true, 'a config that says nothing has the feature on');
-  assert.equal(rule({ captcha: { providers: { recaptcha: { enabled: true } } } }), true);
-  assert.equal(rule({ captcha: { providers: { recaptcha: { enabled: false } } } }), false);
-});
+        ctx.expect(selfHosted({ ...DESKTOP, platforms: { windows: false } }), 'Windows turned off').toBe(false);
+        ctx.expect(selfHosted({ ...DESKTOP, platforms: { windows: { formats: { nsis: false } } } }), 'the installer turned off').toBe(false);
+        ctx.expect(selfHosted({ ...DESKTOP, platforms: { linux: false } }), 'another platform off leaves Windows on').toBe(true);
+        ctx.expect(selfHosted({}), 'no desktop target').toBe(false);
+        ctx.expect(selfHosted({ platforms: { windows: { signing: { strategy: 'self-hosted' } } } }), 'a strategy with no desktop target').toBe(false);
+      },
+    },
 
-test('chosen(path, name): holds only when the path names that provider', () => {
-  const rule = chosen('platforms.windows.signing.cloud.provider', 'azure');
-  const provider = (name) => ({ platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: name } } } } });
+    {
+      name: 'signsWith(strategy, provider): the cloud strategy also has to name that provider',
+      run: (ctx) => {
+        const azure = signsWith('cloud', 'azure');
+        const cloud = (provider) => ({ windows: { signing: { strategy: 'cloud', cloud: { provider } } } });
 
-  assert.equal(rule(provider('azure')), true);
-  assert.equal(rule(provider('sslcom')), false, 'another provider owes nothing of this one');
-  assert.equal(rule({}), false);
-});
+        ctx.expect(azure({ ...DESKTOP, platforms: cloud('azure') })).toBe(true);
+        ctx.expect(azure({ ...DESKTOP, platforms: cloud('sslcom') }), 'another provider').toBe(false);
+        ctx.expect(azure({ ...DESKTOP, platforms: { windows: { signing: { cloud: { provider: 'azure' } } } } }), 'the provider written, the strategy left at its default').toBe(false);
+        ctx.expect(azure({ ...DESKTOP, platforms: { windows: { ...cloud('azure').windows, formats: { nsis: false } } } }), 'the installer turned off').toBe(false);
+        ctx.expect(azure({ platforms: cloud('azure') }), 'no desktop target').toBe(false);
+      },
+    },
 
-test('hasTarget(...types): holds when the brand has a target of one of those types', () => {
-  const backend = hasTarget('backend');
+    {
+      name: 'onUnlessOff(path): absent means on, and only a literal false turns it off',
+      run: (ctx) => {
+        const rule = onUnlessOff('captcha.providers.recaptcha.enabled');
 
-  assert.equal(backend({ targets: { web: { type: 'web' }, backend: { type: 'backend' } } }), true);
-  assert.equal(backend({ targets: { web: { type: 'web' } } }), false);
-  assert.equal(backend({}), false, 'no targets, no backend');
-  // The type decides, never the target's name
-  assert.equal(backend({ targets: { api: { type: 'backend' } } }), true);
-  assert.equal(hasTarget('web')({ targets: { site: { type: 'web' } } }), true);
+        ctx.expect(rule({}), 'a config that says nothing has the feature on').toBe(true);
+        ctx.expect(rule({ captcha: { providers: { recaptcha: { enabled: true } } } })).toBe(true);
+        ctx.expect(rule({ captcha: { providers: { recaptcha: { enabled: false } } } })).toBe(false);
+      },
+    },
 
-  const signing = hasTarget('desktop', 'mobile');
-  assert.equal(signing({ targets: { desktop: { type: 'desktop' } } }), true);
-  assert.equal(signing({ targets: { mobile: { type: 'mobile' } } }), true);
-  assert.equal(signing({ targets: { web: { type: 'web' }, extension: { type: 'extension' } } }), false);
-});
+    {
+      name: 'chosen(path, name): holds only when the path names that provider',
+      run: (ctx) => {
+        const rule = chosen('platforms.windows.signing.cloud.provider', 'azure');
+        const provider = (name) => ({ platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: name } } } } });
 
-test('realProject(): only a demo-* id fails it, and an id not yet chosen still holds', () => {
-  const rule = realProject();
-  const project = (projectId) => ({ cloud: { provider: 'firebase', config: { projectId } } });
+        ctx.expect(rule(provider('azure'))).toBe(true);
+        ctx.expect(rule(provider('sslcom')), 'another provider owes nothing of this one').toBe(false);
+        ctx.expect(rule({})).toBe(false);
+      },
+    },
 
-  assert.equal(rule(project('acme-live')), true);
-  assert.equal(rule(project('demo-acme')), false, 'a demo-* project is local only');
-  // The cloud service's selection flow is how a brand gets a project, so it still runs
-  assert.equal(rule({}), true, 'no project id yet is not a demo project');
-  assert.equal(rule(project('')), true, 'an empty id is one not yet chosen');
-});
+    {
+      name: 'hasTarget(...types): holds when the brand has a target of one of those types',
+      run: (ctx) => {
+        const backend = hasTarget('backend');
 
-test('all(...rules): holds only when every rule holds', () => {
-  const rule = all(holds('captcha.providers.recaptcha.siteKey'), hasTarget('backend'));
-  const siteKey = { captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } };
+        ctx.expect(backend({ targets: { web: { type: 'web' }, backend: { type: 'backend' } } })).toBe(true);
+        ctx.expect(backend({ targets: { web: { type: 'web' } } })).toBe(false);
+        ctx.expect(backend({}), 'no targets, no backend').toBe(false);
+        // The type decides, never the target's name
+        ctx.expect(backend({ targets: { api: { type: 'backend' } } })).toBe(true);
+        ctx.expect(hasTarget('web')({ targets: { site: { type: 'web' } } })).toBe(true);
 
-  assert.equal(rule({ ...siteKey, targets: { backend: { type: 'backend' } } }), true);
-  assert.equal(rule({ ...siteKey, targets: { web: { type: 'web' } } }), false);
-  assert.equal(rule({ targets: { backend: { type: 'backend' } } }), false);
-});
+        const signing = hasTarget('desktop', 'mobile');
+        ctx.expect(signing({ targets: { desktop: { type: 'desktop' } } })).toBe(true);
+        ctx.expect(signing({ targets: { mobile: { type: 'mobile' } } })).toBe(true);
+        ctx.expect(signing({ targets: { web: { type: 'web' }, extension: { type: 'extension' } } })).toBe(false);
+      },
+    },
 
-test('any(...rules): holds when one rule holds', () => {
-  const rule = any(hasTarget('desktop'), realProject());
+    {
+      name: 'realProject(): only a demo-* id fails it, and an id not yet chosen still holds',
+      run: (ctx) => {
+        const rule = realProject();
+        const project = (projectId) => ({ cloud: { provider: 'firebase', config: { projectId } } });
 
-  assert.equal(rule({ targets: { desktop: { type: 'desktop' } } }), true);
-  assert.equal(rule({ cloud: { config: { projectId: 'acme-live' } }, targets: { web: { type: 'web' } } }), true);
-  assert.equal(rule({ cloud: { config: { projectId: 'demo-acme' } }, targets: { web: { type: 'web' } } }), false);
-  assert.equal(rule({ cloud: { config: { projectId: 'demo-acme' } }, targets: { desktop: { type: 'desktop' } } }), true);
+        ctx.expect(rule(project('acme-live'))).toBe(true);
+        ctx.expect(rule(project('demo-acme')), 'a demo-* project is local only').toBe(false);
+        // The cloud service's selection flow is how a brand gets a project, so it still runs
+        ctx.expect(rule({}), 'no project id yet is not a demo project').toBe(true);
+        ctx.expect(rule(project('')), 'an empty id is one not yet chosen').toBe(true);
+      },
+    },
+
+    {
+      name: 'all(...rules): holds only when every rule holds',
+      run: (ctx) => {
+        const rule = all(holds('captcha.providers.recaptcha.siteKey'), hasTarget('backend'));
+        const siteKey = { captcha: { providers: { recaptcha: { siteKey: '6Lc-abc' } } } };
+
+        ctx.expect(rule({ ...siteKey, targets: { backend: { type: 'backend' } } })).toBe(true);
+        ctx.expect(rule({ ...siteKey, targets: { web: { type: 'web' } } })).toBe(false);
+        ctx.expect(rule({ targets: { backend: { type: 'backend' } } })).toBe(false);
+      },
+    },
+
+    {
+      name: 'any(...rules): holds when one rule holds',
+      run: (ctx) => {
+        const rule = any(hasTarget('desktop'), realProject());
+
+        ctx.expect(rule({ targets: { desktop: { type: 'desktop' } } })).toBe(true);
+        ctx.expect(rule({ cloud: { config: { projectId: 'acme-live' } }, targets: { web: { type: 'web' } } })).toBe(true);
+        ctx.expect(rule({ cloud: { config: { projectId: 'demo-acme' } }, targets: { web: { type: 'web' } } })).toBe(false);
+        ctx.expect(rule({ cloud: { config: { projectId: 'demo-acme' } }, targets: { desktop: { type: 'desktop' } } })).toBe(true);
+      },
+    },
+  ],
 });

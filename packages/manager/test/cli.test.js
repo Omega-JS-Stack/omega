@@ -4,8 +4,7 @@
  * module is stubbed before cli.js resolves it, so "did the bare invocation
  * walk this brand?" is observable in-process without running anything.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 
 const managePath = require.resolve('../src/commands/manage.js');
@@ -35,44 +34,62 @@ async function captureLogAsync(fn) {
   return lines.join('\n');
 }
 
-test('cli: a bare omega prints help and runs NOTHING — no walk, no writes', async () => {
-  manageCalls.length = 0;
-  const priorExitCode = process.exitCode;
+module.exports = defineCases({
+  type: 'group',
+  description: 'cli',
+  tests: [
+    {
+      name: 'cli: a bare omega prints help and runs NOTHING — no walk, no writes',
+      run: async (ctx) => {
+        manageCalls.length = 0;
+        const priorExitCode = process.exitCode;
 
-  const text = await captureLogAsync(() => new Main({}).process({ _: [] }));
+        const text = await captureLogAsync(() => new Main({}).process({ _: [] }));
 
-  assert.equal(manageCalls.length, 0, 'a bare CLI must never reconcile a brand behind the operator');
-  assert.match(text, /Usage/);
-  assert.notEqual(process.exitCode, 1, 'printing help is a success');
-  process.exitCode = priorExitCode;
-});
+        ctx.expect(manageCalls.length, 'a bare CLI must never reconcile a brand behind the operator').toBe(0);
+        ctx.expect(text).toMatch(/Usage/);
+        ctx.expect(process.exitCode, 'printing help is a success').not.toBe(1);
+        process.exitCode = priorExitCode;
+      },
+    },
 
-test('cli: the help names the three verbs and the fresh-brand path', async () => {
-  const text = await captureLogAsync(() => new Main({}).process({ _: [] }));
+    {
+      name: 'cli: the help names the three verbs and the fresh-brand path',
+      run: async (ctx) => {
+        const text = await captureLogAsync(() => new Main({}).process({ _: [] }));
 
-  assert.match(text, /omega manage/, 'the walk verb');
-  assert.match(text, /omega dev/, 'the dev stack');
-  assert.match(text, /omega deploy/, 'the publish verb');
-  assert.match(text, /omega onboard/, 'and how a stranger starts a brand at all');
-});
+        ctx.expect(text, 'the walk verb').toMatch(/omega manage/);
+        ctx.expect(text, 'the dev stack').toMatch(/omega dev/);
+        ctx.expect(text, 'the publish verb').toMatch(/omega deploy/);
+        ctx.expect(text, 'and how a stranger starts a brand at all').toMatch(/omega onboard/);
+      },
+    },
 
-test('cli: omega manage runs the walk, with its flags intact', async () => {
-  manageCalls.length = 0;
+    {
+      name: 'cli: omega manage runs the walk, with its flags intact',
+      run: async (ctx) => {
+        manageCalls.length = 0;
 
-  await new Main({}).process({ _: ['manage'], service: 'assets', dryRun: true });
+        await new Main({}).process({ _: ['manage'], service: 'assets', dryRun: true });
 
-  assert.equal(manageCalls.length, 1);
-  assert.equal(manageCalls[0].service, 'assets', '--service reaches the walk');
-  assert.equal(manageCalls[0].dryRun, true);
-});
+        ctx.expect(manageCalls.length).toBe(1);
+        ctx.expect(manageCalls[0].service, '--service reaches the walk').toBe('assets');
+        ctx.expect(manageCalls[0].dryRun).toBe(true);
+      },
+    },
 
-test('cli: the walk answers to ONE name — the old positional aliases are gone', async () => {
-  manageCalls.length = 0;
-  const priorExitCode = process.exitCode;
+    {
+      name: 'cli: the walk answers to ONE name — the old positional aliases are gone',
+      run: async (ctx) => {
+        manageCalls.length = 0;
+        const priorExitCode = process.exitCode;
 
-  await captureLogAsync(() => new Main({}).process({ _: [] , m: true }));
-  await captureLogAsync(() => new Main({}).process({ _: ['run'] }));
+        await captureLogAsync(() => new Main({}).process({ _: [] , m: true }));
+        await captureLogAsync(() => new Main({}).process({ _: ['run'] }));
 
-  assert.equal(manageCalls.length, 0, '`-m` and `run` no longer walk anything');
-  process.exitCode = priorExitCode;
+        ctx.expect(manageCalls.length, '`-m` and `run` no longer walk anything').toBe(0);
+        process.exitCode = priorExitCode;
+      },
+    },
+  ],
 });

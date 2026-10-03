@@ -6,8 +6,7 @@
  * The globals are set on globalThis and deleted again, so each case runs
  * against the state a real page would be in.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const browser = require('../src/transports/browser.js');
 const ga4 = require('../src/adapters/ga4.js');
@@ -20,124 +19,160 @@ function clearGlobals() {
   delete globalThis.ttq;
 }
 
-test('no globals at all: every provider no-ops without throwing', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+module.exports = defineCases({
+  type: 'group',
+  description: 'transport-browser',
+  tests: [
+    {
+      name: 'no globals at all: every provider no-ops without throwing',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  for (const adapter of [ga4, meta, tiktok]) {
-    const descriptor = adapter.resolve('sign_up', { method: 'email' });
-    assert.strictEqual(browser.send(descriptor), false, `${adapter.provider} reports it could not deliver`);
-  }
-});
+        for (const adapter of [ga4, meta, tiktok]) {
+          const descriptor = adapter.resolve('sign_up', { method: 'email' });
+          ctx.expect(browser.send(descriptor), `${adapter.provider} reports it could not deliver`).toBe(false);
+        }
+      },
+    },
 
-test('gtag takes the event command with the native name and payload', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'gtag takes the event command with the native name and payload',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.gtag = (...args) => calls.push(args);
+        const calls = [];
+        globalThis.gtag = (...args) => calls.push(args);
 
-  assert.strictEqual(browser.send(ga4.resolve('sign_up', { method: 'email' })), true);
-  assert.deepEqual(calls, [['event', 'sign_up', { method: 'email' }]]);
-});
+        ctx.expect(browser.send(ga4.resolve('sign_up', { method: 'email' }))).toBe(true);
+        ctx.expect(calls).toEqual([['event', 'sign_up', { method: 'email' }]]);
+      },
+    },
 
-test('fbq picks track or trackCustom by the mapping kind', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'fbq picks track or trackCustom by the mapping kind',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.fbq = (...args) => calls.push(args);
+        const calls = [];
+        globalThis.fbq = (...args) => calls.push(args);
 
-  browser.send(meta.resolve('sign_up', { method: 'email' }));        // standard
-  browser.send(meta.resolve('login', { method: 'email' }));          // custom
+        browser.send(meta.resolve('sign_up', { method: 'email' }));        // standard
+        browser.send(meta.resolve('login', { method: 'email' }));          // custom
 
-  assert.deepEqual(calls[0], ['track', 'CompleteRegistration', { method: 'email' }]);
-  assert.deepEqual(calls[1], ['trackCustom', 'Login', { method: 'email' }]);
-});
+        ctx.expect(calls[0]).toEqual(['track', 'CompleteRegistration', { method: 'email' }]);
+        ctx.expect(calls[1]).toEqual(['trackCustom', 'Login', { method: 'email' }]);
+      },
+    },
 
-test('ttq.track takes the native name and payload', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'ttq.track takes the native name and payload',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.ttq = { track: (...args) => calls.push(args) };
+        const calls = [];
+        globalThis.ttq = { track: (...args) => calls.push(args) };
 
-  assert.strictEqual(browser.send(tiktok.resolve('search', { search_term: 'omega' })), true);
-  assert.deepEqual(calls, [['Search', { search_string: 'omega' }]]);
-});
+        ctx.expect(browser.send(tiktok.resolve('search', { search_term: 'omega' }))).toBe(true);
+        ctx.expect(calls).toEqual([['Search', { search_string: 'omega' }]]);
+      },
+    },
 
-test('a mapping that names a pixel METHOD calls it instead of ttq.track', (t) => {
-  // TikTok documents its page view as the SDK-managed `ttq.page()`, and
-  // `ttq.track('Pageview')` appears nowhere in that surface — sending one would
-  // risk a Pageview metric that silently reads zero
-  // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)). So the catalog
-  // names the method and the transport calls exactly that.
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'a mapping that names a pixel METHOD calls it instead of ttq.track',
+      run: (ctx) => {
+        // TikTok documents its page view as the SDK-managed `ttq.page()`, and
+        // `ttq.track('Pageview')` appears nowhere in that surface — sending one would
+        // risk a Pageview metric that silently reads zero
+        // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)). So the catalog
+        // names the method and the transport calls exactly that.
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.ttq = {
-    page: (...args) => calls.push(['page', ...args]),
-    track: (...args) => calls.push(['track', ...args]),
-  };
+        const calls = [];
+        globalThis.ttq = {
+          page: (...args) => calls.push(['page', ...args]),
+          track: (...args) => calls.push(['track', ...args]),
+        };
 
-  assert.strictEqual(browser.send(tiktok.resolve('page_view', { page_path: '/pricing' })), true);
-  assert.deepEqual(calls, [['page']], 'the pixel method takes no name and no payload');
-});
+        ctx.expect(browser.send(tiktok.resolve('page_view', { page_path: '/pricing' }))).toBe(true);
+        ctx.expect(calls, 'the pixel method takes no name and no payload').toEqual([['page']]);
+      },
+    },
 
-test('a named method the pixel does not have is a no-op, not a throw', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'a named method the pixel does not have is a no-op, not a throw',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  // The blocked-global contract (#306) reaches the method lane too: an older
-  // pixel build, or a stub an extension left behind, has no `page`.
-  globalThis.ttq = { track: () => {} };
+        // The blocked-global contract (#306) reaches the method lane too: an older
+        // pixel build, or a stub an extension left behind, has no `page`.
+        globalThis.ttq = { track: () => {} };
 
-  assert.strictEqual(browser.send(tiktok.resolve('page_view', { page_path: '/' })), false);
-});
+        ctx.expect(browser.send(tiktok.resolve('page_view', { page_path: '/' }))).toBe(false);
+      },
+    },
 
-test('a dedupe id rides in each platform\'s own option slot', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'a dedupe id rides in each platform\'s own option slot',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.fbq = (...args) => calls.push(['fbq', ...args]);
-  globalThis.ttq = { track: (...args) => calls.push(['ttq', ...args]) };
-  globalThis.gtag = (...args) => calls.push(['gtag', ...args]);
+        const calls = [];
+        globalThis.fbq = (...args) => calls.push(['fbq', ...args]);
+        globalThis.ttq = { track: (...args) => calls.push(['ttq', ...args]) };
+        globalThis.gtag = (...args) => calls.push(['gtag', ...args]);
 
-  const params = { transaction_id: 'ORD-1', value: 10, currency: 'USD', items: [{ item_id: 'pro' }] };
-  const withId = (descriptor) => Object.assign(descriptor, { eventId: 'purchase.ORD-1' });
+        const params = { transaction_id: 'ORD-1', value: 10, currency: 'USD', items: [{ item_id: 'pro' }] };
+        const withId = (descriptor) => Object.assign(descriptor, { eventId: 'purchase.ORD-1' });
 
-  browser.send(withId(meta.resolve('purchase', params)));
-  browser.send(withId(tiktok.resolve('purchase', params)));
-  browser.send(withId(ga4.resolve('purchase', params)));
+        browser.send(withId(meta.resolve('purchase', params)));
+        browser.send(withId(tiktok.resolve('purchase', params)));
+        browser.send(withId(ga4.resolve('purchase', params)));
 
-  assert.deepEqual(calls[0].at(-1), { eventID: 'purchase.ORD-1' }, 'Meta reads eventID from the fourth argument');
-  assert.deepEqual(calls[1].at(-1), { event_id: 'purchase.ORD-1' }, 'TikTok reads event_id from the third');
-  assert.strictEqual(calls[2].length, 4, 'gtag takes no dedupe option — GA4 has no cross-source dedupe');
-});
+        ctx.expect(calls[0].at(-1), 'Meta reads eventID from the fourth argument').toEqual({ eventID: 'purchase.ORD-1' });
+        ctx.expect(calls[1].at(-1), 'TikTok reads event_id from the third').toEqual({ event_id: 'purchase.ORD-1' });
+        ctx.expect(calls[2].length, 'gtag takes no dedupe option — GA4 has no cross-source dedupe').toBe(4);
+      },
+    },
 
-test('a half-present ttq (object without track) still no-ops', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'a half-present ttq (object without track) still no-ops',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  globalThis.ttq = {};
+        globalThis.ttq = {};
 
-  assert.strictEqual(browser.send(tiktok.resolve('search', { search_term: 'omega' })), false);
-});
+        ctx.expect(browser.send(tiktok.resolve('search', { search_term: 'omega' }))).toBe(false);
+      },
+    },
 
-test('blockers are per-list: Google allowed still counts while Meta is gone', (t) => {
-  clearGlobals();
-  t.after(clearGlobals);
+    {
+      name: 'blockers are per-list: Google allowed still counts while Meta is gone',
+      run: (ctx) => {
+        clearGlobals();
+        ctx.after(clearGlobals);
 
-  const calls = [];
-  globalThis.gtag = (...args) => calls.push(args);
+        const calls = [];
+        globalThis.gtag = (...args) => calls.push(args);
 
-  assert.strictEqual(browser.send(ga4.resolve('sign_up', { method: 'email' })), true);
-  assert.strictEqual(browser.send(meta.resolve('sign_up', { method: 'email' })), false);
-  assert.strictEqual(calls.length, 1);
-});
+        ctx.expect(browser.send(ga4.resolve('sign_up', { method: 'email' }))).toBe(true);
+        ctx.expect(browser.send(meta.resolve('sign_up', { method: 'email' }))).toBe(false);
+        ctx.expect(calls.length).toBe(1);
+      },
+    },
 
-test('an unknown provider is a no-op, not a crash', () => {
-  assert.strictEqual(browser.send({ provider: 'pinterest', name: 'X', kind: 'standard', payload: {} }), false);
+    {
+      name: 'an unknown provider is a no-op, not a crash',
+      run: (ctx) => {
+        ctx.expect(browser.send({ provider: 'pinterest', name: 'X', kind: 'standard', payload: {} })).toBe(false);
+      },
+    },
+  ],
 });

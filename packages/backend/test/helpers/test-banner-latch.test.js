@@ -58,13 +58,11 @@ function withConsoleRecorder(fn) {
 function withTestEnvironment({ emulator }, fn) {
   const saved = {
     OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
-    OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
     FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
   };
 
   // The ONE environment input (#817): a test lane names testing.
   process.env.OMEGA_ENVIRONMENT = 'testing';
-  process.env.OMEGA_TEST_MODE = 'true';
 
   if (emulator) {
     process.env.FUNCTIONS_EMULATOR = 'true';

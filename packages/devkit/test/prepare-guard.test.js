@@ -11,8 +11,7 @@
 // prepare-package against a scratch package, which is what overwrites
 // `scripts.prepare` on every build.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -140,291 +139,6 @@ function captured(fn) {
   }
 }
 
-// ── the decision ────────────────────────────────────────────────────────────
-
-test('a consumer install reaching into the monorepo skips the prepare', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-  const consumer = path.join(scratch, '..', 'brand');
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: consumer, INIT_CWD: consumer },
-  });
-
-  assert.equal(decision.skip, true);
-  assert.equal(decision.reason, 'consumer-install');
-  assert.equal(decision.monorepoRoot, scratch);
-});
-
-test('an uninstalled checkout skips on any install, wherever the root is (npm reifies a linked prepare before that checkout is installed)', (t) => {
-  const scratch = makeScratch(t);
-  const { root, packageDir } = writeMonorepo(path.join(scratch, 'monorepo'), { installed: false });
-
-  // A brand outside the checkout, and a brand INSIDE it (the snapshot a nested
-  // brand deploys): both skip, because there is no prepare-package to build with
-  for (const installRoot of [path.join(scratch, 'brand'), path.join(root, 'brands', 'brand')]) {
-    const decision = prepareDecision({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: installRoot } });
-    assert.equal(decision.skip, true);
-    assert.equal(decision.reason, 'monorepo-uninstalled');
-  }
-
-  const { result, warnings } = captured(() => guardPrepare({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: path.join(scratch, 'brand') } }));
-  assert.equal(result, false);
-  assert.match(warnings, /not installed yet/);
-
-  // The same package with the checkout installed builds for its own root
-  fs.mkdirSync(path.join(root, 'node_modules'));
-  assert.equal(prepareDecision({ packageDir, env: { npm_command: 'install', npm_config_local_prefix: root } }).skip, false);
-});
-
-test('npm ci in a consumer skips too — it installs the tree the same way', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'ci', npm_config_local_prefix: path.join(scratch, '..', 'brand') },
-  });
-
-  assert.equal(decision.skip, true);
-});
-
-test('INIT_CWD is the fallback when npm names no local prefix', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'install', INIT_CWD: path.join(scratch, '..', 'brand') },
-  });
-
-  assert.equal(decision.skip, true);
-  assert.equal(decision.reason, 'consumer-install');
-});
-
-test("the monorepo's own root install builds", (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: scratch, INIT_CWD: scratch },
-  });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'monorepo-install');
-});
-
-test('a workspace install builds — npm runs it from the monorepo root', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: {
-      npm_command: 'install',
-      npm_config_local_prefix: scratch,
-      INIT_CWD: scratch,
-      npm_config_workspace: 'packages/widget',
-    },
-  });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'monorepo-install');
-});
-
-test('an install typed inside the package builds — its root is still the monorepo', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: scratch, INIT_CWD: packageDir },
-  });
-
-  assert.equal(decision.skip, false);
-});
-
-test('an install from a brand INSIDE the monorepo builds — it is a monorepo workflow', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-  const brand = path.join(scratch, 'brands', 'sandbox-brand');
-  fs.mkdirSync(brand, { recursive: true });
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: brand, INIT_CWD: brand },
-  });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'monorepo-install');
-});
-
-test('npm update, rebuild and dedupe in a consumer skip too — each re-runs a file:-linked prepare', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-  const consumer = path.join(scratch, '..', 'brand');
-
-  for (const command of ['update', 'rebuild', 'dedupe']) {
-    const decision = prepareDecision({
-      packageDir,
-      env: { npm_command: command, npm_config_local_prefix: consumer, INIT_CWD: consumer },
-    });
-    assert.equal(decision.skip, true, command);
-    assert.equal(decision.reason, 'consumer-install', command);
-  }
-});
-
-test("the monorepo's own update/rebuild/dedupe still builds", (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  for (const command of ['update', 'rebuild', 'dedupe']) {
-    const decision = prepareDecision({
-      packageDir,
-      env: { npm_command: command, npm_config_local_prefix: scratch, INIT_CWD: scratch },
-    });
-    assert.equal(decision.skip, false, command);
-    assert.equal(decision.reason, 'monorepo-install', command);
-  }
-});
-
-test('the pack/publish prepare lane always builds, wherever it was invoked from', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-  const elsewhere = path.join(scratch, '..', 'elsewhere');
-
-  for (const command of ['pack', 'publish']) {
-    const decision = prepareDecision({
-      packageDir,
-      env: { npm_command: command, npm_config_local_prefix: elsewhere, INIT_CWD: elsewhere },
-    });
-    assert.equal(decision.skip, false, command);
-    assert.equal(decision.reason, 'not-install', command);
-  }
-});
-
-test('a manual `npm run prepare` builds — run-script is not an install', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({
-    packageDir,
-    env: { npm_command: 'run-script', npm_lifecycle_event: 'prepare', npm_config_local_prefix: scratch },
-  });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'not-install');
-});
-
-test('a package outside any monorepo checkout builds', (t) => {
-  const scratch = makeScratch(t);
-  const loose = path.join(scratch, 'loose-package');
-  fs.mkdirSync(loose, { recursive: true });
-  fs.writeFileSync(path.join(loose, 'package.json'), JSON.stringify({ name: '@omega.js/widget', version: '1.0.0' }));
-
-  const decision = prepareDecision({
-    packageDir: loose,
-    env: { npm_command: 'install', npm_config_local_prefix: path.join(scratch, '..', 'brand') },
-  });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'no-monorepo');
-});
-
-test('an install that names no root builds — no evidence is not evidence of a consumer', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const decision = prepareDecision({ packageDir, env: { npm_command: 'install' } });
-
-  assert.equal(decision.skip, false);
-  assert.equal(decision.reason, 'no-install-root');
-});
-
-// ── the gate ────────────────────────────────────────────────────────────────
-
-test('the gate returns false and prints ONE line naming the package, the install and the watch', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-  const consumer = path.join(scratch, '..', 'brand');
-
-  const { result, warnings } = captured(() => guardPrepare({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: consumer },
-  }));
-
-  assert.equal(result, false);
-  assert.equal(warnings.split('\n').length, 1);
-  assert.match(warnings, /@omega\.js\/widget/);
-  assert.match(warnings, new RegExp(path.resolve(consumer).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(warnings, /npm start/);
-});
-
-test('the gate returns true and stays silent for a monorepo install', (t) => {
-  const scratch = makeScratch(t);
-  const { packageDir } = writeMonorepo(scratch);
-
-  const { result, warnings } = captured(() => guardPrepare({
-    packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: scratch },
-  }));
-
-  assert.equal(result, true);
-  assert.equal(warnings, '');
-});
-
-// ── real npm ────────────────────────────────────────────────────────────────
-
-test('WITHOUT the guard, a consumer npm install rebuilds the linked package (the bug)', (t) => {
-  const scratch = makeScratch(t);
-  const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'), { guarded: false });
-  const consumer = writeConsumer(path.join(scratch, 'brand'), packageDir);
-
-  assert.equal(npm(['install'], root).status, 0);
-  const afterMonorepoInstall = buildCount(buildsLog);
-  assert.ok(afterMonorepoInstall >= 1, 'the monorepo install builds');
-
-  const install = npm(['install'], consumer);
-  assert.equal(install.status, 0);
-  assert.ok(buildCount(buildsLog) > afterMonorepoInstall, 'npm ran the prepare inside the monorepo package');
-});
-
-test('WITH the guard, a consumer npm install leaves the linked package untouched', (t) => {
-  const scratch = makeScratch(t);
-  const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'));
-  const consumer = writeConsumer(path.join(scratch, 'brand'), packageDir);
-
-  assert.equal(npm(['install'], root).status, 0);
-  const afterMonorepoInstall = buildCount(buildsLog);
-  assert.ok(afterMonorepoInstall >= 1, 'the monorepo install still builds');
-
-  const install = npm(['install'], consumer);
-  assert.equal(install.status, 0, install.stderr);
-  assert.equal(buildCount(buildsLog), afterMonorepoInstall, 'no rebuild inside the monorepo package');
-  assert.ok(fs.existsSync(path.join(consumer, 'node_modules', '@omega.js', 'widget')), 'the link is still installed');
-
-  // Same install with the lifecycle output shown: the notice is on the wire
-  fs.rmSync(path.join(consumer, 'node_modules'), { recursive: true, force: true });
-  const loud = npm(['install', '--foreground-scripts'], consumer);
-  assert.equal(loud.status, 0, loud.stderr);
-  assert.equal(buildCount(buildsLog), afterMonorepoInstall, 'still no rebuild');
-  assert.match(`${loud.stdout}${loud.stderr}`, /skipped @omega\.js\/widget's prepare/);
-});
-
-test('WITH the guard, `npm pack` in the linked package still builds its dist', (t) => {
-  const scratch = makeScratch(t);
-  const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'));
-
-  assert.equal(npm(['install'], root).status, 0);
-  const afterMonorepoInstall = buildCount(buildsLog);
-
-  const pack = npm(['pack', '--dry-run'], packageDir);
-  assert.equal(pack.status, 0, pack.stderr);
-  assert.equal(buildCount(buildsLog), afterMonorepoInstall + 1, 'the publish lane built');
-});
-
 // ── staying wired ───────────────────────────────────────────────────────────
 
 /**
@@ -476,57 +190,6 @@ function prepareScript(packageDir) {
   return JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8')).scripts.prepare;
 }
 
-test('a real prepare-package build overwrites the gate (why rewire exists)', (t) => {
-  const scratch = makeScratch(t);
-  const packageDir = writePreparable(path.join(scratch, 'widget'), { hooked: false });
-
-  const built = spawnSync(process.execPath, ['-e', `require('${require.resolve('prepare-package')}')()`], {
-    cwd: packageDir,
-    encoding: 'utf8',
-  });
-
-  assert.equal(built.status, 0, built.stderr);
-  assert.equal(prepareScript(packageDir), UNGUARDED_PREPARE, 'prepare-package owns scripts.prepare');
-});
-
-test('the after CHAIN puts the gate back on every real prepare-package build', (t) => {
-  const scratch = makeScratch(t);
-  const packageDir = writePreparable(path.join(scratch, 'widget'));
-
-  const built = spawnSync(process.execPath, ['-e', `require('${require.resolve('prepare-package')}')()`], {
-    cwd: packageDir,
-    encoding: 'utf8',
-  });
-
-  assert.equal(built.status, 0, built.stderr);
-  // Every entry of the array runs, not just the first: the gate is the LAST one
-  assert.ok(fs.existsSync(path.join(packageDir, 'first-hook.txt')), 'the first after hook ran');
-  assert.equal(prepareScript(packageDir), GUARDED_PREPARE);
-  assert.ok(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build still ran');
-});
-
-test('rewire is idempotent — an already-gated manifest is left byte-identical', (t) => {
-  const scratch = makeScratch(t);
-  const packageDir = writePreparable(path.join(scratch, 'widget'));
-  const manifestPath = path.join(packageDir, 'package.json');
-  const before = fs.readFileSync(manifestPath, 'utf8');
-
-  assert.equal(rewire({ packageDir }), false);
-  assert.equal(fs.readFileSync(manifestPath, 'utf8'), before);
-});
-
-test('rewire never stomps a prepare it does not own', (t) => {
-  const scratch = makeScratch(t);
-  const packageDir = writePreparable(path.join(scratch, 'widget'));
-  const manifestPath = path.join(packageDir, 'package.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  manifest.scripts.prepare = 'node scripts/build.js';
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-  assert.equal(rewire({ packageDir }), false);
-  assert.equal(prepareScript(packageDir), 'node scripts/build.js');
-});
-
 // ── surviving a failed hook (#870) ──────────────────────────────────────────
 
 // The gated one-liner exactly as every dist-building package.json carries it.
@@ -546,126 +209,552 @@ function linkPreparePackage(scratchRoot) {
   fs.symlinkSync(real, path.join(scratchRoot, 'node_modules', 'prepare-package'), 'dir');
 }
 
-test('GUARDED_PREPARE is the gated one-liner the packages carry', () => {
-  assert.equal(GUARDED_PREPARE, GATED_SCRIPT);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'prepare-guard',
+  tests: [
+    // ── the decision ────────────────────────────────────────────────────────────
 
-test('a prepare whose after hook FAILS still leaves the gate wired (#870)', (t) => {
-  const scratch = makeScratch(t);
-  linkPreparePackage(scratch);
-  const packageDir = writePreparable(path.join(scratch, 'widget'), {
-    failing: true,
-    // The shipped gate, with the guard reached by absolute path (a scratch
-    // package has no devkit sibling to hop to)
-    prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
-  });
+    {
+      name: 'a consumer install reaching into the monorepo skips the prepare',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const consumer = path.join(scratch, '..', 'brand');
 
-  const built = npm(['run', 'prepare'], packageDir);
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: consumer, INIT_CWD: consumer },
+        });
 
-  assert.notEqual(built.status, 0, 'the hook failure is still loud');
-  assert.ok(fs.existsSync(path.join(packageDir, 'first-hook.txt')), 'the failing hook ran');
-  assert.ok(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran');
-  assert.equal(prepareScript(packageDir), GATED_SCRIPT, 'the gate is back even though the chain died');
-});
+        ctx.expect(decision.skip).toBe(true);
+        ctx.expect(decision.reason).toBe('consumer-install');
+        ctx.expect(decision.monorepoRoot).toBe(scratch);
+      },
+    },
 
-test('a prepare that ends on a string nobody owns exits NONZERO (C4)', (t) => {
-  const scratch = makeScratch(t);
-  linkPreparePackage(scratch);
-  const packageDir = writePreparable(path.join(scratch, 'widget'), {
-    hooked: false,
-    prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
-  });
+    {
+      name: 'an uninstalled checkout skips on any install, wherever the root is (npm reifies a linked prepare before that checkout is installed)',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { root, packageDir } = writeMonorepo(path.join(scratch, 'monorepo'), { installed: false });
 
-  // An after hook that leaves scripts.prepare on a THIRD string: rewire refuses
-  // to touch a prepare nobody owns, so the build ends with the #350 gate off.
-  // npm buffers the warning away from a plain install, so the only signal a
-  // lane can act on is the exit code.
-  const manifestPath = path.join(packageDir, 'package.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  manifest.preparePackage.hooks = {
-    after: [`node -e "const f=require('fs');const m=JSON.parse(f.readFileSync('${manifestPath}','utf8'));m.scripts.prepare='node scripts/build.js';f.writeFileSync('${manifestPath}', JSON.stringify(m,null,2)+'\\n')"`],
-    afterBlocking: true,
-  };
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+        // A brand outside the checkout, and a brand INSIDE it (the snapshot a nested
+        // brand deploys): both skip, because there is no prepare-package to build with
+        for (const installRoot of [path.join(scratch, 'brand'), path.join(root, 'brands', 'brand')]) {
+          const decision = prepareDecision({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: installRoot } });
+          ctx.expect(decision.skip).toBe(true);
+          ctx.expect(decision.reason).toBe('monorepo-uninstalled');
+        }
 
-  const built = npm(['run', 'prepare'], packageDir);
+        const { result, warnings } = captured(() => guardPrepare({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: path.join(scratch, 'brand') } }));
+        ctx.expect(result).toBe(false);
+        ctx.expect(warnings).toMatch(/not installed yet/);
 
-  assert.ok(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran');
-  assert.notEqual(built.status, 0, 'an ungated prepare ended green');
-  assert.equal(prepareScript(packageDir), 'node scripts/build.js', 'the deliberate prepare is left alone');
-});
+        // The same package with the checkout installed builds for its own root
+        fs.mkdirSync(path.join(root, 'node_modules'));
+        ctx.expect(prepareDecision({ packageDir, env: { npm_command: 'install', npm_config_local_prefix: root } }).skip).toBe(false);
+      },
+    },
 
-test('the freshness heal never leaves a manifest its prepare stripped (#870)', (t) => {
-  delete process.env.OMEGA_SKIP_FRESHNESS;
-  delete process.env.OMEGA_FRESH_REEXEC;
-  const scratch = makeScratch(t);
-  const root = path.join(scratch, 'monorepo');
-  const packageDir = path.join(root, 'packages', 'widget');
+    {
+      name: 'npm ci in a consumer skips too — it installs the tree the same way',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
 
-  // A monorepo-shaped checkout: the heal reads the gate from the devkit BESIDE
-  // the package it prepared, the same hop the gated script's relative require makes
-  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'packages', 'devkit', 'tools'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: 'omega', version: '1.0.0', private: true }, null, 2)}\n`);
-  fs.writeFileSync(path.join(root, 'packages', 'devkit', 'package.json'), `${JSON.stringify({ name: '@omega.js/devkit', version: '1.0.0', private: true }, null, 2)}\n`);
-  fs.copyFileSync(GUARD, path.join(root, 'packages', 'devkit', 'tools', 'prepare-guard.js'));
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'ci', npm_config_local_prefix: path.join(scratch, '..', 'brand') },
+        });
 
-  // The package: src/, an EMPTY dist (stale, so the heal fires), and a prepare
-  // that strips the gate and then DIES: prepare-package's manifest write
-  // followed by a hook that fails, with nothing left to put the gate back
-  fs.mkdirSync(path.join(packageDir, 'src'), { recursive: true });
-  fs.mkdirSync(path.join(packageDir, 'dist'), { recursive: true });
-  fs.writeFileSync(path.join(packageDir, 'src', 'index.js'), 'module.exports = 1;\n');
-  fs.writeFileSync(path.join(packageDir, 'strip.js'), [
-    "const fs = require('fs');",
-    "const path = require('path');",
-    "const manifestPath = path.join(__dirname, 'package.json');",
-    "const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));",
-    `manifest.scripts.prepare = ${JSON.stringify(UNGUARDED_PREPARE)};`,
-    'fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\\n`);',
-    'process.exit(7);',
-    '',
-  ].join('\n'));
-  fs.writeFileSync(path.join(packageDir, 'package.json'), `${JSON.stringify({
-    name: '@omega.js/widget',
-    version: '1.0.0',
-    main: './dist/index.js',
-    scripts: { prepare: 'node strip.js' },
-  }, null, 2)}\n`);
+        ctx.expect(decision.skip).toBe(true);
+      },
+    },
 
-  const consumer = path.join(scratch, 'consumer');
-  fs.mkdirSync(path.join(consumer, 'node_modules', '@omega.js'), { recursive: true });
-  fs.writeFileSync(path.join(consumer, 'package.json'), `${JSON.stringify({ name: 'consumer', version: '1.0.0' }, null, 2)}\n`);
-  fs.symlinkSync(packageDir, path.join(consumer, 'node_modules', '@omega.js', 'widget'), 'dir');
+    {
+      name: 'INIT_CWD is the fallback when npm names no local prefix',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
 
-  const healed = local.ensureFreshLocalDist({ packageName: '@omega.js/widget', fromDir: consumer });
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', INIT_CWD: path.join(scratch, '..', 'brand') },
+        });
 
-  assert.equal(healed.status, 'heal-failed', 'the prepare failure is still a loud stop');
-  assert.equal(prepareScript(packageDir), GATED_SCRIPT, 'the heal restored the gate its prepare stripped');
-});
+        ctx.expect(decision.skip).toBe(true);
+        ctx.expect(decision.reason).toBe('consumer-install');
+      },
+    },
 
-test('every dist-building package carries the gate, with rewire ahead of the hook that can fail', () => {
-  const packagesDir = path.join(__dirname, '..', '..');
-  const rewireHook = 'node -e "require(\'@omega.js/devkit/prepare-guard\').rewire()"';
-  const gated = [];
+    {
+      name: "the monorepo's own root install builds",
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
 
-  for (const name of fs.readdirSync(packagesDir).sort()) {
-    const manifestPath = path.join(packagesDir, name, 'package.json');
-    if (!fs.existsSync(manifestPath)) {
-      continue;
-    }
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    if (!manifest.scripts || !manifest.scripts.prepare) {
-      continue; // Nothing to build, nothing for a consumer install to reach into
-    }
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: scratch, INIT_CWD: scratch },
+        });
 
-    gated.push(name);
-    assert.equal(manifest.scripts.prepare, GATED_SCRIPT, `${name}'s prepare is the gate`);
-    // The prepare:watch lane never runs scripts.prepare, so its only restore is
-    // this hook: it goes FIRST, ahead of a vendor hook that can die (#870)
-    const after = ((manifest.preparePackage || {}).hooks || {}).after || [];
-    assert.equal(after[0], rewireHook, `${name} rewires before any hook that can fail`);
-  }
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('monorepo-install');
+      },
+    },
 
-  assert.deepEqual(gated, ['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
+    {
+      name: 'a workspace install builds — npm runs it from the monorepo root',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        const decision = prepareDecision({
+          packageDir,
+          env: {
+            npm_command: 'install',
+            npm_config_local_prefix: scratch,
+            INIT_CWD: scratch,
+            npm_config_workspace: 'packages/widget',
+          },
+        });
+
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('monorepo-install');
+      },
+    },
+
+    {
+      name: 'an install typed inside the package builds — its root is still the monorepo',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: scratch, INIT_CWD: packageDir },
+        });
+
+        ctx.expect(decision.skip).toBe(false);
+      },
+    },
+
+    {
+      name: 'an install from a brand INSIDE the monorepo builds — it is a monorepo workflow',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const brand = path.join(scratch, 'brands', 'sandbox-brand');
+        fs.mkdirSync(brand, { recursive: true });
+
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: brand, INIT_CWD: brand },
+        });
+
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('monorepo-install');
+      },
+    },
+
+    {
+      name: 'npm update, rebuild and dedupe in a consumer skip too — each re-runs a file:-linked prepare',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const consumer = path.join(scratch, '..', 'brand');
+
+        for (const command of ['update', 'rebuild', 'dedupe']) {
+          const decision = prepareDecision({
+            packageDir,
+            env: { npm_command: command, npm_config_local_prefix: consumer, INIT_CWD: consumer },
+          });
+          ctx.expect(decision.skip, command).toBe(true);
+          ctx.expect(decision.reason, command).toBe('consumer-install');
+        }
+      },
+    },
+
+    {
+      name: "the monorepo's own update/rebuild/dedupe still builds",
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        for (const command of ['update', 'rebuild', 'dedupe']) {
+          const decision = prepareDecision({
+            packageDir,
+            env: { npm_command: command, npm_config_local_prefix: scratch, INIT_CWD: scratch },
+          });
+          ctx.expect(decision.skip, command).toBe(false);
+          ctx.expect(decision.reason, command).toBe('monorepo-install');
+        }
+      },
+    },
+
+    {
+      name: 'the pack/publish prepare lane always builds, wherever it was invoked from',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const elsewhere = path.join(scratch, '..', 'elsewhere');
+
+        for (const command of ['pack', 'publish']) {
+          const decision = prepareDecision({
+            packageDir,
+            env: { npm_command: command, npm_config_local_prefix: elsewhere, INIT_CWD: elsewhere },
+          });
+          ctx.expect(decision.skip, command).toBe(false);
+          ctx.expect(decision.reason, command).toBe('not-install');
+        }
+      },
+    },
+
+    {
+      name: 'a manual `npm run prepare` builds — run-script is not an install',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        const decision = prepareDecision({
+          packageDir,
+          env: { npm_command: 'run-script', npm_lifecycle_event: 'prepare', npm_config_local_prefix: scratch },
+        });
+
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('not-install');
+      },
+    },
+
+    {
+      name: 'a package outside any monorepo checkout builds',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const loose = path.join(scratch, 'loose-package');
+        fs.mkdirSync(loose, { recursive: true });
+        fs.writeFileSync(path.join(loose, 'package.json'), JSON.stringify({ name: '@omega.js/widget', version: '1.0.0' }));
+
+        const decision = prepareDecision({
+          packageDir: loose,
+          env: { npm_command: 'install', npm_config_local_prefix: path.join(scratch, '..', 'brand') },
+        });
+
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('no-monorepo');
+      },
+    },
+
+    {
+      name: 'an install that names no root builds — no evidence is not evidence of a consumer',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        const decision = prepareDecision({ packageDir, env: { npm_command: 'install' } });
+
+        ctx.expect(decision.skip).toBe(false);
+        ctx.expect(decision.reason).toBe('no-install-root');
+      },
+    },
+
+    // ── the gate ────────────────────────────────────────────────────────────────
+
+    {
+      name: 'the gate returns false and prints ONE line naming the package, the install and the watch',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const consumer = path.join(scratch, '..', 'brand');
+
+        const { result, warnings } = captured(() => guardPrepare({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: consumer },
+        }));
+
+        ctx.expect(result).toBe(false);
+        ctx.expect(warnings.split('\n').length).toBe(1);
+        ctx.expect(warnings).toMatch(/@omega\.js\/widget/);
+        ctx.expect(warnings).toMatch(new RegExp(path.resolve(consumer).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        ctx.expect(warnings).toMatch(/npm start/);
+      },
+    },
+
+    {
+      name: 'the gate returns true and stays silent for a monorepo install',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+
+        const { result, warnings } = captured(() => guardPrepare({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: scratch },
+        }));
+
+        ctx.expect(result).toBe(true);
+        ctx.expect(warnings).toBe('');
+      },
+    },
+
+    // ── real npm ────────────────────────────────────────────────────────────────
+
+    {
+      name: 'WITHOUT the guard, a consumer npm install rebuilds the linked package (the bug)',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'), { guarded: false });
+        const consumer = writeConsumer(path.join(scratch, 'brand'), packageDir);
+
+        ctx.expect(npm(['install'], root).status).toBe(0);
+        const afterMonorepoInstall = buildCount(buildsLog);
+        ctx.expect(afterMonorepoInstall >= 1, 'the monorepo install builds').toBeTruthy();
+
+        const install = npm(['install'], consumer);
+        ctx.expect(install.status).toBe(0);
+        ctx.expect(buildCount(buildsLog) > afterMonorepoInstall, 'npm ran the prepare inside the monorepo package').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'WITH the guard, a consumer npm install leaves the linked package untouched',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'));
+        const consumer = writeConsumer(path.join(scratch, 'brand'), packageDir);
+
+        ctx.expect(npm(['install'], root).status).toBe(0);
+        const afterMonorepoInstall = buildCount(buildsLog);
+        ctx.expect(afterMonorepoInstall >= 1, 'the monorepo install still builds').toBeTruthy();
+
+        const install = npm(['install'], consumer);
+        ctx.expect(install.status, install.stderr).toBe(0);
+        ctx.expect(buildCount(buildsLog), 'no rebuild inside the monorepo package').toBe(afterMonorepoInstall);
+        ctx.expect(fs.existsSync(path.join(consumer, 'node_modules', '@omega.js', 'widget')), 'the link is still installed').toBeTruthy();
+
+        // Same install with the lifecycle output shown: the notice is on the wire
+        fs.rmSync(path.join(consumer, 'node_modules'), { recursive: true, force: true });
+        const loud = npm(['install', '--foreground-scripts'], consumer);
+        ctx.expect(loud.status, loud.stderr).toBe(0);
+        ctx.expect(buildCount(buildsLog), 'still no rebuild').toBe(afterMonorepoInstall);
+        ctx.expect(`${loud.stdout}${loud.stderr}`).toMatch(/skipped @omega\.js\/widget's prepare/);
+      },
+    },
+
+    {
+      name: 'WITH the guard, `npm pack` in the linked package still builds its dist',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const { root, packageDir, buildsLog } = writeMonorepo(path.join(scratch, 'monorepo'));
+
+        ctx.expect(npm(['install'], root).status).toBe(0);
+        const afterMonorepoInstall = buildCount(buildsLog);
+
+        const pack = npm(['pack', '--dry-run'], packageDir);
+        ctx.expect(pack.status, pack.stderr).toBe(0);
+        ctx.expect(buildCount(buildsLog), 'the publish lane built').toBe(afterMonorepoInstall + 1);
+      },
+    },
+
+    {
+      name: 'a real prepare-package build overwrites the gate (why rewire exists)',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const packageDir = writePreparable(path.join(scratch, 'widget'), { hooked: false });
+
+        const built = spawnSync(process.execPath, ['-e', `require('${require.resolve('prepare-package')}')()`], {
+          cwd: packageDir,
+          encoding: 'utf8',
+        });
+
+        ctx.expect(built.status, built.stderr).toBe(0);
+        ctx.expect(prepareScript(packageDir), 'prepare-package owns scripts.prepare').toBe(UNGUARDED_PREPARE);
+      },
+    },
+
+    {
+      name: 'the after CHAIN puts the gate back on every real prepare-package build',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const packageDir = writePreparable(path.join(scratch, 'widget'));
+
+        const built = spawnSync(process.execPath, ['-e', `require('${require.resolve('prepare-package')}')()`], {
+          cwd: packageDir,
+          encoding: 'utf8',
+        });
+
+        ctx.expect(built.status, built.stderr).toBe(0);
+        // Every entry of the array runs, not just the first: the gate is the LAST one
+        ctx.expect(fs.existsSync(path.join(packageDir, 'first-hook.txt')), 'the first after hook ran').toBeTruthy();
+        ctx.expect(prepareScript(packageDir)).toBe(GUARDED_PREPARE);
+        ctx.expect(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build still ran').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'rewire is idempotent — an already-gated manifest is left byte-identical',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const packageDir = writePreparable(path.join(scratch, 'widget'));
+        const manifestPath = path.join(packageDir, 'package.json');
+        const before = fs.readFileSync(manifestPath, 'utf8');
+
+        ctx.expect(rewire({ packageDir })).toBe(false);
+        ctx.expect(fs.readFileSync(manifestPath, 'utf8')).toBe(before);
+      },
+    },
+
+    {
+      name: 'rewire never stomps a prepare it does not own',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        const packageDir = writePreparable(path.join(scratch, 'widget'));
+        const manifestPath = path.join(packageDir, 'package.json');
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest.scripts.prepare = 'node scripts/build.js';
+        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+        ctx.expect(rewire({ packageDir })).toBe(false);
+        ctx.expect(prepareScript(packageDir)).toBe('node scripts/build.js');
+      },
+    },
+
+    {
+      name: 'GUARDED_PREPARE is the gated one-liner the packages carry',
+      run: (ctx) => {
+        ctx.expect(GUARDED_PREPARE).toBe(GATED_SCRIPT);
+      },
+    },
+
+    {
+      name: 'a prepare whose after hook FAILS still leaves the gate wired (#870)',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        linkPreparePackage(scratch);
+        const packageDir = writePreparable(path.join(scratch, 'widget'), {
+          failing: true,
+          // The shipped gate, with the guard reached by absolute path (a scratch
+          // package has no devkit sibling to hop to)
+          prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
+        });
+
+        const built = npm(['run', 'prepare'], packageDir);
+
+        ctx.expect(built.status, 'the hook failure is still loud').not.toBe(0);
+        ctx.expect(fs.existsSync(path.join(packageDir, 'first-hook.txt')), 'the failing hook ran').toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran').toBeTruthy();
+        ctx.expect(prepareScript(packageDir), 'the gate is back even though the chain died').toBe(GATED_SCRIPT);
+      },
+    },
+
+    {
+      name: 'a prepare that ends on a string nobody owns exits NONZERO (C4)',
+      run: (ctx) => {
+        const scratch = makeScratch(ctx);
+        linkPreparePackage(scratch);
+        const packageDir = writePreparable(path.join(scratch, 'widget'), {
+          hooked: false,
+          prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
+        });
+
+        // An after hook that leaves scripts.prepare on a THIRD string: rewire refuses
+        // to touch a prepare nobody owns, so the build ends with the #350 gate off.
+        // npm buffers the warning away from a plain install, so the only signal a
+        // lane can act on is the exit code.
+        const manifestPath = path.join(packageDir, 'package.json');
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest.preparePackage.hooks = {
+          after: [`node -e "const f=require('fs');const m=JSON.parse(f.readFileSync('${manifestPath}','utf8'));m.scripts.prepare='node scripts/build.js';f.writeFileSync('${manifestPath}', JSON.stringify(m,null,2)+'\\n')"`],
+          afterBlocking: true,
+        };
+        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+        const built = npm(['run', 'prepare'], packageDir);
+
+        ctx.expect(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran').toBeTruthy();
+        ctx.expect(built.status, 'an ungated prepare ended green').not.toBe(0);
+        ctx.expect(prepareScript(packageDir), 'the deliberate prepare is left alone').toBe('node scripts/build.js');
+      },
+    },
+
+    {
+      name: 'the freshness heal never leaves a manifest its prepare stripped (#870)',
+      run: (ctx) => {
+        delete process.env.OMEGA_SKIP_FRESHNESS;
+        delete process.env.OMEGA_FRESH_REEXEC;
+        const scratch = makeScratch(ctx);
+        const root = path.join(scratch, 'monorepo');
+        const packageDir = path.join(root, 'packages', 'widget');
+
+        // A monorepo-shaped checkout: the heal reads the gate from the devkit BESIDE
+        // the package it prepared, the same hop the gated script's relative require makes
+        fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+        fs.mkdirSync(path.join(root, 'packages', 'devkit', 'tools'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: 'omega', version: '1.0.0', private: true }, null, 2)}\n`);
+        fs.writeFileSync(path.join(root, 'packages', 'devkit', 'package.json'), `${JSON.stringify({ name: '@omega.js/devkit', version: '1.0.0', private: true }, null, 2)}\n`);
+        fs.copyFileSync(GUARD, path.join(root, 'packages', 'devkit', 'tools', 'prepare-guard.js'));
+
+        // The package: src/, an EMPTY dist (stale, so the heal fires), and a prepare
+        // that strips the gate and then DIES: prepare-package's manifest write
+        // followed by a hook that fails, with nothing left to put the gate back
+        fs.mkdirSync(path.join(packageDir, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(packageDir, 'dist'), { recursive: true });
+        fs.writeFileSync(path.join(packageDir, 'src', 'index.js'), 'module.exports = 1;\n');
+        fs.writeFileSync(path.join(packageDir, 'strip.js'), [
+          "const fs = require('fs');",
+          "const path = require('path');",
+          "const manifestPath = path.join(__dirname, 'package.json');",
+          "const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));",
+          `manifest.scripts.prepare = ${JSON.stringify(UNGUARDED_PREPARE)};`,
+          'fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\\n`);',
+          'process.exit(7);',
+          '',
+        ].join('\n'));
+        fs.writeFileSync(path.join(packageDir, 'package.json'), `${JSON.stringify({
+          name: '@omega.js/widget',
+          version: '1.0.0',
+          main: './dist/index.js',
+          scripts: { prepare: 'node strip.js' },
+        }, null, 2)}\n`);
+
+        const consumer = path.join(scratch, 'consumer');
+        fs.mkdirSync(path.join(consumer, 'node_modules', '@omega.js'), { recursive: true });
+        fs.writeFileSync(path.join(consumer, 'package.json'), `${JSON.stringify({ name: 'consumer', version: '1.0.0' }, null, 2)}\n`);
+        fs.symlinkSync(packageDir, path.join(consumer, 'node_modules', '@omega.js', 'widget'), 'dir');
+
+        const healed = local.ensureFreshLocalDist({ packageName: '@omega.js/widget', fromDir: consumer });
+
+        ctx.expect(healed.status, 'the prepare failure is still a loud stop').toBe('heal-failed');
+        ctx.expect(prepareScript(packageDir), 'the heal restored the gate its prepare stripped').toBe(GATED_SCRIPT);
+      },
+    },
+
+    {
+      name: 'every dist-building package carries the gate, with rewire ahead of the hook that can fail',
+      run: (ctx) => {
+        const packagesDir = path.join(__dirname, '..', '..');
+        const rewireHook = 'node -e "require(\'@omega.js/devkit/prepare-guard\').rewire()"';
+        const gated = [];
+
+        for (const name of fs.readdirSync(packagesDir).sort()) {
+          const manifestPath = path.join(packagesDir, name, 'package.json');
+          if (!fs.existsSync(manifestPath)) {
+            continue;
+          }
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          if (!manifest.scripts || !manifest.scripts.prepare) {
+            continue; // Nothing to build, nothing for a consumer install to reach into
+          }
+
+          gated.push(name);
+          ctx.expect(manifest.scripts.prepare, `${name}'s prepare is the gate`).toBe(GATED_SCRIPT);
+          // The prepare:watch lane never runs scripts.prepare, so its only restore is
+          // this hook: it goes FIRST, ahead of a vendor hook that can die (#870)
+          const after = ((manifest.preparePackage || {}).hooks || {}).after || [];
+          ctx.expect(after[0], `${name} rewires before any hook that can fail`).toBe(rewireHook);
+        }
+
+        ctx.expect(gated).toEqual(['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
+      },
+    },
+  ],
 });

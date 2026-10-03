@@ -9,8 +9,7 @@
  *
  * Run: node --test test/temp-home.test.js
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -24,7 +23,7 @@ const hash = (file) => crypto.createHash('sha1').update(fs.readFileSync(file)).d
 
 // Record a brand from a child whose HOME is `home`, with or without the helper.
 // The child reports the registry it wrote, since the helper's temp home goes at exit.
-function recordFrom(home, brandRoot, withHelper) {
+function recordFrom(expect, home, brandRoot, withHelper) {
   const script = `
     ${withHelper ? `require(${JSON.stringify(HELPER)});` : ''}
     const { recordBrand, registryFile } = require(${JSON.stringify(CONFIG)});
@@ -36,45 +35,57 @@ function recordFrom(home, brandRoot, withHelper) {
   delete env.OMEGA_HOME;
 
   const result = spawnSync(process.execPath, ['-e', script], { env, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
+  expect(result.status, result.stderr).toBe(0);
   return JSON.parse(result.stderr);
 }
 
-test('the helper redirects the registry: the real file keeps its hash, the temp home gets the line', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'devkit-temp-home-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'temp-home',
+  tests: [
+    {
+      name: 'the helper redirects the registry: the real file keeps its hash, the temp home gets the line',
+      run: (ctx) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'devkit-temp-home-'));
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const home = path.join(root, 'home');
-  const brandRoot = path.join(root, 'brand');
-  const real = path.join(home, '.omega', 'brands.json');
-  fs.mkdirSync(brandRoot, { recursive: true });
-  fs.mkdirSync(path.dirname(real), { recursive: true });
-  fs.writeFileSync(real, '{\n  "itw-creative-works": { "root": "/nowhere" }\n}\n');
-  const before = hash(real);
+        const home = path.join(root, 'home');
+        const brandRoot = path.join(root, 'brand');
+        const real = path.join(home, '.omega', 'brands.json');
+        fs.mkdirSync(brandRoot, { recursive: true });
+        fs.mkdirSync(path.dirname(real), { recursive: true });
+        fs.writeFileSync(real, '{\n  "itw-creative-works": { "root": "/nowhere" }\n}\n');
+        const before = hash(real);
 
-  const { file: redirected, registry } = recordFrom(home, brandRoot, true);
+        const { file: redirected, registry } = recordFrom(ctx.expect, home, brandRoot, true);
 
-  assert.equal(hash(real), before, 'the real registry is untouched');
-  assert.notEqual(redirected, real);
-  assert.ok(redirected.startsWith(fs.realpathSync(os.tmpdir())) || redirected.startsWith(os.tmpdir()), redirected);
-  assert.equal(registry['fixture-brand'].root, brandRoot);
+        ctx.expect(hash(real), 'the real registry is untouched').toBe(before);
+        ctx.expect(redirected).not.toBe(real);
+        ctx.expect(redirected.startsWith(fs.realpathSync(os.tmpdir())) || redirected.startsWith(os.tmpdir()), redirected).toBeTruthy();
+        ctx.expect(registry['fixture-brand'].root).toBe(brandRoot);
 
-  // The control: the same run without the helper lands in the real file.
-  assert.equal(recordFrom(home, brandRoot, false).file, real);
-  assert.notEqual(hash(real), before, 'without the helper the run writes the real registry');
-});
+        // The control: the same run without the helper lands in the real file.
+        ctx.expect(recordFrom(ctx.expect, home, brandRoot, false).file).toBe(real);
+        ctx.expect(hash(real), 'without the helper the run writes the real registry').not.toBe(before);
+      },
+    },
 
-test('the temp home is removed when the process that required the helper exits', () => {
-  const script = `
+    {
+      name: 'the temp home is removed when the process that required the helper exits',
+      run: (ctx) => {
+        const script = `
     const { OMEGA_HOME } = require(${JSON.stringify(HELPER)});
     require('node:fs').writeFileSync(require('node:path').join(OMEGA_HOME, 'brands.json'), '{}');
     process.stdout.write(OMEGA_HOME);
   `;
-  const env = { ...process.env };
-  delete env.OMEGA_HOME;
+        const env = { ...process.env };
+        delete env.OMEGA_HOME;
 
-  const result = spawnSync(process.execPath, ['-e', script], { env, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.stdout.includes('omega-test-home-'), result.stdout);
-  assert.equal(fs.existsSync(result.stdout), false, `${result.stdout} is left behind`);
+        const result = spawnSync(process.execPath, ['-e', script], { env, encoding: 'utf8' });
+        ctx.expect(result.status, result.stderr).toBe(0);
+        ctx.expect(result.stdout.includes('omega-test-home-'), result.stdout).toBeTruthy();
+        ctx.expect(fs.existsSync(result.stdout), `${result.stdout} is left behind`).toBe(false);
+      },
+    },
+  ],
 });

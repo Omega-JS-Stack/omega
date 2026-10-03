@@ -4,41 +4,64 @@
  * so the defects cannot silently revert; the behavioral coverage lives in
  * the cross-stack e2e once those SDK paths run for real.
  */
-const { describe, it } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
-const { assert } = require('./helpers.js');
+const { createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 const MODULES = path.join(__dirname, '..', 'src', 'modules');
 const read = (name) => fs.readFileSync(path.join(MODULES, name), 'utf8');
 
-describe('Wave-4 source pins', () => {
+module.exports = defineCases({
+  type: 'group',
+  description: 'wave4-pins',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    {
+      name: 'Wave-4 source pins > sentry beforeSend never derefs config.page and reads the auth storage paths auth actually writes (F1/F4)',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const source = read('sentry.js');
+        ctx.expect(!source.includes('config.page.startTime'), 'the config.page.startTime deref is gone — nothing ever writes config.page').toBeTruthy();
+        // auth stores { user, denied } with the User serialized to its stored
+        // document, so identity sits under the document's `auth` branch
+        ctx.expect(source.includes("get('auth.user.auth.email'"), 'user email comes from the auth storage key').toBeTruthy();
+        ctx.expect(source.includes("get('auth.user.auth.uid'"), 'uid comes from the auth storage key').toBeTruthy();
+        ctx.expect(!source.includes("get('user.auth."), 'legacy user.auth.* paths are gone').toBeTruthy();
+      },
+    },
 
-  it('sentry beforeSend never derefs config.page and reads the auth storage paths auth actually writes (F1/F4)', () => {
-    const source = read('sentry.js');
-    assert(!source.includes('config.page.startTime'), 'the config.page.startTime deref is gone — nothing ever writes config.page');
-    // auth stores { user, denied } with the User serialized to its stored
-    // document, so identity sits under the document's `auth` branch
-    assert(source.includes("get('auth.user.auth.email'"), 'user email comes from the auth storage key');
-    assert(source.includes("get('auth.user.auth.uid'"), 'uid comes from the auth storage key');
-    assert(!source.includes("get('user.auth."), 'legacy user.auth.* paths are gone');
-  });
+    {
+      name: 'Wave-4 source pins > auth.listen guards on the same condition initialize() boots Firebase with (F3)',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const source = read('auth.js');
+        ctx.expect(source.includes('_resolveFirebaseConfig()?.apiKey'), 'listen() must not proceed when Firebase cannot boot').toBeTruthy();
+      },
+    },
 
-  it('auth.listen guards on the same condition initialize() boots Firebase with (F3)', () => {
-    const source = read('auth.js');
-    assert(source.includes('_resolveFirebaseConfig()?.apiKey'), 'listen() must not proceed when Firebase cannot boot');
-  });
+    {
+      name: 'Wave-4 source pins > firestore onSnapshot closures are cancellation-safe in both implementations (F5)',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const source = read('firestore.js');
+        const cancelledDecls = source.match(/let cancelled = false;/g) || [];
+        ctx.expect(cancelledDecls.length, 'doc AND query onSnapshot carry the cancellation flag').toBe(2);
+        ctx.expect(!source.includes('let unsubscribe = function () {};'), 'the undetachable placeholder-noop pattern is gone').toBeTruthy();
+      },
+    },
 
-  it('firestore onSnapshot closures are cancellation-safe in both implementations (F5)', () => {
-    const source = read('firestore.js');
-    const cancelledDecls = source.match(/let cancelled = false;/g) || [];
-    assert.strictEqual(cancelledDecls.length, 2, 'doc AND query onSnapshot carry the cancellation flag');
-    assert(!source.includes('let unsubscribe = function () {};'), 'the undetachable placeholder-noop pattern is gone');
-  });
-
-  it('account-fetch failures reach Sentry from the catch that actually sees them (F9)', () => {
-    const source = read('auth.js');
-    const catchBlock = source.slice(source.indexOf('Get account data error'));
-    assert(catchBlock.slice(0, 400).includes('captureException'), 'capture lives in _getAccountData\'s own catch');
-  });
+    {
+      name: 'Wave-4 source pins > account-fetch failures reach Sentry from the catch that actually sees them (F9)',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const source = read('auth.js');
+        const catchBlock = source.slice(source.indexOf('Get account data error'));
+        ctx.expect(catchBlock.slice(0, 400).includes('captureException'), 'capture lives in _getAccountData\'s own catch').toBeTruthy();
+      },
+    },
+  ],
 });

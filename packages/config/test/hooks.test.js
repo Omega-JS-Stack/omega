@@ -7,8 +7,7 @@
  * Fixtures are built under packages/config/.temp/ (gitignored), matching the
  * env cascade tests.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -47,80 +46,98 @@ function useCompany(t, root, id = 'acme-co') {
   return path.join(root, 'parent', 'company');
 }
 
-// ─── Resolution ───
+module.exports = defineCases({
+  type: 'group',
+  description: 'hooks',
+  tests: [
+    // ─── Resolution ───
 
-test('hooks: nested hook path resolves under the brand root', (t) => {
-  const root = makeFixture('hooks-brand', {
-    'brand/config/hooks/account/password.js': 'module.exports = () => "brand-pw";\n',
-  });
-  cleanup(t, root);
-  const brandRoot = path.join(root, 'brand');
+    {
+      name: 'hooks: nested hook path resolves under the brand root',
+      run: (ctx) => {
+        const root = makeFixture('hooks-brand', {
+          'brand/config/hooks/account/password.js': 'module.exports = () => "brand-pw";\n',
+        });
+        cleanup(ctx, root);
+        const brandRoot = path.join(root, 'brand');
 
-  assert.equal(resolveHook(brandRoot, 'account/password'), path.join(brandRoot, 'config', 'hooks', 'account', 'password.js'));
-});
+        ctx.expect(resolveHook(brandRoot, 'account/password')).toBe(path.join(brandRoot, 'config', 'hooks', 'account', 'password.js'));
+      },
+    },
 
-test('hooks: company hook applies when the brand has none, brand wins when both exist', (t) => {
-  const root = makeFixture('hooks-precedence', {
-    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
-    'parent/company/config/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
-    'brand-a/config/omega.json5': `{ brand: { id: 'a' }, company: { id: 'acme-co' } }`,
-    'brand-b/config/omega.json5': `{ brand: { id: 'b' }, company: { id: 'acme-co' } }`,
-    'brand-b/config/hooks/account/password.js': 'module.exports = ({ email }) => `brand:${email}`;\n',
-  });
-  cleanup(t, root);
-  const companyRoot = useCompany(t, root);
-  const brandA = path.join(root, 'brand-a');
-  const brandB = path.join(root, 'brand-b');
+    {
+      name: 'hooks: company hook applies when the brand has none, brand wins when both exist',
+      run: (ctx) => {
+        const root = makeFixture('hooks-precedence', {
+          'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+          'parent/company/config/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
+          'brand-a/config/omega.json5': `{ brand: { id: 'a' }, company: { id: 'acme-co' } }`,
+          'brand-b/config/omega.json5': `{ brand: { id: 'b' }, company: { id: 'acme-co' } }`,
+          'brand-b/config/hooks/account/password.js': 'module.exports = ({ email }) => `brand:${email}`;\n',
+        });
+        cleanup(ctx, root);
+        const companyRoot = useCompany(ctx, root);
+        const brandA = path.join(root, 'brand-a');
+        const brandB = path.join(root, 'brand-b');
 
-  // brand-a: no own hook, so the company's applies
-  const fromCompany = loadHook(brandA, 'account/password');
-  assert.equal(fromCompany.file, path.join(companyRoot, 'config', 'hooks', 'account', 'password.js'));
-  assert.equal(fromCompany.fn({ email: 'x@y.z' }), 'company:x@y.z');
+        // brand-a: no own hook, so the company's applies
+        const fromCompany = loadHook(brandA, 'account/password');
+        ctx.expect(fromCompany.file).toBe(path.join(companyRoot, 'config', 'hooks', 'account', 'password.js'));
+        ctx.expect(fromCompany.fn({ email: 'x@y.z' })).toBe('company:x@y.z');
 
-  // brand-b: its own hook shadows the company's
-  const fromBrand = loadHook(brandB, 'account/password');
-  assert.equal(fromBrand.file, path.join(brandB, 'config', 'hooks', 'account', 'password.js'));
-  assert.equal(fromBrand.fn({ email: 'x@y.z' }), 'brand:x@y.z');
-});
+        // brand-b: its own hook shadows the company's
+        const fromBrand = loadHook(brandB, 'account/password');
+        ctx.expect(fromBrand.file).toBe(path.join(brandB, 'config', 'hooks', 'account', 'password.js'));
+        ctx.expect(fromBrand.fn({ email: 'x@y.z' })).toBe('brand:x@y.z');
+      },
+    },
 
-test('hooks: absent everywhere returns null (callers fall through to defaults)', (t) => {
-  const root = makeFixture('hooks-absent', {
-    'brand/config/omega.json5': `{ brand: { id: 'a' } }`,
-  });
-  cleanup(t, root);
+    {
+      name: 'hooks: absent everywhere returns null (callers fall through to defaults)',
+      run: (ctx) => {
+        const root = makeFixture('hooks-absent', {
+          'brand/config/omega.json5': `{ brand: { id: 'a' } }`,
+        });
+        cleanup(ctx, root);
 
-  assert.equal(resolveHook(path.join(root, 'brand'), 'account/password'), null);
-  assert.equal(loadHook(path.join(root, 'brand'), 'account/password'), null);
-});
+        ctx.expect(resolveHook(path.join(root, 'brand'), 'account/password')).toBe(null);
+        ctx.expect(loadHook(path.join(root, 'brand'), 'account/password')).toBe(null);
+      },
+    },
 
-// ─── Loud failures ───
+    // ─── Loud failures ───
 
-test('hooks: a hook that exports a non-function throws with the file named', (t) => {
-  const root = makeFixture('hooks-nonfn', {
-    'brand/config/hooks/account/password.js': 'module.exports = { nope: true };\n',
-  });
-  cleanup(t, root);
+    {
+      name: 'hooks: a hook that exports a non-function throws with the file named',
+      run: (ctx) => {
+        const root = makeFixture('hooks-nonfn', {
+          'brand/config/hooks/account/password.js': 'module.exports = { nope: true };\n',
+        });
+        cleanup(ctx, root);
 
-  assert.throws(
-    () => loadHook(path.join(root, 'brand'), 'account/password'),
-    /account\/password.*must export a function/s,
-  );
-});
+        ctx.expect(() => loadHook(path.join(root, 'brand'), 'account/password')).toThrow(/account\/password.*must export a function/s);
+      },
+    },
 
-test('hooks: a hook that fails to load surfaces the require error, never silent fallback', (t) => {
-  const root = makeFixture('hooks-broken', {
-    'brand/config/hooks/account/password.js': 'this is not javascript {{{\n',
-  });
-  cleanup(t, root);
+    {
+      name: 'hooks: a hook that fails to load surfaces the require error, never silent fallback',
+      run: (ctx) => {
+        const root = makeFixture('hooks-broken', {
+          'brand/config/hooks/account/password.js': 'this is not javascript {{{\n',
+        });
+        cleanup(ctx, root);
 
-  assert.throws(
-    () => loadHook(path.join(root, 'brand'), 'account/password'),
-    /Hook account\/password failed to load/,
-  );
-});
+        ctx.expect(() => loadHook(path.join(root, 'brand'), 'account/password')).toThrow(/Hook account\/password failed to load/);
+      },
+    },
 
-test('hooks: malformed hook paths are rejected (traversal, absolute, casing)', () => {
-  for (const bad of ['../evil', '/etc/passwd', 'Account/Password', 'account//password', '']) {
-    assert.throws(() => resolveHook('/tmp', bad), /Invalid hook path/);
-  }
+    {
+      name: 'hooks: malformed hook paths are rejected (traversal, absolute, casing)',
+      run: (ctx) => {
+        for (const bad of ['../evil', '/etc/passwd', 'Account/Password', 'account//password', '']) {
+          ctx.expect(() => resolveHook('/tmp', bad)).toThrow(/Invalid hook path/);
+        }
+      },
+    },
+  ],
 });

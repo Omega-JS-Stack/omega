@@ -16,8 +16,7 @@
  * The walk and the per-target runner are stubbed before the commands resolve
  * them — the behavior here is WHERE the tee opens, not what the fan-out does.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -139,80 +138,105 @@ function readVerbLog(root, verb) {
   return fs.readFileSync(path.join(root, 'logs', `${verb}.log`), 'utf8');
 }
 
-test('omega manage tees the service walk to <brandRoot>/logs/manage.log', async () => {
-  const root = stageBrand();
+module.exports = defineCases({
+  type: 'group',
+  description: 'verb-logs',
+  tests: [
+    {
+      name: 'omega manage tees the service walk to <brandRoot>/logs/manage.log',
+      run: async (ctx) => {
+        const root = stageBrand();
 
-  await runVerb(manageCommand, root);
+        await runVerb(manageCommand, root);
 
-  const contents = readVerbLog(root, 'manage');
-  assert.match(contents, new RegExp(WALK_MARKER), "the walk's output is in the brand's manage log");
-  assert.equal(fs.existsSync(path.join(root, 'logs', 'dev.log')), false,
-    'dev.log belongs to `omega dev` — a walk never truncates it');
-});
+        const contents = readVerbLog(root, 'manage');
+        ctx.expect(contents, "the walk's output is in the brand's manage log").toMatch(new RegExp(WALK_MARKER));
+        ctx.expect(fs.existsSync(path.join(root, 'logs', 'dev.log')), 'dev.log belongs to `omega dev` — a walk never truncates it').toBe(false);
+      },
+    },
 
-// ─── The #623 fan-outs — one file per verb, the fan-out's own verdict in it ───
+    // ─── The #623 fan-outs — one file per verb, the fan-out's own verdict in it ───
 
-test('omega build tees the fan-out to <brandRoot>/logs/build.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega build tees the fan-out to <brandRoot>/logs/build.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  await runVerb(buildCommand, root);
+        await runVerb(buildCommand, root);
 
-  const contents = readVerbLog(root, 'build');
-  assert.match(contents, /OMEGA brand build/, 'the fan-out header opens the log');
-  assert.match(contents, /Build summary/, "and the fan-out's own verdict closes it");
-  assert.match(contents, /api/, 'every target the walk covered is named');
-});
+        const contents = readVerbLog(root, 'build');
+        ctx.expect(contents, 'the fan-out header opens the log').toMatch(/OMEGA brand build/);
+        ctx.expect(contents, "and the fan-out's own verdict closes it").toMatch(/Build summary/);
+        ctx.expect(contents, 'every target the walk covered is named').toMatch(/api/);
+      },
+    },
 
-test('omega clean tees the fan-out to <brandRoot>/logs/clean.log — never build.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega clean tees the fan-out to <brandRoot>/logs/clean.log — never build.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  await runVerb(cleanCommand, root);
+        await runVerb(cleanCommand, root);
 
-  assert.match(readVerbLog(root, 'clean'), /Clean summary/);
-  assert.equal(fs.existsSync(path.join(root, 'logs', 'build.log')), false,
-    'one verb never truncates another verb\'s record');
-});
+        ctx.expect(readVerbLog(root, 'clean')).toMatch(/Clean summary/);
+        ctx.expect(fs.existsSync(path.join(root, 'logs', 'build.log')), 'one verb never truncates another verb\'s record').toBe(false);
+      },
+    },
 
-test('omega deploy tees the fan-out (delivery lane included) to <brandRoot>/logs/deploy.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega deploy tees the fan-out (delivery lane included) to <brandRoot>/logs/deploy.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  await runVerb(deployCommand, root);
+        await runVerb(deployCommand, root);
 
-  const contents = readVerbLog(root, 'deploy');
-  assert.match(contents, /OMEGA brand deploy/);
-  assert.match(contents, new RegExp(WALK_MARKER), 'the delivery lane runs under the tee too');
-  assert.match(contents, /Deploy summary/);
-});
+        const contents = readVerbLog(root, 'deploy');
+        ctx.expect(contents).toMatch(/OMEGA brand deploy/);
+        ctx.expect(contents, 'the delivery lane runs under the tee too').toMatch(new RegExp(WALK_MARKER));
+        ctx.expect(contents).toMatch(/Deploy summary/);
+      },
+    },
 
-test('omega update tees the fan-out to <brandRoot>/logs/update.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega update tees the fan-out to <brandRoot>/logs/update.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  await runVerb(updateCommand, root);
+        await runVerb(updateCommand, root);
 
-  const contents = readVerbLog(root, 'update');
-  assert.match(contents, /OMEGA brand update/);
-  assert.match(contents, /Update summary/);
-});
+        const contents = readVerbLog(root, 'update');
+        ctx.expect(contents).toMatch(/OMEGA brand update/);
+        ctx.expect(contents).toMatch(/Update summary/);
+      },
+    },
 
-test('omega test tees the fan-out to <brandRoot>/logs/test.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega test tees the fan-out to <brandRoot>/logs/test.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  await runVerb(testCommand, root, { _: ['test'] });
+        await runVerb(testCommand, root, { _: ['test'] });
 
-  const contents = readVerbLog(root, 'test');
-  assert.match(contents, /OMEGA brand tests/);
-  assert.match(contents, /Test summary/);
-});
+        const contents = readVerbLog(root, 'test');
+        ctx.expect(contents).toMatch(/OMEGA brand tests/);
+        ctx.expect(contents).toMatch(/Test summary/);
+      },
+    },
 
-test('omega pipeline tees its scorecard to <brandRoot>/logs/pipeline.log', async () => {
-  const root = stageFanoutBrand();
+    {
+      name: 'omega pipeline tees its scorecard to <brandRoot>/logs/pipeline.log',
+      run: async (ctx) => {
+        const root = stageFanoutBrand();
 
-  // An unknown service makes the child manage run throw on its own argument
-  // check — no service ever walks, nothing touches the network, and the
-  // pipeline's verdict (no run record) is the fan-out output being asserted.
-  await runVerb(pipelineCommand, root, { service: 'no-such-service' });
+        // An unknown service makes the child manage run throw on its own argument
+        // check — no service ever walks, nothing touches the network, and the
+        // pipeline's verdict (no run record) is the fan-out output being asserted.
+        await runVerb(pipelineCommand, root, { service: 'no-such-service' });
 
-  const contents = readVerbLog(root, 'pipeline');
-  assert.match(contents, /Pipeline — live full-cycle test/, 'the pipeline header opens the log');
-  assert.match(contents, /PIPELINE FAIL/, 'and its own verdict is on disk');
+        const contents = readVerbLog(root, 'pipeline');
+        ctx.expect(contents, 'the pipeline header opens the log').toMatch(/Pipeline — live full-cycle test/);
+        ctx.expect(contents, 'and its own verdict is on disk').toMatch(/PIPELINE FAIL/);
+      },
+    },
+  ],
 });

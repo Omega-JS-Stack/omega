@@ -6,8 +6,7 @@
 // written or read. A linked brand's full chain is proved with devkit's
 // docs-sync prelude, which keeps a linked manager's docs current.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -73,65 +72,86 @@ function publishedFixture() {
   return { brand, manager };
 }
 
-// ─── The manager's AGENTS.md: one tracked import of the map ─────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'agents-md',
+  tests: [
+    // ─── The manager's AGENTS.md: one tracked import of the map ─────────────────
 
-test('agents-md: the manager ships a one-line AGENTS.md importing the map inside its docs', () => {
-  assert.equal(read(PKG_ROOT, 'AGENTS.md'), `${MAP_IMPORT}\n`);
-  const pkg = JSON.parse(read(PKG_ROOT, 'package.json'));
-  assert.ok(pkg.files.includes('AGENTS.md'), 'the files list ships it');
-  assert.ok(fs.existsSync(path.join(MONOREPO, MAP_FILE)), 'the map it imports exists in the monorepo docs');
-  assert.equal(read(MONOREPO, 'AGENTS.md').split('\n')[0], MAP_IMPORT, 'the root AGENTS.md opens with the same map');
-});
+    {
+      name: 'agents-md: the manager ships a one-line AGENTS.md importing the map inside its docs',
+      run: (ctx) => {
+        ctx.expect(read(PKG_ROOT, 'AGENTS.md')).toBe(`${MAP_IMPORT}\n`);
+        const pkg = JSON.parse(read(PKG_ROOT, 'package.json'));
+        ctx.expect(pkg.files.includes('AGENTS.md'), 'the files list ships it').toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(MONOREPO, MAP_FILE)), 'the map it imports exists in the monorepo docs').toBeTruthy();
+        ctx.expect(read(MONOREPO, 'AGENTS.md').split('\n')[0], 'the root AGENTS.md opens with the same map').toBe(MAP_IMPORT);
+      },
+    },
 
-// ─── The whole chain on a linked brand ──────────────────────────────────────
+    // ─── The whole chain on a linked brand ──────────────────────────────────────
 
-test('agents-md: a linked brand resolves the two-import chain (three files) to the live map', async () => {
-  const { brand, monorepo } = linkFixture();
-  fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md'));
+    {
+      name: 'agents-md: a linked brand resolves the two-import chain (three files) to the live map',
+      run: async (ctx) => {
+        const { brand, monorepo } = linkFixture();
+        fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md'));
 
-  assert.equal(docsSync.run({ brandRoot: brand, log: () => {} }).synced, true);
-  const result = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } });
-  assert.deepEqual(result.output, { link: 'removed', agents: 'created' });
+        ctx.expect(docsSync.run({ brandRoot: brand, log: () => {} }).synced).toBe(true);
+        const result = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } });
+        ctx.expect(result.output).toEqual({ link: 'removed', agents: 'created' });
 
-  const chain = followChain(path.join(brand, 'AGENTS.md'));
-  assert.equal(chain.length, 3, 'brand AGENTS.md, then the manager\'s, then the map');
-  assert.equal(fs.readFileSync(chain[2], 'utf8'), '# the map\n');
-  assert.equal(await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } }), null, 'a second run is a no-op');
-});
+        const chain = followChain(path.join(brand, 'AGENTS.md'));
+        ctx.expect(chain.length, 'brand AGENTS.md, then the manager\'s, then the map').toBe(3);
+        ctx.expect(fs.readFileSync(chain[2], 'utf8')).toBe('# the map\n');
+        ctx.expect(await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } }), 'a second run is a no-op').toBe(null);
+      },
+    },
 
-// ─── The workspace ensure op ─────────────────────────────────────────────────
+    // ─── The workspace ensure op ─────────────────────────────────────────────────
 
-test('agents-md: op creates AGENTS.md and no CLAUDE.md on a fresh brand, then is a no-op', async () => {
-  const dir = tmpdir();
-  const context = { brandRoot: dir, brand: { id: 'fixture', config: { brand: { name: 'Fixture' } } } };
+    {
+      name: 'agents-md: op creates AGENTS.md and no CLAUDE.md on a fresh brand, then is a no-op',
+      run: async (ctx) => {
+        const dir = tmpdir();
+        const context = { brandRoot: dir, brand: { id: 'fixture', config: { brand: { name: 'Fixture' } } } };
 
-  const first = await agentsOp(context);
-  assert.deepEqual(first.output, { link: 'absent', agents: 'created' });
-  assert.equal(read(dir, 'AGENTS.md'), BRAND_AGENTS_MD, 'the builder\'s file, no generated heading');
-  assert.equal(fs.existsSync(path.join(dir, 'CLAUDE.md')), false, 'a manage run writes no CLAUDE.md');
+        const first = await agentsOp(context);
+        ctx.expect(first.output).toEqual({ link: 'absent', agents: 'created' });
+        ctx.expect(read(dir, 'AGENTS.md'), 'the builder\'s file, no generated heading').toBe(BRAND_AGENTS_MD);
+        ctx.expect(fs.existsSync(path.join(dir, 'CLAUDE.md')), 'a manage run writes no CLAUDE.md').toBe(false);
 
-  assert.equal(await agentsOp(context), null);
-});
+        ctx.expect(await agentsOp(context)).toBe(null);
+      },
+    },
 
-test('agents-md: op leaves an existing CLAUDE.md alone, content or pointer, with no warning', async () => {
-  for (const content of ['# content\n', '@AGENTS.md\n']) {
-    const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), BRAND_AGENTS_MD);
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content);
+    {
+      name: 'agents-md: op leaves an existing CLAUDE.md alone, content or pointer, with no warning',
+      run: async (ctx) => {
+        for (const content of ['# content\n', '@AGENTS.md\n']) {
+          const dir = tmpdir();
+          fs.writeFileSync(path.join(dir, 'AGENTS.md'), BRAND_AGENTS_MD);
+          fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content);
 
-    assert.equal(await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } }), null);
-    assert.equal(read(dir, 'CLAUDE.md'), content);
-  }
-});
+          ctx.expect(await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } })).toBe(null);
+          ctx.expect(read(dir, 'CLAUDE.md')).toBe(content);
+        }
+      },
+    },
 
-test('agents-md: op under --dry-run plans the link removal and AGENTS.md, and writes nothing', async () => {
-  const { brand, monorepo } = linkFixture();
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), link);
+    {
+      name: 'agents-md: op under --dry-run plans the link removal and AGENTS.md, and writes nothing',
+      run: async (ctx) => {
+        const { brand, monorepo } = linkFixture();
+        const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+        fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), link);
 
-  const planned = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+        const planned = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
 
-  assert.deepEqual(planned.output, { link: 'planned', agents: 'planned' });
-  assert.deepEqual(fs.readdirSync(brand), ['node_modules']);
-  assert.ok(fs.lstatSync(link).isSymbolicLink(), 'the retired link is still there');
+        ctx.expect(planned.output).toEqual({ link: 'planned', agents: 'planned' });
+        ctx.expect(fs.readdirSync(brand)).toEqual(['node_modules']);
+        ctx.expect(fs.lstatSync(link).isSymbolicLink(), 'the retired link is still there').toBeTruthy();
+      },
+    },
+  ],
 });

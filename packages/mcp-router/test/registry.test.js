@@ -4,8 +4,7 @@
  * field by field, and writes that land in the overlay only.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -37,109 +36,157 @@ function fixture(bundled = {}, overlay = {}) {
 
 const DEFAULT = { enabled: true, command: 'npx', args: ['-y', 'thing'], tools: [{ name: 'go' }] };
 
-test('a bundled-only upstream loads with its defaults', () => {
-  const layers = fixture({ alpha: DEFAULT });
-  const alpha = registry.loadUpstreams(layers).alpha;
-  assert.equal(alpha.enabled_on_disk, true);
-  assert.equal(alpha.default, 'auto');
-  assert.deepEqual(alpha.args, ['-y', 'thing']);
-  assert.equal(alpha.bundled, true);
-  assert.equal(alpha.overlaid, false);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'registry',
+  tests: [
+    {
+      name: 'a bundled-only upstream loads with its defaults',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT });
+        const alpha = registry.loadUpstreams(layers).alpha;
+        ctx.expect(alpha.enabled_on_disk).toBe(true);
+        ctx.expect(alpha.default).toBe('auto');
+        ctx.expect(alpha.args).toEqual(['-y', 'thing']);
+        ctx.expect(alpha.bundled).toBe(true);
+        ctx.expect(alpha.overlaid).toBe(false);
+      },
+    },
 
-test('an overlay-only upstream adds a private upstream', () => {
-  const layers = fixture({ alpha: DEFAULT }, { beta: { enabled: true, command: 'node', args: ['b.js'] } });
-  const upstreams = registry.loadUpstreams(layers);
-  assert.deepEqual(Object.keys(upstreams), ['alpha', 'beta']);
-  assert.equal(upstreams.beta.bundled, false);
-  assert.equal(upstreams.beta.overlaid, true);
-  assert.deepEqual(upstreams.beta.tools, []);
-});
+    {
+      name: 'an overlay-only upstream adds a private upstream',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { beta: { enabled: true, command: 'node', args: ['b.js'] } });
+        const upstreams = registry.loadUpstreams(layers);
+        ctx.expect(Object.keys(upstreams)).toEqual(['alpha', 'beta']);
+        ctx.expect(upstreams.beta.bundled).toBe(false);
+        ctx.expect(upstreams.beta.overlaid).toBe(true);
+        ctx.expect(upstreams.beta.tools).toEqual([]);
+      },
+    },
 
-test('the merge is shallow and field-level: overlay keys win, the rest survive', () => {
-  const layers = fixture({ alpha: DEFAULT }, { alpha: { args: ['-y', 'other'] } });
-  const alpha = registry.loadUpstream('alpha', layers);
-  assert.deepEqual(alpha.args, ['-y', 'other']);
-  assert.equal(alpha.command, 'npx', 'the bundled command must survive an args-only overlay');
-  assert.equal(alpha.tools.length, 1, 'the bundled tools cache must survive an args-only overlay');
-  assert.equal(alpha.bundled, true);
-  assert.equal(alpha.overlaid, true);
-});
+    {
+      name: 'the merge is shallow and field-level: overlay keys win, the rest survive',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { alpha: { args: ['-y', 'other'] } });
+        const alpha = registry.loadUpstream('alpha', layers);
+        ctx.expect(alpha.args).toEqual(['-y', 'other']);
+        ctx.expect(alpha.command, 'the bundled command must survive an args-only overlay').toBe('npx');
+        ctx.expect(alpha.tools.length, 'the bundled tools cache must survive an args-only overlay').toBe(1);
+        ctx.expect(alpha.bundled).toBe(true);
+        ctx.expect(alpha.overlaid).toBe(true);
+      },
+    },
 
-test('{"enabled": false} alone turns a bundled default off', () => {
-  const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false } });
-  const alpha = registry.loadUpstream('alpha', layers);
-  assert.equal(alpha.enabled_on_disk, false);
-  assert.equal(alpha.command, 'npx');
-});
+    {
+      name: '{"enabled": false} alone turns a bundled default off',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false } });
+        const alpha = registry.loadUpstream('alpha', layers);
+        ctx.expect(alpha.enabled_on_disk).toBe(false);
+        ctx.expect(alpha.command).toBe('npx');
+      },
+    },
 
-test('{"locked": true} surfaces on the entry and defaults to false', () => {
-  const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false, locked: true }, beta: DEFAULT });
-  assert.equal(registry.loadUpstream('alpha', layers).locked, true);
-  assert.equal(registry.loadUpstream('beta', layers).locked, false);
-});
+    {
+      name: '{"locked": true} surfaces on the entry and defaults to false',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false, locked: true }, beta: DEFAULT });
+        ctx.expect(registry.loadUpstream('alpha', layers).locked).toBe(true);
+        ctx.expect(registry.loadUpstream('beta', layers).locked).toBe(false);
+      },
+    },
 
-test('the locked refusal names the field and the escape hatch', () => {
-  const message = registry.lockedRefusal('alpha');
-  assert.match(message, /"alpha" is locked/);
-  assert.match(message, /locked: true/);
-  assert.match(message, /omega-mcp enable alpha --force/);
-});
+    {
+      name: 'the locked refusal names the field and the escape hatch',
+      run: (ctx) => {
+        const message = registry.lockedRefusal('alpha');
+        ctx.expect(message).toMatch(/"alpha" is locked/);
+        ctx.expect(message).toMatch(/locked: true/);
+        ctx.expect(message).toMatch(/omega-mcp enable alpha --force/);
+      },
+    },
 
-test('a malformed overlay config is skipped loudly and the rest of the registry survives', () => {
-  const layers = fixture({ alpha: DEFAULT, gamma: DEFAULT }, { alpha: '{ not json' });
-  const upstreams = registry.loadUpstreams(layers);
-  assert.deepEqual(Object.keys(upstreams), ['alpha', 'gamma']);
-  assert.equal(upstreams.alpha.command, 'npx', 'the bundled layer answers when the overlay is unreadable');
-});
+    {
+      name: 'a malformed overlay config is skipped loudly and the rest of the registry survives',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT, gamma: DEFAULT }, { alpha: '{ not json' });
+        const upstreams = registry.loadUpstreams(layers);
+        ctx.expect(Object.keys(upstreams)).toEqual(['alpha', 'gamma']);
+        ctx.expect(upstreams.alpha.command, 'the bundled layer answers when the overlay is unreadable').toBe('npx');
+      },
+    },
 
-test('a malformed bundled config with no overlay drops that upstream, not the registry', () => {
-  const layers = fixture({ alpha: '{ not json', gamma: DEFAULT });
-  assert.deepEqual(Object.keys(registry.loadUpstreams(layers)), ['gamma']);
-});
+    {
+      name: 'a malformed bundled config with no overlay drops that upstream, not the registry',
+      run: (ctx) => {
+        const layers = fixture({ alpha: '{ not json', gamma: DEFAULT });
+        ctx.expect(Object.keys(registry.loadUpstreams(layers))).toEqual(['gamma']);
+      },
+    },
 
-test('an unknown name resolves to null', () => {
-  assert.equal(registry.loadUpstream('ghost', fixture({ alpha: DEFAULT })), null);
-});
+    {
+      name: 'an unknown name resolves to null',
+      run: (ctx) => {
+        ctx.expect(registry.loadUpstream('ghost', fixture({ alpha: DEFAULT }))).toBe(null);
+      },
+    },
 
-test('writes land in the overlay only, merged into what is already there', () => {
-  const layers = fixture({ alpha: DEFAULT });
-  registry.patchOverlayEntry('alpha', { enabled: false }, layers);
-  registry.patchOverlayEntry('alpha', { tools: [{ name: 'fresh' }] }, layers);
+    {
+      name: 'writes land in the overlay only, merged into what is already there',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT });
+        registry.patchOverlayEntry('alpha', { enabled: false }, layers);
+        registry.patchOverlayEntry('alpha', { tools: [{ name: 'fresh' }] }, layers);
 
-  const bundled = JSON.parse(fs.readFileSync(path.join(layers.bundledDir, 'alpha', 'config.json'), 'utf8'));
-  assert.deepEqual(bundled, DEFAULT, 'the bundled config must be untouched');
+        const bundled = JSON.parse(fs.readFileSync(path.join(layers.bundledDir, 'alpha', 'config.json'), 'utf8'));
+        ctx.expect(bundled, 'the bundled config must be untouched').toEqual(DEFAULT);
 
-  assert.deepEqual(registry.readOverlayEntry('alpha', layers), { enabled: false, tools: [{ name: 'fresh' }] });
-  const merged = registry.loadUpstream('alpha', layers);
-  assert.equal(merged.command, 'npx');
-  assert.equal(merged.enabled_on_disk, false);
-  assert.deepEqual(merged.tools, [{ name: 'fresh' }]);
-});
+        ctx.expect(registry.readOverlayEntry('alpha', layers)).toEqual({ enabled: false, tools: [{ name: 'fresh' }] });
+        const merged = registry.loadUpstream('alpha', layers);
+        ctx.expect(merged.command).toBe('npx');
+        ctx.expect(merged.enabled_on_disk).toBe(false);
+        ctx.expect(merged.tools).toEqual([{ name: 'fresh' }]);
+      },
+    },
 
-test('removing an overlay entry restores the bundled default', () => {
-  const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false } });
-  assert.equal(registry.removeOverlayEntry('alpha', layers), true);
-  assert.equal(registry.loadUpstream('alpha', layers).enabled_on_disk, true);
-  assert.equal(registry.removeOverlayEntry('alpha', layers), false, 'removing twice is not an error');
-});
+    {
+      name: 'removing an overlay entry restores the bundled default',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false } });
+        ctx.expect(registry.removeOverlayEntry('alpha', layers)).toBe(true);
+        ctx.expect(registry.loadUpstream('alpha', layers).enabled_on_disk).toBe(true);
+        ctx.expect(registry.removeOverlayEntry('alpha', layers), 'removing twice is not an error').toBe(false);
+      },
+    },
 
-test('isBundled distinguishes a shipped default from a private upstream', () => {
-  const layers = fixture({ alpha: DEFAULT }, { beta: DEFAULT });
-  assert.equal(registry.isBundled('alpha', layers), true);
-  assert.equal(registry.isBundled('beta', layers), false);
-});
+    {
+      name: 'isBundled distinguishes a shipped default from a private upstream',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT }, { beta: DEFAULT });
+        ctx.expect(registry.isBundled('alpha', layers)).toBe(true);
+        ctx.expect(registry.isBundled('beta', layers)).toBe(false);
+      },
+    },
 
-test('a missing layer directory is normal, not an error', () => {
-  const layers = fixture({ alpha: DEFAULT });
-  fs.rmSync(layers.overlayDir, { recursive: true });
-  assert.deepEqual(Object.keys(registry.loadUpstreams(layers)), ['alpha']);
-});
+    {
+      name: 'a missing layer directory is normal, not an error',
+      run: (ctx) => {
+        const layers = fixture({ alpha: DEFAULT });
+        fs.rmSync(layers.overlayDir, { recursive: true });
+        ctx.expect(Object.keys(registry.loadUpstreams(layers))).toEqual(['alpha']);
+      },
+    },
 
-test('the default layers are the package servers dir and the overlay env seam', (t) => {
-  t.after(() => { delete process.env.MCP_ROUTER_SERVERS_DIR; });
-  process.env.MCP_ROUTER_SERVERS_DIR = '/tmp/some-overlay';
-  const layers = registry.layers();
-  assert.equal(layers.bundledDir, path.join(__dirname, '..', 'servers'));
-  assert.equal(layers.overlayDir, '/tmp/some-overlay');
+    {
+      name: 'the default layers are the package servers dir and the overlay env seam',
+      run: (ctx) => {
+        ctx.after(() => { delete process.env.MCP_ROUTER_SERVERS_DIR; });
+        process.env.MCP_ROUTER_SERVERS_DIR = '/tmp/some-overlay';
+        const layers = registry.layers();
+        ctx.expect(layers.bundledDir).toBe(path.join(__dirname, '..', 'servers'));
+        ctx.expect(layers.overlayDir).toBe('/tmp/some-overlay');
+      },
+    },
+  ],
 });

@@ -4,8 +4,7 @@
  * test. The spawn is an injected seam: no Chrome is ever started here.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -39,108 +38,147 @@ function cacheFixture(versions) {
   return cacheDir;
 }
 
-test('macOS arm64 finds the binary inside the .app bundle', () => {
-  const cacheDir = cacheFixture({ 'mac_arm-150.0.7871.24': SHAPES['darwin-arm64']() });
-  const found = findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' });
-  assert.equal(found, path.join(cacheDir, 'mac_arm-150.0.7871.24', 'chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'));
-});
-
-test('macOS x64 reads the intel bundle dir, not the arm one', () => {
-  const cacheDir = cacheFixture({ 'mac-150.0.7871.24': SHAPES['darwin-x64']() });
-  assert.ok(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'x64' }).includes('chrome-mac-x64'));
-  assert.equal(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' }), null);
-});
-
-test('linux and windows each find their fixed executable', () => {
-  const linux = cacheFixture({ 'linux-150.0.7871.24': SHAPES.linux() });
-  assert.equal(findChromeForTesting({ cacheDir: linux, platform: 'linux', arch: 'x64' }), path.join(linux, 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'));
-
-  const win = cacheFixture({ 'win64-150.0.7871.24': SHAPES.win32() });
-  assert.equal(findChromeForTesting({ cacheDir: win, platform: 'win32', arch: 'x64' }), path.join(win, 'win64-150.0.7871.24', 'chrome-win64', 'chrome.exe'));
-});
-
-test('the highest version wins, numerically — not by string sort', () => {
-  const cacheDir = cacheFixture({
-    'mac_arm-99.0.1234.5': SHAPES['darwin-arm64'](),
-    'mac_arm-150.0.7871.24': SHAPES['darwin-arm64'](),
-    'mac_arm-150.0.7871.9': SHAPES['darwin-arm64'](),
-  });
-  assert.ok(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' }).includes('mac_arm-150.0.7871.24'));
-});
-
-test('a version dir that holds no executable for this platform is skipped', () => {
-  const cacheDir = cacheFixture({
-    'mac_arm-150.0.7871.24': ['chrome-mac-arm64/Google Chrome for Testing.app/Contents/Info.plist'],
-    'mac_arm-149.0.7827.22': SHAPES['darwin-arm64'](),
-  });
-  assert.ok(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' }).includes('mac_arm-149.0.7827.22'));
-});
-
-test('an empty or absent cache resolves to nothing', () => {
-  assert.equal(findChromeForTesting({ cacheDir: cacheFixture({}), platform: 'darwin', arch: 'arm64' }), null);
-  assert.equal(findChromeForTesting({ cacheDir: '/no/such/cache', platform: 'linux', arch: 'x64' }), null);
-});
-
-test('byVersionDesc orders newest first', () => {
-  assert.deepEqual(['mac_arm-9.0.0.0', 'mac_arm-150.0.7871.24', 'mac_arm-115.0.5790.98'].sort(byVersionDesc), ['mac_arm-150.0.7871.24', 'mac_arm-115.0.5790.98', 'mac_arm-9.0.0.0']);
-});
-
-test('the base argv drives an isolated throwaway Chrome at the found executable', () => {
-  assert.deepEqual(buildArgs('/cft/chrome', {}), [
-    '-y',
-    'chrome-devtools-mcp@1.4.0',
-    '--isolated',
-    '--acceptInsecureCerts',
-    '--usage-statistics=false',
-    '--executablePath=/cft/chrome',
-    '--categoryExtensions',
-  ]);
-});
-
-test('OMEGA_EXTENSION_PATH adds the load-extension pair', () => {
-  const args = buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/brand/targets/extension/dist' });
-  assert.deepEqual(args.slice(-3), [
-    '--chromeArg=--load-extension=/brand/targets/extension/dist',
-    '--ignoreDefaultChromeArg=--disable-extensions',
-    '--categoryExtensions',
-  ]);
-});
-
-test('main spawns the resolved npx with the built argv and forwards the child exit code', () => {
-  const calls = [];
-  const exits = [];
-  main({
-    find: () => '/cft/chrome',
-    env: { OMEGA_EXTENSION_PATH: '/ext' },
-    exit: (code) => exits.push(code),
-    spawn: (command, args, options) => {
-      calls.push({ command, args, options });
-      return { on: (event, handler) => { if (event === 'exit') handler(3, null); } };
+module.exports = defineCases({
+  type: 'group',
+  description: 'launch-cft',
+  tests: [
+    {
+      name: 'macOS arm64 finds the binary inside the .app bundle',
+      run: (ctx) => {
+        const cacheDir = cacheFixture({ 'mac_arm-150.0.7871.24': SHAPES['darwin-arm64']() });
+        const found = findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' });
+        ctx.expect(found).toBe(path.join(cacheDir, 'mac_arm-150.0.7871.24', 'chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'));
+      },
     },
-  });
-  assert.equal(calls.length, 1);
-  // win32 spawns through a shell, where the absolute path needs its quotes.
-  assert.equal(calls[0].command, process.platform === 'win32' ? `"${resolveBin('npx')}"` : resolveBin('npx'));
-  assert.equal(calls[0].options.stdio, 'inherit');
-  assert.deepEqual(calls[0].args, buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/ext' }));
-  assert.deepEqual(exits, [3]);
-});
 
-test('no Chrome for Testing fails loudly with the install hint and never spawns', () => {
-  const exits = [];
-  const said = [];
-  const write = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (chunk) => { said.push(String(chunk)); return true; };
-  try {
-    main({
-      find: () => null,
-      env: {},
-      exit: (code) => exits.push(code),
-      spawn: () => assert.fail('must not spawn without an executable'),
-    });
-  } finally {
-    process.stderr.write = write;
-  }
-  assert.deepEqual(exits, [1]);
-  assert.match(said.join(''), /npx puppeteer browsers install chrome/);
+    {
+      name: 'macOS x64 reads the intel bundle dir, not the arm one',
+      run: (ctx) => {
+        const cacheDir = cacheFixture({ 'mac-150.0.7871.24': SHAPES['darwin-x64']() });
+        ctx.expect(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'x64' }).includes('chrome-mac-x64')).toBeTruthy();
+        ctx.expect(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' })).toBe(null);
+      },
+    },
+
+    {
+      name: 'linux and windows each find their fixed executable',
+      run: (ctx) => {
+        const linux = cacheFixture({ 'linux-150.0.7871.24': SHAPES.linux() });
+        ctx.expect(findChromeForTesting({ cacheDir: linux, platform: 'linux', arch: 'x64' })).toBe(path.join(linux, 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'));
+
+        const win = cacheFixture({ 'win64-150.0.7871.24': SHAPES.win32() });
+        ctx.expect(findChromeForTesting({ cacheDir: win, platform: 'win32', arch: 'x64' })).toBe(path.join(win, 'win64-150.0.7871.24', 'chrome-win64', 'chrome.exe'));
+      },
+    },
+
+    {
+      name: 'the highest version wins, numerically — not by string sort',
+      run: (ctx) => {
+        const cacheDir = cacheFixture({
+          'mac_arm-99.0.1234.5': SHAPES['darwin-arm64'](),
+          'mac_arm-150.0.7871.24': SHAPES['darwin-arm64'](),
+          'mac_arm-150.0.7871.9': SHAPES['darwin-arm64'](),
+        });
+        ctx.expect(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' }).includes('mac_arm-150.0.7871.24')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a version dir that holds no executable for this platform is skipped',
+      run: (ctx) => {
+        const cacheDir = cacheFixture({
+          'mac_arm-150.0.7871.24': ['chrome-mac-arm64/Google Chrome for Testing.app/Contents/Info.plist'],
+          'mac_arm-149.0.7827.22': SHAPES['darwin-arm64'](),
+        });
+        ctx.expect(findChromeForTesting({ cacheDir, platform: 'darwin', arch: 'arm64' }).includes('mac_arm-149.0.7827.22')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'an empty or absent cache resolves to nothing',
+      run: (ctx) => {
+        ctx.expect(findChromeForTesting({ cacheDir: cacheFixture({}), platform: 'darwin', arch: 'arm64' })).toBe(null);
+        ctx.expect(findChromeForTesting({ cacheDir: '/no/such/cache', platform: 'linux', arch: 'x64' })).toBe(null);
+      },
+    },
+
+    {
+      name: 'byVersionDesc orders newest first',
+      run: (ctx) => {
+        ctx.expect(['mac_arm-9.0.0.0', 'mac_arm-150.0.7871.24', 'mac_arm-115.0.5790.98'].sort(byVersionDesc)).toEqual(['mac_arm-150.0.7871.24', 'mac_arm-115.0.5790.98', 'mac_arm-9.0.0.0']);
+      },
+    },
+
+    {
+      name: 'the base argv drives an isolated throwaway Chrome at the found executable',
+      run: (ctx) => {
+        ctx.expect(buildArgs('/cft/chrome', {})).toEqual([
+          '-y',
+          'chrome-devtools-mcp@1.4.0',
+          '--isolated',
+          '--acceptInsecureCerts',
+          '--usage-statistics=false',
+          '--executablePath=/cft/chrome',
+          '--categoryExtensions',
+        ]);
+      },
+    },
+
+    {
+      name: 'OMEGA_EXTENSION_PATH adds the load-extension pair',
+      run: (ctx) => {
+        const args = buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/brand/targets/extension/dist' });
+        ctx.expect(args.slice(-3)).toEqual([
+          '--chromeArg=--load-extension=/brand/targets/extension/dist',
+          '--ignoreDefaultChromeArg=--disable-extensions',
+          '--categoryExtensions',
+        ]);
+      },
+    },
+
+    {
+      name: 'main spawns the resolved npx with the built argv and forwards the child exit code',
+      run: (ctx) => {
+        const calls = [];
+        const exits = [];
+        main({
+          find: () => '/cft/chrome',
+          env: { OMEGA_EXTENSION_PATH: '/ext' },
+          exit: (code) => exits.push(code),
+          spawn: (command, args, options) => {
+            calls.push({ command, args, options });
+            return { on: (event, handler) => { if (event === 'exit') handler(3, null); } };
+          },
+        });
+        ctx.expect(calls.length).toBe(1);
+        // win32 spawns through a shell, where the absolute path needs its quotes.
+        ctx.expect(calls[0].command).toBe(process.platform === 'win32' ? `"${resolveBin('npx')}"` : resolveBin('npx'));
+        ctx.expect(calls[0].options.stdio).toBe('inherit');
+        ctx.expect(calls[0].args).toEqual(buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/ext' }));
+        ctx.expect(exits).toEqual([3]);
+      },
+    },
+
+    {
+      name: 'no Chrome for Testing fails loudly with the install hint and never spawns',
+      run: (ctx) => {
+        const exits = [];
+        const said = [];
+        const write = process.stderr.write.bind(process.stderr);
+        process.stderr.write = (chunk) => { said.push(String(chunk)); return true; };
+        try {
+          main({
+            find: () => null,
+            env: {},
+            exit: (code) => exits.push(code),
+            spawn: () => ctx.expect.fail('must not spawn without an executable'),
+          });
+        } finally {
+          process.stderr.write = write;
+        }
+        ctx.expect(exits).toEqual([1]);
+        ctx.expect(said.join('')).toMatch(/npx puppeteer browsers install chrome/);
+      },
+    },
+  ],
 });

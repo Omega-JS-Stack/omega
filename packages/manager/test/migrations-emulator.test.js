@@ -21,8 +21,7 @@
  * the firebase CLI or a JVM, matching how every other emulator-dependent lane
  * in this repo handles a missing tool.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const jetpack = require('fs-jetpack');
 
 const { OPERATIONS } = require('../src/config.js');
@@ -163,71 +162,81 @@ const unavailable = missingTool();
 // nothing.
 const laneOptions = unavailable ? { skip: unavailable } : {};
 
-test('payment-provider: the audit writes nothing, --execute lands every collection, a rerun is a no-op', laneOptions, async (t) => {
-  const emulator = await startEmulator({ projectId: PROJECT_ID, prefix: 'omega-migrations-emulator' });
-  const root = jetpack.tmpDir({ prefix: 'omega-migrations-brand' }).cwd();
-  t.after(async () => {
-    await emulator.stop();
-    jetpack.remove(emulator.dir);
-    jetpack.remove(root);
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'migrations-emulator',
+  tests: [
+    {
+      name: 'payment-provider: the audit writes nothing, --execute lands every collection, a rerun is a no-op',
+      ...laneOptions,
+      run: async (ctx) => {
+        const emulator = await startEmulator({ projectId: PROJECT_ID, prefix: 'omega-migrations-emulator' });
+        const root = jetpack.tmpDir({ prefix: 'omega-migrations-brand' }).cwd();
+        ctx.after(async () => {
+          await emulator.stop();
+          jetpack.remove(emulator.dir);
+          jetpack.remove(root);
+        });
 
-  const db = emulatorClient(emulator.port);
+        const db = emulatorClient(emulator.port);
 
-  for (const [path, data] of Object.entries({ ...LEGACY, ...CONVERGED })) {
-    await db.seed(path, data);
-  }
+        for (const [path, data] of Object.entries({ ...LEGACY, ...CONVERGED })) {
+          await db.seed(path, data);
+        }
 
-  // ── Pass 1: the AUDIT. Counts the work, touches nothing ───────────────────
-  const settled = {};
-  for (const path of Object.keys(LEGACY)) {
-    settled[path] = await db.updateTime(path);
-  }
+        // ── Pass 1: the AUDIT. Counts the work, touches nothing ───────────────────
+        const settled = {};
+        for (const path of Object.keys(LEGACY)) {
+          settled[path] = await db.updateTime(path);
+        }
 
-  const audit = await runMigrations(root, db, { migration: 'payment-provider' });
+        const audit = await runMigrations(root, db, { migration: 'payment-provider' });
 
-  assert.equal(audit.status, 'success');
-  assert.equal(db.writes, 0, 'the audit performed no write');
-  for (const [path, at] of Object.entries(settled)) {
-    assert.equal(await db.updateTime(path), at, `${path} was not touched`);
-    assert.deepEqual(await db.read(path), LEGACY[path], `${path} still holds the pre-cutover shape`);
-  }
-  assert.equal(audit.output['payment-provider:users'].docsFixed, 1, 'one of the two users needs the rename');
-  assert.equal(audit.output['payment-provider:users'].totalDocs, 2);
-  assert.equal(audit.output['payment-provider:payments-disputes'].docsFixed, 1);
+        ctx.expect(audit.status).toBe('success');
+        ctx.expect(db.writes, 'the audit performed no write').toBe(0);
+        for (const [path, at] of Object.entries(settled)) {
+          ctx.expect(await db.updateTime(path), `${path} was not touched`).toBe(at);
+          ctx.expect(await db.read(path), `${path} still holds the pre-cutover shape`).toEqual(LEGACY[path]);
+        }
+        ctx.expect(audit.output['payment-provider:users'].docsFixed, 'one of the two users needs the rename').toBe(1);
+        ctx.expect(audit.output['payment-provider:users'].totalDocs).toBe(2);
+        ctx.expect(audit.output['payment-provider:payments-disputes'].docsFixed).toBe(1);
 
-  // ── Pass 2: --execute. The rename lands on the server ─────────────────────
-  const executed = await runMigrations(root, db, { migration: 'payment-provider', execute: true });
+        // ── Pass 2: --execute. The rename lands on the server ─────────────────────
+        const executed = await runMigrations(root, db, { migration: 'payment-provider', execute: true });
 
-  assert.equal(executed.status, 'success');
-  assert.equal(db.writes, 5, 'exactly one write per legacy document, and none for the converged pair');
+        ctx.expect(executed.status).toBe('success');
+        ctx.expect(db.writes, 'exactly one write per legacy document, and none for the converged pair').toBe(5);
 
-  const user = await db.read('users/uid-legacy');
-  assert.equal(user.subscription.payment.provider, 'stripe');
-  assert.equal('processor' in user.subscription.payment, false, 'the retired key is gone from the server document');
-  assert.equal(user.subscription.payment.resourceId, 'sub_1', 'the sibling field survived the masked patch');
-  assert.equal(user.subscription.status, 'active');
+        const user = await db.read('users/uid-legacy');
+        ctx.expect(user.subscription.payment.provider).toBe('stripe');
+        ctx.expect('processor' in user.subscription.payment, 'the retired key is gone from the server document').toBe(false);
+        ctx.expect(user.subscription.payment.resourceId, 'the sibling field survived the masked patch').toBe('sub_1');
+        ctx.expect(user.subscription.status).toBe('active');
 
-  assert.deepEqual(await db.read('payments-orders/order-legacy'), { id: 'order-legacy', owner: 'uid-legacy', provider: 'paypal' });
-  assert.deepEqual(await db.read('payments-intents/intent-legacy'), { id: 'intent-legacy', owner: 'uid-legacy', provider: 'chargebee' });
-  assert.deepEqual(await db.read('payments-webhooks/evt-legacy'), { id: 'evt-legacy', provider: 'stripe', eventType: 'invoice.paid' });
+        ctx.expect(await db.read('payments-orders/order-legacy')).toEqual({ id: 'order-legacy', owner: 'uid-legacy', provider: 'paypal' });
+        ctx.expect(await db.read('payments-intents/intent-legacy')).toEqual({ id: 'intent-legacy', owner: 'uid-legacy', provider: 'chargebee' });
+        ctx.expect(await db.read('payments-webhooks/evt-legacy')).toEqual({ id: 'evt-legacy', provider: 'stripe', eventType: 'invoice.paid' });
 
-  const dispute = await db.read('payments-disputes/alert-legacy');
-  assert.equal(dispute.alert.provider, 'stripe', 'the PAYMENT provider moved onto the new word');
-  assert.equal('processor' in dispute.alert, false);
-  assert.equal(dispute.provider, 'chargeblast', 'the ALERT source is a different field and is untouched');
-  assert.equal(dispute.alert.subprovider, 'Ethoca', "Chargeblast's own sibling field survived");
+        const dispute = await db.read('payments-disputes/alert-legacy');
+        ctx.expect(dispute.alert.provider, 'the PAYMENT provider moved onto the new word').toBe('stripe');
+        ctx.expect('processor' in dispute.alert).toBe(false);
+        ctx.expect(dispute.provider, 'the ALERT source is a different field and is untouched').toBe('chargeblast');
+        ctx.expect(dispute.alert.subprovider, "Chargeblast's own sibling field survived").toBe('Ethoca');
 
-  // The converged pair was never written, so it is byte-identical
-  assert.deepEqual(await db.read('users/uid-current'), CONVERGED['users/uid-current']);
-  assert.deepEqual(await db.read('payments-orders/order-current'), CONVERGED['payments-orders/order-current']);
+        // The converged pair was never written, so it is byte-identical
+        ctx.expect(await db.read('users/uid-current')).toEqual(CONVERGED['users/uid-current']);
+        ctx.expect(await db.read('payments-orders/order-current')).toEqual(CONVERGED['payments-orders/order-current']);
 
-  // ── Pass 3: idempotent. A converged brand writes nothing ──────────────────
-  const writesBefore = db.writes;
-  const rerun = await runMigrations(root, db, { migration: 'payment-provider', execute: true });
+        // ── Pass 3: idempotent. A converged brand writes nothing ──────────────────
+        const writesBefore = db.writes;
+        const rerun = await runMigrations(root, db, { migration: 'payment-provider', execute: true });
 
-  assert.equal(rerun.status, 'success');
-  assert.equal(db.writes, writesBefore, 'a second --execute is a strict no-op');
-  assert.equal(rerun.output['payment-provider:users'].docsFixed, 0);
-  assert.equal(rerun.output['payment-provider:payments-orders'].docsFixed, 0);
+        ctx.expect(rerun.status).toBe('success');
+        ctx.expect(db.writes, 'a second --execute is a strict no-op').toBe(writesBefore);
+        ctx.expect(rerun.output['payment-provider:users'].docsFixed).toBe(0);
+        ctx.expect(rerun.output['payment-provider:payments-orders'].docsFixed).toBe(0);
+      },
+    },
+  ],
 });

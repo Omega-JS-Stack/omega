@@ -15,11 +15,10 @@ const SPAWN_TIMEOUT = 20000;
 
 let tempCount = 0;
 
-// A child starts clean: no inherited runner signal, node:test child context, or extended mode.
+// A child starts clean: no inherited node:test child context or extended mode.
 // An `extra` key set to undefined removes that variable too.
 function cleanEnv(extra = {}) {
   const env = { ...process.env };
-  delete env.OMEGA_CASE_RUNNER;
   delete env.NODE_TEST_CONTEXT;
   delete env.TEST_EXTENDED_MODE;
   for (const [key, value] of Object.entries(extra)) {
@@ -41,6 +40,13 @@ function tempPath(label) {
 
 function removeAll(...paths) {
   for (const p of paths) fs.rmSync(p, { recursive: true, force: true });
+}
+
+// Read a temp output file a fixture wrote, then remove it.
+function takeFile(file) {
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  removeAll(file);
+  return text;
 }
 
 function parseJson(text) {
@@ -136,6 +142,7 @@ module.exports = {
   fixtureDir,
   tempPath,
   removeAll,
+  takeFile,
   runCli,
   runNode,
   runScenario,

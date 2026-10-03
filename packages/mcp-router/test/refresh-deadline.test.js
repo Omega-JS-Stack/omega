@@ -12,8 +12,7 @@
  * the shipped 30s default is untouched.
  */
 
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -43,44 +42,6 @@ const schema = { type: 'object', properties: {} };
 let client;
 let markerFile;
 
-before(async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-refresh-'));
-  const overlayDir = path.join(root, 'servers');
-  markerFile = path.join(root, 'starts.log');
-
-  const entries = {
-    // Every bundled default off, by the one-key overlay the layering promises.
-    ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
-    'fixture-hang': {
-      enabled: true,
-      command: 'node',
-      args: [HANG_SERVER, TAG],
-      env: { HANG_MARKER: markerFile },
-      tools: [{ name: 'ping', description: 'Never answered.', inputSchema: schema }],
-    },
-  };
-  for (const [name, config] of Object.entries(entries)) {
-    fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
-    fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
-  }
-
-  client = new Client({ name: 'router-refresh-e2e', version: '1.0.0' }, { capabilities: {} });
-  await client.connect(new StdioClientTransport({
-    command: process.execPath,
-    args: [ROUTER],
-    env: {
-      ...process.env,
-      MCP_ROUTER_SERVERS_DIR: overlayDir,
-      MCP_ROUTER_SPAWN_TIMEOUT_MS: String(DEADLINE_MS),
-    },
-    stderr: 'ignore',
-  }));
-});
-
-after(async () => {
-  await client.close();
-});
-
 const callTool = async (name, args) => {
   const started = Date.now();
   const result = await client.callTool({ name, arguments: args });
@@ -103,21 +64,69 @@ const liveChildren = () => {
   }
 };
 
-test('a refresh whose child never finishes the handshake fails at the deadline', async () => {
-  const result = await callTool('router__refresh_upstream', { name: 'fixture-hang' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'refresh-deadline',
+  setup: async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-refresh-'));
+    const overlayDir = path.join(root, 'servers');
+    markerFile = path.join(root, 'starts.log');
 
-  assert.equal(result.isError, true);
-  assert.match(result.text, /Refresh failed for "fixture-hang": handshake did not finish within 1200ms/);
-  assert.ok(result.elapsed >= DEADLINE_MS, `waited ${result.elapsed}ms, expected at least the deadline`);
-  // Generous, but far below the SDK's own 60s request timeout: what answered
-  // here was the router's deadline, not the client giving up.
-  assert.ok(result.elapsed < 15000, `waited ${result.elapsed}ms, expected the deadline to answer`);
-  assert.equal(starts(), 1, 'the refresh started its own child');
-});
+    const entries = {
+      // Every bundled default off, by the one-key overlay the layering promises.
+      ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
+      'fixture-hang': {
+        enabled: true,
+        command: 'node',
+        args: [HANG_SERVER, TAG],
+        env: { HANG_MARKER: markerFile },
+        tools: [{ name: 'ping', description: 'Never answered.', inputSchema: schema }],
+      },
+    };
+    for (const [name, config] of Object.entries(entries)) {
+      fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
+      fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+    }
 
-test('the stuck refresh child does not outlive the call', () => {
-  // The failure path closes the transport, which ends the child's stdin and
-  // waits for it to go. Nothing else would ever stop it: the fixture holds
-  // its own loop open, so a leaked child lives until the router exits.
-  assert.deepEqual(liveChildren(), [], 'the one-shot child was terminated');
+    client = new Client({ name: 'router-refresh-e2e', version: '1.0.0' }, { capabilities: {} });
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [ROUTER],
+      env: {
+        ...process.env,
+        MCP_ROUTER_SERVERS_DIR: overlayDir,
+        MCP_ROUTER_SPAWN_TIMEOUT_MS: String(DEADLINE_MS),
+      },
+      stderr: 'ignore',
+    }));
+  },
+  cleanup: async () => {
+    await client.close();
+  },
+  tests: [
+    {
+      name: 'a refresh whose child never finishes the handshake fails at the deadline',
+      run: async (ctx) => {
+        const result = await callTool('router__refresh_upstream', { name: 'fixture-hang' });
+
+        ctx.expect(result.isError).toBe(true);
+        ctx.expect(result.text).toMatch(/Refresh failed for "fixture-hang": handshake did not finish within 1200ms/);
+        ctx.expect(result.elapsed >= DEADLINE_MS, `waited ${result.elapsed}ms, expected at least the deadline`).toBeTruthy();
+        // Generous, but far below the SDK's own 60s request timeout: what answered
+        // here was the router's deadline, not the client giving up.
+        ctx.expect(result.elapsed < 15000, `waited ${result.elapsed}ms, expected the deadline to answer`).toBeTruthy();
+        ctx.expect(starts(), 'the refresh started its own child').toBe(1);
+      },
+    },
+
+    {
+      name: 'the stuck refresh child does not outlive the call',
+      run: (ctx) => {
+        // The failure path closes the transport, which ends the child's stdin and
+        // waits for it to go. Nothing else would ever stop it: the fixture holds
+        // its own loop open, so a leaked child lives until the router exits.
+        ctx.expect(liveChildren(), 'the one-shot child was terminated').toEqual([]);
+      },
+    },
+  ],
 });

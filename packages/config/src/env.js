@@ -47,8 +47,9 @@ const { ENV_ENVIRONMENTS } = require('./environment.js');
  * follows the same answer the runtime will give.
  *
  * An already-set `OMEGA_ENVIRONMENT` wins outright, so the producer and the
- * reader can never disagree inside one process. Otherwise: testing wins, then
- * production, else development.
+ * reader can never disagree inside one process; a test lane names `testing`
+ * there and nowhere else. Otherwise: `ENVIRONMENT=production`, then the
+ * development signals, else production.
  *
  * The final `else` is PRODUCTION on purpose: a deployed Cloud Function has no
  * FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so "no signal" IS the normal
@@ -61,10 +62,6 @@ function envEnvironment() {
   // The one input, when a lane already named it (#817).
   if (ENV_ENVIRONMENTS.includes(process.env.OMEGA_ENVIRONMENT)) {
     return process.env.OMEGA_ENVIRONMENT;
-  }
-  // Testing takes precedence, set by the test runner / emulator (OMEGA_TEST_MODE=true).
-  if (process.env.OMEGA_TEST_MODE === 'true') {
-    return 'testing';
   }
   if (process.env.ENVIRONMENT === 'production') {
     return 'production';

@@ -5,8 +5,7 @@
  * commit-and-push (real git, local bare remote), and runDevlog's brand
  * resolution + dry-run path. No live GitHub or Ghostii calls.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -115,131 +114,6 @@ function devlogConfig(id, { enabled = true, org = 'fixture-org' } = {}) {
 }`;
 }
 
-// ─── Config default ──────────────────────────────────────────────────────────
-
-test('devlog: DEFAULTS carry the devlog block, disabled with website destination', () => {
-  assert.equal(DEFAULTS.devlog.enabled, false);
-  // The writer is a KEY under providers (#425); its settings live inside it
-  assert.deepEqual(Object.keys(DEFAULTS.devlog.providers), ['ghostii']);
-  assert.deepEqual(DEFAULTS.devlog.providers.ghostii.destinations, ['website']);
-  assert.equal(DEFAULTS.devlog.providers.ghostii.overrides.research, false);
-  assert.ok(!('provider' in DEFAULTS.devlog), 'the flat provider pick is retired');
-});
-
-// ─── Project map ─────────────────────────────────────────────────────────────
-
-test('devlog: the project map addresses the SOURCE repo the one derivation names (#883)', () => {
-  const brands = [
-    fakeBrand('alpha'),
-    fakeBrand('beta'),
-    fakeBrand('gamma', { owner: null }), // no repo.owner: skipped, like the repo service
-  ];
-
-  const map = buildProjectMap(brands);
-  assert.deepEqual(map, {
-    'alpha-omega': { project: 'alpha brand', url: 'https://alpha.test' },
-    'beta-omega': { project: 'beta brand', url: 'https://beta.test' },
-  });
-
-  const repos = buildBrandRepos(brands);
-  assert.deepEqual(repos, [
-    { owner: 'fixture-org', repo: 'alpha-omega' },
-    { owner: 'fixture-org', repo: 'beta-omega' },
-  ]);
-});
-
-test('devlog: a brand under another owner scans THAT owner, never the first one', () => {
-  const brands = [fakeBrand('acme', { owner: 'Acme-Org' })];
-
-  assert.deepEqual(buildProjectMap(brands), {
-    'acme-omega': { project: 'acme brand', url: 'https://acme.test' },
-  });
-  assert.deepEqual(buildBrandRepos(brands), [{ owner: 'Acme-Org', repo: 'acme-omega' }]);
-});
-
-test('devlog: excludeRepos drops repos from both map and scan list; duplicates collapse', () => {
-  // Two brands in one org whose ids derive the same source repo are ONE repo,
-  // and the duplicate the collapse is about.
-  const brands = [fakeBrand('alpha'), fakeBrand('alpha'), fakeBrand('beta')];
-
-  const map = buildProjectMap(brands, { excludeRepos: ['beta-omega'] });
-  assert.deepEqual(Object.keys(map), ['alpha-omega']);
-
-  const repos = buildBrandRepos(brands, { excludeRepos: ['beta-omega'] });
-  assert.deepEqual(repos, [{ owner: 'fixture-org', repo: 'alpha-omega' }]);
-});
-
-// ─── Collect ─────────────────────────────────────────────────────────────────
-
-test('devlog: collect pre-filters org listings (archived, stale, excluded, private) and probes brand repos', () => {
-  const api = fakeApi([
-    {
-      match: /^orgs\/fixture-org\/repos/,
-      body: [
-        { name: 'active', archived: false, private: false, pushed_at: FRESH(), homepage: 'https://product.test' },
-        { name: 'archived', archived: true, private: false, pushed_at: FRESH() },
-        { name: 'stale', archived: false, private: false, pushed_at: '2020-01-01T00:00:00Z' },
-        { name: 'excluded', archived: false, private: false, pushed_at: FRESH() },
-        { name: 'secret', archived: false, private: true, pushed_at: FRESH() },
-      ],
-    },
-    { match: /repos\/fixture-org\/active\/commits/, body: [ghCommit('feat: ship the thing')] },
-    { match: /repos\/other-org\/brand-repo\/commits/, body: new Error('gh command failed: 404') },
-  ]);
-
-  const { commits, repos } = collectCommits({
-    api,
-    orgs: ['fixture-org'],
-    brandRepos: [{ owner: 'other-org', repo: 'brand-repo' }],
-    since: SINCE(),
-    excludeRepos: ['excluded'],
-    includePrivate: false,
-  });
-
-  // Only `active` produced commits; the missing brand repo skipped quietly
-  assert.deepEqual(repos, ['fixture-org/active']);
-  assert.equal(commits.length, 1);
-  assert.equal(commits[0].message, 'feat: ship the thing');
-  assert.equal(commits[0].homepage, 'https://product.test');
-  assert.equal(commits[0].sha.length, 7);
-
-  // archived/stale/excluded/private never got a commits probe
-  const probed = api.calls.filter((c) => c.includes('/commits'));
-  assert.equal(probed.length, 2);
-});
-
-test('devlog: collect filters merge/bot/fleet/excludeCommits and caps at 30 per repo', () => {
-  const noisy = [
-    ghCommit('Merge branch main'),
-    ghCommit('📦 Omega: Add devlog post 2026-07-09-x'),
-    ghCommit('chore: bump deps', { login: 'renovate[bot]' }),
-    ghCommit('sneaky: mentions ProjectX rewrite'),
-    ...Array.from({ length: 40 }, (_, i) => ghCommit(`feat: change ${i}\n\nbody line`)),
-  ];
-  const api = fakeApi([{ match: /repos\/o\/r\/commits/, body: noisy }]);
-
-  const { commits } = collectCommits({
-    api,
-    brandRepos: [{ owner: 'o', repo: 'r' }],
-    since: SINCE(),
-    excludeCommits: ['projectx'],
-  });
-
-  assert.equal(commits.length, 30); // newest-first cap
-  assert.ok(commits.every((c) => c.message.startsWith('feat: change')));
-  assert.ok(!commits.some((c) => c.message.includes('\n'))); // first line only
-});
-
-test('devlog: collect repairs --paginate concatenated page arrays', () => {
-  const page1 = JSON.stringify([ghCommit('feat: page one')]);
-  const page2 = JSON.stringify([ghCommit('feat: page two')]);
-  const api = fakeApi([{ match: /repos\/o\/r\/commits/, body: `${page1}${page2}` }]);
-
-  const { commits } = collectCommits({ api, brandRepos: [{ owner: 'o', repo: 'r' }], since: SINCE() });
-
-  assert.deepEqual(commits.map((c) => c.message), ['feat: page one', 'feat: page two']);
-});
-
 // ─── Generate ────────────────────────────────────────────────────────────────
 
 function brandConfigFor(id, overrides = {}) {
@@ -253,72 +127,6 @@ function brandConfigFor(id, overrides = {}) {
   };
 }
 
-test('devlog: generate groups the digest by repo, labels mapped projects, and grounds links in real work', async () => {
-  const commits = [
-    { owner: 'o', repo: 'alpha', homepage: '', message: 'feat: one' },
-    { owner: 'o', repo: 'alpha', homepage: '', message: 'fix: two' },
-    { owner: 'o', repo: 'mystery', homepage: 'https://mystery.test', message: 'feat: three' },
-  ];
-  const projectMap = { alpha: { project: 'Alpha', url: 'https://alpha.test' } };
-
-  let captured;
-  const post = await generatePost({
-    brandConfig: brandConfigFor('alpha', { excludeTopics: ['secret plans'] }),
-    commits,
-    projectMap,
-    days: 5,
-    write: async (args) => { captured = args; return ARTICLE; },
-  });
-
-  // Digest: repo sections with project labels; unmapped repo falls back to homepage
-  assert.ok(captured.sourceContent.includes('## alpha — part of "Alpha" (https://alpha.test)'));
-  assert.ok(captured.sourceContent.includes('- feat: one\n- fix: two'));
-  assert.ok(captured.sourceContent.includes('## mystery — project: mystery (https://mystery.test)'));
-
-  // Brief: task + blocklist + voice (brand.description fallback), links grounded
-  assert.ok(captured.description.includes('First-person devlog post for alpha brand'));
-  assert.ok(captured.description.includes('NEVER discuss, mention, or allude to: secret plans.'));
-  assert.ok(captured.description.includes('Voice: We build things.'));
-  assert.deepEqual(captured.links, ['https://alpha.test', 'https://mystery.test']);
-  assert.deepEqual(captured.overrides, brandConfigFor('alpha').devlog.providers.ghostii.overrides);
-
-  // blocksToPost: title from heading-1, header image extracted, body = the rest
-  assert.equal(post.title, 'Auth Round Trips');
-  assert.equal(post.slug, 'auth-round-trips');
-  assert.equal(post.headerImageUrl, 'https://img.test/header.png');
-  assert.equal(post.body, 'First paragraph.\n\nSecond paragraph.');
-  assert.deepEqual(post.tags, ['devlog']);
-});
-
-test('devlog: generate rejects unknown providers and title-less responses', async () => {
-  const commits = [{ owner: 'o', repo: 'r', homepage: '', message: 'feat: x' }];
-
-  const quillbot = brandConfigFor('a');
-  quillbot.devlog.providers = { quillbot: {} };
-  await assert.rejects(
-    generatePost({ brandConfig: quillbot, commits, projectMap: {}, days: 5 }),
-    /Unknown devlog writer: quillbot/,
-  );
-
-  const noWriter = brandConfigFor('a');
-  noWriter.devlog.providers = {};
-  await assert.rejects(
-    generatePost({ brandConfig: noWriter, commits, projectMap: {}, days: 5 }),
-    /Unknown devlog writer: null/,
-  );
-
-  await assert.rejects(
-    generatePost({
-      brandConfig: brandConfigFor('a'),
-      commits,
-      projectMap: {},
-      days: 5,
-      write: async () => ({ json: [], title: '', body: '' }),
-    }),
-    /missing title or body/,
-  );
-});
-
 // ─── Publish ─────────────────────────────────────────────────────────────────
 
 const POST = {
@@ -330,175 +138,414 @@ const POST = {
   body: 'The body.',
 };
 
-test('devlog: renderPostFile emits blueprint front matter with the brand author', () => {
-  const file = renderPostFile(brandConfigFor('alpha'), POST);
+module.exports = defineCases({
+  type: 'group',
+  description: 'devlog',
+  tests: [
+    // ─── Config default ──────────────────────────────────────────────────────────
 
-  assert.ok(file.startsWith('---\nlayout: blueprint/blog/post\n'), 'plain frontmatter — no dispersal-era section markers (C2)');
-  assert.ok(!file.includes('###'), 'marker convention retired');
-  assert.ok(file.includes('post:\n  title: "Auth Round Trips"'));
-  assert.ok(file.includes('  author: alpha'));
-  assert.ok(file.includes('  tags: ["devlog"]'));
-  assert.ok(file.endsWith('---\n\nThe body.\n'));
-});
+    {
+      name: 'devlog: DEFAULTS carry the devlog block, disabled with website destination',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.devlog.enabled).toBe(false);
+        // The writer is a KEY under providers (#425); its settings live inside it
+        ctx.expect(Object.keys(DEFAULTS.devlog.providers)).toEqual(['ghostii']);
+        ctx.expect(DEFAULTS.devlog.providers.ghostii.destinations).toEqual(['website']);
+        ctx.expect(DEFAULTS.devlog.providers.ghostii.overrides.research).toBe(false);
+        ctx.expect(!('provider' in DEFAULTS.devlog), 'the flat provider pick is retired').toBeTruthy();
+      },
+    },
 
-test('devlog: publish writes into the website target, commits ONLY the post file, and pushes', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-publish-'));
-  const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
+    // ─── Project map ─────────────────────────────────────────────────────────────
 
-  const git = (args, cwd = brandRoot) => execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-  const bare = path.join(tmp, 'remote.git');
-  execSync(`git init --bare "${bare}"`, { encoding: 'utf8' });
-  git('init -b main');
-  git('config user.email devlog@test.local && git config user.name Devlog', brandRoot);
-  git('add -A && git commit -m "init" -q', brandRoot);
-  git(`remote add origin "${bare}"`);
-  git('push -u origin main -q');
+    {
+      name: 'devlog: the project map addresses the SOURCE repo the one derivation names (#883)',
+      run: (ctx) => {
+        const brands = [
+          fakeBrand('alpha'),
+          fakeBrand('beta'),
+          fakeBrand('gamma', { owner: null }), // no repo.owner: skipped, like the repo service
+        ];
 
-  // An unrelated dirty file must survive untouched and uncommitted
-  fs.writeFileSync(path.join(brandRoot, 'scratch.txt'), 'dirty');
+        const map = buildProjectMap(brands);
+        ctx.expect(map).toEqual({
+          'alpha-omega': { project: 'alpha brand', url: 'https://alpha.test' },
+          'beta-omega': { project: 'beta brand', url: 'https://beta.test' },
+        });
 
-  const brand = loadBrand(brandRoot);
-  const { postPath, url } = publishToWebsite({ brand, post: POST });
+        const repos = buildBrandRepos(brands);
+        ctx.expect(repos).toEqual([
+          { owner: 'fixture-org', repo: 'alpha-omega' },
+          { owner: 'fixture-org', repo: 'beta-omega' },
+        ]);
+      },
+    },
 
-  const year = String(new Date().getFullYear());
-  assert.ok(postPath.includes(path.join('targets', 'web', 'src', '_posts', year, 'devlog')));
-  assert.ok(postPath.endsWith('-auth-round-trips.md'));
-  assert.equal(url, 'https://alpha.test/blog/auth-round-trips');
+    {
+      name: 'devlog: a brand under another owner scans THAT owner, never the first one',
+      run: (ctx) => {
+        const brands = [fakeBrand('acme', { owner: 'Acme-Org' })];
 
-  // The commit holds exactly the post file, and it reached the remote
-  const files = git('show --name-only --format= HEAD').trim().split('\n');
-  assert.deepEqual(files, [path.relative(brandRoot, postPath).split(path.sep).join('/')]);
-  assert.ok(git('log main --format=%s -1', bare).includes('📦 Omega: Add devlog post'));
-  assert.ok(git('status --porcelain').includes('scratch.txt'));
-});
+        ctx.expect(buildProjectMap(brands)).toEqual({
+          'acme-omega': { project: 'acme brand', url: 'https://acme.test' },
+        });
+        ctx.expect(buildBrandRepos(brands)).toEqual([{ owner: 'Acme-Org', repo: 'acme-omega' }]);
+      },
+    },
 
-test('devlog: publish throws when the brand has no website target', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-noweb-'));
-  const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
-  fs.rmSync(path.join(brandRoot, 'targets'), { recursive: true });
+    {
+      name: 'devlog: excludeRepos drops repos from both map and scan list; duplicates collapse',
+      run: (ctx) => {
+        // Two brands in one org whose ids derive the same source repo are ONE repo,
+        // and the duplicate the collapse is about.
+        const brands = [fakeBrand('alpha'), fakeBrand('alpha'), fakeBrand('beta')];
 
-  const brand = loadBrand(brandRoot);
-  assert.throws(() => publishToWebsite({ brand, post: POST }), /no website target under targets\//);
-});
+        const map = buildProjectMap(brands, { excludeRepos: ['beta-omega'] });
+        ctx.expect(Object.keys(map)).toEqual(['alpha-omega']);
 
-// ─── runDevlog resolution + dry-run ──────────────────────────────────────────
+        const repos = buildBrandRepos(brands, { excludeRepos: ['beta-omega'] });
+        ctx.expect(repos).toEqual([{ owner: 'fixture-org', repo: 'alpha-omega' }]);
+      },
+    },
 
-test('devlog: brand-root runs enforce enabled + orgs and reject mismatched --brand', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-brand-'));
-  const disabled = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha', { enabled: false }) });
-  await assert.rejects(runDevlog(disabled), /Devlog is disabled for alpha/);
-  await assert.rejects(runDevlog(disabled, { brand: 'other' }), /does not match this brand root/);
+    // ─── Collect ─────────────────────────────────────────────────────────────────
 
-  const noOrgs = stageBrandDir(tmp, 'beta', {
-    config: `{
+    {
+      name: 'devlog: collect pre-filters org listings (archived, stale, excluded, private) and probes brand repos',
+      run: (ctx) => {
+        const api = fakeApi([
+          {
+            match: /^orgs\/fixture-org\/repos/,
+            body: [
+              { name: 'active', archived: false, private: false, pushed_at: FRESH(), homepage: 'https://product.test' },
+              { name: 'archived', archived: true, private: false, pushed_at: FRESH() },
+              { name: 'stale', archived: false, private: false, pushed_at: '2020-01-01T00:00:00Z' },
+              { name: 'excluded', archived: false, private: false, pushed_at: FRESH() },
+              { name: 'secret', archived: false, private: true, pushed_at: FRESH() },
+            ],
+          },
+          { match: /repos\/fixture-org\/active\/commits/, body: [ghCommit('feat: ship the thing')] },
+          { match: /repos\/other-org\/brand-repo\/commits/, body: new Error('gh command failed: 404') },
+        ]);
+
+        const { commits, repos } = collectCommits({
+          api,
+          orgs: ['fixture-org'],
+          brandRepos: [{ owner: 'other-org', repo: 'brand-repo' }],
+          since: SINCE(),
+          excludeRepos: ['excluded'],
+          includePrivate: false,
+        });
+
+        // Only `active` produced commits; the missing brand repo skipped quietly
+        ctx.expect(repos).toEqual(['fixture-org/active']);
+        ctx.expect(commits.length).toBe(1);
+        ctx.expect(commits[0].message).toBe('feat: ship the thing');
+        ctx.expect(commits[0].homepage).toBe('https://product.test');
+        ctx.expect(commits[0].sha.length).toBe(7);
+
+        // archived/stale/excluded/private never got a commits probe
+        const probed = api.calls.filter((c) => c.includes('/commits'));
+        ctx.expect(probed.length).toBe(2);
+      },
+    },
+
+    {
+      name: 'devlog: collect filters merge/bot/fleet/excludeCommits and caps at 30 per repo',
+      run: (ctx) => {
+        const noisy = [
+          ghCommit('Merge branch main'),
+          ghCommit('📦 Omega: Add devlog post 2026-07-09-x'),
+          ghCommit('chore: bump deps', { login: 'renovate[bot]' }),
+          ghCommit('sneaky: mentions ProjectX rewrite'),
+          ...Array.from({ length: 40 }, (_, i) => ghCommit(`feat: change ${i}\n\nbody line`)),
+        ];
+        const api = fakeApi([{ match: /repos\/o\/r\/commits/, body: noisy }]);
+
+        const { commits } = collectCommits({
+          api,
+          brandRepos: [{ owner: 'o', repo: 'r' }],
+          since: SINCE(),
+          excludeCommits: ['projectx'],
+        });
+
+        ctx.expect(commits.length).toBe(30); // newest-first cap
+        ctx.expect(commits.every((c) => c.message.startsWith('feat: change'))).toBeTruthy();
+        ctx.expect(!commits.some((c) => c.message.includes('\n'))).toBeTruthy(); // first line only
+      },
+    },
+
+    {
+      name: 'devlog: collect repairs --paginate concatenated page arrays',
+      run: (ctx) => {
+        const page1 = JSON.stringify([ghCommit('feat: page one')]);
+        const page2 = JSON.stringify([ghCommit('feat: page two')]);
+        const api = fakeApi([{ match: /repos\/o\/r\/commits/, body: `${page1}${page2}` }]);
+
+        const { commits } = collectCommits({ api, brandRepos: [{ owner: 'o', repo: 'r' }], since: SINCE() });
+
+        ctx.expect(commits.map((c) => c.message)).toEqual(['feat: page one', 'feat: page two']);
+      },
+    },
+
+    {
+      name: 'devlog: generate groups the digest by repo, labels mapped projects, and grounds links in real work',
+      run: async (ctx) => {
+        const commits = [
+          { owner: 'o', repo: 'alpha', homepage: '', message: 'feat: one' },
+          { owner: 'o', repo: 'alpha', homepage: '', message: 'fix: two' },
+          { owner: 'o', repo: 'mystery', homepage: 'https://mystery.test', message: 'feat: three' },
+        ];
+        const projectMap = { alpha: { project: 'Alpha', url: 'https://alpha.test' } };
+
+        let captured;
+        const post = await generatePost({
+          brandConfig: brandConfigFor('alpha', { excludeTopics: ['secret plans'] }),
+          commits,
+          projectMap,
+          days: 5,
+          write: async (args) => { captured = args; return ARTICLE; },
+        });
+
+        // Digest: repo sections with project labels; unmapped repo falls back to homepage
+        ctx.expect(captured.sourceContent.includes('## alpha — part of "Alpha" (https://alpha.test)')).toBeTruthy();
+        ctx.expect(captured.sourceContent.includes('- feat: one\n- fix: two')).toBeTruthy();
+        ctx.expect(captured.sourceContent.includes('## mystery — project: mystery (https://mystery.test)')).toBeTruthy();
+
+        // Brief: task + blocklist + voice (brand.description fallback), links grounded
+        ctx.expect(captured.description.includes('First-person devlog post for alpha brand')).toBeTruthy();
+        ctx.expect(captured.description.includes('NEVER discuss, mention, or allude to: secret plans.')).toBeTruthy();
+        ctx.expect(captured.description.includes('Voice: We build things.')).toBeTruthy();
+        ctx.expect(captured.links).toEqual(['https://alpha.test', 'https://mystery.test']);
+        ctx.expect(captured.overrides).toEqual(brandConfigFor('alpha').devlog.providers.ghostii.overrides);
+
+        // blocksToPost: title from heading-1, header image extracted, body = the rest
+        ctx.expect(post.title).toBe('Auth Round Trips');
+        ctx.expect(post.slug).toBe('auth-round-trips');
+        ctx.expect(post.headerImageUrl).toBe('https://img.test/header.png');
+        ctx.expect(post.body).toBe('First paragraph.\n\nSecond paragraph.');
+        ctx.expect(post.tags).toEqual(['devlog']);
+      },
+    },
+
+    {
+      name: 'devlog: generate rejects unknown providers and title-less responses',
+      run: async (ctx) => {
+        const commits = [{ owner: 'o', repo: 'r', homepage: '', message: 'feat: x' }];
+
+        const quillbot = brandConfigFor('a');
+        quillbot.devlog.providers = { quillbot: {} };
+        await ctx.expect(generatePost({ brandConfig: quillbot, commits, projectMap: {}, days: 5 })).rejects.toThrow(/Unknown devlog writer: quillbot/);
+
+        const noWriter = brandConfigFor('a');
+        noWriter.devlog.providers = {};
+        await ctx.expect(generatePost({ brandConfig: noWriter, commits, projectMap: {}, days: 5 })).rejects.toThrow(/Unknown devlog writer: null/);
+
+        await ctx.expect(generatePost({
+            brandConfig: brandConfigFor('a'),
+            commits,
+            projectMap: {},
+            days: 5,
+            write: async () => ({ json: [], title: '', body: '' }),
+          })).rejects.toThrow(/missing title or body/);
+      },
+    },
+
+    {
+      name: 'devlog: renderPostFile emits blueprint front matter with the brand author',
+      run: (ctx) => {
+        const file = renderPostFile(brandConfigFor('alpha'), POST);
+
+        ctx.expect(file.startsWith('---\nlayout: blueprint/blog/post\n'), 'plain frontmatter — no dispersal-era section markers (C2)').toBeTruthy();
+        ctx.expect(!file.includes('###'), 'marker convention retired').toBeTruthy();
+        ctx.expect(file.includes('post:\n  title: "Auth Round Trips"')).toBeTruthy();
+        ctx.expect(file.includes('  author: alpha')).toBeTruthy();
+        ctx.expect(file.includes('  tags: ["devlog"]')).toBeTruthy();
+        ctx.expect(file.endsWith('---\n\nThe body.\n')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'devlog: publish writes into the website target, commits ONLY the post file, and pushes',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-publish-'));
+        const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
+
+        const git = (args, cwd = brandRoot) => execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+        const bare = path.join(tmp, 'remote.git');
+        execSync(`git init --bare "${bare}"`, { encoding: 'utf8' });
+        git('init -b main');
+        git('config user.email devlog@test.local && git config user.name Devlog', brandRoot);
+        git('add -A && git commit -m "init" -q', brandRoot);
+        git(`remote add origin "${bare}"`);
+        git('push -u origin main -q');
+
+        // An unrelated dirty file must survive untouched and uncommitted
+        fs.writeFileSync(path.join(brandRoot, 'scratch.txt'), 'dirty');
+
+        const brand = loadBrand(brandRoot);
+        const { postPath, url } = publishToWebsite({ brand, post: POST });
+
+        const year = String(new Date().getFullYear());
+        ctx.expect(postPath.includes(path.join('targets', 'web', 'src', '_posts', year, 'devlog'))).toBeTruthy();
+        ctx.expect(postPath.endsWith('-auth-round-trips.md')).toBeTruthy();
+        ctx.expect(url).toBe('https://alpha.test/blog/auth-round-trips');
+
+        // The commit holds exactly the post file, and it reached the remote
+        const files = git('show --name-only --format= HEAD').trim().split('\n');
+        ctx.expect(files).toEqual([path.relative(brandRoot, postPath).split(path.sep).join('/')]);
+        ctx.expect(git('log main --format=%s -1', bare).includes('📦 Omega: Add devlog post')).toBeTruthy();
+        ctx.expect(git('status --porcelain').includes('scratch.txt')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'devlog: publish throws when the brand has no website target',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-noweb-'));
+        const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
+        fs.rmSync(path.join(brandRoot, 'targets'), { recursive: true });
+
+        const brand = loadBrand(brandRoot);
+        ctx.expect(() => publishToWebsite({ brand, post: POST })).toThrow(/no website target under targets\//);
+      },
+    },
+
+    // ─── runDevlog resolution + dry-run ──────────────────────────────────────────
+
+    {
+      name: 'devlog: brand-root runs enforce enabled + orgs and reject mismatched --brand',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-brand-'));
+        const disabled = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha', { enabled: false }) });
+        await ctx.expect(runDevlog(disabled)).rejects.toThrow(/Devlog is disabled for alpha/);
+        await ctx.expect(runDevlog(disabled, { brand: 'other' })).rejects.toThrow(/does not match this brand root/);
+
+        const noOrgs = stageBrandDir(tmp, 'beta', {
+          config: `{
   brand: { id: 'beta', name: 'beta brand', url: 'https://beta.test' },
   targets: { web: { type: 'web' } },
   devlog: { enabled: true },
 }`,
-  });
-  await assert.rejects(runDevlog(noOrgs), /No devlog.providers.ghostii.orgs configured for beta/);
-});
-
-test('devlog: an empty window reports published: false without generating', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-empty-'));
-  const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
-
-  const report = await runDevlog(brandRoot, {}, {
-    githubApi: fakeApi([]), // every listing/probe returns []
-    generatePost: async () => { throw new Error('must not generate'); },
-  });
-
-  assert.deepEqual(report, { published: false, commits: 0 });
-});
-
-// #586 — devlog talks to REAL GitHub and a real writer account, so its secrets
-// chain is pinned to the `production` overlay: the shell's incidental
-// environment never decides which token the run publishes with.
-test('devlog: the secrets chain reads the brand .env.production overlay, whatever the shell says', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-env-'));
-  const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
-  const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
-
-  fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_FIXTURE_KEY="from-the-base"\n');
-  fs.writeFileSync(path.join(brandRoot, '.env.development'), 'DEVLOG_FIXTURE_KEY="from-the-development-overlay"\n');
-  fs.writeFileSync(path.join(brandRoot, '.env.production'), 'DEVLOG_FIXTURE_KEY="from-the-production-overlay"\n');
-
-  try {
-    delete process.env.DEVLOG_FIXTURE_KEY;
-    delete process.env.OMEGA_TEST_MODE;
-    process.env.ENVIRONMENT = 'development';
-
-    await runDevlog(brandRoot, {}, {
-      githubApi: fakeApi([]),
-      generatePost: async () => { throw new Error('must not generate'); },
-    });
-
-    assert.equal(process.env.DEVLOG_FIXTURE_KEY, 'from-the-production-overlay', 'the devlog lane pins production — a development shell never swaps the overlay');
-  } finally {
-    delete process.env.DEVLOG_FIXTURE_KEY;
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('devlog: --dry-run previews to the brand\'s .omega/devlog/', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-dry-'));
-  const brandRoot = stageBrandDir(tmp, 'brand-b', { config: devlogConfig('brand-b') });
-
-  const api = fakeApi([
-    { match: /^orgs\/fixture-org\/repos/, body: [{ name: 'tool', archived: false, private: false, pushed_at: FRESH() }] },
-    { match: /repos\/fixture-org\/tool\/commits/, body: [ghCommit('feat: sharpen the tool')] },
-    { match: /repos\/fixture-org\/brand-b\/commits/, body: new Error('404') },
-  ]);
-
-  const report = await runDevlog(brandRoot, { dryRun: true }, {
-    githubApi: api,
-    generatePost: async ({ commits, projectMap }) => {
-      assert.deepEqual(Object.keys(projectMap).sort(), ['brand-b-omega']);
-      assert.equal(commits.length, 1);
-      return { ...POST, slug: 'sharpen-the-tool' };
+        });
+        await ctx.expect(runDevlog(noOrgs)).rejects.toThrow(/No devlog.providers.ghostii.orgs configured for beta/);
+      },
     },
-  });
 
-  assert.equal(report.published, false);
-  assert.equal(report.commits, 1);
-  assert.equal(report.previewPath, path.join(brandRoot, '.omega', 'devlog', 'sharpen-the-tool.md'));
-  assert.ok(fs.readFileSync(report.previewPath, 'utf8').includes('layout: blueprint/blog/post'));
-});
+    {
+      name: 'devlog: an empty window reports published: false without generating',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-empty-'));
+        const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
 
-// #677: the company layer is a layer likeany other: the shared `.env` inside
-// the company brand's `company/` tree loads UNDER the brand's own.
-test('devlog: the company .env resolves through the ONE resolver and loads under the brand\'s', async (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-co-'));
-  const brandRoot = stageBrandDir(tmp, 'alpha', {
-    config: devlogConfig('alpha').replace('{', "{\n  company: { id: 'fixture-co' },"),
-  });
+        const report = await runDevlog(brandRoot, {}, {
+          githubApi: fakeApi([]), // every listing/probe returns []
+          generatePost: async () => { throw new Error('must not generate'); },
+        });
 
-  // The company brand, its tree, and the registry line its own run wrote
-  const companyBrandRoot = path.join(tmp, 'fixture-co');
-  fs.mkdirSync(path.join(companyBrandRoot, 'company'), { recursive: true });
-  fs.writeFileSync(path.join(companyBrandRoot, 'company', '.env'), 'DEVLOG_COMPANY_KEY="from-the-company"\nDEVLOG_SHARED_KEY="from-the-company"\n');
-  fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_SHARED_KEY="from-the-brand"\n');
+        ctx.expect(report).toEqual({ published: false, commits: 0 });
+      },
+    },
 
-  const previousHome = process.env.OMEGA_HOME;
-  process.env.OMEGA_HOME = path.join(tmp, 'home');
-  t.after(() => {
-    delete process.env.DEVLOG_COMPANY_KEY;
-    delete process.env.DEVLOG_SHARED_KEY;
-    if (previousHome === undefined) delete process.env.OMEGA_HOME;
-    else process.env.OMEGA_HOME = previousHome;
-    fs.rmSync(tmp, { recursive: true, force: true });
-  });
-  recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+    // #586 — devlog talks to REAL GitHub and a real writer account, so its secrets
+    // chain is pinned to the `production` overlay: the shell's incidental
+    // environment never decides which token the run publishes with.
+    {
+      name: 'devlog: the secrets chain reads the brand .env.production overlay, whatever the shell says',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-env-'));
+        const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
+        const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT };
 
-  await runDevlog(brandRoot, {}, {
-    githubApi: fakeApi([]),
-    generatePost: async () => { throw new Error('must not generate'); },
-  });
+        fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_FIXTURE_KEY="from-the-base"\n');
+        fs.writeFileSync(path.join(brandRoot, '.env.development'), 'DEVLOG_FIXTURE_KEY="from-the-development-overlay"\n');
+        fs.writeFileSync(path.join(brandRoot, '.env.production'), 'DEVLOG_FIXTURE_KEY="from-the-production-overlay"\n');
 
-  assert.equal(process.env.DEVLOG_COMPANY_KEY, 'from-the-company', 'the company layer fills the gap');
-  assert.equal(process.env.DEVLOG_SHARED_KEY, 'from-the-brand', 'the brand still wins over its company');
+        try {
+          delete process.env.DEVLOG_FIXTURE_KEY;
+          delete process.env.OMEGA_ENVIRONMENT;
+          process.env.ENVIRONMENT = 'development';
+
+          await runDevlog(brandRoot, {}, {
+            githubApi: fakeApi([]),
+            generatePost: async () => { throw new Error('must not generate'); },
+          });
+
+          ctx.expect(process.env.DEVLOG_FIXTURE_KEY, 'the devlog lane pins production — a development shell never swaps the overlay').toBe('from-the-production-overlay');
+        } finally {
+          delete process.env.DEVLOG_FIXTURE_KEY;
+          for (const [key, value] of Object.entries(saved)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+          }
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'devlog: --dry-run previews to the brand\'s .omega/devlog/',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-dry-'));
+        const brandRoot = stageBrandDir(tmp, 'brand-b', { config: devlogConfig('brand-b') });
+
+        const api = fakeApi([
+          { match: /^orgs\/fixture-org\/repos/, body: [{ name: 'tool', archived: false, private: false, pushed_at: FRESH() }] },
+          { match: /repos\/fixture-org\/tool\/commits/, body: [ghCommit('feat: sharpen the tool')] },
+          { match: /repos\/fixture-org\/brand-b\/commits/, body: new Error('404') },
+        ]);
+
+        const report = await runDevlog(brandRoot, { dryRun: true }, {
+          githubApi: api,
+          generatePost: async ({ commits, projectMap }) => {
+            ctx.expect(Object.keys(projectMap).sort()).toEqual(['brand-b-omega']);
+            ctx.expect(commits.length).toBe(1);
+            return { ...POST, slug: 'sharpen-the-tool' };
+          },
+        });
+
+        ctx.expect(report.published).toBe(false);
+        ctx.expect(report.commits).toBe(1);
+        ctx.expect(report.previewPath).toBe(path.join(brandRoot, '.omega', 'devlog', 'sharpen-the-tool.md'));
+        ctx.expect(fs.readFileSync(report.previewPath, 'utf8').includes('layout: blueprint/blog/post')).toBeTruthy();
+      },
+    },
+
+    // #677: the company layer is a layer likeany other: the shared `.env` inside
+    // the company brand's `company/` tree loads UNDER the brand's own.
+    {
+      name: 'devlog: the company .env resolves through the ONE resolver and loads under the brand\'s',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-co-'));
+        const brandRoot = stageBrandDir(tmp, 'alpha', {
+          config: devlogConfig('alpha').replace('{', "{\n  company: { id: 'fixture-co' },"),
+        });
+
+        // The company brand, its tree, and the registry line its own run wrote
+        const companyBrandRoot = path.join(tmp, 'fixture-co');
+        fs.mkdirSync(path.join(companyBrandRoot, 'company'), { recursive: true });
+        fs.writeFileSync(path.join(companyBrandRoot, 'company', '.env'), 'DEVLOG_COMPANY_KEY="from-the-company"\nDEVLOG_SHARED_KEY="from-the-company"\n');
+        fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_SHARED_KEY="from-the-brand"\n');
+
+        const previousHome = process.env.OMEGA_HOME;
+        process.env.OMEGA_HOME = path.join(tmp, 'home');
+        ctx.after(() => {
+          delete process.env.DEVLOG_COMPANY_KEY;
+          delete process.env.DEVLOG_SHARED_KEY;
+          if (previousHome === undefined) delete process.env.OMEGA_HOME;
+          else process.env.OMEGA_HOME = previousHome;
+          fs.rmSync(tmp, { recursive: true, force: true });
+        });
+        recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+
+        await runDevlog(brandRoot, {}, {
+          githubApi: fakeApi([]),
+          generatePost: async () => { throw new Error('must not generate'); },
+        });
+
+        ctx.expect(process.env.DEVLOG_COMPANY_KEY, 'the company layer fills the gap').toBe('from-the-company');
+        ctx.expect(process.env.DEVLOG_SHARED_KEY, 'the brand still wins over its company').toBe('from-the-brand');
+      },
+    },
+  ],
 });

@@ -10,9 +10,10 @@
  *   - getEnvironment() is @omega.js/config's, the ONE environment module every
  *     OMEGA target answers from ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
  *     It reads ONE input, `OMEGA_ENVIRONMENT`, which this backend's boot sets
- *     once from the .env cascade's own ambient answer (the test runner's word,
- *     then FUNCTIONS_EMULATOR or an explicit ENVIRONMENT, else production for a
- *     deployed function). Returns exactly ONE of
+ *     once from the .env cascade's own ambient answer (an already-named
+ *     `OMEGA_ENVIRONMENT`, the test lane's `testing` among them, then an explicit
+ *     ENVIRONMENT or FUNCTIONS_EMULATOR, else production for a deployed
+ *     function). Returns exactly ONE of
  *     'development' | 'testing' | 'production', and a missing input throws by name.
  *   - isDevelopment()/isProduction()/isTesting() DERIVE from getEnvironment() — they
  *     never read raw signals, so they can NEVER disagree with it. Exactly one is true.
@@ -45,7 +46,7 @@ function localPort(name) {
 // naming it is the whole raw-signal surface; the other three are the AMBIENT
 // signals the boot resolves it FROM, cleared here so nothing ambiguous is left.
 function withEnv(overrides, fn) {
-  const KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_TEST_MODE', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
+  const KEYS = ['OMEGA_ENVIRONMENT', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
   const saved = {};
   for (const k of KEYS) saved[k] = process.env[k];
   try {
@@ -104,7 +105,7 @@ module.exports = defineCases({
         withEnv({ ENVIRONMENT: 'production' }, () => {
           assert.equal(envEnvironment(), 'production');
         });
-        withEnv({ OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'testing', ENVIRONMENT: 'production' }, () => {
           assert.equal(envEnvironment(), 'testing', 'a test run is not production, whatever else says');
         });
         withEnv({}, () => {
@@ -134,6 +135,23 @@ module.exports = defineCases({
           assert.ok(thrown, 'a process whose lane named no environment must refuse, never answer');
           assert.match(thrown.message, /OMEGA_ENVIRONMENT/, `the refusal names the variable, got: ${thrown && thrown.message}`);
         });
+      },
+    },
+
+    {
+      name: 'the test lane names testing through the one input, here and in the Functions runtime',
+      auth: 'none',
+      async run({ omega, http, assert }) {
+        // The lane (the gate) sets OMEGA_ENVIRONMENT=testing on every child it
+        // starts and no other test-run name, so this process reads it untouched.
+        assert.equal(process.env.OMEGA_ENVIRONMENT, 'testing', 'the runner child carries the one input');
+        assert.equal(process.env.OMEGA_TEST_MODE, undefined, 'the retired test-mode flag is set by no lane');
+        assert.equal(omega.isTesting(), true, 'isTesting() answers the test run');
+
+        const response = await http.as('none').get('omega/health');
+
+        assert.isSuccess(response, 'the liveness probe answers');
+        assert.equal(response.data.environment, 'testing', 'the Functions runtime resolves testing from the same input');
       },
     },
 

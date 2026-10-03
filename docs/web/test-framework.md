@@ -164,7 +164,7 @@ test('the build emits a sitemap', () => {
 - **Name files `*.test.js`** — the suffix is the discovery signal across every OMEGA package ([docs/shared/testing.md](../shared/testing.md)).
 - **There is no `_`-prefix exclusion here** — the suffix does that job: the runner executes exactly `test/**/*.test.js`, so helpers and fixtures under `test/` are safe as long as they do not end in `.test.js` (`test/_helper.js`, `test/fixtures/data.js`).
 - There is no `ctx`/`expect` object and no boot harness: those belong to the desktop/extension/backend runners, not web. A browser proof goes in the brand's e2e lane.
-- **`OMEGA_TEST_MODE` is read, but never set here.** Web's build/CLI surface honors it FIRST — `OMEGA_TEST_MODE=true` resolves `getEnvironment()` to `testing` ahead of every other signal, the context's own `environment` included (#717). The web test lane itself sets nothing, so a bare `npx omega test` leaves the environment to the build's own signals; export the variable yourself when a case needs the testing environment.
+- **The lane names `testing`.** `npx omega test` sets `OMEGA_ENVIRONMENT=testing` for its whole process and every child it spawns, so a case reads `isTesting()` as true; the production build it runs first names production for itself ([docs/shared/config.md](../shared/config.md)).
 
 ## `test/_init.js`: pre-test lifecycle hook
 

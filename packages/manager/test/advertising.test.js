@@ -5,8 +5,7 @@
  * converged read, the per-state warn ladder, the missing-site console
  * deep-link, and dry-run parity (the API has no writes at all).
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
@@ -67,274 +66,325 @@ function runService(config, { adsense, options = {}, brandRoot } = {}) {
   });
 }
 
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'advertising',
+  tests: [
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('advertising: skips without Google credentials in .env', async () => {
-  const result = await runService(brandConfig()); // no injected api → the creds check applies
-  assert.equal(result.status, 'skipped');
-  // The shared setup contract's loud headless skip (#608): names both keys and the fix
-  assert.match(result.reason, /GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET/);
-  assert.deepEqual(result.missingEnv, ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
-});
+    {
+      name: 'advertising: skips without Google credentials in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected api → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        // The shared setup contract's loud headless skip (#608): names both keys and the fix
+        ctx.expect(result.reason).toMatch(/GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET/);
+        ctx.expect(result.missingEnv).toEqual(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
+      },
+    },
 
-// #527 — the adsense block has ONE switch, and it is the client id: `enabled`
-// was a SECOND polarity that stopped the manager managing the account while
-// the site kept serving ads off the same id. It is deleted; a config still
-// carrying it is an undeclared key the service never reads.
-test('advertising: a stray enabled = false does not skip — client presence is the only switch (#527)', async () => {
-  const config = brandConfig();
-  config.advertising.providers.adsense.enabled = false;
+    // #527 — the adsense block has ONE switch, and it is the client id: `enabled`
+    // was a SECOND polarity that stopped the manager managing the account while
+    // the site kept serving ads off the same id. It is deleted; a config still
+    // carrying it is an undeclared key the service never reads.
+    {
+      name: 'advertising: a stray enabled = false does not skip — client presence is the only switch (#527)',
+      run: async (ctx) => {
+        const config = brandConfig();
+        config.advertising.providers.adsense.enabled = false;
 
-  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
-  const result = await runService(config, { adsense: api });
+        const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+        const result = await runService(config, { adsense: api });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.calls[0], { method: 'listSites', accountId: ACCOUNT_ID });
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.calls[0]).toEqual({ method: 'listSites', accountId: ACCOUNT_ID });
+      },
+    },
 
-test('advertising: skips without brand.url', async () => {
-  const result = await runService(brandConfig({ url: '' }), { adsense: fakeAdsense() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /brand\.url/);
-});
+    {
+      name: 'advertising: skips without brand.url',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ url: '' }), { adsense: fakeAdsense() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/brand\.url/);
+      },
+    },
 
-test('advertising: skips without a client id — and the default carries no company account', async () => {
-  const result = await runService(brandConfig({ client: null }), { adsense: fakeAdsense() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /advertising\.providers\.adsense\.client/);
+    {
+      name: 'advertising: skips without a client id — and the default carries no company account',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ client: null }), { adsense: fakeAdsense() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/advertising\.providers\.adsense\.client/);
 
-  // omega-manager defaulted this to the company's shared pub- account — the
-  // manager defaults layer must not seed the provider entry AT ALL (wave-5
-  // F10: defaults merge under every brand, so a seeded section would defeat
-  // the presence gate below)
-  assert.equal(DEFAULTS.advertising?.providers?.adsense, undefined);
-});
+        // omega-manager defaulted this to the company's shared pub- account — the
+        // manager defaults layer must not seed the provider entry AT ALL (wave-5
+        // F10: defaults merge under every brand, so a seeded section would defeat
+        // the presence gate below)
+        ctx.expect(DEFAULTS.advertising?.providers?.adsense).toBe(undefined);
+      },
+    },
 
-test('advertising: NO provider entry = deliberate absence — skips before any account resolution (wave-5 F10)', async () => {
-  // Build the config the way the real pipeline does: the manager DEFAULTS
-  // merge under the brand file. The gate must survive that merge — a seeded
-  // provider entry in DEFAULTS would resurrect it for every brand.
-  const { deepMerge } = require('@omega.js/config');
-  const authored = brandConfig();
-  delete authored.advertising; // the brand never opted in
-  const config = deepMerge(structuredClone(DEFAULTS), authored);
-  assert.equal(config.advertising?.providers?.adsense, undefined);
+    {
+      name: 'advertising: NO provider entry = deliberate absence — skips before any account resolution (wave-5 F10)',
+      run: async (ctx) => {
+        // Build the config the way the real pipeline does: the manager DEFAULTS
+        // merge under the brand file. The gate must survive that merge — a seeded
+        // provider entry in DEFAULTS would resurrect it for every brand.
+        const { deepMerge } = require('@omega.js/config');
+        const authored = brandConfig();
+        delete authored.advertising; // the brand never opted in
+        const config = deepMerge(structuredClone(DEFAULTS), authored);
+        ctx.expect(config.advertising?.providers?.adsense).toBe(undefined);
 
-  const api = fakeAdsense();
-  const result = await runService(config, { adsense: api });
+        const api = fakeAdsense();
+        const result = await runService(config, { adsense: api });
 
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no advertising\.providers\.adsense/);
-  // The account-selection flow must never run — it lands a shared account
-  // into the brand config, which is exactly the writeback this gate prevents.
-  assert.equal(api.calls.length, 0);
-});
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/no advertising\.providers\.adsense/);
+        // The account-selection flow must never run — it lands a shared account
+        // into the brand config, which is exactly the writeback this gate prevents.
+        ctx.expect(api.calls.length).toBe(0);
+      },
+    },
 
-// ─── Site present ────────────────────────────────────────────────────────────
+    // ─── Site present ────────────────────────────────────────────────────────────
 
-test('advertising: READY site is a success with exactly one read', async () => {
-  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+    {
+      name: 'advertising: READY site is a success with exactly one read',
+      run: async (ctx) => {
+        const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
 
-  const result = await runService(brandConfig(), { adsense: api });
+        const result = await runService(brandConfig(), { adsense: api });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.sites, { domain: DOMAIN, state: 'READY', autoAdsEnabled: true });
-  assert.equal(api.calls.length, 1);
-  assert.deepEqual(api.calls[0], { method: 'listSites', accountId: ACCOUNT_ID });
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.sites).toEqual({ domain: DOMAIN, state: 'READY', autoAdsEnabled: true });
+        ctx.expect(api.calls.length).toBe(1);
+        ctx.expect(api.calls[0]).toEqual({ method: 'listSites', accountId: ACCOUNT_ID });
+      },
+    },
 
-test('advertising: a www-prefixed AdSense entry matches the bare domain', async () => {
-  const api = fakeAdsense({ sites: [{ domain: `www.${DOMAIN}`, state: 'READY', autoAdsEnabled: false }] });
+    {
+      name: 'advertising: a www-prefixed AdSense entry matches the bare domain',
+      run: async (ctx) => {
+        const api = fakeAdsense({ sites: [{ domain: `www.${DOMAIN}`, state: 'READY', autoAdsEnabled: false }] });
 
-  const result = await runService(brandConfig(), { adsense: api });
+        const result = await runService(brandConfig(), { adsense: api });
 
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.sites.domain, `www.${DOMAIN}`);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.sites.domain).toBe(`www.${DOMAIN}`);
+      },
+    },
 
-// #631 — AdSense lists sites at the apex only, so the apex entry covers every
-// subdomain of it: a subdomain brand must read its parent's state, not warn
-// that it is missing.
-test('advertising: an apex AdSense entry covers a subdomain brand (#631)', async () => {
-  const sub = `playground.${DOMAIN}`;
-  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'GETTING_READY', autoAdsEnabled: true }] });
+    // #631 — AdSense lists sites at the apex only, so the apex entry covers every
+    // subdomain of it: a subdomain brand must read its parent's state, not warn
+    // that it is missing.
+    {
+      name: 'advertising: an apex AdSense entry covers a subdomain brand (#631)',
+      run: async (ctx) => {
+        const sub = `playground.${DOMAIN}`;
+        const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'GETTING_READY', autoAdsEnabled: true }] });
 
-  const log = captureLog();
-  let result;
-  try {
-    result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
-  } finally {
-    log.restore();
-  }
+        const log = captureLog();
+        let result;
+        try {
+          result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
+        } finally {
+          log.restore();
+        }
 
-  assert.equal(result.status, 'warned'); // the matched entry's state is reported as-is
-  assert.equal(result.output.sites.domain, DOMAIN); // the matched entry's domain
-  assert.equal(result.output.sites.state, 'GETTING_READY');
-  assert.equal(result.output.sites.coveredBy, DOMAIN);
-  // The reported line says the match is a parent, not the brand's own domain
-  assert.ok(
-    log.lines.some((line) => new RegExp(`${sub}.*is covered by.*${DOMAIN}`).test(line)),
-    `expected a covered-by line, got:\n${log.lines.join('\n')}`,
-  );
-});
+        ctx.expect(result.status).toBe('warned'); // the matched entry's state is reported as-is
+        ctx.expect(result.output.sites.domain).toBe(DOMAIN); // the matched entry's domain
+        ctx.expect(result.output.sites.state).toBe('GETTING_READY');
+        ctx.expect(result.output.sites.coveredBy).toBe(DOMAIN);
+        // The reported line says the match is a parent, not the brand's own domain
+        ctx.expect(log.lines.some((line) => new RegExp(`${sub}.*is covered by.*${DOMAIN}`).test(line)), `expected a covered-by line, got:\n${log.lines.join('\n')}`).toBeTruthy();
+      },
+    },
 
-test('advertising: a suffix that is not a parent domain does not cover the brand (#631)', async () => {
-  const sub = `playground.${DOMAIN}`;
-  const api = fakeAdsense({
-    sites: [
-      { domain: `not${DOMAIN}`, state: 'READY' }, // unrelated apex
-      { domain: 'brand.test', state: 'READY' }, // a string suffix of fixture-brand.test, but not a parent
-    ],
-  });
+    {
+      name: 'advertising: a suffix that is not a parent domain does not cover the brand (#631)',
+      run: async (ctx) => {
+        const sub = `playground.${DOMAIN}`;
+        const api = fakeAdsense({
+          sites: [
+            { domain: `not${DOMAIN}`, state: 'READY' }, // unrelated apex
+            { domain: 'brand.test', state: 'READY' }, // a string suffix of fixture-brand.test, but not a parent
+          ],
+        });
 
-  const result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
+        const result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.sites.domain, sub);
-  assert.equal(result.output.sites.state, null);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.sites.domain).toBe(sub);
+        ctx.expect(result.output.sites.state).toBe(null);
+      },
+    },
 
-test('advertising: non-READY approval states are warned, not failed', async () => {
-  for (const state of ['GETTING_READY', 'REQUIRES_REVIEW', 'NEEDS_ATTENTION']) {
-    const api = fakeAdsense({ sites: [{ domain: DOMAIN, state, autoAdsEnabled: false }] });
+    {
+      name: 'advertising: non-READY approval states are warned, not failed',
+      run: async (ctx) => {
+        for (const state of ['GETTING_READY', 'REQUIRES_REVIEW', 'NEEDS_ATTENTION']) {
+          const api = fakeAdsense({ sites: [{ domain: DOMAIN, state, autoAdsEnabled: false }] });
 
-    const result = await runService(brandConfig(), { adsense: api });
+          const result = await runService(brandConfig(), { adsense: api });
 
-    assert.equal(result.status, 'warned', `state ${state} should warn`);
-    assert.equal(result.output.sites.state, state);
-    assert.equal(api.calls.length, 1);
-  }
-});
+          ctx.expect(result.status, `state ${state} should warn`).toBe('warned');
+          ctx.expect(result.output.sites.state).toBe(state);
+          ctx.expect(api.calls.length).toBe(1);
+        }
+      },
+    },
 
-test('advertising: an unknown state is surfaced verbatim as a warning', async () => {
-  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'SOME_FUTURE_STATE' }] });
+    {
+      name: 'advertising: an unknown state is surfaced verbatim as a warning',
+      run: async (ctx) => {
+        const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'SOME_FUTURE_STATE' }] });
 
-  const result = await runService(brandConfig(), { adsense: api });
+        const result = await runService(brandConfig(), { adsense: api });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.sites.state, 'SOME_FUTURE_STATE');
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.sites.state).toBe('SOME_FUTURE_STATE');
+      },
+    },
 
-// ─── Site missing ────────────────────────────────────────────────────────────
+    // ─── Site missing ────────────────────────────────────────────────────────────
 
-test('advertising: missing site warns with the exact add-site console deep-link', async () => {
-  const api = fakeAdsense({ sites: [{ domain: 'some-other-brand.test', state: 'READY' }] });
+    {
+      name: 'advertising: missing site warns with the exact add-site console deep-link',
+      run: async (ctx) => {
+        const api = fakeAdsense({ sites: [{ domain: 'some-other-brand.test', state: 'READY' }] });
 
-  const result = await runService(brandConfig(), { adsense: api });
+        const result = await runService(brandConfig(), { adsense: api });
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.sites, { domain: DOMAIN, state: null, addUrl: SITES_URL });
-  assert.equal(api.calls.length, 1);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.sites).toEqual({ domain: DOMAIN, state: null, addUrl: SITES_URL });
+        ctx.expect(api.calls.length).toBe(1);
+      },
+    },
 
-// ─── Dry-run ─────────────────────────────────────────────────────────────────
+    // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
-test('advertising: dry-run behaves identically — the API has no writes at all', async () => {
-  const ready = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
-  const readyResult = await runService(brandConfig(), { adsense: ready, options: { dryRun: true } });
-  assert.equal(readyResult.status, 'success');
-  assert.equal(ready.calls.length, 1);
+    {
+      name: 'advertising: dry-run behaves identically — the API has no writes at all',
+      run: async (ctx) => {
+        const ready = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+        const readyResult = await runService(brandConfig(), { adsense: ready, options: { dryRun: true } });
+        ctx.expect(readyResult.status).toBe('success');
+        ctx.expect(ready.calls.length).toBe(1);
 
-  const missing = fakeAdsense();
-  const missingResult = await runService(brandConfig(), { adsense: missing, options: { dryRun: true } });
-  assert.equal(missingResult.status, 'warned');
-  assert.equal(missingResult.output.sites.addUrl, SITES_URL);
-  assert.equal(missing.calls.length, 1);
-});
+        const missing = fakeAdsense();
+        const missingResult = await runService(brandConfig(), { adsense: missing, options: { dryRun: true } });
+        ctx.expect(missingResult.status).toBe('warned');
+        ctx.expect(missingResult.output.sites.addUrl).toBe(SITES_URL);
+        ctx.expect(missing.calls.length).toBe(1);
+      },
+    },
 
-// ─── Interactive account selection (config-landing flow) ─────────────────────
+    // ─── Interactive account selection (config-landing flow) ─────────────────────
 
-test('setup: interactive run offers account selection and lands the client id in omega.json5', async () => {
-  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
-  api.listAccounts = async () => {
-    api.calls.push({ method: 'listAccounts' });
-    return [
-      { name: 'accounts/pub-1111111111111111', displayName: 'Other Org' },
-      { name: `accounts/${ACCOUNT_ID}`, displayName: 'Fixture Brand' },
-    ];
-  };
-  const brandRoot = makeBrandRoot(`{
+    {
+      name: 'setup: interactive run offers account selection and lands the client id in omega.json5',
+      run: async (ctx) => {
+        const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+        api.listAccounts = async () => {
+          api.calls.push({ method: 'listAccounts' });
+          return [
+            { name: 'accounts/pub-1111111111111111', displayName: 'Other Org' },
+            { name: `accounts/${ACCOUNT_ID}`, displayName: 'Fixture Brand' },
+          ];
+        };
+        const brandRoot = makeBrandRoot(`{
   // Fixture Brand — adsense writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   advertising: { providers: { adsense: {} } }, // client lands here
   targets: { web: { type: 'web' } },
 }
 `);
-  setBrowserOpener(async () => true); // create-new is never picked, but a test must never launch a real browser
-  const tty = openTtyPrompt();
+        setBrowserOpener(async () => true); // create-new is never picked, but a test must never launch a real browser
+        const tty = openTtyPrompt();
 
-  try {
-    const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
-    await tty.answer('Set up now?', '\r'); // Yes
-    // Cursor lands on the brand match "Fixture Brand (pub-…)" — ENTER picks it
-    await tty.answer('Select AdSense account:', '\r');
-    const result = await run;
+        try {
+          const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
+          await tty.answer('Set up now?', '\r'); // Yes
+          // Cursor lands on the brand match "Fixture Brand (pub-…)" — ENTER picks it
+          await tty.answer('Select AdSense account:', '\r');
+          const result = await run;
 
-    assert.equal(result.status, 'success'); // READY site via the landed account
-    assert.deepEqual(api.calls.at(-1), { method: 'listSites', accountId: ACCOUNT_ID });
-    const written = readConfigSource(brandRoot);
-    assert.ok(written.includes(`client: "${CLIENT}"`)); // ca-pub-… form, the schema's embed-ready value
-    assert.ok(written.includes('// client lands here'));
-  } finally {
-    tty.close();
-    setBrowserOpener(null);
-  }
-});
+          ctx.expect(result.status).toBe('success'); // READY site via the landed account
+          ctx.expect(api.calls.at(-1)).toEqual({ method: 'listSites', accountId: ACCOUNT_ID });
+          const written = readConfigSource(brandRoot);
+          ctx.expect(written.includes(`client: "${CLIENT}"`)).toBeTruthy(); // ca-pub-… form, the schema's embed-ready value
+          ctx.expect(written.includes('// client lands here')).toBeTruthy();
+        } finally {
+          tty.close();
+          setBrowserOpener(null);
+        }
+      },
+    },
 
-test('setup: Disable opts the provider out — never a false where the schema wants a string (cp268, #527)', async () => {
-  const api = fakeAdsense();
-  api.listAccounts = async () => [];
-  const brandRoot = makeBrandRoot(`{
+    {
+      name: 'setup: Disable opts the provider out — never a false where the schema wants a string (cp268, #527)',
+      run: async (ctx) => {
+        const api = fakeAdsense();
+        api.listAccounts = async () => [];
+        const brandRoot = makeBrandRoot(`{
   // Fixture Brand — adsense disable target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   advertising: { providers: { adsense: {} } }, // opted in, no client yet
   targets: { web: { type: 'web' } },
 }
 `);
-  const tty = openTtyPrompt();
+        const tty = openTtyPrompt();
 
-  try {
-    const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
-    // Arrow down twice: Yes → Skip → Disable (stop prompting)
-    await tty.answer('Set up now?', '\x1B[B\x1B[B\r');
-    const result = await run;
+        try {
+          const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
+          // Arrow down twice: Yes → Skip → Disable (stop prompting)
+          await tty.answer('Set up now?', '\x1B[B\x1B[B\r');
+          const result = await run;
 
-    assert.equal(result.status, 'skipped');
-    const written = readConfigSource(brandRoot);
-    // Since #527 there is no `enabled` gate to land it on: Disable opts the
-    // PROVIDER out (the chatsy/slapform shape), which the deliberate-absence
-    // skip already honors on the next run.
-    assert.ok(written.includes('adsense: false'), 'Disable opts the provider entry out');
-    assert.ok(!written.includes('enabled: false'), 'the deleted gate is never resurrected by a writeback');
-    assert.ok(!written.includes('client: false'), 'client (schema string) never receives a boolean');
-  } finally {
-    tty.close();
-  }
-});
+          ctx.expect(result.status).toBe('skipped');
+          const written = readConfigSource(brandRoot);
+          // Since #527 there is no `enabled` gate to land it on: Disable opts the
+          // PROVIDER out (the chatsy/slapform shape), which the deliberate-absence
+          // skip already honors on the next run.
+          ctx.expect(written.includes('adsense: false'), 'Disable opts the provider entry out').toBeTruthy();
+          ctx.expect(!written.includes('enabled: false'), 'the deleted gate is never resurrected by a writeback').toBeTruthy();
+          ctx.expect(!written.includes('client: false'), 'client (schema string) never receives a boolean').toBeTruthy();
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-test('sites: interactive run opens the add-site page and polls until the site appears', async () => {
-  let listCalls = 0;
-  const api = fakeAdsense();
-  api.listSites = async (accountId) => {
-    api.calls.push({ method: 'listSites', accountId });
-    listCalls++;
-    return listCalls === 1 ? [] : [{ domain: DOMAIN, state: 'READY' }];
-  };
-  const opened = [];
-  setBrowserOpener(async (url) => { opened.push(url); return true; });
-  const tty = openTtyPrompt();
+    {
+      name: 'sites: interactive run opens the add-site page and polls until the site appears',
+      run: async (ctx) => {
+        let listCalls = 0;
+        const api = fakeAdsense();
+        api.listSites = async (accountId) => {
+          api.calls.push({ method: 'listSites', accountId });
+          listCalls++;
+          return listCalls === 1 ? [] : [{ domain: DOMAIN, state: 'READY' }];
+        };
+        const opened = [];
+        setBrowserOpener(async (url) => { opened.push(url); return true; });
+        const tty = openTtyPrompt();
 
-  try {
-    const run = runService(brandConfig(), { adsense: api });
-    await tty.answer('Press Enter to open the AdSense sites page', '\r');
-    const result = await run;
+        try {
+          const run = runService(brandConfig(), { adsense: api });
+          await tty.answer('Press Enter to open the AdSense sites page', '\r');
+          const result = await run;
 
-    assert.equal(result.status, 'success');
-    assert.equal(result.output.sites.state, 'READY');
-    assert.deepEqual(opened, [SITES_URL]);
-    assert.equal(listCalls, 2); // initial read + the poll's first re-check
-  } finally {
-    tty.close();
-    setBrowserOpener(null);
-  }
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(result.output.sites.state).toBe('READY');
+          ctx.expect(opened).toEqual([SITES_URL]);
+          ctx.expect(listCalls).toBe(2); // initial read + the poll's first re-check
+        } finally {
+          tty.close();
+          setBrowserOpener(null);
+        }
+      },
+    },
+  ],
 });

@@ -15,21 +15,19 @@
  */
 
 // Run the thunk with the environment resolving to production. getEnvironment() reads
-// these vars live on every call, so swapping them is the real switch — testing wins
-// over everything else, so it has to come off too.
+// these vars live on every call, so swapping them is the real switch — the test
+// lane's OMEGA_ENVIRONMENT=testing is overwritten, and the ambient signals come off.
 
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const Context = require('../../../dist/omega/context.js');
 function withProductionEnvironment(fn) {
   const original = {
     OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
-    OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
     ENVIRONMENT: process.env.ENVIRONMENT,
     TERM_PROGRAM: process.env.TERM_PROGRAM,
     FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
   };
 
-  delete process.env.OMEGA_TEST_MODE;
   delete process.env.TERM_PROGRAM;
   delete process.env.FUNCTIONS_EMULATOR;
   // The ONE environment input (#817), named the way a deployed lane names it.

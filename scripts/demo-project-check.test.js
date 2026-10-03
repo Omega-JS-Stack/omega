@@ -5,8 +5,7 @@
  * what the source says.
  * Run: node --test scripts/demo-project-check.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -27,13 +26,26 @@ const HAND_WRITTEN = [
   /indexOf\(\s*['"`]demo-['"`]\s*\)\s*===?\s*0/,
 ];
 
-for (const file of FILES) {
-  test(`case 12: ${file} reads isDemoProject from @omega.js/config, with no demo- test of its own`, () => {
-    const text = fs.readFileSync(path.join(PACKAGES, file), 'utf8');
+module.exports = defineCases({
+  type: 'group',
+  description: 'demo-project-check',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const file of FILES) {
+        cases.push({
+          name: `case 12: ${file} reads isDemoProject from @omega.js/config, with no demo- test of its own`,
+          run: (ctx) => {
+            const text = fs.readFileSync(path.join(PACKAGES, file), 'utf8');
 
-    assert.deepEqual(HAND_WRITTEN.filter((pattern) => pattern.test(text)).map(String), [], 'a hand-written demo- test');
-    assert.match(text, /require\(\s*['"]@omega\.js\/config['"]\s*\)/, 'it requires @omega.js/config');
-    // Called with a project id: a getter of the same name is not a call
-    assert.match(text, /\bisDemoProject\(\s*[^)\s]/, 'it calls isDemoProject');
-  });
-}
+            ctx.expect(HAND_WRITTEN.filter((pattern) => pattern.test(text)).map(String), 'a hand-written demo- test').toEqual([]);
+            ctx.expect(text, 'it requires @omega.js/config').toMatch(/require\(\s*['"]@omega\.js\/config['"]\s*\)/);
+            // Called with a project id: a getter of the same name is not a call
+            ctx.expect(text, 'it calls isDemoProject').toMatch(/\bisDemoProject\(\s*[^)\s]/);
+          },
+        });
+      }
+      return cases;
+    })(),
+  ],
+});

@@ -6,7 +6,7 @@
  *
  * The switches, in the order they win:
  *   OMEGA_SENTRY_ENABLED=false  kill switch — nothing reports, ever
- *   OMEGA_TEST_RUNNER           a test run never pollutes a live project
+ *   OMEGA_ENVIRONMENT=testing   a test run never pollutes a live project
  *   OMEGA_SENTRY_FORCE=true     report from a non-production run (local proving)
  *   the ONE environment         the DEFAULT production signal, for hosts that
  *                               pass no runtime one
@@ -25,7 +25,7 @@
  * always wins.
  */
 
-const { isProduction } = require('@omega.js/config/environment');
+const { isProduction, isTesting } = require('@omega.js/config/environment');
 
 /**
  * Read the environment gates for core.resolveConfig().
@@ -42,8 +42,8 @@ function readGates(host) {
   let killedReason = null;
   if (env.OMEGA_SENTRY_ENABLED === 'false') {
     killedReason = 'OMEGA_SENTRY_ENABLED=false';
-  } else if (env.OMEGA_TEST_RUNNER) {
-    killedReason = 'test run (OMEGA_TEST_RUNNER)';
+  } else if (isTesting.call(host)) {
+    killedReason = 'test run (OMEGA_ENVIRONMENT=testing)';
   }
 
   return {

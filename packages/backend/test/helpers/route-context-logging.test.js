@@ -37,18 +37,16 @@ function withConsoleRecorder(fn) {
 }
 
 // Run the thunk with the environment resolving to production. getEnvironment() reads
-// these vars live on every call, so swapping them is the real switch — testing wins
-// over everything else, so it has to come off too.
+// these vars live on every call, so swapping them is the real switch — the test
+// lane's OMEGA_ENVIRONMENT=testing is overwritten, and the ambient signals come off.
 function withProductionEnvironment(fn) {
   const original = {
     OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
-    OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
     ENVIRONMENT: process.env.ENVIRONMENT,
     TERM_PROGRAM: process.env.TERM_PROGRAM,
     FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
   };
 
-  delete process.env.OMEGA_TEST_MODE;
   delete process.env.TERM_PROGRAM;
   delete process.env.FUNCTIONS_EMULATOR;
   // The ONE environment input (#817): a deployed production run is what this
@@ -140,15 +138,13 @@ module.exports = defineCases({
       name: 'under-the-emulator-the-line-is-stamped-like-any-local-run',
       run: async ({ assert, omega }) => {
         const saved = process.env.FUNCTIONS_EMULATOR;
-        const savedTestMode = process.env.OMEGA_TEST_MODE;
         const savedEnvironment = process.env.ENVIRONMENT;
         const savedInput = process.env.OMEGA_ENVIRONMENT;
         process.env.FUNCTIONS_EMULATOR = 'true';
         // An emulator run is a DEVELOPMENT lane, and the boot names the input
         // from exactly that ambient answer (#817). Naming it here is what a real
-        // emulator boot leaves in the process; the runner's own test-mode word
-        // comes off so this does not duplicate the local-run case.
-        delete process.env.OMEGA_TEST_MODE;
+        // emulator boot leaves in the process, over the lane's own `testing`, so
+        // this does not duplicate the local-run case.
         delete process.env.ENVIRONMENT;
         process.env.OMEGA_ENVIRONMENT = 'development';
         try {
@@ -171,11 +167,6 @@ module.exports = defineCases({
             delete process.env.FUNCTIONS_EMULATOR;
           } else {
             process.env.FUNCTIONS_EMULATOR = saved;
-          }
-          if (savedTestMode === undefined) {
-            delete process.env.OMEGA_TEST_MODE;
-          } else {
-            process.env.OMEGA_TEST_MODE = savedTestMode;
           }
           if (savedEnvironment === undefined) {
             delete process.env.ENVIRONMENT;

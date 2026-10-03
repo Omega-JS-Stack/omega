@@ -5,8 +5,7 @@
 // the reverse in its private .claude/settings.local.json, taken back out when
 // it goes live. Only the omega keys are ever touched. Real files, no mocks.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -74,242 +73,35 @@ const write = (dir, file, value) => {
 };
 
 // The committed shape: the published copy from GitHub, sparse, auto-updating; on, and the local copy off.
-function assertPublishedOn(settings) {
+function assertPublishedOn(expect, settings) {
   const entry = settings.extraKnownMarketplaces.omega;
-  assert.equal(entry.autoUpdate, true);
-  assert.equal(entry.source.source, 'github');
-  assert.equal(entry.source.repo, 'Omega-JS-Stack/omega');
+  expect(entry.autoUpdate).toBe(true);
+  expect(entry.source.source).toBe('github');
+  expect(entry.source.repo).toBe('Omega-JS-Stack/omega');
 
   // A sparse checkout fetches the marketplace manifest and the plugin folder, and nothing else of the monorepo
   const sparse = entry.source.sparsePaths;
-  assert.ok(Array.isArray(sparse) && sparse.length > 0, 'the source is a sparse checkout');
+  expect(Array.isArray(sparse) && sparse.length > 0, 'the source is a sparse checkout').toBeTruthy();
   const covered = (file) => sparse.some((dir) => file === dir || file.startsWith(`${dir.replace(/\/$/, '')}/`));
-  assert.ok(covered('.claude-plugin/marketplace.json'), `the manifest is fetched: ${sparse}`);
-  assert.ok(covered('agent-plugins/claude/.claude-plugin/plugin.json'), `the plugin folder is fetched: ${sparse}`);
+  expect(covered('.claude-plugin/marketplace.json'), `the manifest is fetched: ${sparse}`).toBeTruthy();
+  expect(covered('agent-plugins/claude/.claude-plugin/plugin.json'), `the plugin folder is fetched: ${sparse}`).toBeTruthy();
   for (const dir of sparse) {
-    assert.ok(/^(\.claude-plugin|agent-plugins\/claude)(\/|$)/.test(dir), `${dir} fetches more than the plugin`);
+    expect(/^(\.claude-plugin|agent-plugins\/claude)(\/|$)/.test(dir), `${dir} fetches more than the plugin`).toBeTruthy();
   }
 
-  assert.equal(settings.enabledPlugins['omega@omega'], true);
-  assert.equal(settings.enabledPlugins['omega@omega-local'], false, 'both on at once loads either copy');
-  assert.equal(settings.extraKnownMarketplaces['omega-local'], undefined, 'the committed file never names a machine path');
+  expect(settings.enabledPlugins['omega@omega']).toBe(true);
+  expect(settings.enabledPlugins['omega@omega-local'], 'both on at once loads either copy').toBe(false);
+  expect(settings.extraKnownMarketplaces['omega-local'], 'the committed file never names a machine path').toBe(undefined);
 }
 
 // The private shape: the local copy at the monorepo's local manifest; on, and the published copy off.
-function assertLocalOn(dir, settings) {
+function assertLocalOn(expect, dir, settings) {
   const source = settings.extraKnownMarketplaces['omega-local'].source;
-  assert.equal(source.source, 'file');
-  assert.equal(path.resolve(dir, source.path), LOCAL_MANIFEST_PATH);
-  assert.equal(settings.enabledPlugins['omega@omega-local'], true);
-  assert.equal(settings.enabledPlugins['omega@omega'], false, 'both on at once loads either copy');
+  expect(source.source).toBe('file');
+  expect(path.resolve(dir, source.path)).toBe(LOCAL_MANIFEST_PATH);
+  expect(settings.enabledPlugins['omega@omega-local']).toBe(true);
+  expect(settings.enabledPlugins['omega@omega'], 'both on at once loads either copy').toBe(false);
 }
-
-// ─── The names ───────────────────────────────────────────────────────────────
-
-test('claude-settings: the names of the two copies and the two files', () => {
-  assert.equal(claudeSettings.MARKETPLACE_NAME, 'omega');
-  assert.equal(claudeSettings.LOCAL_MARKETPLACE_NAME, 'omega-local');
-  assert.equal(claudeSettings.PLUGIN_ID, 'omega@omega');
-  assert.equal(claudeSettings.LOCAL_PLUGIN_ID, 'omega@omega-local');
-  assert.equal(claudeSettings.PLUGIN_REPO, 'Omega-JS-Stack/omega');
-  assert.equal(claudeSettings.SETTINGS_FILE, '.claude/settings.json');
-  assert.equal(claudeSettings.LOCAL_SETTINGS_FILE, '.claude/settings.local.json');
-  assert.equal(claudeSettings.LOCAL_MANIFEST, '.claude-plugin/marketplace.local.json');
-  assert.ok(Array.isArray(claudeSettings.SPARSE_PATHS));
-
-  for (const gone of ['MANAGER_PATH', 'MANAGER_DIR', 'VENDORED_MARKETPLACE', 'hasVendoredPlugin']) {
-    assert.equal(claudeSettings[gone], undefined, `${gone} is the node_modules plugin source, which is gone`);
-  }
-});
-
-// ─── The committed file ──────────────────────────────────────────────────────
-
-test('case 1: a brand with no settings file gets the published copy from GitHub', () => {
-  const dir = liveBrand();
-
-  assert.deepEqual(ensureClaudeSettings(dir), { committed: 'created', local: 'absent' });
-  assertPublishedOn(read(dir, COMMITTED));
-  assert.equal(fs.existsSync(path.join(dir, PRIVATE)), false, 'a live brand gets no private file');
-});
-
-test('case 1: a brand with no install at all still gets the committed file', () => {
-  const dir = tmpdir();
-
-  assert.equal(ensureClaudeSettings(dir).committed, 'created');
-  assertPublishedOn(read(dir, COMMITTED));
-});
-
-test('case 2: the old node_modules folder source is healed to GitHub, every other key kept', () => {
-  const dir = liveBrand();
-  write(dir, COMMITTED, {
-    permissions: { allow: ['Bash(npm test)'] },
-    extraKnownMarketplaces: {
-      omega: { source: { source: 'directory', path: './node_modules/@omega.js/manager' } },
-      other: { source: { source: 'github', repo: 'someone/plugins' } },
-    },
-    enabledPlugins: { 'omega@omega': true, 'other@other': true },
-  });
-
-  assert.equal(ensureClaudeSettings(dir).committed, 'healed');
-
-  const settings = read(dir, COMMITTED);
-  assertPublishedOn(settings);
-  assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
-  assert.deepEqual(settings.extraKnownMarketplaces.other, { source: { source: 'github', repo: 'someone/plugins' } });
-  assert.equal(settings.enabledPlugins['other@other'], true);
-});
-
-test('case 2: a published copy left disabled by hand is turned back on', () => {
-  const dir = liveBrand();
-  write(dir, COMMITTED, { model: 'x', enabledPlugins: { 'omega@omega': false } });
-
-  assert.equal(ensureClaudeSettings(dir).committed, 'healed');
-  assertPublishedOn(read(dir, COMMITTED));
-  assert.equal(read(dir, COMMITTED).model, 'x');
-});
-
-// ─── The private file of a linked brand ──────────────────────────────────────
-
-test('case 3: a linked brand gets the local copy in its private file, the committed file unchanged in shape', () => {
-  const dir = linkedBrand();
-
-  assert.deepEqual(ensureClaudeSettings(dir), { committed: 'created', local: 'written' });
-  assertPublishedOn(read(dir, COMMITTED));
-  assertLocalOn(dir, read(dir, PRIVATE));
-});
-
-test('case 3: the private file keeps every key that is not the omega keys', () => {
-  const dir = linkedBrand();
-  write(dir, PRIVATE, {
-    permissions: { allow: ['Bash(ls)'] },
-    extraKnownMarketplaces: { mine: { source: { source: 'directory', path: '/somewhere' } } },
-    enabledPlugins: { 'mine@mine': true },
-  });
-
-  assert.equal(ensureClaudeSettings(dir).local, 'written');
-
-  const settings = read(dir, PRIVATE);
-  assertLocalOn(dir, settings);
-  assert.deepEqual(settings.permissions, { allow: ['Bash(ls)'] });
-  assert.deepEqual(settings.extraKnownMarketplaces.mine, { source: { source: 'directory', path: '/somewhere' } });
-  assert.equal(settings.enabledPlugins['mine@mine'], true);
-});
-
-test('case 4: a linked brand that goes live loses the omega keys, and its other keys stay', () => {
-  const dir = linkedBrand();
-  write(dir, PRIVATE, { permissions: { allow: ['Bash(ls)'] }, enabledPlugins: { 'mine@mine': true } });
-  ensureClaudeSettings(dir);
-  goLive(dir);
-
-  assert.deepEqual(ensureClaudeSettings(dir), { committed: 'present', local: 'removed' });
-
-  const settings = read(dir, PRIVATE);
-  assert.deepEqual(settings.permissions, { allow: ['Bash(ls)'] });
-  assert.equal(settings.enabledPlugins['mine@mine'], true);
-  assert.equal((settings.extraKnownMarketplaces || {})['omega-local'], undefined);
-  assert.equal('omega@omega-local' in settings.enabledPlugins, false);
-  assert.equal('omega@omega' in settings.enabledPlugins, false, 'the committed file decides for a live brand');
-});
-
-test('case 4: a private file that held only the omega keys is removed when the brand goes live', () => {
-  const dir = linkedBrand();
-  ensureClaudeSettings(dir);
-  assert.ok(fs.existsSync(path.join(dir, PRIVATE)), 'fixture sanity: the linked run wrote the file');
-  goLive(dir);
-
-  assert.equal(ensureClaudeSettings(dir).local, 'removed');
-  assert.equal(fs.existsSync(path.join(dir, PRIVATE)), false);
-  assertPublishedOn(read(dir, COMMITTED));
-});
-
-test('case 4: a live brand whose private file has no omega keys leaves it untouched', () => {
-  const dir = liveBrand();
-  write(dir, PRIVATE, '{ "permissions": { "allow": [] } }\n');
-
-  assert.equal(ensureClaudeSettings(dir).local, 'absent');
-  assert.equal(fs.readFileSync(path.join(dir, PRIVATE), 'utf8'), '{ "permissions": { "allow": [] } }\n');
-});
-
-// ─── Unreadable files ────────────────────────────────────────────────────────
-
-test('case 5: a committed file that is not JSON is reported invalid and never written', () => {
-  const dir = liveBrand();
-  write(dir, COMMITTED, '{ not json');
-
-  assert.equal(ensureClaudeSettings(dir).committed, 'invalid');
-  assert.equal(fs.readFileSync(path.join(dir, COMMITTED), 'utf8'), '{ not json');
-});
-
-test('case 5: a private file that is not JSON is reported invalid and never written', () => {
-  const dir = linkedBrand();
-  write(dir, PRIVATE, 'nope');
-
-  assert.equal(ensureClaudeSettings(dir).local, 'invalid');
-  assert.equal(fs.readFileSync(path.join(dir, PRIVATE), 'utf8'), 'nope');
-
-  goLive(dir);
-  assert.equal(ensureClaudeSettings(dir).local, 'invalid', 'a live run never deletes a file it cannot read');
-  assert.equal(fs.readFileSync(path.join(dir, PRIVATE), 'utf8'), 'nope');
-});
-
-// ─── Idempotence and the dry run ─────────────────────────────────────────────
-
-test('case 6: a second run with nothing changed writes no file', () => {
-  const past = new Date('2020-01-01T00:00:00Z');
-
-  for (const [dir, local] of [[liveBrand(), 'absent'], [linkedBrand(), 'present']]) {
-    ensureClaudeSettings(dir);
-    const written = [COMMITTED, PRIVATE].filter((file) => fs.existsSync(path.join(dir, file)));
-    for (const file of written) fs.utimesSync(path.join(dir, file), past, past);
-
-    assert.deepEqual(ensureClaudeSettings(dir), { committed: 'present', local });
-    for (const file of written) {
-      assert.equal(fs.statSync(path.join(dir, file)).mtime.getTime(), past.getTime(), `${file} was rewritten`);
-    }
-  }
-});
-
-test('ensureClaudeSettings: a dry run returns the verdicts and writes nothing', () => {
-  const dir = linkedBrand();
-
-  assert.deepEqual(ensureClaudeSettings(dir, { dryRun: true }), { committed: 'created', local: 'written' });
-  assert.equal(fs.existsSync(path.join(dir, '.claude')), false);
-});
-
-// ─── The workspace ensure op ─────────────────────────────────────────────────
-
-test('claude-settings op is registered in the workspace OPERATIONS', () => {
-  const { OPERATIONS } = require('../src/config.js');
-  assert.ok(OPERATIONS.workspace.some((op) => op.name === 'claude-settings' && op.ensure === true));
-});
-
-test('claude-settings: the op writes both files for a linked brand, then is a no-op', async () => {
-  const dir = linkedBrand();
-  const context = { brandRoot: dir, brand: { id: 'fixture', config: {} } };
-
-  assert.notEqual(await claudeSettingsOp(context), null);
-  assertPublishedOn(read(dir, COMMITTED));
-  assertLocalOn(dir, read(dir, PRIVATE));
-
-  assert.equal(await claudeSettingsOp(context), null, 'a second run has nothing to say');
-});
-
-test('claude-settings: the op warns on an unreadable file', async () => {
-  const dir = liveBrand();
-  write(dir, COMMITTED, 'nope');
-
-  const result = await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } });
-  assert.equal(result.status, 'warned');
-  assert.equal(fs.readFileSync(path.join(dir, COMMITTED), 'utf8'), 'nope');
-});
-
-test('#971: the op under --dry-run plans the writes and writes nothing', async () => {
-  const dir = linkedBrand();
-  const result = await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
-
-  assert.match(JSON.stringify(result.output), /planned/);
-  assert.equal(fs.existsSync(path.join(dir, '.claude')), false);
-});
 
 // ─── The machine, from the manage walk ───────────────────────────────────────
 
@@ -335,76 +127,367 @@ const sortedCalls = (calls) => calls.map((argv) => argv.join(' ')).sort();
 
 const ON_GITHUB = { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } };
 
-test('case 10: manage runs the two update commands when the installed plugin is older than the brand\'s OMEGA', async (t) => {
-  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'claude-settings',
+  tests: [
+    // ─── The names ───────────────────────────────────────────────────────────────
 
-  const mutations = machine.mutations();
-  assert.equal(mutations.length, 2, JSON.stringify(mutations));
-  assert.ok(mutations.some((argv) => argv.join(' ').includes('marketplace update omega')));
-  assert.ok(mutations.some((argv) => !argv.includes('marketplace') && argv.includes('update') && argv.includes('omega@omega')));
-});
+    {
+      name: 'claude-settings: the names of the two copies and the two files',
+      run: (ctx) => {
+        ctx.expect(claudeSettings.MARKETPLACE_NAME).toBe('omega');
+        ctx.expect(claudeSettings.LOCAL_MARKETPLACE_NAME).toBe('omega-local');
+        ctx.expect(claudeSettings.PLUGIN_ID).toBe('omega@omega');
+        ctx.expect(claudeSettings.LOCAL_PLUGIN_ID).toBe('omega@omega-local');
+        ctx.expect(claudeSettings.PLUGIN_REPO).toBe('Omega-JS-Stack/omega');
+        ctx.expect(claudeSettings.SETTINGS_FILE).toBe('.claude/settings.json');
+        ctx.expect(claudeSettings.LOCAL_SETTINGS_FILE).toBe('.claude/settings.local.json');
+        ctx.expect(claudeSettings.LOCAL_MANIFEST).toBe('.claude-plugin/marketplace.local.json');
+        ctx.expect(Array.isArray(claudeSettings.SPARSE_PATHS)).toBeTruthy();
 
-test('case 10: manage runs no command when the installed plugin is equal or newer', async (t) => {
-  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '999.0.0' } });
-  assert.deepEqual(machine.mutations(), []);
-});
+        for (const gone of ['MANAGER_PATH', 'MANAGER_DIR', 'VENDORED_MARKETPLACE', 'hasVendoredPlugin']) {
+          ctx.expect(claudeSettings[gone], `${gone} is the node_modules plugin source, which is gone`).toBe(undefined);
+        }
+      },
+    },
 
-test('manage says in one line when the plugin is not installed, and never installs it unasked', async (t) => {
-  const { machine, lines } = await opOnMachine(t, {});
+    // ─── The committed file ──────────────────────────────────────────────────────
 
-  assert.ok(
-    lines.includes('Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega'),
-    lines,
-  );
-  assert.deepEqual(machine.mutations(), []);
-});
+    {
+      name: 'case 1: a brand with no settings file gets the published copy from GitHub',
+      run: (ctx) => {
+        const dir = liveBrand();
 
-test('the op runs claude through the runner the manage context injects, never the one on PATH', async () => {
-  const injected = createMachine({ marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
-  const onPath = PATH_MACHINE.calls().length;
+        ctx.expect(ensureClaudeSettings(dir)).toEqual({ committed: 'created', local: 'absent' });
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+        ctx.expect(fs.existsSync(path.join(dir, PRIVATE)), 'a live brand gets no private file').toBe(false);
+      },
+    },
 
-  await claudeSettingsOp({ brandRoot: liveBrand(), brand: { id: 'fixture', config: {} }, execFn: injected.exec });
+    {
+      name: 'case 1: a brand with no install at all still gets the committed file',
+      run: (ctx) => {
+        const dir = tmpdir();
 
-  assert.equal(injected.mutations().length, 2, `the injected runner ran the update: ${JSON.stringify(injected.calls())}`);
-  assert.equal(PATH_MACHINE.calls().length, onPath, 'nothing reached the claude on PATH');
-});
+        ctx.expect(ensureClaudeSettings(dir).committed).toBe('created');
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+      },
+    },
 
-// ─── The machine check is the full walk's, and one walk reads it once ───────
+    {
+      name: 'case 2: the old node_modules folder source is healed to GitHub, every other key kept',
+      run: (ctx) => {
+        const dir = liveBrand();
+        write(dir, COMMITTED, {
+          permissions: { allow: ['Bash(npm test)'] },
+          extraKnownMarketplaces: {
+            omega: { source: { source: 'directory', path: './node_modules/@omega.js/manager' } },
+            other: { source: { source: 'github', repo: 'someone/plugins' } },
+          },
+          enabledPlugins: { 'omega@omega': true, 'other@other': true },
+        });
 
-test('#1042 the boot lane writes the settings files and never runs claude', async (t) => {
-  const { machine, dir } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { lane: 'boot' });
+        ctx.expect(ensureClaudeSettings(dir).committed).toBe('healed');
 
-  assertPublishedOn(read(dir, COMMITTED));
-  assert.deepEqual(machine.calls(), [], 'npm start spawns no claude at all');
-});
+        const settings = read(dir, COMMITTED);
+        assertPublishedOn(ctx.expect, settings);
+        ctx.expect(settings.permissions).toEqual({ allow: ['Bash(npm test)'] });
+        ctx.expect(settings.extraKnownMarketplaces.other).toEqual({ source: { source: 'github', repo: 'someone/plugins' } });
+        ctx.expect(settings.enabledPlugins['other@other']).toBe(true);
+      },
+    },
 
-test('#1042 a full walk on a current plugin reads the machine once: three calls, no mutation', async (t) => {
-  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '999.0.0' } });
+    {
+      name: 'case 2: a published copy left disabled by hand is turned back on',
+      run: (ctx) => {
+        const dir = liveBrand();
+        write(dir, COMMITTED, { model: 'x', enabledPlugins: { 'omega@omega': false } });
 
-  assert.deepEqual(sortedCalls(machine.calls()), [...MACHINE_READS].sort());
-  assert.deepEqual(machine.mutations(), []);
-});
+        ctx.expect(ensureClaudeSettings(dir).committed).toBe('healed');
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+        ctx.expect(read(dir, COMMITTED).model).toBe('x');
+      },
+    },
 
-test('#1042 a full walk on a plugin behind the family version reads once, then runs the two updates', async (t) => {
-  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+    // ─── The private file of a linked brand ──────────────────────────────────────
 
-  const calls = machine.calls();
-  assert.equal(calls.length, 5, JSON.stringify(calls));
-  assert.deepEqual(sortedCalls(calls.slice(0, 3)), [...MACHINE_READS].sort(), 'the three reads come first, once');
-  const updates = calls.slice(3).map((argv) => argv.join(' '));
-  assert.ok(updates.some((line) => line.includes('marketplace update omega')), updates.join(' | '));
-  assert.ok(updates.some((line) => !line.includes('marketplace') && line.includes('update') && line.includes('omega@omega')), updates.join(' | '));
-});
+    {
+      name: 'case 3: a linked brand gets the local copy in its private file, the committed file unchanged in shape',
+      run: (ctx) => {
+        const dir = linkedBrand();
 
-test('#1042 a full walk with no plugin installed prints the install hint off one read of the machine', async (t) => {
-  const { machine, lines } = await opOnMachine(t, {});
+        ctx.expect(ensureClaudeSettings(dir)).toEqual({ committed: 'created', local: 'written' });
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+        assertLocalOn(ctx.expect, dir, read(dir, PRIVATE));
+      },
+    },
 
-  assert.ok(lines.includes('Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega'), lines);
-  assert.deepEqual(sortedCalls(machine.calls()), [...MACHINE_READS].sort());
-});
+    {
+      name: 'case 3: the private file keeps every key that is not the omega keys',
+      run: (ctx) => {
+        const dir = linkedBrand();
+        write(dir, PRIVATE, {
+          permissions: { allow: ['Bash(ls)'] },
+          extraKnownMarketplaces: { mine: { source: { source: 'directory', path: '/somewhere' } } },
+          enabledPlugins: { 'mine@mine': true },
+        });
 
-test('#1042 a dry run never runs claude', async (t) => {
-  const { machine } = await opOnMachine(t, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { dryRun: true });
+        ctx.expect(ensureClaudeSettings(dir).local).toBe('written');
 
-  assert.deepEqual(machine.calls(), []);
+        const settings = read(dir, PRIVATE);
+        assertLocalOn(ctx.expect, dir, settings);
+        ctx.expect(settings.permissions).toEqual({ allow: ['Bash(ls)'] });
+        ctx.expect(settings.extraKnownMarketplaces.mine).toEqual({ source: { source: 'directory', path: '/somewhere' } });
+        ctx.expect(settings.enabledPlugins['mine@mine']).toBe(true);
+      },
+    },
+
+    {
+      name: 'case 4: a linked brand that goes live loses the omega keys, and its other keys stay',
+      run: (ctx) => {
+        const dir = linkedBrand();
+        write(dir, PRIVATE, { permissions: { allow: ['Bash(ls)'] }, enabledPlugins: { 'mine@mine': true } });
+        ensureClaudeSettings(dir);
+        goLive(dir);
+
+        ctx.expect(ensureClaudeSettings(dir)).toEqual({ committed: 'present', local: 'removed' });
+
+        const settings = read(dir, PRIVATE);
+        ctx.expect(settings.permissions).toEqual({ allow: ['Bash(ls)'] });
+        ctx.expect(settings.enabledPlugins['mine@mine']).toBe(true);
+        ctx.expect((settings.extraKnownMarketplaces || {})['omega-local']).toBe(undefined);
+        ctx.expect('omega@omega-local' in settings.enabledPlugins).toBe(false);
+        ctx.expect('omega@omega' in settings.enabledPlugins, 'the committed file decides for a live brand').toBe(false);
+      },
+    },
+
+    {
+      name: 'case 4: a private file that held only the omega keys is removed when the brand goes live',
+      run: (ctx) => {
+        const dir = linkedBrand();
+        ensureClaudeSettings(dir);
+        ctx.expect(fs.existsSync(path.join(dir, PRIVATE)), 'fixture sanity: the linked run wrote the file').toBeTruthy();
+        goLive(dir);
+
+        ctx.expect(ensureClaudeSettings(dir).local).toBe('removed');
+        ctx.expect(fs.existsSync(path.join(dir, PRIVATE))).toBe(false);
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+      },
+    },
+
+    {
+      name: 'case 4: a live brand whose private file has no omega keys leaves it untouched',
+      run: (ctx) => {
+        const dir = liveBrand();
+        write(dir, PRIVATE, '{ "permissions": { "allow": [] } }\n');
+
+        ctx.expect(ensureClaudeSettings(dir).local).toBe('absent');
+        ctx.expect(fs.readFileSync(path.join(dir, PRIVATE), 'utf8')).toBe('{ "permissions": { "allow": [] } }\n');
+      },
+    },
+
+    // ─── Unreadable files ────────────────────────────────────────────────────────
+
+    {
+      name: 'case 5: a committed file that is not JSON is reported invalid and never written',
+      run: (ctx) => {
+        const dir = liveBrand();
+        write(dir, COMMITTED, '{ not json');
+
+        ctx.expect(ensureClaudeSettings(dir).committed).toBe('invalid');
+        ctx.expect(fs.readFileSync(path.join(dir, COMMITTED), 'utf8')).toBe('{ not json');
+      },
+    },
+
+    {
+      name: 'case 5: a private file that is not JSON is reported invalid and never written',
+      run: (ctx) => {
+        const dir = linkedBrand();
+        write(dir, PRIVATE, 'nope');
+
+        ctx.expect(ensureClaudeSettings(dir).local).toBe('invalid');
+        ctx.expect(fs.readFileSync(path.join(dir, PRIVATE), 'utf8')).toBe('nope');
+
+        goLive(dir);
+        ctx.expect(ensureClaudeSettings(dir).local, 'a live run never deletes a file it cannot read').toBe('invalid');
+        ctx.expect(fs.readFileSync(path.join(dir, PRIVATE), 'utf8')).toBe('nope');
+      },
+    },
+
+    // ─── Idempotence and the dry run ─────────────────────────────────────────────
+
+    {
+      name: 'case 6: a second run with nothing changed writes no file',
+      run: (ctx) => {
+        const past = new Date('2020-01-01T00:00:00Z');
+
+        for (const [dir, local] of [[liveBrand(), 'absent'], [linkedBrand(), 'present']]) {
+          ensureClaudeSettings(dir);
+          const written = [COMMITTED, PRIVATE].filter((file) => fs.existsSync(path.join(dir, file)));
+          for (const file of written) fs.utimesSync(path.join(dir, file), past, past);
+
+          ctx.expect(ensureClaudeSettings(dir)).toEqual({ committed: 'present', local });
+          for (const file of written) {
+            ctx.expect(fs.statSync(path.join(dir, file)).mtime.getTime(), `${file} was rewritten`).toBe(past.getTime());
+          }
+        }
+      },
+    },
+
+    {
+      name: 'ensureClaudeSettings: a dry run returns the verdicts and writes nothing',
+      run: (ctx) => {
+        const dir = linkedBrand();
+
+        ctx.expect(ensureClaudeSettings(dir, { dryRun: true })).toEqual({ committed: 'created', local: 'written' });
+        ctx.expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
+      },
+    },
+
+    // ─── The workspace ensure op ─────────────────────────────────────────────────
+
+    {
+      name: 'claude-settings op is registered in the workspace OPERATIONS',
+      run: (ctx) => {
+        const { OPERATIONS } = require('../src/config.js');
+        ctx.expect(OPERATIONS.workspace.some((op) => op.name === 'claude-settings' && op.ensure === true)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'claude-settings: the op writes both files for a linked brand, then is a no-op',
+      run: async (ctx) => {
+        const dir = linkedBrand();
+        const context = { brandRoot: dir, brand: { id: 'fixture', config: {} } };
+
+        ctx.expect(await claudeSettingsOp(context)).not.toBe(null);
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+        assertLocalOn(ctx.expect, dir, read(dir, PRIVATE));
+
+        ctx.expect(await claudeSettingsOp(context), 'a second run has nothing to say').toBe(null);
+      },
+    },
+
+    {
+      name: 'claude-settings: the op warns on an unreadable file',
+      run: async (ctx) => {
+        const dir = liveBrand();
+        write(dir, COMMITTED, 'nope');
+
+        const result = await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } });
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(fs.readFileSync(path.join(dir, COMMITTED), 'utf8')).toBe('nope');
+      },
+    },
+
+    {
+      name: '#971: the op under --dry-run plans the writes and writes nothing',
+      run: async (ctx) => {
+        const dir = linkedBrand();
+        const result = await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+
+        ctx.expect(JSON.stringify(result.output)).toMatch(/planned/);
+        ctx.expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
+      },
+    },
+
+    {
+      name: 'case 10: manage runs the two update commands when the installed plugin is older than the brand\'s OMEGA',
+      run: async (ctx) => {
+        const { machine } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+
+        const mutations = machine.mutations();
+        ctx.expect(mutations.length, JSON.stringify(mutations)).toBe(2);
+        ctx.expect(mutations.some((argv) => argv.join(' ').includes('marketplace update omega'))).toBeTruthy();
+        ctx.expect(mutations.some((argv) => !argv.includes('marketplace') && argv.includes('update') && argv.includes('omega@omega'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'case 10: manage runs no command when the installed plugin is equal or newer',
+      run: async (ctx) => {
+        const { machine } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '999.0.0' } });
+        ctx.expect(machine.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'manage says in one line when the plugin is not installed, and never installs it unasked',
+      run: async (ctx) => {
+        const { machine, lines } = await opOnMachine(ctx, {});
+
+        ctx.expect(lines.includes('Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega'), lines).toBeTruthy();
+        ctx.expect(machine.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'the op runs claude through the runner the manage context injects, never the one on PATH',
+      run: async (ctx) => {
+        const injected = createMachine({ marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+        const onPath = PATH_MACHINE.calls().length;
+
+        await claudeSettingsOp({ brandRoot: liveBrand(), brand: { id: 'fixture', config: {} }, execFn: injected.exec });
+
+        ctx.expect(injected.mutations().length, `the injected runner ran the update: ${JSON.stringify(injected.calls())}`).toBe(2);
+        ctx.expect(PATH_MACHINE.calls().length, 'nothing reached the claude on PATH').toBe(onPath);
+      },
+    },
+
+    // ─── The machine check is the full walk's, and one walk reads it once ───────
+
+    {
+      name: '#1042 the boot lane writes the settings files and never runs claude',
+      run: async (ctx) => {
+        const { machine, dir } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { lane: 'boot' });
+
+        assertPublishedOn(ctx.expect, read(dir, COMMITTED));
+        ctx.expect(machine.calls(), 'npm start spawns no claude at all').toEqual([]);
+      },
+    },
+
+    {
+      name: '#1042 a full walk on a current plugin reads the machine once: three calls, no mutation',
+      run: async (ctx) => {
+        const { machine } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '999.0.0' } });
+
+        ctx.expect(sortedCalls(machine.calls())).toEqual([...MACHINE_READS].sort());
+        ctx.expect(machine.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: '#1042 a full walk on a plugin behind the family version reads once, then runs the two updates',
+      run: async (ctx) => {
+        const { machine } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' });
+
+        const calls = machine.calls();
+        ctx.expect(calls.length, JSON.stringify(calls)).toBe(5);
+        ctx.expect(sortedCalls(calls.slice(0, 3)), 'the three reads come first, once').toEqual([...MACHINE_READS].sort());
+        const updates = calls.slice(3).map((argv) => argv.join(' '));
+        ctx.expect(updates.some((line) => line.includes('marketplace update omega')), updates.join(' | ')).toBeTruthy();
+        ctx.expect(updates.some((line) => !line.includes('marketplace') && line.includes('update') && line.includes('omega@omega')), updates.join(' | ')).toBeTruthy();
+      },
+    },
+
+    {
+      name: '#1042 a full walk with no plugin installed prints the install hint off one read of the machine',
+      run: async (ctx) => {
+        const { machine, lines } = await opOnMachine(ctx, {});
+
+        ctx.expect(lines.includes('Claude plugin not installed on this machine. Run: claude plugin marketplace add Omega-JS-Stack/omega && claude plugin install omega@omega'), lines).toBeTruthy();
+        ctx.expect(sortedCalls(machine.calls())).toEqual([...MACHINE_READS].sort());
+      },
+    },
+
+    {
+      name: '#1042 a dry run never runs claude',
+      run: async (ctx) => {
+        const { machine } = await opOnMachine(ctx, { marketplaces: ON_GITHUB, installed: { 'omega@omega': '0.0.1' }, published: '999.0.0' }, { dryRun: true });
+
+        ctx.expect(machine.calls()).toEqual([]);
+      },
+    },
+  ],
 });

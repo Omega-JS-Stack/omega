@@ -5,19 +5,33 @@
 // Ian's machine) and skipped cleanly where it isn't (CI) — the prefix only applies
 // to actual `npm install` commands, which are too heavy for a unit test.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { safeInstall } = require('../src/safe-install');
 
-test('exports safeInstall as a function', () => {
-  assert.equal(typeof safeInstall, 'function');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'safe-install',
+  tests: [
+    {
+      name: 'exports safeInstall as a function',
+      run: (ctx) => {
+        ctx.expect(typeof safeInstall).toBe('function');
+      },
+    },
 
-test('non-install commands pass through and execute for real', async () => {
-  const output = await safeInstall('node -e "console.log(\'safe-install-ok\')"', { log: false });
-  assert.match(String(output), /safe-install-ok/);
-});
+    {
+      name: 'non-install commands pass through and execute for real',
+      run: async (ctx) => {
+        const output = await safeInstall('node -e "console.log(\'safe-install-ok\')"', { log: false });
+        ctx.expect(String(output)).toMatch(/safe-install-ok/);
+      },
+    },
 
-test('failing commands reject', async () => {
-  await assert.rejects(() => safeInstall('node -e "process.exit(3)"', { log: false }));
+    {
+      name: 'failing commands reject',
+      run: async (ctx) => {
+        await ctx.expect((() => safeInstall('node -e "process.exit(3)"', { log: false }))()).rejects.toThrow();
+      },
+    },
+  ],
 });

@@ -5,8 +5,7 @@
  * forwarding, filtering, and the stop-on-failure bail are asserted from what
  * actually got spawned.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -289,477 +288,542 @@ async function runDeployCommand(cwd, options = {}) {
   }
 }
 
-// ─── Execution over the staged brand ─────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'deploy-command',
+  tests: [
+    // ─── Execution over the staged brand ─────────────────────────────────────────
 
-test('a custom target\'s own deploy script runs bare: no --snapshot, no brand flag', async () => {
-  const { brand } = stageBrand();
-  const configPath = path.join(brand, 'config', 'omega.json5');
-  fs.writeFileSync(configPath, fs.readFileSync(configPath, 'utf8').replace("targets: {", "targets: { api: { type: 'custom' },"));
-  const record = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'api',phase:'start',cwd:process.cwd(),argv:['deploy'].concat(process.argv.slice(1))})+'\\n')\"";
-  write(path.join(brand, 'targets', 'api', 'package.json'), JSON.stringify({ name: 'api', private: true, scripts: { deploy: record } }));
+    {
+      name: 'a custom target\'s own deploy script runs bare: no --snapshot, no brand flag',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const configPath = path.join(brand, 'config', 'omega.json5');
+        fs.writeFileSync(configPath, fs.readFileSync(configPath, 'utf8').replace("targets: {", "targets: { api: { type: 'custom' },"));
+        const record = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'api',phase:'start',cwd:process.cwd(),argv:['deploy'].concat(process.argv.slice(1))})+'\\n')\"";
+        write(path.join(brand, 'targets', 'api', 'package.json'), JSON.stringify({ name: 'api', private: true, scripts: { deploy: record } }));
 
-  const code = await runDeployCommand(brand, { direct: false, platforms: 'mac' });
+        const code = await runDeployCommand(brand, { direct: false, platforms: 'mac' });
 
-  const api = readCalls(brand).find((call) => call.name === 'api');
-  assert.ok(api, 'the custom target deployed');
-  assert.deepEqual(api.argv, ['deploy'], 'the brand\'s own script hears neither the root\'s --snapshot nor a brand flag');
-  const web = readCalls(brand).find((call) => call.name === 'web');
-  assert.ok(web.argv.includes('--snapshot=sha1234567890abcdef'), 'while the framework\'s own `omega deploy` still hears them');
-  assert.equal(code, undefined);
-});
-
-test('bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in its own cwd', async () => {
-  const { brand } = stageBrand();
-  const code = await runDeployCommand(brand);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  // Order is TARGET_ORDER (backend → web), not the directory listing
-  assert.deepEqual(calls.map((c) => c.name), ['backend', 'web']);
-  for (const call of calls) {
-    // The only flag a bare run carries is the root's own word about the
-    // delivery it performed for the whole run (#901), never a user flag.
-    assert.deepEqual(call.argv, ['deploy', '--snapshot=sha1234567890abcdef'], 'bare per-target: the deploy command and the root delivery hand-off');
-  }
-  assert.equal(calls[0].cwd, path.join(brand, 'targets', 'backend'));
-  assert.equal(calls[1].cwd, path.join(brand, 'targets', 'web'));
-  assert.equal(code, undefined, 'all targets green → no error exit code');
-});
-
-test('flags forward verbatim to every target; --target= is consumed here', async () => {
-  const { brand } = stageBrand();
-  // The parse shape: kebab original + camelCase twin (the twin must NOT forward twice)
-  await runDeployCommand(brand, { 'dry-run': true, dryRun: true, direct: true });
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['deploy', '--dry-run', '--direct']);
-  }
-});
-
-test('--target= picks by target NAME; nothing else runs', async () => {
-  const { brand } = stageBrand();
-  await runDeployCommand(brand, { target: 'web' });
-
-  let calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['web']);
-  assert.deepEqual(calls[0].argv, ['deploy', '--snapshot=sha1234567890abcdef'], '--target= never forwards');
-
-  fs.rmSync(path.join(brand, 'calls.log'));
-  await runDeployCommand(brand, { target: 'backend,web' });
-  calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['backend', 'web'], 'order stays backend-first regardless of the flag order');
-});
-
-// The retired pickers (#780) — `--only` is firebase's own flag on the backend
-// target, so accepting it at the brand root would mean two things at once
-test('--only and --except are REFUSED, not ignored and not aliased — zero spawns', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runDeployCommand(brand, { only: 'web' }),
-    (error) => {
-      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-      assert.match(error.message, /--only is retired: pick targets with --target=/);
-      assert.match(error.message, /firebase's own --only hosting runs from targets\/backend/, 'the sentence names where the firebase flag DOES belong');
-      return true;
+        const api = readCalls(brand).find((call) => call.name === 'api');
+        ctx.expect(api, 'the custom target deployed').toBeTruthy();
+        ctx.expect(api.argv, 'the brand\'s own script hears neither the root\'s --snapshot nor a brand flag').toEqual(['deploy']);
+        const web = readCalls(brand).find((call) => call.name === 'web');
+        ctx.expect(web.argv.includes('--snapshot=sha1234567890abcdef'), 'while the framework\'s own `omega deploy` still hears them').toBeTruthy();
+        ctx.expect(code).toBe(undefined);
+      },
     },
-  );
-  await assert.rejects(() => runDeployCommand(brand, { except: 'backend' }), /--except is retired/);
 
-  assert.deepEqual(readCalls(brand, { all: true }), [], 'not even the delivery lane ran');
-});
+    {
+      name: 'bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in its own cwd',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const code = await runDeployCommand(brand);
 
-test('a --target= token matching nothing STOPS the run — never a matched subset, never deploy-everything', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runDeployCommand(brand, { target: 'hosting' }),
-    (error) => {
-      assert.equal(error.refusal, true);
-      assert.match(error.message, /Unknown --target token "hosting"/);
-      assert.match(error.message, /this brand's targets are backend, web/, 'the error names what the brand actually has');
-      return true;
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        // Order is TARGET_ORDER (backend → web), not the directory listing
+        ctx.expect(calls.map((c) => c.name)).toEqual(['backend', 'web']);
+        for (const call of calls) {
+          // The only flag a bare run carries is the root's own word about the
+          // delivery it performed for the whole run (#901), never a user flag.
+          ctx.expect(call.argv, 'bare per-target: the deploy command and the root delivery hand-off').toEqual(['deploy', '--snapshot=sha1234567890abcdef']);
+        }
+        ctx.expect(calls[0].cwd).toBe(path.join(brand, 'targets', 'backend'));
+        ctx.expect(calls[1].cwd).toBe(path.join(brand, 'targets', 'web'));
+        ctx.expect(code, 'all targets green → no error exit code').toBe(undefined);
+      },
     },
-  );
 
-  // A typo BESIDE a real target must not quietly deploy the matched half
-  await assert.rejects(() => runDeployCommand(brand, { target: 'web,hosting' }), /Unknown --target token "hosting"/);
+    {
+      name: 'flags forward verbatim to every target; --target= is consumed here',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        // The parse shape: kebab original + camelCase twin (the twin must NOT forward twice)
+        await runDeployCommand(brand, { 'dry-run': true, dryRun: true, direct: true });
 
-  assert.deepEqual(readCalls(brand, { all: true }), [], 'not even the delivery lane ran');
-});
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv).toEqual(['deploy', '--dry-run', '--direct']);
+        }
+      },
+    },
 
-test('a failing backend STOPS the run before web (later targets depend on it) — exit 1', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
-  const code = await runDeployCommand(brand);
+    {
+      name: '--target= picks by target NAME; nothing else runs',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runDeployCommand(brand, { target: 'web' });
 
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['backend'], 'web never deployed after the backend failure');
-  assert.equal(code, 1);
-});
+        let calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['web']);
+        ctx.expect(calls[0].argv, '--target= never forwards').toEqual(['deploy', '--snapshot=sha1234567890abcdef']);
 
-test('a backend that SKIPS (one line, exit 0) never stops the group, and reads green (#882)', async () => {
-  const { brand } = stageBrand();
-  // What the backend verb does on a shared cloud project: it prints its skip
-  // line and exits 0. The gate ahead of the group stops the run on FAILURE
-  // only, so the fan-out has nothing to add: the verb's own line rides through
-  // its inherited stdout and the summary ticks the target.
-  fs.writeFileSync(path.join(brand, 'SKIP-backend'), '');
+        fs.rmSync(path.join(brand, 'calls.log'));
+        await runDeployCommand(brand, { target: 'backend,web' });
+        calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name), 'order stays backend-first regardless of the flag order').toEqual(['backend', 'web']);
+      },
+    },
 
-  const lines = [];
-  const originalLog = console.log;
-  console.log = (...args) => lines.push(args.map(String).join(' '));
+    // The retired pickers (#780) — `--only` is firebase's own flag on the backend
+    // target, so accepting it at the brand root would mean two things at once
+    {
+      name: '--only and --except are REFUSED, not ignored and not aliased — zero spawns',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
 
-  let code;
-  try {
-    code = await runDeployCommand(brand);
-  } finally {
-    console.log = originalLog;
-  }
+        await ctx.expect((() => runDeployCommand(brand, { only: 'web' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+            ctx.expect(error.message).toMatch(/--only is retired: pick targets with --target=/);
+            ctx.expect(error.message, 'the sentence names where the firebase flag DOES belong').toMatch(/firebase's own --only hosting runs from targets\/backend/);
+            return true;
+          });
+        await ctx.expect((() => runDeployCommand(brand, { except: 'backend' }))()).rejects.toThrow(/--except is retired/);
 
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['backend', 'web'], 'web still deploys after the skipped backend');
-  assert.equal(code, undefined, 'a skip is not a failure: the run stays green');
-  assert.ok(lines.join('\n').includes('✓ backend'), `the summary ticks the skipped target (printed: ${lines.join('\n')})`);
-});
+        ctx.expect(readCalls(brand, { all: true }), 'not even the delivery lane ran').toEqual([]);
+      },
+    },
 
-test('--continue-on-error keeps going past the failure, still exit 1', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
-  const code = await runDeployCommand(brand, { 'continue-on-error': true, continueOnError: true });
+    {
+      name: 'a --target= token matching nothing STOPS the run — never a matched subset, never deploy-everything',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['backend', 'web']);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['deploy', '--snapshot=sha1234567890abcdef'], 'the brand-level bail switch never forwards');
-  }
-  assert.equal(code, 1);
-});
+        await ctx.expect((() => runDeployCommand(brand, { target: 'hosting' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal).toBe(true);
+            ctx.expect(error.message).toMatch(/Unknown --target token "hosting"/);
+            ctx.expect(error.message, 'the error names what the brand actually has').toMatch(/this brand's targets are backend, web/);
+            return true;
+          });
 
-test('outside any brand: errors with exit 1', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-deploy-cmd-nobrand-'));
-  const code = await runDeployCommand(scratch);
-  assert.equal(code, 1);
-});
+        // A typo BESIDE a real target must not quietly deploy the matched half
+        await ctx.expect((() => runDeployCommand(brand, { target: 'web,hosting' }))()).rejects.toThrow(/Unknown --target token "hosting"/);
 
-test('cli routes `deploy` through ALIASES to the command file', () => {
-  const Main = require('../src/cli.js');
-  assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'deploy'));
-  assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'deploy.js')));
-});
+        ctx.expect(readCalls(brand, { all: true }), 'not even the delivery lane ran').toEqual([]);
+      },
+    },
 
-// ─── The delivery lane (#678) ────────────────────────────────────────────────
+    {
+      name: 'a failing backend STOPS the run before web (later targets depend on it) — exit 1',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
+        const code = await runDeployCommand(brand);
 
-test('the delivery lane runs ONCE, before the first target — brand inputs land before anything publishes', async () => {
-  const { brand } = stageBrand();
-  await runDeployCommand(brand);
+        ctx.expect(readCalls(brand).map((c) => c.name), 'web never deployed after the backend failure').toEqual(['backend']);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  assert.deepEqual(readSequence(brand), ['delivery-lane', 'backend:scaffold', 'web:scaffold', 'lockfile-gate', 'behind-check', 'compose-workflows', 'snapshot-push', 'snapshot-wait-ref', 'backend:deploy', 'web:deploy']);
-  assert.equal(manageCalls.length, 1, 'one lane pass for the whole fan-out, not one per target');
-  assert.equal(manageCalls[0].startDir, brand);
-});
+    {
+      name: 'a backend that SKIPS (one line, exit 0) never stops the group, and reads green (#882)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        // What the backend verb does on a shared cloud project: it prints its skip
+        // line and exits 0. The gate ahead of the group stops the run on FAILURE
+        // only, so the fan-out has nothing to add: the verb's own line rides through
+        // its inherited stdout and the summary ticks the target.
+        fs.writeFileSync(path.join(brand, 'SKIP-backend'), '');
 
-test('the lane deploy runs IS the boot lane — one constant, two triggers', async () => {
-  const { brand } = stageBrand();
-  await runDeployCommand(brand);
+        const lines = [];
+        const originalLog = console.log;
+        console.log = (...args) => lines.push(args.map(String).join(' '));
 
-  // The lane is asked for BY NAME, so its service list can never be a second
-  // copy of BOOT_SERVICES: manage resolves 'boot' to that constant
-  // (manage.test.js pins the resolution), and deploy hand-picks nothing.
-  assert.equal(manageCalls[0].options.lane, 'boot');
-  assert.equal(manageCalls[0].options.service, undefined);
-  assert.ok(BOOT_SERVICES.includes('disperse'), 'the delivery services are the boot lane\'s');
-});
+        let code;
+        try {
+          code = await runDeployCommand(brand);
+        } finally {
+          console.log = originalLog;
+        }
 
-test('--dry-run reaches the lane too — a planned deploy plans its delivery', async () => {
-  const { brand } = stageBrand();
-  await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
+        ctx.expect(readCalls(brand).map((c) => c.name), 'web still deploys after the skipped backend').toEqual(['backend', 'web']);
+        ctx.expect(code, 'a skip is not a failure: the run stays green').toBe(undefined);
+        ctx.expect(lines.join('\n').includes('✓ backend'), `the summary ticks the skipped target (printed: ${lines.join('\n')})`).toBeTruthy();
+      },
+    },
 
-  assert.equal(manageCalls[0].options.dryRun, true);
-});
+    {
+      name: '--continue-on-error keeps going past the failure, still exit 1',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
+        const code = await runDeployCommand(brand, { 'continue-on-error': true, continueOnError: true });
 
-test('a delivery lane with errors stops the deploy — nothing publishes on broken inputs', async () => {
-  const { brand } = stageBrand();
-  manageReport = { hasErrors: true, results: {}, brand: {} };
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['backend', 'web']);
+        for (const call of calls) {
+          ctx.expect(call.argv, 'the brand-level bail switch never forwards').toEqual(['deploy', '--snapshot=sha1234567890abcdef']);
+        }
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  try {
-    const code = await runDeployCommand(brand);
+    {
+      name: 'outside any brand: errors with exit 1',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-deploy-cmd-nobrand-'));
+        const code = await runDeployCommand(scratch);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-    assert.equal(code, 1);
-    assert.deepEqual(readCalls(brand), [], 'no target was spawned');
-  } finally {
-    manageReport = { hasErrors: false, results: {}, brand: {} };
-  }
-});
+    {
+      name: 'cli routes `deploy` through ALIASES to the command file',
+      run: (ctx) => {
+        const Main = require('../src/cli.js');
+        ctx.expect(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'deploy')).toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(Main.config.commandsDir, 'deploy.js'))).toBeTruthy();
+      },
+    },
 
-// ─── The one push, and the parallel group (#901) ─────────────────────────────
+    // ─── The delivery lane (#678) ────────────────────────────────────────────────
 
-test('the ONE lane pushes ONCE at the root, and every target dispatches against that sha (#901, #915)', async () => {
-  const { brand } = stageBrand();
-  const code = await runDeployCommand(brand);
+    {
+      name: 'the delivery lane runs ONCE, before the first target — brand inputs land before anything publishes',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runDeployCommand(brand);
 
-  assert.equal(pushes.length, 1, 'one push for the whole fan-out, never one per target');
-  assert.equal(pushes[0].brandRoot, brand, 'the BRAND folder is what rides');
-  assert.equal(pushes[0].ref, 'omega-deploy', 'the one branch CI ever builds');
-  assert.deepEqual(
-    { owner: pushes[0].owner, repo: pushes[0].repo },
-    { owner: 'Fixture-Org', repo: 'fixture-brand-omega' },
-    'the push address is the brand repo the config names',
-  );
+        ctx.expect(readSequence(brand)).toEqual(['delivery-lane', 'backend:scaffold', 'web:scaffold', 'lockfile-gate', 'behind-check', 'compose-workflows', 'snapshot-push', 'snapshot-wait-ref', 'backend:deploy', 'web:deploy']);
+        ctx.expect(manageCalls.length, 'one lane pass for the whole fan-out, not one per target').toBe(1);
+        ctx.expect(manageCalls[0].startDir).toBe(brand);
+      },
+    },
 
-  // And the ref has to CARRY that push before a target dispatches against it
-  // (#902): GitHub resolves the branch on its side, so a dispatch sent in the
-  // same second can start a run on the snapshot before this one.
-  assert.equal(refWaits.length, 1, 'the root waits for the ref once, for the whole run');
-  assert.deepEqual(
-    { ref: refWaits[0].ref, sha: refWaits[0].sha },
-    { ref: 'omega-deploy', sha: 'sha1234567890abcdef' },
-    'it waits for the very sha the root just pushed',
-  );
+    {
+      name: 'the lane deploy runs IS the boot lane — one constant, two triggers',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runDeployCommand(brand);
 
-  const sequence = readSequence(brand);
-  assert.ok(
-    sequence.indexOf('snapshot-push') < sequence.indexOf('snapshot-wait-ref')
-    && sequence.indexOf('snapshot-wait-ref') < sequence.indexOf('backend:deploy'),
-    `the wait sits between the push and the first dispatch (got ${JSON.stringify(sequence)})`,
-  );
+        // The lane is asked for BY NAME, so its service list can never be a second
+        // copy of BOOT_SERVICES: manage resolves 'boot' to that constant
+        // (manage.test.js pins the resolution), and deploy hand-picks nothing.
+        ctx.expect(manageCalls[0].options.lane).toBe('boot');
+        ctx.expect(manageCalls[0].options.service).toBe(undefined);
+        ctx.expect(BOOT_SERVICES.includes('disperse'), 'the delivery services are the boot lane\'s').toBeTruthy();
+      },
+    },
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web']);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['deploy', '--snapshot=sha1234567890abcdef'], 'every target is told the sha the root pushed');
-  }
-  assert.equal(code, undefined, 'all targets green → no error exit code');
-});
+    {
+      name: '--dry-run reaches the lane too — a planned deploy plans its delivery',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
 
-test('the snapshot address composes the PRODUCTION config, never the machine\'s (#856, #915)', async () => {
-  const { brand } = stageBrand();
-  // A brand whose production layer names a different repo: the snapshot is a
-  // production artifact, and an address read off this machine's ambient
-  // environment (a terminal answers `development`) would push it to a repo the
-  // targets never dispatch against.
-  write(path.join(brand, 'config', 'omega.production.json5'), `{
+        ctx.expect(manageCalls[0].options.dryRun).toBe(true);
+      },
+    },
+
+    {
+      name: 'a delivery lane with errors stops the deploy — nothing publishes on broken inputs',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        manageReport = { hasErrors: true, results: {}, brand: {} };
+
+        try {
+          const code = await runDeployCommand(brand);
+
+          ctx.expect(code).toBe(1);
+          ctx.expect(readCalls(brand), 'no target was spawned').toEqual([]);
+        } finally {
+          manageReport = { hasErrors: false, results: {}, brand: {} };
+        }
+      },
+    },
+
+    // ─── The one push, and the parallel group (#901) ─────────────────────────────
+
+    {
+      name: 'the ONE lane pushes ONCE at the root, and every target dispatches against that sha (#901, #915)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const code = await runDeployCommand(brand);
+
+        ctx.expect(pushes.length, 'one push for the whole fan-out, never one per target').toBe(1);
+        ctx.expect(pushes[0].brandRoot, 'the BRAND folder is what rides').toBe(brand);
+        ctx.expect(pushes[0].ref, 'the one branch CI ever builds').toBe('omega-deploy');
+        ctx.expect({ owner: pushes[0].owner, repo: pushes[0].repo }, 'the push address is the brand repo the config names').toEqual({ owner: 'Fixture-Org', repo: 'fixture-brand-omega' });
+
+        // And the ref has to CARRY that push before a target dispatches against it
+        // (#902): GitHub resolves the branch on its side, so a dispatch sent in the
+        // same second can start a run on the snapshot before this one.
+        ctx.expect(refWaits.length, 'the root waits for the ref once, for the whole run').toBe(1);
+        ctx.expect({ ref: refWaits[0].ref, sha: refWaits[0].sha }, 'it waits for the very sha the root just pushed').toEqual({ ref: 'omega-deploy', sha: 'sha1234567890abcdef' });
+
+        const sequence = readSequence(brand);
+        ctx.expect(sequence.indexOf('snapshot-push') < sequence.indexOf('snapshot-wait-ref')
+          && sequence.indexOf('snapshot-wait-ref') < sequence.indexOf('backend:deploy'), `the wait sits between the push and the first dispatch (got ${JSON.stringify(sequence)})`).toBeTruthy();
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((call) => call.name)).toEqual(['backend', 'web']);
+        for (const call of calls) {
+          ctx.expect(call.argv, 'every target is told the sha the root pushed').toEqual(['deploy', '--snapshot=sha1234567890abcdef']);
+        }
+        ctx.expect(code, 'all targets green → no error exit code').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'the snapshot address composes the PRODUCTION config, never the machine\'s (#856, #915)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        // A brand whose production layer names a different repo: the snapshot is a
+        // production artifact, and an address read off this machine's ambient
+        // environment (a terminal answers `development`) would push it to a repo the
+        // targets never dispatch against.
+        write(path.join(brand, 'config', 'omega.production.json5'), `{
   repo: { provider: 'github', owner: 'Prod-Org' },
 }
 `);
 
-  // The machine stating what a developer's terminal states.
-  const ambient = process.env.OMEGA_ENVIRONMENT;
-  process.env.OMEGA_ENVIRONMENT = 'development';
+        // The machine stating what a developer's terminal states.
+        const ambient = process.env.OMEGA_ENVIRONMENT;
+        process.env.OMEGA_ENVIRONMENT = 'development';
 
-  try {
-    await runDeployCommand(brand);
-  } finally {
-    if (ambient === undefined) delete process.env.OMEGA_ENVIRONMENT;
-    else process.env.OMEGA_ENVIRONMENT = ambient;
-  }
+        try {
+          await runDeployCommand(brand);
+        } finally {
+          if (ambient === undefined) delete process.env.OMEGA_ENVIRONMENT;
+          else process.env.OMEGA_ENVIRONMENT = ambient;
+        }
 
-  assert.equal(pushes[0].owner, 'Prod-Org', 'the push goes to the production org');
-  assert.equal(composes[0].owner, 'Prod-Org', 'and the composed workflows to the same repo');
-});
-
-test('the root checks it is current and composes the workflows ONCE, before the group, and commits nothing (#915)', async () => {
-  const { brand } = stageBrand(['desktop']);
-
-  await runDeployCommand(brand);
-
-  assert.equal(composes.length, 1, 'one workflow compare for the whole fan-out, never one per target');
-  assert.deepEqual(
-    { brandRoot: composes[0].brandRoot, branch: composes[0].branch, repo: composes[0].repo },
-    { brandRoot: brand, branch: 'main', repo: 'fixture-brand-omega' },
-    'the composed files of THIS brand go to its repo\'s default branch',
-  );
-
-  // Both run before a single target is spawned, and in this order: a refusal
-  // has to land before anything is written anywhere (#915).
-  const sequence = readSequence(brand);
-  const firstDeploy = sequence.findIndex((entry) => entry.endsWith(':deploy'));
-  assert.ok(
-    sequence.indexOf('lockfile-gate') !== -1
-    && sequence.indexOf('lockfile-gate') < sequence.indexOf('behind-check')
-    && sequence.indexOf('behind-check') < sequence.indexOf('compose-workflows')
-    && sequence.indexOf('compose-workflows') < sequence.indexOf('snapshot-push')
-    && sequence.indexOf('snapshot-push') < firstDeploy,
-    `gate the lockfile, check, compose, push, then the targets (got ${JSON.stringify(sequence)})`,
-  );
-
-  for (const call of readCalls(brand)) {
-    assert.deepEqual(call.argv, ['deploy', '--snapshot=sha1234567890abcdef'], 'the root delivered: no child repeats it');
-    assert.ok(!call.argv.includes('--no-sync'), 'the flag is retired with the push lane (#915)');
-  }
-});
-
-test('a --dry-run and a --direct run deliver NOTHING at the root (#901)', async () => {
-  const { brand } = stageBrand();
-
-  await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
-  assert.equal(pushes.length, 0, 'a dry run promises to send nothing at all');
-  assert.equal(composes.length, 0, 'the default branch is not touched either');
-
-  await runDeployCommand(brand, { direct: true });
-  assert.equal(pushes.length, 0, 'a --direct run publishes from this machine without dispatching');
-  for (const call of readCalls(brand, { verb: 'deploy' })) {
-    assert.ok(!call.argv.includes('--snapshot=sha1234567890abcdef'), 'and neither forwards a sha for a delivery nobody ran');
-  }
-});
-
-test('a --dry-run pushes NOTHING: the run promises to send nothing at all (#901)', async () => {
-  const { brand } = stageBrand();
-
-  await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
-
-  assert.equal(pushes.length, 0);
-  for (const call of readCalls(brand)) {
-    assert.deepEqual(call.argv, ['deploy', '--dry-run'], 'and no sha is forwarded for a snapshot nobody pushed');
-  }
-});
-
-test('web, desktop and extension deploy CONCURRENTLY, after the backend (#901)', async () => {
-  const { brand } = stageBrand(['desktop', 'extension']);
-  fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
-  const code = await runDeployCommand(brand);
-
-  const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
-  const starts = calls.filter((entry) => entry.phase === 'start').map((entry) => entry.name);
-  const ends = calls.filter((entry) => entry.phase === 'end').map((entry) => entry.name);
-
-  assert.equal(starts[0], 'backend', 'the API goes live before the surfaces that call it');
-  assert.deepEqual(starts.slice(1).sort(), ['desktop', 'extension', 'web'], 'and the three surfaces all ran');
-  assert.equal(ends[0], 'backend', 'the backend is finished before the group is spawned');
-
-  // The group's three all START before the first of them ENDS: a sequential
-  // fan-out could not produce this order.
-  const groupStarts = calls.filter((entry) => entry.phase === 'start' && entry.name !== 'backend');
-  const firstGroupEnd = calls.findIndex((entry) => entry.phase === 'end' && entry.name !== 'backend');
-  assert.equal(groupStarts.length, 3);
-  for (const start of groupStarts) {
-    assert.ok(calls.indexOf(start) < firstGroupEnd, `${start.name} started before any of the group had finished`);
-  }
-
-  assert.equal(code, undefined);
-});
-
-test('a failing member of the group lets its siblings finish, then exits 1 naming it (#901)', async () => {
-  const { brand } = stageBrand(['desktop', 'extension']);
-  // The FIRST of the group: a run that stopped at a failure would leave
-  // extension and desktop unpublished behind it.
-  fs.writeFileSync(path.join(brand, 'FAIL-web'), '');
-
-  const code = await runDeployCommand(brand);
-  const ended = readCalls(brand, { phases: true }).filter((entry) => entry.phase === 'end').map((entry) => entry.name);
-
-  assert.deepEqual(ended.sort(), ['backend', 'desktop', 'extension', 'web'], 'every sibling ran to the end');
-  assert.equal(code, 1);
-});
-
-test('--target=web,desktop: no backend, and the two run together (#901)', async () => {
-  const { brand } = stageBrand(['desktop', 'extension']);
-  fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
-  await runDeployCommand(brand, { target: 'web,desktop' });
-
-  const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
-  assert.deepEqual(
-    calls.filter((entry) => entry.phase === 'start').map((entry) => entry.name).sort(),
-    ['desktop', 'web'],
-    'the picked set, and nothing else: no backend, no extension',
-  );
-
-  const firstEnd = calls.findIndex((entry) => entry.phase === 'end');
-  assert.equal(calls.slice(0, firstEnd).filter((entry) => entry.phase === 'start').length, 2, 'both started before either finished');
-});
-
-// ─── The scaffold, before the push (#901) ────────────────────────────────────
-
-test('every selected target is SCAFFOLDED first, in order, before the push and before any deploy (#901)', async () => {
-  const { brand } = stageBrand(['desktop']);
-  const code = await runDeployCommand(brand);
-
-  // A target's scaffold composes its workflow into the brand root, and the
-  // snapshot is what carries it to the runner: scaffolding after the push
-  // would dispatch a workflow the mirror does not hold yet.
-  assert.deepEqual(readSequence(brand).slice(0, 6), [
-    'delivery-lane',
-    'backend:scaffold',
-    'web:scaffold',
-    'desktop:scaffold',
-    'lockfile-gate',
-    'behind-check',
-  ], 'every scaffold ran, in TARGET_ORDER, before the run\'s one delivery');
-
-  for (const call of readCalls(brand, { verb: 'scaffold' })) {
-    assert.deepEqual(call.argv, ['scaffold'], 'the bare verb: no flags are forwarded to a scaffold');
-    assert.equal(call.cwd, path.join(brand, 'targets', call.name), 'each one runs in its own target dir');
-  }
-
-  assert.equal(code, undefined);
-});
-
-test('a --dry-run scaffolds too, and still pushes nothing (#901)', async () => {
-  const { brand } = stageBrand();
-  await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
-
-  assert.deepEqual(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name), ['backend', 'web'], 'a dry run of a deploy scaffolds, exactly as every verb does');
-  assert.equal(pushes.length, 0);
-});
-
-test('a scaffold failure stops the run BEFORE the push: nothing pushed, nothing deployed (#901)', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'FAIL-scaffold-backend'), '');
-
-  const code = await runDeployCommand(brand);
-
-  assert.deepEqual(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name), ['backend'], 'the run stops at the first failing scaffold');
-  assert.equal(pushes.length, 0, 'nothing was pushed');
-  assert.deepEqual(readCalls(brand), [], 'and no target deployed');
-  assert.equal(code, 1);
-});
-
-test('--target=web scaffolds web ONLY: the picked set is the scaffolded set (#901)', async () => {
-  const { brand } = stageBrand(['desktop']);
-  await runDeployCommand(brand, { target: 'web' });
-
-  assert.deepEqual(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name), ['web']);
-  assert.deepEqual(readCalls(brand).map((call) => call.name), ['web']);
-});
-
-// ─── Units ───────────────────────────────────────────────────────────────────
-
-test('selectTargets: full TARGET_ORDER, backend, web, then the rest', () => {
-  const targets = [
-    { name: 'desktop', target: 'desktop' },
-    { name: 'web', target: 'web' },
-    { name: 'extension', target: 'extension' },
-    { name: 'backend', target: 'backend' },
-  ];
-  const { selected } = selectTargets({ targets });
-  assert.deepEqual(selected.map((entry) => entry.target), ['backend', 'web', 'extension', 'desktop']);
-});
-
-test('selectTargets: an unknown token throws — a matched subset is never returned', () => {
-  const targets = [{ name: 'web', target: 'web' }];
-
-  assert.throws(
-    () => selectTargets({ targets, target: 'web,hosting' }),
-    (error) => {
-      assert.equal(error.refusal, true);
-      assert.match(error.message, /Unknown --target token "hosting": this brand's targets are web\. Nothing ran\./);
-      return true;
+        ctx.expect(pushes[0].owner, 'the push goes to the production org').toBe('Prod-Org');
+        ctx.expect(composes[0].owner, 'and the composed workflows to the same repo').toBe('Prod-Org');
+      },
     },
-  );
 
-  assert.deepEqual(selectTargets({ targets, target: 'web' }).selected.map((entry) => entry.name), ['web']);
-});
+    {
+      name: 'the root checks it is current and composes the workflows ONCE, before the group, and commits nothing (#915)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop']);
 
-test('buildForwardedFlags: values, booleans, --no- forms; brand-level keys consumed', () => {
-  const flags = buildForwardedFlags({
-    _: ['deploy'],
-    target: 'web',
-    'continue-on-error': true,
-    continueOnError: true,
-    'dry-run': true,
-    dryRun: true,
-    secrets: false,
-    platforms: 'mac,win',
-  });
-  assert.deepEqual(flags, ['--dry-run', '--no-secrets', '--platforms=mac,win']);
+        await runDeployCommand(brand);
+
+        ctx.expect(composes.length, 'one workflow compare for the whole fan-out, never one per target').toBe(1);
+        ctx.expect({ brandRoot: composes[0].brandRoot, branch: composes[0].branch, repo: composes[0].repo }, 'the composed files of THIS brand go to its repo\'s default branch').toEqual({ brandRoot: brand, branch: 'main', repo: 'fixture-brand-omega' });
+
+        // Both run before a single target is spawned, and in this order: a refusal
+        // has to land before anything is written anywhere (#915).
+        const sequence = readSequence(brand);
+        const firstDeploy = sequence.findIndex((entry) => entry.endsWith(':deploy'));
+        ctx.expect(sequence.indexOf('lockfile-gate') !== -1
+          && sequence.indexOf('lockfile-gate') < sequence.indexOf('behind-check')
+          && sequence.indexOf('behind-check') < sequence.indexOf('compose-workflows')
+          && sequence.indexOf('compose-workflows') < sequence.indexOf('snapshot-push')
+          && sequence.indexOf('snapshot-push') < firstDeploy, `gate the lockfile, check, compose, push, then the targets (got ${JSON.stringify(sequence)})`).toBeTruthy();
+
+        for (const call of readCalls(brand)) {
+          ctx.expect(call.argv, 'the root delivered: no child repeats it').toEqual(['deploy', '--snapshot=sha1234567890abcdef']);
+          ctx.expect(!call.argv.includes('--no-sync'), 'the flag is retired with the push lane (#915)').toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'a --dry-run and a --direct run deliver NOTHING at the root (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+
+        await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
+        ctx.expect(pushes.length, 'a dry run promises to send nothing at all').toBe(0);
+        ctx.expect(composes.length, 'the default branch is not touched either').toBe(0);
+
+        await runDeployCommand(brand, { direct: true });
+        ctx.expect(pushes.length, 'a --direct run publishes from this machine without dispatching').toBe(0);
+        for (const call of readCalls(brand, { verb: 'deploy' })) {
+          ctx.expect(!call.argv.includes('--snapshot=sha1234567890abcdef'), 'and neither forwards a sha for a delivery nobody ran').toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'a --dry-run pushes NOTHING: the run promises to send nothing at all (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+
+        await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
+
+        ctx.expect(pushes.length).toBe(0);
+        for (const call of readCalls(brand)) {
+          ctx.expect(call.argv, 'and no sha is forwarded for a snapshot nobody pushed').toEqual(['deploy', '--dry-run']);
+        }
+      },
+    },
+
+    {
+      name: 'web, desktop and extension deploy CONCURRENTLY, after the backend (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop', 'extension']);
+        fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
+        const code = await runDeployCommand(brand);
+
+        const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
+        const starts = calls.filter((entry) => entry.phase === 'start').map((entry) => entry.name);
+        const ends = calls.filter((entry) => entry.phase === 'end').map((entry) => entry.name);
+
+        ctx.expect(starts[0], 'the API goes live before the surfaces that call it').toBe('backend');
+        ctx.expect(starts.slice(1).sort(), 'and the three surfaces all ran').toEqual(['desktop', 'extension', 'web']);
+        ctx.expect(ends[0], 'the backend is finished before the group is spawned').toBe('backend');
+
+        // The group's three all START before the first of them ENDS: a sequential
+        // fan-out could not produce this order.
+        const groupStarts = calls.filter((entry) => entry.phase === 'start' && entry.name !== 'backend');
+        const firstGroupEnd = calls.findIndex((entry) => entry.phase === 'end' && entry.name !== 'backend');
+        ctx.expect(groupStarts.length).toBe(3);
+        for (const start of groupStarts) {
+          ctx.expect(calls.indexOf(start) < firstGroupEnd, `${start.name} started before any of the group had finished`).toBeTruthy();
+        }
+
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a failing member of the group lets its siblings finish, then exits 1 naming it (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop', 'extension']);
+        // The FIRST of the group: a run that stopped at a failure would leave
+        // extension and desktop unpublished behind it.
+        fs.writeFileSync(path.join(brand, 'FAIL-web'), '');
+
+        const code = await runDeployCommand(brand);
+        const ended = readCalls(brand, { phases: true }).filter((entry) => entry.phase === 'end').map((entry) => entry.name);
+
+        ctx.expect(ended.sort(), 'every sibling ran to the end').toEqual(['backend', 'desktop', 'extension', 'web']);
+        ctx.expect(code).toBe(1);
+      },
+    },
+
+    {
+      name: '--target=web,desktop: no backend, and the two run together (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop', 'extension']);
+        fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
+        await runDeployCommand(brand, { target: 'web,desktop' });
+
+        const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
+        ctx.expect(calls.filter((entry) => entry.phase === 'start').map((entry) => entry.name).sort(), 'the picked set, and nothing else: no backend, no extension').toEqual(['desktop', 'web']);
+
+        const firstEnd = calls.findIndex((entry) => entry.phase === 'end');
+        ctx.expect(calls.slice(0, firstEnd).filter((entry) => entry.phase === 'start').length, 'both started before either finished').toBe(2);
+      },
+    },
+
+    // ─── The scaffold, before the push (#901) ────────────────────────────────────
+
+    {
+      name: 'every selected target is SCAFFOLDED first, in order, before the push and before any deploy (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop']);
+        const code = await runDeployCommand(brand);
+
+        // A target's scaffold composes its workflow into the brand root, and the
+        // snapshot is what carries it to the runner: scaffolding after the push
+        // would dispatch a workflow the mirror does not hold yet.
+        ctx.expect(readSequence(brand).slice(0, 6), 'every scaffold ran, in TARGET_ORDER, before the run\'s one delivery').toEqual([
+          'delivery-lane',
+          'backend:scaffold',
+          'web:scaffold',
+          'desktop:scaffold',
+          'lockfile-gate',
+          'behind-check',
+        ]);
+
+        for (const call of readCalls(brand, { verb: 'scaffold' })) {
+          ctx.expect(call.argv, 'the bare verb: no flags are forwarded to a scaffold').toEqual(['scaffold']);
+          ctx.expect(call.cwd, 'each one runs in its own target dir').toBe(path.join(brand, 'targets', call.name));
+        }
+
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a --dry-run scaffolds too, and still pushes nothing (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
+
+        ctx.expect(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name), 'a dry run of a deploy scaffolds, exactly as every verb does').toEqual(['backend', 'web']);
+        ctx.expect(pushes.length).toBe(0);
+      },
+    },
+
+    {
+      name: 'a scaffold failure stops the run BEFORE the push: nothing pushed, nothing deployed (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'FAIL-scaffold-backend'), '');
+
+        const code = await runDeployCommand(brand);
+
+        ctx.expect(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name), 'the run stops at the first failing scaffold').toEqual(['backend']);
+        ctx.expect(pushes.length, 'nothing was pushed').toBe(0);
+        ctx.expect(readCalls(brand), 'and no target deployed').toEqual([]);
+        ctx.expect(code).toBe(1);
+      },
+    },
+
+    {
+      name: '--target=web scaffolds web ONLY: the picked set is the scaffolded set (#901)',
+      run: async (ctx) => {
+        const { brand } = stageBrand(['desktop']);
+        await runDeployCommand(brand, { target: 'web' });
+
+        ctx.expect(readCalls(brand, { verb: 'scaffold' }).map((call) => call.name)).toEqual(['web']);
+        ctx.expect(readCalls(brand).map((call) => call.name)).toEqual(['web']);
+      },
+    },
+
+    // ─── Units ───────────────────────────────────────────────────────────────────
+
+    {
+      name: 'selectTargets: full TARGET_ORDER, backend, web, then the rest',
+      run: (ctx) => {
+        const targets = [
+          { name: 'desktop', target: 'desktop' },
+          { name: 'web', target: 'web' },
+          { name: 'extension', target: 'extension' },
+          { name: 'backend', target: 'backend' },
+        ];
+        const { selected } = selectTargets({ targets });
+        ctx.expect(selected.map((entry) => entry.target)).toEqual(['backend', 'web', 'extension', 'desktop']);
+      },
+    },
+
+    {
+      name: 'selectTargets: an unknown token throws — a matched subset is never returned',
+      run: (ctx) => {
+        const targets = [{ name: 'web', target: 'web' }];
+
+        ctx.expect(() => selectTargets({ targets, target: 'web,hosting' })).toThrow((error) => {
+            ctx.expect(error.refusal).toBe(true);
+            ctx.expect(error.message).toMatch(/Unknown --target token "hosting": this brand's targets are web\. Nothing ran\./);
+            return true;
+          });
+
+        ctx.expect(selectTargets({ targets, target: 'web' }).selected.map((entry) => entry.name)).toEqual(['web']);
+      },
+    },
+
+    {
+      name: 'buildForwardedFlags: values, booleans, --no- forms; brand-level keys consumed',
+      run: (ctx) => {
+        const flags = buildForwardedFlags({
+          _: ['deploy'],
+          target: 'web',
+          'continue-on-error': true,
+          continueOnError: true,
+          'dry-run': true,
+          dryRun: true,
+          secrets: false,
+          platforms: 'mac,win',
+        });
+        ctx.expect(flags).toEqual(['--dry-run', '--no-secrets', '--platforms=mac,win']);
+      },
+    },
+  ],
 });

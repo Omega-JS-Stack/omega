@@ -3,8 +3,7 @@
  * strict { state, output, status, error } handler returns, state/output
  * accumulation across handlers, setup skip, stop-on-error.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,34 +19,6 @@ const CONSENT_THROW = `module.exports = async () => {
   throw error;
 };`;
 
-// ─── splitReturn contract ────────────────────────────────────────────────────
-
-test('splitReturn: null/undefined are no-ops', () => {
-  assert.deepEqual(splitReturn(null), { state: null, output: null });
-  assert.deepEqual(splitReturn(undefined), { state: null, output: null });
-});
-
-test('splitReturn: routes state and output', () => {
-  const { state, output } = splitReturn({ state: { id: 1 }, output: { count: 2 } }, 'op');
-  assert.deepEqual(state, { id: 1 });
-  assert.deepEqual(output, { count: 2 });
-});
-
-test('splitReturn: status/error are allowed metadata', () => {
-  const { state, output } = splitReturn({ status: 'warned', error: 'x', output: { a: 1 } }, 'op');
-  assert.equal(state, null);
-  assert.deepEqual(output, { a: 1 });
-});
-
-test('splitReturn: unknown top-level keys throw', () => {
-  assert.throws(() => splitReturn({ projectId: 'leak' }, 'op'), /invalid top-level key/);
-});
-
-test('splitReturn: arrays and scalars throw', () => {
-  assert.throws(() => splitReturn([1], 'op'), /returned an array/);
-  assert.throws(() => splitReturn('nope', 'op'), /returned string/);
-});
-
 // ─── Runner behavior over a staged service dir ───────────────────────────────
 
 function stageService(handlers) {
@@ -60,233 +31,324 @@ function stageService(handlers) {
   return dir;
 }
 
-test('runner: accumulates state + output across ensure handlers, later handlers see earlier state', async () => {
-  const serviceDir = stageService({
-    'ensure/alpha.js': `module.exports = async () => ({ state: { a: 1 }, output: { ranA: true } });`,
-    'ensure/beta.js': `module.exports = async ({ serviceData }) => ({ output: { sawA: serviceData.a } });`,
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'runner',
+  tests: [
+    // ─── splitReturn contract ────────────────────────────────────────────────────
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'alpha', ensure: true }, { name: 'beta', ensure: true }],
-    serviceData: {},
-  });
+    {
+      name: 'splitReturn: null/undefined are no-ops',
+      run: (ctx) => {
+        ctx.expect(splitReturn(null)).toEqual({ state: null, output: null });
+        ctx.expect(splitReturn(undefined)).toEqual({ state: null, output: null });
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.state, { a: 1 });
-  assert.deepEqual(result.output, { ranA: true, sawA: 1 });
-});
+    {
+      name: 'splitReturn: routes state and output',
+      run: (ctx) => {
+        const { state, output } = splitReturn({ state: { id: 1 }, output: { count: 2 } }, 'op');
+        ctx.expect(state).toEqual({ id: 1 });
+        ctx.expect(output).toEqual({ count: 2 });
+      },
+    },
 
-test('runner: pre-loaded serviceData is initial state (cross-service reads)', async () => {
-  const serviceDir = stageService({
-    'ensure/reads.js': `module.exports = async ({ serviceData }) => ({ output: { existing: serviceData.fromDisk } });`,
-  });
+    {
+      name: 'splitReturn: status/error are allowed metadata',
+      run: (ctx) => {
+        const { state, output } = splitReturn({ status: 'warned', error: 'x', output: { a: 1 } }, 'op');
+        ctx.expect(state).toBe(null);
+        ctx.expect(output).toEqual({ a: 1 });
+      },
+    },
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'reads', ensure: true }],
-    serviceData: { fromDisk: 'persisted-id' },
-  });
+    {
+      name: 'splitReturn: unknown top-level keys throw',
+      run: (ctx) => {
+        ctx.expect(() => splitReturn({ projectId: 'leak' }, 'op')).toThrow(/invalid top-level key/);
+      },
+    },
 
-  assert.equal(result.output.existing, 'persisted-id');
-  // Initial serviceData rides the state accumulator (it came FROM state.json)
-  assert.equal(result.state.fromDisk, 'persisted-id');
-});
+    {
+      name: 'splitReturn: arrays and scalars throw',
+      run: (ctx) => {
+        ctx.expect(() => splitReturn([1], 'op')).toThrow(/returned an array/);
+        ctx.expect(() => splitReturn('nope', 'op')).toThrow(/returned string/);
+      },
+    },
 
-test('runner: stops on first error, later operations never run', async () => {
-  const serviceDir = stageService({
-    'ensure/boom.js': `module.exports = async () => { throw new Error('kaput'); };`,
-    'ensure/after.js': `module.exports = async () => ({ output: { ran: true } });`,
-  });
+    {
+      name: 'runner: accumulates state + output across ensure handlers, later handlers see earlier state',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/alpha.js': `module.exports = async () => ({ state: { a: 1 }, output: { ranA: true } });`,
+          'ensure/beta.js': `module.exports = async ({ serviceData }) => ({ output: { sawA: serviceData.a } });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'boom', ensure: true }, { name: 'after', ensure: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'alpha', ensure: true }, { name: 'beta', ensure: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /kaput/);
-  assert.equal(result.output, null);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.state).toEqual({ a: 1 });
+        ctx.expect(result.output).toEqual({ ranA: true, sawA: 1 });
+      },
+    },
 
-test('runner: contract violation in a handler surfaces as operation error', async () => {
-  const serviceDir = stageService({
-    'ensure/leaky.js': `module.exports = async () => ({ projectId: 'leaked-to-top-level' });`,
-  });
+    {
+      name: 'runner: pre-loaded serviceData is initial state (cross-service reads)',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/reads.js': `module.exports = async ({ serviceData }) => ({ output: { existing: serviceData.fromDisk } });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'leaky', ensure: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'reads', ensure: true }],
+          serviceData: { fromDisk: 'persisted-id' },
+        });
 
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /invalid top-level key/);
-});
+        ctx.expect(result.output.existing).toBe('persisted-id');
+        // Initial serviceData rides the state accumulator (it came FROM state.json)
+        ctx.expect(result.state.fromDisk).toBe('persisted-id');
+      },
+    },
 
-test('runner: warned status is sticky but never downgrades an error', async () => {
-  const serviceDir = stageService({
-    'ensure/warns.js': `module.exports = async () => ({ status: 'warned', output: { findings: ['x'] } });`,
-    'ensure/fine.js': `module.exports = async () => ({ output: { ok: true } });`,
-  });
+    {
+      name: 'runner: stops on first error, later operations never run',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/boom.js': `module.exports = async () => { throw new Error('kaput'); };`,
+          'ensure/after.js': `module.exports = async () => ({ output: { ran: true } });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'warns', ensure: true }, { name: 'fine', ensure: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'boom', ensure: true }, { name: 'after', ensure: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output, { findings: ['x'], ok: true });
-});
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/kaput/);
+        ctx.expect(result.output).toBe(null);
+      },
+    },
 
-// ─── Consent gates are pending, not failures (#228) ──────────────────────────
+    {
+      name: 'runner: contract violation in a handler surfaces as operation error',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/leaky.js': `module.exports = async () => ({ projectId: 'leaked-to-top-level' });`,
+        });
 
-test('runner: a consent-required ensure throw warns with the ⚑ marker and the walk continues', async () => {
-  const serviceDir = stageService({
-    'ensure/consent.js': CONSENT_THROW,
-    'ensure/after.js': `module.exports = async () => ({ output: { ran: true } });`,
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'leaky', ensure: true }],
+          serviceData: {},
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'consent', ensure: true }, { name: 'after', ensure: true }],
-    serviceData: {},
-  });
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/invalid top-level key/);
+      },
+    },
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.error, null);
-  assert.match(result.output.consent.needsInteractive, /Google consent required/);
-  assert.equal(result.output.ran, true, 'the operations after a pending gate still run');
-});
+    {
+      name: 'runner: warned status is sticky but never downgrades an error',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/warns.js': `module.exports = async () => ({ status: 'warned', output: { findings: ['x'] } });`,
+          'ensure/fine.js': `module.exports = async () => ({ output: { ok: true } });`,
+        });
 
-test('runner: a consent-required read throw warns, and nothing writes on top of the gate', async () => {
-  const serviceDir = stageService({
-    'read/list.js': CONSENT_THROW,
-    'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'warns', ensure: true }, { name: 'fine', ensure: true }],
+          serviceData: {},
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'list', read: true, write: true }],
-    serviceData: {},
-  });
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output).toEqual({ findings: ['x'], ok: true });
+      },
+    },
 
-  assert.equal(result.status, 'warned');
-  assert.match(result.output.list.needsInteractive, /Google consent required/);
-  assert.equal(result.output.wrote, undefined);
-});
+    // ─── Consent gates are pending, not failures (#228) ──────────────────────────
 
-test('runner: a consent-required transform throw warns instead of failing the service', async () => {
-  const serviceDir = stageService({
-    'read/list.js': `module.exports = async () => ({ count: 1 });`,
-    'transform/list.js': CONSENT_THROW,
-    'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
-  });
+    {
+      name: 'runner: a consent-required ensure throw warns with the ⚑ marker and the walk continues',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/consent.js': CONSENT_THROW,
+          'ensure/after.js': `module.exports = async () => ({ output: { ran: true } });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'list', read: true, write: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'consent', ensure: true }, { name: 'after', ensure: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'warned');
-  assert.match(result.output.list.needsInteractive, /Google consent required/);
-  assert.equal(result.output.wrote, undefined);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.error).toBe(null);
+        ctx.expect(result.output.consent.needsInteractive).toMatch(/Google consent required/);
+        ctx.expect(result.output.ran, 'the operations after a pending gate still run').toBe(true);
+      },
+    },
 
-test('runner: a consent-required write throw warns instead of failing the service', async () => {
-  const serviceDir = stageService({
-    'write/push.js': CONSENT_THROW,
-  });
+    {
+      name: 'runner: a consent-required read throw warns, and nothing writes on top of the gate',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'read/list.js': CONSENT_THROW,
+          'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'push', write: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'list', read: true, write: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.error, null);
-  assert.match(result.output.push.needsInteractive, /Google consent required/);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.list.needsInteractive).toMatch(/Google consent required/);
+        ctx.expect(result.output.wrote).toBe(undefined);
+      },
+    },
 
-test('runner: setup can skip the whole service', async () => {
-  const serviceDir = stageService({});
+    {
+      name: 'runner: a consent-required transform throw warns instead of failing the service',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'read/list.js': `module.exports = async () => ({ count: 1 });`,
+          'transform/list.js': CONSENT_THROW,
+          'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
+        });
 
-  const run = createServiceRunner({
-    serviceDir,
-    logOperations: false,
-    setup: () => ({ skip: true, reason: 'not configured' }),
-  });
-  const result = await run({ operations: [{ name: 'anything', ensure: true }], serviceData: {} });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'list', read: true, write: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'skipped');
-  assert.equal(result.reason, 'not configured');
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.list.needsInteractive).toMatch(/Google consent required/);
+        ctx.expect(result.output.wrote).toBe(undefined);
+      },
+    },
 
-test('runner: write-only operation routes through the write handler', async () => {
-  const serviceDir = stageService({
-    'write/push.js': `module.exports = async () => ({ state: { pushedId: 'w-1' } });`,
-  });
+    {
+      name: 'runner: a consent-required write throw warns instead of failing the service',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'write/push.js': CONSENT_THROW,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'push', write: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'push', write: true }],
+          serviceData: {},
+        });
 
-  assert.equal(result.status, 'success');
-  assert.equal(result.state.pushedId, 'w-1');
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.error).toBe(null);
+        ctx.expect(result.output.push.needsInteractive).toMatch(/Google consent required/);
+      },
+    },
 
-// ─── Warned/failed operations are named, with their reason (#643) ────────────
+    {
+      name: 'runner: setup can skip the whole service',
+      run: async (ctx) => {
+        const serviceDir = stageService({});
 
-test('runner: records each warned operation with the reason it returned', async () => {
-  const serviceDir = stageService({
-    'ensure/zone.js': `module.exports = async () => ({ status: 'warned', reason: 'no zone available' });`,
-    'ensure/bare.js': `module.exports = async () => ({ status: 'warned' });`,
-  });
+        const run = createServiceRunner({
+          serviceDir,
+          logOperations: false,
+          setup: () => ({ skip: true, reason: 'not configured' }),
+        });
+        const result = await run({ operations: [{ name: 'anything', ensure: true }], serviceData: {} });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'zone', ensure: true }, { name: 'bare', ensure: true }],
-    serviceData: {},
-  });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toBe('not configured');
+      },
+    },
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.warned, [
-    { operation: 'zone', reason: 'no zone available' },
-    { operation: 'bare', reason: null },
-  ]);
-});
+    {
+      name: 'runner: write-only operation routes through the write handler',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'write/push.js': `module.exports = async () => ({ state: { pushedId: 'w-1' } });`,
+        });
 
-test('runner: records the failed operation with its error as the reason', async () => {
-  const serviceDir = stageService({
-    'ensure/boom.js': `module.exports = async () => { throw new Error('kaput'); };`,
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'push', write: true }],
+          serviceData: {},
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'boom', ensure: true }],
-    serviceData: {},
-  });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.state.pushedId).toBe('w-1');
+      },
+    },
 
-  assert.equal(result.status, 'error');
-  assert.deepEqual(result.failed, [{ operation: 'boom', reason: 'kaput' }]);
-});
+    // ─── Warned/failed operations are named, with their reason (#643) ────────────
 
-test('runner: a warned write operation is recorded under its operation name', async () => {
-  const serviceDir = stageService({
-    'write/push.js': `module.exports = async () => ({ status: 'warned', reason: 'API declined the update' });`,
-  });
+    {
+      name: 'runner: records each warned operation with the reason it returned',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/zone.js': `module.exports = async () => ({ status: 'warned', reason: 'no zone available' });`,
+          'ensure/bare.js': `module.exports = async () => ({ status: 'warned' });`,
+        });
 
-  const run = createServiceRunner({ serviceDir, logOperations: false });
-  const result = await run({
-    operations: [{ name: 'push', write: true }],
-    serviceData: {},
-  });
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'zone', ensure: true }, { name: 'bare', ensure: true }],
+          serviceData: {},
+        });
 
-  assert.deepEqual(result.warned, [{ operation: 'push', reason: 'API declined the update' }]);
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.warned).toEqual([
+          { operation: 'zone', reason: 'no zone available' },
+          { operation: 'bare', reason: null },
+        ]);
+      },
+    },
+
+    {
+      name: 'runner: records the failed operation with its error as the reason',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'ensure/boom.js': `module.exports = async () => { throw new Error('kaput'); };`,
+        });
+
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'boom', ensure: true }],
+          serviceData: {},
+        });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.failed).toEqual([{ operation: 'boom', reason: 'kaput' }]);
+      },
+    },
+
+    {
+      name: 'runner: a warned write operation is recorded under its operation name',
+      run: async (ctx) => {
+        const serviceDir = stageService({
+          'write/push.js': `module.exports = async () => ({ status: 'warned', reason: 'API declined the update' });`,
+        });
+
+        const run = createServiceRunner({ serviceDir, logOperations: false });
+        const result = await run({
+          operations: [{ name: 'push', write: true }],
+          serviceData: {},
+        });
+
+        ctx.expect(result.warned).toEqual([{ operation: 'push', reason: 'API declined the update' }]);
+      },
+    },
+  ],
 });

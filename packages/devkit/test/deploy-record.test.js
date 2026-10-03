@@ -7,8 +7,7 @@
  * loudly, and a brand still carrying retired config-shaped keys beside its
  * records keeps them untouched.
  */
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -54,135 +53,165 @@ function capture(fn) {
   }
 }
 
-test('recordDeploy resolves to the brand root from a target dir; readDeployRecord sees it from anywhere', () => {
-  const root = makeBrand();
-  const targetDir = path.join(root, 'targets', 'web');
+module.exports = defineCases({
+  type: 'group',
+  description: 'deploy-record',
+  tests: [
+    {
+      name: 'recordDeploy resolves to the brand root from a target dir; readDeployRecord sees it from anywhere',
+      run: (ctx) => {
+        const root = makeBrand();
+        const targetDir = path.join(root, 'targets', 'web');
 
-  assert.equal(readDeployRecord({ dir: targetDir, target: 'web' }), null);
+        ctx.expect(readDeployRecord({ dir: targetDir, target: 'web' })).toBe(null);
 
-  const written = recordDeploy({ dir: targetDir, target: 'web', detail: { method: 'dispatch' } });
-  assert.ok(written.at, 'stamped');
-  assert.equal(written.method, 'dispatch');
+        const written = recordDeploy({ dir: targetDir, target: 'web', detail: { method: 'dispatch' } });
+        ctx.expect(written.at, 'stamped').toBeTruthy();
+        ctx.expect(written.method).toBe('dispatch');
 
-  const records = readRecords(root);
-  assert.equal(records.web.method, 'dispatch', 'record lands at the BRAND root, not the target');
+        const records = readRecords(root);
+        ctx.expect(records.web.method, 'record lands at the BRAND root, not the target').toBe('dispatch');
 
-  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch');
-  assert.equal(readDeployRecord({ dir: targetDir, target: 'backend' }), null, 'target-scoped');
+        ctx.expect(readDeployRecord({ dir: root, target: 'web' }).method).toBe('dispatch');
+        ctx.expect(readDeployRecord({ dir: targetDir, target: 'backend' }), 'target-scoped').toBe(null);
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('the record key is the target NAME, so sibling web targets never share a stamp (#886)', () => {
-  const root = makeBrand();
+    {
+      name: 'the record key is the target NAME, so sibling web targets never share a stamp (#886)',
+      run: (ctx) => {
+        const root = makeBrand();
 
-  recordDeploy({ dir: root, target: 'web', detail: { method: 'dispatch' } });
-  recordDeploy({ dir: root, target: 'admin', detail: { method: 'direct' } });
+        recordDeploy({ dir: root, target: 'web', detail: { method: 'dispatch' } });
+        recordDeploy({ dir: root, target: 'admin', detail: { method: 'direct' } });
 
-  assert.deepEqual(Object.keys(readRecords(root)).sort(), ['admin', 'web'], 'per-target records, distinct keys');
+        ctx.expect(Object.keys(readRecords(root)).sort(), 'per-target records, distinct keys').toEqual(['admin', 'web']);
 
-  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch');
-  assert.equal(readDeployRecord({ dir: root, target: 'admin' }).method, 'direct');
-  assert.equal(readDeployRecord({ dir: root, target: 'cdn' }), null, 'a name the brand never deployed');
+        ctx.expect(readDeployRecord({ dir: root, target: 'web' }).method).toBe('dispatch');
+        ctx.expect(readDeployRecord({ dir: root, target: 'admin' }).method).toBe('direct');
+        ctx.expect(readDeployRecord({ dir: root, target: 'cdn' }), 'a name the brand never deployed').toBe(null);
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('recordDeploy preserves other targets', () => {
-  const root = makeBrand();
+    {
+      name: 'recordDeploy preserves other targets',
+      run: (ctx) => {
+        const root = makeBrand();
 
-  recordDeploy({ dir: root, target: 'backend' });
-  recordDeploy({ dir: root, target: 'web' });
+        recordDeploy({ dir: root, target: 'backend' });
+        recordDeploy({ dir: root, target: 'web' });
 
-  const records = readRecords(root);
-  assert.ok(records.backend.at, 'other targets survive');
-  assert.ok(records.web.at);
+        const records = readRecords(root);
+        ctx.expect(records.backend.at, 'other targets survive').toBeTruthy();
+        ctx.expect(records.web.at).toBeTruthy();
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('a foreign top-level state.json section survives a record write untouched (#479)', () => {
-  const root = makeBrand();
-  writeState(root, { install: { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] } });
+    {
+      name: 'a foreign top-level state.json section survives a record write untouched (#479)',
+      run: (ctx) => {
+        const root = makeBrand();
+        writeState(root, { install: { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] } });
 
-  recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
+        recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
 
-  const state = readState(root);
-  assert.deepEqual(state.install, { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] }, 'other fact kinds are read-through, never rewritten');
-  assert.equal(state.deploy.web.method, 'direct', 'the deploy section is the only one this module writes');
+        const state = readState(root);
+        ctx.expect(state.install, 'other fact kinds are read-through, never rewritten').toEqual({ lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] });
+        ctx.expect(state.deploy.web.method, 'the deploy section is the only one this module writes').toBe('direct');
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('a standalone .omega/deploys.json is adopted into state.json, LOUDLY, and the old file goes (#479)', () => {
-  const root = makeBrand();
-  writeLegacyDeploys(root, { backend: { at: '2026-08-01T00:00:00.000Z', method: 'firebase' } });
+    {
+      name: 'a standalone .omega/deploys.json is adopted into state.json, LOUDLY, and the old file goes (#479)',
+      run: (ctx) => {
+        const root = makeBrand();
+        writeLegacyDeploys(root, { backend: { at: '2026-08-01T00:00:00.000Z', method: 'firebase' } });
 
-  const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
+        const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
 
-  assert.equal(result.method, 'firebase', 'the old record is not lost');
-  assert.deepEqual(readRecords(root).backend, { at: '2026-08-01T00:00:00.000Z', method: 'firebase' }, 'adopted whole, stamps intact');
-  assert.equal(fs.existsSync(path.join(root, '.omega', 'deploys.json')), false, 'the old file is removed');
+        ctx.expect(result.method, 'the old record is not lost').toBe('firebase');
+        ctx.expect(readRecords(root).backend, 'adopted whole, stamps intact').toEqual({ at: '2026-08-01T00:00:00.000Z', method: 'firebase' });
+        ctx.expect(fs.existsSync(path.join(root, '.omega', 'deploys.json')), 'the old file is removed').toBe(false);
 
-  assert.equal(lines.length, 1, 'ONE line, not a per-record chorus');
-  assert.match(lines[0], /\[@omega\.js\/devkit:deploy-record\]/, 'the log-tag convention');
-  assert.match(lines[0], /deploys\.json/, 'names what was adopted');
-  assert.match(lines[0], /state\.json/, 'names where it landed');
-  assert.match(lines[0], /removed/, 'says the old file went');
+        ctx.expect(lines.length, 'ONE line, not a per-record chorus').toBe(1);
+        ctx.expect(lines[0], 'the log-tag convention').toMatch(/\[@omega\.js\/devkit:deploy-record\]/);
+        ctx.expect(lines[0], 'names what was adopted').toMatch(/deploys\.json/);
+        ctx.expect(lines[0], 'names where it landed').toMatch(/state\.json/);
+        ctx.expect(lines[0], 'says the old file went').toMatch(/removed/);
 
-  const quiet = capture(() => recordDeploy({ dir: root, target: 'web' }));
-  assert.deepEqual(quiet.lines, [], 'adoption is ONE-TIME — the next write is silent');
-  assert.equal(readRecords(root).backend.method, 'firebase', 'the adopted record survives the next write');
+        const quiet = capture(() => recordDeploy({ dir: root, target: 'web' }));
+        ctx.expect(quiet.lines, 'adoption is ONE-TIME — the next write is silent').toEqual([]);
+        ctx.expect(readRecords(root).backend.method, 'the adopted record survives the next write').toBe('firebase');
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('an EMPTY legacy deploys.json is cleaned up silently — no "Adopted 0" line (#479)', () => {
-  const root = makeBrand();
-  writeLegacyDeploys(root, {});
+    {
+      name: 'an EMPTY legacy deploys.json is cleaned up silently — no "Adopted 0" line (#479)',
+      run: (ctx) => {
+        const root = makeBrand();
+        writeLegacyDeploys(root, {});
 
-  const { lines } = capture(() => recordDeploy({ dir: root, target: 'web' }));
+        const { lines } = capture(() => recordDeploy({ dir: root, target: 'web' }));
 
-  assert.equal(fs.existsSync(path.join(root, '.omega', 'deploys.json')), false, 'the empty husk still goes');
-  assert.deepEqual(lines, [], 'nothing was adopted, so nothing is announced');
+        ctx.expect(fs.existsSync(path.join(root, '.omega', 'deploys.json')), 'the empty husk still goes').toBe(false);
+        ctx.expect(lines, 'nothing was adopted, so nothing is announced').toEqual([]);
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('an unmigrated brand reads its records in place — retired keys untouched, nothing announced (#479)', () => {
-  const root = makeBrand();
-  writeState(root, {
-    edge: { zoneId: 'zone-abc' },
-    search: { propertyUrl: 'sc-domain:fixture-brand.test' },
-    deploy: { backend: { at: '2026-07-17T00:00:00.000Z', method: 'firebase' } },
-  });
+    {
+      name: 'an unmigrated brand reads its records in place — retired keys untouched, nothing announced (#479)',
+      run: (ctx) => {
+        const root = makeBrand();
+        writeState(root, {
+          edge: { zoneId: 'zone-abc' },
+          search: { propertyUrl: 'sc-domain:fixture-brand.test' },
+          deploy: { backend: { at: '2026-07-17T00:00:00.000Z', method: 'firebase' } },
+        });
 
-  const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
-  assert.equal(result.method, 'firebase', 'the record is already home — read in place, no adoption');
-  assert.deepEqual(lines, [], 'nothing moved, so nothing is announced');
+        const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
+        ctx.expect(result.method, 'the record is already home — read in place, no adoption').toBe('firebase');
+        ctx.expect(lines, 'nothing moved, so nothing is announced').toEqual([]);
 
-  const quiet = capture(() => recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } }));
-  assert.deepEqual(quiet.lines, [], 'the write is silent too');
+        const quiet = capture(() => recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } }));
+        ctx.expect(quiet.lines, 'the write is silent too').toEqual([]);
 
-  const state = readState(root);
-  assert.equal(state.deploy.backend.method, 'firebase', 'the existing record survives the write');
-  assert.equal(state.deploy.web.method, 'direct');
-  assert.deepEqual(state.edge, { zoneId: 'zone-abc' }, 'retired content is the state-retirement migration\'s to move, never this module\'s');
-  assert.deepEqual(state.search, { propertyUrl: 'sc-domain:fixture-brand.test' });
+        const state = readState(root);
+        ctx.expect(state.deploy.backend.method, 'the existing record survives the write').toBe('firebase');
+        ctx.expect(state.deploy.web.method).toBe('direct');
+        ctx.expect(state.edge, 'retired content is the state-retirement migration\'s to move, never this module\'s').toEqual({ zoneId: 'zone-abc' });
+        ctx.expect(state.search).toEqual({ propertyUrl: 'sc-domain:fixture-brand.test' });
 
-  fs.rmSync(root, { recursive: true, force: true });
-});
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
 
-test('a record already in state.json wins over the legacy file it adopts beside', () => {
-  const root = makeBrand();
-  recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
-  writeLegacyDeploys(root, { web: { at: '2021-01-01T00:00:00.000Z', method: 'stale-file' }, desktop: { at: 'd' } });
+    {
+      name: 'a record already in state.json wins over the legacy file it adopts beside',
+      run: (ctx) => {
+        const root = makeBrand();
+        recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
+        writeLegacyDeploys(root, { web: { at: '2021-01-01T00:00:00.000Z', method: 'stale-file' }, desktop: { at: 'd' } });
 
-  capture(() => {
-    assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'direct', 'the newer write is the record');
-  });
+        capture(() => {
+          ctx.expect(readDeployRecord({ dir: root, target: 'web' }).method, 'the newer write is the record').toBe('direct');
+        });
 
-  assert.equal(readDeployRecord({ dir: root, target: 'desktop' }).at, 'd', 'the rest of the old file is still adopted');
+        ctx.expect(readDeployRecord({ dir: root, target: 'desktop' }).at, 'the rest of the old file is still adopted').toBe('d');
 
-  fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+  ],
 });

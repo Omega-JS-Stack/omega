@@ -2,54 +2,74 @@
  * Unit tests for @omega.js/config's merge module — the one agnostic deep
  * merge every config layer composes through.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { deepMerge } = require('../src/index.js');
 
-test('objects merge recursively, later layers win', () => {
-  const result = deepMerge(
-    { brand: { id: 'a', name: 'A' }, theme: { id: 'classy' } },
-    { brand: { name: 'B' } },
-  );
+module.exports = defineCases({
+  type: 'group',
+  description: 'merge',
+  tests: [
+    {
+      name: 'objects merge recursively, later layers win',
+      run: (ctx) => {
+        const result = deepMerge(
+          { brand: { id: 'a', name: 'A' }, theme: { id: 'classy' } },
+          { brand: { name: 'B' } },
+        );
 
-  assert.deepStrictEqual(result, { brand: { id: 'a', name: 'B' }, theme: { id: 'classy' } });
-});
+        ctx.expect(result).toEqual({ brand: { id: 'a', name: 'B' }, theme: { id: 'classy' } });
+      },
+    },
 
-test('arrays replace whole — payment.products never concatenates', () => {
-  const result = deepMerge(
-    { payment: { products: [{ id: 'basic' }, { id: 'premium' }] } },
-    { payment: { products: [{ id: 'ultimate' }] } },
-  );
+    {
+      name: 'arrays replace whole — payment.products never concatenates',
+      run: (ctx) => {
+        const result = deepMerge(
+          { payment: { products: [{ id: 'basic' }, { id: 'premium' }] } },
+          { payment: { products: [{ id: 'ultimate' }] } },
+        );
 
-  assert.deepStrictEqual(result.payment.products, [{ id: 'ultimate' }]);
-});
+        ctx.expect(result.payment.products).toEqual([{ id: 'ultimate' }]);
+      },
+    },
 
-test('null replaces, undefined is skipped', () => {
-  const result = deepMerge(
-    { monitoring: { providers: { sentry: { dsn: 'https://a' } } }, theme: { id: 'classy' } },
-    { monitoring: { providers: { sentry: { dsn: null } } }, theme: { id: undefined } },
-  );
+    {
+      name: 'null replaces, undefined is skipped',
+      run: (ctx) => {
+        const result = deepMerge(
+          { monitoring: { providers: { sentry: { dsn: 'https://a' } } }, theme: { id: 'classy' } },
+          { monitoring: { providers: { sentry: { dsn: null } } }, theme: { id: undefined } },
+        );
 
-  assert.strictEqual(result.monitoring.providers.sentry.dsn, null);
-  assert.strictEqual(result.theme.id, 'classy');
-});
+        ctx.expect(result.monitoring.providers.sentry.dsn).toBe(null);
+        ctx.expect(result.theme.id).toBe('classy');
+      },
+    },
 
-test('falsy layers are skipped — optional brand file / target section', () => {
-  const result = deepMerge(null, { brand: { id: 'a' } }, undefined, { brand: { name: 'A' } });
+    {
+      name: 'falsy layers are skipped — optional brand file / target section',
+      run: (ctx) => {
+        const result = deepMerge(null, { brand: { id: 'a' } }, undefined, { brand: { name: 'A' } });
 
-  assert.deepStrictEqual(result, { brand: { id: 'a', name: 'A' } });
-});
+        ctx.expect(result).toEqual({ brand: { id: 'a', name: 'A' } });
+      },
+    },
 
-test('inputs are never mutated and share no references with the result', () => {
-  const base = { brand: { id: 'a' }, payment: { products: [{ id: 'basic' }] } };
-  const overlay = { brand: { name: 'A' } };
+    {
+      name: 'inputs are never mutated and share no references with the result',
+      run: (ctx) => {
+        const base = { brand: { id: 'a' }, payment: { products: [{ id: 'basic' }] } };
+        const overlay = { brand: { name: 'A' } };
 
-  const result = deepMerge(base, overlay);
-  result.brand.id = 'changed';
-  result.payment.products[0].id = 'changed';
+        const result = deepMerge(base, overlay);
+        result.brand.id = 'changed';
+        result.payment.products[0].id = 'changed';
 
-  assert.strictEqual(base.brand.id, 'a');
-  assert.strictEqual(base.payment.products[0].id, 'basic');
-  assert.deepStrictEqual(overlay, { brand: { name: 'A' } });
+        ctx.expect(base.brand.id).toBe('a');
+        ctx.expect(base.payment.products[0].id).toBe('basic');
+        ctx.expect(overlay).toEqual({ brand: { name: 'A' } });
+      },
+    },
+  ],
 });

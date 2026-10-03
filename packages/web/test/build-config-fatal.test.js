@@ -140,8 +140,8 @@ test('build: the PRODUCTION overlay composes, never the machine ambient one (#85
 
   // This machine says `development`, the way a terminal running a local build
   // does. The lane still builds for production, which is the whole point.
-  const saved = [['ENVIRONMENT', process.env.ENVIRONMENT], ['OMEGA_TEST_MODE', process.env.OMEGA_TEST_MODE]];
-  delete process.env.OMEGA_TEST_MODE;
+  const saved = [['ENVIRONMENT', process.env.ENVIRONMENT], ['OMEGA_ENVIRONMENT', process.env.OMEGA_ENVIRONMENT]];
+  delete process.env.OMEGA_ENVIRONMENT;
   process.env.ENVIRONMENT = 'development';
   t.after(() => {
     for (const [key, value] of saved) {

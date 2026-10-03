@@ -7,8 +7,7 @@
  * merge:false semantic — but it overwrote blindly on every run; the port
  * reads first), and the dry-run zero-mutation guarantee.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/server/index.js');
@@ -82,150 +81,198 @@ function runService(config, { db, options = {} } = {}) {
   });
 }
 
-// ─── Registry / defaults pins ────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'server',
+  tests: [
+    // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('server: registered after email with the brands operation', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('email') + 1], 'server');
-  assert.deepEqual(OPERATIONS.server.map((o) => o.name), ['brands']);
-});
-
-test('server: defaults are enabled-only (project comes from the service account)', () => {
-  assert.deepEqual(DEFAULTS.server, { enabled: true });
-});
-
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('server: server.enabled = false skips the service', async () => {
-  const result = await runService(brandConfig({ server: { enabled: false } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /server\.enabled/);
-});
-
-test('server: scalar server: false skips the service', async () => {
-  const result = await runService(brandConfig({ server: false }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /server\.enabled/);
-});
-
-test('server: skips without SERVER_SERVICE_ACCOUNT in .env', async () => {
-  const result = await runService(brandConfig()); // no injected db → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /SERVER_SERVICE_ACCOUNT/);
-});
-
-// ─── Converged no-op ─────────────────────────────────────────────────────────
-
-test('server: a registry entry matching config is a zero-mutation no-op', async () => {
-  const db = fakeDb({ getDoc: desiredDoc() });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.deepEqual(db.reads(), [DOC_PATH]);
-  assert.equal(result.output.brands.synced, true);
-  // no durable state — the registry doc IS the sync target
-  assert.equal(result.state, null);
-});
-
-test('server: key order differences are not drift', async () => {
-  // Same content as desiredDoc(), every level reordered
-  const db = fakeDb({
-    getDoc: {
-      sponsorships: {
-        prices: { 'link-insertion': 50, 'guest-post': 70 },
-        unacceptable: ['spam'],
-        acceptable: ['tech', 'marketing'],
+    {
+      name: 'server: registered after email with the brands operation',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('email') + 1]).toBe('server');
+        ctx.expect(OPERATIONS.server.map((o) => o.name)).toEqual(['brands']);
       },
-      repo: { owner: 'fixture-org', provider: 'github' },
-      brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
-  });
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'server: defaults are enabled-only (project comes from the service account)',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.server).toEqual({ enabled: true });
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-// ─── brands ──────────────────────────────────────────────────────────────────
+    {
+      name: 'server: server.enabled = false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ server: { enabled: false } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/server\.enabled/);
+      },
+    },
 
-test('server: a missing registry entry is created with ONLY the whitelisted sections', async () => {
-  const db = fakeDb({ getDoc: null, setDoc: {} });
+    {
+      name: 'server: scalar server: false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ server: false }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/server\.enabled/);
+      },
+    },
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'server: skips without SERVER_SERVICE_ACCOUNT in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected db → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/SERVER_SERVICE_ACCOUNT/);
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  // Exact full-document write: payment/analytics/targets/server never cross
-  assert.deepEqual(db.mutations().map((c) => c.args), [[DOC_PATH, desiredDoc()]]);
-  assert.equal(result.output.brands.created, true);
-});
+    // ─── Converged no-op ─────────────────────────────────────────────────────────
 
-test('server: an absent sponsorships section is omitted from the document', async () => {
-  const db = fakeDb({ getDoc: null, setDoc: {} });
+    {
+      name: 'server: a registry entry matching config is a zero-mutation no-op',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: desiredDoc() });
 
-  const result = await runService(brandConfig({ sponsorships: null }), { db });
+        const result = await runService(brandConfig(), { db });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations()[0].args[1], { brand: BRAND, repo: REPO });
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(db.reads()).toEqual([DOC_PATH]);
+        ctx.expect(result.output.brands.synced).toBe(true);
+        // no durable state — the registry doc IS the sync target
+        ctx.expect(result.state).toBe(null);
+      },
+    },
 
-test('server: drifted brand data is replace-written with the full document', async () => {
-  const stale = desiredDoc();
-  stale.brand.name = 'Old Name';
-  const db = fakeDb({ getDoc: stale, setDoc: {} });
+    {
+      name: 'server: key order differences are not drift',
+      run: async (ctx) => {
+        // Same content as desiredDoc(), every level reordered
+        const db = fakeDb({
+          getDoc: {
+            sponsorships: {
+              prices: { 'link-insertion': 50, 'guest-post': 70 },
+              unacceptable: ['spam'],
+              acceptable: ['tech', 'marketing'],
+            },
+            repo: { owner: 'fixture-org', provider: 'github' },
+            brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
+          },
+        });
 
-  const result = await runService(brandConfig(), { db });
+        const result = await runService(brandConfig(), { db });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[DOC_PATH, desiredDoc()]]);
-  assert.equal(result.output.brands.updated, true);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
 
-test('server: a stale key in the registry entry is drift (replace removes it)', async () => {
-  // Every desired field matches — only an extra leftover key differs. A
-  // merge-style compare would call this converged; the full-replace
-  // semantic must rewrite the document so the stale key disappears.
-  const db = fakeDb({ getDoc: { ...desiredDoc(), legacy: true }, setDoc: {} });
+    // ─── brands ──────────────────────────────────────────────────────────────────
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'server: a missing registry entry is created with ONLY the whitelisted sections',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null, setDoc: {} });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[DOC_PATH, desiredDoc()]]);
-});
+        const result = await runService(brandConfig(), { db });
 
-test('server: a changed sponsorship price is drift', async () => {
-  const stale = desiredDoc();
-  stale.sponsorships.prices['guest-post'] = 30;
-  const db = fakeDb({ getDoc: stale, setDoc: {} });
+        ctx.expect(result.status).toBe('success');
+        // Exact full-document write: payment/analytics/targets/server never cross
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[DOC_PATH, desiredDoc()]]);
+        ctx.expect(result.output.brands.created).toBe(true);
+      },
+    },
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'server: an absent sponsorships section is omitted from the document',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null, setDoc: {} });
 
-  assert.equal(result.status, 'success');
-  assert.equal(db.mutations().length, 1);
-});
+        const result = await runService(brandConfig({ sponsorships: null }), { db });
 
-// ─── Dry run ─────────────────────────────────────────────────────────────────
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()[0].args[1]).toEqual({ brand: BRAND, repo: REPO });
+      },
+    },
 
-test('server: dry run on a drifted entry performs zero mutations', async () => {
-  const stale = desiredDoc();
-  stale.brand.url = 'https://old-url.test';
-  const db = fakeDb({ getDoc: stale });
+    {
+      name: 'server: drifted brand data is replace-written with the full document',
+      run: async (ctx) => {
+        const stale = desiredDoc();
+        stale.brand.name = 'Old Name';
+        const db = fakeDb({ getDoc: stale, setDoc: {} });
 
-  const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+        const result = await runService(brandConfig(), { db });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.brands.planned, 'update');
-  assert.equal(result.state, null);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[DOC_PATH, desiredDoc()]]);
+        ctx.expect(result.output.brands.updated).toBe(true);
+      },
+    },
 
-test('server: dry run on a missing entry plans a create', async () => {
-  const db = fakeDb({ getDoc: null });
+    {
+      name: 'server: a stale key in the registry entry is drift (replace removes it)',
+      run: async (ctx) => {
+        // Every desired field matches — only an extra leftover key differs. A
+        // merge-style compare would call this converged; the full-replace
+        // semantic must rewrite the document so the stale key disappears.
+        const db = fakeDb({ getDoc: { ...desiredDoc(), legacy: true }, setDoc: {} });
 
-  const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+        const result = await runService(brandConfig(), { db });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.brands.planned, 'create');
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[DOC_PATH, desiredDoc()]]);
+      },
+    },
+
+    {
+      name: 'server: a changed sponsorship price is drift',
+      run: async (ctx) => {
+        const stale = desiredDoc();
+        stale.sponsorships.prices['guest-post'] = 30;
+        const db = fakeDb({ getDoc: stale, setDoc: {} });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().length).toBe(1);
+      },
+    },
+
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'server: dry run on a drifted entry performs zero mutations',
+      run: async (ctx) => {
+        const stale = desiredDoc();
+        stale.brand.url = 'https://old-url.test';
+        const db = fakeDb({ getDoc: stale });
+
+        const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.brands.planned).toBe('update');
+        ctx.expect(result.state).toBe(null);
+      },
+    },
+
+    {
+      name: 'server: dry run on a missing entry plans a create',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null });
+
+        const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.brands.planned).toBe('create');
+      },
+    },
+  ],
 });

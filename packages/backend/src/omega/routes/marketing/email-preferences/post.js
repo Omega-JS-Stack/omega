@@ -104,7 +104,7 @@ async function handleAuthenticated({ ctx, omega, user, data, analytics }) {
       // Doc is already updated — provider sync is best-effort. Don't fail the request.
     }
   } else {
-    ctx.log('email-preferences (auth): Skipping provider calls (OMEGA_TEST_MODE=true)');
+    ctx.log('email-preferences (auth): Skipping provider calls (OMEGA_ENVIRONMENT=testing)');
   }
 
   analytics.event('marketing/email-preferences', { action, mode: 'authenticated' });
@@ -170,7 +170,7 @@ async function handleAnonymous({ ctx, omega, data, analytics }) {
   const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldCallExternalAPIs) {
-    ctx.log('email-preferences (anon): Skipping SendGrid (OMEGA_TEST_MODE=true)');
+    ctx.log('email-preferences (anon): Skipping SendGrid (OMEGA_ENVIRONMENT=testing)');
     return ctx.respond({ success: true });
   }
 

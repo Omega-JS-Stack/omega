@@ -9,8 +9,7 @@
  * still answers is WHERE the tree is, in two tiers, and that is what these
  * prove. The derivation that reads it lives in signing-env.test.js.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -28,43 +27,55 @@ function stage(t) {
   return root;
 }
 
-test('certs: the module exports the tree readers, and no delivery (#891)', () => {
-  const certs = require('../src/certs.js');
+module.exports = defineCases({
+  type: 'group',
+  description: 'certs',
+  tests: [
+    {
+      name: 'certs: the module exports the tree readers, and no delivery (#891)',
+      run: (ctx) => {
+        const certs = require('../src/certs.js');
 
-  assert.deepEqual(
-    Object.keys(certs).sort(),
-    ['EXPIRY_WARN_DAYS', 'certificateExpiry', 'certsSourceDir', 'signingTree'],
-  );
-});
+        ctx.expect(Object.keys(certs).sort()).toEqual(['EXPIRY_WARN_DAYS', 'certificateExpiry', 'certsSourceDir', 'signingTree']);
+      },
+    },
 
-test('certs: a brand of a company READS the company tree first, its own second', (t) => {
-  const brandRoot = stage(t);
-  const companyRoot = `${brandRoot}-company`;
-  t.after(() => fs.rmSync(companyRoot, { recursive: true, force: true }));
+    {
+      name: 'certs: a brand of a company READS the company tree first, its own second',
+      run: (ctx) => {
+        const brandRoot = stage(ctx);
+        const companyRoot = `${brandRoot}-company`;
+        ctx.after(() => fs.rmSync(companyRoot, { recursive: true, force: true }));
 
-  // The company holds the signing cert; only the API key is brand-local
-  jetpack.write(path.join(certsSourceDir(companyRoot), 'certificates/DEVELOPER_ID_APPLICATION_G2.p12'), 'company-p12-bytes');
-  jetpack.write(path.join(certsSourceDir(brandRoot), 'certificates/DEVELOPER_ID_APPLICATION_G2.p12'), 'brand-p12-bytes');
-  jetpack.write(path.join(certsSourceDir(brandRoot), 'AuthKey_FIXKEY123.p8'), 'brand-authkey-bytes');
+        // The company holds the signing cert; only the API key is brand-local
+        jetpack.write(path.join(certsSourceDir(companyRoot), 'certificates/DEVELOPER_ID_APPLICATION_G2.p12'), 'company-p12-bytes');
+        jetpack.write(path.join(certsSourceDir(brandRoot), 'certificates/DEVELOPER_ID_APPLICATION_G2.p12'), 'brand-p12-bytes');
+        jetpack.write(path.join(certsSourceDir(brandRoot), 'AuthKey_FIXKEY123.p8'), 'brand-authkey-bytes');
 
-  const tree = signingTree({ brandRoot, companyRoot });
+        const tree = signingTree({ brandRoot, companyRoot });
 
-  const cert = tree.find('certificates/DEVELOPER_ID_APPLICATION_G2.p12');
-  assert.equal(cert.source, 'company');
-  assert.equal(jetpack.read(cert.path), 'company-p12-bytes');
-  assert.equal(tree.find('AuthKey_FIXKEY123.p8').source, 'brand');
-});
+        const cert = tree.find('certificates/DEVELOPER_ID_APPLICATION_G2.p12');
+        ctx.expect(cert.source).toBe('company');
+        ctx.expect(jetpack.read(cert.path)).toBe('company-p12-bytes');
+        ctx.expect(tree.find('AuthKey_FIXKEY123.p8').source).toBe('brand');
+      },
+    },
 
-test('signingTree: writes go to the company tree when there is one, the brand tree otherwise', () => {
-  const company = signingTree({ brandRoot: '/tmp/brand', companyRoot: '/tmp/parent/company' });
-  assert.equal(company.writeDir, path.join('/tmp/parent/company', '.omega', 'certificates', 'apple'));
-  assert.deepEqual(company.readDirs, [
-    path.join('/tmp/parent/company', '.omega', 'certificates', 'apple'),
-    path.join('/tmp/brand', '.omega', 'certificates', 'apple'),
-  ]);
+    {
+      name: 'signingTree: writes go to the company tree when there is one, the brand tree otherwise',
+      run: (ctx) => {
+        const company = signingTree({ brandRoot: '/tmp/brand', companyRoot: '/tmp/parent/company' });
+        ctx.expect(company.writeDir).toBe(path.join('/tmp/parent/company', '.omega', 'certificates', 'apple'));
+        ctx.expect(company.readDirs).toEqual([
+          path.join('/tmp/parent/company', '.omega', 'certificates', 'apple'),
+          path.join('/tmp/brand', '.omega', 'certificates', 'apple'),
+        ]);
 
-  const standalone = signingTree({ brandRoot: '/tmp/brand', companyRoot: null });
-  assert.equal(standalone.writeDir, path.join('/tmp/brand', '.omega', 'certificates', 'apple'));
-  assert.equal(standalone.readDirs.length, 1);
-  assert.equal(standalone.find('certificates/NOPE.p12'), null);
+        const standalone = signingTree({ brandRoot: '/tmp/brand', companyRoot: null });
+        ctx.expect(standalone.writeDir).toBe(path.join('/tmp/brand', '.omega', 'certificates', 'apple'));
+        ctx.expect(standalone.readDirs.length).toBe(1);
+        ctx.expect(standalone.find('certificates/NOPE.p12')).toBe(null);
+      },
+    },
+  ],
 });

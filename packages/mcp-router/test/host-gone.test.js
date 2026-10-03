@@ -17,8 +17,7 @@
  * rather than start a second one that exits over the top of it.
  */
 
-const { test, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -40,16 +39,6 @@ const schema = { type: 'object', properties: {} };
 // Every process a run started, so a run that goes red still cleans up after
 // itself: the fixtures below outlive a polite close by design.
 const started = [];
-
-after(() => {
-  for (const pid of started) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // already gone — fine
-    }
-  }
-});
 
 /**
  * Build one run's own overlay, with the three fixture upstreams in it.
@@ -177,22 +166,23 @@ const waitFor = async (condition, timeout) => {
 /**
  * Handshake a router and spawn all three fixture upstreams through it.
  *
+ * @param {Function} expect - The calling case's `ctx.expect`
  * @param {object} session - What startRouter answered
  * @param {object} markers - The marker files buildOverlay named
  * @returns {Promise<object>} The pids the fixtures reported, all running
  */
-const spawnFixtures = async ({ request, notify }, markers) => {
+const spawnFixtures = async (expect, { request, notify }, markers) => {
   const initialized = await request('initialize', {
     protocolVersion: '2025-06-18',
     capabilities: {},
     clientInfo: { name: 'host-gone-e2e', version: '1.0.0' },
   });
-  assert.ok(initialized.result, `initialize failed: ${JSON.stringify(initialized.error)}`);
+  expect(initialized.result, `initialize failed: ${JSON.stringify(initialized.error)}`).toBeTruthy();
   notify('notifications/initialized');
 
   for (const name of ['fixture-host__ping', 'fixture-tree__ping', 'fixture-deep__ping']) {
     const called = await request('tools/call', { name, arguments: {} });
-    assert.equal(called.result.content[0].text, 'pong', `${name} did not answer`);
+    expect(called.result.content[0].text, `${name} did not answer`).toBe('pong');
   }
 
   const child = Number(fs.readFileSync(markers.pidFile, 'utf8').trim());
@@ -201,12 +191,12 @@ const spawnFixtures = async ({ request, notify }, markers) => {
     () => (fs.existsSync(markers.deepMarker) ? JSON.parse(fs.readFileSync(markers.deepMarker, 'utf8')) : null),
     5000,
   );
-  assert.ok(deep, 'the depth-2 fixture never reported its tree');
+  expect(deep, 'the depth-2 fixture never reported its tree').toBeTruthy();
   started.push(child, tree.grandchild, deep.mid, deep.leaf);
 
-  assert.ok(alive(child), 'the upstream child is running');
-  assert.ok(alive(tree.grandchild), 'the grandchild an upstream started is running');
-  assert.ok(alive(deep.leaf), 'the leaf two levels down is running');
+  expect(alive(child), 'the upstream child is running').toBeTruthy();
+  expect(alive(tree.grandchild), 'the grandchild an upstream started is running').toBeTruthy();
+  expect(alive(deep.leaf), 'the leaf two levels down is running').toBeTruthy();
 
   return { child, tree, deep };
 };
@@ -214,54 +204,76 @@ const spawnFixtures = async ({ request, notify }, markers) => {
 /**
  * Assert nothing an upstream started outlived the router.
  *
+ * @param {Function} expect - The calling case's `ctx.expect`
  * @param {object} pids - What spawnFixtures answered
  * @returns {Promise<void>} Resolves once every pid is gone
  */
-const assertTreesGone = async ({ child, tree, deep }) => {
-  assert.ok(await waitFor(() => !alive(child), 2000), `the child ${child} outlived the router`);
+const assertTreesGone = async (expect, { child, tree, deep }) => {
+  expect(await waitFor(() => !alive(child), 2000), `the child ${child} outlived the router`).toBeTruthy();
   // Nothing but the router knew these pids: a shutdown that skipped its grace,
   // or a capture that only went one level down, left them running for good.
-  assert.ok(await waitFor(() => !alive(tree.grandchild), 2000), `the grandchild ${tree.grandchild} outlived the router`);
-  assert.ok(await waitFor(() => !alive(deep.leaf), 2000), `the leaf ${deep.leaf} outlived the router`);
+  expect(await waitFor(() => !alive(tree.grandchild), 2000), `the grandchild ${tree.grandchild} outlived the router`).toBeTruthy();
+  expect(await waitFor(() => !alive(deep.leaf), 2000), `the leaf ${deep.leaf} outlived the router`).toBeTruthy();
 };
 
-test('ending the router stdin shuts it down and takes every tree with it', async () => {
-  const markers = buildOverlay('host-gone');
-  const session = startRouter(markers.overlayDir);
-  const pids = await spawnFixtures(session, markers);
+module.exports = defineCases({
+  type: 'group',
+  description: 'host-gone',
+  cleanup: () => {
+    for (const pid of started) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // already gone — fine
+      }
+    }
+  },
+  tests: [
+    {
+      name: 'ending the router stdin shuts it down and takes every tree with it',
+      run: async (ctx) => {
+        const markers = buildOverlay('host-gone');
+        const session = startRouter(markers.overlayDir);
+        const pids = await spawnFixtures(ctx.expect, session, markers);
 
-  const exited = new Promise((resolve) => session.router.once('exit', (code) => resolve(code)));
-  session.router.stdin.end();
+        const exited = new Promise((resolve) => session.router.once('exit', (code) => resolve(code)));
+        session.router.stdin.end();
 
-  // Long enough for the 2s grace the shutdown waits out, far short of a router
-  // that never leaves at all.
-  const code = await Promise.race([
-    exited,
-    new Promise((resolve) => setTimeout(() => resolve('still running'), 8000)),
-  ]);
-  assert.equal(code, 0, 'the router exits when the host goes away');
-  await assertTreesGone(pids);
-});
+        // Long enough for the 2s grace the shutdown waits out, far short of a router
+        // that never leaves at all.
+        const code = await Promise.race([
+          exited,
+          new Promise((resolve) => setTimeout(() => resolve('still running'), 8000)),
+        ]);
+        ctx.expect(code, 'the router exits when the host goes away').toBe(0);
+        await assertTreesGone(ctx.expect, pids);
+      },
+    },
 
-test('a SIGTERM landing mid-shutdown joins it instead of exiting over it', async () => {
-  const markers = buildOverlay('host-sigterm');
-  const session = startRouter(markers.overlayDir);
-  const pids = await spawnFixtures(session, markers);
+    {
+      name: 'a SIGTERM landing mid-shutdown joins it instead of exiting over it',
+      run: async (ctx) => {
+        const markers = buildOverlay('host-sigterm');
+        const session = startRouter(markers.overlayDir);
+        const pids = await spawnFixtures(ctx.expect, session, markers);
 
-  const exited = new Promise((resolve) => session.router.once('exit', (code, signal) => resolve({ code, signal })));
-  session.router.stdin.end();
+        const exited = new Promise((resolve) => session.router.once('exit', (code, signal) => resolve({ code, signal })));
+        session.router.stdin.end();
 
-  // The host's own teardown, to the letter: EOF, then a signal while the
-  // shutdown is still waiting out its grace. A second shutdown run would find
-  // every slot already emptied, await nothing, and exit(0) on top of the timers
-  // that had yet to kill the trees.
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  if (session.router.exitCode === null) session.router.kill('SIGTERM');
+        // The host's own teardown, to the letter: EOF, then a signal while the
+        // shutdown is still waiting out its grace. A second shutdown run would find
+        // every slot already emptied, await nothing, and exit(0) on top of the timers
+        // that had yet to kill the trees.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (session.router.exitCode === null) session.router.kill('SIGTERM');
 
-  const result = await Promise.race([
-    exited,
-    new Promise((resolve) => setTimeout(() => resolve({ code: 'still running' }), 8000)),
-  ]);
-  assert.equal(result.code, 0, `the router left on its own terms (signal ${result.signal})`);
-  await assertTreesGone(pids);
+        const result = await Promise.race([
+          exited,
+          new Promise((resolve) => setTimeout(() => resolve({ code: 'still running' }), 8000)),
+        ]);
+        ctx.expect(result.code, `the router left on its own terms (signal ${result.signal})`).toBe(0);
+        await assertTreesGone(ctx.expect, pids);
+      },
+    },
+  ],
 });

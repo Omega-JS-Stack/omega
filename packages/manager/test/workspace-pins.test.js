@@ -6,8 +6,7 @@
  * target together. The local era's `file:` specs are never touched, and a
  * rerun over an already-pinned brand changes nothing.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -30,56 +29,74 @@ function tempDir() {
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-test('pin writer: the brand root pins @omega.js/manager at the manager\'s own version, exactly', () => {
-  const root = tempDir();
-  applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
+module.exports = defineCases({
+  type: 'group',
+  description: 'workspace-pins',
+  tests: [
+    {
+      name: 'pin writer: the brand root pins @omega.js/manager at the manager\'s own version, exactly',
+      run: (ctx) => {
+        const root = tempDir();
+        applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  const pkg = readJson(path.join(root, 'package.json'));
-  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': MANAGER_VERSION });
-  assert.match(pkg.devDependencies['@omega.js/manager'], /^\d+\.\d+\.\d+/, 'a version, never a range');
-});
+        const pkg = readJson(path.join(root, 'package.json'));
+        ctx.expect(pkg.devDependencies).toEqual({ '@omega.js/manager': MANAGER_VERSION });
+        ctx.expect(pkg.devDependencies['@omega.js/manager'], 'a version, never a range').toMatch(/^\d+\.\d+\.\d+/);
+      },
+    },
 
-test('pin writer: every target pins its framework at the same version — no caret, no star', () => {
-  const root = tempDir();
-  applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
+    {
+      name: 'pin writer: every target pins its framework at the same version — no caret, no star',
+      run: (ctx) => {
+        const root = tempDir();
+        applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  // The backend's framework is a RUNTIME dep (the stage derives dist/package.json
-  // from it); every other target declares its framework as a devDependency
-  assert.deepEqual(readJson(path.join(root, 'targets', 'web', 'package.json')).devDependencies, { '@omega.js/web': MANAGER_VERSION });
-  assert.deepEqual(readJson(path.join(root, 'targets', 'desktop', 'package.json')).devDependencies, { '@omega.js/desktop': MANAGER_VERSION });
-  assert.deepEqual(readJson(path.join(root, 'targets', 'backend', 'package.json')).dependencies, { '@omega.js/backend': MANAGER_VERSION });
+        // The backend's framework is a RUNTIME dep (the stage derives dist/package.json
+        // from it); every other target declares its framework as a devDependency
+        ctx.expect(readJson(path.join(root, 'targets', 'web', 'package.json')).devDependencies).toEqual({ '@omega.js/web': MANAGER_VERSION });
+        ctx.expect(readJson(path.join(root, 'targets', 'desktop', 'package.json')).devDependencies).toEqual({ '@omega.js/desktop': MANAGER_VERSION });
+        ctx.expect(readJson(path.join(root, 'targets', 'backend', 'package.json')).dependencies).toEqual({ '@omega.js/backend': MANAGER_VERSION });
 
-  for (const file of ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json']) {
-    const raw = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.ok(!/"@omega\.js\/[^"]+": "[\^~*]/.test(raw), `${file} carries a range instead of a pin`);
-  }
-});
+        for (const file of ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json']) {
+          const raw = fs.readFileSync(path.join(root, file), 'utf8');
+          ctx.expect(!/"@omega\.js\/[^"]+": "[\^~*]/.test(raw), `${file} carries a range instead of a pin`).toBeTruthy();
+        }
+      },
+    },
 
-test('pin writer: a `file:` spec already present is left untouched (the local era)', () => {
-  const root = tempDir();
-  const linkedRoot = '{\n  "name": "pinbrand",\n  "private": true,\n  "workspaces": ["targets/*"],\n  "devDependencies": { "@omega.js/manager": "file:../omega/packages/manager" }\n}\n';
-  const linkedTarget = '{\n  "name": "pinbrand-web",\n  "devDependencies": { "@omega.js/web": "file:../../../omega/packages/web" }\n}\n';
-  fs.writeFileSync(path.join(root, 'package.json'), linkedRoot);
-  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), linkedTarget);
+    {
+      name: 'pin writer: a `file:` spec already present is left untouched (the local era)',
+      run: (ctx) => {
+        const root = tempDir();
+        const linkedRoot = '{\n  "name": "pinbrand",\n  "private": true,\n  "workspaces": ["targets/*"],\n  "devDependencies": { "@omega.js/manager": "file:../omega/packages/manager" }\n}\n';
+        const linkedTarget = '{\n  "name": "pinbrand-web",\n  "devDependencies": { "@omega.js/web": "file:../../../omega/packages/web" }\n}\n';
+        fs.writeFileSync(path.join(root, 'package.json'), linkedRoot);
+        fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), linkedTarget);
 
-  applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
+        applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), linkedRoot);
-  assert.equal(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'), linkedTarget);
-});
+        ctx.expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(linkedRoot);
+        ctx.expect(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8')).toBe(linkedTarget);
+      },
+    },
 
-test('pin writer: idempotent — a rerun over an already-pinned brand writes nothing', () => {
-  const root = tempDir();
-  applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
+    {
+      name: 'pin writer: idempotent — a rerun over an already-pinned brand writes nothing',
+      run: (ctx) => {
+        const root = tempDir();
+        applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  const files = ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json'];
-  const before = files.map((file) => fs.readFileSync(path.join(root, file), 'utf8'));
+        const files = ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json'];
+        const before = files.map((file) => fs.readFileSync(path.join(root, file), 'utf8'));
 
-  const rerun = applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
+        const rerun = applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  assert.equal(rerun.created.length, 0, 'nothing is rewritten on a converged brand');
-  files.forEach((file, i) => {
-    assert.equal(fs.readFileSync(path.join(root, file), 'utf8'), before[i], `${file} changed on a rerun`);
-  });
+        ctx.expect(rerun.created.length, 'nothing is rewritten on a converged brand').toBe(0);
+        files.forEach((file, i) => {
+          ctx.expect(fs.readFileSync(path.join(root, file), 'utf8'), `${file} changed on a rerun`).toBe(before[i]);
+        });
+      },
+    },
+  ],
 });

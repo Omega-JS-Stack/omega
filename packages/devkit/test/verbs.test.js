@@ -3,8 +3,7 @@
  * CLI, and every CLI's own table covered, so a verb added to a CLI without a
  * registry row fails here. The CLIs are read from their real source files.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,10 +16,10 @@ const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun
  * A router CLI's alias table, read from its source: the object literal after
  * `marker`, evaluated as the literal it is (comments and all).
  */
-function aliasTable(pkg, marker) {
+function aliasTable(expect, pkg, marker) {
   const source = fs.readFileSync(path.join(PACKAGES, pkg, 'src', 'cli.js'), 'utf8');
   const open = source.indexOf('{', source.indexOf(marker));
-  assert.ok(source.includes(marker) && open !== -1, `${pkg}/src/cli.js carries "${marker}"`);
+  expect(source.includes(marker) && open !== -1, `${pkg}/src/cli.js carries "${marker}"`).toBeTruthy();
 
   let depth = 0;
   let close = open;
@@ -39,8 +38,8 @@ function commandFiles(pkg) {
 }
 
 /** Each CLI's surface as { verb: aliases }: the alias table plus every command file. */
-function routerSurface(pkg, marker) {
-  const table = aliasTable(pkg, marker);
+function routerSurface(expect, pkg, marker) {
+  const table = aliasTable(expect, pkg, marker);
   const surface = { help: [], ...table };
   for (const verb of commandFiles(pkg)) surface[verb] = surface[verb] || [];
   return surface;
@@ -48,99 +47,132 @@ function routerSurface(pkg, marker) {
 
 const BACKEND_COMMANDS = require(path.join(PACKAGES, 'backend', 'src', 'cli', 'command-table.js')).COMMANDS;
 
-const CLIS = {
-  '@omega.js/manager': routerSurface('manager', 'const ALIASES ='),
-  '@omega.js/web': routerSurface('web', 'const ALIASES ='),
-  '@omega.js/desktop': routerSurface('desktop', 'aliases: {'),
-  '@omega.js/extension': routerSurface('extension', 'aliases: {'),
-  '@omega.js/backend': Object.fromEntries(BACKEND_COMMANDS.map((command) => [command.name, command.aliases || []])),
-};
+/** Every CLI's surface by package name; `expect` is the calling case's. */
+function clis(expect) {
+  return {
+    '@omega.js/manager': routerSurface(expect, 'manager', 'const ALIASES ='),
+    '@omega.js/web': routerSurface(expect, 'web', 'const ALIASES ='),
+    '@omega.js/desktop': routerSurface(expect, 'desktop', 'aliases: {'),
+    '@omega.js/extension': routerSurface(expect, 'extension', 'aliases: {'),
+    '@omega.js/backend': Object.fromEntries(BACKEND_COMMANDS.map((command) => [command.name, command.aliases || []])),
+  };
+}
 
-test('verbs: every row carries every field, each with an allowed value', () => {
-  for (const entry of VERBS) {
-    assert.deepEqual(Object.keys(entry).sort(), [...FIELDS].sort(), `${entry.name} carries exactly the registry fields`);
-    assert.equal(typeof entry.name, 'string');
-    assert.ok(Array.isArray(entry.aliases), `${entry.name}.aliases is an array`);
-    assert.ok(SCOPES.includes(entry.scope), `${entry.name}.scope "${entry.scope}"`);
-    assert.ok(FANOUTS.includes(entry.fanout), `${entry.name}.fanout "${entry.fanout}"`);
-    assert.ok(entry.owners.length > 0, `${entry.name} has an owner`);
-    for (const owner of entry.owners) assert.ok(owner in CLIS, `${entry.name} owner ${owner} is one of the five CLIs`);
-    // The one order constant, by reference: a per-row copy is the drift this table exists to stop
-    assert.equal(entry.order, entry.fanout === 'each' ? TARGET_ORDER : null, `${entry.name}.order`);
-    assert.equal(typeof entry.dryRun, 'boolean', `${entry.name}.dryRun`);
-    assert.equal(typeof entry.readOnly, 'boolean', `${entry.name}.readOnly`);
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'verbs',
+  tests: [
+    {
+      name: 'verbs: every row carries every field, each with an allowed value',
+      run: (ctx) => {
+        const CLIS = clis(ctx.expect);
+        for (const entry of VERBS) {
+          ctx.expect(Object.keys(entry).sort(), `${entry.name} carries exactly the registry fields`).toEqual([...FIELDS].sort());
+          ctx.expect(typeof entry.name).toBe('string');
+          ctx.expect(Array.isArray(entry.aliases), `${entry.name}.aliases is an array`).toBeTruthy();
+          ctx.expect(SCOPES.includes(entry.scope), `${entry.name}.scope "${entry.scope}"`).toBeTruthy();
+          ctx.expect(FANOUTS.includes(entry.fanout), `${entry.name}.fanout "${entry.fanout}"`).toBeTruthy();
+          ctx.expect(entry.owners.length > 0, `${entry.name} has an owner`).toBeTruthy();
+          for (const owner of entry.owners) ctx.expect(owner in CLIS, `${entry.name} owner ${owner} is one of the five CLIs`).toBeTruthy();
+          // The one order constant, by reference: a per-row copy is the drift this table exists to stop
+          ctx.expect(entry.order, `${entry.name}.order`).toBe(entry.fanout === 'each' ? TARGET_ORDER : null);
+          ctx.expect(typeof entry.dryRun, `${entry.name}.dryRun`).toBe('boolean');
+          ctx.expect(typeof entry.readOnly, `${entry.name}.readOnly`).toBe('boolean');
+        }
+      },
+    },
 
-test('verbs: names and aliases are unique, and the one shared token means one verb per CLI', () => {
-  const names = VERBS.map((entry) => entry.name);
-  assert.deepEqual(names, [...new Set(names)], 'no name repeats');
+    {
+      name: 'verbs: names and aliases are unique, and the one shared token means one verb per CLI',
+      run: (ctx) => {
+        const CLIS = clis(ctx.expect);
+        const names = VERBS.map((entry) => entry.name);
+        ctx.expect(names, 'no name repeats').toEqual([...new Set(names)]);
 
-  const aliases = VERBS.flatMap((entry) => entry.aliases);
-  assert.deepEqual(aliases, [...new Set(aliases)], 'no alias repeats');
+        const aliases = VERBS.flatMap((entry) => entry.aliases);
+        ctx.expect(aliases, 'no alias repeats').toEqual([...new Set(aliases)]);
 
-  const rowsOf = (token) => VERBS.filter((entry) => tokensOf(entry).includes(token));
-  const shared = [...new Set(VERBS.flatMap(tokensOf))].filter((token) => rowsOf(token).length > 1);
-  assert.deepEqual(shared, ['serve'], 'serve (a dev alias AND the backend verb) is the only token two rows share');
+        const rowsOf = (token) => VERBS.filter((entry) => tokensOf(entry).includes(token));
+        const shared = [...new Set(VERBS.flatMap(tokensOf))].filter((token) => rowsOf(token).length > 1);
+        ctx.expect(shared, 'serve (a dev alias AND the backend verb) is the only token two rows share').toEqual(['serve']);
 
-  const [dev, serve] = rowsOf('serve');
-  // A CLI owning both rows answers the token as the row that NAMES it, so its dev never lists it
-  for (const owner of dev.owners.filter((owner) => serve.owners.includes(owner))) {
-    assert.equal((CLIS[owner].dev || []).includes('serve'), false, `${owner} answers serve as its own verb, never as dev`);
-  }
-  assert.equal(findVerb('serve'), serve, 'the row that NAMES a token answers it');
-});
+        const [dev, serve] = rowsOf('serve');
+        // A CLI owning both rows answers the token as the row that NAMES it, so its dev never lists it
+        for (const owner of dev.owners.filter((owner) => serve.owners.includes(owner))) {
+          ctx.expect((CLIS[owner].dev || []).includes('serve'), `${owner} answers serve as its own verb, never as dev`).toBe(false);
+        }
+        ctx.expect(findVerb('serve'), 'the row that NAMES a token answers it').toBe(serve);
+      },
+    },
 
-test('verbs: every CLI\'s alias table and command set is a subset of the registry', () => {
-  for (const [owner, surface] of Object.entries(CLIS)) {
-    for (const [verb, aliases] of Object.entries(surface)) {
-      const entry = VERBS.find((row) => row.name === verb);
-      assert.ok(entry, `${owner} answers "${verb}", which has no registry row`);
-      assert.ok(entry.owners.includes(owner), `the "${verb}" row names ${owner} among its owners`);
-      for (const alias of aliases) {
-        assert.ok(entry.aliases.includes(alias), `${owner}'s "${verb}" alias "${alias}" is in the registry row`);
-      }
-    }
-  }
-});
+    {
+      name: 'verbs: every CLI\'s alias table and command set is a subset of the registry',
+      run: (ctx) => {
+        for (const [owner, surface] of Object.entries(clis(ctx.expect))) {
+          for (const [verb, aliases] of Object.entries(surface)) {
+            const entry = VERBS.find((row) => row.name === verb);
+            ctx.expect(entry, `${owner} answers "${verb}", which has no registry row`).toBeTruthy();
+            ctx.expect(entry.owners.includes(owner), `the "${verb}" row names ${owner} among its owners`).toBeTruthy();
+            for (const alias of aliases) {
+              ctx.expect(entry.aliases.includes(alias), `${owner}'s "${verb}" alias "${alias}" is in the registry row`).toBeTruthy();
+            }
+          }
+        }
+      },
+    },
 
-test('verbs: every owner a row names really answers that verb', () => {
-  for (const entry of VERBS) {
-    for (const owner of entry.owners) {
-      assert.ok(entry.name in CLIS[owner], `${owner} is listed as owning "${entry.name}" but its CLI has no such verb`);
-    }
-  }
-});
+    {
+      name: 'verbs: every owner a row names really answers that verb',
+      run: (ctx) => {
+        const CLIS = clis(ctx.expect);
+        for (const entry of VERBS) {
+          for (const owner of entry.owners) {
+            ctx.expect(entry.name in CLIS[owner], `${owner} is listed as owning "${entry.name}" but its CLI has no such verb`).toBeTruthy();
+          }
+        }
+      },
+    },
 
-test('verbs: status is contextless, the manager\'s alone, and runs once natively', () => {
-  const row = findVerb('status');
-  assert.ok(row, 'the status row exists');
-  assert.deepEqual(
-    { scope: row.scope, owners: row.owners, fanout: row.fanout },
-    { scope: 'contextless', owners: ['@omega.js/manager'], fanout: 'root' },
-  );
-});
+    {
+      name: 'verbs: status is contextless, the manager\'s alone, and runs once natively',
+      run: (ctx) => {
+        const row = findVerb('status');
+        ctx.expect(row, 'the status row exists').toBeTruthy();
+        ctx.expect({ scope: row.scope, owners: row.owners, fanout: row.fanout }).toEqual({ scope: 'contextless', owners: ['@omega.js/manager'], fanout: 'root' });
+      },
+    },
 
-test('verbs: status says on its row that it reads only, and a verb that writes says it does not', () => {
-  assert.equal(findVerb('status').readOnly, true);
-  for (const name of ['onboard', 'manage', 'deploy']) assert.equal(findVerb(name).readOnly, false, name);
-});
+    {
+      name: 'verbs: status says on its row that it reads only, and a verb that writes says it does not',
+      run: (ctx) => {
+        ctx.expect(findVerb('status').readOnly).toBe(true);
+        for (const name of ['onboard', 'manage', 'deploy']) ctx.expect(findVerb(name).readOnly, name).toBe(false);
+      },
+    },
 
-test('verbs: the dispatcher derives its contextless and box sets from the registry', () => {
-  const { CONTEXTLESS_VERBS, BOX_VERBS } = require('../src/omega-bin.js');
-  const contextless = VERBS.filter((entry) => entry.scope === 'contextless').flatMap(tokensOf);
+    {
+      name: 'verbs: the dispatcher derives its contextless and box sets from the registry',
+      run: (ctx) => {
+        const { CONTEXTLESS_VERBS, BOX_VERBS } = require('../src/omega-bin.js');
+        const contextless = VERBS.filter((entry) => entry.scope === 'contextless').flatMap(tokensOf);
 
-  assert.deepEqual([...CONTEXTLESS_VERBS].sort(), contextless.sort());
-  assert.deepEqual([...BOX_VERBS].sort(), ['runner', 'sign-windows']);
-});
+        ctx.expect([...CONTEXTLESS_VERBS].sort()).toEqual(contextless.sort());
+        ctx.expect([...BOX_VERBS].sort()).toEqual(['runner', 'sign-windows']);
+      },
+    },
 
-test('verbs: the brand guide\'s verb table lists every root verb, and names no verb the registry lacks', () => {
-  const guide = fs.readFileSync(path.join(PACKAGES, '..', 'docs', 'manager', 'brand.md'), 'utf8');
-  const section = guide.slice(guide.indexOf('## Verbs'), guide.indexOf('\n## ', guide.indexOf('## Verbs') + 1));
-  // The table's first column is the verb's name in a code span
-  const documented = [...section.matchAll(/^\| `([^`]+)` \|/gm)].map(([, name]) => name);
+    {
+      name: 'verbs: the brand guide\'s verb table lists every root verb, and names no verb the registry lacks',
+      run: (ctx) => {
+        const guide = fs.readFileSync(path.join(PACKAGES, '..', 'docs', 'manager', 'brand.md'), 'utf8');
+        const section = guide.slice(guide.indexOf('## Verbs'), guide.indexOf('\n## ', guide.indexOf('## Verbs') + 1));
+        // The table's first column is the verb's name in a code span
+        const documented = [...section.matchAll(/^\| `([^`]+)` \|/gm)].map(([, name]) => name);
 
-  const root = VERBS.filter((entry) => entry.scope === 'root').map((entry) => entry.name);
-  assert.deepEqual(root.filter((name) => !documented.includes(name)), [], 'every root verb has a row in docs/manager/brand.md § Verbs');
-  assert.deepEqual(documented.filter((name) => !root.includes(name)), [], 'every row there names a root verb of the registry');
+        const root = VERBS.filter((entry) => entry.scope === 'root').map((entry) => entry.name);
+        ctx.expect(root.filter((name) => !documented.includes(name)), 'every root verb has a row in docs/manager/brand.md § Verbs').toEqual([]);
+        ctx.expect(documented.filter((name) => !root.includes(name)), 'every row there names a root verb of the registry').toEqual([]);
+      },
+    },
+  ],
 });

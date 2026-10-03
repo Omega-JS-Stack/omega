@@ -4,8 +4,7 @@
  * next command. Folders with nothing installed, so the manager answers as the
  * bin's own CLI.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -51,67 +50,6 @@ const scratch = (name) => {
   return dir;
 };
 
-test('#1031 case 8: --json prints one JSON object with the report\'s fields, and nothing else on stdout', () => {
-  const out = status(stageTemplate(scratch('acme-omega')), ['--json']);
-
-  let report;
-  assert.doesNotThrow(() => { report = JSON.parse(out.stdout); }, `all of stdout is one JSON value:\n${out.stdout}\n${out.stderr}`);
-  assert.equal(typeof report, 'object');
-  assert.deepEqual(Object.keys(report).sort(), FIELDS);
-  assert.equal(report.state, 'template');
-  assert.equal(report.next, 'npm start');
-
-  const empty = status(scratch('empty'), ['--json']);
-  assert.equal(JSON.parse(empty.stdout).state, 'empty', `${empty.stdout}\n${empty.stderr}`);
-});
-
-test('#1031 status: the plain report names the state and ends on the one next command', () => {
-  const out = status(stageTemplate(scratch('acme-omega')));
-
-  assert.equal(out.status, 0, out.stderr);
-  assert.match(out.stdout, /template/);
-  const last = out.stdout.trim().split('\n').pop();
-  assert.match(last, /npm start/, `the last line is the next command: ${out.stdout}`);
-});
-
-test('#1031 status: a finished brand with missing keys names npm run manage once for going live, prints the operator-only keys as optional, and ends on npm start', async () => {
-  const root = await websiteBrand();
-
-  const out = status(root);
-  assert.equal(out.status, 0, out.stderr);
-  const lines = out.stdout.trim().split('\n');
-  assert.equal(lines.filter((line) => line.includes('npm run manage')).length, 1, `one line names npm run manage:\n${out.stdout}`);
-  assert.match(lines[lines.length - 1], /npm start/, `the last line is the next command:\n${out.stdout}`);
-  const optionalAt = out.stdout.indexOf('optional, for later');
-  assert.notEqual(optionalAt, -1, `an optional line is printed:\n${out.stdout}`);
-  for (const key of OPERATOR_ONLY_KEYS) {
-    assert.ok(out.stdout.indexOf(key) > optionalAt, `${key} is printed under the optional line:\n${out.stdout}`);
-  }
-
-  const report = JSON.parse(status(root, ['--json']).stdout);
-  assert.equal(report.state, 'brand');
-  assert.equal(report.next, 'npm start');
-  const optional = report.missing.env.filter((entry) => entry.optional === true).map((entry) => entry.key);
-  assert.deepEqual(OPERATOR_ONLY_KEYS.filter((key) => !optional.includes(key)), []);
-});
-
-test('#1031 status: a brand missing only optional keys prints no going-live header, only the optional line', async () => {
-  const root = await websiteBrand();
-  const owed = JSON.parse(status(root, ['--json']).stdout).missing.env.filter((entry) => !entry.optional);
-  assert.notEqual(owed.length, 0, 'the fixture starts owing a going-live key');
-  fs.writeFileSync(path.join(root, '.env'), owed.map(({ key }) => `${key}="placeholder"\n`).join(''));
-
-  const report = JSON.parse(status(root, ['--json']).stdout);
-  assert.deepEqual(report.missing.env.filter((entry) => !entry.optional), [], 'only optional keys are left missing');
-
-  const out = status(root);
-  assert.equal(out.status, 0, out.stderr);
-  assert.doesNotMatch(out.stdout, /Env keys for going live/, `no going-live header:\n${out.stdout}`);
-  const optionalLine = out.stdout.split('\n').find((line) => line.includes('optional, for later'));
-  assert.ok(optionalLine, `an optional line is printed:\n${out.stdout}`);
-  assert.match(optionalLine, /SLAPFORM_SERVICE_ACCOUNT/);
-});
-
 /** A PATH holding only node and git, so every machine-tool probe the bin runs finds nothing. */
 function pathWithoutMachineTools() {
   const bin = scratch('bin');
@@ -120,23 +58,105 @@ function pathWithoutMachineTools() {
   return bin;
 }
 
-test('#1032 case 9: on a brand whose backend misses the Firebase CLI, status lists it under Machine tools', async () => {
-  const root = folder('acme');
-  const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, targets: 'web,backend' };
-  // The onboarding itself finds every tool present, so it never probes this machine's own
-  await quietly(() => runOnboard(root, { ...flags, execFn: toolProbe() }));
-  install(root);
-  const firebase = MACHINE_TOOLS.backend.find((tool) => tool.name === 'firebase');
-  const env = { PATH: pathWithoutMachineTools() };
+module.exports = defineCases({
+  type: 'group',
+  description: 'status-command',
+  tests: [
+    {
+      name: '#1031 case 8: --json prints one JSON object with the report\'s fields, and nothing else on stdout',
+      run: (ctx) => {
+        const out = status(stageTemplate(scratch('acme-omega')), ['--json']);
 
-  const out = status(root, [], env);
-  assert.equal(out.status, 0, out.stderr);
-  const lines = out.stdout.split('\n');
-  const header = lines.findIndex((line) => line.includes('Machine tools'));
-  assert.notEqual(header, -1, `a Machine tools gap is printed:\n${out.stdout}`);
-  assert.ok(lines.slice(header).some((line) => line.includes(firebase.name)), `firebase is listed under it:\n${out.stdout}`);
+        let report;
+        ctx.expect(() => { report = JSON.parse(out.stdout); }, `all of stdout is one JSON value:\n${out.stdout}\n${out.stderr}`).not.toThrow();
+        ctx.expect(typeof report).toBe('object');
+        ctx.expect(Object.keys(report).sort()).toEqual(FIELDS);
+        ctx.expect(report.state).toBe('template');
+        ctx.expect(report.next).toBe('npm start');
 
-  const report = JSON.parse(status(root, ['--json'], env).stdout);
-  const names = report.missing.tools.map((tool) => (typeof tool === 'string' ? tool : tool.name));
-  assert.ok(names.includes(firebase.name), JSON.stringify(report.missing.tools));
+        const empty = status(scratch('empty'), ['--json']);
+        ctx.expect(JSON.parse(empty.stdout).state, `${empty.stdout}\n${empty.stderr}`).toBe('empty');
+      },
+    },
+
+    {
+      name: '#1031 status: the plain report names the state and ends on the one next command',
+      run: (ctx) => {
+        const out = status(stageTemplate(scratch('acme-omega')));
+
+        ctx.expect(out.status, out.stderr).toBe(0);
+        ctx.expect(out.stdout).toMatch(/template/);
+        const last = out.stdout.trim().split('\n').pop();
+        ctx.expect(last, `the last line is the next command: ${out.stdout}`).toMatch(/npm start/);
+      },
+    },
+
+    {
+      name: '#1031 status: a finished brand with missing keys names npm run manage once for going live, prints the operator-only keys as optional, and ends on npm start',
+      run: async (ctx) => {
+        const root = await websiteBrand();
+
+        const out = status(root);
+        ctx.expect(out.status, out.stderr).toBe(0);
+        const lines = out.stdout.trim().split('\n');
+        ctx.expect(lines.filter((line) => line.includes('npm run manage')).length, `one line names npm run manage:\n${out.stdout}`).toBe(1);
+        ctx.expect(lines[lines.length - 1], `the last line is the next command:\n${out.stdout}`).toMatch(/npm start/);
+        const optionalAt = out.stdout.indexOf('optional, for later');
+        ctx.expect(optionalAt, `an optional line is printed:\n${out.stdout}`).not.toBe(-1);
+        for (const key of OPERATOR_ONLY_KEYS) {
+          ctx.expect(out.stdout.indexOf(key) > optionalAt, `${key} is printed under the optional line:\n${out.stdout}`).toBeTruthy();
+        }
+
+        const report = JSON.parse(status(root, ['--json']).stdout);
+        ctx.expect(report.state).toBe('brand');
+        ctx.expect(report.next).toBe('npm start');
+        const optional = report.missing.env.filter((entry) => entry.optional === true).map((entry) => entry.key);
+        ctx.expect(OPERATOR_ONLY_KEYS.filter((key) => !optional.includes(key))).toEqual([]);
+      },
+    },
+
+    {
+      name: '#1031 status: a brand missing only optional keys prints no going-live header, only the optional line',
+      run: async (ctx) => {
+        const root = await websiteBrand();
+        const owed = JSON.parse(status(root, ['--json']).stdout).missing.env.filter((entry) => !entry.optional);
+        ctx.expect(owed.length, 'the fixture starts owing a going-live key').not.toBe(0);
+        fs.writeFileSync(path.join(root, '.env'), owed.map(({ key }) => `${key}="placeholder"\n`).join(''));
+
+        const report = JSON.parse(status(root, ['--json']).stdout);
+        ctx.expect(report.missing.env.filter((entry) => !entry.optional), 'only optional keys are left missing').toEqual([]);
+
+        const out = status(root);
+        ctx.expect(out.status, out.stderr).toBe(0);
+        ctx.expect(out.stdout, `no going-live header:\n${out.stdout}`).not.toMatch(/Env keys for going live/);
+        const optionalLine = out.stdout.split('\n').find((line) => line.includes('optional, for later'));
+        ctx.expect(optionalLine, `an optional line is printed:\n${out.stdout}`).toBeTruthy();
+        ctx.expect(optionalLine).toMatch(/SLAPFORM_SERVICE_ACCOUNT/);
+      },
+    },
+
+    {
+      name: '#1032 case 9: on a brand whose backend misses the Firebase CLI, status lists it under Machine tools',
+      run: async (ctx) => {
+        const root = folder('acme');
+        const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, targets: 'web,backend' };
+        // The onboarding itself finds every tool present, so it never probes this machine's own
+        await quietly(() => runOnboard(root, { ...flags, execFn: toolProbe() }));
+        install(root);
+        const firebase = MACHINE_TOOLS.backend.find((tool) => tool.name === 'firebase');
+        const env = { PATH: pathWithoutMachineTools() };
+
+        const out = status(root, [], env);
+        ctx.expect(out.status, out.stderr).toBe(0);
+        const lines = out.stdout.split('\n');
+        const header = lines.findIndex((line) => line.includes('Machine tools'));
+        ctx.expect(header, `a Machine tools gap is printed:\n${out.stdout}`).not.toBe(-1);
+        ctx.expect(lines.slice(header).some((line) => line.includes(firebase.name)), `firebase is listed under it:\n${out.stdout}`).toBeTruthy();
+
+        const report = JSON.parse(status(root, ['--json'], env).stdout);
+        const names = report.missing.tools.map((tool) => (typeof tool === 'string' ? tool : tool.name));
+        ctx.expect(names.includes(firebase.name), JSON.stringify(report.missing.tools)).toBeTruthy();
+      },
+    },
+  ],
 });

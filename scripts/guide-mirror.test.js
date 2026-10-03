@@ -10,8 +10,7 @@
  *
  * Run: node --test scripts/guide-mirror.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -68,53 +67,77 @@ function mirrorFindings(guides, omitted) {
   return findings;
 }
 
-test('mirrorFindings() passes a mirror and a single-guide section', () => {
-  const guides = {
-    a: ['Identity', 'Only A', 'CLI', 'Docs'],
-    b: ['Identity', 'CLI', 'Only B', 'Docs'],
-  };
-  assert.deepEqual(mirrorFindings(guides, {}), []);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'guide-mirror',
+  tests: [
+    {
+      name: 'mirrorFindings() passes a mirror and a single-guide section',
+      run: (ctx) => {
+        const guides = {
+          a: ['Identity', 'Only A', 'CLI', 'Docs'],
+          b: ['Identity', 'CLI', 'Only B', 'Docs'],
+        };
+        ctx.expect(mirrorFindings(guides, {})).toEqual([]);
+      },
+    },
 
-test('mirrorFindings() flags a shared section one guide lacks', () => {
-  const guides = {
-    a: ['Identity', 'Client', 'CLI'],
-    b: ['Identity', 'Client', 'CLI'],
-    c: ['Identity', 'CLI'],
-  };
-  assert.deepEqual(mirrorFindings(guides, {}), ['c: missing the shared section "Client"']);
-  assert.deepEqual(mirrorFindings(guides, { Client: ['c'] }), []);
-});
+    {
+      name: 'mirrorFindings() flags a shared section one guide lacks',
+      run: (ctx) => {
+        const guides = {
+          a: ['Identity', 'Client', 'CLI'],
+          b: ['Identity', 'Client', 'CLI'],
+          c: ['Identity', 'CLI'],
+        };
+        ctx.expect(mirrorFindings(guides, {})).toEqual(['c: missing the shared section "Client"']);
+        ctx.expect(mirrorFindings(guides, { Client: ['c'] })).toEqual([]);
+      },
+    },
 
-test('mirrorFindings() flags an omission the guide no longer makes', () => {
-  const guides = { a: ['Identity', 'Client'], b: ['Identity', 'Client'] };
-  assert.deepEqual(mirrorFindings(guides, { Client: ['b'] }), ['b: carries "Client", which OMITTED says it leaves out']);
-});
+    {
+      name: 'mirrorFindings() flags an omission the guide no longer makes',
+      run: (ctx) => {
+        const guides = { a: ['Identity', 'Client'], b: ['Identity', 'Client'] };
+        ctx.expect(mirrorFindings(guides, { Client: ['b'] })).toEqual(['b: carries "Client", which OMITTED says it leaves out']);
+      },
+    },
 
-test('mirrorFindings() flags shared sections out of order', () => {
-  const guides = {
-    a: ['Identity', 'CLI', 'Docs'],
-    b: ['Identity', 'Docs', 'CLI'],
-  };
-  assert.deepEqual(mirrorFindings(guides, {}), [
-    'a vs b: shared sections in a different order (Identity, CLI, Docs / Identity, Docs, CLI)',
-  ]);
-});
+    {
+      name: 'mirrorFindings() flags shared sections out of order',
+      run: (ctx) => {
+        const guides = {
+          a: ['Identity', 'CLI', 'Docs'],
+          b: ['Identity', 'Docs', 'CLI'],
+        };
+        ctx.expect(mirrorFindings(guides, {})).toEqual([
+          'a vs b: shared sections in a different order (Identity, CLI, Docs / Identity, Docs, CLI)',
+        ]);
+      },
+    },
 
-test('the four framework guides mirror each other section for section', () => {
-  const guides = Object.fromEntries(GUIDES.map((name) => [name, sections(readGuide(name))]));
-  assert.deepEqual(mirrorFindings(guides, OMITTED), []);
-});
+    {
+      name: 'the four framework guides mirror each other section for section',
+      run: (ctx) => {
+        const guides = Object.fromEntries(GUIDES.map((name) => [name, sections(readGuide(name))]));
+        ctx.expect(mirrorFindings(guides, OMITTED)).toEqual([]);
+      },
+    },
 
-test('every guide names its playground target as the designated test consumer, in the same words', () => {
-  const lines = GUIDES.map((name) => {
-    const markdown = readGuide(name);
-    const start = markdown.indexOf('### For Framework Development');
-    const section = markdown.slice(start, markdown.indexOf('\n## ', start));
-    const line = section.split('\n').find((text) => text.includes('designated test consumer'));
-    assert.ok(start !== -1 && line, `${name}: no designated test consumer under For Framework Development`);
-    assert.ok(line.includes(`brands/playground-omega/targets/${name}`), `${name}: the consumer is not its playground target`);
-    return line.replace(/^\d+\.\s*/, '').replace(new RegExp(`\\b${name}\\b`, 'g'), '<framework>');
-  });
-  assert.equal(new Set(lines).size, 1, `the four lines differ:\n${lines.join('\n')}`);
+    {
+      name: 'every guide names its playground target as the designated test consumer, in the same words',
+      run: (ctx) => {
+        const lines = GUIDES.map((name) => {
+          const markdown = readGuide(name);
+          const start = markdown.indexOf('### For Framework Development');
+          const section = markdown.slice(start, markdown.indexOf('\n## ', start));
+          const line = section.split('\n').find((text) => text.includes('designated test consumer'));
+          ctx.expect(start !== -1 && line, `${name}: no designated test consumer under For Framework Development`).toBeTruthy();
+          ctx.expect(line.includes(`brands/playground-omega/targets/${name}`), `${name}: the consumer is not its playground target`).toBeTruthy();
+          return line.replace(/^\d+\.\s*/, '').replace(new RegExp(`\\b${name}\\b`, 'g'), '<framework>');
+        });
+        ctx.expect(new Set(lines).size, `the four lines differ:\n${lines.join('\n')}`).toBe(1);
+      },
+    },
+  ],
 });

@@ -1,9 +1,9 @@
 /**
- * The json stdout guard and errors raised while a case runs, driven through
- * `cli.js` on a fixture in a child process.
+ * The json stdout guard, errors raised while a case runs, and a bare run a
+ * case starts, driven through `cli.js` on a fixture in a child process.
  */
 const defineCases = require('../../src/test/define-cases.js');
-const { runCli, removeAll } = require('./_fixtures/helpers.js');
+const { runCli, tempPath, removeAll, takeFile } = require('./_fixtures/helpers.js');
 
 const byName = (json, name) => json.tests.find((t) => t.name === name);
 
@@ -24,6 +24,20 @@ module.exports = defineCases({
         const pretty = runCli('guard-context', [], { reporter: 'pretty', env });
         removeAll(pretty.log);
         ctx.expect(pretty.stdout, pretty.output).toContain('Results');
+      },
+    },
+    {
+      name: 'case-102 a bare node <file> a case starts inside the runner runs its own cases, with no env mask',
+      run(ctx) {
+        const marker = tempPath('nested-bare.txt');
+        const run = runCli('nested-bare', [], { env: { FIXTURE_OUT: marker } });
+        const ran = takeFile(marker);
+        removeAll(run.log);
+
+        ctx.expect(run.json, run.output).not.toBeNull();
+        ctx.expect(ran, `the inner case ran:\n${JSON.stringify(run.json, null, 2)}`).toBe('inner case ran\n');
+        ctx.expect(run.json.passed).toBe(1);
+        ctx.expect(run.status).toBe(0);
       },
     },
     {

@@ -5,40 +5,57 @@
 // on every surface while each framework supplies its own blast-radius lines,
 // so the headline text and the headline-first order are the contract.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { makeExtendedModeWarning } = require('../src/test/extended-mode-warning');
 
 const HEADLINE = '⚠️⚠️⚠️  WARNING: TEST_EXTENDED_MODE IS TRUE  ⚠️⚠️⚠️';
 
-test('the shared headline leads, framework detail lines follow in order', () => {
-  const lines = makeExtendedModeWarning([
-    'Real emails will be sent through SendGrid.',
-    'Real AI provider calls will be billed.',
-  ]);
+module.exports = defineCases({
+  type: 'group',
+  description: 'extended-mode-warning',
+  tests: [
+    {
+      name: 'the shared headline leads, framework detail lines follow in order',
+      run: (ctx) => {
+        const lines = makeExtendedModeWarning([
+          'Real emails will be sent through SendGrid.',
+          'Real AI provider calls will be billed.',
+        ]);
 
-  assert.deepStrictEqual(lines, [
-    HEADLINE,
-    'Real emails will be sent through SendGrid.',
-    'Real AI provider calls will be billed.',
-  ]);
-});
+        ctx.expect(lines).toEqual([
+          HEADLINE,
+          'Real emails will be sent through SendGrid.',
+          'Real AI provider calls will be billed.',
+        ]);
+      },
+    },
 
-test('the headline stands alone when a framework supplies no detail', () => {
-  assert.deepStrictEqual(makeExtendedModeWarning([]), [HEADLINE]);
-});
+    {
+      name: 'the headline stands alone when a framework supplies no detail',
+      run: (ctx) => {
+        ctx.expect(makeExtendedModeWarning([])).toEqual([HEADLINE]);
+      },
+    },
 
-test('every framework gets the SAME headline, whatever it passes', () => {
-  const web = makeExtendedModeWarning(['web detail']);
-  const backend = makeExtendedModeWarning(['backend detail one', 'backend detail two']);
+    {
+      name: 'every framework gets the SAME headline, whatever it passes',
+      run: (ctx) => {
+        const web = makeExtendedModeWarning(['web detail']);
+        const backend = makeExtendedModeWarning(['backend detail one', 'backend detail two']);
 
-  assert.strictEqual(web[0], backend[0]);
-});
+        ctx.expect(web[0]).toBe(backend[0]);
+      },
+    },
 
-test('the caller array is never mutated — a fresh array comes back', () => {
-  const detail = ['only line'];
-  const lines = makeExtendedModeWarning(detail);
+    {
+      name: 'the caller array is never mutated — a fresh array comes back',
+      run: (ctx) => {
+        const detail = ['only line'];
+        const lines = makeExtendedModeWarning(detail);
 
-  assert.deepStrictEqual(detail, ['only line']);
-  assert.notStrictEqual(lines, detail);
+        ctx.expect(detail).toEqual(['only line']);
+        ctx.expect(lines).not.toBe(detail);
+      },
+    },
+  ],
 });

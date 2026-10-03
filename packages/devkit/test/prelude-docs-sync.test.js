@@ -8,8 +8,7 @@
  * devkit, so the prelude runs the real docs lane.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -43,40 +42,55 @@ function linkedBrand() {
   return { monorepo, manager, brand };
 }
 
-test('docs-sync: it is on the boot list for every verb', () => {
-  assert.ok(PRELUDES.includes(docsSync));
-  assert.equal(docsSync.verbs, 'all');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'prelude-docs-sync',
+  tests: [
+    {
+      name: 'docs-sync: it is on the boot list for every verb',
+      run: (ctx) => {
+        ctx.expect(PRELUDES.includes(docsSync)).toBeTruthy();
+        ctx.expect(docsSync.verbs).toBe('all');
+      },
+    },
 
-test('docs-sync: a linked manager is synced, and a re-run writes only what changed', () => {
-  const { monorepo, manager, brand } = linkedBrand();
-  const lines = [];
-  const log = (line) => lines.push(line);
+    {
+      name: 'docs-sync: a linked manager is synced, and a re-run writes only what changed',
+      run: (ctx) => {
+        const { monorepo, manager, brand } = linkedBrand();
+        const lines = [];
+        const log = (line) => lines.push(line);
 
-  assert.deepEqual(docsSync.run({ brandRoot: brand, log }).written.sort(), ['omega.md', 'shared/config.md']);
-  assert.equal(fs.readFileSync(path.join(manager, 'docs', 'omega.md'), 'utf8'), '# the map\n');
-  assert.equal(lines.length, 1, 'a sync that wrote something says so in one line');
+        ctx.expect(docsSync.run({ brandRoot: brand, log }).written.sort()).toEqual(['omega.md', 'shared/config.md']);
+        ctx.expect(fs.readFileSync(path.join(manager, 'docs', 'omega.md'), 'utf8')).toBe('# the map\n');
+        ctx.expect(lines.length, 'a sync that wrote something says so in one line').toBe(1);
 
-  const untouched = path.join(manager, 'docs', 'shared', 'config.md');
-  const past = new Date('2020-01-01T00:00:00Z');
-  fs.utimesSync(untouched, past, past);
-  assert.deepEqual(docsSync.run({ brandRoot: brand, log }), { synced: true, written: [], removed: [] });
-  assert.equal(lines.length, 1, 'a sync with nothing to do is silent');
+        const untouched = path.join(manager, 'docs', 'shared', 'config.md');
+        const past = new Date('2020-01-01T00:00:00Z');
+        fs.utimesSync(untouched, past, past);
+        ctx.expect(docsSync.run({ brandRoot: brand, log })).toEqual({ synced: true, written: [], removed: [] });
+        ctx.expect(lines.length, 'a sync with nothing to do is silent').toBe(1);
 
-  fs.writeFileSync(path.join(monorepo, 'docs', 'omega.md'), '# the map v2\n');
-  assert.deepEqual(docsSync.run({ brandRoot: brand, log }).written, ['omega.md']);
-  assert.equal(fs.statSync(untouched).mtime.getTime(), past.getTime(), 'the unchanged file is untouched');
-});
+        fs.writeFileSync(path.join(monorepo, 'docs', 'omega.md'), '# the map v2\n');
+        ctx.expect(docsSync.run({ brandRoot: brand, log }).written).toEqual(['omega.md']);
+        ctx.expect(fs.statSync(untouched).mtime.getTime(), 'the unchanged file is untouched').toBe(past.getTime());
+      },
+    },
 
-test('docs-sync: a published manager and a run outside a brand are left alone', () => {
-  const brand = tmpdir();
-  const manager = path.join(brand, 'node_modules', '@omega.js', 'manager');
-  fs.mkdirSync(path.join(manager, 'docs'), { recursive: true });
-  fs.writeFileSync(path.join(manager, 'package.json'), JSON.stringify({ name: '@omega.js/manager' }));
-  fs.writeFileSync(path.join(manager, 'docs', 'omega.md'), '# shipped\n');
+    {
+      name: 'docs-sync: a published manager and a run outside a brand are left alone',
+      run: (ctx) => {
+        const brand = tmpdir();
+        const manager = path.join(brand, 'node_modules', '@omega.js', 'manager');
+        fs.mkdirSync(path.join(manager, 'docs'), { recursive: true });
+        fs.writeFileSync(path.join(manager, 'package.json'), JSON.stringify({ name: '@omega.js/manager' }));
+        fs.writeFileSync(path.join(manager, 'docs', 'omega.md'), '# shipped\n');
 
-  assert.deepEqual(docsSync.run({ brandRoot: brand }), { synced: false, reason: 'published' });
-  assert.equal(fs.readFileSync(path.join(manager, 'docs', 'omega.md'), 'utf8'), '# shipped\n');
-  assert.deepEqual(docsSync.run({ brandRoot: null }), { synced: false, reason: 'no-brand' });
-  assert.deepEqual(docsSync.run({ brandRoot: tmpdir() }), { synced: false, reason: 'no-manager' });
+        ctx.expect(docsSync.run({ brandRoot: brand })).toEqual({ synced: false, reason: 'published' });
+        ctx.expect(fs.readFileSync(path.join(manager, 'docs', 'omega.md'), 'utf8')).toBe('# shipped\n');
+        ctx.expect(docsSync.run({ brandRoot: null })).toEqual({ synced: false, reason: 'no-brand' });
+        ctx.expect(docsSync.run({ brandRoot: tmpdir() })).toEqual({ synced: false, reason: 'no-manager' });
+      },
+    },
+  ],
 });

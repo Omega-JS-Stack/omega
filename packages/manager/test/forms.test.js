@@ -7,8 +7,7 @@
  * subscription fields, the config plan override, the dry-run zero-mutation
  * guarantee, and the typed-value encode/decode round-trip.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { encodeFields, decodeFields } = require('../src/lib/firestore-rest.js');
@@ -107,237 +106,6 @@ function runService(config, { db, options = {}, serviceData = {}, brandRoot } = 
   });
 }
 
-// ─── Registry / defaults pins ────────────────────────────────────────────────
-
-test('forms: registered after payment with the form + user operations', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('payment') + 1], 'forms');
-  assert.deepEqual(OPERATIONS.forms.map((o) => o.name), ['form', 'user']);
-});
-
-test('forms: defaults carry no formId and Slapform\'s top tier as the plan', () => {
-  assert.equal(DEFAULTS.forms.providers.slapform.enabled, true);
-  assert.equal(DEFAULTS.forms.providers.slapform.formId, null);
-  assert.deepEqual(DEFAULTS.forms.providers.slapform.plan, { id: 'grandmaster', name: 'Grandmaster' });
-});
-
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('forms: slapform.enabled = false skips the service', async () => {
-  const result = await runService(brandConfig({ slapform: { enabled: false } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /forms\.providers\.slapform\.enabled/);
-});
-
-test('forms: scalar slapform: false skips the service', async () => {
-  const result = await runService(brandConfig({ slapform: false }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /forms\.providers\.slapform\.enabled/);
-});
-
-test('forms: skips without a web target (the form lives on the website)', async () => {
-  const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no web target/);
-});
-
-// The gate is by TYPE (#886): a brand may name its web target anything
-test('forms: a web target named `site` runs the service, key spelling is not the gate', async () => {
-  const result = await runService(brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } }), { db: fakeDb(convergedResponses()) });
-
-  assert.notEqual(result.status, 'skipped');
-});
-
-test('forms: skips without slapform.formId', async () => {
-  const result = await runService(brandConfig({ slapform: { formId: null } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /forms\.providers\.slapform\.formId/);
-});
-
-test('forms: skips without SLAPFORM_SERVICE_ACCOUNT in .env', async () => {
-  const result = await runService(brandConfig()); // no injected db → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /SLAPFORM_SERVICE_ACCOUNT/);
-});
-
-// ─── Converged no-op ─────────────────────────────────────────────────────────
-
-test('forms: fully converged brand is a zero-mutation no-op across both operations', async () => {
-  const db = fakeDb(convergedResponses());
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.deepEqual(db.reads(), [`forms/${FORM_ID}`, `forms/${FORM_ID}`, `users/${OWNER_UID}`]);
-  assert.equal(result.state.formId, FORM_ID);
-  assert.equal(result.state.ownerUid, OWNER_UID);
-  assert.equal(result.output.form.synced, true);
-  assert.equal(result.output.user.synced, true);
-});
-
-test('forms: extra Slapform-written subscription fields do not count as drift', async () => {
-  const db = fakeDb(convergedResponses({
-    user: {
-      subscription: {
-        ...subscription(),
-        trial: { active: false, days: 14 },
-        cancelled: false,
-      },
-      email: 'owner@fixture-brand.test',
-    },
-  }));
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
-
-// ─── form ────────────────────────────────────────────────────────────────────
-
-test('forms: a drifted form name is patched with a leaf-masked merge write', async () => {
-  const db = fakeDb({
-    ...convergedResponses({ form: { name: 'Old Name', owner: OWNER_UID, settings: { enabled: true } } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[
-    `forms/${FORM_ID}`,
-    { name: FORM_NAME, settings: { enabled: true } },
-    ['name', 'settings.enabled'],
-  ]]);
-  assert.equal(result.output.form.updated, true);
-});
-
-test('forms: a disabled form is re-enabled', async () => {
-  const db = fakeDb({
-    ...convergedResponses({ form: { name: FORM_NAME, owner: OWNER_UID, settings: { enabled: false } } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.equal(db.mutations().length, 1);
-});
-
-test('forms: a formId pointing at no document errors instead of creating an orphan', async () => {
-  const db = fakeDb({ getDoc: null });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'error');
-  assert.deepEqual(db.mutations(), []);
-  // stopOnError: the user operation never runs after the form error
-  assert.deepEqual(db.reads(), [`forms/${FORM_ID}`]);
-});
-
-// ─── user ────────────────────────────────────────────────────────────────────
-
-test('forms: a missing user document is created with the full subscription', async () => {
-  const db = fakeDb({
-    getDoc: (path) => (path === `forms/${FORM_ID}`
-      ? { name: FORM_NAME, owner: OWNER_UID, settings: { enabled: true } }
-      : null),
-    patchDoc: {},
-  });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[
-    `users/${OWNER_UID}`,
-    { subscription: subscription() },
-    SUBSCRIPTION_FIELD_PATHS,
-  ]]);
-  assert.equal(result.output.user.updated, true);
-  assert.equal(result.state.ownerUid, OWNER_UID);
-});
-
-test('forms: a user on a lower plan is moved to the configured plan', async () => {
-  const db = fakeDb({
-    ...convergedResponses({ user: { subscription: subscription('mini', 'Mini') } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.equal(db.mutations().length, 1);
-  assert.equal(db.mutations()[0].args[1].subscription.product.id, 'grandmaster');
-});
-
-test('forms: slapform.plan overrides the default tier', async () => {
-  const db = fakeDb({
-    ...convergedResponses({ user: { subscription: subscription() } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(
-    brandConfig({ slapform: { plan: { id: 'sumo', name: 'Sumo' } } }),
-    { db },
-  );
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations()[0].args[1].subscription.product, { id: 'sumo', name: 'Sumo' });
-  assert.equal(result.output.user.plan, 'sumo');
-});
-
-test('forms: a form without an owner field errors the user operation', async () => {
-  const db = fakeDb(convergedResponses({ form: { name: FORM_NAME, settings: { enabled: true } } }));
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'error');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.form.synced, true); // the form op itself passed
-});
-
-// ─── Dry run ─────────────────────────────────────────────────────────────────
-
-test('forms: dry run on a fully drifted brand performs zero mutations', async () => {
-  const db = fakeDb({
-    getDoc: (path) => (path === `forms/${FORM_ID}`
-      ? { name: 'Old Name', owner: OWNER_UID, settings: { enabled: false } }
-      : null),
-  });
-
-  const result = await runService(brandConfig(), { db, options: { dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.form.planned, 'update');
-  assert.equal(result.output.user.planned, 'grandmaster');
-  // no durable state lands in a dry run
-  assert.equal(result.state, null);
-});
-
-// ─── Firestore typed-value codec ─────────────────────────────────────────────
-
-test('firestore-rest: typed-value encode/decode round-trips a nested document', () => {
-  const doc = {
-    name: 'Contact Form',
-    settings: { enabled: true },
-    price: 0,
-    ratio: 1.5,
-    tags: ['a', 'b'],
-    resourceId: null,
-  };
-
-  const encoded = encodeFields(doc);
-
-  // REST int64s are string-encoded; nested maps/arrays use typed wrappers
-  assert.deepEqual(encoded.price, { integerValue: '0' });
-  assert.deepEqual(encoded.ratio, { doubleValue: 1.5 });
-  assert.deepEqual(encoded.settings, { mapValue: { fields: { enabled: { booleanValue: true } } } });
-  assert.deepEqual(encoded.resourceId, { nullValue: null });
-
-  assert.deepEqual(decodeFields(encoded), doc);
-});
-
 // ─── 2b create-on-missing (operator SA mints the brand's own form) ───────────
 
 /** Stateful doc-store fake: setDoc lands, getDoc reads back — the mint +
@@ -397,188 +165,497 @@ function createConfig() {
   return config;
 }
 
-test('forms 2b: missing formId + SA + template donor mints the brand-owned form end to end', async (t) => {
-  process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
-  t.after(() => delete process.env[PASSWORD_PIN_VAR]);
-
-  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
-  const authAdmin = fakeAuthAdmin();
-  const brandRoot = makeRoot(`{
-  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } }, // formId lands here
-}
-`);
-
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot,
-    brandConfig: createConfig(),
-    brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
-    targets: [],
-    operations: OPERATIONS.forms,
-    options: {},
-    serviceData: {},
-    slapformDb: store,
-    slapformAuthAdmin: authAdmin,
-  });
-
-  assert.equal(result.status, 'success');
-
-  // The product user: looked up, created with the pinned password, doc = the
-  // canonical account shape with REAL generated credentials
-  assert.deepEqual(authAdmin.calls.map((c) => c.method), ['getUserByEmail', 'createUser']);
-  assert.equal(authAdmin.calls[1].password, 'fixture-password-123');
-  const userSet = store.sets().find((c) => c.args[0] === 'users/uid_minted1');
-  assert.ok(userSet, 'users/{uid} doc written');
-  assert.equal(userSet.args[1].auth.uid, 'uid_minted1');
-  assert.equal(userSet.args[1].auth.email, 'support@fixture-brand.test');
-  assert.match(userSet.args[1].api.privateKey, /^[A-Za-z0-9]{43}$/, 'real api key generated');
-
-  // The form: shape-templated from the donor, owned by the new user
-  const formId = result.state.formId;
-  assert.match(formId, /^[A-Za-z0-9]{14}$/, 'minted id matches the product convention');
-  const formSet = store.sets().find((c) => c.args[0] === `forms/${formId}`);
-  assert.ok(formSet, 'form doc written');
-  assert.equal(formSet.args[1].owner, 'uid_minted1');
-  assert.deepEqual(formSet.args[1].fields, ['email', 'message'], 'donor shape copied');
-  assert.equal(formSet.args[1].id, formId, 'embedded id field re-pointed at the minted doc, not the donor');
-
-  // Same-run convergence: the ensures patched the donor name + enabled flag
-  const formPatch = store.patches().find((c) => c.args[0] === `forms/${formId}`);
-  assert.ok(formPatch, 'form converged in the same run');
-  assert.equal(formPatch.args[1].name, FORM_NAME);
-
-  // Writeback: the minted id landed in omega.json5, comments intact
-  const written = readSource(brandRoot);
-  assert.ok(written.includes(`formId: "${formId}"`), 'minted id written back');
-  assert.ok(written.includes('// formId lands here'));
-});
-
-test('forms 2b: dry run plans the mint — zero writes, no user creation, no writeback', async () => {
-  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
-  const authAdmin = fakeAuthAdmin();
-  const brandRoot = makeRoot(`{
-  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } },
-}
-`);
-
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot,
-    brandConfig: createConfig(),
-    brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
-    targets: [],
-    operations: OPERATIONS.forms,
-    options: { dryRun: true },
-    serviceData: {},
-    slapformDb: store,
-    slapformAuthAdmin: authAdmin,
-  });
-
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /creation planned/);
-  assert.deepEqual(store.sets(), []);
-  assert.deepEqual(store.patches(), []);
-  assert.deepEqual(authAdmin.calls, []);
-  assert.ok(!readSource(brandRoot).includes('formId:'), 'no writeback on dry run');
-});
-
-test('forms 2b: an existing product user is reused — no createUser, no users write', async (t) => {
-  process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
-  t.after(() => delete process.env[PASSWORD_PIN_VAR]);
-
-  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
-  const authAdmin = fakeAuthAdmin({ existing: { uid: 'uid_existing9', email: 'support@fixture-brand.test' } });
-  const brandRoot = makeRoot(`{
-  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  forms: { providers: { slapform: { enabled: true } } },
-}
-`);
-
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot,
-    brandConfig: createConfig(),
-    brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
-    targets: [],
-    operations: OPERATIONS.forms,
-    options: {},
-    serviceData: {},
-    slapformDb: store,
-    slapformAuthAdmin: authAdmin,
-  });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(authAdmin.calls.map((c) => c.method), ['getUserByEmail']);
-  assert.equal(store.sets().length, 1, 'only the form doc written');
-  assert.equal(store.sets()[0].args[1].owner, 'uid_existing9');
-});
-
-test('forms 2b: a missing template doc fails loud instead of minting garbage', async () => {
-  const store = fakeStore({}); // no template
-  const authAdmin = fakeAuthAdmin();
-
-  await assert.rejects(
-    service.run({
-      brandId: 'fixture-brand',
-      brandRoot: '/tmp/omega-manager-slapform-unused',
-      brandConfig: createConfig(),
-      brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
-      targets: [],
-      operations: OPERATIONS.forms,
-      options: {},
-      serviceData: {},
-      slapformDb: store,
-      slapformAuthAdmin: authAdmin,
-    }),
-    /template doc forms\/tmplForm1 not found/,
-  );
-});
-
-test('forms 2b: no brand contact email → no mint attempt, normal missing-id skip', async () => {
-  const config = brandConfig({ slapform: { formId: null, templateFormId: 'tmplForm1' } });
-  // no config.brand.contact
-  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
-
-  const result = await runService(config, { db: store });
-
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /forms\.providers\.slapform\.formId/);
-  assert.deepEqual(store.sets(), []);
-});
-
 // ─── Interactive setup flow (config-landing) ─────────────────────────────────
 
 const { setBrowserOpener: setOpener } = require('@omega.js/devkit/flows');
 const { makeBrandRoot: makeRoot, readConfigSource: readSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt: openTty } = require('./lib/interactive.js');
 
-test('setup: interactive run lands the pasted form id in omega.json5 and proceeds', async () => {
-  const config = brandConfig({ slapform: { formId: null } });
-  const db = fakeDb(convergedResponses());
-  const brandRoot = makeRoot(`{
+module.exports = defineCases({
+  type: 'group',
+  description: 'forms',
+  tests: [
+    // ─── Registry / defaults pins ────────────────────────────────────────────────
+
+    {
+      name: 'forms: registered after payment with the form + user operations',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('payment') + 1]).toBe('forms');
+        ctx.expect(OPERATIONS.forms.map((o) => o.name)).toEqual(['form', 'user']);
+      },
+    },
+
+    {
+      name: 'forms: defaults carry no formId and Slapform\'s top tier as the plan',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.forms.providers.slapform.enabled).toBe(true);
+        ctx.expect(DEFAULTS.forms.providers.slapform.formId).toBe(null);
+        ctx.expect(DEFAULTS.forms.providers.slapform.plan).toEqual({ id: 'grandmaster', name: 'Grandmaster' });
+      },
+    },
+
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
+
+    {
+      name: 'forms: slapform.enabled = false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ slapform: { enabled: false } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/forms\.providers\.slapform\.enabled/);
+      },
+    },
+
+    {
+      name: 'forms: scalar slapform: false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ slapform: false }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/forms\.providers\.slapform\.enabled/);
+      },
+    },
+
+    {
+      name: 'forms: skips without a web target (the form lives on the website)',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/no web target/);
+      },
+    },
+
+    // The gate is by TYPE (#886): a brand may name its web target anything
+    {
+      name: 'forms: a web target named `site` runs the service, key spelling is not the gate',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } }), { db: fakeDb(convergedResponses()) });
+
+        ctx.expect(result.status).not.toBe('skipped');
+      },
+    },
+
+    {
+      name: 'forms: skips without slapform.formId',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ slapform: { formId: null } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/forms\.providers\.slapform\.formId/);
+      },
+    },
+
+    {
+      name: 'forms: skips without SLAPFORM_SERVICE_ACCOUNT in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected db → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/SLAPFORM_SERVICE_ACCOUNT/);
+      },
+    },
+
+    // ─── Converged no-op ─────────────────────────────────────────────────────────
+
+    {
+      name: 'forms: fully converged brand is a zero-mutation no-op across both operations',
+      run: async (ctx) => {
+        const db = fakeDb(convergedResponses());
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(db.reads()).toEqual([`forms/${FORM_ID}`, `forms/${FORM_ID}`, `users/${OWNER_UID}`]);
+        ctx.expect(result.state.formId).toBe(FORM_ID);
+        ctx.expect(result.state.ownerUid).toBe(OWNER_UID);
+        ctx.expect(result.output.form.synced).toBe(true);
+        ctx.expect(result.output.user.synced).toBe(true);
+      },
+    },
+
+    {
+      name: 'forms: extra Slapform-written subscription fields do not count as drift',
+      run: async (ctx) => {
+        const db = fakeDb(convergedResponses({
+          user: {
+            subscription: {
+              ...subscription(),
+              trial: { active: false, days: 14 },
+              cancelled: false,
+            },
+            email: 'owner@fixture-brand.test',
+          },
+        }));
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
+
+    // ─── form ────────────────────────────────────────────────────────────────────
+
+    {
+      name: 'forms: a drifted form name is patched with a leaf-masked merge write',
+      run: async (ctx) => {
+        const db = fakeDb({
+          ...convergedResponses({ form: { name: 'Old Name', owner: OWNER_UID, settings: { enabled: true } } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[
+          `forms/${FORM_ID}`,
+          { name: FORM_NAME, settings: { enabled: true } },
+          ['name', 'settings.enabled'],
+        ]]);
+        ctx.expect(result.output.form.updated).toBe(true);
+      },
+    },
+
+    {
+      name: 'forms: a disabled form is re-enabled',
+      run: async (ctx) => {
+        const db = fakeDb({
+          ...convergedResponses({ form: { name: FORM_NAME, owner: OWNER_UID, settings: { enabled: false } } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().length).toBe(1);
+      },
+    },
+
+    {
+      name: 'forms: a formId pointing at no document errors instead of creating an orphan',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(db.mutations()).toEqual([]);
+        // stopOnError: the user operation never runs after the form error
+        ctx.expect(db.reads()).toEqual([`forms/${FORM_ID}`]);
+      },
+    },
+
+    // ─── user ────────────────────────────────────────────────────────────────────
+
+    {
+      name: 'forms: a missing user document is created with the full subscription',
+      run: async (ctx) => {
+        const db = fakeDb({
+          getDoc: (path) => (path === `forms/${FORM_ID}`
+            ? { name: FORM_NAME, owner: OWNER_UID, settings: { enabled: true } }
+            : null),
+          patchDoc: {},
+        });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[
+          `users/${OWNER_UID}`,
+          { subscription: subscription() },
+          SUBSCRIPTION_FIELD_PATHS,
+        ]]);
+        ctx.expect(result.output.user.updated).toBe(true);
+        ctx.expect(result.state.ownerUid).toBe(OWNER_UID);
+      },
+    },
+
+    {
+      name: 'forms: a user on a lower plan is moved to the configured plan',
+      run: async (ctx) => {
+        const db = fakeDb({
+          ...convergedResponses({ user: { subscription: subscription('mini', 'Mini') } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().length).toBe(1);
+        ctx.expect(db.mutations()[0].args[1].subscription.product.id).toBe('grandmaster');
+      },
+    },
+
+    {
+      name: 'forms: slapform.plan overrides the default tier',
+      run: async (ctx) => {
+        const db = fakeDb({
+          ...convergedResponses({ user: { subscription: subscription() } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(
+          brandConfig({ slapform: { plan: { id: 'sumo', name: 'Sumo' } } }),
+          { db },
+        );
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()[0].args[1].subscription.product).toEqual({ id: 'sumo', name: 'Sumo' });
+        ctx.expect(result.output.user.plan).toBe('sumo');
+      },
+    },
+
+    {
+      name: 'forms: a form without an owner field errors the user operation',
+      run: async (ctx) => {
+        const db = fakeDb(convergedResponses({ form: { name: FORM_NAME, settings: { enabled: true } } }));
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.form.synced).toBe(true); // the form op itself passed
+      },
+    },
+
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'forms: dry run on a fully drifted brand performs zero mutations',
+      run: async (ctx) => {
+        const db = fakeDb({
+          getDoc: (path) => (path === `forms/${FORM_ID}`
+            ? { name: 'Old Name', owner: OWNER_UID, settings: { enabled: false } }
+            : null),
+        });
+
+        const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.form.planned).toBe('update');
+        ctx.expect(result.output.user.planned).toBe('grandmaster');
+        // no durable state lands in a dry run
+        ctx.expect(result.state).toBe(null);
+      },
+    },
+
+    // ─── Firestore typed-value codec ─────────────────────────────────────────────
+
+    {
+      name: 'firestore-rest: typed-value encode/decode round-trips a nested document',
+      run: (ctx) => {
+        const doc = {
+          name: 'Contact Form',
+          settings: { enabled: true },
+          price: 0,
+          ratio: 1.5,
+          tags: ['a', 'b'],
+          resourceId: null,
+        };
+
+        const encoded = encodeFields(doc);
+
+        // REST int64s are string-encoded; nested maps/arrays use typed wrappers
+        ctx.expect(encoded.price).toEqual({ integerValue: '0' });
+        ctx.expect(encoded.ratio).toEqual({ doubleValue: 1.5 });
+        ctx.expect(encoded.settings).toEqual({ mapValue: { fields: { enabled: { booleanValue: true } } } });
+        ctx.expect(encoded.resourceId).toEqual({ nullValue: null });
+
+        ctx.expect(decodeFields(encoded)).toEqual(doc);
+      },
+    },
+
+    {
+      name: 'forms 2b: missing formId + SA + template donor mints the brand-owned form end to end',
+      run: async (ctx) => {
+        process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
+        ctx.after(() => delete process.env[PASSWORD_PIN_VAR]);
+
+        const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+        const authAdmin = fakeAuthAdmin();
+        const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } }, // formId lands here
+}
+`);
+
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot,
+          brandConfig: createConfig(),
+          brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
+          targets: [],
+          operations: OPERATIONS.forms,
+          options: {},
+          serviceData: {},
+          slapformDb: store,
+          slapformAuthAdmin: authAdmin,
+        });
+
+        ctx.expect(result.status).toBe('success');
+
+        // The product user: looked up, created with the pinned password, doc = the
+        // canonical account shape with REAL generated credentials
+        ctx.expect(authAdmin.calls.map((c) => c.method)).toEqual(['getUserByEmail', 'createUser']);
+        ctx.expect(authAdmin.calls[1].password).toBe('fixture-password-123');
+        const userSet = store.sets().find((c) => c.args[0] === 'users/uid_minted1');
+        ctx.expect(userSet, 'users/{uid} doc written').toBeTruthy();
+        ctx.expect(userSet.args[1].auth.uid).toBe('uid_minted1');
+        ctx.expect(userSet.args[1].auth.email).toBe('support@fixture-brand.test');
+        ctx.expect(userSet.args[1].api.privateKey, 'real api key generated').toMatch(/^[A-Za-z0-9]{43}$/);
+
+        // The form: shape-templated from the donor, owned by the new user
+        const formId = result.state.formId;
+        ctx.expect(formId, 'minted id matches the product convention').toMatch(/^[A-Za-z0-9]{14}$/);
+        const formSet = store.sets().find((c) => c.args[0] === `forms/${formId}`);
+        ctx.expect(formSet, 'form doc written').toBeTruthy();
+        ctx.expect(formSet.args[1].owner).toBe('uid_minted1');
+        ctx.expect(formSet.args[1].fields, 'donor shape copied').toEqual(['email', 'message']);
+        ctx.expect(formSet.args[1].id, 'embedded id field re-pointed at the minted doc, not the donor').toBe(formId);
+
+        // Same-run convergence: the ensures patched the donor name + enabled flag
+        const formPatch = store.patches().find((c) => c.args[0] === `forms/${formId}`);
+        ctx.expect(formPatch, 'form converged in the same run').toBeTruthy();
+        ctx.expect(formPatch.args[1].name).toBe(FORM_NAME);
+
+        // Writeback: the minted id landed in omega.json5, comments intact
+        const written = readSource(brandRoot);
+        ctx.expect(written.includes(`formId: "${formId}"`), 'minted id written back').toBeTruthy();
+        ctx.expect(written.includes('// formId lands here')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'forms 2b: dry run plans the mint — zero writes, no user creation, no writeback',
+      run: async (ctx) => {
+        const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+        const authAdmin = fakeAuthAdmin();
+        const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } },
+}
+`);
+
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot,
+          brandConfig: createConfig(),
+          brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
+          targets: [],
+          operations: OPERATIONS.forms,
+          options: { dryRun: true },
+          serviceData: {},
+          slapformDb: store,
+          slapformAuthAdmin: authAdmin,
+        });
+
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/creation planned/);
+        ctx.expect(store.sets()).toEqual([]);
+        ctx.expect(store.patches()).toEqual([]);
+        ctx.expect(authAdmin.calls).toEqual([]);
+        ctx.expect(!readSource(brandRoot).includes('formId:'), 'no writeback on dry run').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'forms 2b: an existing product user is reused — no createUser, no users write',
+      run: async (ctx) => {
+        process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
+        ctx.after(() => delete process.env[PASSWORD_PIN_VAR]);
+
+        const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+        const authAdmin = fakeAuthAdmin({ existing: { uid: 'uid_existing9', email: 'support@fixture-brand.test' } });
+        const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  forms: { providers: { slapform: { enabled: true } } },
+}
+`);
+
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot,
+          brandConfig: createConfig(),
+          brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
+          targets: [],
+          operations: OPERATIONS.forms,
+          options: {},
+          serviceData: {},
+          slapformDb: store,
+          slapformAuthAdmin: authAdmin,
+        });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(authAdmin.calls.map((c) => c.method)).toEqual(['getUserByEmail']);
+        ctx.expect(store.sets().length, 'only the form doc written').toBe(1);
+        ctx.expect(store.sets()[0].args[1].owner).toBe('uid_existing9');
+      },
+    },
+
+    {
+      name: 'forms 2b: a missing template doc fails loud instead of minting garbage',
+      run: async (ctx) => {
+        const store = fakeStore({}); // no template
+        const authAdmin = fakeAuthAdmin();
+
+        await ctx.expect(service.run({
+            brandId: 'fixture-brand',
+            brandRoot: '/tmp/omega-manager-slapform-unused',
+            brandConfig: createConfig(),
+            brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
+            targets: [],
+            operations: OPERATIONS.forms,
+            options: {},
+            serviceData: {},
+            slapformDb: store,
+            slapformAuthAdmin: authAdmin,
+          })).rejects.toThrow(/template doc forms\/tmplForm1 not found/);
+      },
+    },
+
+    {
+      name: 'forms 2b: no brand contact email → no mint attempt, normal missing-id skip',
+      run: async (ctx) => {
+        const config = brandConfig({ slapform: { formId: null, templateFormId: 'tmplForm1' } });
+        // no config.brand.contact
+        const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+
+        const result = await runService(config, { db: store });
+
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/forms\.providers\.slapform\.formId/);
+        ctx.expect(store.sets()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'setup: interactive run lands the pasted form id in omega.json5 and proceeds',
+      run: async (ctx) => {
+        const config = brandConfig({ slapform: { formId: null } });
+        const db = fakeDb(convergedResponses());
+        const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   forms: { providers: { slapform: { enabled: true } } }, // formId lands here
 }
 `);
-  const opened = [];
-  setOpener(async (url) => { opened.push(url); return true; });
-  const tty = openTty();
+        const opened = [];
+        setOpener(async (url) => { opened.push(url); return true; });
+        const tty = openTty();
 
-  try {
-    const run = runService(config, { db, brandRoot });
-    await tty.answer('Set up now?', '\r'); // Yes
-    await tty.answer('Slapform form ID:', `${FORM_ID}\r`);
-    const result = await run;
+        try {
+          const run = runService(config, { db, brandRoot });
+          await tty.answer('Set up now?', '\r'); // Yes
+          await tty.answer('Slapform form ID:', `${FORM_ID}\r`);
+          const result = await run;
 
-    assert.equal(result.state.formId, FORM_ID);
-    assert.deepEqual(opened, ['https://slapform.com']);
-    const written = readSource(brandRoot);
-    assert.ok(written.includes(`formId: "${FORM_ID}"`));
-    assert.ok(written.includes('// formId lands here'));
-  } finally {
-    tty.close();
-    setOpener(null);
-  }
+          ctx.expect(result.state.formId).toBe(FORM_ID);
+          ctx.expect(opened).toEqual(['https://slapform.com']);
+          const written = readSource(brandRoot);
+          ctx.expect(written.includes(`formId: "${FORM_ID}"`)).toBeTruthy();
+          ctx.expect(written.includes('// formId lands here')).toBeTruthy();
+        } finally {
+          tty.close();
+          setOpener(null);
+        }
+      },
+    },
+  ],
 });

@@ -8,8 +8,7 @@
 // hold is the manage-lane framing this op owns — which targets count as live,
 // the dir surviving the key, and the dry run.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -65,62 +64,83 @@ function context(root, discovered, enabledTargets, options = {}) {
 
 const composed = (root) => (jetpack.list(path.join(root, '.github', 'workflows')) || []).sort();
 
-test('workflows op is registered in the workspace OPERATIONS', () => {
-  assert.ok(OPERATIONS.workspace.some((op) => op.name === 'workflows' && op.ensure === true));
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'workspace-workflows',
+  tests: [
+    {
+      name: 'workflows op is registered in the workspace OPERATIONS',
+      run: (ctx) => {
+        ctx.expect(OPERATIONS.workspace.some((op) => op.name === 'workflows' && op.ensure === true)).toBeTruthy();
+      },
+    },
 
-test('workflows: a target dropped from the config loses its composed files, the dir survives', async () => {
-  const root = stageBrand(['web', 'extension']);
-  assert.deepEqual(composed(root), ['extension-build.yml', 'web-build.yml']);
+    {
+      name: 'workflows: a target dropped from the config loses its composed files, the dir survives',
+      run: async (ctx) => {
+        const root = stageBrand(['web', 'extension']);
+        ctx.expect(composed(root)).toEqual(['extension-build.yml', 'web-build.yml']);
 
-  // `targets.extension` is gone from omega.json5; targets/extension/ is still
-  // on disk (whole-dir removal is deliberately not ours) so discovery finds it
-  const discovered = [
-    { name: 'web', target: 'web' },
-    { name: 'extension', target: 'extension' },
-  ];
+        // `targets.extension` is gone from omega.json5; targets/extension/ is still
+        // on disk (whole-dir removal is deliberately not ours) so discovery finds it
+        const discovered = [
+          { name: 'web', target: 'web' },
+          { name: 'extension', target: 'extension' },
+        ];
 
-  const result = await workflowsOp(context(root, discovered, ['web']));
+        const result = await workflowsOp(context(root, discovered, ['web']));
 
-  assert.equal(result.output.workflows.removed, 1);
-  assert.deepEqual(composed(root), ['web-build.yml']);
-  assert.equal(fs.existsSync(path.join(root, 'targets', 'extension')), true);
-});
+        ctx.expect(result.output.workflows.removed).toBe(1);
+        ctx.expect(composed(root)).toEqual(['web-build.yml']);
+        ctx.expect(fs.existsSync(path.join(root, 'targets', 'extension'))).toBe(true);
+      },
+    },
 
-test('workflows: every enabled target keeps its files, and the rerun removes nothing', async () => {
-  const root = stageBrand(['web', 'extension']);
-  const discovered = [
-    { name: 'web', target: 'web' },
-    { name: 'extension', target: 'extension' },
-  ];
+    {
+      name: 'workflows: every enabled target keeps its files, and the rerun removes nothing',
+      run: async (ctx) => {
+        const root = stageBrand(['web', 'extension']);
+        const discovered = [
+          { name: 'web', target: 'web' },
+          { name: 'extension', target: 'extension' },
+        ];
 
-  assert.equal(await workflowsOp(context(root, discovered, ['web', 'extension'])), null);
-  assert.deepEqual(composed(root), ['extension-build.yml', 'web-build.yml']);
+        ctx.expect(await workflowsOp(context(root, discovered, ['web', 'extension']))).toBe(null);
+        ctx.expect(composed(root)).toEqual(['extension-build.yml', 'web-build.yml']);
 
-  // Set → unset → rerun: one removal, then a converged no-op
-  const dropped = await workflowsOp(context(root, discovered, ['web']));
-  assert.equal(dropped.output.workflows.removed, 1);
-  assert.equal(await workflowsOp(context(root, discovered, ['web'])), null);
-  assert.deepEqual(composed(root), ['web-build.yml']);
-});
+        // Set → unset → rerun: one removal, then a converged no-op
+        const dropped = await workflowsOp(context(root, discovered, ['web']));
+        ctx.expect(dropped.output.workflows.removed).toBe(1);
+        ctx.expect(await workflowsOp(context(root, discovered, ['web']))).toBe(null);
+        ctx.expect(composed(root)).toEqual(['web-build.yml']);
+      },
+    },
 
-test('workflows: a declared custom target is live — it has no framework to compose with', async () => {
-  const root = stageBrand(['web']);
-  const discovered = [
-    { name: 'web', target: 'web' },
-    { name: 'render-api', target: null, custom: true },
-  ];
+    {
+      name: 'workflows: a declared custom target is live — it has no framework to compose with',
+      run: async (ctx) => {
+        const root = stageBrand(['web']);
+        const discovered = [
+          { name: 'web', target: 'web' },
+          { name: 'render-api', target: null, custom: true },
+        ];
 
-  assert.equal(await workflowsOp(context(root, discovered, ['web', 'render-api'])), null);
-  assert.deepEqual(composed(root), ['web-build.yml']);
-});
+        ctx.expect(await workflowsOp(context(root, discovered, ['web', 'render-api']))).toBe(null);
+        ctx.expect(composed(root)).toEqual(['web-build.yml']);
+      },
+    },
 
-test('workflows: a dry run names the files and deletes nothing', async () => {
-  const root = stageBrand(['extension']);
-  const discovered = [{ name: 'extension', target: 'extension' }];
+    {
+      name: 'workflows: a dry run names the files and deletes nothing',
+      run: async (ctx) => {
+        const root = stageBrand(['extension']);
+        const discovered = [{ name: 'extension', target: 'extension' }];
 
-  const result = await workflowsOp(context(root, discovered, [], { dryRun: true }));
+        const result = await workflowsOp(context(root, discovered, [], { dryRun: true }));
 
-  assert.equal(result.output.workflows.planned, 1);
-  assert.deepEqual(composed(root), ['extension-build.yml']);
+        ctx.expect(result.output.workflows.planned).toBe(1);
+        ctx.expect(composed(root)).toEqual(['extension-build.yml']);
+      },
+    },
+  ],
 });

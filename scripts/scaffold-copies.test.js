@@ -9,8 +9,7 @@
  *
  * Run: node --test scripts/scaffold-copies.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -42,23 +41,35 @@ function copies() {
     });
 }
 
-test('every scaffold source speaks the markdown marker grammar', () => {
-  const found = sources();
-  assert.deepEqual(found.map(({ framework }) => framework).sort(), ['@omega.js/backend', '@omega.js/desktop', '@omega.js/extension', '@omega.js/web']);
-  for (const { file } of found) {
-    assert.ok(hasSectionMarkers(fs.readFileSync(file, 'utf8'), 'README.md'), `${path.relative(ROOT, file)} carries no Default/Custom markers, so the merge would wipe every copy`);
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'scaffold-copies',
+  tests: [
+    {
+      name: 'every scaffold source speaks the markdown marker grammar',
+      run: (ctx) => {
+        const found = sources();
+        ctx.expect(found.map(({ framework }) => framework).sort()).toEqual(['@omega.js/backend', '@omega.js/desktop', '@omega.js/extension', '@omega.js/web']);
+        for (const { file } of found) {
+          ctx.expect(hasSectionMarkers(fs.readFileSync(file, 'utf8'), 'README.md'), `${path.relative(ROOT, file)} carries no Default/Custom markers, so the merge would wipe every copy`).toBeTruthy();
+        }
+      },
+    },
 
-test('every tracked copy is exactly what the scaffold walk writes from its source', () => {
-  const bySource = new Map(sources().map(({ framework, file }) => [framework, fs.readFileSync(file, 'utf8')]));
-  const found = copies();
-  assert.ok(found.length > 0, 'no tracked copy found: the glob is wrong');
-  for (const { relative, deps } of found) {
-    const owners = deps.filter((dep) => bySource.has(dep));
-    assert.equal(owners.length, 1, `${relative}: its target depends on no framework (or several) that scaffolds ${DOC}`);
-    const copy = fs.readFileSync(path.join(ROOT, relative), 'utf8');
-    const walked = mergeLineBasedFiles(copy, bySource.get(owners[0]), 'README.md');
-    assert.equal(copy, walked, `${relative} drifted from its source: edit the source in its framework's defaults tree, never the copy`);
-  }
+    {
+      name: 'every tracked copy is exactly what the scaffold walk writes from its source',
+      run: (ctx) => {
+        const bySource = new Map(sources().map(({ framework, file }) => [framework, fs.readFileSync(file, 'utf8')]));
+        const found = copies();
+        ctx.expect(found.length > 0, 'no tracked copy found: the glob is wrong').toBeTruthy();
+        for (const { relative, deps } of found) {
+          const owners = deps.filter((dep) => bySource.has(dep));
+          ctx.expect(owners.length, `${relative}: its target depends on no framework (or several) that scaffolds ${DOC}`).toBe(1);
+          const copy = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+          const walked = mergeLineBasedFiles(copy, bySource.get(owners[0]), 'README.md');
+          ctx.expect(copy, `${relative} drifted from its source: edit the source in its framework's defaults tree, never the copy`).toBe(walked);
+        }
+      },
+    },
+  ],
 });

@@ -10,8 +10,7 @@
  * Every fixture points OMEGA_HOME at its own temp home: a test must never
  * read or write the developer's real machine registry.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -88,155 +87,179 @@ function stageBrand(parentDir, dirName, company) {
   return root;
 }
 
-// ─── init ────────────────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'company-init',
+  tests: [
+    // ─── init ────────────────────────────────────────────────────────────────────
 
-test('company init: one command scaffolds the tree inside the company brand', (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
-  const root = stageBrand(dir, 'fixture-co', 'self');
+    {
+      name: 'company init: one command scaffolds the tree inside the company brand',
+      run: (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
+        const root = stageBrand(dir, 'fixture-co', 'self');
 
-  const { result } = captureOutput(() => runCompanyInit(root));
+        const { result } = captureOutput(() => runCompanyInit(root));
 
-  assert.equal(result.brandRoot, root);
-  assert.equal(result.companyDir, path.join(root, 'company'));
-  assert.deepEqual(result.created.sort(), [
-    '.env',
-    '.gitignore',
-    'README.md',
-    path.join('config', 'omega.json5'),
-  ].sort());
-  assert.deepEqual(result.kept, []);
-  // The committed files carry no em dash. The .env is gitignored and its group
-  // headers are the env schema's, so only its own header is pinned below.
-  for (const relative of result.created.filter((file) => file !== '.env')) {
-    assert.equal(fs.readFileSync(path.join(root, 'company', relative), 'utf8').includes('\u2014'), false, `${relative} carries no em dash`);
-  }
+        ctx.expect(result.brandRoot).toBe(root);
+        ctx.expect(result.companyDir).toBe(path.join(root, 'company'));
+        ctx.expect(result.created.sort()).toEqual([
+          '.env',
+          '.gitignore',
+          'README.md',
+          path.join('config', 'omega.json5'),
+        ].sort());
+        ctx.expect(result.kept).toEqual([]);
+        // The committed files carry no em dash. The .env is gitignored and its group
+        // headers are the env schema's, so only its own header is pinned below.
+        for (const relative of result.created.filter((file) => file !== '.env')) {
+          ctx.expect(fs.readFileSync(path.join(root, 'company', relative), 'utf8').includes('\u2014'), `${relative} carries no em dash`).toBe(false);
+        }
 
-  // The config LAYER: brand-agnostic placeholders only, no brand, no targets,
-  // nothing about the parent brand the tree sits inside
-  const config = JSON5.parse(fs.readFileSync(path.join(root, 'company', 'config', 'omega.json5'), 'utf8'));
-  assert.deepEqual(config, {});
+        // The config LAYER: brand-agnostic placeholders only, no brand, no targets,
+        // nothing about the parent brand the tree sits inside
+        const config = JSON5.parse(fs.readFileSync(path.join(root, 'company', 'config', 'omega.json5'), 'utf8'));
+        ctx.expect(config).toEqual({});
 
-  // The .env carries placeholders only: the same canonical shape a brand .env
-  // has, and not one key set
-  const env = fs.readFileSync(path.join(root, 'company', '.env'), 'utf8');
-  assert.match(env, /^# APPLE_API_ISSUER=""$/m, 'the canonical groups render as commented placeholders');
-  assert.equal(env.split('\n\n')[0].includes('\u2014'), false, 'the .env header carries no em dash');
-  assert.equal(env.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 0, 'not one key is set');
+        // The .env carries placeholders only: the same canonical shape a brand .env
+        // has, and not one key set
+        const env = fs.readFileSync(path.join(root, 'company', '.env'), 'utf8');
+        ctx.expect(env, 'the canonical groups render as commented placeholders').toMatch(/^# APPLE_API_ISSUER=""$/m);
+        ctx.expect(env.split('\n\n')[0].includes('\u2014'), 'the .env header carries no em dash').toBe(false);
+        ctx.expect(env.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 'not one key is set').toBe(0);
 
-  // The unshareable half can never be committed, whatever the root file says
-  const entries = fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8')
-    .split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
-  assert.deepEqual(entries, ['.env', '.env.*', '.omega/']);
-  assert.equal(fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8'), require('../src/lib/gitignore.js').renderCompanyGitignore(), 'the marked file the workspace service heals');
+        // The unshareable half can never be committed, whatever the root file says
+        const entries = fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8')
+          .split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
+        ctx.expect(entries).toEqual(['.env', '.env.*', '.omega/']);
+        ctx.expect(fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8'), 'the marked file the workspace service heals').toBe(require('../src/lib/gitignore.js').renderCompanyGitignore());
 
-  // The signing tree and the shared templates have an obvious home from minute one
-  for (const relative of ['.omega/certificates/apple/certificates', '.omega/certificates/apple/csr', 'assets/templates']) {
-    assert.equal(jetpack.exists(path.join(root, 'company', relative)), 'dir', `${relative} is scaffolded`);
-  }
+        // The signing tree and the shared templates have an obvious home from minute one
+        for (const relative of ['.omega/certificates/apple/certificates', '.omega/certificates/apple/csr', 'assets/templates']) {
+          ctx.expect(jetpack.exists(path.join(root, 'company', relative)), `${relative} is scaffolded`).toBe('dir');
+        }
 
-  assert.match(fs.readFileSync(path.join(root, 'company', 'README.md'), 'utf8'), /company layer/i);
-});
+        ctx.expect(fs.readFileSync(path.join(root, 'company', 'README.md'), 'utf8')).toMatch(/company layer/i);
+      },
+    },
 
-test('company init: refuses a brand that is not the company', (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
+    {
+      name: 'company init: refuses a brand that is not the company',
+      run: (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
 
-  const standalone = stageBrand(dir, 'plain-brand');
-  assert.throws(() => captureOutput(() => runCompanyInit(standalone)), /Set company: \{ id: "self" \} in config\/omega\.json5 first/);
-  assert.equal(jetpack.exists(path.join(standalone, 'company')), false, 'nothing was written');
+        const standalone = stageBrand(dir, 'plain-brand');
+        ctx.expect(() => captureOutput(() => runCompanyInit(standalone))).toThrow(/Set company: \{ id: "self" \} in config\/omega\.json5 first/);
+        ctx.expect(jetpack.exists(path.join(standalone, 'company')), 'nothing was written').toBe(false);
 
-  const child = stageBrand(dir, 'child-brand', 'fixture-co');
-  assert.throws(() => captureOutput(() => runCompanyInit(child)), /Set company: \{ id: "self" \}/);
+        const child = stageBrand(dir, 'child-brand', 'fixture-co');
+        ctx.expect(() => captureOutput(() => runCompanyInit(child))).toThrow(/Set company: \{ id: "self" \}/);
 
-  assert.throws(() => captureOutput(() => runCompanyInit(tmpdir('omega-company-bare-'))), /No brand found at or above/);
-});
+        ctx.expect(() => captureOutput(() => runCompanyInit(tmpdir('omega-company-bare-')))).toThrow(/No brand found at or above/);
+      },
+    },
 
-test('company init: a rerun fills gaps only, not one byte rewritten', (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
-  const root = stageBrand(dir, 'fixture-co', 'self');
-  captureOutput(() => runCompanyInit(root));
+    {
+      name: 'company init: a rerun fills gaps only, not one byte rewritten',
+      run: (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
+        const root = stageBrand(dir, 'fixture-co', 'self');
+        captureOutput(() => runCompanyInit(root));
 
-  // The operator's own edits (and their own files) must survive a rerun
-  const layerPath = path.join(root, 'company', 'config', 'omega.json5');
-  fs.writeFileSync(layerPath, '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }\n');
-  jetpack.write(path.join(root, 'company', '.omega', 'certificates', 'apple', 'AuthKey_ABC123.p8'), 'not-a-real-key');
-  const before = snapshot(root);
+        // The operator's own edits (and their own files) must survive a rerun
+        const layerPath = path.join(root, 'company', 'config', 'omega.json5');
+        fs.writeFileSync(layerPath, '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }\n');
+        jetpack.write(path.join(root, 'company', '.omega', 'certificates', 'apple', 'AuthKey_ABC123.p8'), 'not-a-real-key');
+        const before = snapshot(root);
 
-  const { result } = captureOutput(() => runCompanyInit(root));
+        const { result } = captureOutput(() => runCompanyInit(root));
 
-  assert.deepEqual(result.created, [], 'nothing was created the second time');
-  assert.equal(result.kept.length, 4, 'every scaffolded file was kept');
-  assert.deepEqual(result.dirs, [], 'the tree already existed');
-  assert.deepEqual(snapshot(root), before, 'a rerun is a byte-level (and mtime-level) no-op');
-});
+        ctx.expect(result.created, 'nothing was created the second time').toEqual([]);
+        ctx.expect(result.kept.length, 'every scaffolded file was kept').toBe(4);
+        ctx.expect(result.dirs, 'the tree already existed').toEqual([]);
+        ctx.expect(snapshot(root), 'a rerun is a byte-level (and mtime-level) no-op').toEqual(before);
+      },
+    },
 
-test('company init: a missing piece is refilled without touching the rest', (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
-  const root = stageBrand(dir, 'fixture-co', 'self');
-  captureOutput(() => runCompanyInit(root));
+    {
+      name: 'company init: a missing piece is refilled without touching the rest',
+      run: (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
+        const root = stageBrand(dir, 'fixture-co', 'self');
+        captureOutput(() => runCompanyInit(root));
 
-  jetpack.remove(path.join(root, 'company', '.env'));
-  jetpack.remove(path.join(root, 'company', '.omega'));
-  const before = snapshot(root);
+        jetpack.remove(path.join(root, 'company', '.env'));
+        jetpack.remove(path.join(root, 'company', '.omega'));
+        const before = snapshot(root);
 
-  const { result } = captureOutput(() => runCompanyInit(root));
+        const { result } = captureOutput(() => runCompanyInit(root));
 
-  assert.deepEqual(result.created, ['.env']);
-  assert.deepEqual(result.dirs, ['.omega/certificates/apple/certificates', '.omega/certificates/apple/csr']);
-  for (const [file, state] of before) {
-    assert.deepEqual(snapshot(root).get(file), state, `${file} was left alone`);
-  }
-});
+        ctx.expect(result.created).toEqual(['.env']);
+        ctx.expect(result.dirs).toEqual(['.omega/certificates/apple/certificates', '.omega/certificates/apple/csr']);
+        for (const [file, state] of before) {
+          ctx.expect(snapshot(root).get(file), `${file} was left alone`).toEqual(state);
+        }
+      },
+    },
 
-test('company init: what it scaffolds is what a brand of the company inherits', (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
-  const companyBrand = stageBrand(dir, 'fixture-co', 'self');
-  captureOutput(() => runCompanyInit(companyBrand));
+    {
+      name: 'company init: what it scaffolds is what a brand of the company inherits',
+      run: (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
+        const companyBrand = stageBrand(dir, 'fixture-co', 'self');
+        captureOutput(() => runCompanyInit(companyBrand));
 
-  // The operator fills the layer the command just created
-  fs.writeFileSync(
-    path.join(companyBrand, 'company', 'config', 'omega.json5'),
-    '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }\n',
-  );
-  fs.writeFileSync(path.join(companyBrand, 'company', '.env'), 'SENDGRID_API_KEY="company"\n');
+        // The operator fills the layer the command just created
+        fs.writeFileSync(
+          path.join(companyBrand, 'company', 'config', 'omega.json5'),
+          '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }\n',
+        );
+        fs.writeFileSync(path.join(companyBrand, 'company', '.env'), 'SENDGRID_API_KEY="company"\n');
 
-  // The registry line the company brand's own run writes
-  recordBrand({ id: 'fixture-co', root: companyBrand, name: 'fixture-co brand', url: 'https://fixture-co.com' });
+        // The registry line the company brand's own run writes
+        recordBrand({ id: 'fixture-co', root: companyBrand, name: 'fixture-co brand', url: 'https://fixture-co.com' });
 
-  const child = stageBrand(dir, 'child-brand', 'fixture-co');
+        const child = stageBrand(dir, 'child-brand', 'fixture-co');
 
-  const viaManager = loadBrand(child).config;
-  const direct = loadConfig(child, undefined, { defaults: DEFAULTS }).config;
+        const viaManager = loadBrand(child).config;
+        const direct = loadConfig(child, undefined, { defaults: DEFAULTS }).config;
 
-  assert.equal(viaManager.monitoring.providers.sentry.org, 'fixture-co', 'the company layer fills the gap');
-  assert.equal(viaManager.brand.name, 'child-brand brand', 'the brand still wins over the company default');
-  assert.equal(direct.company.name, 'fixture-co brand', "the child's company section carries the parent's facts");
-});
+        ctx.expect(viaManager.monitoring.providers.sentry.org, 'the company layer fills the gap').toBe('fixture-co');
+        ctx.expect(viaManager.brand.name, 'the brand still wins over the company default').toBe('child-brand brand');
+        ctx.expect(direct.company.name, "the child's company section carries the parent's facts").toBe('fixture-co brand');
+      },
+    },
 
-// ─── The verb ────────────────────────────────────────────────────────────────
+    // ─── The verb ────────────────────────────────────────────────────────────────
 
-test('company: the CLI verb runs init in the cwd and names its surface otherwise', async (t) => {
-  const dir = tmpdir();
-  useHome(t, dir);
-  const root = stageBrand(dir, 'fixture-co', 'self');
-  const priorExitCode = process.exitCode;
-  const cwd = process.cwd();
+    {
+      name: 'company: the CLI verb runs init in the cwd and names its surface otherwise',
+      run: async (ctx) => {
+        const dir = tmpdir();
+        useHome(ctx, dir);
+        const root = stageBrand(dir, 'fixture-co', 'self');
+        const priorExitCode = process.exitCode;
+        const cwd = process.cwd();
 
-  process.chdir(root);
-  t.after(() => process.chdir(cwd));
+        process.chdir(root);
+        ctx.after(() => process.chdir(cwd));
 
-  await captureOutput(() => companyCommand({ _: ['company', 'init'] })).result;
-  assert.equal(jetpack.exists(path.join(root, 'company', 'config', 'omega.json5')), 'file', '`omega company init` scaffolds the brand it runs in');
+        await captureOutput(() => companyCommand({ _: ['company', 'init'] })).result;
+        ctx.expect(jetpack.exists(path.join(root, 'company', 'config', 'omega.json5')), '`omega company init` scaffolds the brand it runs in').toBe('file');
 
-  const bogus = captureOutput(() => companyCommand({ _: ['company', 'adopt'] }));
-  await bogus.result;
-  assert.match(bogus.text, /Unknown company command/);
-  assert.match(bogus.text, /init/);
-  assert.equal(process.exitCode, 1, 'an unknown subcommand fails loudly');
+        const bogus = captureOutput(() => companyCommand({ _: ['company', 'adopt'] }));
+        await bogus.result;
+        ctx.expect(bogus.text).toMatch(/Unknown company command/);
+        ctx.expect(bogus.text).toMatch(/init/);
+        ctx.expect(process.exitCode, 'an unknown subcommand fails loudly').toBe(1);
 
-  process.exitCode = priorExitCode;
+        process.exitCode = priorExitCode;
+      },
+    },
+  ],
 });

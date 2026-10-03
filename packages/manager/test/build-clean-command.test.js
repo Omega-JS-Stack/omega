@@ -16,8 +16,7 @@
  * Nothing here spawns anything: both commands take their runner as a seam
  * (custom-target.test.js's pattern), over a real fixture brand on disk.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -96,133 +95,169 @@ async function runFanout(command, root, options = {}, { fail = [] } = {}) {
   }
 }
 
-// ─── the build fan-out ───────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'build-clean-command',
+  tests: [
+    // ─── the build fan-out ───────────────────────────────────────────────────────
 
-test('omega build: every target type builds, in dependency order, custom LAST', async () => {
-  const { calls, code } = await runFanout(buildCommand, stageBrand());
+    {
+      name: 'omega build: every target type builds, in dependency order, custom LAST',
+      run: async (ctx) => {
+        const { calls, code } = await runFanout(buildCommand, stageBrand());
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
-  assert.equal(code, undefined, 'all targets green → no error exit code');
+        ctx.expect(calls.map((call) => call.name)).toEqual(['backend', 'web', 'api']);
+        ctx.expect(code, 'all targets green → no error exit code').toBe(undefined);
 
-  // Every target runs its own script, framework and custom alike
-  for (const call of calls) {
-    assert.equal(call.command, 'npm');
-    assert.deepEqual(call.args, ['run', 'build']);
-  }
-});
-
-test('omega build: a custom target with no build script is a LOUD skip, never a failure', async () => {
-  const { calls, output, code } = await runFanout(buildCommand, stageBrand({ scripts: { clean: 'rm -rf dist' } }));
-
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web'], 'the api target ran nothing');
-  assert.match(output, /api/, 'the skip names the target');
-  assert.match(output, /"build" script/, 'and the verb it had no script for');
-  assert.equal(code, undefined, 'an absent script is not an error');
-});
-
-test('omega build: a framework target runs the build script it declares, never a bin behind it', async () => {
-  const { calls } = await runFanout(buildCommand, stageBrand({ extension: true }));
-
-  // The fixture extension declares `gulp build`: the target's script is the verb's one lane
-  const extension = calls.find((call) => call.name === 'extension');
-  assert.equal(extension.command, 'npm');
-  assert.deepEqual(extension.args, ['run', 'build']);
-});
-
-test('omega build: a failing target never stops the rest — every one is reported, exit 1', async () => {
-  const { calls, code } = await runFanout(buildCommand, stageBrand(), {}, { fail: ['backend'] });
-
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api'], 'the fan-out kept going');
-  assert.equal(code, 1);
-});
-
-test('omega build: --target= narrows to one target, by its NAME', async () => {
-  const { calls } = await runFanout(buildCommand, stageBrand(), { target: 'api' });
-
-  assert.deepEqual(calls.map((call) => call.name), ['api']);
-
-  const byName = await runFanout(buildCommand, stageBrand(), { target: 'web' });
-  assert.deepEqual(byName.calls.map((call) => call.name), ['web'], 'the name IS the dir');
-});
-
-test('omega build: a --target= token matching nothing STOPS the run, never a matched subset', async () => {
-  await assert.rejects(
-    () => runFanout(buildCommand, stageBrand(), { target: 'hosting' }),
-    (error) => {
-      assert.equal(error.refusal, true);
-      assert.match(error.message, /Unknown --target token "hosting"/);
-      assert.match(error.message, /this brand's targets are api, backend, web/, 'the error names what the brand actually has');
-      return true;
-    },
-  );
-
-  // A typo beside a real target never builds the matched half
-  await assert.rejects(() => runFanout(buildCommand, stageBrand(), { target: 'web,hosting' }), /Unknown --target token "hosting"/);
-});
-
-// The retired pickers (#780): both verbs share the one fan-out, so one refusal
-// serves both — never ignored, never aliased
-test('omega build/clean: --only and --except are REFUSED, naming --target=', async () => {
-  for (const command of [buildCommand, cleanCommand]) {
-    await assert.rejects(
-      () => runFanout(command, stageBrand(), { only: 'api' }),
-      (error) => {
-        assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-        assert.match(error.message, /--only is retired: pick targets with --target=/);
-        return true;
+        // Every target runs its own script, framework and custom alike
+        for (const call of calls) {
+          ctx.expect(call.command).toBe('npm');
+          ctx.expect(call.args).toEqual(['run', 'build']);
+        }
       },
-    );
-    await assert.rejects(() => runFanout(command, stageBrand(), { except: 'api' }), /--except is retired/);
-  }
-});
+    },
 
-test('omega build --dry-run: nothing runs at all, every target prints its plan', async () => {
-  const { calls, output, code } = await runFanout(buildCommand, stageBrand(), { 'dry-run': true, dryRun: true });
+    {
+      name: 'omega build: a custom target with no build script is a LOUD skip, never a failure',
+      run: async (ctx) => {
+        const { calls, output, code } = await runFanout(buildCommand, stageBrand({ scripts: { clean: 'rm -rf dist' } }));
 
-  assert.deepEqual(calls, [], 'a dry run executes NOTHING');
-  assert.match(output, /would run npm run build in targets\/backend/, 'every target reports its plan');
-  assert.match(output, /would run npm run build in targets\/web/);
-  assert.match(output, /would run npm run build in targets\/api/);
-  assert.equal(code, undefined, 'a dry run is not a failure');
-});
+        ctx.expect(calls.map((call) => call.name), 'the api target ran nothing').toEqual(['backend', 'web']);
+        ctx.expect(output, 'the skip names the target').toMatch(/api/);
+        ctx.expect(output, 'and the verb it had no script for').toMatch(/"build" script/);
+        ctx.expect(code, 'an absent script is not an error').toBe(undefined);
+      },
+    },
 
-// ─── the clean fan-out ───────────────────────────────────────────────────────
+    {
+      name: 'omega build: a framework target runs the build script it declares, never a bin behind it',
+      run: async (ctx) => {
+        const { calls } = await runFanout(buildCommand, stageBrand({ extension: true }));
 
-test('omega clean: every target type cleans, in the same order', async () => {
-  const { calls, code } = await runFanout(cleanCommand, stageBrand());
+        // The fixture extension declares `gulp build`: the target's script is the verb's one lane
+        const extension = calls.find((call) => call.name === 'extension');
+        ctx.expect(extension.command).toBe('npm');
+        ctx.expect(extension.args).toEqual(['run', 'build']);
+      },
+    },
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
-  assert.deepEqual(calls[0].args, ['run', 'clean'], 'a framework target runs its own script');
-  assert.deepEqual(calls[2].args, ['run', 'clean'], 'and so does a custom target');
-  assert.equal(code, undefined);
-});
+    {
+      name: 'omega build: a failing target never stops the rest — every one is reported, exit 1',
+      run: async (ctx) => {
+        const { calls, code } = await runFanout(buildCommand, stageBrand(), {}, { fail: ['backend'] });
 
-test('omega clean: a custom target with no clean script is the same loud skip', async () => {
-  const { calls, output, code } = await runFanout(cleanCommand, stageBrand({ scripts: { build: 'tsc' } }));
+        ctx.expect(calls.map((call) => call.name), 'the fan-out kept going').toEqual(['backend', 'web', 'api']);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web']);
-  assert.match(output, /api/);
-  assert.match(output, /"clean" script/);
-  assert.equal(code, undefined);
-});
+    {
+      name: 'omega build: --target= narrows to one target, by its NAME',
+      run: async (ctx) => {
+        const { calls } = await runFanout(buildCommand, stageBrand(), { target: 'api' });
 
-// ─── reachability + the no-brand guard ───────────────────────────────────────
+        ctx.expect(calls.map((call) => call.name)).toEqual(['api']);
 
-test('cli routes `build` and `clean` through ALIASES to their command files', () => {
-  const Main = require('../src/cli.js');
+        const byName = await runFanout(buildCommand, stageBrand(), { target: 'web' });
+        ctx.expect(byName.calls.map((call) => call.name), 'the name IS the dir').toEqual(['web']);
+      },
+    },
 
-  for (const verb of ['build', 'clean']) {
-    assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, verb), `${verb} is aliased like dev/test/deploy`);
-    assert.ok(fs.existsSync(path.join(Main.config.commandsDir, `${verb}.js`)), `${verb}.js dispatches`);
-  }
-});
+    {
+      name: 'omega build: a --target= token matching nothing STOPS the run, never a matched subset',
+      run: async (ctx) => {
+        await ctx.expect((() => runFanout(buildCommand, stageBrand(), { target: 'hosting' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal).toBe(true);
+            ctx.expect(error.message).toMatch(/Unknown --target token "hosting"/);
+            ctx.expect(error.message, 'the error names what the brand actually has').toMatch(/this brand's targets are api, backend, web/);
+            return true;
+          });
 
-test('outside any brand: both verbs error with exit 1 and run nothing', async () => {
-  for (const command of [buildCommand, cleanCommand]) {
-    const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-build-cmd-nobrand-')));
-    const { calls, code } = await runFanout(command, scratch);
+        // A typo beside a real target never builds the matched half
+        await ctx.expect((() => runFanout(buildCommand, stageBrand(), { target: 'web,hosting' }))()).rejects.toThrow(/Unknown --target token "hosting"/);
+      },
+    },
 
-    assert.deepEqual(calls, []);
-    assert.equal(code, 1);
-  }
+    // The retired pickers (#780): both verbs share the one fan-out, so one refusal
+    // serves both — never ignored, never aliased
+    {
+      name: 'omega build/clean: --only and --except are REFUSED, naming --target=',
+      run: async (ctx) => {
+        for (const command of [buildCommand, cleanCommand]) {
+          await ctx.expect((() => runFanout(command, stageBrand(), { only: 'api' }))()).rejects.toThrow((error) => {
+              ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+              ctx.expect(error.message).toMatch(/--only is retired: pick targets with --target=/);
+              return true;
+            });
+          await ctx.expect((() => runFanout(command, stageBrand(), { except: 'api' }))()).rejects.toThrow(/--except is retired/);
+        }
+      },
+    },
+
+    {
+      name: 'omega build --dry-run: nothing runs at all, every target prints its plan',
+      run: async (ctx) => {
+        const { calls, output, code } = await runFanout(buildCommand, stageBrand(), { 'dry-run': true, dryRun: true });
+
+        ctx.expect(calls, 'a dry run executes NOTHING').toEqual([]);
+        ctx.expect(output, 'every target reports its plan').toMatch(/would run npm run build in targets\/backend/);
+        ctx.expect(output).toMatch(/would run npm run build in targets\/web/);
+        ctx.expect(output).toMatch(/would run npm run build in targets\/api/);
+        ctx.expect(code, 'a dry run is not a failure').toBe(undefined);
+      },
+    },
+
+    // ─── the clean fan-out ───────────────────────────────────────────────────────
+
+    {
+      name: 'omega clean: every target type cleans, in the same order',
+      run: async (ctx) => {
+        const { calls, code } = await runFanout(cleanCommand, stageBrand());
+
+        ctx.expect(calls.map((call) => call.name)).toEqual(['backend', 'web', 'api']);
+        ctx.expect(calls[0].args, 'a framework target runs its own script').toEqual(['run', 'clean']);
+        ctx.expect(calls[2].args, 'and so does a custom target').toEqual(['run', 'clean']);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'omega clean: a custom target with no clean script is the same loud skip',
+      run: async (ctx) => {
+        const { calls, output, code } = await runFanout(cleanCommand, stageBrand({ scripts: { build: 'tsc' } }));
+
+        ctx.expect(calls.map((call) => call.name)).toEqual(['backend', 'web']);
+        ctx.expect(output).toMatch(/api/);
+        ctx.expect(output).toMatch(/"clean" script/);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    // ─── reachability + the no-brand guard ───────────────────────────────────────
+
+    {
+      name: 'cli routes `build` and `clean` through ALIASES to their command files',
+      run: (ctx) => {
+        const Main = require('../src/cli.js');
+
+        for (const verb of ['build', 'clean']) {
+          ctx.expect(Object.prototype.hasOwnProperty.call(Main.config.aliases, verb), `${verb} is aliased like dev/test/deploy`).toBeTruthy();
+          ctx.expect(fs.existsSync(path.join(Main.config.commandsDir, `${verb}.js`)), `${verb}.js dispatches`).toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'outside any brand: both verbs error with exit 1 and run nothing',
+      run: async (ctx) => {
+        for (const command of [buildCommand, cleanCommand]) {
+          const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-build-cmd-nobrand-')));
+          const { calls, code } = await runFanout(command, scratch);
+
+          ctx.expect(calls).toEqual([]);
+          ctx.expect(code).toBe(1);
+        }
+      },
+    },
+  ],
 });

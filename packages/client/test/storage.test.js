@@ -1,72 +1,129 @@
-const { describe, it, before } = require('node:test');
-const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { getOmega, TEST_CONFIG, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
 
-describe('Storage Module', () => {
+const beforeEachHook = clearStorage;
 
-  before(async () => {
-    await getOmega().initialize(TEST_CONFIG);
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'storage',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        await getOmega().initialize(TEST_CONFIG);
+      })()));
 
-  it('should set and get values', () => {
-    const storage = getOmega().storage;
-    storage.set('testKey', 'testValue');
-    assert.strictEqual(storage.get('testKey'), 'testValue');
-  });
+      cases.push({
+        name: 'Storage Module > should set and get values',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          storage.set('testKey', 'testValue');
+          ctx.expect(storage.get('testKey')).toBe('testValue');
+        },
+      });
 
-  it('should handle nested dot-notation paths', () => {
-    const storage = getOmega().storage;
-    storage.set('user.profile.name', 'John Doe');
-    assert.strictEqual(storage.get('user.profile.name'), 'John Doe');
-  });
+      cases.push({
+        name: 'Storage Module > should handle nested dot-notation paths',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          storage.set('user.profile.name', 'John Doe');
+          ctx.expect(storage.get('user.profile.name')).toBe('John Doe');
+        },
+      });
 
-  it('should return default when key missing', () => {
-    const storage = getOmega().storage;
-    assert.strictEqual(storage.get('nonexistent', 'fallback'), 'fallback');
-  });
+      cases.push({
+        name: 'Storage Module > should return default when key missing',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          ctx.expect(storage.get('nonexistent', 'fallback')).toBe('fallback');
+        },
+      });
 
-  it('should return entire storage when no path given', () => {
-    const storage = getOmega().storage;
-    storage.set('a', 1);
-    const all = storage.get();
-    assert.strictEqual(typeof all, 'object');
-    assert.strictEqual(all.a, 1);
-  });
+      cases.push({
+        name: 'Storage Module > should return entire storage when no path given',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          storage.set('a', 1);
+          const all = storage.get();
+          ctx.expect(typeof all).toBe('object');
+          ctx.expect(all.a).toBe(1);
+        },
+      });
 
-  it('should remove a key', () => {
-    const storage = getOmega().storage;
-    storage.set('removeMe', 'value');
-    assert.strictEqual(storage.get('removeMe'), 'value');
-    storage.remove('removeMe');
-    assert.strictEqual(storage.get('removeMe'), undefined);
-  });
+      cases.push({
+        name: 'Storage Module > should remove a key',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          storage.set('removeMe', 'value');
+          ctx.expect(storage.get('removeMe')).toBe('value');
+          storage.remove('removeMe');
+          ctx.expect(storage.get('removeMe')).toBe(undefined);
+        },
+      });
 
-  it('should clear all storage', () => {
-    const storage = getOmega().storage;
-    storage.set('key1', 'a');
-    storage.set('key2', 'b');
-    storage.clear();
-    const all = storage.get();
-    assert.deepStrictEqual(all, {});
-  });
+      cases.push({
+        name: 'Storage Module > should clear all storage',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const storage = getOmega().storage;
+          storage.set('key1', 'a');
+          storage.set('key2', 'b');
+          storage.clear();
+          const all = storage.get();
+          ctx.expect(all).toEqual({});
+        },
+      });
 
-  it('should work with session storage', () => {
-    const session = getOmega().storage.session;
-    session.set('sessionKey', 'sessionValue');
-    assert.strictEqual(session.get('sessionKey'), 'sessionValue');
-  });
+      cases.push({
+        name: 'Storage Module > should work with session storage',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const session = getOmega().storage.session;
+          session.set('sessionKey', 'sessionValue');
+          ctx.expect(session.get('sessionKey')).toBe('sessionValue');
+        },
+      });
 
-  it('should remove session storage key', () => {
-    const session = getOmega().storage.session;
-    session.set('temp', 'data');
-    session.remove('temp');
-    assert.strictEqual(session.get('temp'), undefined);
-  });
+      cases.push({
+        name: 'Storage Module > should remove session storage key',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const session = getOmega().storage.session;
+          session.set('temp', 'data');
+          session.remove('temp');
+          ctx.expect(session.get('temp')).toBe(undefined);
+        },
+      });
 
-  it('should clear session storage', () => {
-    const session = getOmega().storage.session;
-    session.set('a', 1);
-    session.set('b', 2);
-    session.clear();
-    assert.deepStrictEqual(session.get(), {});
-  });
+      cases.push({
+        name: 'Storage Module > should clear session storage',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const session = getOmega().storage.session;
+          session.set('a', 1);
+          session.set('b', 2);
+          session.clear();
+          ctx.expect(session.get()).toEqual({});
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

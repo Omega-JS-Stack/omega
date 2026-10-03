@@ -181,7 +181,7 @@ async function handleEvent({ omega, ctx, parsed }) {
       ctx.error(`sendgrid webhook: cross-provider sync failed for ${email}:`, e);
     }
   } else {
-    ctx.log('sendgrid webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
+    ctx.log('sendgrid webhook: skipping cross-provider sync (OMEGA_ENVIRONMENT=testing)');
   }
 
   return { handled: true, uid, email, eventType };

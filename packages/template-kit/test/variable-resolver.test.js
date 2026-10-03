@@ -10,8 +10,7 @@
  * its own name.
  */
 
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const resolver = require('../src/variable-resolver.js');
 
 // A render context stand-in — the seam register-liquid.js builds from LiquidJS.
@@ -26,140 +25,173 @@ const CONTEXT = {
 
 const lookup = (path) => CONTEXT[path];
 
-test('quoted input is a string literal, quotes stripped', () => {
-  assert.strictEqual(resolver.resolveInput(lookup, '"hello"'), 'hello');
-  assert.strictEqual(resolver.resolveInput(lookup, "'hello'"), 'hello');
-  // A quoted path is NOT looked up.
-  assert.strictEqual(resolver.resolveInput(lookup, '"page.title"'), 'page.title');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'variable-resolver',
+  tests: [
+    {
+      name: 'quoted input is a string literal, quotes stripped',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveInput(lookup, '"hello"')).toBe('hello');
+        ctx.expect(resolver.resolveInput(lookup, "'hello'")).toBe('hello');
+        // A quoted path is NOT looked up.
+        ctx.expect(resolver.resolveInput(lookup, '"page.title"')).toBe('page.title');
+      },
+    },
 
-test('unquoted input resolves through the context by default', () => {
-  assert.strictEqual(resolver.resolveInput(lookup, 'page.title'), 'My Page');
-  assert.strictEqual(resolver.resolveInput(lookup, 'hero'), 'from-context');
-  // Unresolvable → null, never the raw text.
-  assert.strictEqual(resolver.resolveInput(lookup, 'page.missing'), null);
-});
+    {
+      name: 'unquoted input resolves through the context by default',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveInput(lookup, 'page.title')).toBe('My Page');
+        ctx.expect(resolver.resolveInput(lookup, 'hero')).toBe('from-context');
+        // Unresolvable → null, never the raw text.
+        ctx.expect(resolver.resolveInput(lookup, 'page.missing')).toBe(null);
+      },
+    },
 
-test('empty and absent input resolve to null', () => {
-  assert.strictEqual(resolver.resolveInput(lookup, ''), null);
-  assert.strictEqual(resolver.resolveInput(lookup, null), null);
-  assert.strictEqual(resolver.resolveInput(lookup, undefined), null);
-});
+    {
+      name: 'empty and absent input resolve to null',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveInput(lookup, '')).toBe(null);
+        ctx.expect(resolver.resolveInput(lookup, null)).toBe(null);
+        ctx.expect(resolver.resolveInput(lookup, undefined)).toBe(null);
+      },
+    },
 
-test('preferLiteral resolves typed literals typed', () => {
-  assert.strictEqual(resolver.resolveInput(lookup, '640', true), 640);
-  assert.strictEqual(resolver.resolveInput(lookup, '-12', true), -12);
-  assert.strictEqual(resolver.resolveInput(lookup, '1.5', true), 1.5);
-  assert.strictEqual(resolver.resolveInput(lookup, 'true', true), true);
-  assert.strictEqual(resolver.resolveInput(lookup, 'false', true), false);
-  assert.strictEqual(resolver.resolveInput(lookup, 'nil', true), null);
-  // A quoted number stays a string — the quotes are the author's opt-out.
-  assert.strictEqual(resolver.resolveInput(lookup, '"640"', true), '640');
-});
+    {
+      name: 'preferLiteral resolves typed literals typed',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveInput(lookup, '640', true)).toBe(640);
+        ctx.expect(resolver.resolveInput(lookup, '-12', true)).toBe(-12);
+        ctx.expect(resolver.resolveInput(lookup, '1.5', true)).toBe(1.5);
+        ctx.expect(resolver.resolveInput(lookup, 'true', true)).toBe(true);
+        ctx.expect(resolver.resolveInput(lookup, 'false', true)).toBe(false);
+        ctx.expect(resolver.resolveInput(lookup, 'nil', true)).toBe(null);
+        // A quoted number stays a string — the quotes are the author's opt-out.
+        ctx.expect(resolver.resolveInput(lookup, '"640"', true)).toBe('640');
+      },
+    },
 
-test('preferLiteral keeps bare words as text unless the context has them', () => {
-  // A bare word absent from context stays literal — class=hero works.
-  assert.strictEqual(resolver.resolveInput(lookup, 'lazy', true), 'lazy');
-  // A bare word PRESENT in context resolves (Ruby's truthiness guard).
-  assert.strictEqual(resolver.resolveInput(lookup, 'hero', true), 'from-context');
-  // A falsy context value fails the guard, so the word stays literal.
-  assert.strictEqual(resolver.resolveInput(lookup, 'falsy', true), 'falsy');
-  // A dotted path always resolves, present or not.
-  assert.strictEqual(resolver.resolveInput(lookup, 'page.title', true), 'My Page');
-  assert.strictEqual(resolver.resolveInput(lookup, 'page.missing', true), null);
-});
+    {
+      name: 'preferLiteral keeps bare words as text unless the context has them',
+      run: (ctx) => {
+        // A bare word absent from context stays literal — class=hero works.
+        ctx.expect(resolver.resolveInput(lookup, 'lazy', true)).toBe('lazy');
+        // A bare word PRESENT in context resolves (Ruby's truthiness guard).
+        ctx.expect(resolver.resolveInput(lookup, 'hero', true)).toBe('from-context');
+        // A falsy context value fails the guard, so the word stays literal.
+        ctx.expect(resolver.resolveInput(lookup, 'falsy', true)).toBe('falsy');
+        // A dotted path always resolves, present or not.
+        ctx.expect(resolver.resolveInput(lookup, 'page.title', true)).toBe('My Page');
+        ctx.expect(resolver.resolveInput(lookup, 'page.missing', true)).toBe(null);
+      },
+    },
 
-test('bare literals evaluate before any scope lookup', () => {
-  assert.strictEqual(resolver.resolveVariable(lookup, '640'), 640);
-  assert.strictEqual(resolver.resolveVariable(lookup, '-12'), -12);
-  assert.strictEqual(resolver.resolveVariable(lookup, '1.5'), 1.5);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'true'), true);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'false'), false);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'nil'), null);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'null'), null);
-  // Surrounding whitespace does not defeat literal detection.
-  assert.strictEqual(resolver.resolveVariable(lookup, '  640  '), 640);
-});
+    {
+      name: 'bare literals evaluate before any scope lookup',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveVariable(lookup, '640')).toBe(640);
+        ctx.expect(resolver.resolveVariable(lookup, '-12')).toBe(-12);
+        ctx.expect(resolver.resolveVariable(lookup, '1.5')).toBe(1.5);
+        ctx.expect(resolver.resolveVariable(lookup, 'true')).toBe(true);
+        ctx.expect(resolver.resolveVariable(lookup, 'false')).toBe(false);
+        ctx.expect(resolver.resolveVariable(lookup, 'nil')).toBe(null);
+        ctx.expect(resolver.resolveVariable(lookup, 'null')).toBe(null);
+        // Surrounding whitespace does not defeat literal detection.
+        ctx.expect(resolver.resolveVariable(lookup, '  640  ')).toBe(640);
+      },
+    },
 
-test('resolveVariable maps an absent lookup to null and keeps real falsy values', () => {
-  assert.strictEqual(resolver.resolveVariable(lookup, ''), null);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'page.missing'), null);
-  // A context value of false/0 is a VALUE, not an absence.
-  assert.strictEqual(resolver.resolveVariable(lookup, 'falsy'), false);
-  assert.strictEqual(resolver.resolveVariable(lookup, 'zero'), 0);
-});
+    {
+      name: 'resolveVariable maps an absent lookup to null and keeps real falsy values',
+      run: (ctx) => {
+        ctx.expect(resolver.resolveVariable(lookup, '')).toBe(null);
+        ctx.expect(resolver.resolveVariable(lookup, 'page.missing')).toBe(null);
+        // A context value of false/0 is a VALUE, not an absence.
+        ctx.expect(resolver.resolveVariable(lookup, 'falsy')).toBe(false);
+        ctx.expect(resolver.resolveVariable(lookup, 'zero')).toBe(0);
+      },
+    },
 
-test('parseArguments splits on commas, trims, and preserves quoted commas', () => {
-  assert.deepStrictEqual(resolver.parseArguments('a, b, c'), ['a', 'b', 'c']);
-  assert.deepStrictEqual(resolver.parseArguments('  a  ,b  '), ['a', 'b']);
-  assert.deepStrictEqual(
-    resolver.parseArguments('"one, two", three'),
-    ['"one, two"', 'three'],
-  );
-  assert.deepStrictEqual(
-    resolver.parseArguments("post.image, class='a, b', lazy"),
-    ['post.image', "class='a, b'", 'lazy'],
-  );
-  assert.deepStrictEqual(resolver.parseArguments(''), []);
-  assert.deepStrictEqual(resolver.parseArguments(undefined), []);
-});
+    {
+      name: 'parseArguments splits on commas, trims, and preserves quoted commas',
+      run: (ctx) => {
+        ctx.expect(resolver.parseArguments('a, b, c')).toEqual(['a', 'b', 'c']);
+        ctx.expect(resolver.parseArguments('  a  ,b  ')).toEqual(['a', 'b']);
+        ctx.expect(resolver.parseArguments('"one, two", three')).toEqual(['"one, two"', 'three']);
+        ctx.expect(resolver.parseArguments("post.image, class='a, b', lazy")).toEqual(['post.image', "class='a, b'", 'lazy']);
+        ctx.expect(resolver.parseArguments('')).toEqual([]);
+        ctx.expect(resolver.parseArguments(undefined)).toEqual([]);
+      },
+    },
 
-test('parseOptions reads key=value pairs and ignores positional arguments', () => {
-  const options = resolver.parseOptions(['post.image', 'width=640', "class='hero big'"]);
+    {
+      name: 'parseOptions reads key=value pairs and ignores positional arguments',
+      run: (ctx) => {
+        const options = resolver.parseOptions(['post.image', 'width=640', "class='hero big'"]);
 
-  assert.deepStrictEqual(options, { width: '640', class: 'hero big' });
-});
+        ctx.expect(options).toEqual({ width: '640', class: 'hero big' });
+      },
+    },
 
-test('parseOptions without a lookup strips quotes and keeps values as text', () => {
-  assert.deepStrictEqual(
-    resolver.parseOptions(['width=640', 'alt="A photo"', 'src=page.title']),
-    { width: '640', alt: 'A photo', src: 'page.title' },
-  );
-});
+    {
+      name: 'parseOptions without a lookup strips quotes and keeps values as text',
+      run: (ctx) => {
+        ctx.expect(resolver.parseOptions(['width=640', 'alt="A photo"', 'src=page.title'])).toEqual({ width: '640', alt: 'A photo', src: 'page.title' });
+      },
+    },
 
-test('parseOptions with a lookup applies the preferLiteral rule per value', () => {
-  const options = resolver.parseOptions([
-    'width=640',
-    'webp=false',
-    'class=card',
-    'hero=hero',
-    'src=post.image',
-    'alt=page.missing',
-    'title="literal text"',
-  ], lookup);
+    {
+      name: 'parseOptions with a lookup applies the preferLiteral rule per value',
+      run: (ctx) => {
+        const options = resolver.parseOptions([
+          'width=640',
+          'webp=false',
+          'class=card',
+          'hero=hero',
+          'src=post.image',
+          'alt=page.missing',
+          'title="literal text"',
+        ], lookup);
 
-  assert.deepStrictEqual(options, {
-    // A typed literal resolves TYPED in this lane too — max_width=640 is the
-    // number 640, webp=false the boolean, exactly as the non-preferLiteral
-    // lane pinned above.
-    width: 640,
-    webp: false,
-    // A bare word absent from context keeps its text — class=card works.
-    class: 'card',
-    // A bare word PRESENT in context resolves instead.
-    hero: 'from-context',
-    src: '/assets/hero.png',
-    // A typo'd dotted path yields null, never its own name in the page.
-    alt: null,
-    title: 'literal text',
-  });
-});
+        ctx.expect(options).toEqual({
+          // A typed literal resolves TYPED in this lane too — max_width=640 is the
+          // number 640, webp=false the boolean, exactly as the non-preferLiteral
+          // lane pinned above.
+          width: 640,
+          webp: false,
+          // A bare word absent from context keeps its text — class=card works.
+          class: 'card',
+          // A bare word PRESENT in context resolves instead.
+          hero: 'from-context',
+          src: '/assets/hero.png',
+          // A typo'd dotted path yields null, never its own name in the page.
+          alt: null,
+          title: 'literal text',
+        });
+      },
+    },
 
-test('parseOptions keeps only the FIRST = as the separator', () => {
-  assert.deepStrictEqual(
-    resolver.parseOptions(['style=color:red;width=10']),
-    { style: 'color:red;width=10' },
-  );
-});
+    {
+      name: 'parseOptions keeps only the FIRST = as the separator',
+      run: (ctx) => {
+        ctx.expect(resolver.parseOptions(['style=color:red;width=10'])).toEqual({ style: 'color:red;width=10' });
+      },
+    },
 
-test('isQuoted and stripQuotes read the raw argument shape', () => {
-  assert.strictEqual(resolver.isQuoted('"hi"'), true);
-  assert.strictEqual(resolver.isQuoted("'hi'"), true);
-  assert.strictEqual(resolver.isQuoted('hi'), false);
-  assert.strictEqual(resolver.isQuoted(''), false);
-  assert.strictEqual(resolver.isQuoted(undefined), false);
+    {
+      name: 'isQuoted and stripQuotes read the raw argument shape',
+      run: (ctx) => {
+        ctx.expect(resolver.isQuoted('"hi"')).toBe(true);
+        ctx.expect(resolver.isQuoted("'hi'")).toBe(true);
+        ctx.expect(resolver.isQuoted('hi')).toBe(false);
+        ctx.expect(resolver.isQuoted('')).toBe(false);
+        ctx.expect(resolver.isQuoted(undefined)).toBe(false);
 
-  assert.strictEqual(resolver.stripQuotes('"hi"'), 'hi');
-  assert.strictEqual(resolver.stripQuotes("'hi'"), 'hi');
-  assert.strictEqual(resolver.stripQuotes('hi'), 'hi');
+        ctx.expect(resolver.stripQuotes('"hi"')).toBe('hi');
+        ctx.expect(resolver.stripQuotes("'hi'")).toBe('hi');
+        ctx.expect(resolver.stripQuotes('hi')).toBe('hi');
+      },
+    },
+  ],
 });

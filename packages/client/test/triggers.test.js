@@ -11,8 +11,7 @@
  * convention: Node has no DOM and the package pulls in no jsdom), and the
  * closest() here is a real parent-chain walk, not a stub of a match.
  */
-const { describe, it, before, after, beforeEach } = require('node:test');
-const assert = require('assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // ─── The minimum DOM the module touches ───
 
@@ -63,126 +62,166 @@ function makeClick(target) {
   };
 }
 
-describe('triggers', () => {
-  let triggers;
-  let click;
-  let listenerCount;
-  let originalAddEventListener;
-  let originalWarn;
-  let warnings;
+module.exports = defineCases({
+  type: 'group',
+  description: 'triggers',
+  tests: [
+    ...(() => {
+      const cases = [];
+      let triggers;
+      let click;
+      let listenerCount;
+      let originalAddEventListener;
+      let originalWarn;
+      let warnings;
 
-  before(async () => {
-    originalAddEventListener = global.document.addEventListener;
-    listenerCount = 0;
-    global.document.addEventListener = (type, handler) => {
-      if (type === 'click') {
-        listenerCount++;
-        click = handler;
-      }
-    };
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        originalAddEventListener = global.document.addEventListener;
+        listenerCount = 0;
+        global.document.addEventListener = (type, handler) => {
+          if (type === 'click') {
+            listenerCount++;
+            click = handler;
+          }
+        };
 
-    const Triggers = (await import('../src/modules/triggers.js')).default;
-    triggers = new Triggers();
-  });
+        const Triggers = (await import('../src/modules/triggers.js')).default;
+        triggers = new Triggers();
+      })()));
 
-  after(() => {
-    global.document.addEventListener = originalAddEventListener;
-  });
+      const afterHook = () => {
+        global.document.addEventListener = originalAddEventListener;
+      };
 
-  beforeEach(() => {
-    warnings = [];
-    originalWarn = console.warn;
-    console.warn = (...args) => warnings.push(args.join(' '));
-  });
+      const beforeEachHook = () => {
+        warnings = [];
+        originalWarn = console.warn;
+        console.warn = (...args) => warnings.push(args.join(' '));
+      };
 
-  it('registers a handler and arms exactly one document listener', () => {
-    triggers.register('demo', () => {});
+      cases.push({
+        name: 'triggers > registers a handler and arms exactly one document listener',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          beforeEachHook();
+          triggers.register('demo', () => {});
 
-    assert.strictEqual(typeof click, 'function', 'the delegated click handler is attached');
-    assert.strictEqual(listenerCount, 1);
+          ctx.expect(typeof click, 'the delegated click handler is attached').toBe('function');
+          ctx.expect(listenerCount).toBe(1);
 
-    triggers.register('other', () => {});
-    assert.strictEqual(listenerCount, 1, 'a second registration reuses the ONE listener');
+          triggers.register('other', () => {});
+          ctx.expect(listenerCount, 'a second registration reuses the ONE listener').toBe(1);
 
-    console.warn = originalWarn;
-  });
+          console.warn = originalWarn;
+        },
+      });
 
-  it('dispatches to the handler for a click INSIDE the trigger element (closest)', () => {
-    const calls = [];
-    triggers.register('signout', (event, element) => calls.push([event, element]));
+      cases.push({
+        name: 'triggers > dispatches to the handler for a click INSIDE the trigger element (closest)',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          beforeEachHook();
+          const calls = [];
+          triggers.register('signout', (event, element) => calls.push([event, element]));
 
-    const button = makeElement(['btn', 'omega-signout']);
-    const icon = makeElement(['fa-solid', 'fa-right-from-bracket'], button);
-    const event = makeClick(icon);
+          const button = makeElement(['btn', 'omega-signout']);
+          const icon = makeElement(['fa-solid', 'fa-right-from-bracket'], button);
+          const event = makeClick(icon);
 
-    click(event);
+          click(event);
 
-    assert.strictEqual(calls.length, 1, 'the handler ran for a click on the child icon');
-    assert.strictEqual(calls[0][0], event, 'handler gets the event');
-    assert.strictEqual(calls[0][1], button, 'handler gets the TRIGGER element, not the click target');
-    assert.strictEqual(event.prevented, true, 'the framework owns the click: default suppressed');
-    assert.strictEqual(event.stopped, true, 'the framework owns the click: propagation stopped');
+          ctx.expect(calls.length, 'the handler ran for a click on the child icon').toBe(1);
+          ctx.expect(calls[0][0], 'handler gets the event').toBe(event);
+          ctx.expect(calls[0][1], 'handler gets the TRIGGER element, not the click target').toBe(button);
+          ctx.expect(event.prevented, 'the framework owns the click: default suppressed').toBe(true);
+          ctx.expect(event.stopped, 'the framework owns the click: propagation stopped').toBe(true);
 
-    console.warn = originalWarn;
-  });
+          console.warn = originalWarn;
+        },
+      });
 
-  it('answers `omega-<name>` only — an unregistered class is ignored', () => {
-    let ran = 0;
-    triggers.register('password-toggle', () => { ran++; });
+      cases.push({
+        name: 'triggers > answers `omega-<name>` only — an unregistered class is ignored',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          beforeEachHook();
+          let ran = 0;
+          triggers.register('password-toggle', () => { ran++; });
 
-    // The legacy name, and a bare name without the prefix: neither is a trigger.
-    for (const classNames of [['uj-password-toggle'], ['password-toggle'], ['btn']]) {
-      const event = makeClick(makeElement(classNames));
-      click(event);
-      assert.strictEqual(event.prevented, false, `${classNames.join('.')} is not a trigger`);
-    }
+          // The legacy name, and a bare name without the prefix: neither is a trigger.
+          for (const classNames of [['uj-password-toggle'], ['password-toggle'], ['btn']]) {
+            const event = makeClick(makeElement(classNames));
+            click(event);
+            ctx.expect(event.prevented, `${classNames.join('.')} is not a trigger`).toBe(false);
+          }
 
-    assert.strictEqual(ran, 0, 'no handler ran');
+          ctx.expect(ran, 'no handler ran').toBe(0);
 
-    const event = makeClick(makeElement(['omega-password-toggle']));
-    click(event);
-    assert.strictEqual(ran, 1, 'the omega- prefixed class does fire it');
+          const event = makeClick(makeElement(['omega-password-toggle']));
+          click(event);
+          ctx.expect(ran, 'the omega- prefixed class does fire it').toBe(1);
 
-    console.warn = originalWarn;
-  });
+          console.warn = originalWarn;
+        },
+      });
 
-  it('re-registering a name REPLACES the handler and warns (never stacks)', () => {
-    const ran = [];
-    triggers.register('replaceme', () => ran.push('first'));
-    assert.deepStrictEqual(warnings, [], 'a fresh name warns about nothing');
+      cases.push({
+        name: 'triggers > re-registering a name REPLACES the handler and warns (never stacks)',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          beforeEachHook();
+          const ran = [];
+          triggers.register('replaceme', () => ran.push('first'));
+          ctx.expect(warnings, 'a fresh name warns about nothing').toEqual([]);
 
-    triggers.register('replaceme', () => ran.push('second'));
-    assert.strictEqual(warnings.length, 1, 'the replacement warns');
-    assert.match(warnings[0], /Trigger "replaceme" re-registered/);
+          triggers.register('replaceme', () => ran.push('second'));
+          ctx.expect(warnings.length, 'the replacement warns').toBe(1);
+          ctx.expect(warnings[0]).toMatch(/Trigger "replaceme" re-registered/);
 
-    click(makeClick(makeElement(['omega-replaceme'])));
-    assert.deepStrictEqual(ran, ['second'], 'only the new handler ran');
+          click(makeClick(makeElement(['omega-replaceme'])));
+          ctx.expect(ran, 'only the new handler ran').toEqual(['second']);
 
-    console.warn = originalWarn;
-  });
+          console.warn = originalWarn;
+        },
+      });
 
-  it('rejects a non-function handler', () => {
-    assert.throws(() => triggers.register('bogus', 'nope'), /needs a handler function/);
+      cases.push({
+        name: 'triggers > rejects a non-function handler',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          beforeEachHook();
+          ctx.expect(() => triggers.register('bogus', 'nope')).toThrow(/needs a handler function/);
 
-    console.warn = originalWarn;
-  });
+          console.warn = originalWarn;
+        },
+      });
 
-  it('a throwing handler is logged, never allowed to break the others', () => {
-    const errors = [];
-    const originalError = console.error;
-    console.error = (...args) => errors.push(args.join(' '));
+      cases.push({
+        name: 'triggers > a throwing handler is logged, never allowed to break the others',
+        run: async (ctx) => {
+          ctx.after(afterHook);
+          await beforeHook(ctx);
+          beforeEachHook();
+          const errors = [];
+          const originalError = console.error;
+          console.error = (...args) => errors.push(args.join(' '));
 
-    let sibling = 0;
-    triggers.register('boom', () => { throw new Error('handler exploded'); });
-    triggers.register('fine', () => { sibling++; });
+          let sibling = 0;
+          triggers.register('boom', () => { throw new Error('handler exploded'); });
+          triggers.register('fine', () => { sibling++; });
 
-    click(makeClick(makeElement(['omega-boom', 'omega-fine'])));
+          click(makeClick(makeElement(['omega-boom', 'omega-fine'])));
 
-    console.error = originalError;
-    console.warn = originalWarn;
+          console.error = originalError;
+          console.warn = originalWarn;
 
-    assert.strictEqual(sibling, 1, 'the sibling trigger on the same element still ran');
-    assert.strictEqual(errors.length, 1);
-    assert.match(errors[0], /Trigger "boom" failed/);
-  });
+          ctx.expect(sibling, 'the sibling trigger on the same element still ran').toBe(1);
+          ctx.expect(errors.length).toBe(1);
+          ctx.expect(errors[0]).toMatch(/Trigger "boom" failed/);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

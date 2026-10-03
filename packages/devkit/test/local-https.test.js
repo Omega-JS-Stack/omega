@@ -6,8 +6,7 @@
 // those tests skip cleanly when it's absent (the module's own no-mkcert
 // fallback is exactly `null`). The pure checks always run.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -41,240 +40,292 @@ function once(emitter, event) {
   return new Promise((resolve) => emitter.once(event, resolve));
 }
 
-test('exports the expected surface', () => {
-  assert.equal(typeof ensureLocalHttpsCerts, 'function');
-  assert.equal(typeof startLocalHttpsProxy, 'function');
-  assert.equal(typeof checkCertProblem, 'function');
-  assert.equal(typeof findCertPair, 'function');
-  assert.equal(typeof mkcertInstallHint, 'function');
-  assert.equal(typeof mkcertCaRootPem, 'function');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'local-https',
+  tests: [
+    {
+      name: 'exports the expected surface',
+      run: (ctx) => {
+        ctx.expect(typeof ensureLocalHttpsCerts).toBe('function');
+        ctx.expect(typeof startLocalHttpsProxy).toBe('function');
+        ctx.expect(typeof checkCertProblem).toBe('function');
+        ctx.expect(typeof findCertPair).toBe('function');
+        ctx.expect(typeof mkcertInstallHint).toBe('function');
+        ctx.expect(typeof mkcertCaRootPem).toBe('function');
+      },
+    },
 
-// The root CA path is what a spawned process trusts through
-// NODE_EXTRA_CA_CERTS (#795), so "no mkcert" has to answer null rather than a
-// path that verifies nothing. The lookup is injected — no real mkcert runs.
-test('mkcertCaRootPem: no mkcert on the host → null', () => {
-  const answer = mkcertCaRootPem({ exec: () => { throw new Error('command not found: mkcert'); } });
+    // The root CA path is what a spawned process trusts through
+    // NODE_EXTRA_CA_CERTS (#795), so "no mkcert" has to answer null rather than a
+    // path that verifies nothing. The lookup is injected — no real mkcert runs.
+    {
+      name: 'mkcertCaRootPem: no mkcert on the host → null',
+      run: (ctx) => {
+        const answer = mkcertCaRootPem({ exec: () => { throw new Error('command not found: mkcert'); } });
 
-  assert.equal(answer, null);
-});
+        ctx.expect(answer).toBe(null);
+      },
+    },
 
-test('mkcertCaRootPem: a CAROOT holding rootCA.pem → the joined path', () => {
-  const dir = tmpDir('caroot');
-  fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
+    {
+      name: 'mkcertCaRootPem: a CAROOT holding rootCA.pem → the joined path',
+      run: (ctx) => {
+        const dir = tmpDir('caroot');
+        fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
 
-  assert.equal(mkcertCaRootPem({ exec: () => `${dir}\n` }), path.join(dir, 'rootCA.pem'));
-});
+        ctx.expect(mkcertCaRootPem({ exec: () => `${dir}\n` })).toBe(path.join(dir, 'rootCA.pem'));
+      },
+    },
 
-test('mkcertCaRootPem: a CAROOT without the root file → null', () => {
-  const dir = tmpDir('caroot-empty');
+    {
+      name: 'mkcertCaRootPem: a CAROOT without the root file → null',
+      run: (ctx) => {
+        const dir = tmpDir('caroot-empty');
 
-  assert.equal(mkcertCaRootPem({ exec: () => `${dir}\n` }), null);
-});
+        ctx.expect(mkcertCaRootPem({ exec: () => `${dir}\n` })).toBe(null);
+      },
+    },
 
-test('mkcertCaRootPem: memoised — three call sites, one shell call', () => {
-  const dir = tmpDir('caroot-memo');
-  fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
+    {
+      name: 'mkcertCaRootPem: memoised — three call sites, one shell call',
+      run: (ctx) => {
+        const dir = tmpDir('caroot-memo');
+        fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
 
-  let calls = 0;
-  const exec = () => { calls += 1; return `${dir}\n`; };
+        let calls = 0;
+        const exec = () => { calls += 1; return `${dir}\n`; };
 
-  assert.equal(mkcertCaRootPem({ exec }), path.join(dir, 'rootCA.pem'));
-  assert.equal(mkcertCaRootPem({ exec }), path.join(dir, 'rootCA.pem'));
-  assert.equal(calls, 1, 'the second call answers from the memo');
-});
+        ctx.expect(mkcertCaRootPem({ exec })).toBe(path.join(dir, 'rootCA.pem'));
+        ctx.expect(mkcertCaRootPem({ exec })).toBe(path.join(dir, 'rootCA.pem'));
+        ctx.expect(calls, 'the second call answers from the memo').toBe(1);
+      },
+    },
 
-// The hint is the ONLY thing a host without mkcert gets, so it has to name a
-// manager that host actually has. Platform is an argument so all three branches
-// are pinned from one machine.
-test('mkcertInstallHint: every platform gets its own manager', () => {
-  assert.equal(mkcertInstallHint('darwin'), 'brew install mkcert && mkcert -install');
+    // The hint is the ONLY thing a host without mkcert gets, so it has to name a
+    // manager that host actually has. Platform is an argument so all three branches
+    // are pinned from one machine.
+    {
+      name: 'mkcertInstallHint: every platform gets its own manager',
+      run: (ctx) => {
+        ctx.expect(mkcertInstallHint('darwin')).toBe('brew install mkcert && mkcert -install');
 
-  // Windows: Chocolatey IS the command; scoop is named after it, not spliced in.
-  assert.equal(mkcertInstallHint('win32').split('.')[0], 'choco install mkcert && mkcert -install');
-  assert.match(mkcertInstallHint('win32'), /scoop/i, 'scoop is still named');
+        // Windows: Chocolatey IS the command; scoop is named after it, not spliced in.
+        ctx.expect(mkcertInstallHint('win32').split('.')[0]).toBe('choco install mkcert && mkcert -install');
+        ctx.expect(mkcertInstallHint('win32'), 'scoop is still named').toMatch(/scoop/i);
 
-  // Linux, per mkcert's README: certutil from apt, mkcert from the release binary.
-  assert.match(mkcertInstallHint('linux'), /apt install libnss3-tools/);
-  assert.match(mkcertInstallHint('linux'), /github\.com\/FiloSottile\/mkcert\/releases/);
+        // Linux, per mkcert's README: certutil from apt, mkcert from the release binary.
+        ctx.expect(mkcertInstallHint('linux')).toMatch(/apt install libnss3-tools/);
+        ctx.expect(mkcertInstallHint('linux')).toMatch(/github\.com\/FiloSottile\/mkcert\/releases/);
 
-  for (const platform of ['darwin', 'win32', 'linux', 'freebsd']) {
-    const hint = mkcertInstallHint(platform);
-    assert.match(hint, /mkcert -install/, `${platform} must still trust the CA`);
-  }
+        for (const platform of ['darwin', 'win32', 'linux', 'freebsd']) {
+          const hint = mkcertInstallHint(platform);
+          ctx.expect(hint, `${platform} must still trust the CA`).toMatch(/mkcert -install/);
+        }
 
-  // The bug this replaces: every host was told `brew install mkcert`.
-  for (const platform of ['win32', 'linux', 'freebsd']) {
-    assert.doesNotMatch(mkcertInstallHint(platform), /brew install/, `${platform} has no Homebrew`);
-  }
-});
+        // The bug this replaces: every host was told `brew install mkcert`.
+        for (const platform of ['win32', 'linux', 'freebsd']) {
+          ctx.expect(mkcertInstallHint(platform), `${platform} has no Homebrew`).not.toMatch(/brew install/);
+        }
+      },
+    },
 
-test('mkcertInstallHint: the line OPENS with something pasteable', () => {
-  // A reader copies the head of the line; an alternative buried inside the
-  // command is a command that does not run.
-  for (const platform of ['darwin', 'win32', 'linux']) {
-    const head = mkcertInstallHint(platform).split('.')[0];
-    assert.doesNotMatch(head, /\(or\b|\bor:/, `${platform} splices an alternative into the command`);
-  }
-});
+    {
+      name: 'mkcertInstallHint: the line OPENS with something pasteable',
+      run: (ctx) => {
+        // A reader copies the head of the line; an alternative buried inside the
+        // command is a command that does not run.
+        for (const platform of ['darwin', 'win32', 'linux']) {
+          const head = mkcertInstallHint(platform).split('.')[0];
+          ctx.expect(head, `${platform} splices an alternative into the command`).not.toMatch(/\(or\b|\bor:/);
+        }
+      },
+    },
 
-test('mkcertInstallHint: defaults to the host platform', () => {
-  assert.equal(mkcertInstallHint(), mkcertInstallHint(process.platform));
-});
+    {
+      name: 'mkcertInstallHint: defaults to the host platform',
+      run: (ctx) => {
+        ctx.expect(mkcertInstallHint()).toBe(mkcertInstallHint(process.platform));
+      },
+    },
 
-test('findCertPair: empty dir → null', () => {
-  const dir = tmpDir('empty');
-  assert.equal(findCertPair(dir), null);
-});
+    {
+      name: 'findCertPair: empty dir → null',
+      run: (ctx) => {
+        const dir = tmpDir('empty');
+        ctx.expect(findCertPair(dir)).toBe(null);
+      },
+    },
 
-test('checkCertProblem: garbage file → unreadable', () => {
-  const dir = tmpDir('garbage');
-  const file = path.join(dir, 'localhost.pem');
-  fs.writeFileSync(file, 'not a certificate');
-  assert.equal(checkCertProblem(file), 'unreadable certificate');
-});
+    {
+      name: 'checkCertProblem: garbage file → unreadable',
+      run: (ctx) => {
+        const dir = tmpDir('garbage');
+        const file = path.join(dir, 'localhost.pem');
+        fs.writeFileSync(file, 'not a certificate');
+        ctx.expect(checkCertProblem(file)).toBe('unreadable certificate');
+      },
+    },
 
-test('ensureLocalHttpsCerts: generates then reuses a pair', { skip: !hasMkcert }, async () => {
-  const dir = tmpDir('gen');
+    {
+      name: 'ensureLocalHttpsCerts: generates then reuses a pair',
+      skip: !hasMkcert,
+      run: async (ctx) => {
+        const dir = tmpDir('gen');
 
-  const first = await ensureLocalHttpsCerts({ certsDir: dir });
-  assert.ok(first, 'pair generated');
-  assert.ok(fs.existsSync(first.key), 'key file exists');
-  assert.ok(fs.existsSync(first.cert), 'cert file exists');
-  assert.equal(checkCertProblem(first.cert), null, 'fresh cert is usable');
+        const first = await ensureLocalHttpsCerts({ certsDir: dir });
+        ctx.expect(first, 'pair generated').toBeTruthy();
+        ctx.expect(fs.existsSync(first.key), 'key file exists').toBeTruthy();
+        ctx.expect(fs.existsSync(first.cert), 'cert file exists').toBeTruthy();
+        ctx.expect(checkCertProblem(first.cert), 'fresh cert is usable').toBe(null);
 
-  const logs = [];
-  const second = await ensureLocalHttpsCerts({ certsDir: dir, log: (line) => logs.push(line) });
-  assert.equal(second.cert, first.cert, 'same cert reused');
-  assert.ok(logs.some((line) => line.includes('existing mkcert certificates')), 'reuse logged');
-});
+        const logs = [];
+        const second = await ensureLocalHttpsCerts({ certsDir: dir, log: (line) => logs.push(line) });
+        ctx.expect(second.cert, 'same cert reused').toBe(first.cert);
+        ctx.expect(logs.some((line) => line.includes('existing mkcert certificates')), 'reuse logged').toBeTruthy();
+      },
+    },
 
-test('proxy round-trip: TLS in, plain http out, x-forwarded headers set', { skip: !hasMkcert }, async () => {
-  const dir = tmpDir('proxy');
-  const certs = await ensureLocalHttpsCerts({ certsDir: dir });
-  assert.ok(certs, 'certs available');
+    {
+      name: 'proxy round-trip: TLS in, plain http out, x-forwarded headers set',
+      skip: !hasMkcert,
+      run: async (ctx) => {
+        const dir = tmpDir('proxy');
+        const certs = await ensureLocalHttpsCerts({ certsDir: dir });
+        ctx.expect(certs, 'certs available').toBeTruthy();
 
-  // Upstream plain-http server echoing what it saw
-  const seen = {};
-  const upstream = http.createServer((req, res) => {
-    seen.url = req.url;
-    seen.proto = req.headers['x-forwarded-proto'];
-    seen.host = req.headers['x-forwarded-host'];
-    res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end('upstream-ok');
-  });
-  upstream.listen(0);
-  await once(upstream, 'listening');
-  const targetPort = upstream.address().port;
+        // Upstream plain-http server echoing what it saw
+        const seen = {};
+        const upstream = http.createServer((req, res) => {
+          seen.url = req.url;
+          seen.proto = req.headers['x-forwarded-proto'];
+          seen.host = req.headers['x-forwarded-host'];
+          res.writeHead(200, { 'content-type': 'text/plain' });
+          res.end('upstream-ok');
+        });
+        upstream.listen(0);
+        await once(upstream, 'listening');
+        const targetPort = upstream.address().port;
 
-  const proxy = startLocalHttpsProxy({ port: 0, targetPort, certs });
-  await once(proxy, 'listening');
-  const proxyPort = proxy.address().port;
+        const proxy = startLocalHttpsProxy({ port: 0, targetPort, certs });
+        await once(proxy, 'listening');
+        const proxyPort = proxy.address().port;
 
-  const body = await new Promise((resolve, reject) => {
-    https.get(`https://localhost:${proxyPort}/hello?x=1`, { rejectUnauthorized: false }, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => resolve(data));
-    }).on('error', reject);
-  });
+        const body = await new Promise((resolve, reject) => {
+          https.get(`https://localhost:${proxyPort}/hello?x=1`, { rejectUnauthorized: false }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => (data += chunk));
+            res.on('end', () => resolve(data));
+          }).on('error', reject);
+        });
 
-  assert.equal(body, 'upstream-ok');
-  assert.equal(seen.url, '/hello?x=1');
-  assert.equal(seen.proto, 'https');
-  assert.equal(seen.host, `localhost:${proxyPort}`);
+        ctx.expect(body).toBe('upstream-ok');
+        ctx.expect(seen.url).toBe('/hello?x=1');
+        ctx.expect(seen.proto).toBe('https');
+        ctx.expect(seen.host).toBe(`localhost:${proxyPort}`);
 
-  proxy.close();
-  proxy.closeAllConnections?.();
-  upstream.close();
-  upstream.closeAllConnections?.();
-});
+        proxy.close();
+        proxy.closeAllConnections?.();
+        upstream.close();
+        upstream.closeAllConnections?.();
+      },
+    },
 
-test('plain http on the TLS port → 307 redirect to https (same host + path)', { skip: !hasMkcert }, async () => {
-  const dir = tmpDir('redirect');
-  const certs = await ensureLocalHttpsCerts({ certsDir: dir });
-  assert.ok(certs, 'certs available');
+    {
+      name: 'plain http on the TLS port → 307 redirect to https (same host + path)',
+      skip: !hasMkcert,
+      run: async (ctx) => {
+        const dir = tmpDir('redirect');
+        const certs = await ensureLocalHttpsCerts({ certsDir: dir });
+        ctx.expect(certs, 'certs available').toBeTruthy();
 
-  // No upstream needed — the redirect answers at the front door
-  const proxy = startLocalHttpsProxy({ port: 0, targetPort: 9, certs });
-  await once(proxy, 'listening');
-  const proxyPort = proxy.address().port;
+        // No upstream needed — the redirect answers at the front door
+        const proxy = startLocalHttpsProxy({ port: 0, targetPort: 9, certs });
+        await once(proxy, 'listening');
+        const proxyPort = proxy.address().port;
 
-  const res = await new Promise((resolve, reject) => {
-    http.get(`http://localhost:${proxyPort}/payment/checkout?product=premium`, resolve).on('error', reject);
-  });
+        const res = await new Promise((resolve, reject) => {
+          http.get(`http://localhost:${proxyPort}/payment/checkout?product=premium`, resolve).on('error', reject);
+        });
 
-  assert.equal(res.statusCode, 307, 'temporary, method-preserving redirect');
-  assert.equal(res.headers.location, `https://localhost:${proxyPort}/payment/checkout?product=premium`);
-  res.resume();
+        ctx.expect(res.statusCode, 'temporary, method-preserving redirect').toBe(307);
+        ctx.expect(res.headers.location).toBe(`https://localhost:${proxyPort}/payment/checkout?product=premium`);
+        res.resume();
 
-  proxy.close();
-});
+        proxy.close();
+      },
+    },
 
-test('proxy tunnels WebSocket upgrades (dev-server live-reload)', { skip: !hasMkcert }, async () => {
-  const dir = tmpDir('ws');
-  const certs = await ensureLocalHttpsCerts({ certsDir: dir });
-  assert.ok(certs, 'certs available');
+    {
+      name: 'proxy tunnels WebSocket upgrades (dev-server live-reload)',
+      skip: !hasMkcert,
+      run: async (ctx) => {
+        const dir = tmpDir('ws');
+        const certs = await ensureLocalHttpsCerts({ certsDir: dir });
+        ctx.expect(certs, 'certs available').toBeTruthy();
 
-  // Upstream that accepts the upgrade and echoes raw bytes back
-  const upstream = http.createServer();
-  upstream.on('upgrade', (req, socket) => {
-    socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
-    socket.on('data', (chunk) => socket.write(chunk));
-  });
-  upstream.listen(0);
-  await once(upstream, 'listening');
-  const targetPort = upstream.address().port;
+        // Upstream that accepts the upgrade and echoes raw bytes back
+        const upstream = http.createServer();
+        upstream.on('upgrade', (req, socket) => {
+          socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
+          socket.on('data', (chunk) => socket.write(chunk));
+        });
+        upstream.listen(0);
+        await once(upstream, 'listening');
+        const targetPort = upstream.address().port;
 
-  const proxy = startLocalHttpsProxy({ port: 0, targetPort, certs });
-  await once(proxy, 'listening');
-  const proxyPort = proxy.address().port;
+        const proxy = startLocalHttpsProxy({ port: 0, targetPort, certs });
+        await once(proxy, 'listening');
+        const proxyPort = proxy.address().port;
 
-  const client = tls.connect({ port: proxyPort, host: 'localhost', rejectUnauthorized: false });
-  await once(client, 'secureConnect');
+        const client = tls.connect({ port: proxyPort, host: 'localhost', rejectUnauthorized: false });
+        await once(client, 'secureConnect');
 
-  client.write([
-    'GET /live-reload HTTP/1.1',
-    `Host: localhost:${proxyPort}`,
-    'Connection: Upgrade',
-    'Upgrade: websocket',
-    'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
-    'Sec-WebSocket-Version: 13',
-    '', '',
-  ].join('\r\n'));
+        client.write([
+          'GET /live-reload HTTP/1.1',
+          `Host: localhost:${proxyPort}`,
+          'Connection: Upgrade',
+          'Upgrade: websocket',
+          'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+          'Sec-WebSocket-Version: 13',
+          '', '',
+        ].join('\r\n'));
 
-  // Handshake through the tunnel
-  let received = '';
-  const sawHandshake = new Promise((resolve) => {
-    client.on('data', (chunk) => {
-      received += chunk.toString();
-      if (received.includes('101 Switching Protocols')) {
-        resolve();
-      }
-    });
-  });
-  await sawHandshake;
+        // Handshake through the tunnel
+        let received = '';
+        const sawHandshake = new Promise((resolve) => {
+          client.on('data', (chunk) => {
+            received += chunk.toString();
+            if (received.includes('101 Switching Protocols')) {
+              resolve();
+            }
+          });
+        });
+        await sawHandshake;
 
-  // Bytes echo through the spliced sockets
-  received = '';
-  client.write('ping-through-tunnel');
-  const sawEcho = new Promise((resolve) => {
-    const check = () => {
-      if (received.includes('ping-through-tunnel')) {
-        resolve();
-      }
-    };
-    client.on('data', (chunk) => {
-      received += chunk.toString();
-      check();
-    });
-    check();
-  });
-  await sawEcho;
+        // Bytes echo through the spliced sockets
+        received = '';
+        client.write('ping-through-tunnel');
+        const sawEcho = new Promise((resolve) => {
+          const check = () => {
+            if (received.includes('ping-through-tunnel')) {
+              resolve();
+            }
+          };
+          client.on('data', (chunk) => {
+            received += chunk.toString();
+            check();
+          });
+          check();
+        });
+        await sawEcho;
 
-  client.destroy();
-  proxy.close();
-  proxy.closeAllConnections?.();
-  upstream.close();
-  upstream.closeAllConnections?.();
+        client.destroy();
+        proxy.close();
+        proxy.closeAllConnections?.();
+        upstream.close();
+        upstream.closeAllConnections?.();
+      },
+    },
+  ],
 });

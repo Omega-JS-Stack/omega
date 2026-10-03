@@ -3,8 +3,7 @@
  * company brand and `--admins` the account list, typed on the command line and
  * read back from the written brand config.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -40,16 +39,25 @@ async function omega(cwd, args) {
   }
 }
 
-test('#1031 case 11: --company and --admins with no terminal write that company and those account admins', async () => {
-  companyBrand('acme-co');
-  const root = folder('acme');
+module.exports = defineCases({
+  type: 'group',
+  description: 'onboard-flags',
+  tests: [
+    {
+      name: '#1031 case 11: --company and --admins with no terminal write that company and those account admins',
+      run: async (ctx) => {
+        companyBrand('acme-co');
+        const root = folder('acme');
 
-  await omega(root, [
-    'onboard', '--id=acme', '--name=Acme', '--url=https://acme.test', '--targets=web', '--contactName=Jane Doe',
-    '--company=acme-co', '--admins=a@x.com,b@x.com', '--no-manage', '--no-dev',
-  ]);
+        await omega(root, [
+          'onboard', '--id=acme', '--name=Acme', '--url=https://acme.test', '--targets=web', '--contactName=Jane Doe',
+          '--company=acme-co', '--admins=a@x.com,b@x.com', '--no-manage', '--no-dev',
+        ]);
 
-  const config = readConfig(root);
-  assert.deepEqual(config.company, { id: 'acme-co' });
-  assert.deepEqual(config.account.admins.map((admin) => admin.email), ['a@x.com', 'b@x.com']);
+        const config = readConfig(root);
+        ctx.expect(config.company).toEqual({ id: 'acme-co' });
+        ctx.expect(config.account.admins.map((admin) => admin.email)).toEqual(['a@x.com', 'b@x.com']);
+      },
+    },
+  ],
 });

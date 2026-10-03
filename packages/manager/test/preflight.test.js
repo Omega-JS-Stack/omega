@@ -4,8 +4,7 @@
 // against the token store's granted-scopes record. Plus the run/skip/strict
 // verdicts, the walkthrough content, and the runManage wiring.
 
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -28,14 +27,6 @@ const { createMachine } = require('./lib/fake-claude.js');
 // already has the plugin, so no walk below spawns the real one or touches ~/.claude.
 const MANAGER_VERSION = require('../package.json').version;
 let restoreClaude;
-before(() => {
-  restoreClaude = createMachine({
-    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
-    installed: { 'omega@omega': MANAGER_VERSION },
-    published: MANAGER_VERSION,
-  }).activate();
-});
-after(() => restoreClaude());
 
 // Preflight checks must be deterministic regardless of the shell's exports
 delete process.env.CLOUDFLARE_TOKEN;
@@ -126,183 +117,6 @@ function preflight(services, brandConfig, { isTTY = false, brandRoot = stageToke
   return { ...result, log };
 }
 
-test('preflight: edge turned off, no finding', () => {
-  const { findings, gates } = preflight(['edge'], { edge: { providers: { cloudflare: { enabled: false } } } });
-  assert.equal(findings.length, 0);
-  assert.equal(gates.edge, undefined);
-});
-
-// The advertising gate is the client id alone. The `enabled` key it
-// used to read beside it is deleted, so a config still carrying it must not
-// silence the preflight ask for the account the service still manages.
-test('preflight: the advertising ask is client presence, not a second switch (#527)', () => {
-  const withClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: { client: 'ca-pub-1', enabled: false } } } });
-  assert.ok(withClient.gates.advertising, 'a configured client id asks for its credentials');
-  assert.deepEqual([...withClient.gates.advertising.missingEnv].sort(), ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
-
-  const noClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: {} } } });
-  assert.equal(noClient.gates.advertising, undefined, 'no client id, nothing to ask for');
-});
-
-test('preflight: missing env, a finding naming the exact vars', () => {
-  const { gates } = preflight(['edge'], {});
-  assert.deepEqual(gates.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
-  assert.equal(gates.edge.needsInteractive, undefined, 'a missing secret is no consent gap');
-});
-
-test('preflight: env present, no finding', () => {
-  process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
-  try {
-    const { findings, gates } = preflight(['edge'], {});
-    assert.equal(findings.length, 0);
-    assert.deepEqual(gates, {});
-  } finally {
-    delete process.env.CLOUDFLARE_TOKEN;
-  }
-});
-
-test('preflight: namecheap creds only for namecheap brands', () => {
-  const squarespace = preflight(['domain'], { domain: { providers: { squarespace: {} } } });
-  assert.deepEqual(squarespace.gates.domain.missingEnv, ['CLOUDFLARE_TOKEN']);
-
-  const namecheap = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
-  assert.deepEqual([...namecheap.gates.domain.missingEnv].sort(), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
-
-  // No provider chosen: the service skips itself and preflight stays quiet
-  assert.equal(preflight(['domain'], {}).gates.domain, undefined);
-});
-
-test('preflight: scopes, no token store is a consent gap with no missing env', () => {
-  process.env.GOOGLE_CLIENT_ID = 'id';
-  process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
-  try {
-    const { gates } = preflight(['search'], REAL_PROJECT);
-    assert.match(gates.search.needsInteractive, /Google consent/);
-    assert.deepEqual(gates.search.missingEnv, []);
-  } finally {
-    delete process.env.GOOGLE_CLIENT_ID;
-    delete process.env.GOOGLE_CLIENT_SECRET;
-  }
-});
-
-test('preflight: scopes, a store missing a required scope names it, a sufficient one is clean', () => {
-  process.env.GOOGLE_CLIENT_ID = 'id';
-  process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
-  try {
-    const partial = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
-    const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: partial });
-    assert.match(narrow.gates.search.needsInteractive, /siteverification/);
-
-    const full = stageTokenStore({
-      access_token: 'tok',
-      scopes: ['https://www.googleapis.com/auth/webmasters', 'https://www.googleapis.com/auth/siteverification'],
-      account_email: 'ops@example.test',
-    });
-    assert.deepEqual(preflight(['search'], REAL_PROJECT, { brandRoot: full }).gates, {});
-  } finally {
-    delete process.env.GOOGLE_CLIENT_ID;
-    delete process.env.GOOGLE_CLIENT_SECRET;
-  }
-});
-
-test('preflight: readTokenStore, a real store round-trips and a pre-tracking store grants nothing', () => {
-  const root = stageTokenStore({ access_token: 'tok', scopes: ['a', 'b'], account_email: 'me@example.test' });
-  const store = readTokenStore(root);
-  assert.equal(store.exists, true);
-  assert.deepEqual(store.scopes, ['a', 'b']);
-  assert.equal(store.accountEmail, 'me@example.test');
-
-  const legacyRoot = stageTokenStore({ access_token: 'tok' }); // no scopes array
-  assert.deepEqual(readTokenStore(legacyRoot).scopes, []);
-
-  assert.equal(readTokenStore(stageTokenStore(null)).exists, false);
-});
-
-// ─── runPreflight: verdicts ─────────────────────────────────────────────────
-
-test('preflight verdicts: non-interactive missing env, skip with missingEnv', () => {
-  const { gates, log } = preflight(['edge'], {});
-
-  assert.match(log, /Preflight/);
-  assert.equal(gates.edge.action, 'skip');
-  assert.match(gates.edge.reason, /CLOUDFLARE_TOKEN/);
-  assert.match(gates.edge.reason, /^preflight: /);
-  assert.deepEqual(gates.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
-});
-
-test('preflight verdicts: interactive and a pasted key, run (the paste flow fixes it mid-run)', () => {
-  assert.equal(preflight(['edge'], {}, { isTTY: true }).gates.edge.action, 'run');
-});
-
-test('preflight verdicts: interactive but a key nobody pastes, still skip (no flow collects it)', () => {
-  // The Google OAuth client is set up by hand in the Cloud console, never pasted mid-run
-  assert.equal(preflight(['search'], REAL_PROJECT, { isTTY: true }).gates.search.action, 'skip');
-});
-
-test('preflight verdicts: --strict is an error, even interactive', () => {
-  assert.equal(preflight(['edge'], {}, { isTTY: true, options: { strict: true } }).gates.edge.action, 'error');
-});
-
-test('preflight verdicts: a consent/scope gap carries the ⚑ pending marker; a missing-secret gap does not (#228)', () => {
-  process.env.GOOGLE_CLIENT_ID = 'id';
-  process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
-  try {
-    const { gates } = preflight(['search', 'edge'], REAL_PROJECT);
-
-    assert.match(gates.search.needsInteractive, /Google consent/,
-      'the summary ⚑ section reads this field; without it the skip is a nameless count');
-    assert.equal(gates.edge.needsInteractive, undefined,
-      'a missing secret already rides the 🔑 section; double-listing is noise');
-
-    // A store that exists but lacks the scope is the same pending human step
-    const narrowStore = stageTokenStore({ access_token: 'a', refresh_token: 'r', scopes: ['https://www.googleapis.com/auth/firebase'] });
-    const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: narrowStore });
-    assert.match(narrow.gates.search.needsInteractive, /webmasters/, 'and it names the scopes to re-consent');
-  } finally {
-    delete process.env.GOOGLE_CLIENT_ID;
-    delete process.env.GOOGLE_CLIENT_SECRET;
-  }
-});
-
-test('preflight verdicts: nothing missing, no gates and nothing printed', () => {
-  process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
-  try {
-    const { findings, gates, log } = preflight(['edge'], {});
-    assert.equal(findings.length, 0);
-    assert.deepEqual(gates, {});
-    assert.equal(log, '');
-  } finally {
-    delete process.env.CLOUDFLARE_TOKEN;
-  }
-});
-
-// ─── Walkthrough content (cp236 tone) ───────────────────────────────────────
-
-test('preflight walkthrough: what/which/why/fix/rerun', () => {
-  const { log } = preflight(['edge'], {});
-
-  assert.match(log, /Preflight/);                                            // the consolidated header
-  assert.match(log, /edge/);                                                 // which service
-  assert.match(log, /reconciles the zone, DNS records/);                     // why it matters
-  assert.match(log, /CLOUDFLARE_TOKEN=<value>/);                             // the exact .env line
-  assert.match(log, /https:\/\/dash\.cloudflare\.com\/profile\/api-tokens/); // where the value comes from
-  assert.match(log, /Create a token with Zone edit/);                        // the hint
-  assert.match(log, /npm run manage -- --service=edge/);                     // the rerun verb
-});
-
-test('preflight walkthrough: a present var is not nagged, and env VALUES never appear', () => {
-  process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
-  try {
-    const { log } = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
-
-    assert.match(log, /NAMECHEAP_API_KEY=<value>/);
-    assert.ok(!log.includes('CLOUDFLARE_TOKEN=<value>'), 'present vars are not nagged');
-    assert.ok(!log.includes(SECRET_VALUE), 'values NEVER print');
-  } finally {
-    delete process.env.CLOUDFLARE_TOKEN;
-  }
-});
-
 // A brand of a company, both real on disk: the parent carries the
 // shared `company/` tree, whose `.env` is the tier every sub-brand inherits,
 // and the machine registry is how the child's `company: { id }` resolves.
@@ -330,73 +144,6 @@ function stageCompanyBrand({ envFile = true } = {}) {
 
   return { root, companyEnv: path.join(parentRoot, 'company', '.env') };
 }
-
-test('preflight walkthrough: a company brand is sent to the COMPANY .env (#910)', () => {
-  const { root, companyEnv } = stageCompanyBrand();
-  const company = resolveCompany(root);
-  assert.equal(company.id, 'parent-brand', 'the fixture resolves a company');
-
-  const { gates, log } = preflight(['edge'], {}, { brandRoot: root, company });
-
-  // One shape for every service the walkthrough prints: the key belongs in
-  // the company file each sub-brand inherits, and the brand file is the
-  // override, not the home.
-  assert.match(log, /CLOUDFLARE_TOKEN=<value>/);
-  assert.ok(log.includes(companyEnv), `the fix line names the company .env: ${log}`);
-  assert.match(log, /brand \.env overrides it/);
-  assert.ok(gates.edge.reason.includes(companyEnv), `the skip reason says it too: ${gates.edge.reason}`);
-});
-
-test('preflight walkthrough: the company .env is named even before it exists (#910)', () => {
-  // The file a first-time company brand has yet to create is still the file
-  // the key belongs in, so the line names the path rather than falling back.
-  const { root, companyEnv } = stageCompanyBrand({ envFile: false });
-
-  const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
-
-  assert.ok(log.includes(companyEnv), `the fix line names the file to create: ${log}`);
-});
-
-test('preflight walkthrough: a standalone brand keeps the brand .env line (#910)', () => {
-  const root = stageTokenStore(null);
-
-  const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
-
-  assert.match(log, /to the brand \.env/);
-  assert.ok(!log.includes('company'), `no company, no company line: ${log}`);
-});
-
-test('preflight walkthrough: scope gap names the acting identity + both remedies (cp236 model)', () => {
-  process.env.GOOGLE_CLIENT_ID = 'id';
-  process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
-  try {
-    const root = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
-
-    const { log } = preflight(['search'], REAL_PROJECT, { brandRoot: root });
-
-    assert.match(log, /search/);
-    assert.match(log, /scope:siteverification/);           // what's missing, short form
-    assert.match(log, /ops@example\.test/);                // acting identity (cp236)
-    assert.match(log, /google-tokens\.json/);              // the token store path
-    assert.match(log, /re-consent/);                       // remedy 1
-    assert.match(log, /delete the token store/);           // remedy 2 (cp236 alternative)
-    assert.ok(!log.includes(SECRET_VALUE));
-  } finally {
-    delete process.env.GOOGLE_CLIENT_ID;
-    delete process.env.GOOGLE_CLIENT_SECRET;
-  }
-});
-
-// ─── Registry sanity ────────────────────────────────────────────────────────
-
-test('preflight registry: every REQUIRES key is a real service, and its scopes are Google scopes', () => {
-  for (const [serviceName, declaration] of Object.entries(REQUIRES)) {
-    assert.ok(SERVICE_ORDER.includes(serviceName), `${serviceName} is not in SERVICE_ORDER`);
-    for (const scope of declaration.scopes || []) {
-      assert.match(scope, /^https:\/\/www\.googleapis\.com\/auth\//, `${serviceName} scope ${scope}`);
-    }
-  }
-});
 
 // ─── runManage wiring ───────────────────────────────────────────────────────
 
@@ -435,46 +182,376 @@ fs.writeFileSync(path.join(__dirname, 'dist', 'index.html'), '<!doctype html><ti
   return root;
 }
 
-test('runManage: preflight-failing service skips with the walkthrough reason and missingEnv', async () => {
-  const root = stageBrand();
-  const report = await withStreams(false, () => runManage(root, { service: 'edge' }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'preflight',
+  setup: () => {
+    restoreClaude = createMachine({
+      marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+      installed: { 'omega@omega': MANAGER_VERSION },
+      published: MANAGER_VERSION,
+    }).activate();
+  },
+  cleanup: () => restoreClaude(),
+  tests: [
+    {
+      name: 'preflight: edge turned off, no finding',
+      run: (ctx) => {
+        const { findings, gates } = preflight(['edge'], { edge: { providers: { cloudflare: { enabled: false } } } });
+        ctx.expect(findings.length).toBe(0);
+        ctx.expect(gates.edge).toBe(undefined);
+      },
+    },
 
-  assert.equal(report.hasErrors, false);
-  assert.equal(report.results.edge.status, 'skipped');
-  assert.match(report.results.edge.reason, /^preflight: /);
-  assert.match(report.results.edge.reason, /CLOUDFLARE_TOKEN/);
-  assert.deepEqual(report.results.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
-});
+    // The advertising gate is the client id alone. The `enabled` key it
+    // used to read beside it is deleted, so a config still carrying it must not
+    // silence the preflight ask for the account the service still manages.
+    {
+      name: 'preflight: the advertising ask is client presence, not a second switch (#527)',
+      run: (ctx) => {
+        const withClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: { client: 'ca-pub-1', enabled: false } } } });
+        ctx.expect(withClient.gates.advertising, 'a configured client id asks for its credentials').toBeTruthy();
+        ctx.expect([...withClient.gates.advertising.missingEnv].sort()).toEqual(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
 
-test('runManage: --strict turns the preflight failure into a hard error', async () => {
-  const root = stageBrand();
-  const report = await withStreams(false, () => runManage(root, { service: 'edge', strict: true }));
+        const noClient = preflight(['advertising'], { ...REAL_PROJECT, advertising: { providers: { adsense: {} } } });
+        ctx.expect(noClient.gates.advertising, 'no client id, nothing to ask for').toBe(undefined);
+      },
+    },
 
-  assert.equal(report.hasErrors, true);
-  assert.equal(report.results.edge.status, 'error');
-  assert.match(report.results.edge.error, /^preflight: /);
-  assert.match(report.results.edge.error, /CLOUDFLARE_TOKEN/);
-});
+    {
+      name: 'preflight: missing env, a finding naming the exact vars',
+      run: (ctx) => {
+        const { gates } = preflight(['edge'], {});
+        ctx.expect(gates.edge.missingEnv).toEqual(['CLOUDFLARE_TOKEN']);
+        ctx.expect(gates.edge.needsInteractive, 'a missing secret is no consent gap').toBe(undefined);
+      },
+    },
 
-test('runManage: a consent-gated preflight skip is NAMED in the ⚑ pending list, with its rerun hint (#228)', async () => {
-  const root = stageBrand({ projectId: 'preflight-live' });
+    {
+      name: 'preflight: env present, no finding',
+      run: (ctx) => {
+        process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
+        try {
+          const { findings, gates } = preflight(['edge'], {});
+          ctx.expect(findings.length).toBe(0);
+          ctx.expect(gates).toEqual({});
+        } finally {
+          delete process.env.CLOUDFLARE_TOKEN;
+        }
+      },
+    },
 
-  const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search' })));
+    {
+      name: 'preflight: namecheap creds only for namecheap brands',
+      run: (ctx) => {
+        const squarespace = preflight(['domain'], { domain: { providers: { squarespace: {} } } });
+        ctx.expect(squarespace.gates.domain.missingEnv).toEqual(['CLOUDFLARE_TOKEN']);
 
-  assert.match(log, /⚑ Skipped — needs an interactive run/,
-    'a consent gap belongs in the pending aggregate, not only in the walkthrough scroll-back');
-  assert.match(log, /search\/preflight/, 'the ⚑ line names the service');
-  assert.match(log, /npm run manage -- --service=search/);
-});
+        const namecheap = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
+        ctx.expect([...namecheap.gates.domain.missingEnv].sort()).toEqual(['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
 
-test('runManage: the cycle continues past preflight skips (absorb, never crash)', async () => {
-  const root = stageBrand();
-  const report = await withStreams(false, () => runManage(root, {}));
+        // No provider chosen: the service skips itself and preflight stays quiet
+        ctx.expect(preflight(['domain'], {}).gates.domain).toBe(undefined);
+      },
+    },
 
-  // edge (and friends) skipped by preflight…
-  assert.equal(report.results.edge.status, 'skipped');
-  assert.match(report.results.edge.reason, /^preflight: /);
-  // …while later services still ran — the loop never stopped
-  assert.ok(report.results.testing, 'testing service should still have run');
-  assert.ok(report.results.workspace, 'workspace service should still have run');
+    {
+      name: 'preflight: scopes, no token store is a consent gap with no missing env',
+      run: (ctx) => {
+        process.env.GOOGLE_CLIENT_ID = 'id';
+        process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
+        try {
+          const { gates } = preflight(['search'], REAL_PROJECT);
+          ctx.expect(gates.search.needsInteractive).toMatch(/Google consent/);
+          ctx.expect(gates.search.missingEnv).toEqual([]);
+        } finally {
+          delete process.env.GOOGLE_CLIENT_ID;
+          delete process.env.GOOGLE_CLIENT_SECRET;
+        }
+      },
+    },
+
+    {
+      name: 'preflight: scopes, a store missing a required scope names it, a sufficient one is clean',
+      run: (ctx) => {
+        process.env.GOOGLE_CLIENT_ID = 'id';
+        process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
+        try {
+          const partial = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
+          const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: partial });
+          ctx.expect(narrow.gates.search.needsInteractive).toMatch(/siteverification/);
+
+          const full = stageTokenStore({
+            access_token: 'tok',
+            scopes: ['https://www.googleapis.com/auth/webmasters', 'https://www.googleapis.com/auth/siteverification'],
+            account_email: 'ops@example.test',
+          });
+          ctx.expect(preflight(['search'], REAL_PROJECT, { brandRoot: full }).gates).toEqual({});
+        } finally {
+          delete process.env.GOOGLE_CLIENT_ID;
+          delete process.env.GOOGLE_CLIENT_SECRET;
+        }
+      },
+    },
+
+    {
+      name: 'preflight: readTokenStore, a real store round-trips and a pre-tracking store grants nothing',
+      run: (ctx) => {
+        const root = stageTokenStore({ access_token: 'tok', scopes: ['a', 'b'], account_email: 'me@example.test' });
+        const store = readTokenStore(root);
+        ctx.expect(store.exists).toBe(true);
+        ctx.expect(store.scopes).toEqual(['a', 'b']);
+        ctx.expect(store.accountEmail).toBe('me@example.test');
+
+        const legacyRoot = stageTokenStore({ access_token: 'tok' }); // no scopes array
+        ctx.expect(readTokenStore(legacyRoot).scopes).toEqual([]);
+
+        ctx.expect(readTokenStore(stageTokenStore(null)).exists).toBe(false);
+      },
+    },
+
+    // ─── runPreflight: verdicts ─────────────────────────────────────────────────
+
+    {
+      name: 'preflight verdicts: non-interactive missing env, skip with missingEnv',
+      run: (ctx) => {
+        const { gates, log } = preflight(['edge'], {});
+
+        ctx.expect(log).toMatch(/Preflight/);
+        ctx.expect(gates.edge.action).toBe('skip');
+        ctx.expect(gates.edge.reason).toMatch(/CLOUDFLARE_TOKEN/);
+        ctx.expect(gates.edge.reason).toMatch(/^preflight: /);
+        ctx.expect(gates.edge.missingEnv).toEqual(['CLOUDFLARE_TOKEN']);
+      },
+    },
+
+    {
+      name: 'preflight verdicts: interactive and a pasted key, run (the paste flow fixes it mid-run)',
+      run: (ctx) => {
+        ctx.expect(preflight(['edge'], {}, { isTTY: true }).gates.edge.action).toBe('run');
+      },
+    },
+
+    {
+      name: 'preflight verdicts: interactive but a key nobody pastes, still skip (no flow collects it)',
+      run: (ctx) => {
+        // The Google OAuth client is set up by hand in the Cloud console, never pasted mid-run
+        ctx.expect(preflight(['search'], REAL_PROJECT, { isTTY: true }).gates.search.action).toBe('skip');
+      },
+    },
+
+    {
+      name: 'preflight verdicts: --strict is an error, even interactive',
+      run: (ctx) => {
+        ctx.expect(preflight(['edge'], {}, { isTTY: true, options: { strict: true } }).gates.edge.action).toBe('error');
+      },
+    },
+
+    {
+      name: 'preflight verdicts: a consent/scope gap carries the ⚑ pending marker; a missing-secret gap does not (#228)',
+      run: (ctx) => {
+        process.env.GOOGLE_CLIENT_ID = 'id';
+        process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
+        try {
+          const { gates } = preflight(['search', 'edge'], REAL_PROJECT);
+
+          ctx.expect(gates.search.needsInteractive, 'the summary ⚑ section reads this field; without it the skip is a nameless count').toMatch(/Google consent/);
+          ctx.expect(gates.edge.needsInteractive, 'a missing secret already rides the 🔑 section; double-listing is noise').toBe(undefined);
+
+          // A store that exists but lacks the scope is the same pending human step
+          const narrowStore = stageTokenStore({ access_token: 'a', refresh_token: 'r', scopes: ['https://www.googleapis.com/auth/firebase'] });
+          const narrow = preflight(['search'], REAL_PROJECT, { brandRoot: narrowStore });
+          ctx.expect(narrow.gates.search.needsInteractive, 'and it names the scopes to re-consent').toMatch(/webmasters/);
+        } finally {
+          delete process.env.GOOGLE_CLIENT_ID;
+          delete process.env.GOOGLE_CLIENT_SECRET;
+        }
+      },
+    },
+
+    {
+      name: 'preflight verdicts: nothing missing, no gates and nothing printed',
+      run: (ctx) => {
+        process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
+        try {
+          const { findings, gates, log } = preflight(['edge'], {});
+          ctx.expect(findings.length).toBe(0);
+          ctx.expect(gates).toEqual({});
+          ctx.expect(log).toBe('');
+        } finally {
+          delete process.env.CLOUDFLARE_TOKEN;
+        }
+      },
+    },
+
+    // ─── Walkthrough content (cp236 tone) ───────────────────────────────────────
+
+    {
+      name: 'preflight walkthrough: what/which/why/fix/rerun',
+      run: (ctx) => {
+        const { log } = preflight(['edge'], {});
+
+        ctx.expect(log).toMatch(/Preflight/);                                            // the consolidated header
+        ctx.expect(log).toMatch(/edge/);                                                 // which service
+        ctx.expect(log).toMatch(/reconciles the zone, DNS records/);                     // why it matters
+        ctx.expect(log).toMatch(/CLOUDFLARE_TOKEN=<value>/);                             // the exact .env line
+        ctx.expect(log).toMatch(/https:\/\/dash\.cloudflare\.com\/profile\/api-tokens/); // where the value comes from
+        ctx.expect(log).toMatch(/Create a token with Zone edit/);                        // the hint
+        ctx.expect(log).toMatch(/npm run manage -- --service=edge/);                     // the rerun verb
+      },
+    },
+
+    {
+      name: 'preflight walkthrough: a present var is not nagged, and env VALUES never appear',
+      run: (ctx) => {
+        process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
+        try {
+          const { log } = preflight(['domain'], { domain: { providers: { namecheap: {} } } });
+
+          ctx.expect(log).toMatch(/NAMECHEAP_API_KEY=<value>/);
+          ctx.expect(!log.includes('CLOUDFLARE_TOKEN=<value>'), 'present vars are not nagged').toBeTruthy();
+          ctx.expect(!log.includes(SECRET_VALUE), 'values NEVER print').toBeTruthy();
+        } finally {
+          delete process.env.CLOUDFLARE_TOKEN;
+        }
+      },
+    },
+
+    {
+      name: 'preflight walkthrough: a company brand is sent to the COMPANY .env (#910)',
+      run: (ctx) => {
+        const { root, companyEnv } = stageCompanyBrand();
+        const company = resolveCompany(root);
+        ctx.expect(company.id, 'the fixture resolves a company').toBe('parent-brand');
+
+        const { gates, log } = preflight(['edge'], {}, { brandRoot: root, company });
+
+        // One shape for every service the walkthrough prints: the key belongs in
+        // the company file each sub-brand inherits, and the brand file is the
+        // override, not the home.
+        ctx.expect(log).toMatch(/CLOUDFLARE_TOKEN=<value>/);
+        ctx.expect(log.includes(companyEnv), `the fix line names the company .env: ${log}`).toBeTruthy();
+        ctx.expect(log).toMatch(/brand \.env overrides it/);
+        ctx.expect(gates.edge.reason.includes(companyEnv), `the skip reason says it too: ${gates.edge.reason}`).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'preflight walkthrough: the company .env is named even before it exists (#910)',
+      run: (ctx) => {
+        // The file a first-time company brand has yet to create is still the file
+        // the key belongs in, so the line names the path rather than falling back.
+        const { root, companyEnv } = stageCompanyBrand({ envFile: false });
+
+        const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
+
+        ctx.expect(log.includes(companyEnv), `the fix line names the file to create: ${log}`).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'preflight walkthrough: a standalone brand keeps the brand .env line (#910)',
+      run: (ctx) => {
+        const root = stageTokenStore(null);
+
+        const { log } = preflight(['edge'], {}, { brandRoot: root, company: resolveCompany(root) });
+
+        ctx.expect(log).toMatch(/to the brand \.env/);
+        ctx.expect(!log.includes('company'), `no company, no company line: ${log}`).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'preflight walkthrough: scope gap names the acting identity + both remedies (cp236 model)',
+      run: (ctx) => {
+        process.env.GOOGLE_CLIENT_ID = 'id';
+        process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
+        try {
+          const root = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
+
+          const { log } = preflight(['search'], REAL_PROJECT, { brandRoot: root });
+
+          ctx.expect(log).toMatch(/search/);
+          ctx.expect(log).toMatch(/scope:siteverification/);           // what's missing, short form
+          ctx.expect(log).toMatch(/ops@example\.test/);                // acting identity (cp236)
+          ctx.expect(log).toMatch(/google-tokens\.json/);              // the token store path
+          ctx.expect(log).toMatch(/re-consent/);                       // remedy 1
+          ctx.expect(log).toMatch(/delete the token store/);           // remedy 2 (cp236 alternative)
+          ctx.expect(!log.includes(SECRET_VALUE)).toBeTruthy();
+        } finally {
+          delete process.env.GOOGLE_CLIENT_ID;
+          delete process.env.GOOGLE_CLIENT_SECRET;
+        }
+      },
+    },
+
+    // ─── Registry sanity ────────────────────────────────────────────────────────
+
+    {
+      name: 'preflight registry: every REQUIRES key is a real service, and its scopes are Google scopes',
+      run: (ctx) => {
+        for (const [serviceName, declaration] of Object.entries(REQUIRES)) {
+          ctx.expect(SERVICE_ORDER.includes(serviceName), `${serviceName} is not in SERVICE_ORDER`).toBeTruthy();
+          for (const scope of declaration.scopes || []) {
+            ctx.expect(scope, `${serviceName} scope ${scope}`).toMatch(/^https:\/\/www\.googleapis\.com\/auth\//);
+          }
+        }
+      },
+    },
+
+    {
+      name: 'runManage: preflight-failing service skips with the walkthrough reason and missingEnv',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const report = await withStreams(false, () => runManage(root, { service: 'edge' }));
+
+        ctx.expect(report.hasErrors).toBe(false);
+        ctx.expect(report.results.edge.status).toBe('skipped');
+        ctx.expect(report.results.edge.reason).toMatch(/^preflight: /);
+        ctx.expect(report.results.edge.reason).toMatch(/CLOUDFLARE_TOKEN/);
+        ctx.expect(report.results.edge.missingEnv).toEqual(['CLOUDFLARE_TOKEN']);
+      },
+    },
+
+    {
+      name: 'runManage: --strict turns the preflight failure into a hard error',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const report = await withStreams(false, () => runManage(root, { service: 'edge', strict: true }));
+
+        ctx.expect(report.hasErrors).toBe(true);
+        ctx.expect(report.results.edge.status).toBe('error');
+        ctx.expect(report.results.edge.error).toMatch(/^preflight: /);
+        ctx.expect(report.results.edge.error).toMatch(/CLOUDFLARE_TOKEN/);
+      },
+    },
+
+    {
+      name: 'runManage: a consent-gated preflight skip is NAMED in the ⚑ pending list, with its rerun hint (#228)',
+      run: async (ctx) => {
+        const root = stageBrand({ projectId: 'preflight-live' });
+
+        const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search' })));
+
+        ctx.expect(log, 'a consent gap belongs in the pending aggregate, not only in the walkthrough scroll-back').toMatch(/⚑ Skipped — needs an interactive run/);
+        ctx.expect(log, 'the ⚑ line names the service').toMatch(/search\/preflight/);
+        ctx.expect(log).toMatch(/npm run manage -- --service=search/);
+      },
+    },
+
+    {
+      name: 'runManage: the cycle continues past preflight skips (absorb, never crash)',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const report = await withStreams(false, () => runManage(root, {}));
+
+        // edge (and friends) skipped by preflight…
+        ctx.expect(report.results.edge.status).toBe('skipped');
+        ctx.expect(report.results.edge.reason).toMatch(/^preflight: /);
+        // …while later services still ran — the loop never stopped
+        ctx.expect(report.results.testing, 'testing service should still have run').toBeTruthy();
+        ctx.expect(report.results.workspace, 'workspace service should still have run').toBeTruthy();
+      },
+    },
+  ],
 });

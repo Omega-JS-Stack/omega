@@ -10,7 +10,7 @@ omega.isTesting()         // true ONLY in testing
 omega.isProduction()      // true ONLY in production
 ```
 
-**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` is `@omega.js/config`'s [environment.js](../../packages/config/src/environment.js), the module @omega.js/desktop, @omega.js/extension, @omega.js/web and @omega.js/client all answer from. It reads the `OMEGA_ENVIRONMENT` variable and nothing else, and a process whose lane never named one **throws**, naming the variable. `initialize()` sets it ONCE, right after the `.env` cascade loads, from `envEnvironment()`, the AMBIENT answer, whose rules are the ones this file always described (below). Nothing re-sniffs a raw signal at read time. The three `is*()` checks **derive** from it live on every call, so they can never disagree with `getEnvironment()`.
+**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` is `@omega.js/config`'s [environment.js](../../packages/config/src/environment.js), the module @omega.js/desktop, @omega.js/extension, @omega.js/web and @omega.js/client all answer from. It reads the `OMEGA_ENVIRONMENT` variable and nothing else, and a process whose lane never named one **throws**, naming the variable. `initialize()` sets it ONCE, right after the `.env` cascade loads, from `envEnvironment()`, the AMBIENT answer, whose rules are below. Nothing re-sniffs a raw signal at read time. The three `is*()` checks **derive** from it live on every call, so they can never disagree with `getEnvironment()`.
 
 **`ctx` forwards to the instance.** Every handler receives a `ctx`, so the same methods are exposed there and return identical results; call whichever is in scope:
 
@@ -28,7 +28,7 @@ ctx.isTesting()       // === omega.isTesting()
 | Helper | Returns |
 |---|---|
 | `getEnvironment()` | `'development' \| 'testing' \| 'production'`: the one reader of the one input; throws when it is absent. |
-| `isDevelopment()` | `true` ONLY in development (local Firebase emulator / dev), and NOT testing. Derives from `getEnvironment()`. |
+| `isDevelopment()` | `true` ONLY in development (an explicit `ENVIRONMENT=development`, or a `FUNCTIONS_EMULATOR` process no lane named an environment for), and NOT testing: the emulator `omega` starts is a testing run. Derives from `getEnvironment()`. |
 | `isTesting()` | `true` ONLY in testing. Derives from `getEnvironment()`. |
 | `isProduction()` | `true` ONLY in production (deployed Cloud Functions). A **real positive check** — NOT `!isDevelopment()`. |
 
@@ -73,10 +73,9 @@ Source: `@omega.js/config`'s [environment.js](../../packages/config/src/environm
 when it is absent ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
 @omega.js/backend is the target whose deployed runtime legitimately arrives with
 no lane above it, so `initialize()` resolves that input ONCE, from
-`@omega.js/config`'s `envEnvironment()`: the AMBIENT answer, whose precedence is
-unchanged:
+`@omega.js/config`'s `envEnvironment()`: the AMBIENT answer, in this order:
 
-1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'` (set by the test runner / emulator). A test run is a test run regardless of any other signal.
+1. **Already named**: an `OMEGA_ENVIRONMENT` the lane set stands. This is the ONE way a run is a test run: `omega test` and the emulator write `OMEGA_ENVIRONMENT=testing` into the child they spawn, and nothing else marks one.
 2. **Production** — `process.env.ENVIRONMENT === 'production'`.
 3. **Development** — `process.env.ENVIRONMENT === 'development'`, or `FUNCTIONS_EMULATOR` is set, or `TERM_PROGRAM` is `Apple_Terminal` / `vscode` (running locally).
 4. **Else**: production. A deployed Cloud Function has no `FUNCTIONS_EMULATOR` and often no `ENVIRONMENT`, so "no signal" IS the normal production state.
@@ -93,7 +92,7 @@ If you need a new environment-derived helper, add it next to the others on the `
 
 ## Why this matters
 
-**One signal, used everywhere.** The test runner sets `OMEGA_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
+**One signal, used everywhere.** The test lane sets `OMEGA_ENVIRONMENT=testing`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true`, with no per-module env var to invent.
 
 **Sub-modules check the same signal.** When framework code (an analytics flush, a webhook fan-out) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
@@ -101,4 +100,4 @@ If you need a new environment-derived helper, add it next to the others on the `
 
 ## See also
 
-- [test-framework.md](test-framework.md) — `OMEGA_TEST_MODE` is set automatically by the test runner; `TEST_EXTENDED_MODE` gates real external APIs.
+- [test-framework.md](test-framework.md): `OMEGA_ENVIRONMENT=testing` is set automatically by the test lane; `TEST_EXTENDED_MODE` gates real external APIs.

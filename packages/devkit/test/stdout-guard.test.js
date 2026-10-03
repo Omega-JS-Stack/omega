@@ -6,8 +6,7 @@
  *
  * Run: node --test test/stdout-guard.test.js
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -22,66 +21,84 @@ const SCRIPT = `
   process.stdout.write(Buffer.from([0xff, 0x0f, 0x00, 0x01]));
 `;
 
-/** Run SCRIPT under the guard with the given env, capturing both streams raw. */
-function run(env) {
+/** Run SCRIPT under the guard with the given env, capturing both streams raw; `expect` is the case's. */
+function run(expect, env) {
   const result = spawnSync(process.execPath, ['--require', GUARD, '-e', SCRIPT], {
     env: { ...process.env, ...env },
   });
-  assert.equal(result.status, 0, result.stderr?.toString());
+  expect(result.status, result.stderr?.toString()).toBe(0);
   return result;
 }
 
-test('stdout-guard: in a runner child, stdout carries the frame bytes alone', () => {
-  const { stdout, stderr } = run({ NODE_TEST_CONTEXT: 'child-v8' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'stdout-guard',
+  tests: [
+    {
+      name: 'stdout-guard: in a runner child, stdout carries the frame bytes alone',
+      run: (ctx) => {
+        const { stdout, stderr } = run(ctx.expect, { NODE_TEST_CONTEXT: 'child-v8' });
 
-  assert.deepEqual([...stdout], [0xff, 0x0f, 0x00, 0x01]);
-  assert.match(stderr.toString(), /─── \[1\/2\] website ───/);
-  assert.match(stderr.toString(), /→ a direct write/);
-});
+        ctx.expect([...stdout]).toEqual([0xff, 0x0f, 0x00, 0x01]);
+        ctx.expect(stderr.toString()).toMatch(/─── \[1\/2\] website ───/);
+        ctx.expect(stderr.toString()).toMatch(/→ a direct write/);
+      },
+    },
 
-test('stdout-guard: a spawned child inherits stderr in place of the frame pipe', () => {
-  // `stdio: 'inherit'` would hand the grandchild our fd 1 — output this process
-  // cannot patch, landing straight in the frames.
-  const spawner = `
+    {
+      name: 'stdout-guard: a spawned child inherits stderr in place of the frame pipe',
+      run: (ctx) => {
+        // `stdio: 'inherit'` would hand the grandchild our fd 1 — output this process
+        // cannot patch, landing straight in the frames.
+        const spawner = `
     const { spawnSync } = require('node:child_process');
     spawnSync(process.execPath, ['-e', "process.stdout.write('grandchild ─ line\\\\n')"], { stdio: 'inherit' });
     process.stdout.write(Buffer.from([0xff, 0x0f]));
   `;
-  const result = spawnSync(process.execPath, ['--require', GUARD, '-e', spawner], {
-    env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
-  });
+        const result = spawnSync(process.execPath, ['--require', GUARD, '-e', spawner], {
+          env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+        });
 
-  assert.equal(result.status, 0, result.stderr.toString());
-  assert.deepEqual([...result.stdout], [0xff, 0x0f]);
-  assert.match(result.stderr.toString(), /grandchild ─ line/);
-});
+        ctx.expect(result.status, result.stderr.toString()).toBe(0);
+        ctx.expect([...result.stdout]).toEqual([0xff, 0x0f]);
+        ctx.expect(result.stderr.toString()).toMatch(/grandchild ─ line/);
+      },
+    },
 
-test('stdout-guard: outside a runner child it leaves stdout alone', () => {
-  const env = { ...process.env };
-  delete env.NODE_TEST_CONTEXT;
-  const result = spawnSync(process.execPath, ['--require', GUARD, '-e', SCRIPT], { env });
+    {
+      name: 'stdout-guard: outside a runner child it leaves stdout alone',
+      run: (ctx) => {
+        const env = { ...process.env };
+        delete env.NODE_TEST_CONTEXT;
+        const result = spawnSync(process.execPath, ['--require', GUARD, '-e', SCRIPT], { env });
 
-  assert.equal(result.status, 0, result.stderr.toString());
-  assert.match(result.stdout.toString(), /─── \[1\/2\] website ───/);
-  assert.equal(result.stderr.toString(), '');
-});
+        ctx.expect(result.status, result.stderr.toString()).toBe(0);
+        ctx.expect(result.stdout.toString()).toMatch(/─── \[1\/2\] website ───/);
+        ctx.expect(result.stderr.toString()).toBe('');
+      },
+    },
 
-test('stdout-guard: loading it twice re-applies nothing', () => {
-  // Every wired package preloads the same file, but a suite can reach the guard
-  // a second way (its own require, a vendored copy) — the second application
-  // would wrap the ALREADY guarded stdout.write, stacking a layer per load.
-  const reload = `
+    {
+      name: 'stdout-guard: loading it twice re-applies nothing',
+      run: (ctx) => {
+        // Every wired package preloads the same file, but a suite can reach the guard
+        // a second way (its own require, a vendored copy) — the second application
+        // would wrap the ALREADY guarded stdout.write, stacking a layer per load.
+        const reload = `
     const first = process.stdout.write;
     delete require.cache[require.resolve(${JSON.stringify(GUARD)})];
     require(${JSON.stringify(GUARD)});
     process.stderr.write(String(process.stdout.write === first) + '\\n');
     process.stdout.write(Buffer.from([0xff, 0x0f]));
   `;
-  const result = spawnSync(process.execPath, ['--require', GUARD, '-e', reload], {
-    env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
-  });
+        const result = spawnSync(process.execPath, ['--require', GUARD, '-e', reload], {
+          env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+        });
 
-  assert.equal(result.status, 0, result.stderr.toString());
-  assert.match(result.stderr.toString(), /^true$/m);
-  assert.deepEqual([...result.stdout], [0xff, 0x0f]);
+        ctx.expect(result.status, result.stderr.toString()).toBe(0);
+        ctx.expect(result.stderr.toString()).toMatch(/^true$/m);
+        ctx.expect([...result.stdout]).toEqual([0xff, 0x0f]);
+      },
+    },
+  ],
 });

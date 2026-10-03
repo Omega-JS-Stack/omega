@@ -4,19 +4,12 @@
  */
 const fs = require('node:fs');
 const defineCases = require('../../src/test/define-cases.js');
-const { runCli, tempPath, removeAll, basenames, names } = require('./_fixtures/helpers.js');
+const { runCli, tempPath, removeAll, takeFile, basenames, names } = require('./_fixtures/helpers.js');
 
 const RUN_SHAPE_KEYS = ['durationMs', 'failed', 'noMatch', 'passed', 'skipped', 'tests'];
 const TEST_SHAPE_KEYS = ['durationMs', 'file', 'id', 'layer', 'name', 'source', 'status', 'suite'];
 const OPTIONAL_TEST_KEYS = ['reason', 'error'];
 const ANSI = /\u001b\[[0-9;]*m/g;
-
-// Read a temp output file a fixture wrote, then remove it.
-function takeFile(file) {
-  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-  removeAll(file);
-  return text;
-}
 
 module.exports = defineCases({
   type: 'group',

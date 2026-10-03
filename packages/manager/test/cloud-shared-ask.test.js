@@ -4,8 +4,7 @@
  * run asks once (a two-choice select, default No) and lands the answer.
  * Runs against the fully converged project, so the ask is the run's only prompt.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { stripVTControlCharacters } = require('node:util');
 const JSON5 = require('json5');
 
@@ -61,52 +60,64 @@ function convergedRun(brandRoot) {
   });
 }
 
-test('cloud: shared unauthored, in a terminal, the owner answers no: cloud.shared: false lands and a second run does not ask', async () => {
-  const brandRoot = stagedRoot(UNAUTHORED);
-  const tty = openTtyPrompt(); // interactive: a second ask would hang the second run
+module.exports = defineCases({
+  type: 'group',
+  description: 'cloud-shared-ask',
+  tests: [
+    {
+      name: 'cloud: shared unauthored, in a terminal, the owner answers no: cloud.shared: false lands and a second run does not ask',
+      run: async (ctx) => {
+        const brandRoot = stagedRoot(UNAUTHORED);
+        const tty = openTtyPrompt(); // interactive: a second ask would hang the second run
 
-  try {
-    const run = convergedRun(brandRoot);
-    await tty.answer('❯', '\r'); // the two-choice select, default No
-    const result = await run;
+        try {
+          const run = convergedRun(brandRoot);
+          await tty.answer('❯', '\r'); // the two-choice select, default No
+          const result = await run;
 
-    assert.equal(JSON5.parse(readConfigSource(brandRoot)).cloud.shared, false);
-    assert.equal(result.status, 'success', 'a no runs every operation, as a brand-owned project does');
+          ctx.expect(JSON5.parse(readConfigSource(brandRoot)).cloud.shared).toBe(false);
+          ctx.expect(result.status, 'a no runs every operation, as a brand-owned project does').toBe('success');
 
-    // The next run reads the file that now authors the key
-    const again = await convergedRun(brandRoot);
-    assert.equal(again.status, 'success');
-  } finally {
-    tty.close();
-  }
-});
+          // The next run reads the file that now authors the key
+          const again = await convergedRun(brandRoot);
+          ctx.expect(again.status).toBe('success');
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-test('cloud: a brand config that authors cloud.shared: false is never asked', async () => {
-  const brandRoot = stagedRoot(AUTHORED_FALSE);
-  const tty = openTtyPrompt(); // interactive: an ask here would hang
+    {
+      name: 'cloud: a brand config that authors cloud.shared: false is never asked',
+      run: async (ctx) => {
+        const brandRoot = stagedRoot(AUTHORED_FALSE);
+        const tty = openTtyPrompt(); // interactive: an ask here would hang
 
-  try {
-    const result = await convergedRun(brandRoot);
+        try {
+          const result = await convergedRun(brandRoot);
 
-    assert.equal(result.status, 'success');
-    assert.equal(readConfigSource(brandRoot), AUTHORED_FALSE);
-  } finally {
-    tty.close();
-  }
-});
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(readConfigSource(brandRoot)).toBe(AUTHORED_FALSE);
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-test('cloud: shared unauthored, headless: no prompt, and the headless line names cloud.shared', async () => {
-  const brandRoot = stagedRoot(UNAUTHORED);
-  let result;
+    {
+      name: 'cloud: shared unauthored, headless: no prompt, and the headless line names cloud.shared',
+      run: async (ctx) => {
+        const brandRoot = stagedRoot(UNAUTHORED);
+        let result;
 
-  const printed = await captureLogAsync(async () => {
-    result = await convergedRun(brandRoot);
-  });
+        const printed = await captureLogAsync(async () => {
+          result = await convergedRun(brandRoot);
+        });
 
-  assert.equal(result.status, 'success', 'the service goes on as it does today');
-  assert.equal(readConfigSource(brandRoot), UNAUTHORED);
-  assert.ok(
-    printed.includes('→ Set cloud.shared in config/omega.json5, or run manage in a terminal to answer'),
-    `headless line missing from: ${printed}`,
-  );
+        ctx.expect(result.status, 'the service goes on as it does today').toBe('success');
+        ctx.expect(readConfigSource(brandRoot)).toBe(UNAUTHORED);
+        ctx.expect(printed.includes('→ Set cloud.shared in config/omega.json5, or run manage in a terminal to answer'), `headless line missing from: ${printed}`).toBeTruthy();
+      },
+    },
+  ],
 });

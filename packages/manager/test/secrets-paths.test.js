@@ -14,8 +14,7 @@
  * built (the key is deliberately unreadable, which is what proves it was the
  * file the service opened).
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -47,35 +46,50 @@ function runMigrations(brandRoot) {
   });
 }
 
-test('secrets paths: the migrations service names the devkit key path when none is minted', async () => {
-  const result = await runMigrations(stageBrand());
+module.exports = defineCases({
+  type: 'group',
+  description: 'secrets-paths',
+  tests: [
+    {
+      name: 'secrets paths: the migrations service names the devkit key path when none is minted',
+      run: async (ctx) => {
+        const result = await runMigrations(stageBrand());
 
-  assert.equal(result.status, 'skipped');
-  assert.ok(result.reason.includes(SERVICE_ACCOUNT_REL), `the skip reason names ${SERVICE_ACCOUNT_REL}: ${result.reason}`);
-});
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason.includes(SERVICE_ACCOUNT_REL), `the skip reason names ${SERVICE_ACCOUNT_REL}: ${result.reason}`).toBeTruthy();
+      },
+    },
 
-test('secrets paths: the migrations service reads the key from the devkit path', async () => {
-  const brandRoot = stageBrand();
-  // Unreadable on purpose: the service gets past the exists() check and dies
-  // naming the file it opened, which is the whole assertion.
-  jetpack.write(join(brandRoot, SERVICE_ACCOUNT_REL), 'not json');
+    {
+      name: 'secrets paths: the migrations service reads the key from the devkit path',
+      run: async (ctx) => {
+        const brandRoot = stageBrand();
+        // Unreadable on purpose: the service gets past the exists() check and dies
+        // naming the file it opened, which is the whole assertion.
+        jetpack.write(join(brandRoot, SERVICE_ACCOUNT_REL), 'not json');
 
-  await assert.rejects(runMigrations(brandRoot), (error) => {
-    assert.ok(error.message.includes(join(brandRoot, SERVICE_ACCOUNT_REL)), error.message);
-    return true;
-  });
-});
+        await ctx.expect(runMigrations(brandRoot)).rejects.toThrow((error) => {
+          ctx.expect(error.message.includes(join(brandRoot, SERVICE_ACCOUNT_REL)), error.message).toBeTruthy();
+          return true;
+        });
+      },
+    },
 
-test('secrets paths: the legacy OAuth conversion writes the devkit oauth path', () => {
-  const brandRoot = stageBrand();
-  jetpack.write(join(brandRoot, '.omega', 'secrets', 'oauth.json'), {
-    googleClientId: 'client-id',
-    googleClientSecret: 'client-secret',
-  });
+    {
+      name: 'secrets paths: the legacy OAuth conversion writes the devkit oauth path',
+      run: (ctx) => {
+        const brandRoot = stageBrand();
+        jetpack.write(join(brandRoot, '.omega', 'secrets', 'oauth.json'), {
+          googleClientId: 'client-id',
+          googleClientSecret: 'client-secret',
+        });
 
-  assert.deepEqual(convertLegacyOAuthSecret(brandRoot), { converted: true });
-  assert.deepEqual(jetpack.read(join(brandRoot, GOOGLE_OAUTH_REL), 'json'), {
-    clientId: 'client-id',
-    clientSecret: 'client-secret',
-  });
+        ctx.expect(convertLegacyOAuthSecret(brandRoot)).toEqual({ converted: true });
+        ctx.expect(jetpack.read(join(brandRoot, GOOGLE_OAUTH_REL), 'json')).toEqual({
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+        });
+      },
+    },
+  ],
 });

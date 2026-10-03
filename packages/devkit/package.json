@@ -96,7 +96,7 @@
     "./target-picker": "./src/target-picker.js"
   },
   "scripts": {
-    "test": "node scripts/run-tests.js"
+    "test": "node src/test/cli.js --isolation=process"
   },
   "engines": {
     "node": ">=22"

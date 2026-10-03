@@ -7,64 +7,90 @@
  * this file rather than quietly moving both surfaces at once.
  */
 
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { PAYMENT_PROVIDERS, paymentProvider, clientConfig } = require('../src/index.js');
 
 const CAPABILITY_KEYS = ['id', 'name', 'acceptsZeroCharge', 'refundable', 'couponsHostedByProvider', 'subscriptions', 'oneTime', 'trials'];
 
-test('every descriptor carries exactly the capability keys, keyed by its own id', () => {
-  for (const [id, descriptor] of Object.entries(PAYMENT_PROVIDERS)) {
-    assert.deepStrictEqual(Object.keys(descriptor), CAPABILITY_KEYS, `${id} carries the one descriptor shape`);
-    assert.strictEqual(descriptor.id, id, `${id} is keyed by its own id`);
-    assert.strictEqual(typeof descriptor.name, 'string');
-    CAPABILITY_KEYS.slice(2).forEach((key) => assert.strictEqual(typeof descriptor[key], 'boolean', `${id}.${key} is a boolean`));
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'payment-providers',
+  tests: [
+    {
+      name: 'every descriptor carries exactly the capability keys, keyed by its own id',
+      run: (ctx) => {
+        for (const [id, descriptor] of Object.entries(PAYMENT_PROVIDERS)) {
+          ctx.expect(Object.keys(descriptor), `${id} carries the one descriptor shape`).toEqual(CAPABILITY_KEYS);
+          ctx.expect(descriptor.id, `${id} is keyed by its own id`).toBe(id);
+          ctx.expect(typeof descriptor.name).toBe('string');
+          CAPABILITY_KEYS.slice(2).forEach((key) => ctx.expect(typeof descriptor[key], `${id}.${key} is a boolean`).toBe('boolean'));
+        }
+      },
+    },
 
-test('the rulings, row by row', () => {
-  const row = (id) => {
-    const { name, ...capabilities } = PAYMENT_PROVIDERS[id];
-    return capabilities;
-  };
+    {
+      name: 'the rulings, row by row',
+      run: (ctx) => {
+        const row = (id) => {
+          const { name, ...capabilities } = PAYMENT_PROVIDERS[id];
+          return capabilities;
+        };
 
-  // Hosted coupons, and a 100% code is the provider's own $0 checkout
-  assert.deepStrictEqual(row('stripe'), { id: 'stripe', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
-  assert.deepStrictEqual(row('chargebee'), { id: 'chargebee', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
-  // A computed price, and no API here takes a zero one
-  assert.deepStrictEqual(row('paypal'), { id: 'paypal', acceptsZeroCharge: false, refundable: true, couponsHostedByProvider: false, subscriptions: true, oneTime: true, trials: true });
-  // One hosted charge: no refund API, nothing recurring
-  assert.deepStrictEqual(row('coinbase'), { id: 'coinbase', acceptsZeroCharge: false, refundable: false, couponsHostedByProvider: false, subscriptions: false, oneTime: true, trials: false });
-  // The fixture provider does everything, so no test is ever limited by it
-  assert.deepStrictEqual(row('test'), { id: 'test', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
-  assert.deepStrictEqual(Object.keys(PAYMENT_PROVIDERS).sort(), ['chargebee', 'coinbase', 'paypal', 'stripe', 'test']);
-});
+        // Hosted coupons, and a 100% code is the provider's own $0 checkout
+        ctx.expect(row('stripe')).toEqual({ id: 'stripe', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
+        ctx.expect(row('chargebee')).toEqual({ id: 'chargebee', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
+        // A computed price, and no API here takes a zero one
+        ctx.expect(row('paypal')).toEqual({ id: 'paypal', acceptsZeroCharge: false, refundable: true, couponsHostedByProvider: false, subscriptions: true, oneTime: true, trials: true });
+        // One hosted charge: no refund API, nothing recurring
+        ctx.expect(row('coinbase')).toEqual({ id: 'coinbase', acceptsZeroCharge: false, refundable: false, couponsHostedByProvider: false, subscriptions: false, oneTime: true, trials: false });
+        // The fixture provider does everything, so no test is ever limited by it
+        ctx.expect(row('test')).toEqual({ id: 'test', acceptsZeroCharge: true, refundable: true, couponsHostedByProvider: true, subscriptions: true, oneTime: true, trials: true });
+        ctx.expect(Object.keys(PAYMENT_PROVIDERS).sort()).toEqual(['chargebee', 'coinbase', 'paypal', 'stripe', 'test']);
+      },
+    },
 
-test('the display names are the words a refusal speaks', () => {
-  assert.strictEqual(PAYMENT_PROVIDERS.paypal.name, 'PayPal');
-  assert.strictEqual(PAYMENT_PROVIDERS.coinbase.name, 'Coinbase Commerce');
-});
+    {
+      name: 'the display names are the words a refusal speaks',
+      run: (ctx) => {
+        ctx.expect(PAYMENT_PROVIDERS.paypal.name).toBe('PayPal');
+        ctx.expect(PAYMENT_PROVIDERS.coinbase.name).toBe('Coinbase Commerce');
+      },
+    },
 
-test('paymentProvider() answers a known id, and null for anything else', () => {
-  assert.strictEqual(paymentProvider('paypal'), PAYMENT_PROVIDERS.paypal);
-  assert.strictEqual(paymentProvider('unknown-provider'), null);
-  // A request names the provider, so an inherited property is never a provider
-  assert.strictEqual(paymentProvider('constructor'), null);
-  assert.strictEqual(paymentProvider('__proto__'), null);
-  assert.strictEqual(paymentProvider(undefined), null);
-});
+    {
+      name: 'paymentProvider() answers a known id, and null for anything else',
+      run: (ctx) => {
+        ctx.expect(paymentProvider('paypal')).toBe(PAYMENT_PROVIDERS.paypal);
+        ctx.expect(paymentProvider('unknown-provider')).toBe(null);
+        // A request names the provider, so an inherited property is never a provider
+        ctx.expect(paymentProvider('constructor')).toBe(null);
+        ctx.expect(paymentProvider('__proto__')).toBe(null);
+        ctx.expect(paymentProvider(undefined)).toBe(null);
+      },
+    },
 
-test('the table is frozen: no caller can edit a capability at runtime', () => {
-  assert.ok(Object.isFrozen(PAYMENT_PROVIDERS));
-  assert.ok(Object.isFrozen(PAYMENT_PROVIDERS.coinbase));
-});
+    {
+      name: 'the table is frozen: no caller can edit a capability at runtime',
+      run: (ctx) => {
+        ctx.expect(Object.isFrozen(PAYMENT_PROVIDERS)).toBeTruthy();
+        ctx.expect(Object.isFrozen(PAYMENT_PROVIDERS.coinbase)).toBeTruthy();
+      },
+    },
 
-test('the browser bake carries the SAME table as payment.capabilities', () => {
-  const client = clientConfig({ payment: { providers: { paypal: { clientId: 'x' } }, products: [] } });
+    {
+      name: 'the browser bake carries the SAME table as payment.capabilities',
+      run: (ctx) => {
+        const client = clientConfig({ payment: { providers: { paypal: { clientId: 'x' } }, products: [] } });
 
-  assert.deepStrictEqual(client.payment.capabilities, JSON.parse(JSON.stringify(PAYMENT_PROVIDERS)));
-});
+        ctx.expect(client.payment.capabilities).toEqual(JSON.parse(JSON.stringify(PAYMENT_PROVIDERS)));
+      },
+    },
 
-test('a config with no payment section bakes no capability table', () => {
-  assert.strictEqual(clientConfig({ brand: { id: 'acme' } }).payment, undefined);
+    {
+      name: 'a config with no payment section bakes no capability table',
+      run: (ctx) => {
+        ctx.expect(clientConfig({ brand: { id: 'acme' } }).payment).toBe(undefined);
+      },
+    },
+  ],
 });

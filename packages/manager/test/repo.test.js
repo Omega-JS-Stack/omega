@@ -12,8 +12,7 @@
  * are plain GET reads whose ANSWERS are the whole point of that step, so they
  * come from stubs.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
@@ -145,241 +144,6 @@ function convergedWorld() {
   };
 }
 
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('repo service: a config with no repo block skips, naming repo.owner', async () => {
-  const config = brandConfig();
-  delete config.repo;
-
-  const result = await run(config, client(ghWorld()));
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /repo\.owner/);
-});
-
-test('repo service: an owner with no brand.id fails loudly instead of ensuring half an address', async () => {
-  const config = brandConfig();
-  delete config.brand.id;
-
-  await assert.rejects(() => run(config, client(ghWorld())), /brand\.id/);
-});
-
-test('repo service: an origin that is not the derived source repo REFUSES before anything is ensured (#934)', async () => {
-  // A real checkout, with the remote a rename leaves behind: same org, another
-  // name, so the owner-only compare this replaced would have walked on and
-  // ensured fixture-org/fixture-brand-omega beside the repo origin points at.
-  const root = brandRoot(true);
-  const { execFileSync } = require('node:child_process');
-  execFileSync('git', ['-C', root, 'init', '-q']);
-  execFileSync('git', ['-C', root, 'remote', 'add', 'origin', 'https://github.com/fixture-org/fixture-brand-site.git']);
-
-  const execFn = ghWorld();
-
-  await assert.rejects(
-    () => run(brandConfig(), client(execFn), { root }),
-    (error) => {
-      assert.equal(error.message, `origin is fixture-org/fixture-brand-site but config derives ${SOURCE}: fix repo.owner in config/omega.json5 or move the repo`);
-      return true;
-    },
-  );
-  assert.deepEqual(execFn.calls, [], 'not one gh call: nothing read, nothing ensured');
-});
-
-test('repo service: the operations are the two roles, the runner check, then the secrets push', () => {
-  // `secrets` is LAST (#891): it publishes into the repos the roles above make.
-  assert.deepEqual(OPERATIONS.repo.map((op) => op.name), ['repo', 'website', 'runners', 'secrets']);
-});
-
-// ─── The plan (dry run) ──────────────────────────────────────────────────────
-
-test('dry run: the plan names the private source repo and the public website repo, and mutates nothing', async () => {
-  const execFn = ghWorld();
-  const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(execFn.mutations(), []);
-
-  assert.deepEqual(result.output.repo.planned, [`create ${SOURCE} (private)`]);
-  assert.deepEqual(result.output.website.planned, [`create ${WEBSITE} (public: free plan)`]);
-  assert.equal(result.output.website.repos[0].visibility, 'public');
-});
-
-test('dry run: a private brand on a PAID org plans a private website repo, saying which plan', async () => {
-  const execFn = ghWorld({ plan: 'team' });
-  const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
-
-  assert.deepEqual(result.output.website.planned, [`create ${WEBSITE} (private: fixture-org is on the team plan)`]);
-  assert.equal(result.output.website.repos[0].visibility, 'private');
-});
-
-test('dry run: a PUBLIC brand publishes both repos, the plan never asked about', async () => {
-  const execFn = ghWorld();
-  const api = client(execFn);
-  const result = await run(brandConfig(), api, { root: brandRoot(false), options: { dryRun: true } });
-
-  assert.deepEqual(result.output.repo.planned, [`create ${SOURCE} (public)`]);
-  assert.deepEqual(result.output.website.planned, [`create ${WEBSITE} (public: the brand is public)`]);
-  assert.equal(api.planReads, 0, 'a public brand needs no plan to know the answer');
-});
-
-test('visibility: a brand root with no `private` key at all is private (#883)', async () => {
-  const execFn = ghWorld();
-  const result = await run(brandConfig(), client(execFn), { root: brandRoot(undefined), options: { dryRun: true } });
-
-  assert.deepEqual(result.output.repo.planned, [`create ${SOURCE} (private)`]);
-});
-
-// ─── The source role ─────────────────────────────────────────────────────────
-
-test('source: the repo is created private, with no homepage and no initial commit', async () => {
-  const execFn = ghWorld();
-  const result = await run(brandConfig(), client(execFn));
-
-  assert.equal(result.output.repo.created, true);
-  const create = execFn.calls.find((args) => args[0] === 'repo' && args[1] === 'create');
-  assert.deepEqual(create, ['repo', 'create', SOURCE, '--private', '--description', 'A fixture brand']);
-  assert.equal(result.state.repo.fullName, SOURCE);
-});
-
-test('source: visibility drift is patched back to what the brand root states', async () => {
-  const world = convergedWorld();
-  world.repos[SOURCE] = { private: false, homepage: '' };
-  const execFn = ghWorld(world);
-
-  const result = await run(brandConfig(), client(execFn));
-
-  assert.equal(result.output.repo.changed, true);
-  assert.deepEqual(result.output.repo.planned, [`${SOURCE}: public -> private`]);
-  const patch = execFn.calls.find((args) => args.includes('-X') && args[1] === `repos/${SOURCE}`);
-  assert.deepEqual(patch, ['api', `repos/${SOURCE}`, '-X', 'PATCH', '-F', 'private=true']);
-});
-
-test('source: Pages still serving the source repo is a warning with the by-hand steps, never a delete', async () => {
-  const world = convergedWorld();
-  world.pages[SOURCE] = { source: { branch: 'gh-pages' }, cname: 'fixture-brand.test' };
-  const execFn = ghWorld(world);
-
-  const result = await run(brandConfig(), client(execFn));
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.warned, [{ operation: 'repo', reason: `${SOURCE} still serves GitHub Pages: the website moved to its own repo (#883)` }]);
-  assert.deepEqual(execFn.mutations(), [], 'the walk never retires Pages on its own');
-});
-
-test('source: Pages is never CONFIGURED on the source repo, converged or fresh', async () => {
-  const converged = ghWorld(convergedWorld());
-  await run(brandConfig(), client(converged));
-
-  const fresh = ghWorld();
-  await run(brandConfig(), client(fresh));
-
-  for (const execFn of [converged, fresh]) {
-    const sourcePages = execFn.calls.filter((args) => args[1] === `repos/${SOURCE}/pages` && args.includes('-X'));
-    assert.deepEqual(sourcePages, []);
-  }
-});
-
-// ─── The website role ────────────────────────────────────────────────────────
-
-test('website: a fresh repo is created public with the target url, and Pages waits for the first deploy', async () => {
-  const execFn = ghWorld();
-  const result = await run(brandConfig(), client(execFn));
-
-  const create = execFn.calls.find((args) => args[0] === 'repo' && args[1] === 'create' && args[2] === WEBSITE);
-  assert.deepEqual(create, [
-    'repo', 'create', WEBSITE, '--public',
-    '--description', 'Fixture Brand website (web)',
-    '--homepage', 'https://fixture-brand.test',
-  ]);
-  assert.ok(!create.includes('--add-readme'), 'a repo the deploy force-pushes never starts with a commit');
-
-  assert.equal(result.output.website.repos[0].pagesPending, true);
-  assert.deepEqual(endpoints(execFn).filter((endpoint) => endpoint === `repos/${WEBSITE}/pages`), []);
-});
-
-test('website: once gh-pages exists, Pages is pointed at it and at the target host', async () => {
-  const execFn = ghWorld({
-    repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' } },
-    branches: { [WEBSITE]: ['gh-pages'] },
-  });
-  const result = await run(brandConfig(), client(execFn));
-
-  assert.deepEqual(result.output.website.planned, [`pages ${WEBSITE}: gh-pages -> fixture-brand.test`]);
-  const post = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('POST'));
-  assert.deepEqual(post, ['api', `repos/${WEBSITE}/pages`, '-X', 'POST', '-f', 'source[branch]=gh-pages', '-f', 'source[path]=/']);
-  const domain = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('PUT'));
-  assert.deepEqual(domain, ['api', `repos/${WEBSITE}/pages`, '-X', 'PUT', '-f', 'cname=fixture-brand.test']);
-});
-
-test('website: two web targets get two repos, one per NAME, off ONE plan read', async () => {
-  const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
-  const execFn = ghWorld();
-  const api = client(execFn);
-
-  const result = await run(config, api, { options: { dryRun: true } });
-
-  assert.deepEqual(result.output.website.repos.map((repo) => repo.slug), [
-    WEBSITE,
-    'fixture-org/fixture-brand-community',
-  ]);
-  assert.equal(api.planReads, 1, 'the plan is the org\'s, not the target\'s');
-  assert.match(result.output.website.planned.join('\n'), /create fixture-org\/fixture-brand-community \(public: free plan\)/);
-});
-
-test('website: the second target\'s Pages domain is its OWN subdomain', async () => {
-  const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
-  const execFn = ghWorld({
-    repos: {
-      [SOURCE]: { private: true },
-      [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' },
-      'fixture-org/fixture-brand-community': { private: false, homepage: 'https://community.fixture-brand.test' },
-    },
-    branches: { 'fixture-org/fixture-brand-community': ['gh-pages'] },
-  });
-
-  await run(config, client(execFn));
-
-  const domain = execFn.calls.find((args) => args[1] === 'repos/fixture-org/fixture-brand-community/pages' && args.includes('PUT'));
-  assert.deepEqual(domain, ['api', 'repos/fixture-org/fixture-brand-community/pages', '-X', 'PUT', '-f', 'cname=community.fixture-brand.test']);
-});
-
-// C5/#366: a project site's url IS its Pages address, so the walk has no custom
-// domain to claim. The derivation is @omega.js/config's ONE `pagesHost`, the
-// same one the web deploy writes its CNAME file from: claiming
-// `<owner>.github.io` here would take the site off the address it serves at.
-test('website: a *.github.io brand claims NO custom domain', async () => {
-  const config = brandConfig();
-  config.brand.url = 'https://fixture-org.github.io/fixture-brand-web/';
-  const execFn = ghWorld({
-    repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-org.github.io/fixture-brand-web/' } },
-    branches: { [WEBSITE]: ['gh-pages'] },
-  });
-
-  const result = await run(config, client(execFn));
-
-  assert.deepEqual(result.output.website.planned, [`pages ${WEBSITE}: gh-pages`], 'the branch, and no domain');
-  const domain = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('PUT'));
-  assert.equal(domain, undefined, 'no cname is ever PUT for a project site');
-});
-
-test('website: a brand with no web target owns no website repo', async () => {
-  const execFn = ghWorld();
-  const result = await run(brandConfig({ targets: { backend: { type: 'backend' } } }), client(execFn));
-
-  assert.equal(result.output.website.skipped, 'no GitHub-hosted web target');
-  assert.deepEqual(endpoints(execFn).filter((endpoint) => endpoint.includes('-web')), []);
-});
-
-// ─── Idempotency ─────────────────────────────────────────────────────────────
-
-test('a fully converged brand is a zero-mutation no-op', async () => {
-  const execFn = ghWorld(convergedWorld());
-  const result = await run(brandConfig(), client(execFn));
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(execFn.mutations(), []);
-  assert.deepEqual(result.output.website.planned, []);
-});
-
 // ─── Runners (#872, #879) ────────────────────────────────────────────────────
 
 const RUNNERS_LINK = 'https://github.com/organizations/fixture-org/settings/actions/runner-groups';
@@ -458,226 +222,6 @@ async function captureRun(body) {
   }
 }
 
-test('runners: an org group that allows public repositories passes', async () => {
-  const { result, api } = await runDesktop({
-    groups: { runner_groups: [{ id: 1, name: 'Default', allows_public_repositories: true, visibility: 'all' }] },
-  });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.runners.group, 'Default');
-  assert.deepEqual(api.groupReads, [], 'visibility all already answers for every repo');
-});
-
-test('runners: a selected-repositories group that lists the SOURCE repo passes (#879)', async () => {
-  const { result, api } = await runDesktop({
-    groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
-    repositories: { repositories: [{ name: 'fixture-brand-omega', full_name: SOURCE }] },
-  });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.groupReads, [['fixture-org', 7]]);
-  assert.equal(result.output.runners.group, 'Signers');
-});
-
-test('runners: a selected-repositories group without the source repo FAILS the walk (#879)', async () => {
-  const { result } = await runDesktop({
-    groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
-    repositories: { repositories: [{ name: 'other-omega', full_name: 'fixture-org/other-omega' }] },
-  });
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /Signers/);
-  assert.ok(result.error.includes(SOURCE));
-  assert.ok(result.error.includes(RUNNERS_LINK));
-  assert.deepEqual(result.failed, [{ operation: 'runners', reason: result.error }]);
-});
-
-test('runners: a later allowing group serves the repo when an earlier selected group leaves it out (#879)', async () => {
-  const { result, api } = await runDesktop({
-    groups: {
-      runner_groups: [
-        { id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' },
-        { id: 2, name: 'Default', allows_public_repositories: true, visibility: 'all' },
-      ],
-    },
-    repositories: { repositories: [] },
-  });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.runners.group, 'Default');
-  assert.deepEqual(api.groupReads, [['fixture-org', 7]]);
-});
-
-test('runners: a token without the scope to read a group\'s repositories warns with the link (#879)', async () => {
-  const { result } = await runDesktop({
-    groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
-    repositoriesError: 'gh api failed: HTTP 403: Resource not accessible by integration',
-  });
-
-  assert.equal(result.status, 'warned');
-  assert.equal(result.warned.at(-1).operation, 'runners');
-  assert.ok(result.output.runners.unreadable.includes(RUNNERS_LINK));
-});
-
-test('runners: a repositories read that fails for any other reason is an error, never "check it by hand" (#879)', async () => {
-  const { result } = await runDesktop({
-    groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
-    repositoriesError: 'gh api failed: HTTP 500: Internal Server Error',
-  });
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /HTTP 500/);
-});
-
-test('runners: no group allowing public repositories FAILS the walk, naming the checkbox and the link', async () => {
-  const { result } = await runDesktop({
-    groups: { runner_groups: [{ name: 'Default', allows_public_repositories: false }] },
-  });
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /Allow public repositories/);
-  assert.ok(result.error.includes(RUNNERS_LINK));
-});
-
-test('runners: a personal-account owner has no runner groups to read', async () => {
-  const { result } = await runDesktop({ user: { type: 'User' } });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.runners.skipped, 'owner is not an organization');
-});
-
-test('runners: a token without the scope to read the groups warns with the link', async () => {
-  const { result } = await runDesktop({ groupsError: 'gh api failed: HTTP 403: Resource not accessible by integration' });
-
-  assert.equal(result.status, 'warned');
-  assert.ok(result.output.runners.unreadable.includes(RUNNERS_LINK));
-});
-
-test('runners: a cloud Windows signer never touches the org runner groups', async () => {
-  const { result } = await runDesktop({}, { config: desktopBrand({ platforms: { windows: { signing: { strategy: 'cloud' } } } }) });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.runners.skipped, 'Windows signing strategy is cloud');
-});
-
-test('runners: the signing strategy is read off the desktop-TYPED entry, whatever it is named (#886)', async () => {
-  const config = brandConfig({
-    targets: { web: { type: 'web' }, app: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud' } } } } },
-  });
-  const { result } = await runDesktop({}, { config });
-
-  assert.equal(result.output.runners.skipped, 'Windows signing strategy is cloud', 'the entry named `app` is the desktop target');
-});
-
-test('runners: a PRIVATE brand and a brand with no desktop target both skip', async () => {
-  const priv = await runDesktop({}, { isPrivate: true });
-  assert.equal(priv.result.output.runners.skipped, 'repo is private');
-
-  const noDesktop = await runDesktop({}, { config: brandConfig() });
-  assert.equal(noDesktop.result.output.runners.skipped, 'no desktop target');
-});
-
-
-// ─── runners: the stray-trigger warning (#875) ───────────────────────────────
-// The org runner group says whether a dispatch REACHES the self-hosted signer;
-// this says what ELSE could reach it. A workflow with a job on the box fires on
-// a dispatch and nothing else, so a `push` or `pull_request` trigger in one is
-// warned on by name.
-
-test('runners: a push trigger in a workflow that targets a self-hosted runner warns, naming the file and the trigger (#875)', async () => {
-  const { result, lines } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push:\n    branches: [main]') } },
-  ));
-
-  assert.equal(result.status, 'warned');
-  assert.equal(result.warned.at(-1).operation, 'runners');
-  assert.deepEqual(result.output.runners.strayTriggers, [{ file: 'desktop-build.yml', trigger: 'push' }]);
-  // The group answer rides along: the two checks never overwrite each other.
-  assert.equal(result.output.runners.group, 'Default');
-
-  const warning = lines.find((line) => line.includes('desktop-build.yml') && line.includes('push'));
-  assert.ok(warning, 'one line naming the file and the trigger');
-  assert.match(warning, /self-hosted/);
-});
-
-test('runners: a pull_request trigger is warned on too, and both are named at once (#875)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': workflow('  push:\n  pull_request:\n  workflow_dispatch:') } },
-  ));
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.runners.strayTriggers, [
-    { file: 'desktop-build.yml', trigger: 'push' },
-    { file: 'desktop-build.yml', trigger: 'pull_request' },
-  ]);
-  assert.match(result.warned.at(-1).reason, /desktop-build\.yml \(push\), desktop-build\.yml \(pull_request\)/);
-});
-
-test('runners: the dispatch-only workflows a brand actually composes warn about nothing (#875)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:') } },
-  ));
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.runners.group, 'Default');
-  assert.equal(result.output.runners.strayTriggers, undefined);
-});
-
-test('runners: a push trigger on a HOSTED-runner workflow is nobody\'s emergency (#875)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'web-build.yml': workflow('  push:\n  workflow_dispatch:', 'ubuntu-latest') } },
-  ));
-
-  assert.equal(result.status, 'success');
-});
-
-test('runners: a trigger with a trailing COMMENT is still a stray trigger (B3)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push: # only main, for now') } },
-  ));
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.runners.strayTriggers, [{ file: 'desktop-build.yml', trigger: 'push' }]);
-});
-
-test('runners: a FLOW-style trigger is still a stray trigger (C7)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push: { branches: [main] }') } },
-  ));
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.runners.strayTriggers, [{ file: 'desktop-build.yml', trigger: 'push' }]);
-});
-
-test('runners: the QUOTED `"on":` key reads like the bare one (C7)', async () => {
-  // YAML 1.1 reads a bare `on` as the boolean true, so a quoted key is a
-  // spelling a real workflow carries, not a curiosity.
-  const quoted = workflow('  workflow_dispatch:\n  push:').replace(/^on:$/m, '"on":');
-
-  const { result } = await captureRun(() => runDesktop(
-    { groups: ALLOWING },
-    { workflows: { 'desktop-build.yml': quoted } },
-  ));
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.runners.strayTriggers, [{ file: 'desktop-build.yml', trigger: 'push' }]);
-});
-
-test('runners: a stray trigger never softens the runner-group ERROR it rides with (#875)', async () => {
-  const { result } = await captureRun(() => runDesktop(
-    { groups: { runner_groups: [{ name: 'Default', allows_public_repositories: false }] } },
-    { workflows: { 'desktop-build.yml': workflow('  push:') } },
-  ));
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /Allow public repositories/);
-});
 
 
 // ─── secrets: the manage-lane call of the ONE publisher (#891) ──────────────
@@ -719,54 +263,635 @@ function brandWithTarget({ target, brandEnv = '', extra = {} }) {
   return { root, targets: [{ name: target, dir: `targets/${target}`, path: targetPath, target }] };
 }
 
-test('secrets: a dry run plans the target\'s key NAMES and issues no gh call', async () => {
-  const { root, targets } = brandWithTarget({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
-  const execFn = ghWorld(convergedWorld());
-  const secretsGh = ghWorld(convergedWorld());
+module.exports = defineCases({
+  type: 'group',
+  description: 'repo',
+  tests: [
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot: root,
-    brandConfig: brandConfig(),
-    brand: { id: 'fixture-brand', config: brandConfig(), enabledTargets: ['web'], targets: [] },
-    targets,
-    operations: OPERATIONS.repo,
-    options: { dryRun: true },
-    serviceData: {},
-    githubApi: client(execFn),
-    execFn: secretsGh,
-  });
+    {
+      name: 'repo service: a config with no repo block skips, naming repo.owner',
+      run: async (ctx) => {
+        const config = brandConfig();
+        delete config.repo;
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.secrets.extension.planned, ['CHROME_CLIENT_ID']);
-  assert.deepEqual(secretsGh.calls, [], 'a dry run sends nothing');
-});
+        const result = await run(config, client(ghWorld()));
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/repo\.owner/);
+      },
+    },
 
-test('secrets: a REFUSED target is the operation\'s error, with the key and its fix', async () => {
-  // Apple signing declared, no signing tree: the mac set is required and the
-  // cascade cannot value it, so the publisher refuses and publishes nothing.
-  const { root, targets } = brandWithTarget({
-    target: 'desktop',
-    brandEnv: 'CSC_KEY_PASSWORD=pw\n',
-    extra: { certificates: { providers: { apple: { teamId: 'TEAMTEST12' } } } },
-  });
-  const secretsGh = ghWorld(convergedWorld());
+    {
+      name: 'repo service: an owner with no brand.id fails loudly instead of ensuring half an address',
+      run: async (ctx) => {
+        const config = brandConfig();
+        delete config.brand.id;
 
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot: root,
-    brandConfig: brandConfig(),
-    brand: { id: 'fixture-brand', config: brandConfig(), enabledTargets: ['web'], targets: [] },
-    targets,
-    operations: OPERATIONS.repo,
-    options: {},
-    serviceData: {},
-    githubApi: client(ghWorld(convergedWorld())),
-    execFn: secretsGh,
-  });
+        await ctx.expect((() => run(config, client(ghWorld())))()).rejects.toThrow(/brand\.id/);
+      },
+    },
 
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /CSC_LINK/);
-  assert.match(result.error, /omega manage --service certificates/);
-  assert.deepEqual(secretsGh.calls, [], 'a refusal publishes nothing');
+    {
+      name: 'repo service: an origin that is not the derived source repo REFUSES before anything is ensured (#934)',
+      run: async (ctx) => {
+        // A real checkout, with the remote a rename leaves behind: same org, another
+        // name, so the owner-only compare this replaced would have walked on and
+        // ensured fixture-org/fixture-brand-omega beside the repo origin points at.
+        const root = brandRoot(true);
+        const { execFileSync } = require('node:child_process');
+        execFileSync('git', ['-C', root, 'init', '-q']);
+        execFileSync('git', ['-C', root, 'remote', 'add', 'origin', 'https://github.com/fixture-org/fixture-brand-site.git']);
+
+        const execFn = ghWorld();
+
+        await ctx.expect((() => run(brandConfig(), client(execFn), { root }))()).rejects.toThrow((error) => {
+            ctx.expect(error.message).toBe(`origin is fixture-org/fixture-brand-site but config derives ${SOURCE}: fix repo.owner in config/omega.json5 or move the repo`);
+            return true;
+          });
+        ctx.expect(execFn.calls, 'not one gh call: nothing read, nothing ensured').toEqual([]);
+      },
+    },
+
+    {
+      name: 'repo service: the operations are the two roles, the runner check, then the secrets push',
+      run: (ctx) => {
+        // `secrets` is LAST (#891): it publishes into the repos the roles above make.
+        ctx.expect(OPERATIONS.repo.map((op) => op.name)).toEqual(['repo', 'website', 'runners', 'secrets']);
+      },
+    },
+
+    // ─── The plan (dry run) ──────────────────────────────────────────────────────
+
+    {
+      name: 'dry run: the plan names the private source repo and the public website repo, and mutates nothing',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(execFn.mutations()).toEqual([]);
+
+        ctx.expect(result.output.repo.planned).toEqual([`create ${SOURCE} (private)`]);
+        ctx.expect(result.output.website.planned).toEqual([`create ${WEBSITE} (public: free plan)`]);
+        ctx.expect(result.output.website.repos[0].visibility).toBe('public');
+      },
+    },
+
+    {
+      name: 'dry run: a private brand on a PAID org plans a private website repo, saying which plan',
+      run: async (ctx) => {
+        const execFn = ghWorld({ plan: 'team' });
+        const result = await run(brandConfig(), client(execFn), { options: { dryRun: true } });
+
+        ctx.expect(result.output.website.planned).toEqual([`create ${WEBSITE} (private: fixture-org is on the team plan)`]);
+        ctx.expect(result.output.website.repos[0].visibility).toBe('private');
+      },
+    },
+
+    {
+      name: 'dry run: a PUBLIC brand publishes both repos, the plan never asked about',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const api = client(execFn);
+        const result = await run(brandConfig(), api, { root: brandRoot(false), options: { dryRun: true } });
+
+        ctx.expect(result.output.repo.planned).toEqual([`create ${SOURCE} (public)`]);
+        ctx.expect(result.output.website.planned).toEqual([`create ${WEBSITE} (public: the brand is public)`]);
+        ctx.expect(api.planReads, 'a public brand needs no plan to know the answer').toBe(0);
+      },
+    },
+
+    {
+      name: 'visibility: a brand root with no `private` key at all is private (#883)',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const result = await run(brandConfig(), client(execFn), { root: brandRoot(undefined), options: { dryRun: true } });
+
+        ctx.expect(result.output.repo.planned).toEqual([`create ${SOURCE} (private)`]);
+      },
+    },
+
+    // ─── The source role ─────────────────────────────────────────────────────────
+
+    {
+      name: 'source: the repo is created private, with no homepage and no initial commit',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const result = await run(brandConfig(), client(execFn));
+
+        ctx.expect(result.output.repo.created).toBe(true);
+        const create = execFn.calls.find((args) => args[0] === 'repo' && args[1] === 'create');
+        ctx.expect(create).toEqual(['repo', 'create', SOURCE, '--private', '--description', 'A fixture brand']);
+        ctx.expect(result.state.repo.fullName).toBe(SOURCE);
+      },
+    },
+
+    {
+      name: 'source: visibility drift is patched back to what the brand root states',
+      run: async (ctx) => {
+        const world = convergedWorld();
+        world.repos[SOURCE] = { private: false, homepage: '' };
+        const execFn = ghWorld(world);
+
+        const result = await run(brandConfig(), client(execFn));
+
+        ctx.expect(result.output.repo.changed).toBe(true);
+        ctx.expect(result.output.repo.planned).toEqual([`${SOURCE}: public -> private`]);
+        const patch = execFn.calls.find((args) => args.includes('-X') && args[1] === `repos/${SOURCE}`);
+        ctx.expect(patch).toEqual(['api', `repos/${SOURCE}`, '-X', 'PATCH', '-F', 'private=true']);
+      },
+    },
+
+    {
+      name: 'source: Pages still serving the source repo is a warning with the by-hand steps, never a delete',
+      run: async (ctx) => {
+        const world = convergedWorld();
+        world.pages[SOURCE] = { source: { branch: 'gh-pages' }, cname: 'fixture-brand.test' };
+        const execFn = ghWorld(world);
+
+        const result = await run(brandConfig(), client(execFn));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.warned).toEqual([{ operation: 'repo', reason: `${SOURCE} still serves GitHub Pages: the website moved to its own repo (#883)` }]);
+        ctx.expect(execFn.mutations(), 'the walk never retires Pages on its own').toEqual([]);
+      },
+    },
+
+    {
+      name: 'source: Pages is never CONFIGURED on the source repo, converged or fresh',
+      run: async (ctx) => {
+        const converged = ghWorld(convergedWorld());
+        await run(brandConfig(), client(converged));
+
+        const fresh = ghWorld();
+        await run(brandConfig(), client(fresh));
+
+        for (const execFn of [converged, fresh]) {
+          const sourcePages = execFn.calls.filter((args) => args[1] === `repos/${SOURCE}/pages` && args.includes('-X'));
+          ctx.expect(sourcePages).toEqual([]);
+        }
+      },
+    },
+
+    // ─── The website role ────────────────────────────────────────────────────────
+
+    {
+      name: 'website: a fresh repo is created public with the target url, and Pages waits for the first deploy',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const result = await run(brandConfig(), client(execFn));
+
+        const create = execFn.calls.find((args) => args[0] === 'repo' && args[1] === 'create' && args[2] === WEBSITE);
+        ctx.expect(create).toEqual([
+          'repo', 'create', WEBSITE, '--public',
+          '--description', 'Fixture Brand website (web)',
+          '--homepage', 'https://fixture-brand.test',
+        ]);
+        ctx.expect(!create.includes('--add-readme'), 'a repo the deploy force-pushes never starts with a commit').toBeTruthy();
+
+        ctx.expect(result.output.website.repos[0].pagesPending).toBe(true);
+        ctx.expect(endpoints(execFn).filter((endpoint) => endpoint === `repos/${WEBSITE}/pages`)).toEqual([]);
+      },
+    },
+
+    {
+      name: 'website: once gh-pages exists, Pages is pointed at it and at the target host',
+      run: async (ctx) => {
+        const execFn = ghWorld({
+          repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' } },
+          branches: { [WEBSITE]: ['gh-pages'] },
+        });
+        const result = await run(brandConfig(), client(execFn));
+
+        ctx.expect(result.output.website.planned).toEqual([`pages ${WEBSITE}: gh-pages -> fixture-brand.test`]);
+        const post = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('POST'));
+        ctx.expect(post).toEqual(['api', `repos/${WEBSITE}/pages`, '-X', 'POST', '-f', 'source[branch]=gh-pages', '-f', 'source[path]=/']);
+        const domain = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('PUT'));
+        ctx.expect(domain).toEqual(['api', `repos/${WEBSITE}/pages`, '-X', 'PUT', '-f', 'cname=fixture-brand.test']);
+      },
+    },
+
+    {
+      name: 'website: two web targets get two repos, one per NAME, off ONE plan read',
+      run: async (ctx) => {
+        const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
+        const execFn = ghWorld();
+        const api = client(execFn);
+
+        const result = await run(config, api, { options: { dryRun: true } });
+
+        ctx.expect(result.output.website.repos.map((repo) => repo.slug)).toEqual([
+          WEBSITE,
+          'fixture-org/fixture-brand-community',
+        ]);
+        ctx.expect(api.planReads, 'the plan is the org\'s, not the target\'s').toBe(1);
+        ctx.expect(result.output.website.planned.join('\n')).toMatch(/create fixture-org\/fixture-brand-community \(public: free plan\)/);
+      },
+    },
+
+    {
+      name: 'website: the second target\'s Pages domain is its OWN subdomain',
+      run: async (ctx) => {
+        const config = brandConfig({ targets: { web: { type: 'web' }, community: { type: 'web' } } });
+        const execFn = ghWorld({
+          repos: {
+            [SOURCE]: { private: true },
+            [WEBSITE]: { private: false, homepage: 'https://fixture-brand.test' },
+            'fixture-org/fixture-brand-community': { private: false, homepage: 'https://community.fixture-brand.test' },
+          },
+          branches: { 'fixture-org/fixture-brand-community': ['gh-pages'] },
+        });
+
+        await run(config, client(execFn));
+
+        const domain = execFn.calls.find((args) => args[1] === 'repos/fixture-org/fixture-brand-community/pages' && args.includes('PUT'));
+        ctx.expect(domain).toEqual(['api', 'repos/fixture-org/fixture-brand-community/pages', '-X', 'PUT', '-f', 'cname=community.fixture-brand.test']);
+      },
+    },
+
+    // C5/#366: a project site's url IS its Pages address, so the walk has no custom
+    // domain to claim. The derivation is @omega.js/config's ONE `pagesHost`, the
+    // same one the web deploy writes its CNAME file from: claiming
+    // `<owner>.github.io` here would take the site off the address it serves at.
+    {
+      name: 'website: a *.github.io brand claims NO custom domain',
+      run: async (ctx) => {
+        const config = brandConfig();
+        config.brand.url = 'https://fixture-org.github.io/fixture-brand-web/';
+        const execFn = ghWorld({
+          repos: { [SOURCE]: { private: true }, [WEBSITE]: { private: false, homepage: 'https://fixture-org.github.io/fixture-brand-web/' } },
+          branches: { [WEBSITE]: ['gh-pages'] },
+        });
+
+        const result = await run(config, client(execFn));
+
+        ctx.expect(result.output.website.planned, 'the branch, and no domain').toEqual([`pages ${WEBSITE}: gh-pages`]);
+        const domain = execFn.calls.find((args) => args[1] === `repos/${WEBSITE}/pages` && args.includes('PUT'));
+        ctx.expect(domain, 'no cname is ever PUT for a project site').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'website: a brand with no web target owns no website repo',
+      run: async (ctx) => {
+        const execFn = ghWorld();
+        const result = await run(brandConfig({ targets: { backend: { type: 'backend' } } }), client(execFn));
+
+        ctx.expect(result.output.website.skipped).toBe('no GitHub-hosted web target');
+        ctx.expect(endpoints(execFn).filter((endpoint) => endpoint.includes('-web'))).toEqual([]);
+      },
+    },
+
+    // ─── Idempotency ─────────────────────────────────────────────────────────────
+
+    {
+      name: 'a fully converged brand is a zero-mutation no-op',
+      run: async (ctx) => {
+        const execFn = ghWorld(convergedWorld());
+        const result = await run(brandConfig(), client(execFn));
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(execFn.mutations()).toEqual([]);
+        ctx.expect(result.output.website.planned).toEqual([]);
+      },
+    },
+
+    {
+      name: 'runners: an org group that allows public repositories passes',
+      run: async (ctx) => {
+        const { result, api } = await runDesktop({
+          groups: { runner_groups: [{ id: 1, name: 'Default', allows_public_repositories: true, visibility: 'all' }] },
+        });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.runners.group).toBe('Default');
+        ctx.expect(api.groupReads, 'visibility all already answers for every repo').toEqual([]);
+      },
+    },
+
+    {
+      name: 'runners: a selected-repositories group that lists the SOURCE repo passes (#879)',
+      run: async (ctx) => {
+        const { result, api } = await runDesktop({
+          groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
+          repositories: { repositories: [{ name: 'fixture-brand-omega', full_name: SOURCE }] },
+        });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.groupReads).toEqual([['fixture-org', 7]]);
+        ctx.expect(result.output.runners.group).toBe('Signers');
+      },
+    },
+
+    {
+      name: 'runners: a selected-repositories group without the source repo FAILS the walk (#879)',
+      run: async (ctx) => {
+        const { result } = await runDesktop({
+          groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
+          repositories: { repositories: [{ name: 'other-omega', full_name: 'fixture-org/other-omega' }] },
+        });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/Signers/);
+        ctx.expect(result.error.includes(SOURCE)).toBeTruthy();
+        ctx.expect(result.error.includes(RUNNERS_LINK)).toBeTruthy();
+        ctx.expect(result.failed).toEqual([{ operation: 'runners', reason: result.error }]);
+      },
+    },
+
+    {
+      name: 'runners: a later allowing group serves the repo when an earlier selected group leaves it out (#879)',
+      run: async (ctx) => {
+        const { result, api } = await runDesktop({
+          groups: {
+            runner_groups: [
+              { id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' },
+              { id: 2, name: 'Default', allows_public_repositories: true, visibility: 'all' },
+            ],
+          },
+          repositories: { repositories: [] },
+        });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.runners.group).toBe('Default');
+        ctx.expect(api.groupReads).toEqual([['fixture-org', 7]]);
+      },
+    },
+
+    {
+      name: 'runners: a token without the scope to read a group\'s repositories warns with the link (#879)',
+      run: async (ctx) => {
+        const { result } = await runDesktop({
+          groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
+          repositoriesError: 'gh api failed: HTTP 403: Resource not accessible by integration',
+        });
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.warned.at(-1).operation).toBe('runners');
+        ctx.expect(result.output.runners.unreadable.includes(RUNNERS_LINK)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'runners: a repositories read that fails for any other reason is an error, never "check it by hand" (#879)',
+      run: async (ctx) => {
+        const { result } = await runDesktop({
+          groups: { runner_groups: [{ id: 7, name: 'Signers', allows_public_repositories: true, visibility: 'selected' }] },
+          repositoriesError: 'gh api failed: HTTP 500: Internal Server Error',
+        });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/HTTP 500/);
+      },
+    },
+
+    {
+      name: 'runners: no group allowing public repositories FAILS the walk, naming the checkbox and the link',
+      run: async (ctx) => {
+        const { result } = await runDesktop({
+          groups: { runner_groups: [{ name: 'Default', allows_public_repositories: false }] },
+        });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/Allow public repositories/);
+        ctx.expect(result.error.includes(RUNNERS_LINK)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'runners: a personal-account owner has no runner groups to read',
+      run: async (ctx) => {
+        const { result } = await runDesktop({ user: { type: 'User' } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.runners.skipped).toBe('owner is not an organization');
+      },
+    },
+
+    {
+      name: 'runners: a token without the scope to read the groups warns with the link',
+      run: async (ctx) => {
+        const { result } = await runDesktop({ groupsError: 'gh api failed: HTTP 403: Resource not accessible by integration' });
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.runners.unreadable.includes(RUNNERS_LINK)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'runners: a cloud Windows signer never touches the org runner groups',
+      run: async (ctx) => {
+        const { result } = await runDesktop({}, { config: desktopBrand({ platforms: { windows: { signing: { strategy: 'cloud' } } } }) });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.runners.skipped).toBe('Windows signing strategy is cloud');
+      },
+    },
+
+    {
+      name: 'runners: the signing strategy is read off the desktop-TYPED entry, whatever it is named (#886)',
+      run: async (ctx) => {
+        const config = brandConfig({
+          targets: { web: { type: 'web' }, app: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud' } } } } },
+        });
+        const { result } = await runDesktop({}, { config });
+
+        ctx.expect(result.output.runners.skipped, 'the entry named `app` is the desktop target').toBe('Windows signing strategy is cloud');
+      },
+    },
+
+    {
+      name: 'runners: a PRIVATE brand and a brand with no desktop target both skip',
+      run: async (ctx) => {
+        const priv = await runDesktop({}, { isPrivate: true });
+        ctx.expect(priv.result.output.runners.skipped).toBe('repo is private');
+
+        const noDesktop = await runDesktop({}, { config: brandConfig() });
+        ctx.expect(noDesktop.result.output.runners.skipped).toBe('no desktop target');
+      },
+    },
+
+    // ─── runners: the stray-trigger warning (#875) ───────────────────────────────
+    // The org runner group says whether a dispatch REACHES the self-hosted signer;
+    // this says what ELSE could reach it. A workflow with a job on the box fires on
+    // a dispatch and nothing else, so a `push` or `pull_request` trigger in one is
+    // warned on by name.
+
+    {
+      name: 'runners: a push trigger in a workflow that targets a self-hosted runner warns, naming the file and the trigger (#875)',
+      run: async (ctx) => {
+        const { result, lines } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push:\n    branches: [main]') } },
+        ));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.warned.at(-1).operation).toBe('runners');
+        ctx.expect(result.output.runners.strayTriggers).toEqual([{ file: 'desktop-build.yml', trigger: 'push' }]);
+        // The group answer rides along: the two checks never overwrite each other.
+        ctx.expect(result.output.runners.group).toBe('Default');
+
+        const warning = lines.find((line) => line.includes('desktop-build.yml') && line.includes('push'));
+        ctx.expect(warning, 'one line naming the file and the trigger').toBeTruthy();
+        ctx.expect(warning).toMatch(/self-hosted/);
+      },
+    },
+
+    {
+      name: 'runners: a pull_request trigger is warned on too, and both are named at once (#875)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': workflow('  push:\n  pull_request:\n  workflow_dispatch:') } },
+        ));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.runners.strayTriggers).toEqual([
+          { file: 'desktop-build.yml', trigger: 'push' },
+          { file: 'desktop-build.yml', trigger: 'pull_request' },
+        ]);
+        ctx.expect(result.warned.at(-1).reason).toMatch(/desktop-build\.yml \(push\), desktop-build\.yml \(pull_request\)/);
+      },
+    },
+
+    {
+      name: 'runners: the dispatch-only workflows a brand actually composes warn about nothing (#875)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:') } },
+        ));
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.runners.group).toBe('Default');
+        ctx.expect(result.output.runners.strayTriggers).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'runners: a push trigger on a HOSTED-runner workflow is nobody\'s emergency (#875)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'web-build.yml': workflow('  push:\n  workflow_dispatch:', 'ubuntu-latest') } },
+        ));
+
+        ctx.expect(result.status).toBe('success');
+      },
+    },
+
+    {
+      name: 'runners: a trigger with a trailing COMMENT is still a stray trigger (B3)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push: # only main, for now') } },
+        ));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.runners.strayTriggers).toEqual([{ file: 'desktop-build.yml', trigger: 'push' }]);
+      },
+    },
+
+    {
+      name: 'runners: a FLOW-style trigger is still a stray trigger (C7)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': workflow('  workflow_dispatch:\n  push: { branches: [main] }') } },
+        ));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.runners.strayTriggers).toEqual([{ file: 'desktop-build.yml', trigger: 'push' }]);
+      },
+    },
+
+    {
+      name: 'runners: the QUOTED `"on":` key reads like the bare one (C7)',
+      run: async (ctx) => {
+        // YAML 1.1 reads a bare `on` as the boolean true, so a quoted key is a
+        // spelling a real workflow carries, not a curiosity.
+        const quoted = workflow('  workflow_dispatch:\n  push:').replace(/^on:$/m, '"on":');
+
+        const { result } = await captureRun(() => runDesktop(
+          { groups: ALLOWING },
+          { workflows: { 'desktop-build.yml': quoted } },
+        ));
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.runners.strayTriggers).toEqual([{ file: 'desktop-build.yml', trigger: 'push' }]);
+      },
+    },
+
+    {
+      name: 'runners: a stray trigger never softens the runner-group ERROR it rides with (#875)',
+      run: async (ctx) => {
+        const { result } = await captureRun(() => runDesktop(
+          { groups: { runner_groups: [{ name: 'Default', allows_public_repositories: false }] } },
+          { workflows: { 'desktop-build.yml': workflow('  push:') } },
+        ));
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/Allow public repositories/);
+      },
+    },
+
+    {
+      name: 'secrets: a dry run plans the target\'s key NAMES and issues no gh call',
+      run: async (ctx) => {
+        const { root, targets } = brandWithTarget({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
+        const execFn = ghWorld(convergedWorld());
+        const secretsGh = ghWorld(convergedWorld());
+
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot: root,
+          brandConfig: brandConfig(),
+          brand: { id: 'fixture-brand', config: brandConfig(), enabledTargets: ['web'], targets: [] },
+          targets,
+          operations: OPERATIONS.repo,
+          options: { dryRun: true },
+          serviceData: {},
+          githubApi: client(execFn),
+          execFn: secretsGh,
+        });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.secrets.extension.planned).toEqual(['CHROME_CLIENT_ID']);
+        ctx.expect(secretsGh.calls, 'a dry run sends nothing').toEqual([]);
+      },
+    },
+
+    {
+      name: 'secrets: a REFUSED target is the operation\'s error, with the key and its fix',
+      run: async (ctx) => {
+        // Apple signing declared, no signing tree: the mac set is required and the
+        // cascade cannot value it, so the publisher refuses and publishes nothing.
+        const { root, targets } = brandWithTarget({
+          target: 'desktop',
+          brandEnv: 'CSC_KEY_PASSWORD=pw\n',
+          extra: { certificates: { providers: { apple: { teamId: 'TEAMTEST12' } } } },
+        });
+        const secretsGh = ghWorld(convergedWorld());
+
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot: root,
+          brandConfig: brandConfig(),
+          brand: { id: 'fixture-brand', config: brandConfig(), enabledTargets: ['web'], targets: [] },
+          targets,
+          operations: OPERATIONS.repo,
+          options: {},
+          serviceData: {},
+          githubApi: client(ghWorld(convergedWorld())),
+          execFn: secretsGh,
+        });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/CSC_LINK/);
+        ctx.expect(result.error).toMatch(/omega manage --service certificates/);
+        ctx.expect(secretsGh.calls, 'a refusal publishes nothing').toEqual([]);
+      },
+    },
+  ],
 });

@@ -10,8 +10,7 @@
  * `--reset-assets` force refresh that clears the cache so a converged brand
  * rebuilds anyway (#214).
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -102,254 +101,6 @@ function stageFont(root) {
   fs.writeFileSync(path.join(root, 'assets', 'fonts', 'TestFont-Regular.otf'), Buffer.from(font.toArrayBuffer()));
 }
 
-// ─── Registry / defaults pins ────────────────────────────────────────────────
-
-test('assets: registered after directory with the seven operations in dependency order', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('directory') + 1], 'assets');
-  // templates before icons — icons prefers the composited icon.png it makes;
-  // reconcile last, so everything this walk generated is already derived
-  assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons', 'reconcile']);
-});
-
-test('assets: defaults are enabled-only', () => {
-  assert.deepEqual(DEFAULTS.assets, { enabled: true });
-});
-
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('assets: assets.enabled = false skips the service', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig({ assets: { enabled: false } }));
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /assets\.enabled/);
-});
-
-test('assets: scalar assets: false skips the service', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig({ assets: false }));
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /assets\.enabled/);
-});
-
-test('assets: no brandmark.svg skips the service with guidance', async () => {
-  const root = stageBrand({ brandmark: false });
-  const result = await runService(root, brandConfig());
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /brandmark\.svg/);
-  assert.deepEqual(derivedFiles(root), []);
-});
-
-// ─── Full real generation ────────────────────────────────────────────────────
-
-test('assets: a brandmark generates the full derived set for real', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-
-  const files = derivedFiles(root);
-  // 20 logo files (2 SVGs + 9 color + 9 black PNGs), 2 app icons,
-  // 4 social icons, 7 favicon files
-  assert.equal(files.length, 33);
-  for (const expected of [
-    'logo/brandmark/color-x.svg', 'logo/brandmark/black-x.svg',
-    'logo/brandmark/color-16.png', 'logo/brandmark/color-2048.png', 'logo/brandmark/black-1024.png',
-    'app/macos/icon.icns', 'app/windows/icon.ico',
-    'social/brandmark/color-x.svg', 'social/brandmark/color-2048.png',
-    'favicon/favicon.ico', 'favicon/apple-touch-icon.png', 'favicon/site.webmanifest',
-  ]) {
-    assert.ok(files.includes(expected), `missing ${expected}`);
-  }
-
-  // No wordmark/combomark sources → no derived dirs for them
-  assert.ok(!files.some((file) => file.startsWith('logo/wordmark/') || file.startsWith('logo/combomark/')));
-
-  // The black variant is actually black — the source color is gone
-  const blackSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'black-x.svg'), 'utf8');
-  assert.ok(blackSvg.includes('fill="#000000"'));
-  assert.ok(!blackSvg.includes('#e63946'));
-
-  // The color variant is the source verbatim
-  const colorSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), 'utf8');
-  assert.equal(colorSvg, BRANDMARK_SVG);
-
-  // Container formats carry their magic bytes
-  const icns = fs.readFileSync(path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.icns'));
-  assert.equal(icns.subarray(0, 4).toString('ascii'), 'icns');
-  const ico = fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'favicon.ico'));
-  assert.deepEqual([...ico.subarray(0, 4)], [0, 0, 1, 0]);
-
-  // The webmanifest derives from config
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'site.webmanifest'), 'utf8'));
-  assert.equal(manifest.name, 'AB');
-  assert.equal(manifest.icons.length, 2);
-});
-
-// ─── Idempotency (the upgrade that replaced the --onboarding gate) ───────────
-
-test('assets: a converged rerun regenerates nothing', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(mtimes(root, files), before);
-  assert.equal(result.output.process.synced, true);
-  assert.equal(result.output.icons.synced, true);
-  assert.equal(result.output.socialIcons.synced, true);
-  assert.equal(result.output.favicons.synced, true);
-});
-
-test('assets: a touched brandmark regenerates its derived files', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-
-  // Source newer than every derived file → everything brandmark-derived is stale
-  const future = new Date(Date.now() + 10000);
-  fs.utimesSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), future, future);
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  const after = mtimes(root, files);
-  const changed = files.filter((_, index) => after[index] !== before[index]);
-  // Everything except the config-derived webmanifest regenerates
-  assert.equal(changed.length, files.length - 1);
-  assert.ok(!changed.includes('favicon/site.webmanifest'));
-});
-
-test('assets: a changed brand name rewrites only the webmanifest', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-
-  const renamed = brandConfig();
-  renamed.brand.name = 'Renamed Brand';
-  const result = await runService(root, renamed);
-
-  assert.equal(result.status, 'success');
-  const after = mtimes(root, files);
-  const changed = files.filter((_, index) => after[index] !== before[index]);
-  assert.deepEqual(changed, ['favicon/site.webmanifest']);
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'site.webmanifest'), 'utf8'));
-  assert.equal(manifest.name, 'Renamed Brand');
-  assert.equal(result.output.favicons.generated, 1);
-});
-
-// ─── Dry run ─────────────────────────────────────────────────────────────────
-
-test('assets: dry run on a fresh brand writes nothing and reports the plan', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig(), { options: { dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(derivedFiles(root), []);
-  assert.equal(result.output.process.planned, 20);
-  assert.equal(result.output.icons.planned, 2);
-  assert.equal(result.output.socialIcons.planned, 4);
-  assert.equal(result.output.favicons.planned, 7);
-});
-
-// ─── logo-gen ────────────────────────────────────────────────────────────────
-
-test('assets: no brand.font → wordmark/combomark noted, everything else proceeds', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.logos, { skipped: 'no brand.font' });
-  assert.ok(!fs.existsSync(path.join(root, 'assets', 'logo', 'wordmark.svg')));
-});
-
-test('assets: brand.font + a real font file generates wordmark and combomark', async () => {
-  const root = stageBrand();
-  stageFont(root);
-
-  const result = await runService(root, brandConfig({ font: 'TestFont-Regular' }));
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.logos.generated, ['wordmark', 'combomark']);
-
-  const wordmark = fs.readFileSync(path.join(root, 'assets', 'logo', 'wordmark.svg'), 'utf8');
-  assert.match(wordmark, /<path d="M/); // text as path outlines
-  const combomark = fs.readFileSync(path.join(root, 'assets', 'logo', 'combomark.svg'), 'utf8');
-  assert.ok(combomark.includes('<rect')); // the embedded brandmark content
-  assert.match(combomark, /<path d="M/);
-
-  // …and process derived their variant sets too
-  const files = derivedFiles(root);
-  assert.ok(files.includes('logo/wordmark/color-x.svg'));
-  assert.ok(files.includes('logo/combomark/black-2048.png'));
-});
-
-test('assets: existing wordmark/combomark are never regenerated (missing-only)', async () => {
-  const root = stageBrand();
-  stageFont(root);
-  await runService(root, brandConfig({ font: 'TestFont-Regular' }));
-
-  const wordmarkPath = path.join(root, 'assets', 'logo', 'wordmark.svg');
-  const before = fs.statSync(wordmarkPath).mtimeMs;
-
-  // Even a newer brandmark must not clobber a (possibly hand-tuned) wordmark
-  const future = new Date(Date.now() + 10000);
-  fs.utimesSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), future, future);
-
-  const result = await runService(root, brandConfig({ font: 'TestFont-Regular' }));
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.logos.synced, true);
-  assert.equal(fs.statSync(wordmarkPath).mtimeMs, before);
-});
-
-test('assets: a configured font that cannot be found is an error', async () => {
-  const root = stageBrand();
-  const result = await runService(root, brandConfig({ font: 'Missing-Font' }));
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /font "Missing-Font" not found/);
-});
-
-test('assets: dry run reports the planned wordmark/combomark without a font file', async () => {
-  // The plan is reported before font resolution — dry run needs no font
-  const root = stageBrand();
-  const result = await runService(root, brandConfig({ font: 'Missing-Font' }), { options: { dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.logos.planned, ['wordmark', 'combomark']);
-  assert.ok(!fs.existsSync(path.join(root, 'assets', 'logo', 'wordmark.svg')));
-});
-
-// ─── svg-to-black ────────────────────────────────────────────────────────────
-
-test('svg-to-black: fills, strokes, style values, and defs all go black', () => {
-  const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg">',
-    '<defs><linearGradient id="g"><stop stop-color="#ff0000"/></linearGradient></defs>',
-    '<rect fill="url(#g)" stroke="#00ff00"/>',
-    '<circle style="fill:rgb(1,2,3);stroke:blue"/>',
-    '<path fill="none" stroke="none"/>',
-    '</svg>',
-  ].join('');
-
-  const black = convertSvgToBlack(svg);
-
-  assert.ok(!black.includes('<defs>'));
-  assert.ok(black.includes('fill="#000000" stroke="#000000"'));
-  assert.ok(black.includes('style="fill:#000000;stroke:#000000"'));
-  // none is a deliberate absence, not a color
-  assert.ok(black.includes('fill="none" stroke="none"'));
-  assert.ok(!black.includes('ff0000') && !black.includes('00ff00'));
-});
-
 // ─── PSD templates (seed from the company + layer replacement + exports) ─────
 
 const { readPsd, writePsdBuffer, initializeCanvas } = require('ag-psd');
@@ -431,115 +182,6 @@ function readBrandPsd(root, name) {
   return readPsd(fs.readFileSync(path.join(root, 'assets', 'templates', `${name}.psd`)));
 }
 
-test('templates: seeded from the company, logo layer re-rastered, PNG exported, icons consume the composite', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-
-  const result = await runService(root, brandConfig());
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.templates.seeded, 1);
-  assert.equal(result.output.templates.processed, 1);
-  assert.equal(result.output.templates.missing.length, Object.keys(TEMPLATE_CONFIG).length - 1);
-
-  // The seeded PSD is now brand collateral with the brandmark in its logo layer
-  const psd = readBrandPsd(root, 'app-macos-icon');
-  const logo = psd.children.find((l) => l.name === 'Main')
-    .children.find((l) => l.name === 'Logo').children[0];
-  const logoSize = Math.floor(0.575 * 1024);
-  assert.equal(logo.canvas.width, logoSize);
-  assert.equal(logo.canvas.height, logoSize);
-  // Centered inside the configured bounds — not the fixture's 100,100
-  assert.ok(logo.left > 79 && logo.top > 90, `logo at ${logo.left},${logo.top}`);
-  // The re-raster carries the brandmark's red, not the fixture's green
-  const px = logo.canvas.getContext('2d').getImageData(logoSize / 2, logoSize / 2, 1, 1).data;
-  assert.ok(px[0] > 200 && px[1] < 100, `center pixel rgb(${px[0]},${px[1]},${px[2]})`);
-
-  // The export composite exists at template dimensions
-  const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
-  assert.ok(fs.existsSync(iconPng));
-  const sharp = require('sharp');
-  const meta = await sharp(iconPng).metadata();
-  assert.equal(meta.width, 1024);
-  assert.equal(meta.height, 1024);
-
-  // The icons op ran AFTER templates and used the composited icon.png
-  // (its .icns must be newer than the composite it derives from)
-  const icns = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.icns');
-  assert.ok(fs.statSync(icns).mtimeMs >= fs.statSync(iconPng).mtimeMs);
-});
-
-test('templates: text layers take brandConfig values and overflow shrinks the font', async () => {
-  const root = stageBrand();
-  stageCompany(root, {
-    'social-og-image': fixturePsd(1200, 630, { textLayers: ['Brand Name', 'Brand Tagline'] }),
-  });
-
-  const config = brandConfig();
-  config.brand.tagline = 'A very long fixture tagline that cannot possibly fit inside seventy percent of the canvas width without shrinking quite a lot first';
-
-  const result = await runService(root, config);
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.templates.processed, 1);
-
-  const psd = readBrandPsd(root, 'social-og-image');
-  const textFolder = psd.children.find((l) => l.name === 'Main').children.find((l) => l.name === 'Text');
-  const nameLayer = textFolder.children.find((l) => l.name === 'Brand Name');
-  const taglineLayer = textFolder.children.find((l) => l.name === 'Brand Tagline');
-
-  assert.equal(nameLayer.text.text, 'AB');
-  assert.equal(taglineLayer.text.text, config.brand.tagline);
-  // 'AB' fits at 48pt; the long tagline had to shrink
-  assert.equal(nameLayer.text.style.fontSize, 48);
-  assert.ok(taglineLayer.text.style.fontSize < 48, `tagline still ${taglineLayer.text.style.fontSize}pt`);
-
-  const meta = await require('sharp')(path.join(root, '.omega', 'assets', 'social', 'og-image.png')).metadata();
-  assert.equal(meta.width, 1200);
-  assert.equal(meta.height, 630);
-});
-
-test('templates: converged rerun is zero-work; a touched PSD reprocesses', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-  await runService(root, brandConfig());
-
-  const psdPath = path.join(root, 'assets', 'templates', 'app-macos-icon.psd');
-  const pngPath = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
-  const before = [fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs];
-
-  const rerun = await runService(root, brandConfig());
-  assert.equal(rerun.output.templates.processed, 0);
-  assert.equal(rerun.output.templates.seeded, 0);
-  assert.equal(rerun.output.templates.fresh, 1);
-  assert.deepEqual([fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs], before);
-
-  // A manual Photoshop edit (mtime bump) → the logo refresh + export rerun
-  const future = new Date(Date.now() + 5000);
-  fs.utimesSync(psdPath, future, future);
-  const touched = await runService(root, brandConfig());
-  assert.equal(touched.output.templates.processed, 1);
-  assert.ok(fs.statSync(pngPath).mtimeMs > before[1]);
-});
-
-test('templates: dry-run plans the seed + process and writes nothing', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-
-  const result = await runService(root, brandConfig(), { options: { dryRun: true } });
-  assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.templates.planned, ['app-macos-icon (seed + process)']);
-  assert.ok(!fs.existsSync(path.join(root, 'assets', 'templates')));
-  assert.deepEqual(derivedFiles(root), []);
-});
-
-test('templates: no PSDs anywhere is a quiet note, never a warn', async () => {
-  const root = stageBrand(); // no company marker, no brand templates
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.templates.missing.length, Object.keys(TEMPLATE_CONFIG).length);
-  assert.equal(result.output.templates.processed, 0);
-});
-
 // ─── AI brandmark generation (MrLogo product ladder) ────────────────────────
 
 const http = require('node:http');
@@ -577,343 +219,817 @@ function startLogoApi() {
   });
 }
 
-test('brandmark: interactive generation via the logo API roots the whole derived set', async () => {
-  const api = await startLogoApi();
-  const root = stageBrand({ brandmark: false });
-  const config = brandConfig();
-  config.brand.description = 'A fixture brand';
-
-  process.env.MRLOGO_API_URL = api.url;
-  process.env.LOGO_API_ID_TOKEN = 'test-token-123';
-  const tty = openTtyPrompt();
-  try {
-    const running = runService(root, config);
-    await tty.answer('Logo prompt', 'geometric fox\r');
-    const result = await running;
-
-    assert.equal(result.status, 'success');
-
-    // The generated SVG landed as committed brand collateral
-    assert.equal(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8'), GENERATED_SVG);
-
-    // The request carried the token + the brand identity + the typed direction
-    const post = api.requests.find((r) => r.method === 'POST');
-    assert.equal(post.authorization, 'Bearer test-token-123');
-    assert.equal(post.body.brandName, 'AB');
-    assert.equal(post.body.mode, 'brandmark');
-    assert.equal(post.body.description, 'A fixture brand. geometric fox');
-    assert.deepEqual(post.body.colors, ['#000000']);
-
-    // And the rest of the service derived from it in the same run
-    const colorSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), 'utf8');
-    assert.equal(colorSvg, GENERATED_SVG);
-  } finally {
-    tty.close();
-    delete process.env.MRLOGO_API_URL;
-    delete process.env.LOGO_API_ID_TOKEN;
-    api.server.close();
-  }
-});
-
-test('brandmark: no credentials skips with the ladder guidance — no API call', async () => {
-  const api = await startLogoApi();
-  const root = stageBrand({ brandmark: false });
-
-  // No MRLOGO_SERVICE_ACCOUNT / MRLOGO_API_KEY / LOGO_API_ID_TOKEN → nothing to mint with
-  process.env.MRLOGO_API_URL = api.url;
-  const tty = openTtyPrompt();
-  try {
-    const result = await runService(root, brandConfig());
-
-    assert.equal(result.status, 'skipped');
-    assert.match(result.reason, /brandmark\.svg/);
-    assert.match(result.reason, /MRLOGO_SERVICE_ACCOUNT/);
-    assert.equal(api.requests.length, 0);
-    assert.ok(!fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg')));
-  } finally {
-    tty.close();
-    delete process.env.MRLOGO_API_URL;
-    api.server.close();
-  }
-});
-
-test('brandmark: dry runs never generate; non-interactive runs GENERATE when credentialed', async () => {
-  const api = await startLogoApi();
-  process.env.MRLOGO_API_URL = api.url;
-  process.env.LOGO_API_ID_TOKEN = 'test-token-123';
-  try {
-    // Dry run: interactive TTY, credential present — still no attempt
-    const tty = openTtyPrompt();
-    try {
-      const dry = await runService(stageBrand({ brandmark: false }), brandConfig(), { options: { dryRun: true } });
-      assert.equal(dry.status, 'skipped');
-      assert.equal(api.requests.length, 0);
-    } finally {
-      tty.close();
-    }
-
-    // Headless with a credential: setting it IS the consent — the brandmark
-    // mints and the whole leg runs to success. This is the pipeline story.
-    const headless = await runService(stageBrand({ brandmark: false }), brandConfig());
-    assert.equal(headless.status, 'success');
-    const mint = api.requests.find((request) => request.url === '/logos');
-    assert.ok(mint, 'the logo API was called');
-    assert.equal(mint.body.brandName, 'AB');
-  } finally {
-    delete process.env.MRLOGO_API_URL;
-    delete process.env.LOGO_API_ID_TOKEN;
-    api.server.close();
-  }
-});
-
-test('brandmark: MRLOGO_API_KEY rides the same Bearer transport (BEM resolves non-JWTs by api.privateKey)', async () => {
-  const api = await startLogoApi();
-  const root = stageBrand({ brandmark: false });
-
-  process.env.MRLOGO_API_URL = api.url;
-  process.env.MRLOGO_API_KEY = 'k'.repeat(43);
-  try {
-    const result = await runService(root, brandConfig());
-
-    assert.equal(result.status, 'success');
-    const post = api.requests.find((r) => r.method === 'POST');
-    assert.equal(post.authorization, `Bearer ${'k'.repeat(43)}`);
-    assert.equal(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8'), GENERATED_SVG);
-  } finally {
-    delete process.env.MRLOGO_API_URL;
-    delete process.env.MRLOGO_API_KEY;
-    api.server.close();
-  }
-});
-
 // ─── Force refresh (#214) ────────────────────────────────────────────────────
 
 const { resolveResetKinds, resetAssetsCache } = require('../src/services/assets/lib/reset.js');
 
-test('reset: the flag resolves to kinds: bare = both, a value = that kind, unknown throws', () => {
-  assert.deepEqual(resolveResetKinds(undefined), []);
-  assert.deepEqual(resolveResetKinds(true), ['logos', 'templates']);
-  assert.deepEqual(resolveResetKinds('templates'), ['templates']);
-  assert.deepEqual(resolveResetKinds('templates,logos'), ['logos', 'templates']);
-  assert.throws(() => resolveResetKinds('logo'), /Unknown --reset-assets kind\(s\): logo/);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'assets',
+  tests: [
+    // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('reset: clearing one kind leaves the other kind and the brand sources alone', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-  await runService(root, brandConfig());
-  const outDir = path.join(root, '.omega', 'assets');
-
-  const logos = resetAssetsCache({ outDir, kinds: ['logos'] });
-
-  assert.ok(logos.removed.includes('logo/brandmark'));
-  assert.ok(logos.removed.includes('social/brandmark'));
-  assert.ok(logos.removed.includes('favicon'));
-  assert.ok(logos.removed.includes(path.join('app', 'macos', 'icon.icns')));
-  // The templates kind's export survives; only it is left
-  assert.deepEqual(derivedFiles(root), ['app/macos/icon.png']);
-
-  const templates = resetAssetsCache({ outDir, kinds: ['templates'] });
-
-  assert.ok(templates.removed.includes(path.join('app', 'macos', 'icon.png')));
-  assert.deepEqual(derivedFiles(root), []);
-
-  // Only .omega/assets/ is cache: the brand's committed sources are never touched
-  assert.ok(fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg')));
-  assert.ok(fs.existsSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd')));
-});
-
-test('assets: --reset-assets regenerates the derived set a converged rerun skips', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-
-  // Timestamps alone: the rerun has nothing to do
-  const converged = await runService(root, brandConfig());
-  assert.equal(converged.output.process.synced, true);
-  assert.deepEqual(mtimes(root, files), before);
-
-  // Forced: the cache is cleared, so the same walk rebuilds every file
-  const forced = await runService(root, brandConfig(), { options: { resetAssets: true } });
-
-  assert.equal(forced.status, 'success');
-  assert.deepEqual(derivedFiles(root), files);
-  assert.equal(forced.output.process.generated, 20);
-  assert.equal(forced.output.icons.generated, 2);
-  assert.equal(forced.output.socialIcons.generated, 4);
-  assert.equal(forced.output.favicons.generated, 7);
-  const after = mtimes(root, files);
-  assert.equal(files.filter((_, index) => after[index] === before[index]).length, 0);
-});
-
-test('assets: --reset-assets=templates re-exports the PSD and leaves the logo variants fresh', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-  await runService(root, brandConfig());
-
-  const logoSvg = path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg');
-  const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
-  const before = { logo: fs.statSync(logoSvg).mtimeMs, icon: fs.statSync(iconPng).mtimeMs };
-
-  const result = await runService(root, brandConfig(), { options: { resetAssets: 'templates' } });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.templates.processed, 1);
-  // The PSD is brand collateral, not cache: it is re-processed, never re-seeded
-  assert.equal(result.output.templates.seeded, 0);
-  assert.equal(result.output.process.synced, true);
-  assert.equal(fs.statSync(logoSvg).mtimeMs, before.logo);
-  assert.ok(fs.statSync(iconPng).mtimeMs > before.icon);
-});
-
-test('assets: a dry run reports the reset and deletes nothing', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-
-  const result = await runService(root, brandConfig(), { options: { resetAssets: true, dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(derivedFiles(root), files);
-  assert.deepEqual(mtimes(root, files), before);
-});
-
-// ─── Reconcile: writes delete what the sources no longer derive (#636) ───────
-
-test('reconcile: a stray inside an output dir goes, the derived set stays', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-  const files = derivedFiles(root);
-
-  // Leftovers of an older shape, inside two operations' own output dirs
-  fs.writeFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-64.webp'), 'stray');
-  fs.writeFileSync(path.join(root, '.omega', 'assets', 'favicon', 'favicon-64x64.png'), 'stray');
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.reconcile.removed, 2);
-  assert.deepEqual(derivedFiles(root), files);
-});
-
-test('reconcile: only the operations\' own output dirs are swept', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  // Inside .omega/assets/ but outside every output dir — out of boundary
-  const outside = path.join(root, '.omega', 'assets', 'notes.txt');
-  fs.writeFileSync(outside, 'not the assets service\'s');
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.output.reconcile.removed, 0);
-  assert.ok(fs.existsSync(outside));
-});
-
-test('reconcile: dropping a logo source removes everything it derived, and only that', async () => {
-  const root = stageBrand();
-  stageFont(root);
-  await runService(root, brandConfig({ font: 'TestFont-Regular' }));
-  assert.ok(derivedFiles(root).some((file) => file.startsWith('logo/wordmark/')));
-
-  // The brand drops the wordmark source; no brand.font, so logo-gen (missing-only)
-  // has nothing to regenerate it from
-  fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.status, 'success');
-  // 2 SVGs + 5 sizes × 2 variants
-  assert.equal(result.output.reconcile.removed, 12);
-  const files = derivedFiles(root);
-  assert.ok(!files.some((file) => file.startsWith('logo/wordmark/')));
-  assert.ok(files.some((file) => file.startsWith('logo/combomark/')));
-  assert.ok(files.includes('logo/brandmark/color-x.svg'));
-});
-
-test('reconcile: a removed PSD takes its exports with it, the app icon stays', async () => {
-  const root = stageBrand();
-  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
-  await runService(root, brandConfig());
-  assert.ok(derivedFiles(root).includes('app/macos/icon.png'));
-
-  // Drop the brand's PSD and the company key that would re-seed it
-  fs.rmSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd'));
-  writeBrandConfig(root);
-
-  const result = await runService(root, brandConfig());
-
-  assert.equal(result.output.reconcile.removed, 1);
-  const files = derivedFiles(root);
-  assert.ok(!files.includes('app/macos/icon.png'));
-  assert.ok(files.includes('app/macos/icon.icns'));
-});
-
-test('reconcile: set → unset → rerun converges once and stays converged', async () => {
-  const root = stageBrand();
-  stageFont(root);
-  await runService(root, brandConfig({ font: 'TestFont-Regular' }));
-
-  fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
-  const unset = await runService(root, brandConfig());
-  assert.equal(unset.output.reconcile.removed, 12);
-
-  const files = derivedFiles(root);
-  const before = mtimes(root, files);
-  const rerun = await runService(root, brandConfig());
-
-  assert.equal(rerun.output.reconcile.removed, 0);
-  assert.deepEqual(derivedFiles(root), files);
-  assert.deepEqual(mtimes(root, files), before);
-});
-
-test('reconcile: a dry run names the leftovers and deletes nothing', async () => {
-  const root = stageBrand();
-  await runService(root, brandConfig());
-
-  const stray = path.join(root, '.omega', 'assets', 'favicon', 'legacy-touch-icon.png');
-  fs.writeFileSync(stray, 'stray');
-
-  const result = await runService(root, brandConfig(), { options: { dryRun: true } });
-
-  assert.equal(result.output.reconcile.planned, 1);
-  assert.ok(fs.existsSync(stray));
-});
-
-test('brandmark: operator SA ensures the brand\'s own product user and generates with ITS api key', async () => {
-  const api = await startLogoApi();
-  const root = stageBrand({ brandmark: false });
-  const config = brandConfig();
-  config.brand.contact = { email: 'support@fixture-brand.test' };
-
-  // Injected seams stand in for MRLOGO_SERVICE_ACCOUNT (the trio pattern):
-  // the user already exists on MrLogo, its doc carries the private key
-  const lookups = [];
-  const reads = [];
-  const context = {
-    mrlogoAuthAdmin: {
-      getUserByEmail: async (email) => { lookups.push(email); return { uid: 'mrlogo-uid-1' }; },
+    {
+      name: 'assets: registered after directory with the seven operations in dependency order',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('directory') + 1]).toBe('assets');
+        // templates before icons — icons prefers the composited icon.png it makes;
+        // reconcile last, so everything this walk generated is already derived
+        ctx.expect(OPERATIONS.assets.map((o) => o.name)).toEqual(['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons', 'reconcile']);
+      },
     },
-    mrlogoDb: {
-      getDoc: async (docPath) => { reads.push(docPath); return { api: { privateKey: 'pk-fixture-brand-key' } }; },
+
+    {
+      name: 'assets: defaults are enabled-only',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.assets).toEqual({ enabled: true });
+      },
     },
-  };
 
-  process.env.MRLOGO_API_URL = api.url;
-  try {
-    const result = await runService(root, config, { context });
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-    assert.equal(result.status, 'success');
-    assert.deepEqual(lookups, ['support@fixture-brand.test']);
-    assert.deepEqual(reads, ['users/mrlogo-uid-1']);
-    const post = api.requests.find((r) => r.method === 'POST');
-    assert.equal(post.authorization, 'Bearer pk-fixture-brand-key');
-  } finally {
-    delete process.env.MRLOGO_API_URL;
-    api.server.close();
-  }
+    {
+      name: 'assets: assets.enabled = false skips the service',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig({ assets: { enabled: false } }));
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/assets\.enabled/);
+      },
+    },
+
+    {
+      name: 'assets: scalar assets: false skips the service',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig({ assets: false }));
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/assets\.enabled/);
+      },
+    },
+
+    {
+      name: 'assets: no brandmark.svg skips the service with guidance',
+      run: async (ctx) => {
+        const root = stageBrand({ brandmark: false });
+        const result = await runService(root, brandConfig());
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/brandmark\.svg/);
+        ctx.expect(derivedFiles(root)).toEqual([]);
+      },
+    },
+
+    // ─── Full real generation ────────────────────────────────────────────────────
+
+    {
+      name: 'assets: a brandmark generates the full derived set for real',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+
+        const files = derivedFiles(root);
+        // 20 logo files (2 SVGs + 9 color + 9 black PNGs), 2 app icons,
+        // 4 social icons, 7 favicon files
+        ctx.expect(files.length).toBe(33);
+        for (const expected of [
+          'logo/brandmark/color-x.svg', 'logo/brandmark/black-x.svg',
+          'logo/brandmark/color-16.png', 'logo/brandmark/color-2048.png', 'logo/brandmark/black-1024.png',
+          'app/macos/icon.icns', 'app/windows/icon.ico',
+          'social/brandmark/color-x.svg', 'social/brandmark/color-2048.png',
+          'favicon/favicon.ico', 'favicon/apple-touch-icon.png', 'favicon/site.webmanifest',
+        ]) {
+          ctx.expect(files.includes(expected), `missing ${expected}`).toBeTruthy();
+        }
+
+        // No wordmark/combomark sources → no derived dirs for them
+        ctx.expect(!files.some((file) => file.startsWith('logo/wordmark/') || file.startsWith('logo/combomark/'))).toBeTruthy();
+
+        // The black variant is actually black — the source color is gone
+        const blackSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'black-x.svg'), 'utf8');
+        ctx.expect(blackSvg.includes('fill="#000000"')).toBeTruthy();
+        ctx.expect(!blackSvg.includes('#e63946')).toBeTruthy();
+
+        // The color variant is the source verbatim
+        const colorSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), 'utf8');
+        ctx.expect(colorSvg).toBe(BRANDMARK_SVG);
+
+        // Container formats carry their magic bytes
+        const icns = fs.readFileSync(path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.icns'));
+        ctx.expect(icns.subarray(0, 4).toString('ascii')).toBe('icns');
+        const ico = fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'favicon.ico'));
+        ctx.expect([...ico.subarray(0, 4)]).toEqual([0, 0, 1, 0]);
+
+        // The webmanifest derives from config
+        const manifest = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'site.webmanifest'), 'utf8'));
+        ctx.expect(manifest.name).toBe('AB');
+        ctx.expect(manifest.icons.length).toBe(2);
+      },
+    },
+
+    // ─── Idempotency (the upgrade that replaced the --onboarding gate) ───────────
+
+    {
+      name: 'assets: a converged rerun regenerates nothing',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(mtimes(root, files)).toEqual(before);
+        ctx.expect(result.output.process.synced).toBe(true);
+        ctx.expect(result.output.icons.synced).toBe(true);
+        ctx.expect(result.output.socialIcons.synced).toBe(true);
+        ctx.expect(result.output.favicons.synced).toBe(true);
+      },
+    },
+
+    {
+      name: 'assets: a touched brandmark regenerates its derived files',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+
+        // Source newer than every derived file → everything brandmark-derived is stale
+        const future = new Date(Date.now() + 10000);
+        fs.utimesSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), future, future);
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        const after = mtimes(root, files);
+        const changed = files.filter((_, index) => after[index] !== before[index]);
+        // Everything except the config-derived webmanifest regenerates
+        ctx.expect(changed.length).toBe(files.length - 1);
+        ctx.expect(!changed.includes('favicon/site.webmanifest')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'assets: a changed brand name rewrites only the webmanifest',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+
+        const renamed = brandConfig();
+        renamed.brand.name = 'Renamed Brand';
+        const result = await runService(root, renamed);
+
+        ctx.expect(result.status).toBe('success');
+        const after = mtimes(root, files);
+        const changed = files.filter((_, index) => after[index] !== before[index]);
+        ctx.expect(changed).toEqual(['favicon/site.webmanifest']);
+        const manifest = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'assets', 'favicon', 'site.webmanifest'), 'utf8'));
+        ctx.expect(manifest.name).toBe('Renamed Brand');
+        ctx.expect(result.output.favicons.generated).toBe(1);
+      },
+    },
+
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'assets: dry run on a fresh brand writes nothing and reports the plan',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig(), { options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(derivedFiles(root)).toEqual([]);
+        ctx.expect(result.output.process.planned).toBe(20);
+        ctx.expect(result.output.icons.planned).toBe(2);
+        ctx.expect(result.output.socialIcons.planned).toBe(4);
+        ctx.expect(result.output.favicons.planned).toBe(7);
+      },
+    },
+
+    // ─── logo-gen ────────────────────────────────────────────────────────────────
+
+    {
+      name: 'assets: no brand.font → wordmark/combomark noted, everything else proceeds',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.logos).toEqual({ skipped: 'no brand.font' });
+        ctx.expect(!fs.existsSync(path.join(root, 'assets', 'logo', 'wordmark.svg'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'assets: brand.font + a real font file generates wordmark and combomark',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageFont(root);
+
+        const result = await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.logos.generated).toEqual(['wordmark', 'combomark']);
+
+        const wordmark = fs.readFileSync(path.join(root, 'assets', 'logo', 'wordmark.svg'), 'utf8');
+        ctx.expect(wordmark).toMatch(/<path d="M/); // text as path outlines
+        const combomark = fs.readFileSync(path.join(root, 'assets', 'logo', 'combomark.svg'), 'utf8');
+        ctx.expect(combomark.includes('<rect')).toBeTruthy(); // the embedded brandmark content
+        ctx.expect(combomark).toMatch(/<path d="M/);
+
+        // …and process derived their variant sets too
+        const files = derivedFiles(root);
+        ctx.expect(files.includes('logo/wordmark/color-x.svg')).toBeTruthy();
+        ctx.expect(files.includes('logo/combomark/black-2048.png')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'assets: existing wordmark/combomark are never regenerated (missing-only)',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageFont(root);
+        await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+
+        const wordmarkPath = path.join(root, 'assets', 'logo', 'wordmark.svg');
+        const before = fs.statSync(wordmarkPath).mtimeMs;
+
+        // Even a newer brandmark must not clobber a (possibly hand-tuned) wordmark
+        const future = new Date(Date.now() + 10000);
+        fs.utimesSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), future, future);
+
+        const result = await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.logos.synced).toBe(true);
+        ctx.expect(fs.statSync(wordmarkPath).mtimeMs).toBe(before);
+      },
+    },
+
+    {
+      name: 'assets: a configured font that cannot be found is an error',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const result = await runService(root, brandConfig({ font: 'Missing-Font' }));
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.error).toMatch(/font "Missing-Font" not found/);
+      },
+    },
+
+    {
+      name: 'assets: dry run reports the planned wordmark/combomark without a font file',
+      run: async (ctx) => {
+        // The plan is reported before font resolution — dry run needs no font
+        const root = stageBrand();
+        const result = await runService(root, brandConfig({ font: 'Missing-Font' }), { options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.logos.planned).toEqual(['wordmark', 'combomark']);
+        ctx.expect(!fs.existsSync(path.join(root, 'assets', 'logo', 'wordmark.svg'))).toBeTruthy();
+      },
+    },
+
+    // ─── svg-to-black ────────────────────────────────────────────────────────────
+
+    {
+      name: 'svg-to-black: fills, strokes, style values, and defs all go black',
+      run: (ctx) => {
+        const svg = [
+          '<svg xmlns="http://www.w3.org/2000/svg">',
+          '<defs><linearGradient id="g"><stop stop-color="#ff0000"/></linearGradient></defs>',
+          '<rect fill="url(#g)" stroke="#00ff00"/>',
+          '<circle style="fill:rgb(1,2,3);stroke:blue"/>',
+          '<path fill="none" stroke="none"/>',
+          '</svg>',
+        ].join('');
+
+        const black = convertSvgToBlack(svg);
+
+        ctx.expect(!black.includes('<defs>')).toBeTruthy();
+        ctx.expect(black.includes('fill="#000000" stroke="#000000"')).toBeTruthy();
+        ctx.expect(black.includes('style="fill:#000000;stroke:#000000"')).toBeTruthy();
+        // none is a deliberate absence, not a color
+        ctx.expect(black.includes('fill="none" stroke="none"')).toBeTruthy();
+        ctx.expect(!black.includes('ff0000') && !black.includes('00ff00')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'templates: seeded from the company, logo layer re-rastered, PNG exported, icons consume the composite',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+
+        const result = await runService(root, brandConfig());
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.templates.seeded).toBe(1);
+        ctx.expect(result.output.templates.processed).toBe(1);
+        ctx.expect(result.output.templates.missing.length).toBe(Object.keys(TEMPLATE_CONFIG).length - 1);
+
+        // The seeded PSD is now brand collateral with the brandmark in its logo layer
+        const psd = readBrandPsd(root, 'app-macos-icon');
+        const logo = psd.children.find((l) => l.name === 'Main')
+          .children.find((l) => l.name === 'Logo').children[0];
+        const logoSize = Math.floor(0.575 * 1024);
+        ctx.expect(logo.canvas.width).toBe(logoSize);
+        ctx.expect(logo.canvas.height).toBe(logoSize);
+        // Centered inside the configured bounds — not the fixture's 100,100
+        ctx.expect(logo.left > 79 && logo.top > 90, `logo at ${logo.left},${logo.top}`).toBeTruthy();
+        // The re-raster carries the brandmark's red, not the fixture's green
+        const px = logo.canvas.getContext('2d').getImageData(logoSize / 2, logoSize / 2, 1, 1).data;
+        ctx.expect(px[0] > 200 && px[1] < 100, `center pixel rgb(${px[0]},${px[1]},${px[2]})`).toBeTruthy();
+
+        // The export composite exists at template dimensions
+        const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+        ctx.expect(fs.existsSync(iconPng)).toBeTruthy();
+        const sharp = require('sharp');
+        const meta = await sharp(iconPng).metadata();
+        ctx.expect(meta.width).toBe(1024);
+        ctx.expect(meta.height).toBe(1024);
+
+        // The icons op ran AFTER templates and used the composited icon.png
+        // (its .icns must be newer than the composite it derives from)
+        const icns = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.icns');
+        ctx.expect(fs.statSync(icns).mtimeMs >= fs.statSync(iconPng).mtimeMs).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'templates: text layers take brandConfig values and overflow shrinks the font',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, {
+          'social-og-image': fixturePsd(1200, 630, { textLayers: ['Brand Name', 'Brand Tagline'] }),
+        });
+
+        const config = brandConfig();
+        config.brand.tagline = 'A very long fixture tagline that cannot possibly fit inside seventy percent of the canvas width without shrinking quite a lot first';
+
+        const result = await runService(root, config);
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.templates.processed).toBe(1);
+
+        const psd = readBrandPsd(root, 'social-og-image');
+        const textFolder = psd.children.find((l) => l.name === 'Main').children.find((l) => l.name === 'Text');
+        const nameLayer = textFolder.children.find((l) => l.name === 'Brand Name');
+        const taglineLayer = textFolder.children.find((l) => l.name === 'Brand Tagline');
+
+        ctx.expect(nameLayer.text.text).toBe('AB');
+        ctx.expect(taglineLayer.text.text).toBe(config.brand.tagline);
+        // 'AB' fits at 48pt; the long tagline had to shrink
+        ctx.expect(nameLayer.text.style.fontSize).toBe(48);
+        ctx.expect(taglineLayer.text.style.fontSize < 48, `tagline still ${taglineLayer.text.style.fontSize}pt`).toBeTruthy();
+
+        const meta = await require('sharp')(path.join(root, '.omega', 'assets', 'social', 'og-image.png')).metadata();
+        ctx.expect(meta.width).toBe(1200);
+        ctx.expect(meta.height).toBe(630);
+      },
+    },
+
+    {
+      name: 'templates: converged rerun is zero-work; a touched PSD reprocesses',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+        await runService(root, brandConfig());
+
+        const psdPath = path.join(root, 'assets', 'templates', 'app-macos-icon.psd');
+        const pngPath = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+        const before = [fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs];
+
+        const rerun = await runService(root, brandConfig());
+        ctx.expect(rerun.output.templates.processed).toBe(0);
+        ctx.expect(rerun.output.templates.seeded).toBe(0);
+        ctx.expect(rerun.output.templates.fresh).toBe(1);
+        ctx.expect([fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs]).toEqual(before);
+
+        // A manual Photoshop edit (mtime bump) → the logo refresh + export rerun
+        const future = new Date(Date.now() + 5000);
+        fs.utimesSync(psdPath, future, future);
+        const touched = await runService(root, brandConfig());
+        ctx.expect(touched.output.templates.processed).toBe(1);
+        ctx.expect(fs.statSync(pngPath).mtimeMs > before[1]).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'templates: dry-run plans the seed + process and writes nothing',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+
+        const result = await runService(root, brandConfig(), { options: { dryRun: true } });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.templates.planned).toEqual(['app-macos-icon (seed + process)']);
+        ctx.expect(!fs.existsSync(path.join(root, 'assets', 'templates'))).toBeTruthy();
+        ctx.expect(derivedFiles(root)).toEqual([]);
+      },
+    },
+
+    {
+      name: 'templates: no PSDs anywhere is a quiet note, never a warn',
+      run: async (ctx) => {
+        const root = stageBrand(); // no company marker, no brand templates
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.templates.missing.length).toBe(Object.keys(TEMPLATE_CONFIG).length);
+        ctx.expect(result.output.templates.processed).toBe(0);
+      },
+    },
+
+    {
+      name: 'brandmark: interactive generation via the logo API roots the whole derived set',
+      run: async (ctx) => {
+        const api = await startLogoApi();
+        const root = stageBrand({ brandmark: false });
+        const config = brandConfig();
+        config.brand.description = 'A fixture brand';
+
+        process.env.MRLOGO_API_URL = api.url;
+        process.env.LOGO_API_ID_TOKEN = 'test-token-123';
+        const tty = openTtyPrompt();
+        try {
+          const running = runService(root, config);
+          await tty.answer('Logo prompt', 'geometric fox\r');
+          const result = await running;
+
+          ctx.expect(result.status).toBe('success');
+
+          // The generated SVG landed as committed brand collateral
+          ctx.expect(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8')).toBe(GENERATED_SVG);
+
+          // The request carried the token + the brand identity + the typed direction
+          const post = api.requests.find((r) => r.method === 'POST');
+          ctx.expect(post.authorization).toBe('Bearer test-token-123');
+          ctx.expect(post.body.brandName).toBe('AB');
+          ctx.expect(post.body.mode).toBe('brandmark');
+          ctx.expect(post.body.description).toBe('A fixture brand. geometric fox');
+          ctx.expect(post.body.colors).toEqual(['#000000']);
+
+          // And the rest of the service derived from it in the same run
+          const colorSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), 'utf8');
+          ctx.expect(colorSvg).toBe(GENERATED_SVG);
+        } finally {
+          tty.close();
+          delete process.env.MRLOGO_API_URL;
+          delete process.env.LOGO_API_ID_TOKEN;
+          api.server.close();
+        }
+      },
+    },
+
+    {
+      name: 'brandmark: no credentials skips with the ladder guidance — no API call',
+      run: async (ctx) => {
+        const api = await startLogoApi();
+        const root = stageBrand({ brandmark: false });
+
+        // No MRLOGO_SERVICE_ACCOUNT / MRLOGO_API_KEY / LOGO_API_ID_TOKEN → nothing to mint with
+        process.env.MRLOGO_API_URL = api.url;
+        const tty = openTtyPrompt();
+        try {
+          const result = await runService(root, brandConfig());
+
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.reason).toMatch(/brandmark\.svg/);
+          ctx.expect(result.reason).toMatch(/MRLOGO_SERVICE_ACCOUNT/);
+          ctx.expect(api.requests.length).toBe(0);
+          ctx.expect(!fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg'))).toBeTruthy();
+        } finally {
+          tty.close();
+          delete process.env.MRLOGO_API_URL;
+          api.server.close();
+        }
+      },
+    },
+
+    {
+      name: 'brandmark: dry runs never generate; non-interactive runs GENERATE when credentialed',
+      run: async (ctx) => {
+        const api = await startLogoApi();
+        process.env.MRLOGO_API_URL = api.url;
+        process.env.LOGO_API_ID_TOKEN = 'test-token-123';
+        try {
+          // Dry run: interactive TTY, credential present — still no attempt
+          const tty = openTtyPrompt();
+          try {
+            const dry = await runService(stageBrand({ brandmark: false }), brandConfig(), { options: { dryRun: true } });
+            ctx.expect(dry.status).toBe('skipped');
+            ctx.expect(api.requests.length).toBe(0);
+          } finally {
+            tty.close();
+          }
+
+          // Headless with a credential: setting it IS the consent — the brandmark
+          // mints and the whole leg runs to success. This is the pipeline story.
+          const headless = await runService(stageBrand({ brandmark: false }), brandConfig());
+          ctx.expect(headless.status).toBe('success');
+          const mint = api.requests.find((request) => request.url === '/logos');
+          ctx.expect(mint, 'the logo API was called').toBeTruthy();
+          ctx.expect(mint.body.brandName).toBe('AB');
+        } finally {
+          delete process.env.MRLOGO_API_URL;
+          delete process.env.LOGO_API_ID_TOKEN;
+          api.server.close();
+        }
+      },
+    },
+
+    {
+      name: 'brandmark: MRLOGO_API_KEY rides the same Bearer transport (BEM resolves non-JWTs by api.privateKey)',
+      run: async (ctx) => {
+        const api = await startLogoApi();
+        const root = stageBrand({ brandmark: false });
+
+        process.env.MRLOGO_API_URL = api.url;
+        process.env.MRLOGO_API_KEY = 'k'.repeat(43);
+        try {
+          const result = await runService(root, brandConfig());
+
+          ctx.expect(result.status).toBe('success');
+          const post = api.requests.find((r) => r.method === 'POST');
+          ctx.expect(post.authorization).toBe(`Bearer ${'k'.repeat(43)}`);
+          ctx.expect(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8')).toBe(GENERATED_SVG);
+        } finally {
+          delete process.env.MRLOGO_API_URL;
+          delete process.env.MRLOGO_API_KEY;
+          api.server.close();
+        }
+      },
+    },
+
+    {
+      name: 'reset: the flag resolves to kinds: bare = both, a value = that kind, unknown throws',
+      run: (ctx) => {
+        ctx.expect(resolveResetKinds(undefined)).toEqual([]);
+        ctx.expect(resolveResetKinds(true)).toEqual(['logos', 'templates']);
+        ctx.expect(resolveResetKinds('templates')).toEqual(['templates']);
+        ctx.expect(resolveResetKinds('templates,logos')).toEqual(['logos', 'templates']);
+        ctx.expect(() => resolveResetKinds('logo')).toThrow(/Unknown --reset-assets kind\(s\): logo/);
+      },
+    },
+
+    {
+      name: 'reset: clearing one kind leaves the other kind and the brand sources alone',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+        await runService(root, brandConfig());
+        const outDir = path.join(root, '.omega', 'assets');
+
+        const logos = resetAssetsCache({ outDir, kinds: ['logos'] });
+
+        ctx.expect(logos.removed.includes('logo/brandmark')).toBeTruthy();
+        ctx.expect(logos.removed.includes('social/brandmark')).toBeTruthy();
+        ctx.expect(logos.removed.includes('favicon')).toBeTruthy();
+        ctx.expect(logos.removed.includes(path.join('app', 'macos', 'icon.icns'))).toBeTruthy();
+        // The templates kind's export survives; only it is left
+        ctx.expect(derivedFiles(root)).toEqual(['app/macos/icon.png']);
+
+        const templates = resetAssetsCache({ outDir, kinds: ['templates'] });
+
+        ctx.expect(templates.removed.includes(path.join('app', 'macos', 'icon.png'))).toBeTruthy();
+        ctx.expect(derivedFiles(root)).toEqual([]);
+
+        // Only .omega/assets/ is cache: the brand's committed sources are never touched
+        ctx.expect(fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg'))).toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'assets: --reset-assets regenerates the derived set a converged rerun skips',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+
+        // Timestamps alone: the rerun has nothing to do
+        const converged = await runService(root, brandConfig());
+        ctx.expect(converged.output.process.synced).toBe(true);
+        ctx.expect(mtimes(root, files)).toEqual(before);
+
+        // Forced: the cache is cleared, so the same walk rebuilds every file
+        const forced = await runService(root, brandConfig(), { options: { resetAssets: true } });
+
+        ctx.expect(forced.status).toBe('success');
+        ctx.expect(derivedFiles(root)).toEqual(files);
+        ctx.expect(forced.output.process.generated).toBe(20);
+        ctx.expect(forced.output.icons.generated).toBe(2);
+        ctx.expect(forced.output.socialIcons.generated).toBe(4);
+        ctx.expect(forced.output.favicons.generated).toBe(7);
+        const after = mtimes(root, files);
+        ctx.expect(files.filter((_, index) => after[index] === before[index]).length).toBe(0);
+      },
+    },
+
+    {
+      name: 'assets: --reset-assets=templates re-exports the PSD and leaves the logo variants fresh',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+        await runService(root, brandConfig());
+
+        const logoSvg = path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg');
+        const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+        const before = { logo: fs.statSync(logoSvg).mtimeMs, icon: fs.statSync(iconPng).mtimeMs };
+
+        const result = await runService(root, brandConfig(), { options: { resetAssets: 'templates' } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.templates.processed).toBe(1);
+        // The PSD is brand collateral, not cache: it is re-processed, never re-seeded
+        ctx.expect(result.output.templates.seeded).toBe(0);
+        ctx.expect(result.output.process.synced).toBe(true);
+        ctx.expect(fs.statSync(logoSvg).mtimeMs).toBe(before.logo);
+        ctx.expect(fs.statSync(iconPng).mtimeMs > before.icon).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'assets: a dry run reports the reset and deletes nothing',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+
+        const result = await runService(root, brandConfig(), { options: { resetAssets: true, dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(derivedFiles(root)).toEqual(files);
+        ctx.expect(mtimes(root, files)).toEqual(before);
+      },
+    },
+
+    // ─── Reconcile: writes delete what the sources no longer derive (#636) ───────
+
+    {
+      name: 'reconcile: a stray inside an output dir goes, the derived set stays',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+        const files = derivedFiles(root);
+
+        // Leftovers of an older shape, inside two operations' own output dirs
+        fs.writeFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-64.webp'), 'stray');
+        fs.writeFileSync(path.join(root, '.omega', 'assets', 'favicon', 'favicon-64x64.png'), 'stray');
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output.reconcile.removed).toBe(2);
+        ctx.expect(derivedFiles(root)).toEqual(files);
+      },
+    },
+
+    {
+      name: 'reconcile: only the operations\' own output dirs are swept',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        // Inside .omega/assets/ but outside every output dir — out of boundary
+        const outside = path.join(root, '.omega', 'assets', 'notes.txt');
+        fs.writeFileSync(outside, 'not the assets service\'s');
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.output.reconcile.removed).toBe(0);
+        ctx.expect(fs.existsSync(outside)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'reconcile: dropping a logo source removes everything it derived, and only that',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageFont(root);
+        await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+        ctx.expect(derivedFiles(root).some((file) => file.startsWith('logo/wordmark/'))).toBeTruthy();
+
+        // The brand drops the wordmark source; no brand.font, so logo-gen (missing-only)
+        // has nothing to regenerate it from
+        fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.status).toBe('success');
+        // 2 SVGs + 5 sizes × 2 variants
+        ctx.expect(result.output.reconcile.removed).toBe(12);
+        const files = derivedFiles(root);
+        ctx.expect(!files.some((file) => file.startsWith('logo/wordmark/'))).toBeTruthy();
+        ctx.expect(files.some((file) => file.startsWith('logo/combomark/'))).toBeTruthy();
+        ctx.expect(files.includes('logo/brandmark/color-x.svg')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'reconcile: a removed PSD takes its exports with it, the app icon stays',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+        await runService(root, brandConfig());
+        ctx.expect(derivedFiles(root).includes('app/macos/icon.png')).toBeTruthy();
+
+        // Drop the brand's PSD and the company key that would re-seed it
+        fs.rmSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd'));
+        writeBrandConfig(root);
+
+        const result = await runService(root, brandConfig());
+
+        ctx.expect(result.output.reconcile.removed).toBe(1);
+        const files = derivedFiles(root);
+        ctx.expect(!files.includes('app/macos/icon.png')).toBeTruthy();
+        ctx.expect(files.includes('app/macos/icon.icns')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'reconcile: set → unset → rerun converges once and stays converged',
+      run: async (ctx) => {
+        const root = stageBrand();
+        stageFont(root);
+        await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+
+        fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
+        const unset = await runService(root, brandConfig());
+        ctx.expect(unset.output.reconcile.removed).toBe(12);
+
+        const files = derivedFiles(root);
+        const before = mtimes(root, files);
+        const rerun = await runService(root, brandConfig());
+
+        ctx.expect(rerun.output.reconcile.removed).toBe(0);
+        ctx.expect(derivedFiles(root)).toEqual(files);
+        ctx.expect(mtimes(root, files)).toEqual(before);
+      },
+    },
+
+    {
+      name: 'reconcile: a dry run names the leftovers and deletes nothing',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await runService(root, brandConfig());
+
+        const stray = path.join(root, '.omega', 'assets', 'favicon', 'legacy-touch-icon.png');
+        fs.writeFileSync(stray, 'stray');
+
+        const result = await runService(root, brandConfig(), { options: { dryRun: true } });
+
+        ctx.expect(result.output.reconcile.planned).toBe(1);
+        ctx.expect(fs.existsSync(stray)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'brandmark: operator SA ensures the brand\'s own product user and generates with ITS api key',
+      run: async (ctx) => {
+        const api = await startLogoApi();
+        const root = stageBrand({ brandmark: false });
+        const config = brandConfig();
+        config.brand.contact = { email: 'support@fixture-brand.test' };
+
+        // Injected seams stand in for MRLOGO_SERVICE_ACCOUNT (the trio pattern):
+        // the user already exists on MrLogo, its doc carries the private key
+        const lookups = [];
+        const reads = [];
+        const context = {
+          mrlogoAuthAdmin: {
+            getUserByEmail: async (email) => { lookups.push(email); return { uid: 'mrlogo-uid-1' }; },
+          },
+          mrlogoDb: {
+            getDoc: async (docPath) => { reads.push(docPath); return { api: { privateKey: 'pk-fixture-brand-key' } }; },
+          },
+        };
+
+        process.env.MRLOGO_API_URL = api.url;
+        try {
+          const result = await runService(root, config, { context });
+
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(lookups).toEqual(['support@fixture-brand.test']);
+          ctx.expect(reads).toEqual(['users/mrlogo-uid-1']);
+          const post = api.requests.find((r) => r.method === 'POST');
+          ctx.expect(post.authorization).toBe('Bearer pk-fixture-brand-key');
+        } finally {
+          delete process.env.MRLOGO_API_URL;
+          api.server.close();
+        }
+      },
+    },
+  ],
 });

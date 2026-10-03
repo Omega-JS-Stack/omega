@@ -1,5 +1,7 @@
-const { describe, it, afterEach } = require('node:test');
-const { getOmega, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { getOmega, TEST_CONFIG, setPathPrefix, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 // Count the calls the real ServiceWorker module makes into the harness's inert
 // navigator.serviceWorker container — the assertions watch the actual code path.
@@ -41,130 +43,184 @@ function setLocation(protocol, href, origin) {
   return () => Object.assign(global.window.location, previous);
 }
 
-describe('Service Worker origin gate', () => {
-  let container;
-  let restoreLocation;
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-worker',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let container;
+      let restoreLocation;
 
-  afterEach(() => {
-    container?.restore();
-    restoreLocation?.();
-    container = null;
-    restoreLocation = null;
-  });
+      const afterEachHook = () => {
+        container?.restore();
+        restoreLocation?.();
+        container = null;
+        restoreLocation = null;
+      };
 
-  it('should skip registration entirely on a file:// origin', async () => {
-    restoreLocation = setLocation('file:', 'file:///Applications/Brand.app/index.html', 'file://');
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker origin gate > should skip registration entirely on a file:// origin',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook);
+          restoreLocation = setLocation('file:', 'file:///Applications/Brand.app/index.html', 'file://');
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG });
+          await getOmega().initialize({ ...TEST_CONFIG });
 
-    assert.strictEqual(container.calls.register, 0);
-    assert.strictEqual(container.calls.getRegistrations, 0);
-  });
+          ctx.expect(container.calls.register).toBe(0);
+          ctx.expect(container.calls.getRegistrations).toBe(0);
+        },
+      });
 
-  it('should skip the disabled-branch sweep on a chrome-extension:// origin', async () => {
-    restoreLocation = setLocation('chrome-extension:', 'chrome-extension://abc/popup.html', 'chrome-extension://abc');
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker origin gate > should skip the disabled-branch sweep on a chrome-extension:// origin',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook);
+          restoreLocation = setLocation('chrome-extension:', 'chrome-extension://abc/popup.html', 'chrome-extension://abc');
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
+          await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
 
-    assert.strictEqual(container.calls.register, 0);
-    assert.strictEqual(container.calls.getRegistrations, 0);
-  });
+          ctx.expect(container.calls.register).toBe(0);
+          ctx.expect(container.calls.getRegistrations).toBe(0);
+        },
+      });
 
-  it('should register on an http(s) origin when enabled', async () => {
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker origin gate > should register on an http(s) origin when enabled',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook);
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG });
+          await getOmega().initialize({ ...TEST_CONFIG });
 
-    assert.strictEqual(container.calls.register, 1);
-    assert.strictEqual(container.calls.getRegistrations, 0);
-  });
+          ctx.expect(container.calls.register).toBe(1);
+          ctx.expect(container.calls.getRegistrations).toBe(0);
+        },
+      });
 
-  it('should sweep the origin on an http(s) origin when disabled', async () => {
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker origin gate > should sweep the origin on an http(s) origin when disabled',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook);
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
+          await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
 
-    assert.strictEqual(container.calls.register, 0);
-    assert.strictEqual(container.calls.getRegistrations, 1);
-  });
-});
+          ctx.expect(container.calls.register).toBe(0);
+          ctx.expect(container.calls.getRegistrations).toBe(1);
+        },
+      });
+      return cases;
+    })(),
 
-// #360 — a site served under a URL path (#355) hosts its worker script at
-// /<prefix>/service-worker.js, which can only claim /<prefix>/. The page reads
-// the stamp the build wrote on <html> and hands the value to the worker on the
-// script URL's query string (a worker has no document to read it from).
-describe('Service Worker under a URL-path mount', () => {
-  let container;
-  let restorePrefix;
+    // #360 — a site served under a URL path (#355) hosts its worker script at
+    // /<prefix>/service-worker.js, which can only claim /<prefix>/. The page reads
+    // the stamp the build wrote on <html> and hands the value to the worker on the
+    // script URL's query string (a worker has no document to read it from).
+    ...(() => {
+      const cases = [];
+      let container;
+      let restorePrefix;
 
-  afterEach(() => {
-    container?.restore();
-    restorePrefix?.();
-    container = null;
-    restorePrefix = null;
-  });
+      const afterEachHook2 = () => {
+        container?.restore();
+        restorePrefix?.();
+        container = null;
+        restorePrefix = null;
+      };
 
-  it('should register the mounted script at the mounted scope, carrying the prefix', async () => {
-    restorePrefix = setPathPrefix('/workkit');
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker under a URL-path mount > should register the mounted script at the mounted scope, carrying the prefix',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook2);
+          restorePrefix = setPathPrefix('/workkit');
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG });
+          await getOmega().initialize({ ...TEST_CONFIG });
 
-    assert.deepStrictEqual(container.registered, [{
-      url: '/workkit/service-worker.js?omega-path-prefix=%2Fworkkit',
-      options: { scope: '/workkit/', updateViaCache: 'none' },
-    }]);
-  });
+          ctx.expect(container.registered).toEqual([{
+            url: '/workkit/service-worker.js?omega-path-prefix=%2Fworkkit',
+            options: { scope: '/workkit/', updateViaCache: 'none' },
+          }]);
+        },
+      });
 
-  it('should mount an explicitly configured script path too', async () => {
-    restorePrefix = setPathPrefix('/workkit');
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker under a URL-path mount > should mount an explicitly configured script path too',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook2);
+          restorePrefix = setPathPrefix('/workkit');
+          container = instrumentContainer();
 
-    await getOmega().initialize({
-      ...TEST_CONFIG,
-      serviceWorker: { enabled: true, config: { path: '/sw.js' } },
-    });
+          await getOmega().initialize({
+            ...TEST_CONFIG,
+            serviceWorker: { enabled: true, config: { path: '/sw.js' } },
+          });
 
-    assert.strictEqual(container.registered[0].url, '/workkit/sw.js?omega-path-prefix=%2Fworkkit');
-    assert.strictEqual(container.registered[0].options.scope, '/workkit/');
-  });
+          ctx.expect(container.registered[0].url).toBe('/workkit/sw.js?omega-path-prefix=%2Fworkkit');
+          ctx.expect(container.registered[0].options.scope).toBe('/workkit/');
+        },
+      });
 
-  it('should leave the unprefixed default byte-identical', async () => {
-    container = instrumentContainer();
+      cases.push({
+        name: 'Service Worker under a URL-path mount > should leave the unprefixed default byte-identical',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook2);
+          container = instrumentContainer();
 
-    await getOmega().initialize({ ...TEST_CONFIG });
+          await getOmega().initialize({ ...TEST_CONFIG });
 
-    assert.deepStrictEqual(container.registered, [{
-      url: '/service-worker.js',
-      options: { scope: '/', updateViaCache: 'none' },
-    }]);
-  });
-});
+          ctx.expect(container.registered).toEqual([{
+            url: '/service-worker.js',
+            options: { scope: '/', updateViaCache: 'none' },
+          }]);
+        },
+      });
+      return cases;
+    })(),
 
-// #817: the worker payload's `environment` is read through the ONE
-// environment surface, the same module every OMEGA target answers from, never
-// off `config.environment` by hand: an artifact that baked no environment fails
-// the registration by name instead of handing the worker `undefined`.
-describe('Service Worker environment fact', () => {
-  let container;
+    // #817: the worker payload's `environment` is read through the ONE
+    // environment surface, the same module every OMEGA target answers from, never
+    // off `config.environment` by hand: an artifact that baked no environment fails
+    // the registration by name instead of handing the worker `undefined`.
+    ...(() => {
+      const cases = [];
+      let container;
 
-  afterEach(() => {
-    container?.restore();
-    container = null;
-  });
+      const afterEachHook3 = () => {
+        container?.restore();
+        container = null;
+      };
 
-  it('should fail registration by name when the artifact baked no environment', async () => {
-    const omega = getOmega();
-    const { environment, ...withoutEnvironment } = TEST_CONFIG;
+      cases.push({
+        name: 'Service Worker environment fact > should fail registration by name when the artifact baked no environment',
+        run: async (ctx) => {
+          await beforeEachHook();
+          ctx.after(afterEachHook3);
+          const omega = getOmega();
+          const { environment, ...withoutEnvironment } = TEST_CONFIG;
 
-    // Registered by hand, off a boot whose own SW branch is disabled, so the
-    // rejection under test is this call's and not the boot's.
-    await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
-    container = instrumentContainer();
+          // Registered by hand, off a boot whose own SW branch is disabled, so the
+          // rejection under test is this call's and not the boot's.
+          await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
+          container = instrumentContainer();
 
-    await assert.rejects(() => omega.serviceWorker.register({}), /OMEGA_ENVIRONMENT/);
-    assert.strictEqual(container.calls.register, 0, 'nothing was registered on a broken artifact');
-  });
+          await ctx.expect((() => omega.serviceWorker.register({}))()).rejects.toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(container.calls.register, 'nothing was registered on a broken artifact').toBe(0);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

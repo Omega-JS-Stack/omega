@@ -141,7 +141,7 @@ function noMatchMessage(target) {
 // manager sets this signal on the runs it forwards and reads the exit code
 // below to tell a miss from a failure
 // ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). Its presence is
-// the whole signal, the way OMEGA_CASE_RUNNER's is.
+// the whole signal.
 const FANOUT_ENV = 'OMEGA_TEST_FANOUT';
 
 // The exit code a no-match answers with under that signal: distinct, so the

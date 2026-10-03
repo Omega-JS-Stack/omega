@@ -1,8 +1,7 @@
 // Unit tests for src/npm-registry.js — registry reads over real HTTP against a
 // local server (no live-registry dependency, no mocks).
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const http = require('http');
 const { getPackageManifest, getLatestVersion } = require('../src/npm-registry');
 
@@ -31,28 +30,49 @@ function withServer(fn) {
   });
 }
 
-test('getPackageManifest returns the full latest manifest', () => withServer(async (registryUrl) => {
-  const manifest = await getPackageManifest('left-pad', { registryUrl });
-  assert.equal(manifest.version, '9.9.9');
-  assert.deepEqual(manifest.peerDependencies, { chalk: '^5.0.0' });
-}));
+module.exports = defineCases({
+  type: 'group',
+  description: 'npm-registry',
+  tests: [
+    {
+      name: 'getPackageManifest returns the full latest manifest',
+      run: (ctx) => withServer(async (registryUrl) => {
+        const manifest = await getPackageManifest('left-pad', { registryUrl });
+        ctx.expect(manifest.version).toBe('9.9.9');
+        ctx.expect(manifest.peerDependencies).toEqual({ chalk: '^5.0.0' });
+      }),
+    },
 
-test('scoped package names keep the leading @ and encode the slash', () => withServer(async (registryUrl) => {
-  const manifest = await getPackageManifest('@omega.js/backend', { registryUrl });
-  assert.equal(manifest.name, '@omega.js/backend');
-}));
+    {
+      name: 'scoped package names keep the leading @ and encode the slash',
+      run: (ctx) => withServer(async (registryUrl) => {
+        const manifest = await getPackageManifest('@omega.js/backend', { registryUrl });
+        ctx.expect(manifest.name).toBe('@omega.js/backend');
+      }),
+    },
 
-test('getLatestVersion returns the version string', () => withServer(async (registryUrl) => {
-  assert.equal(await getLatestVersion('left-pad', { registryUrl }), '9.9.9');
-}));
+    {
+      name: 'getLatestVersion returns the version string',
+      run: (ctx) => withServer(async (registryUrl) => {
+        ctx.expect(await getLatestVersion('left-pad', { registryUrl })).toBe('9.9.9');
+      }),
+    },
 
-test('unknown package (404) resolves null, never throws', () => withServer(async (registryUrl) => {
-  assert.equal(await getPackageManifest('no-such-package', { registryUrl }), null);
-  assert.equal(await getLatestVersion('no-such-package', { registryUrl }), null);
-}));
+    {
+      name: 'unknown package (404) resolves null, never throws',
+      run: (ctx) => withServer(async (registryUrl) => {
+        ctx.expect(await getPackageManifest('no-such-package', { registryUrl })).toBe(null);
+        ctx.expect(await getLatestVersion('no-such-package', { registryUrl })).toBe(null);
+      }),
+    },
 
-test('unreachable registry resolves null, never throws', async () => {
-  // Port 1 is never listening — connection refused is the expected condition
-  const manifest = await getPackageManifest('left-pad', { registryUrl: 'http://127.0.0.1:1', timeout: 2000 });
-  assert.equal(manifest, null);
+    {
+      name: 'unreachable registry resolves null, never throws',
+      run: async (ctx) => {
+        // Port 1 is never listening — connection refused is the expected condition
+        const manifest = await getPackageManifest('left-pad', { registryUrl: 'http://127.0.0.1:1', timeout: 2000 });
+        ctx.expect(manifest).toBe(null);
+      },
+    },
+  ],
 });

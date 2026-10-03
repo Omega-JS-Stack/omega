@@ -9,8 +9,7 @@
 // file: specs, and a registry stub on an ephemeral 127.0.0.1 port for the
 // registry side.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -43,250 +42,6 @@ function withEnv(value, fn) {
     }
   }
 }
-
-// ---- isMonorepoRoot / resolveMonorepoRoot
-
-test('isMonorepoRoot accepts the real monorepo and the fixture fake', () => {
-  assert.equal(local.isMonorepoRoot(MONOREPO_ROOT), true);
-  assert.equal(local.isMonorepoRoot(FAKE_MONOREPO), true);
-});
-
-test('isMonorepoRoot rejects a plain package and a missing dir', () => {
-  assert.equal(local.isMonorepoRoot(path.join(FIXTURES, 'brand')), false);
-  assert.equal(local.isMonorepoRoot(path.join(FIXTURES, 'nope')), false);
-});
-
-test('resolveMonorepoRoot self-locates the repo these tests run inside', () => {
-  withEnv(undefined, () => {
-    assert.equal(local.resolveMonorepoRoot(), MONOREPO_ROOT);
-  });
-});
-
-test('resolveMonorepoRoot honors OMEGA_MONOREPO override', () => {
-  withEnv(FAKE_MONOREPO, () => {
-    assert.equal(local.resolveMonorepoRoot(), path.resolve(FAKE_MONOREPO));
-  });
-});
-
-test('resolveMonorepoRoot throws on an invalid OMEGA_MONOREPO', () => {
-  withEnv(path.join(FIXTURES, 'brand'), () => {
-    assert.throws(() => local.resolveMonorepoRoot(), /OMEGA_MONOREPO/);
-  });
-});
-
-// ---- packageDir
-
-test('packageDir maps a scoped name to its packages/ directory', () => {
-  assert.equal(local.packageDir('/repo', '@omega.js/client'), path.join('/repo', 'packages', 'client'));
-});
-
-// ---- findBrandRoot / discoverTargets
-
-test('findBrandRoot walks up from a target to the brand monorepo root', () => {
-  const brand = path.join(FIXTURES, 'brand');
-  assert.equal(local.findBrandRoot(path.join(brand, 'targets', 'site')), brand);
-  assert.equal(local.findBrandRoot(path.join(brand, 'targets', 'backend-api', 'functions')), brand);
-  assert.equal(local.findBrandRoot(brand), brand);
-});
-
-test('findBrandRoot treats a standalone project as its own root — never the Omega monorepo', () => {
-  const standalone = path.join(FIXTURES, 'standalone-project');
-  // The fixture lives INSIDE the Omega monorepo (which has brands/) — the walk
-  // must stop at the project, not classify the monorepo as a brand.
-  assert.equal(local.findBrandRoot(standalone), standalone);
-});
-
-test('discoverTargets lists the brand root plus every target with a package.json', () => {
-  const brand = path.join(FIXTURES, 'brand');
-  assert.deepEqual(local.discoverTargets(brand), [
-    brand,
-    path.join(brand, 'targets', 'backend-api'),
-    path.join(brand, 'targets', 'site'),
-  ]);
-});
-
-test('discoverTargets on a standalone project returns just that project', () => {
-  const standalone = path.join(FIXTURES, 'standalone-project');
-  assert.deepEqual(local.discoverTargets(standalone), [standalone]);
-});
-
-// ---- frameworkPackagesOf
-
-test('frameworkPackagesOf finds deps and devDeps with placement flags', () => {
-  const site = path.join(FIXTURES, 'brand', 'targets', 'site');
-  assert.deepEqual(local.frameworkPackagesOf(site), [
-    { name: '@omega.js/client', spec: '^5.0.0', dev: false, dir: site },
-    { name: '@omega.js/web', spec: '^0.2.0', dev: true, dir: site },
-  ]);
-});
-
-test('frameworkPackagesOf reads the target-root manifest (src/dist pillar — no functions/ probe)', () => {
-  const backendTarget = path.join(FIXTURES, 'brand', 'targets', 'backend-api');
-  assert.deepEqual(local.frameworkPackagesOf(backendTarget), [
-    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: backendTarget },
-  ]);
-});
-
-test('frameworkPackagesOf is empty for a package with no @omega.js deps', () => {
-  assert.deepEqual(local.frameworkPackagesOf(path.join(FIXTURES, 'brand')), []);
-});
-
-// ---- linkLocalPackages (dryRun + real-symlink skip detection)
-
-test('linkLocalPackages plans the WHOLE brand tree: sibling targets included (cp194)', async () => {
-  const site = path.join(FIXTURES, 'brand', 'targets', 'site');
-  const actions = await local.linkLocalPackages({ dir: site, monorepoRoot: FAKE_MONOREPO, dryRun: true });
-  assert.deepEqual(
-    actions.map(({ name, action }) => ({ name, action })),
-    [
-      { name: '@omega.js/backend', action: 'missing' }, // sibling target scanned too — npm resolves the whole workspace tree
-      { name: '@omega.js/client', action: 'link' },     // fake monorepo has packages/client
-      { name: '@omega.js/web', action: 'missing' },     // ...but no packages/web
-    ]
-  );
-});
-
-test('linkLocalPackages skips deps already resolving to the monorepo copy under its file: spec', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-test-'));
-  try {
-    const clientSpec = `file:${path.relative(fs.realpathSync(scratch), fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client'))).split(path.sep).join('/')}`;
-    fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
-      name: 'scratch-target',
-      dependencies: { '@omega.js/client': clientSpec },
-    }));
-    fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
-    fs.symlinkSync(path.join(FAKE_MONOREPO, 'packages', 'client'), path.join(scratch, 'node_modules', '@omega.js', 'client'));
-
-    const actions = await local.linkLocalPackages({ dir: scratch, monorepoRoot: FAKE_MONOREPO, dryRun: true });
-    assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
-      { name: '@omega.js/client', action: 'skip' },
-    ]);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('linkLocalPackages flips a registry pin even when a parent node_modules already resolves local', async () => {
-  // An in-repo brand resolves every @omega.js package through the monorepo
-  // root's workspace links, so the tree alone must never excuse a registry pin.
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-pin-'));
-  try {
-    const webPackage = path.join(scratch, 'packages', 'web');
-    fs.mkdirSync(webPackage, { recursive: true });
-    fs.writeFileSync(path.join(webPackage, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.51.0' }));
-    fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
-    fs.symlinkSync(webPackage, path.join(scratch, 'node_modules', '@omega.js', 'web'));
-
-    const brand = path.join(scratch, 'brands', 'x');
-    const webTarget = path.join(brand, 'targets', 'web');
-    fs.mkdirSync(webTarget, { recursive: true });
-    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({
-      name: 'x', private: true, workspaces: ['targets/*'],
-    }));
-    fs.writeFileSync(path.join(webTarget, 'package.json'), JSON.stringify({
-      name: 'x-web', private: true, dependencies: { '@omega.js/web': '0.51.0' },
-    }));
-
-    const actions = await local.linkLocalPackages({ dir: webTarget, monorepoRoot: scratch, dryRun: true });
-    assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
-      { name: '@omega.js/web', action: 'link' },
-    ]);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('linkLocalPackages links a fresh outside brand with ONE real install — unpublished sibling specs cannot 404 (cp194)', async () => {
-  // Two targets whose @omega.js deps exist ONLY in the fake monorepo: with the
-  // old per-dep `npm install <path>` mechanics, linking target-a died on target-b's
-  // registry-unresolvable spec. The tree-wide flip must link both offline.
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-brand-'));
-  try {
-    fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
-      name: 'scratch-brand', private: true, workspaces: ['targets/*'],
-    }));
-    const targetA = path.join(scratch, 'targets', 'target-a');
-    const targetB = path.join(scratch, 'targets', 'target-b');
-    fs.mkdirSync(targetA, { recursive: true });
-    fs.mkdirSync(targetB, { recursive: true });
-    fs.writeFileSync(path.join(targetA, 'package.json'), JSON.stringify({
-      name: 'scratch-target-a', private: true, dependencies: { '@omega.js/client': '*' },
-    }));
-    fs.writeFileSync(path.join(targetB, 'package.json'), JSON.stringify({
-      name: 'scratch-target-b', private: true, devDependencies: { '@omega.js/devkit': '*' },
-    }));
-
-    const actions = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
-    assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
-      { name: '@omega.js/client', action: 'link' },
-      { name: '@omega.js/devkit', action: 'link' },
-    ]);
-
-    // Specs flipped in place, placement preserved
-    const pkgA = JSON.parse(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'));
-    const pkgB = JSON.parse(fs.readFileSync(path.join(targetB, 'package.json'), 'utf8'));
-    assert.match(pkgA.dependencies['@omega.js/client'], /^file:/, 'app-a dep flipped to file:');
-    assert.match(pkgB.devDependencies['@omega.js/devkit'], /^file:/, 'app-b devDep flipped to file: in place');
-
-    // The one real install materialized links for BOTH targets (hoisted)
-    assert.equal(
-      fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'client')),
-      fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client')),
-      'client resolves to the monorepo copy'
-    );
-    assert.equal(
-      fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'devkit')),
-      fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'devkit')),
-      'sibling devkit resolves to the monorepo copy'
-    );
-
-    // Rerun converges: everything skips, no manifest churn
-    const before = fs.readFileSync(path.join(targetA, 'package.json'), 'utf8');
-    const again = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
-    assert.deepEqual(again.map(({ action }) => action), ['skip', 'skip'], 'second run all-skip');
-    assert.equal(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'), before, 'no rewrite on rerun');
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-// ---- Watch lock
-
-test('acquireWatchLock takes, holds, and releases the single-instance lock', () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
-  try {
-    const first = local.acquireWatchLock(scratch);
-    assert.deepEqual(first, { acquired: true, pid: process.pid });
-    assert.equal(fs.existsSync(path.join(scratch, local.WATCH_LOCK)), true);
-
-    // Second take fails while the (live) owner holds it
-    const second = local.acquireWatchLock(scratch);
-    assert.deepEqual(second, { acquired: false, pid: process.pid });
-
-    local.releaseWatchLock(scratch);
-    assert.equal(fs.existsSync(path.join(scratch, local.WATCH_LOCK)), false);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('a stale lock (dead pid) is cleared and re-acquirable', () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
-  try {
-    // A real pid that is guaranteed dead: a child that has already exited
-    const dead = spawnSync(process.execPath, ['-e', '']);
-    const lockPath = path.join(scratch, local.WATCH_LOCK);
-    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
-    fs.writeFileSync(lockPath, JSON.stringify({ pid: dead.pid }));
-
-    assert.equal(local.readLiveWatchPid(scratch), null);
-    assert.equal(fs.existsSync(lockPath), false); // stale lock swept
-    assert.equal(local.acquireWatchLock(scratch).acquired, true);
-    local.releaseWatchLock(scratch);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
 
 /**
  * Stage a brand root whose one target declares @omega.js/web, beside a
@@ -324,37 +79,6 @@ function stageLinkedBrand(link) {
   return { scratch, brandRoot, monorepoRoot };
 }
 
-test('#587: resolveLinkedMonorepo names the checkout a brand resolves INTO', () => {
-  const { scratch, brandRoot, monorepoRoot } = stageLinkedBrand('monorepo');
-  try {
-    assert.equal(local.resolveLinkedMonorepo(brandRoot), monorepoRoot);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('#587: a registry-installed brand resolves into no monorepo at all', () => {
-  const { scratch, brandRoot } = stageLinkedBrand('registry');
-  try {
-    assert.equal(local.resolveLinkedMonorepo(brandRoot), null);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('startMonorepoWatch declines to double-start when the lock is held', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
-  try {
-    local.acquireWatchLock(scratch); // held by us — a live process
-    const { ready, ...result } = local.startMonorepoWatch({ monorepoRoot: scratch });
-    assert.deepEqual(result, { alreadyRunning: true, pid: process.pid, child: null });
-    await ready; // no initial prepare of our own to wait for (#670)
-    local.releaseWatchLock(scratch);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
 // ---- Vendor propagation
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -381,272 +105,6 @@ function vendorScratch({ withSrc = true } = {}) {
   fs.mkdirSync(withSrc ? path.join(packagesDir, 'devkit', 'src') : packagesDir, { recursive: true });
   return { scratch, packagesDir };
 }
-
-// The pass/debounce/coalesce logic is tested through poke() — the documented
-// seam the real fs watchers feed (macOS FSEvents streams activate
-// asynchronously, so a write landing right after fs.watch() can be lost;
-// the one integration test below covers the fs layer flake-free).
-
-test('startVendorPropagation watches only packages with an existing src/', () => {
-  const { scratch, packagesDir } = vendorScratch();
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit', 'config', 'account'], // only devkit/src exists in the scratch
-    dependents: [],
-  });
-  try {
-    assert.deepEqual(propagation.watched, ['devkit']);
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('a change re-prepares every dependent, in order', async () => {
-  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
-  const calls = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
-    runPrepare: async (dependent) => { calls.push(dependent.name); },
-    debounceMs: 25,
-  });
-  try {
-    propagation.poke('devkit');
-    await waitUntil(() => calls.length >= 2, 'the pass to cover both dependents');
-    await sleep(150); // settle: a single change must not schedule another pass
-    assert.deepEqual(calls, ['backend', 'client']);
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('rapid changes inside the debounce window coalesce into one pass', async () => {
-  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
-  const calls = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }],
-    runPrepare: async (dependent) => { calls.push(dependent.name); },
-    debounceMs: 50,
-  });
-  try {
-    propagation.poke('devkit');
-    propagation.poke('devkit');
-    propagation.poke('devkit');
-    await waitUntil(() => calls.length >= 1, 'the coalesced pass');
-    await sleep(200); // settle: the burst must not schedule further passes
-    assert.deepEqual(calls, ['backend']);
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('a change landing mid-pass queues exactly one follow-up pass', async () => {
-  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
-  const calls = [];
-  const resolvers = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }],
-    runPrepare: (dependent) => new Promise((resolve) => {
-      calls.push(dependent.name);
-      resolvers.push(resolve);
-    }),
-    debounceMs: 25,
-  });
-  try {
-    propagation.poke('devkit');
-    await waitUntil(() => calls.length === 1, 'the first pass to start');
-
-    // Two more changes while the first pass is still blocked in runPrepare —
-    // they must fold into ONE follow-up, not one pass per change
-    propagation.poke('devkit');
-    propagation.poke('devkit');
-    await sleep(100); // let their debounce fire and mark the run pending
-    resolvers.shift()();
-
-    await waitUntil(() => calls.length === 2, 'the follow-up pass');
-    resolvers.shift()();
-    await sleep(200); // settle: no third pass
-    assert.equal(calls.length, 2);
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('a failing prepare is contained — the rest of the pass still runs', async () => {
-  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
-  const calls = [];
-  const logs = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
-    runPrepare: async (dependent) => {
-      calls.push(dependent.name);
-      if (dependent.name === 'backend') {
-        throw new Error('boom');
-      }
-    },
-    log: (line) => logs.push(line),
-    debounceMs: 25,
-  });
-  try {
-    propagation.poke('devkit');
-    await waitUntil(() => calls.length >= 2, 'the pass to reach the second dependent');
-    assert.deepEqual(calls, ['backend', 'client']);
-    assert.ok(logs.some((line) => line.includes('backend') && line.includes('boom')), 'failure surfaced in the log');
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('close() stops the watch — later changes trigger nothing', async () => {
-  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
-  const calls = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }],
-    runPrepare: async (dependent) => { calls.push(dependent.name); },
-    debounceMs: 25,
-  });
-  propagation.close();
-  try {
-    propagation.poke('devkit');
-    await sleep(150);
-    assert.deepEqual(calls, []);
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('the real fs watch feeds the same pipeline (recursive, by package name)', async () => {
-  const { scratch, packagesDir } = vendorScratch();
-  const calls = [];
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: ['devkit'],
-    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
-    runPrepare: async (dependent) => { calls.push(dependent.name); },
-    debounceMs: 25,
-  });
-  try {
-    // A nested dir proves recursive: true carries. FSEvents activates
-    // asynchronously, so keep editing until the pipeline reacts instead of
-    // trusting the first write to be seen.
-    const deepDir = path.join(packagesDir, 'devkit', 'src', 'nested');
-    fs.mkdirSync(deepDir, { recursive: true });
-    const target = path.join(deepDir, 'deep.js');
-    const start = Date.now();
-    let version = 0;
-    while (calls.length === 0) {
-      if (Date.now() - start > 10000) {
-        throw new Error('fs.watch never delivered an event');
-      }
-      fs.writeFileSync(target, `// v${version += 1}\n`);
-      await sleep(200);
-    }
-
-    // Late events may run extra passes — assert structure, not pass count:
-    // every completed pass covers both dependents in order.
-    await waitUntil(() => calls.length >= 2, 'the first pass to complete');
-    await sleep(300);
-    assert.ok(calls.length >= 2, 'at least one full pass ran');
-    for (let i = 0; i + 1 < calls.length; i += 2) {
-      assert.deepEqual(calls.slice(i, i + 2), ['backend', 'client'], `pass ${i / 2} covers both dependents in order`);
-    }
-  } finally {
-    propagation.close();
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-// ---- restoreRegistrySpecs (the publish-day inverse)
-
-test('restoreRegistrySpecs plans the linked version for file: specs and skips registry specs', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-'));
-  try {
-    // A fake linked package whose version the flip derives
-    const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
-    fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
-
-    const brand = path.join(scratch, 'brand');
-    const targetDir = path.join(brand, 'targets', 'site');
-    fs.mkdirSync(targetDir, { recursive: true });
-    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
-    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
-      name: 'site',
-      dependencies: {
-        '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
-        '@omega.js/web': '^0.1.0',
-      },
-    }));
-
-    const actions = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
-    assert.deepEqual(actions.map(({ name, spec, action }) => ({ name, spec, action })), [
-      { name: '@omega.js/client', spec: '0.1.0', action: 'flip' },
-      { name: '@omega.js/web', spec: '^0.1.0', action: 'skip' },
-    ]);
-
-    // Explicit range override wins over the derived version, verbatim
-    const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^0.2.0' });
-    assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^0.2.0');
-
-    // dryRun writes nothing — the file: spec survives verbatim
-    const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    assert.ok(manifest.dependencies['@omega.js/client'].startsWith('file:'));
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('restoreRegistrySpecs writes the EXACT version, never a caret (#794 lockstep)', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-exact-'));
-  try {
-    const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
-    fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.3.0' }));
-
-    const brand = path.join(scratch, 'brand');
-    const targetDir = path.join(brand, 'targets', 'site');
-    fs.mkdirSync(targetDir, { recursive: true });
-    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
-    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
-      name: 'site',
-      dependencies: {
-        '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
-      },
-    }));
-
-    // The plan carries the bare version — a caret would let this target float
-    // ahead of its siblings the moment the family releases again
-    const planned = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
-    assert.deepEqual(planned.map(({ name, spec, action }) => ({ name, spec, action })), [
-      { name: '@omega.js/client', spec: '0.3.0', action: 'flip' },
-    ]);
-
-    // The planned spec IS the string the flip writes (setDependencySpec takes
-    // it verbatim); the write leg itself stays out of this test because its
-    // install resolves the family from the REGISTRY, which no offline run can
-    // do for an unpublished version.
-
-    // An explicit range still wins verbatim — the caller owns that string
-    const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^9.9.9' });
-    assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^9.9.9');
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
 
 // ---- #938: both flips regenerate the brand's OWN lockfile
 
@@ -676,15 +134,16 @@ function makeNestedBrand(dependencies) {
  * `@omega.js/client@0.1.0` packed from a real directory, and pointing npm at it
  * for the duration of `fn` (an isolated cache, so nothing leaks either way).
  *
+ * @param {Function} expect - the calling case's `ctx.expect`.
  * @param {string} scratch - Where the package and the cache live.
  * @param {function} fn - async ({ url, requests }) => void
  */
-async function withRegistry(scratch, fn) {
+async function withRegistry(expect, scratch, fn) {
   const source = path.join(scratch, 'registry-src');
   fs.mkdirSync(source, { recursive: true });
   fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
   const packed = spawnSync('npm', ['pack', '--pack-destination', scratch], { cwd: source, encoding: 'utf8' });
-  assert.equal(packed.status, 0, packed.stderr);
+  expect(packed.status, packed.stderr).toBe(0);
   const tarball = fs.readFileSync(path.join(scratch, 'omega.js-client-0.1.0.tgz'));
   const integrity = `sha512-${crypto.createHash('sha512').update(tarball).digest('base64')}`;
 
@@ -740,24 +199,6 @@ function writeStaleLinkLock(brand, linkTarget) {
   }, null, 2));
 }
 
-test('#938: linkLocalPackages writes the BRAND\'s own lockfile when the brand sits inside an outer workspace', async () => {
-  const { scratch, outer, brand, targetA } = makeNestedBrand({ '@omega.js/client': '*' });
-  try {
-    await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
-
-    const spec = JSON.parse(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8')).dependencies['@omega.js/client'];
-    const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
-    const expectedLink = path.relative(brand, fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client'))).split(path.sep).join('/');
-
-    assert.equal(lock.packages['node_modules/@omega.js/client'].link, true, 'the brand lock carries the link');
-    assert.equal(lock.packages['node_modules/@omega.js/client'].resolved, expectedLink);
-    assert.equal(lock.packages['targets/target-a'].dependencies['@omega.js/client'], spec, 'and records the flipped spec');
-    assert.ok(fs.existsSync(path.join(outer, 'package-lock.json')), 'npm still wrote the outer lock (the climb the helper answers)');
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
 /**
  * A nested brand still on its local-era link: target-a's `file:` spec points at
  * a linked copy that sits at the SAME version the flip writes, under a stale
@@ -778,144 +219,806 @@ function makeLinkedBrand() {
   return { scratch, outer, brand, targetA, linked };
 }
 
-test('#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the stale link npm would otherwise keep', async () => {
-  const { scratch, brand, targetA } = makeLinkedBrand();
+module.exports = defineCases({
+  type: 'group',
+  description: 'local',
+  tests: [
+    // ---- isMonorepoRoot / resolveMonorepoRoot
 
-  try {
-    await withRegistry(scratch, async ({ url }) => {
-      const actions = await local.restoreRegistrySpecs({ dir: targetA });
-      assert.deepEqual(actions.map(({ name, spec, action }) => ({ name, spec, action })), [
-        { name: '@omega.js/client', spec: '0.1.0', action: 'flip' },
-      ]);
-
-      const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
-      const entry = lock.packages['node_modules/@omega.js/client'];
-      assert.equal(entry.link, undefined, 'no link left');
-      assert.equal(entry.version, '0.1.0');
-      assert.equal(entry.resolved, `${url}/client-0.1.0.tgz`, 'resolved from the registry');
-      assert.equal(lock.packages['../../linked-client'], undefined, 'the link target entry is gone too');
-      assert.doesNotThrow(() => assertBrandLockfile({ root: brand }), 'the deploy gate accepts it');
-    });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('#862: restoreRegistrySpecs prunes the lock BEFORE the install, so no @omega.js package stays linked', async () => {
-  // A STANDALONE brand (the real consumer topology): nested, npm's tree install
-  // climbs to the outer root and never writes the brand's node_modules at all.
-  const { scratch, outer, brand, targetA } = makeLinkedBrand();
-  fs.rmSync(path.join(outer, 'package.json'));
-
-  try {
-    await withRegistry(scratch, async () => {
-      await local.restoreRegistrySpecs({ dir: targetA });
-
-      const installed = path.join(brand, 'node_modules/@omega.js/client');
-      assert.equal(fs.lstatSync(installed).isSymbolicLink(), false, `${installed} is still a link`);
-      assert.equal(local.resolveLinkedMonorepo(brand), null);
-    });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('#862: restoreRegistrySpecs with nothing to flip fails loudly on a tree that is still linked', async () => {
-  // The playground's real failure shape: registry specs, a registry lock, and
-  // a node_modules copy that is still a symlink into the checkout.
-  const { scratch, outer, brand, targetA, linked } = makeLinkedBrand();
-  fs.rmSync(path.join(outer, 'package.json'));
-
-  try {
-    await withRegistry(scratch, async () => {
-      await local.restoreRegistrySpecs({ dir: targetA });
-
-      const installed = path.join(brand, 'node_modules/@omega.js/client');
-      fs.rmSync(installed, { recursive: true });
-      fs.symlinkSync(linked, installed);
-
-      await assert.rejects(
-        local.restoreRegistrySpecs({ dir: targetA }),
-        { message: `omega i live left ${installed} linked into ${linked}` },
-      );
-      // A plan writes nothing, so it verifies nothing
-      await assert.doesNotReject(local.restoreRegistrySpecs({ dir: targetA, dryRun: true }));
-    });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('#938: restoreRegistrySpecs with nothing to flip still heals a lock that disagrees, and leaves an agreeing one alone', async () => {
-  // The playground's state after the first 0.51.0 flip: registry specs, and a
-  // brand lock that still says link. `omega i live` is the fix the gate names,
-  // so it has to work here too.
-  const { scratch, brand, targetA } = makeNestedBrand({ '@omega.js/client': '0.1.0' });
-  const linked = path.join(scratch, 'linked-client');
-  fs.mkdirSync(linked, { recursive: true });
-  fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
-  writeStaleLinkLock(brand, '../../linked-client');
-
-  try {
-    await withRegistry(scratch, async ({ url, requests }) => {
-      const actions = await local.restoreRegistrySpecs({ dir: targetA });
-      assert.deepEqual(actions.map(({ action }) => action), ['skip']);
-      const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
-      assert.equal(lock.packages['node_modules/@omega.js/client'].resolved, `${url}/client-0.1.0.tgz`);
-      assert.doesNotThrow(() => assertBrandLockfile({ root: brand }));
-
-      // A rerun on the healed lock asks npm nothing at all
-      requests.length = 0;
-      const before = fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8');
-      await local.restoreRegistrySpecs({ dir: targetA });
-      assert.deepEqual(requests, [], 'no registry call on an agreeing lock');
-      assert.equal(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'), before);
-    });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test('#938: regenerateLockfile prunes a STALE workspace entry (a renamed target) so npm cannot re-create the link it declares', async () => {
-  // The playground's real shape: `targets/website` was renamed to `targets/web`,
-  // and the lock still carries the old folder's entry declaring the local-era
-  // `file:` spec. npm's lock-only run honors that entry and links it again.
-  const { scratch, brand } = makeNestedBrand({ '@omega.js/client': '0.1.0' });
-  const linked = path.join(scratch, 'linked-client');
-  fs.mkdirSync(linked, { recursive: true });
-  fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
-  fs.writeFileSync(path.join(brand, 'package-lock.json'), JSON.stringify({
-    name: 'nested-brand',
-    lockfileVersion: 3,
-    requires: true,
-    packages: {
-      '': { name: 'nested-brand', workspaces: ['targets/*'] },
-      '../../linked-client': { name: '@omega.js/client', version: '0.1.0' },
-      'node_modules/@omega.js/client': { resolved: '../../linked-client', link: true },
-      'node_modules/nested-target-a': { resolved: 'targets/target-a', link: true },
-      'node_modules/old-website': { resolved: 'targets/website', link: true },
-      'targets/target-a': { name: 'nested-target-a', dependencies: { '@omega.js/client': '0.1.0' } },
-      'targets/website': { name: 'old-website', extraneous: true, dependencies: { '@omega.js/client': 'file:../../../../linked-client' } },
-      'targets/website/node_modules/left-pad': { version: '1.3.0', extraneous: true },
+    {
+      name: 'isMonorepoRoot accepts the real monorepo and the fixture fake',
+      run: (ctx) => {
+        ctx.expect(local.isMonorepoRoot(MONOREPO_ROOT)).toBe(true);
+        ctx.expect(local.isMonorepoRoot(FAKE_MONOREPO)).toBe(true);
+      },
     },
-  }, null, 2));
 
-  try {
-    await withRegistry(scratch, async ({ url }) => {
-      const lines = [];
-      await regenerateLockfile({ root: brand, log: (line) => lines.push(line) });
+    {
+      name: 'isMonorepoRoot rejects a plain package and a missing dir',
+      run: (ctx) => {
+        ctx.expect(local.isMonorepoRoot(path.join(FIXTURES, 'brand'))).toBe(false);
+        ctx.expect(local.isMonorepoRoot(path.join(FIXTURES, 'nope'))).toBe(false);
+      },
+    },
 
-      const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
-      assert.equal(lock.packages['node_modules/@omega.js/client'].link, undefined, 'no link re-created');
-      assert.equal(lock.packages['node_modules/@omega.js/client'].resolved, `${url}/client-0.1.0.tgz`);
-      assert.equal(lock.packages['targets/website'], undefined, 'the stale workspace entry is gone');
-      assert.equal(lock.packages['targets/website/node_modules/left-pad'], undefined, 'and everything under it');
-      assert.equal(lock.packages['node_modules/old-website'], undefined, 'and the link that pointed at it');
-      assert.ok(lock.packages['targets/target-a'], 'the live workspace stays');
-      assert.ok(lines.some((line) => line.includes('targets/website')), `the prune is logged (got ${JSON.stringify(lines)})`);
-      assert.doesNotThrow(() => assertBrandLockfile({ root: brand }));
-    });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
+    {
+      name: 'resolveMonorepoRoot self-locates the repo these tests run inside',
+      run: (ctx) => {
+        withEnv(undefined, () => {
+          ctx.expect(local.resolveMonorepoRoot()).toBe(MONOREPO_ROOT);
+        });
+      },
+    },
+
+    {
+      name: 'resolveMonorepoRoot honors OMEGA_MONOREPO override',
+      run: (ctx) => {
+        withEnv(FAKE_MONOREPO, () => {
+          ctx.expect(local.resolveMonorepoRoot()).toBe(path.resolve(FAKE_MONOREPO));
+        });
+      },
+    },
+
+    {
+      name: 'resolveMonorepoRoot throws on an invalid OMEGA_MONOREPO',
+      run: (ctx) => {
+        withEnv(path.join(FIXTURES, 'brand'), () => {
+          ctx.expect(() => local.resolveMonorepoRoot()).toThrow(/OMEGA_MONOREPO/);
+        });
+      },
+    },
+
+    // ---- packageDir
+
+    {
+      name: 'packageDir maps a scoped name to its packages/ directory',
+      run: (ctx) => {
+        ctx.expect(local.packageDir('/repo', '@omega.js/client')).toBe(path.join('/repo', 'packages', 'client'));
+      },
+    },
+
+    // ---- findBrandRoot / discoverTargets
+
+    {
+      name: 'findBrandRoot walks up from a target to the brand monorepo root',
+      run: (ctx) => {
+        const brand = path.join(FIXTURES, 'brand');
+        ctx.expect(local.findBrandRoot(path.join(brand, 'targets', 'site'))).toBe(brand);
+        ctx.expect(local.findBrandRoot(path.join(brand, 'targets', 'backend-api', 'functions'))).toBe(brand);
+        ctx.expect(local.findBrandRoot(brand)).toBe(brand);
+      },
+    },
+
+    {
+      name: 'findBrandRoot treats a standalone project as its own root — never the Omega monorepo',
+      run: (ctx) => {
+        const standalone = path.join(FIXTURES, 'standalone-project');
+        // The fixture lives INSIDE the Omega monorepo (which has brands/) — the walk
+        // must stop at the project, not classify the monorepo as a brand.
+        ctx.expect(local.findBrandRoot(standalone)).toBe(standalone);
+      },
+    },
+
+    {
+      name: 'discoverTargets lists the brand root plus every target with a package.json',
+      run: (ctx) => {
+        const brand = path.join(FIXTURES, 'brand');
+        ctx.expect(local.discoverTargets(brand)).toEqual([
+          brand,
+          path.join(brand, 'targets', 'backend-api'),
+          path.join(brand, 'targets', 'site'),
+        ]);
+      },
+    },
+
+    {
+      name: 'discoverTargets on a standalone project returns just that project',
+      run: (ctx) => {
+        const standalone = path.join(FIXTURES, 'standalone-project');
+        ctx.expect(local.discoverTargets(standalone)).toEqual([standalone]);
+      },
+    },
+
+    // ---- frameworkPackagesOf
+
+    {
+      name: 'frameworkPackagesOf finds deps and devDeps with placement flags',
+      run: (ctx) => {
+        const site = path.join(FIXTURES, 'brand', 'targets', 'site');
+        ctx.expect(local.frameworkPackagesOf(site)).toEqual([
+          { name: '@omega.js/client', spec: '^5.0.0', dev: false, dir: site },
+          { name: '@omega.js/web', spec: '^0.2.0', dev: true, dir: site },
+        ]);
+      },
+    },
+
+    {
+      name: 'frameworkPackagesOf reads the target-root manifest (src/dist pillar — no functions/ probe)',
+      run: (ctx) => {
+        const backendTarget = path.join(FIXTURES, 'brand', 'targets', 'backend-api');
+        ctx.expect(local.frameworkPackagesOf(backendTarget)).toEqual([
+          { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: backendTarget },
+        ]);
+      },
+    },
+
+    {
+      name: 'frameworkPackagesOf is empty for a package with no @omega.js deps',
+      run: (ctx) => {
+        ctx.expect(local.frameworkPackagesOf(path.join(FIXTURES, 'brand'))).toEqual([]);
+      },
+    },
+
+    // ---- linkLocalPackages (dryRun + real-symlink skip detection)
+
+    {
+      name: 'linkLocalPackages plans the WHOLE brand tree: sibling targets included (cp194)',
+      run: async (ctx) => {
+        const site = path.join(FIXTURES, 'brand', 'targets', 'site');
+        const actions = await local.linkLocalPackages({ dir: site, monorepoRoot: FAKE_MONOREPO, dryRun: true });
+        ctx.expect(actions.map(({ name, action }) => ({ name, action }))).toEqual([
+            { name: '@omega.js/backend', action: 'missing' }, // sibling target scanned too — npm resolves the whole workspace tree
+            { name: '@omega.js/client', action: 'link' },     // fake monorepo has packages/client
+            { name: '@omega.js/web', action: 'missing' },     // ...but no packages/web
+          ]);
+      },
+    },
+
+    {
+      name: 'linkLocalPackages skips deps already resolving to the monorepo copy under its file: spec',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-test-'));
+        try {
+          const clientSpec = `file:${path.relative(fs.realpathSync(scratch), fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client'))).split(path.sep).join('/')}`;
+          fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
+            name: 'scratch-target',
+            dependencies: { '@omega.js/client': clientSpec },
+          }));
+          fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
+          fs.symlinkSync(path.join(FAKE_MONOREPO, 'packages', 'client'), path.join(scratch, 'node_modules', '@omega.js', 'client'));
+
+          const actions = await local.linkLocalPackages({ dir: scratch, monorepoRoot: FAKE_MONOREPO, dryRun: true });
+          ctx.expect(actions.map(({ name, action }) => ({ name, action }))).toEqual([
+            { name: '@omega.js/client', action: 'skip' },
+          ]);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'linkLocalPackages flips a registry pin even when a parent node_modules already resolves local',
+      run: async (ctx) => {
+        // An in-repo brand resolves every @omega.js package through the monorepo
+        // root's workspace links, so the tree alone must never excuse a registry pin.
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-pin-'));
+        try {
+          const webPackage = path.join(scratch, 'packages', 'web');
+          fs.mkdirSync(webPackage, { recursive: true });
+          fs.writeFileSync(path.join(webPackage, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.51.0' }));
+          fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
+          fs.symlinkSync(webPackage, path.join(scratch, 'node_modules', '@omega.js', 'web'));
+
+          const brand = path.join(scratch, 'brands', 'x');
+          const webTarget = path.join(brand, 'targets', 'web');
+          fs.mkdirSync(webTarget, { recursive: true });
+          fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({
+            name: 'x', private: true, workspaces: ['targets/*'],
+          }));
+          fs.writeFileSync(path.join(webTarget, 'package.json'), JSON.stringify({
+            name: 'x-web', private: true, dependencies: { '@omega.js/web': '0.51.0' },
+          }));
+
+          const actions = await local.linkLocalPackages({ dir: webTarget, monorepoRoot: scratch, dryRun: true });
+          ctx.expect(actions.map(({ name, action }) => ({ name, action }))).toEqual([
+            { name: '@omega.js/web', action: 'link' },
+          ]);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'linkLocalPackages links a fresh outside brand with ONE real install — unpublished sibling specs cannot 404 (cp194)',
+      run: async (ctx) => {
+        // Two targets whose @omega.js deps exist ONLY in the fake monorepo: with the
+        // old per-dep `npm install <path>` mechanics, linking target-a died on target-b's
+        // registry-unresolvable spec. The tree-wide flip must link both offline.
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-brand-'));
+        try {
+          fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
+            name: 'scratch-brand', private: true, workspaces: ['targets/*'],
+          }));
+          const targetA = path.join(scratch, 'targets', 'target-a');
+          const targetB = path.join(scratch, 'targets', 'target-b');
+          fs.mkdirSync(targetA, { recursive: true });
+          fs.mkdirSync(targetB, { recursive: true });
+          fs.writeFileSync(path.join(targetA, 'package.json'), JSON.stringify({
+            name: 'scratch-target-a', private: true, dependencies: { '@omega.js/client': '*' },
+          }));
+          fs.writeFileSync(path.join(targetB, 'package.json'), JSON.stringify({
+            name: 'scratch-target-b', private: true, devDependencies: { '@omega.js/devkit': '*' },
+          }));
+
+          const actions = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
+          ctx.expect(actions.map(({ name, action }) => ({ name, action }))).toEqual([
+            { name: '@omega.js/client', action: 'link' },
+            { name: '@omega.js/devkit', action: 'link' },
+          ]);
+
+          // Specs flipped in place, placement preserved
+          const pkgA = JSON.parse(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'));
+          const pkgB = JSON.parse(fs.readFileSync(path.join(targetB, 'package.json'), 'utf8'));
+          ctx.expect(pkgA.dependencies['@omega.js/client'], 'app-a dep flipped to file:').toMatch(/^file:/);
+          ctx.expect(pkgB.devDependencies['@omega.js/devkit'], 'app-b devDep flipped to file: in place').toMatch(/^file:/);
+
+          // The one real install materialized links for BOTH targets (hoisted)
+          ctx.expect(fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'client')), 'client resolves to the monorepo copy').toBe(fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client')));
+          ctx.expect(fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'devkit')), 'sibling devkit resolves to the monorepo copy').toBe(fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'devkit')));
+
+          // Rerun converges: everything skips, no manifest churn
+          const before = fs.readFileSync(path.join(targetA, 'package.json'), 'utf8');
+          const again = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
+          ctx.expect(again.map(({ action }) => action), 'second run all-skip').toEqual(['skip', 'skip']);
+          ctx.expect(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'), 'no rewrite on rerun').toBe(before);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // ---- Watch lock
+
+    {
+      name: 'acquireWatchLock takes, holds, and releases the single-instance lock',
+      run: (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
+        try {
+          const first = local.acquireWatchLock(scratch);
+          ctx.expect(first).toEqual({ acquired: true, pid: process.pid });
+          ctx.expect(fs.existsSync(path.join(scratch, local.WATCH_LOCK))).toBe(true);
+
+          // Second take fails while the (live) owner holds it
+          const second = local.acquireWatchLock(scratch);
+          ctx.expect(second).toEqual({ acquired: false, pid: process.pid });
+
+          local.releaseWatchLock(scratch);
+          ctx.expect(fs.existsSync(path.join(scratch, local.WATCH_LOCK))).toBe(false);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a stale lock (dead pid) is cleared and re-acquirable',
+      run: (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
+        try {
+          // A real pid that is guaranteed dead: a child that has already exited
+          const dead = spawnSync(process.execPath, ['-e', '']);
+          const lockPath = path.join(scratch, local.WATCH_LOCK);
+          fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+          fs.writeFileSync(lockPath, JSON.stringify({ pid: dead.pid }));
+
+          ctx.expect(local.readLiveWatchPid(scratch)).toBe(null);
+          ctx.expect(fs.existsSync(lockPath)).toBe(false); // stale lock swept
+          ctx.expect(local.acquireWatchLock(scratch).acquired).toBe(true);
+          local.releaseWatchLock(scratch);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#587: resolveLinkedMonorepo names the checkout a brand resolves INTO',
+      run: (ctx) => {
+        const { scratch, brandRoot, monorepoRoot } = stageLinkedBrand('monorepo');
+        try {
+          ctx.expect(local.resolveLinkedMonorepo(brandRoot)).toBe(monorepoRoot);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#587: a registry-installed brand resolves into no monorepo at all',
+      run: (ctx) => {
+        const { scratch, brandRoot } = stageLinkedBrand('registry');
+        try {
+          ctx.expect(local.resolveLinkedMonorepo(brandRoot)).toBe(null);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'startMonorepoWatch declines to double-start when the lock is held',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
+        try {
+          local.acquireWatchLock(scratch); // held by us — a live process
+          const { ready, ...result } = local.startMonorepoWatch({ monorepoRoot: scratch });
+          ctx.expect(result).toEqual({ alreadyRunning: true, pid: process.pid, child: null });
+          await ready; // no initial prepare of our own to wait for (#670)
+          local.releaseWatchLock(scratch);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // The pass/debounce/coalesce logic is tested through poke() — the documented
+    // seam the real fs watchers feed (macOS FSEvents streams activate
+    // asynchronously, so a write landing right after fs.watch() can be lost;
+    // the one integration test below covers the fs layer flake-free).
+
+    {
+      name: 'startVendorPropagation watches only packages with an existing src/',
+      run: (ctx) => {
+        const { scratch, packagesDir } = vendorScratch();
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit', 'config', 'account'], // only devkit/src exists in the scratch
+          dependents: [],
+        });
+        try {
+          ctx.expect(propagation.watched).toEqual(['devkit']);
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a change re-prepares every dependent, in order',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch({ withSrc: false });
+        const calls = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+          runPrepare: async (dependent) => { calls.push(dependent.name); },
+          debounceMs: 25,
+        });
+        try {
+          propagation.poke('devkit');
+          await waitUntil(() => calls.length >= 2, 'the pass to cover both dependents');
+          await sleep(150); // settle: a single change must not schedule another pass
+          ctx.expect(calls).toEqual(['backend', 'client']);
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'rapid changes inside the debounce window coalesce into one pass',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch({ withSrc: false });
+        const calls = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }],
+          runPrepare: async (dependent) => { calls.push(dependent.name); },
+          debounceMs: 50,
+        });
+        try {
+          propagation.poke('devkit');
+          propagation.poke('devkit');
+          propagation.poke('devkit');
+          await waitUntil(() => calls.length >= 1, 'the coalesced pass');
+          await sleep(200); // settle: the burst must not schedule further passes
+          ctx.expect(calls).toEqual(['backend']);
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a change landing mid-pass queues exactly one follow-up pass',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch({ withSrc: false });
+        const calls = [];
+        const resolvers = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }],
+          runPrepare: (dependent) => new Promise((resolve) => {
+            calls.push(dependent.name);
+            resolvers.push(resolve);
+          }),
+          debounceMs: 25,
+        });
+        try {
+          propagation.poke('devkit');
+          await waitUntil(() => calls.length === 1, 'the first pass to start');
+
+          // Two more changes while the first pass is still blocked in runPrepare —
+          // they must fold into ONE follow-up, not one pass per change
+          propagation.poke('devkit');
+          propagation.poke('devkit');
+          await sleep(100); // let their debounce fire and mark the run pending
+          resolvers.shift()();
+
+          await waitUntil(() => calls.length === 2, 'the follow-up pass');
+          resolvers.shift()();
+          await sleep(200); // settle: no third pass
+          ctx.expect(calls.length).toBe(2);
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a failing prepare is contained — the rest of the pass still runs',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch({ withSrc: false });
+        const calls = [];
+        const logs = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+          runPrepare: async (dependent) => {
+            calls.push(dependent.name);
+            if (dependent.name === 'backend') {
+              throw new Error('boom');
+            }
+          },
+          log: (line) => logs.push(line),
+          debounceMs: 25,
+        });
+        try {
+          propagation.poke('devkit');
+          await waitUntil(() => calls.length >= 2, 'the pass to reach the second dependent');
+          ctx.expect(calls).toEqual(['backend', 'client']);
+          ctx.expect(logs.some((line) => line.includes('backend') && line.includes('boom')), 'failure surfaced in the log').toBeTruthy();
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'close() stops the watch — later changes trigger nothing',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch({ withSrc: false });
+        const calls = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }],
+          runPrepare: async (dependent) => { calls.push(dependent.name); },
+          debounceMs: 25,
+        });
+        propagation.close();
+        try {
+          propagation.poke('devkit');
+          await sleep(150);
+          ctx.expect(calls).toEqual([]);
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'the real fs watch feeds the same pipeline (recursive, by package name)',
+      run: async (ctx) => {
+        const { scratch, packagesDir } = vendorScratch();
+        const calls = [];
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: ['devkit'],
+          dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+          runPrepare: async (dependent) => { calls.push(dependent.name); },
+          debounceMs: 25,
+        });
+        try {
+          // A nested dir proves recursive: true carries. FSEvents activates
+          // asynchronously, so keep editing until the pipeline reacts instead of
+          // trusting the first write to be seen.
+          const deepDir = path.join(packagesDir, 'devkit', 'src', 'nested');
+          fs.mkdirSync(deepDir, { recursive: true });
+          const target = path.join(deepDir, 'deep.js');
+          const start = Date.now();
+          let version = 0;
+          while (calls.length === 0) {
+            if (Date.now() - start > 10000) {
+              throw new Error('fs.watch never delivered an event');
+            }
+            fs.writeFileSync(target, `// v${version += 1}\n`);
+            await sleep(200);
+          }
+
+          // Late events may run extra passes — assert structure, not pass count:
+          // every completed pass covers both dependents in order.
+          await waitUntil(() => calls.length >= 2, 'the first pass to complete');
+          await sleep(300);
+          ctx.expect(calls.length >= 2, 'at least one full pass ran').toBeTruthy();
+          for (let i = 0; i + 1 < calls.length; i += 2) {
+            ctx.expect(calls.slice(i, i + 2), `pass ${i / 2} covers both dependents in order`).toEqual(['backend', 'client']);
+          }
+        } finally {
+          propagation.close();
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // ---- restoreRegistrySpecs (the publish-day inverse)
+
+    {
+      name: 'restoreRegistrySpecs plans the linked version for file: specs and skips registry specs',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-'));
+        try {
+          // A fake linked package whose version the flip derives
+          const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
+          fs.mkdirSync(pkgDir, { recursive: true });
+          fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
+
+          const brand = path.join(scratch, 'brand');
+          const targetDir = path.join(brand, 'targets', 'site');
+          fs.mkdirSync(targetDir, { recursive: true });
+          fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
+          fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
+            name: 'site',
+            dependencies: {
+              '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
+              '@omega.js/web': '^0.1.0',
+            },
+          }));
+
+          const actions = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
+          ctx.expect(actions.map(({ name, spec, action }) => ({ name, spec, action }))).toEqual([
+            { name: '@omega.js/client', spec: '0.1.0', action: 'flip' },
+            { name: '@omega.js/web', spec: '^0.1.0', action: 'skip' },
+          ]);
+
+          // Explicit range override wins over the derived version, verbatim
+          const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^0.2.0' });
+          ctx.expect(overridden.find((action) => action.name === '@omega.js/client').spec).toBe('^0.2.0');
+
+          // dryRun writes nothing — the file: spec survives verbatim
+          const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
+          ctx.expect(manifest.dependencies['@omega.js/client'].startsWith('file:')).toBeTruthy();
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'restoreRegistrySpecs writes the EXACT version, never a caret (#794 lockstep)',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-exact-'));
+        try {
+          const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
+          fs.mkdirSync(pkgDir, { recursive: true });
+          fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.3.0' }));
+
+          const brand = path.join(scratch, 'brand');
+          const targetDir = path.join(brand, 'targets', 'site');
+          fs.mkdirSync(targetDir, { recursive: true });
+          fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
+          fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
+            name: 'site',
+            dependencies: {
+              '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
+            },
+          }));
+
+          // The plan carries the bare version — a caret would let this target float
+          // ahead of its siblings the moment the family releases again
+          const planned = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
+          ctx.expect(planned.map(({ name, spec, action }) => ({ name, spec, action }))).toEqual([
+            { name: '@omega.js/client', spec: '0.3.0', action: 'flip' },
+          ]);
+
+          // The planned spec IS the string the flip writes (setDependencySpec takes
+          // it verbatim); the write leg itself stays out of this test because its
+          // install resolves the family from the REGISTRY, which no offline run can
+          // do for an unpublished version.
+
+          // An explicit range still wins verbatim — the caller owns that string
+          const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^9.9.9' });
+          ctx.expect(overridden.find((action) => action.name === '@omega.js/client').spec).toBe('^9.9.9');
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#938: linkLocalPackages writes the BRAND\'s own lockfile when the brand sits inside an outer workspace',
+      run: async (ctx) => {
+        const { scratch, outer, brand, targetA } = makeNestedBrand({ '@omega.js/client': '*' });
+        try {
+          await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
+
+          const spec = JSON.parse(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8')).dependencies['@omega.js/client'];
+          const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
+          const expectedLink = path.relative(brand, fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client'))).split(path.sep).join('/');
+
+          ctx.expect(lock.packages['node_modules/@omega.js/client'].link, 'the brand lock carries the link').toBe(true);
+          ctx.expect(lock.packages['node_modules/@omega.js/client'].resolved).toBe(expectedLink);
+          ctx.expect(lock.packages['targets/target-a'].dependencies['@omega.js/client'], 'and records the flipped spec').toBe(spec);
+          ctx.expect(fs.existsSync(path.join(outer, 'package-lock.json')), 'npm still wrote the outer lock (the climb the helper answers)').toBeTruthy();
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the stale link npm would otherwise keep',
+      run: async (ctx) => {
+        const { scratch, brand, targetA } = makeLinkedBrand();
+
+        try {
+          await withRegistry(ctx.expect, scratch, async ({ url }) => {
+            const actions = await local.restoreRegistrySpecs({ dir: targetA });
+            ctx.expect(actions.map(({ name, spec, action }) => ({ name, spec, action }))).toEqual([
+              { name: '@omega.js/client', spec: '0.1.0', action: 'flip' },
+            ]);
+
+            const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
+            const entry = lock.packages['node_modules/@omega.js/client'];
+            ctx.expect(entry.link, 'no link left').toBe(undefined);
+            ctx.expect(entry.version).toBe('0.1.0');
+            ctx.expect(entry.resolved, 'resolved from the registry').toBe(`${url}/client-0.1.0.tgz`);
+            ctx.expect(lock.packages['../../linked-client'], 'the link target entry is gone too').toBe(undefined);
+            ctx.expect(() => assertBrandLockfile({ root: brand }), 'the deploy gate accepts it').not.toThrow();
+          });
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#862: restoreRegistrySpecs prunes the lock BEFORE the install, so no @omega.js package stays linked',
+      run: async (ctx) => {
+        // A STANDALONE brand (the real consumer topology): nested, npm's tree install
+        // climbs to the outer root and never writes the brand's node_modules at all.
+        const { scratch, outer, brand, targetA } = makeLinkedBrand();
+        fs.rmSync(path.join(outer, 'package.json'));
+
+        try {
+          await withRegistry(ctx.expect, scratch, async () => {
+            await local.restoreRegistrySpecs({ dir: targetA });
+
+            const installed = path.join(brand, 'node_modules/@omega.js/client');
+            ctx.expect(fs.lstatSync(installed).isSymbolicLink(), `${installed} is still a link`).toBe(false);
+            ctx.expect(local.resolveLinkedMonorepo(brand)).toBe(null);
+          });
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#862: restoreRegistrySpecs with nothing to flip fails loudly on a tree that is still linked',
+      run: async (ctx) => {
+        // The playground's real failure shape: registry specs, a registry lock, and
+        // a node_modules copy that is still a symlink into the checkout.
+        const { scratch, outer, brand, targetA, linked } = makeLinkedBrand();
+        fs.rmSync(path.join(outer, 'package.json'));
+
+        try {
+          await withRegistry(ctx.expect, scratch, async () => {
+            await local.restoreRegistrySpecs({ dir: targetA });
+
+            const installed = path.join(brand, 'node_modules/@omega.js/client');
+            fs.rmSync(installed, { recursive: true });
+            fs.symlinkSync(linked, installed);
+
+            await ctx.expect(local.restoreRegistrySpecs({ dir: targetA })).rejects.toThrow({ message: `omega i live left ${installed} linked into ${linked}` });
+            // A plan writes nothing, so it verifies nothing
+            await local.restoreRegistrySpecs({ dir: targetA, dryRun: true });
+          });
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#938: restoreRegistrySpecs with nothing to flip still heals a lock that disagrees, and leaves an agreeing one alone',
+      run: async (ctx) => {
+        // The playground's state after the first 0.51.0 flip: registry specs, and a
+        // brand lock that still says link. `omega i live` is the fix the gate names,
+        // so it has to work here too.
+        const { scratch, brand, targetA } = makeNestedBrand({ '@omega.js/client': '0.1.0' });
+        const linked = path.join(scratch, 'linked-client');
+        fs.mkdirSync(linked, { recursive: true });
+        fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
+        writeStaleLinkLock(brand, '../../linked-client');
+
+        try {
+          await withRegistry(ctx.expect, scratch, async ({ url, requests }) => {
+            const actions = await local.restoreRegistrySpecs({ dir: targetA });
+            ctx.expect(actions.map(({ action }) => action)).toEqual(['skip']);
+            const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
+            ctx.expect(lock.packages['node_modules/@omega.js/client'].resolved).toBe(`${url}/client-0.1.0.tgz`);
+            ctx.expect(() => assertBrandLockfile({ root: brand })).not.toThrow();
+
+            // A rerun on the healed lock asks npm nothing at all
+            requests.length = 0;
+            const before = fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8');
+            await local.restoreRegistrySpecs({ dir: targetA });
+            ctx.expect(requests, 'no registry call on an agreeing lock').toEqual([]);
+            ctx.expect(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8')).toBe(before);
+          });
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#938: regenerateLockfile prunes a STALE workspace entry (a renamed target) so npm cannot re-create the link it declares',
+      run: async (ctx) => {
+        // The playground's real shape: `targets/website` was renamed to `targets/web`,
+        // and the lock still carries the old folder's entry declaring the local-era
+        // `file:` spec. npm's lock-only run honors that entry and links it again.
+        const { scratch, brand } = makeNestedBrand({ '@omega.js/client': '0.1.0' });
+        const linked = path.join(scratch, 'linked-client');
+        fs.mkdirSync(linked, { recursive: true });
+        fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
+        fs.writeFileSync(path.join(brand, 'package-lock.json'), JSON.stringify({
+          name: 'nested-brand',
+          lockfileVersion: 3,
+          requires: true,
+          packages: {
+            '': { name: 'nested-brand', workspaces: ['targets/*'] },
+            '../../linked-client': { name: '@omega.js/client', version: '0.1.0' },
+            'node_modules/@omega.js/client': { resolved: '../../linked-client', link: true },
+            'node_modules/nested-target-a': { resolved: 'targets/target-a', link: true },
+            'node_modules/old-website': { resolved: 'targets/website', link: true },
+            'targets/target-a': { name: 'nested-target-a', dependencies: { '@omega.js/client': '0.1.0' } },
+            'targets/website': { name: 'old-website', extraneous: true, dependencies: { '@omega.js/client': 'file:../../../../linked-client' } },
+            'targets/website/node_modules/left-pad': { version: '1.3.0', extraneous: true },
+          },
+        }, null, 2));
+
+        try {
+          await withRegistry(ctx.expect, scratch, async ({ url }) => {
+            const lines = [];
+            await regenerateLockfile({ root: brand, log: (line) => lines.push(line) });
+
+            const lock = JSON.parse(fs.readFileSync(path.join(brand, 'package-lock.json'), 'utf8'));
+            ctx.expect(lock.packages['node_modules/@omega.js/client'].link, 'no link re-created').toBe(undefined);
+            ctx.expect(lock.packages['node_modules/@omega.js/client'].resolved).toBe(`${url}/client-0.1.0.tgz`);
+            ctx.expect(lock.packages['targets/website'], 'the stale workspace entry is gone').toBe(undefined);
+            ctx.expect(lock.packages['targets/website/node_modules/left-pad'], 'and everything under it').toBe(undefined);
+            ctx.expect(lock.packages['node_modules/old-website'], 'and the link that pointed at it').toBe(undefined);
+            ctx.expect(lock.packages['targets/target-a'], 'the live workspace stays').toBeTruthy();
+            ctx.expect(lines.some((line) => line.includes('targets/website')), `the prune is logged (got ${JSON.stringify(lines)})`).toBeTruthy();
+            ctx.expect(() => assertBrandLockfile({ root: brand })).not.toThrow();
+          });
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

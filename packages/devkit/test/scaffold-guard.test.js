@@ -3,8 +3,7 @@
  * writes ([#699](https://github.com/Omega-JS-Stack/omega/issues/699)). Real
  * directories in an os.tmpdir() scratch, no mocks.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -28,74 +27,101 @@ function stageRepo(manifests) {
   return root;
 }
 
-test('assertScaffoldable: a workspace root is refused by name and reason', () => {
-  const root = stageRepo({ '.': { name: 'omega', private: true, workspaces: ['packages/*'] } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'scaffold-guard',
+  tests: [
+    {
+      name: 'assertScaffoldable: a workspace root is refused by name and reason',
+      run: (ctx) => {
+        const root = stageRepo({ '.': { name: 'omega', private: true, workspaces: ['packages/*'] } });
 
-  assert.throws(() => assertScaffoldable(root), (error) => {
-    assert.match(error.message, /refusing to scaffold into/);
-    assert.ok(error.message.includes(root), `names the directory: ${error.message}`);
-    assert.match(error.message, /declares "workspaces"/);
-    assert.match(error.message, /Nothing was scaffolded/);
-    return true;
-  });
-});
+        ctx.expect(() => assertScaffoldable(root)).toThrow((error) => {
+          ctx.expect(error.message).toMatch(/refusing to scaffold into/);
+          ctx.expect(error.message.includes(root), `names the directory: ${error.message}`).toBeTruthy();
+          ctx.expect(error.message).toMatch(/declares "workspaces"/);
+          ctx.expect(error.message).toMatch(/Nothing was scaffolded/);
+          return true;
+        });
+      },
+    },
 
-test('assertScaffoldable: the refusal is FLAGGED, so every CLI prints it as a refusal (#706)', () => {
-  const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
+    {
+      name: 'assertScaffoldable: the refusal is FLAGGED, so every CLI prints it as a refusal (#706)',
+      run: (ctx) => {
+        const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
 
-  assert.throws(() => assertScaffoldable(root), (error) => {
-    assert.equal(error.refusal, true, 'the flag the router and the bins print by, instead of a stack');
-    return true;
-  });
-});
+        ctx.expect(() => assertScaffoldable(root)).toThrow((error) => {
+          ctx.expect(error.refusal, 'the flag the router and the bins print by, instead of a stack').toBe(true);
+          return true;
+        });
+      },
+    },
 
-test('assertScaffoldable: an UNPARSEABLE manifest up the walk refuses too, crafted (#706)', () => {
-  // A corrupt package.json used to throw a raw SyntaxError out of the guard —
-  // loud, but naming neither the file nor the refusal. And it must never READ as
-  // "not a workspace root": scaffolding on a guess is the accident this stops.
-  const root = stageRepo({});
-  fs.writeFileSync(path.join(root, 'package.json'), '{ "name": "broken", ');
+    {
+      name: 'assertScaffoldable: an UNPARSEABLE manifest up the walk refuses too, crafted (#706)',
+      run: (ctx) => {
+        // A corrupt package.json used to throw a raw SyntaxError out of the guard —
+        // loud, but naming neither the file nor the refusal. And it must never READ as
+        // "not a workspace root": scaffolding on a guess is the accident this stops.
+        const root = stageRepo({});
+        fs.writeFileSync(path.join(root, 'package.json'), '{ "name": "broken", ');
 
-  assert.throws(() => assertScaffoldable(root), (error) => {
-    assert.equal(error.refusal, true);
-    assert.match(error.message, /refusing to scaffold into/);
-    assert.ok(error.message.includes(path.join(root, 'package.json')), `names the unreadable file: ${error.message}`);
-    assert.match(error.message, /Nothing was scaffolded/);
-    return true;
-  });
-});
+        ctx.expect(() => assertScaffoldable(root)).toThrow((error) => {
+          ctx.expect(error.refusal).toBe(true);
+          ctx.expect(error.message).toMatch(/refusing to scaffold into/);
+          ctx.expect(error.message.includes(path.join(root, 'package.json')), `names the unreadable file: ${error.message}`).toBeTruthy();
+          ctx.expect(error.message).toMatch(/Nothing was scaffolded/);
+          return true;
+        });
+      },
+    },
 
-test('assertScaffoldable: a directory INSIDE a workspace root is refused too (nearest manifest)', () => {
-  const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
-  const scratchDir = path.join(root, 'scratch', 'deep');
-  fs.mkdirSync(scratchDir, { recursive: true });
+    {
+      name: 'assertScaffoldable: a directory INSIDE a workspace root is refused too (nearest manifest)',
+      run: (ctx) => {
+        const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
+        const scratchDir = path.join(root, 'scratch', 'deep');
+        fs.mkdirSync(scratchDir, { recursive: true });
 
-  assert.throws(() => assertScaffoldable(scratchDir), /refusing to scaffold into/);
-});
+        ctx.expect(() => assertScaffoldable(scratchDir)).toThrow(/refusing to scaffold into/);
+      },
+    },
 
-test('assertScaffoldable: a workspace MEMBER scaffolds — it carries its own manifest', () => {
-  const root = stageRepo({
-    '.': { name: 'acme', workspaces: ['targets/*'] },
-    'targets/app': { name: 'acme-app', devDependencies: { '@omega.js/desktop': '*' } },
-  });
+    {
+      name: 'assertScaffoldable: a workspace MEMBER scaffolds — it carries its own manifest',
+      run: (ctx) => {
+        const root = stageRepo({
+          '.': { name: 'acme', workspaces: ['targets/*'] },
+          'targets/app': { name: 'acme-app', devDependencies: { '@omega.js/desktop': '*' } },
+        });
 
-  assert.doesNotThrow(() => assertScaffoldable(path.join(root, 'targets', 'app')));
-});
+        ctx.expect(() => assertScaffoldable(path.join(root, 'targets', 'app'))).not.toThrow();
+      },
+    },
 
-test('assertScaffoldable: a fresh directory with no manifest above it still scaffolds (bootstrap)', () => {
-  const root = stageRepo({});
-  const fresh = path.join(root, 'my-app');
-  fs.mkdirSync(fresh);
+    {
+      name: 'assertScaffoldable: a fresh directory with no manifest above it still scaffolds (bootstrap)',
+      run: (ctx) => {
+        const root = stageRepo({});
+        const fresh = path.join(root, 'my-app');
+        fs.mkdirSync(fresh);
 
-  assert.doesNotThrow(() => assertScaffoldable(fresh));
-});
+        ctx.expect(() => assertScaffoldable(fresh)).not.toThrow();
+      },
+    },
 
-test('nearestManifest: the walk stops at the nearest .git — a manifest outside the repo is never adopted', () => {
-  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-guard-outer-'));
-  fs.writeFileSync(path.join(outer, 'package.json'), JSON.stringify({ name: 'outer', workspaces: ['*'] }));
-  const repo = path.join(outer, 'repo');
-  fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    {
+      name: 'nearestManifest: the walk stops at the nearest .git — a manifest outside the repo is never adopted',
+      run: (ctx) => {
+        const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-guard-outer-'));
+        fs.writeFileSync(path.join(outer, 'package.json'), JSON.stringify({ name: 'outer', workspaces: ['*'] }));
+        const repo = path.join(outer, 'repo');
+        fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
 
-  assert.equal(nearestManifest(repo), null);
-  assert.doesNotThrow(() => assertScaffoldable(repo));
+        ctx.expect(nearestManifest(repo)).toBe(null);
+        ctx.expect(() => assertScaffoldable(repo)).not.toThrow();
+      },
+    },
+  ],
 });

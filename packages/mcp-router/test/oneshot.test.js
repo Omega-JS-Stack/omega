@@ -15,23 +15,32 @@
  * reaches this helper, and so both of its callers.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const BUDGET_MS = 150;
-process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS = String(BUDGET_MS);
+const ONESHOT = require.resolve('../src/lib/oneshot.js');
 
-const { SPAWN_TIMEOUT_MS, connectWithDeadline, readToolsOnce } = require('../src/lib/oneshot.js');
+// The suites share one process: load a private copy under the shrunk seam, then
+// hand back the env and the module cache so no other suite inherits the budget.
+const shared = { seam: process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS, module: require.cache[ONESHOT] };
+process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS = String(BUDGET_MS);
+delete require.cache[ONESHOT];
+const { SPAWN_TIMEOUT_MS, connectWithDeadline, readToolsOnce } = require(ONESHOT);
+if (shared.seam === undefined) delete process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS;
+else process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS = shared.seam;
+if (shared.module) require.cache[ONESHOT] = shared.module;
+else delete require.cache[ONESHOT];
 
 const TOOLS = [{ name: 'echo', description: 'Echo the text back.', inputSchema: { type: 'object', properties: {} } }];
 
 /**
  * A stand-in for the SDK client/transport pair, recording what was called.
  *
+ * @param {Function} expect - The calling case's `ctx.expect`
  * @param {object} [behavior] - `{ connect, listTools }` overrides returning a promise
  * @returns {object} `{ client, transport, calls, readOptions }`
  */
-function pair(behavior = {}) {
+function pair(expect, behavior = {}) {
   const calls = [];
   const state = { calls, readOptions: null };
 
@@ -43,7 +52,7 @@ function pair(behavior = {}) {
   state.client = {
     connect: (transport) => {
       calls.push('client.connect');
-      assert.equal(transport, state.transport, 'the client is connected over its own transport');
+      expect(transport, 'the client is connected over its own transport').toBe(state.transport);
       return behavior.connect ? behavior.connect() : Promise.resolve();
     },
     listTools: (params, options) => {
@@ -59,60 +68,84 @@ function pair(behavior = {}) {
   return state;
 }
 
-test('the env seam sets the budget this helper runs on', () => {
-  assert.equal(SPAWN_TIMEOUT_MS, BUDGET_MS);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'oneshot',
+  tests: [
+    {
+      name: 'the env seam sets the budget this helper runs on',
+      run: (ctx) => {
+        ctx.expect(SPAWN_TIMEOUT_MS).toBe(BUDGET_MS);
+      },
+    },
 
-test('a successful read returns the tools and closes through the client alone', async () => {
-  const fake = pair();
+    {
+      name: 'a successful read returns the tools and closes through the client alone',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect);
 
-  assert.deepEqual(await readToolsOnce(fake.client, fake.transport), TOOLS);
-  // Closing the transport as well would close a real one twice.
-  assert.deepEqual(fake.calls, ['client.connect', 'client.listTools', 'client.close']);
-});
+        ctx.expect(await readToolsOnce(fake.client, fake.transport)).toEqual(TOOLS);
+        // Closing the transport as well would close a real one twice.
+        ctx.expect(fake.calls).toEqual(['client.connect', 'client.listTools', 'client.close']);
+      },
+    },
 
-test('the read carries the router budget as its request options', async () => {
-  const fake = pair();
+    {
+      name: 'the read carries the router budget as its request options',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect);
 
-  await readToolsOnce(fake.client, fake.transport);
-  assert.deepEqual(fake.readOptions, { timeout: BUDGET_MS });
-});
+        await readToolsOnce(fake.client, fake.transport);
+        ctx.expect(fake.readOptions).toEqual({ timeout: BUDGET_MS });
+      },
+    },
 
-test('a failed connect closes the transport and rethrows', async () => {
-  const fake = pair({ connect: () => Promise.reject(new Error('spawn ENOENT')) });
+    {
+      name: 'a failed connect closes the transport and rethrows',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect, { connect: () => Promise.reject(new Error('spawn ENOENT')) });
 
-  await assert.rejects(readToolsOnce(fake.client, fake.transport), /spawn ENOENT/);
-  // Nothing else would terminate the child the transport already started.
-  assert.deepEqual(fake.calls, ['client.connect', 'transport.close']);
-});
+        await ctx.expect(readToolsOnce(fake.client, fake.transport)).rejects.toThrow(/spawn ENOENT/);
+        // Nothing else would terminate the child the transport already started.
+        ctx.expect(fake.calls).toEqual(['client.connect', 'transport.close']);
+      },
+    },
 
-test('a connect that never settles fails at the deadline, with the transport closed', async () => {
-  const fake = pair({ connect: () => new Promise(() => {}) });
-  const started = Date.now();
+    {
+      name: 'a connect that never settles fails at the deadline, with the transport closed',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect, { connect: () => new Promise(() => {}) });
+        const started = Date.now();
 
-  await assert.rejects(
-    readToolsOnce(fake.client, fake.transport),
-    new RegExp(`handshake did not finish within ${BUDGET_MS}ms`),
-  );
-  // 10ms of slack: Node fires timers up to a few ms before Date.now agrees
-  // (timer rounding vs the clock) — the rejection MESSAGE above is the proof
-  // the deadline answered; this only pins that nothing answered early.
-  assert.ok(Date.now() - started >= BUDGET_MS - 10, 'the deadline, not the fake, answered');
-  assert.deepEqual(fake.calls, ['client.connect', 'transport.close']);
-});
+        await ctx.expect(readToolsOnce(fake.client, fake.transport)).rejects.toThrow(new RegExp(`handshake did not finish within ${BUDGET_MS}ms`));
+        // 10ms of slack: Node fires timers up to a few ms before Date.now agrees
+        // (timer rounding vs the clock) — the rejection MESSAGE above is the proof
+        // the deadline answered; this only pins that nothing answered early.
+        ctx.expect(Date.now() - started >= BUDGET_MS - 10, 'the deadline, not the fake, answered').toBeTruthy();
+        ctx.expect(fake.calls).toEqual(['client.connect', 'transport.close']);
+      },
+    },
 
-test('a failed read closes the transport and rethrows', async () => {
-  const fake = pair({ listTools: () => Promise.reject(new Error('tools/list is unavailable')) });
+    {
+      name: 'a failed read closes the transport and rethrows',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect, { listTools: () => Promise.reject(new Error('tools/list is unavailable')) });
 
-  await assert.rejects(readToolsOnce(fake.client, fake.transport), /tools\/list is unavailable/);
-  // The connect deadline is done with the transport by then, so this path owns
-  // the cleanup; closing through the client would leave the child running.
-  assert.deepEqual(fake.calls, ['client.connect', 'client.listTools', 'transport.close']);
-});
+        await ctx.expect(readToolsOnce(fake.client, fake.transport)).rejects.toThrow(/tools\/list is unavailable/);
+        // The connect deadline is done with the transport by then, so this path owns
+        // the cleanup; closing through the client would leave the child running.
+        ctx.expect(fake.calls).toEqual(['client.connect', 'client.listTools', 'transport.close']);
+      },
+    },
 
-test('connectWithDeadline resolves without touching the transport', async () => {
-  const fake = pair();
+    {
+      name: 'connectWithDeadline resolves without touching the transport',
+      run: async (ctx) => {
+        const fake = pair(ctx.expect);
 
-  await connectWithDeadline(fake.client, fake.transport);
-  assert.deepEqual(fake.calls, ['client.connect']);
+        await connectWithDeadline(fake.client, fake.transport);
+        ctx.expect(fake.calls).toEqual(['client.connect']);
+      },
+    },
+  ],
 });

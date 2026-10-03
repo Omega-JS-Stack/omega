@@ -77,7 +77,7 @@ In the order they win:
 | Env var | Effect |
 |---|---|
 | `OMEGA_SENTRY_ENABLED=false` | Kill switch. Nothing reports, ever. |
-| `OMEGA_TEST_RUNNER` | A test run never pollutes a live project. |
+| `OMEGA_ENVIRONMENT=testing` | A test run never pollutes a live project: the gate asks the one environment's `isTesting()`, off the same host as the production default below. A run named `testing` includes the backend emulator runtime that the backend `omega test` lane and `omega dev` both boot (the emulator command sets `OMEGA_ENVIRONMENT: 'testing'` on its child), so functions under the emulator never report, and `OMEGA_SENTRY_FORCE` cannot override it: the kill sits above FORCE. |
 | `OMEGA_SENTRY_FORCE=true` | Report from a non-production run (local proving). |
 | the ONE environment | The default production signal, for a host that passes no runtime one. |
 

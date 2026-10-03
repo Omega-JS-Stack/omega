@@ -1,129 +1,159 @@
-const { describe, it, before, beforeEach } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { registerHooks } = require('node:module');
-const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
 
-// #798: the probe is only worth having if something ASKS it. The boot wires the
-// two free moments of doubt (the tab coming back into view, and the network
-// coming back) beside the auth state listener, so web, desktop and extension
-// get them from the one place. The third moment, a 401, is the request layer's
-// onUnauthorized dep (request.test.js).
-describe('Omega: the session probe\'s moments of doubt (#798)', () => {
+const beforeEachHook = clearStorage;
 
-  const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
+module.exports = defineCases({
+  type: 'group',
+  description: 'session-moments',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    // #798: the probe is only worth having if something ASKS it. The boot wires the
+    // two free moments of doubt (the tab coming back into view, and the network
+    // coming back) beside the auth state listener, so web, desktop and extension
+    // get them from the one place. The third moment, a 401, is the request layer's
+    // onUnauthorized dep (request.test.js).
+    ...(() => {
+      const cases = [];
+      const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
 
-  // Booting Firebase is what registers the moments, so the SDK is the seam:
-  // the four lazily-imported specifiers resolve to stubs reading
-  // `globalThis.__omegaFirebase` (the #700 firestore stub's pattern). Nothing
-  // else in this file imports them.
-  const STUB_URLS = {
-    'firebase/app': 'omega-test-stub:firebase-app',
-    'firebase/auth': 'omega-test-stub:firebase-auth',
-    'firebase/firestore': 'omega-test-stub:firebase-firestore',
-    'firebase/messaging': 'omega-test-stub:firebase-messaging',
-  };
+      // Booting Firebase is what registers the moments, so the SDK is the seam:
+      // the four lazily-imported specifiers resolve to stubs reading
+      // `globalThis.__omegaFirebase` (the #700 firestore stub's pattern). Nothing
+      // else in this file imports them.
+      const STUB_URLS = {
+        'firebase/app': 'omega-test-stub:firebase-app',
+        'firebase/auth': 'omega-test-stub:firebase-auth',
+        'firebase/firestore': 'omega-test-stub:firebase-firestore',
+        'firebase/messaging': 'omega-test-stub:firebase-messaging',
+      };
 
-  const STUB_SOURCES = {
-    'omega-test-stub:firebase-app': `export const initializeApp = () => globalThis.__omegaFirebase.app;
+      const STUB_SOURCES = {
+        'omega-test-stub:firebase-app': `export const initializeApp = () => globalThis.__omegaFirebase.app;
                                      export const getApp = () => globalThis.__omegaFirebase.app;
                                      export const getApps = () => [];`,
-    'omega-test-stub:firebase-auth': `export const getAuth = () => globalThis.__omegaFirebase.auth;
+        'omega-test-stub:firebase-auth': `export const getAuth = () => globalThis.__omegaFirebase.auth;
                                       export const onAuthStateChanged = (auth, callback) => { globalThis.__omegaFirebase.authCallbacks.push(callback); return () => {}; };
                                       export const getIdToken = (...args) => globalThis.__omegaFirebase.getIdToken(...args);
                                       export const signOut = (...args) => globalThis.__omegaFirebase.signOut(...args);`,
-    'omega-test-stub:firebase-firestore': `export const initializeFirestore = () => ({});`,
-    'omega-test-stub:firebase-messaging': `export const getMessaging = () => ({});`,
-  };
+        'omega-test-stub:firebase-firestore': `export const initializeFirestore = () => ({});`,
+        'omega-test-stub:firebase-messaging': `export const getMessaging = () => ({});`,
+      };
 
-  const stubFirebaseModules = () => registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (STUB_URLS[specifier]) {
-        return { url: STUB_URLS[specifier], shortCircuit: true };
-      }
+      const stubFirebaseModules = () => registerHooks({
+        resolve(specifier, context, nextResolve) {
+          if (STUB_URLS[specifier]) {
+            return { url: STUB_URLS[specifier], shortCircuit: true };
+          }
 
-      return nextResolve(specifier, context);
-    },
-    load(url, context, nextLoad) {
-      if (STUB_SOURCES[url]) {
-        return { format: 'module', shortCircuit: true, source: STUB_SOURCES[url] };
-      }
+          return nextResolve(specifier, context);
+        },
+        load(url, context, nextLoad) {
+          if (STUB_SOURCES[url]) {
+            return { format: 'module', shortCircuit: true, source: STUB_SOURCES[url] };
+          }
 
-      return nextLoad(url, context);
-    },
-  });
+          return nextLoad(url, context);
+        },
+      });
 
-  // Every call the probe makes to the stubbed SDK
-  const calls = { getIdToken: [], signOut: 0 };
+      // Every call the probe makes to the stubbed SDK
+      const calls = { getIdToken: [], signOut: 0 };
 
-  // Flush the microtask queue so the probe's lazy `import('firebase/auth')`
-  // has landed and the stub has really been called
-  const flush = () => new Promise((resolve) => setImmediate(resolve));
+      // Flush the microtask queue so the probe's lazy `import('firebase/auth')`
+      // has landed and the stub has really been called
+      const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-  const listeners = (target, type) => global.__omegaListeners[target][type] || [];
+      const listeners = (target, type) => global.__omegaListeners[target][type] || [];
 
-  // What a dispatched event does: every registered handler runs. The version
-  // check owns an `online` listener of its own, so firing the whole set is
-  // also the honest way to prove exactly ONE of them probes.
-  const dispatch = (target, type) => listeners(target, type).forEach((handler) => handler());
+      // What a dispatched event does: every registered handler runs. The version
+      // check owns an `online` listener of its own, so firing the whole set is
+      // also the honest way to prove exactly ONE of them probes.
+      const dispatch = (target, type) => listeners(target, type).forEach((handler) => handler());
 
-  before(async () => {
-    // Registered here, not at load: hooks route every later require through the
-    // ESM loader, and the helpers' Omega import pulls in CJS that will not
-    // survive the trip.
-    stubFirebaseModules();
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        // Registered here, not at load: hooks route every later require through the
+        // ESM loader, and the helpers' Omega import pulls in CJS that will not
+        // survive the trip.
+        stubFirebaseModules();
 
-    globalThis.__omegaFirebase = {
-      app: { name: '[DEFAULT]' },
-      auth: { currentUser: null },
-      authCallbacks: [],
-      getIdToken: async (user, force) => {
-        calls.getIdToken.push({ uid: user.uid, force });
-        throw Object.assign(new Error('Firebase: Error (auth/user-token-expired).'), { code: 'auth/user-token-expired' });
-      },
-      signOut: async () => {
-        calls.signOut++;
-        globalThis.__omegaFirebase.auth.currentUser = null;
-        return true;
-      },
-    };
+        globalThis.__omegaFirebase = {
+          app: { name: '[DEFAULT]' },
+          auth: { currentUser: null },
+          authCallbacks: [],
+          getIdToken: async (user, force) => {
+            calls.getIdToken.push({ uid: user.uid, force });
+            throw Object.assign(new Error('Firebase: Error (auth/user-token-expired).'), { code: 'auth/user-token-expired' });
+          },
+          signOut: async () => {
+            calls.signOut++;
+            globalThis.__omegaFirebase.auth.currentUser = null;
+            return true;
+          },
+        };
 
-    // A config the SDK can actually boot: apiKey is what gates _initializeFirebase
-    await getOmega().initialize({
-      ...TEST_CONFIG,
-      firebase: { app: { enabled: true, config: { apiKey: 'test-api-key', projectId: 'test-project' } } },
-    });
-  });
+        // A config the SDK can actually boot: apiKey is what gates _initializeFirebase
+        await getOmega().initialize({
+          ...TEST_CONFIG,
+          firebase: { app: { enabled: true, config: { apiKey: 'test-api-key', projectId: 'test-project' } } },
+        });
+      })()));
 
-  beforeEach(() => {
-    calls.getIdToken = [];
-    calls.signOut = 0;
-    globalThis.__omegaFirebase.auth.currentUser = USER;
-  });
+      const beforeEachHook2 = () => {
+        calls.getIdToken = [];
+        calls.signOut = 0;
+        globalThis.__omegaFirebase.auth.currentUser = USER;
+      };
 
-  it('should register visibilitychange on the document and online on the window', () => {
-    assert.strictEqual(listeners('document', 'visibilitychange').length, 1, 'ONE registration per Omega instance');
-    assert.ok(listeners('window', 'online').length >= 1, 'the network coming back is the second moment');
-  });
+      cases.push({
+        name: 'Omega: the session probe\'s moments of doubt (#798) > should register visibilitychange on the document and online on the window',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          ctx.expect(listeners('document', 'visibilitychange').length, 'ONE registration per Omega instance').toBe(1);
+          ctx.expect(listeners('window', 'online').length >= 1, 'the network coming back is the second moment').toBeTruthy();
+        },
+      });
 
-  it('should probe when the tab comes back into view, and not while it is hidden', async () => {
-    global.document.visibilityState = 'hidden';
-    dispatch('document', 'visibilitychange');
-    await flush();
-    assert.strictEqual(calls.getIdToken.length, 0, 'a tab going away asks nothing');
+      cases.push({
+        name: 'Omega: the session probe\'s moments of doubt (#798) > should probe when the tab comes back into view, and not while it is hidden',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          global.document.visibilityState = 'hidden';
+          dispatch('document', 'visibilitychange');
+          await flush();
+          ctx.expect(calls.getIdToken.length, 'a tab going away asks nothing').toBe(0);
 
-    global.document.visibilityState = 'visible';
-    dispatch('document', 'visibilitychange');
-    await flush();
+          global.document.visibilityState = 'visible';
+          dispatch('document', 'visibilitychange');
+          await flush();
 
-    assert.strictEqual(calls.getIdToken.length, 1, 'the tab coming back re-asks the Auth server');
-    assert.strictEqual(calls.getIdToken[0].force, true, 'and it is the FORCED refresh');
-    assert.strictEqual(calls.signOut, 1, 'a revoked session signs out, and the emission drives the policy listener');
-  });
+          ctx.expect(calls.getIdToken.length, 'the tab coming back re-asks the Auth server').toBe(1);
+          ctx.expect(calls.getIdToken[0].force, 'and it is the FORCED refresh').toBe(true);
+          ctx.expect(calls.signOut, 'a revoked session signs out, and the emission drives the policy listener').toBe(1);
+        },
+      });
 
-  it('should probe when the network comes back', async () => {
-    dispatch('window', 'online');
-    await flush();
+      cases.push({
+        name: 'Omega: the session probe\'s moments of doubt (#798) > should probe when the network comes back',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          dispatch('window', 'online');
+          await flush();
 
-    assert.strictEqual(calls.getIdToken.length, 1, 'exactly one of the online listeners is the probe');
-    assert.strictEqual(calls.signOut, 1);
-  });
+          ctx.expect(calls.getIdToken.length, 'exactly one of the online listeners is the probe').toBe(1);
+          ctx.expect(calls.signOut).toBe(1);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

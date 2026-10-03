@@ -12,10 +12,9 @@
  * outside this module. The guard reads the monorepo's own packages, so it runs
  * here and nowhere else (devkit's tests never ship inside a framework).
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SECRETS_DIR, SERVICE_ACCOUNT_REL, GOOGLE_OAUTH_REL } = require('../src/service-account.js');
 
@@ -54,24 +53,36 @@ function code(source) {
     .join('\n');
 }
 
-test('the secrets folder and its two files have one spelling', () => {
-  assert.equal(SECRETS_DIR, path.join('.omega', 'secrets'));
-  assert.equal(SERVICE_ACCOUNT_REL, path.join(SECRETS_DIR, 'service-account.json'));
-  assert.equal(GOOGLE_OAUTH_REL, path.join(SECRETS_DIR, 'google-oauth.json'));
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-account',
+  tests: [
+    {
+      name: 'the secrets folder and its two files have one spelling',
+      run: (ctx) => {
+        ctx.expect(SECRETS_DIR).toBe(path.join('.omega', 'secrets'));
+        ctx.expect(SERVICE_ACCOUNT_REL).toBe(path.join(SECRETS_DIR, 'service-account.json'));
+        ctx.expect(GOOGLE_OAUTH_REL).toBe(path.join(SECRETS_DIR, 'google-oauth.json'));
+      },
+    },
 
-test('no package builds the secrets path by hand', () => {
-  const packages = fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== 'devkit')
-    .map((entry) => path.join(PACKAGES_DIR, entry.name, 'src'))
-    .filter((dir) => fs.existsSync(dir));
+    {
+      name: 'no package builds the secrets path by hand',
+      run: (ctx) => {
+        const packages = fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory() && entry.name !== 'devkit')
+          .map((entry) => path.join(PACKAGES_DIR, entry.name, 'src'))
+          .filter((dir) => fs.existsSync(dir));
 
-  assert.ok(packages.length > 3, `the packages' src trees were found (${packages.length})`);
+        ctx.expect(packages.length > 3, `the packages' src trees were found (${packages.length})`).toBeTruthy();
 
-  const offenders = packages
-    .flatMap((dir) => sourceFiles(dir))
-    .filter((file) => HAND_TYPED.some((shape) => shape.test(code(fs.readFileSync(file, 'utf8')))))
-    .map((file) => path.relative(PACKAGES_DIR, file));
+        const offenders = packages
+          .flatMap((dir) => sourceFiles(dir))
+          .filter((file) => HAND_TYPED.some((shape) => shape.test(code(fs.readFileSync(file, 'utf8')))))
+          .map((file) => path.relative(PACKAGES_DIR, file));
 
-  assert.deepEqual(offenders, [], `these build the secrets path by hand instead of importing @omega.js/devkit/service-account:\n  ${offenders.join('\n  ')}`);
+        ctx.expect(offenders, `these build the secrets path by hand instead of importing @omega.js/devkit/service-account:\n  ${offenders.join('\n  ')}`).toEqual([]);
+      },
+    },
+  ],
 });

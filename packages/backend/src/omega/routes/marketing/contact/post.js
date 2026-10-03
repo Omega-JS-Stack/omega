@@ -111,7 +111,7 @@ module.exports = async ({ ctx, data, analytics }) => {
   let providerResults = {};
 
   if (!shouldCallExternalAPIs) {
-    ctx.log('marketing/contact: Skipping providers (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)');
+    ctx.log('marketing/contact: Skipping providers (OMEGA_ENVIRONMENT=testing, TEST_EXTENDED_MODE not set)');
   } else {
     const mailer = ctx.email;
     providerResults = await mailer.add({

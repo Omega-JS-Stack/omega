@@ -11,7 +11,6 @@ const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
 const connectTrap = require('./connect-trap.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
-const { markRunnerActive } = require('@omega.js/devkit/test/define-cases');
 const { parseTestScope, isPathTargeted, noMatchMessage, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 const { declaredLanes } = require('../utils/test-lanes.js');
 
@@ -67,13 +66,6 @@ class TestRunner {
       console.error(chalk.red(`  Running from: ${__dirname}\n`));
       process.exit(1);
     }
-
-    // Set testing flag to skip external API calls (emails, SendGrid)
-    process.env.OMEGA_TEST_MODE = 'true';
-
-    // Claim the run before any case file is required: defineCases() only lets a
-    // spec through once a real runner is loading it (#630).
-    markRunnerActive();
 
     this.results.startTime = Date.now();
 

@@ -5,8 +5,7 @@
  * gcloud, no able account, unknown identity, genuine faults) falls back to
  * the original diagnostic error from google-auth's 403 decoration.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { ensureProjectAccess } = require('../src/services/cloud/lib/access-heal.js');
 
@@ -64,130 +63,154 @@ function fakeApi({ denyCount = 0, email = 'itw.creative.works@gmail.com', probeE
 
 const quiet = () => {};
 
-test('access-heal: accessible project probes once and heals nothing', async () => {
-  const api = fakeApi();
-  const exec = fakeGcloud();
+module.exports = defineCases({
+  type: 'group',
+  description: 'access-heal',
+  tests: [
+    {
+      name: 'access-heal: accessible project probes once and heals nothing',
+      run: async (ctx) => {
+        const api = fakeApi();
+        const exec = fakeGcloud();
 
-  const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
+        const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
 
-  assert.deepEqual(result, { healed: false, probed: true });
-  assert.equal(api.probes, 1);
-  assert.equal(exec.calls.length, 0, 'gcloud never consulted');
-});
+        ctx.expect(result).toEqual({ healed: false, probed: true });
+        ctx.expect(api.probes).toBe(1);
+        ctx.expect(exec.calls.length, 'gcloud never consulted').toBe(0);
+      },
+    },
 
-test('access-heal: denied → grant via the able local account → healed', async () => {
-  const api = fakeApi({ denyCount: 1 });
-  const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com', 'itw.creative.works@gmail.com'] });
+    {
+      name: 'access-heal: denied → grant via the able local account → healed',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1 });
+        const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com', 'itw.creative.works@gmail.com'] });
 
-  const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
+        const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
 
-  assert.equal(result.healed, true);
-  assert.equal(result.grantor, 'Ian.Wiedenman@gmail.com');
-  assert.equal(result.manageEmail, 'itw.creative.works@gmail.com');
-  assert.deepEqual(result.roles, ['roles/owner'], 'owner lands first when the API allows it');
-  assert.equal(exec.grants().length, 1, 'one grant call');
-  const grant = exec.grants()[0];
-  assert.ok(grant.includes('add-iam-policy-binding') && grant.includes('omegajs'), 'grants on the project');
-  assert.ok(grant.includes('--member=user:itw.creative.works@gmail.com'), 'grants the MANAGE identity');
-  assert.ok(grant.includes('--account=Ian.Wiedenman@gmail.com'), 'acts as the OTHER local account');
-});
+        ctx.expect(result.healed).toBe(true);
+        ctx.expect(result.grantor).toBe('Ian.Wiedenman@gmail.com');
+        ctx.expect(result.manageEmail).toBe('itw.creative.works@gmail.com');
+        ctx.expect(result.roles, 'owner lands first when the API allows it').toEqual(['roles/owner']);
+        ctx.expect(exec.grants().length, 'one grant call').toBe(1);
+        const grant = exec.grants()[0];
+        ctx.expect(grant.includes('add-iam-policy-binding') && grant.includes('omegajs'), 'grants on the project').toBeTruthy();
+        ctx.expect(grant.includes('--member=user:itw.creative.works@gmail.com'), 'grants the MANAGE identity').toBeTruthy();
+        ctx.expect(grant.includes('--account=Ian.Wiedenman@gmail.com'), 'acts as the OTHER local account').toBeTruthy();
+      },
+    },
 
-test('access-heal: owner rejected (no-org invitation rule) → editor + firebase.admin land', async () => {
-  const api = fakeApi({ denyCount: 1 });
-  const exec = fakeGcloud({
-    accounts: ['Ian.Wiedenman@gmail.com', 'itw.creative.works@gmail.com'],
-    grantFails: (args) => args.includes('--role=roles/owner'),
-  });
+    {
+      name: 'access-heal: owner rejected (no-org invitation rule) → editor + firebase.admin land',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1 });
+        const exec = fakeGcloud({
+          accounts: ['Ian.Wiedenman@gmail.com', 'itw.creative.works@gmail.com'],
+          grantFails: (args) => args.includes('--role=roles/owner'),
+        });
 
-  const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
+        const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
 
-  assert.equal(result.healed, true);
-  assert.deepEqual(result.roles, ['roles/editor', 'roles/firebase.admin']);
-  const roles = exec.grants().map((args) => (args.find((a) => a.startsWith('--role=')) || '').replace('--role=', ''));
-  assert.deepEqual(roles, ['roles/owner', 'roles/editor', 'roles/firebase.admin'], 'owner attempted first, pair follows');
-});
+        ctx.expect(result.healed).toBe(true);
+        ctx.expect(result.roles).toEqual(['roles/editor', 'roles/firebase.admin']);
+        const roles = exec.grants().map((args) => (args.find((a) => a.startsWith('--role=')) || '').replace('--role=', ''));
+        ctx.expect(roles, 'owner attempted first, pair follows').toEqual(['roles/owner', 'roles/editor', 'roles/firebase.admin']);
+      },
+    },
 
-test('access-heal: the manage identity itself is never a grantor candidate', async () => {
-  const api = fakeApi({ denyCount: 1 });
-  const exec = fakeGcloud({ accounts: ['itw.creative.works@gmail.com'] });
+    {
+      name: 'access-heal: the manage identity itself is never a grantor candidate',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1 });
+        const exec = fakeGcloud({ accounts: ['itw.creative.works@gmail.com'] });
 
-  await assert.rejects(
-    ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 }),
-    /does not have permission/,
-  );
-  assert.equal(exec.grants().length, 0, 'no self-grant attempt');
-});
+        await ctx.expect(ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 })).rejects.toThrow(/does not have permission/);
+        ctx.expect(exec.grants().length, 'no self-grant attempt').toBe(0);
+      },
+    },
 
-test('access-heal: a failing grantor falls through to the next', async () => {
-  const api = fakeApi({ denyCount: 1 });
-  const exec = fakeGcloud({
-    accounts: ['first@x.com', 'second@x.com', 'itw.creative.works@gmail.com'],
-    grantFails: ['first@x.com'],
-  });
+    {
+      name: 'access-heal: a failing grantor falls through to the next',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1 });
+        const exec = fakeGcloud({
+          accounts: ['first@x.com', 'second@x.com', 'itw.creative.works@gmail.com'],
+          grantFails: ['first@x.com'],
+        });
 
-  const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
+        const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
 
-  assert.equal(result.healed, true);
-  assert.equal(result.grantor, 'second@x.com');
-  assert.deepEqual(result.roles, ['roles/owner']);
-  assert.equal(exec.grants().length, 3, 'first tried owner + fallback, second landed owner');
-});
+        ctx.expect(result.healed).toBe(true);
+        ctx.expect(result.grantor).toBe('second@x.com');
+        ctx.expect(result.roles).toEqual(['roles/owner']);
+        ctx.expect(exec.grants().length, 'first tried owner + fallback, second landed owner').toBe(3);
+      },
+    },
 
-test('access-heal: propagation lag — probe retries until the grant lands', async () => {
-  const api = fakeApi({ denyCount: 3 }); // initial + 2 post-grant denials
-  const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
+    {
+      name: 'access-heal: propagation lag — probe retries until the grant lands',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 3 }); // initial + 2 post-grant denials
+        const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
 
-  const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
+        const result = await ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 });
 
-  assert.equal(result.healed, true);
-  assert.equal(api.probes, 4, 'initial + retries through propagation');
-});
+        ctx.expect(result.healed).toBe(true);
+        ctx.expect(api.probes, 'initial + retries through propagation').toBe(4);
+      },
+    },
 
-test('access-heal: no able account → the original diagnostic error stands', async () => {
-  const api = fakeApi({ denyCount: 99 });
-  const exec = fakeGcloud({ accounts: ['cant@x.com'], grantFails: ['cant@x.com'] });
+    {
+      name: 'access-heal: no able account → the original diagnostic error stands',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 99 });
+        const exec = fakeGcloud({ accounts: ['cant@x.com'], grantFails: ['cant@x.com'] });
 
-  await assert.rejects(
-    ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 }),
-    /does not have permission/,
-  );
-});
+        await ctx.expect(ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 })).rejects.toThrow(/does not have permission/);
+      },
+    },
 
-test('access-heal: no local gcloud → the original diagnostic error stands', async () => {
-  const api = fakeApi({ denyCount: 1 });
-  const exec = fakeGcloud({ accounts: new Error('gcloud: command not found') });
+    {
+      name: 'access-heal: no local gcloud → the original diagnostic error stands',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1 });
+        const exec = fakeGcloud({ accounts: new Error('gcloud: command not found') });
 
-  await assert.rejects(
-    ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 }),
-    /does not have permission/,
-  );
-});
+        await ctx.expect(ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 })).rejects.toThrow(/does not have permission/);
+      },
+    },
 
-test('access-heal: unknowable manage identity → original error, gcloud untouched', async () => {
-  const api = fakeApi({ denyCount: 1, email: null });
-  const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
+    {
+      name: 'access-heal: unknowable manage identity → original error, gcloud untouched',
+      run: async (ctx) => {
+        const api = fakeApi({ denyCount: 1, email: null });
+        const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
 
-  await assert.rejects(
-    ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 }),
-    /does not have permission/,
-  );
-  assert.equal(exec.calls.length, 0);
-});
+        await ctx.expect(ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 })).rejects.toThrow(/does not have permission/);
+        ctx.expect(exec.calls.length).toBe(0);
+      },
+    },
 
-test('access-heal: non-permission probe faults rethrow untouched — not the seam', async () => {
-  const fault = new Error('Google API Error: backend timeout');
-  fault.status = 500;
-  const api = fakeApi({ probeError: fault });
-  const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
+    {
+      name: 'access-heal: non-permission probe faults rethrow untouched — not the seam',
+      run: async (ctx) => {
+        const fault = new Error('Google API Error: backend timeout');
+        fault.status = 500;
+        const api = fakeApi({ probeError: fault });
+        const exec = fakeGcloud({ accounts: ['Ian.Wiedenman@gmail.com'] });
 
-  await assert.rejects(
-    ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 }),
-    /backend timeout/,
-  );
-  assert.equal(exec.calls.length, 0);
-});
+        await ctx.expect(ensureProjectAccess({ firebaseApi: api, projectId: 'omegajs', exec, log: quiet, delayMs: 0 })).rejects.toThrow(/backend timeout/);
+        ctx.expect(exec.calls.length).toBe(0);
+      },
+    },
 
-test('access-heal: fakes without the probe surface skip the heal', async () => {
-  const result = await ensureProjectAccess({ firebaseApi: {}, projectId: 'omegajs', exec: fakeGcloud(), log: quiet, delayMs: 0 });
-  assert.deepEqual(result, { healed: false, probed: false });
+    {
+      name: 'access-heal: fakes without the probe surface skip the heal',
+      run: async (ctx) => {
+        const result = await ensureProjectAccess({ firebaseApi: {}, projectId: 'omegajs', exec: fakeGcloud(), log: quiet, delayMs: 0 });
+        ctx.expect(result).toEqual({ healed: false, probed: false });
+      },
+    },
+  ],
 });

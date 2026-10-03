@@ -361,7 +361,7 @@ test('deploy --direct: a fatal config finding stops the lane before any deploy w
 test('deploy --direct: the PRODUCTION overlay is the config the lane reads (#856)', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-overlay-'));
   const previous = process.cwd();
-  const saved = [['ENVIRONMENT', process.env.ENVIRONMENT], ['OMEGA_TEST_MODE', process.env.OMEGA_TEST_MODE]];
+  const saved = [['ENVIRONMENT', process.env.ENVIRONMENT], ['OMEGA_ENVIRONMENT', process.env.OMEGA_ENVIRONMENT]];
   t.after(() => {
     process.chdir(previous);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -383,7 +383,7 @@ test('deploy --direct: the PRODUCTION overlay is the config the lane reads (#856
   fs.writeFileSync(path.join(dir, 'config', 'omega.development.json5'), "{ theme: { id: 'classy' } }");
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'acme-website', private: true }));
 
-  delete process.env.OMEGA_TEST_MODE;
+  delete process.env.OMEGA_ENVIRONMENT;
   process.env.ENVIRONMENT = 'development';
   process.chdir(dir);
 

@@ -159,6 +159,8 @@ surface attaches it at its entry point.
 | the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/test/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `dev.log`, `page.log` |
 | **This monorepo** | | |
 | every root test lane (`npm test`, `npm run test:packages`, …) | `.temp/logs/<lane>.log` | the lane's own lines plus every child command's output — `test:packages` → `.temp/logs/test-packages.log` |
+| a library package's `npm test` (account, analytics, client, config, devkit, manager, mcp-router, monitoring, template-kit) | `packages/<pkg>/logs/test.log` | the devkit case runner's whole run, written by `src/test/cli.js` and truncated on each run: suite names, pass/fail, and what the suites print |
+| the root `scripts/` suites (the first command of `test:packages`) | `.temp/logs/scripts.log` | the case runner's run over `scripts/*.test.js` (`--log=.temp/logs/scripts.log`), truncated on each run |
 | `npm start` (the watcher) | `.temp/logs/watch-all.log` | is it alive, did it respawn, what did it rebuild |
 | every e2e runner's per-step verdicts | `.temp/<lane>/steps.log` | one `PASS` / `FAIL` line per step — see below |
 | every e2e runner's environment | `.temp/<lane>/` | `emulator.log`, `page.log`, `sw.log`, `screenshots/`, the journey's numbered stage logs |

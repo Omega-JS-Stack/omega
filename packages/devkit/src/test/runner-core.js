@@ -47,7 +47,6 @@ const chalk = require('chalk').default;
 
 const expect = require('./expect.js');
 const { parseTestScope, isPathTargeted } = require('./scope.js');
-const { markRunnerActive } = require('./define-cases.js');
 const { runInitSetups } = require('./init-hooks.js');
 
 class SkipError extends Error {
@@ -72,10 +71,6 @@ function createRunner(config) {
     options.reporter = options.reporter || 'pretty';
 
     const startTime = Date.now();
-
-    // Claim the run before any case file is required: defineCases() only lets a
-    // spec through once a real runner is loading it (#630).
-    markRunnerActive();
 
     const sources = discoverTestFiles(options.target);
 

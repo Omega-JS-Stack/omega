@@ -15,8 +15,8 @@ const AI = require('../../dist/omega/libraries/ai/index.js');
 const { emptyTokens, buildTokens, addTokens } = require('../../dist/omega/libraries/ai/tokens.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// No Omega instance — the test provider falls back to the OMEGA_TEST_MODE signal, which
-// the test runner sets
+// No Omega instance — the test provider falls back to isTesting(), which the test
+// lane's OMEGA_ENVIRONMENT=testing answers
 function makeAI() {
   return new AI({}, 'test');
 }

@@ -10,8 +10,7 @@
  * registry is ever reached. The manager runs from its built dist/, so a monorepo
  * checkout needs its `npm run prepare` before this case is meaningful.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -38,12 +37,13 @@ function executable(file, body) {
  * A template copy with the manager installed the way npm installs it, a fake
  * `npm` wherever a script could find one, and a fake `gh` and `claude` ahead of
  * any real one.
+ * @param {Function} expect - the calling case's `ctx.expect`
  * @returns {{ root: string, clone: string, fakeBin: string, npmLog: string }}
  */
-function stageTemplateCopy() {
+function stageTemplateCopy(expect) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-first-run-')));
   const clone = stageTemplate(path.join(root, 'template-copy'));
-  assert.equal(spawnSync('git', ['-C', clone, 'init', '-q']).status, 0, 'git init');
+  expect(spawnSync('git', ['-C', clone, 'init', '-q']).status, 'git init').toBe(0);
 
   fs.mkdirSync(path.join(clone, 'node_modules', '@omega.js'), { recursive: true });
   fs.symlinkSync(MANAGER_PKG, path.join(clone, 'node_modules', '@omega.js', 'manager'), 'dir');
@@ -61,57 +61,66 @@ function stageTemplateCopy() {
   return { root, clone, fakeBin, npmLog };
 }
 
-test('first run: npm start -- --id=acme --targets=web --no-dev in a template copy ends on a generated brand (#1023 case 10)', () => {
-  assert.ok(fs.existsSync(NPM_CLI), `npm ships beside node at ${NPM_CLI}`);
-  const { root, clone, fakeBin, npmLog } = stageTemplateCopy();
+module.exports = defineCases({
+  type: 'group',
+  description: 'omega-bin-first-run',
+  tests: [
+    {
+      name: 'first run: npm start -- --id=acme --targets=web --no-dev in a template copy ends on a generated brand (#1023 case 10)',
+      run: (ctx) => {
+        ctx.expect(fs.existsSync(NPM_CLI), `npm ships beside node at ${NPM_CLI}`).toBeTruthy();
+        const { root, clone, fakeBin, npmLog } = stageTemplateCopy(ctx.expect);
 
-  const env = {
-    ...scrubCredentialEnv(process.env, root),
-    PATH: [fakeBin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter),
-    OMEGA_TEST_NPM_LOG: npmLog,
-    // The local-dist freshness heal can rebuild and re-exec; a monorepo-dev
-    // convenience, not part of this contract.
-    OMEGA_SKIP_FRESHNESS: '1',
-    CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
-    npm_config_update_notifier: 'false',
-    npm_config_fund: 'false',
-    npm_config_audit: 'false',
-  };
+        const env = {
+          ...scrubCredentialEnv(process.env, root),
+          PATH: [fakeBin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter),
+          OMEGA_TEST_NPM_LOG: npmLog,
+          // The local-dist freshness heal can rebuild and re-exec; a monorepo-dev
+          // convenience, not part of this contract.
+          OMEGA_SKIP_FRESHNESS: '1',
+          CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
+          npm_config_update_notifier: 'false',
+          npm_config_fund: 'false',
+          npm_config_audit: 'false',
+        };
 
-  const out = spawnSync(process.execPath, [NPM_CLI, 'start', '--', '--id=acme', '--targets=web', '--no-dev'], {
-    cwd: clone,
-    encoding: 'utf8',
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 180000,
-  });
-  const said = `${out.stdout}\n${out.stderr}`;
+        const out = spawnSync(process.execPath, [NPM_CLI, 'start', '--', '--id=acme', '--targets=web', '--no-dev'], {
+          cwd: clone,
+          encoding: 'utf8',
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 180000,
+        });
+        const said = `${out.stdout}\n${out.stderr}`;
 
-  assert.equal(out.status, 0, `npm start exited ${out.status}\n${said}`);
-  assert.doesNotMatch(said, /Unknown command/);
+        ctx.expect(out.status, `npm start exited ${out.status}\n${said}`).toBe(0);
+        ctx.expect(said).not.toMatch(/Unknown command/);
 
-  // The template's package.json was taken over by the generated one
-  const pkg = JSON.parse(fs.readFileSync(path.join(clone, 'package.json'), 'utf8'));
-  assert.equal(pkg.name, 'acme', '--id reached onboard');
-  assert.deepEqual(pkg.workspaces, ['targets/*']);
-  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': MANAGER_VERSION });
-  assert.equal(pkg.scripts.start, 'omega dev', 'every later npm start is the dev stack');
-  assert.ok(!('omega' in pkg), 'no template marker left');
+        // The template's package.json was taken over by the generated one
+        const pkg = JSON.parse(fs.readFileSync(path.join(clone, 'package.json'), 'utf8'));
+        ctx.expect(pkg.name, '--id reached onboard').toBe('acme');
+        ctx.expect(pkg.workspaces).toEqual(['targets/*']);
+        ctx.expect(pkg.devDependencies).toEqual({ '@omega.js/manager': MANAGER_VERSION });
+        ctx.expect(pkg.scripts.start, 'every later npm start is the dev stack').toBe('omega dev');
+        ctx.expect(!('omega' in pkg), 'no template marker left').toBeTruthy();
 
-  // And so was its README
-  const readme = fs.readFileSync(path.join(clone, 'README.md'), 'utf8');
-  assert.ok(!readme.includes('<!-- omega:template -->'), 'the template README is gone');
+        // And so was its README
+        const readme = fs.readFileSync(path.join(clone, 'README.md'), 'utf8');
+        ctx.expect(!readme.includes('<!-- omega:template -->'), 'the template README is gone').toBeTruthy();
 
-  const config = JSON5.parse(fs.readFileSync(path.join(clone, 'config', 'omega.json5'), 'utf8'));
-  assert.equal(config.brand.id, 'acme');
-  assert.deepEqual(config.targets, { web: { type: 'web' } }, '--targets reached onboard');
-  assert.ok(fs.existsSync(path.join(clone, 'targets', 'web', 'package.json')));
+        const config = JSON5.parse(fs.readFileSync(path.join(clone, 'config', 'omega.json5'), 'utf8'));
+        ctx.expect(config.brand.id).toBe('acme');
+        ctx.expect(config.targets, '--targets reached onboard').toEqual({ web: { type: 'web' } });
+        ctx.expect(fs.existsSync(path.join(clone, 'targets', 'web', 'package.json'))).toBeTruthy();
 
-  // The script's own install ran first; --no-dev stopped short of the dev stack
-  const npmCalls = fs.readFileSync(npmLog, 'utf8').trim().split('\n');
-  assert.equal(npmCalls[0], `${clone}|install`, `the start script installed first: ${npmCalls.join(', ')}`);
-  assert.ok(npmCalls.every((line) => !/\|(start|run dev)\b/.test(line)), `no dev stack through npm: ${npmCalls.join(', ')}`);
-  assert.equal(fs.existsSync(path.join(clone, 'logs', 'dev.log')), false, '--no-dev reached onboard: no dev stack ran');
+        // The script's own install ran first; --no-dev stopped short of the dev stack
+        const npmCalls = fs.readFileSync(npmLog, 'utf8').trim().split('\n');
+        ctx.expect(npmCalls[0], `the start script installed first: ${npmCalls.join(', ')}`).toBe(`${clone}|install`);
+        ctx.expect(npmCalls.every((line) => !/\|(start|run dev)\b/.test(line)), `no dev stack through npm: ${npmCalls.join(', ')}`).toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(clone, 'logs', 'dev.log')), '--no-dev reached onboard: no dev stack ran').toBe(false);
 
-  fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+  ],
 });

@@ -9,8 +9,7 @@
  * child process and speaks MCP over its stdin and stdout.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -121,51 +120,69 @@ function launch(pluginRoot, project) {
   };
 }
 
-test('the plugin declares one server, launched from inside the plugin', () => {
-  const declaration = JSON.parse(fs.readFileSync(path.join(PLUGIN_DIR, '.mcp.json'), 'utf8'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'plugin-launch',
+  tests: [
+    {
+      name: 'the plugin declares one server, launched from inside the plugin',
+      run: (ctx) => {
+        const declaration = JSON.parse(fs.readFileSync(path.join(PLUGIN_DIR, '.mcp.json'), 'utf8'));
 
-  assert.deepEqual(Object.keys(declaration.mcpServers), ['mcp-router']);
-  assert.deepEqual(declaration.mcpServers['mcp-router'].args, ['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js']);
-  assert.ok(!JSON.stringify(declaration).includes('..'), 'the declaration never reaches outside the plugin');
-  assert.ok(fs.existsSync(path.join(PLUGIN_DIR, LAUNCHER)), 'the launcher it names is there');
-});
+        ctx.expect(Object.keys(declaration.mcpServers)).toEqual(['mcp-router']);
+        ctx.expect(declaration.mcpServers['mcp-router'].args).toEqual(['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js']);
+        ctx.expect(!JSON.stringify(declaration).includes('..'), 'the declaration never reaches outside the plugin').toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(PLUGIN_DIR, LAUNCHER)), 'the launcher it names is there').toBeTruthy();
+      },
+    },
 
-test('the launcher resolves this package\'s bin from the plugin directory', () => {
-  assert.equal(
-    require.resolve(ROUTER_BIN, { paths: [PLUGIN_DIR] }),
-    path.join(__dirname, '..', 'bin', 'mcp-router.js')
-  );
-});
+    {
+      name: 'the launcher resolves this package\'s bin from the plugin directory',
+      run: (ctx) => {
+        ctx.expect(require.resolve(ROUTER_BIN, { paths: [PLUGIN_DIR] })).toBe(path.join(__dirname, '..', 'bin', 'mcp-router.js'));
+      },
+    },
 
-test('case 12: the launcher in this monorepo runs the workspace router, even in a brand that installs its own', async () => {
-  const server = launch(PLUGIN_DIR, brandWithRouter());
-  try {
-    const answer = await server.initialize();
-    assert.equal(answer.result.serverInfo.name, 'mcp-router', 'the plugin folder wins over the open project');
-  } finally {
-    await server.close();
-  }
-});
+    {
+      name: 'case 12: the launcher in this monorepo runs the workspace router, even in a brand that installs its own',
+      run: async (ctx) => {
+        const server = launch(PLUGIN_DIR, brandWithRouter());
+        try {
+          const answer = await server.initialize();
+          ctx.expect(answer.result.serverInfo.name, 'the plugin folder wins over the open project').toBe('mcp-router');
+        } finally {
+          await server.close();
+        }
+      },
+    },
 
-test('case 12: a fetched launcher in a brand runs the brand\'s installed router', async () => {
-  const server = launch(fetchedPlugin(), brandWithRouter());
-  try {
-    const answer = await server.initialize();
-    assert.equal(answer.result.serverInfo.name, 'brand-router-stub');
-  } finally {
-    await server.close();
-  }
-});
+    {
+      name: 'case 12: a fetched launcher in a brand runs the brand\'s installed router',
+      run: async (ctx) => {
+        const server = launch(fetchedPlugin(), brandWithRouter());
+        try {
+          const answer = await server.initialize();
+          ctx.expect(answer.result.serverInfo.name).toBe('brand-router-stub');
+        } finally {
+          await server.close();
+        }
+      },
+    },
 
-test('case 12: a fetched launcher with no router anywhere answers with an empty tool list and exits 0 when its input closes', async () => {
-  const server = launch(fetchedPlugin(), tmpdir('empty'));
+    {
+      name: 'case 12: a fetched launcher with no router anywhere answers with an empty tool list and exits 0 when its input closes',
+      run: async (ctx) => {
+        const server = launch(fetchedPlugin(), tmpdir('empty'));
 
-  const init = await server.initialize();
-  assert.ok(init.result, `initialize is answered, not refused: ${JSON.stringify(init)}`);
-  assert.ok(init.result.serverInfo && init.result.protocolVersion, 'a well-formed initialize result');
+        const init = await server.initialize();
+        ctx.expect(init.result, `initialize is answered, not refused: ${JSON.stringify(init)}`).toBeTruthy();
+        ctx.expect(init.result.serverInfo && init.result.protocolVersion, 'a well-formed initialize result').toBeTruthy();
 
-  const list = await server.request('tools/list');
-  assert.deepEqual(list.result, { tools: [] });
+        const list = await server.request('tools/list');
+        ctx.expect(list.result).toEqual({ tools: [] });
 
-  assert.equal(await server.close(), 0);
+        ctx.expect(await server.close()).toBe(0);
+      },
+    },
+  ],
 });

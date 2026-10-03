@@ -1,8 +1,6 @@
 // The browser globals every case needs, loaded here so one file runs on its own
 // (`node --test packages/client/test/<file>`), not only behind the package's preload.
 require('./setup.js');
-const assert = require('assert');
-const { before, beforeEach, after } = require('node:test');
 
 // Shared test config (Firebase + Sentry disabled for unit tests).
 //
@@ -25,27 +23,27 @@ function getOmega() {
   return omega;
 }
 
-// Root hooks — registered on require, so every test file that pulls the
-// helpers in gets the same pre-suite instance and per-test storage reset.
-before(async () => {
+// The suite hooks every file that pulls the helpers in wires as its own:
+// `createOmega` as its setup, `clearStorage` before each case, `disposeOmega` as its cleanup.
+async function createOmega() {
   const { Omega } = await import('../src/index.js');
   omega = new Omega();
-});
+}
 
-beforeEach(() => {
+function clearStorage() {
   if (global.window) {
     global.window.localStorage.clear();
     global.window.sessionStorage.clear();
   }
-});
+}
 
 // `initialize()` arms the refresh-new-version interval, which lives for the
 // page's lifetime in a browser and would hold the test process open forever.
-after(() => {
+function disposeOmega() {
   if (omega?._versionCheckInterval) {
     clearInterval(omega._versionCheckInterval);
   }
-});
+}
 
 // Stamp the #355 base path on <html>, the way the web build's HTML pass does,
 // and hand back the undo — every module that mounts under a prefix reads it
@@ -67,7 +65,9 @@ function setPathPrefix(prefix) {
 
 module.exports = {
   TEST_CONFIG,
-  assert,
   getOmega,
+  createOmega,
+  clearStorage,
+  disposeOmega,
   setPathPrefix,
 };

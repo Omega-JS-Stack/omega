@@ -15,7 +15,7 @@
     "./variable-resolver": "./src/variable-resolver.js"
   },
   "scripts": {
-    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
+    "test": "node ../devkit/src/test/cli.js"
   },
   "engines": {
     "node": ">=22"

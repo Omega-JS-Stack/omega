@@ -372,8 +372,8 @@ module.exports = defineCases({
         //
         // In PRODUCTION the same request meets reCAPTCHA first — a missing or
         // bad token is a 403 before the gate is ever reached. The emulator
-        // bypasses reCAPTCHA (OMEGA_TEST_MODE=true), which is what leaves the
-        // rate limit as the visible protection here.
+        // bypasses reCAPTCHA (OMEGA_ENVIRONMENT=testing), which is what leaves
+        // the rate limit as the visible protection here.
         const send = () => http.post('omega/marketing/contact', {
           email: TEST_EMAILS.valid(),
           source: 'backend-test',

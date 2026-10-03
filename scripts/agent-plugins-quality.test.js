@@ -3,8 +3,7 @@
  * names the quality skills that own it, and Stop asks for the review.
  * Run: node --test scripts/agent-plugins-quality.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -31,8 +30,9 @@ const stopped = (session, stopHookActive) => quality({
   stop_hook_active: Boolean(stopHookActive),
 });
 
-const context = (result) => {
-  assert.equal(result.status, 0, `hook exited ${result.status}: ${result.stderr}`);
+// `expect` is the calling case's.
+const context = (expect, result) => {
+  expect(result.status, `hook exited ${result.status}: ${result.stderr}`).toBe(0);
   if (!result.stdout) return '';
   return JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
 };
@@ -40,100 +40,130 @@ const context = (result) => {
 let qualitySessions = 0;
 const qualitySession = () => `quality-${process.pid}-${Date.now()}-${++qualitySessions}`;
 
-test('quality: each web surface asks for the skills that own it', () => {
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  const table = [
-    ['src/pages/index.html', ['omega:seo', 'omega:accessibility']],
-    ['src/pages/blog/post.md', ['omega:seo', 'omega:accessibility']],
-    ['core/_layouts/blueprint/index.html', ['omega:seo', 'omega:accessibility']],
-    ['core/_includes/core/head.html', ['omega:seo', 'omega:accessibility']],
-    ['themes/classy/_includes/frontend/sections/nav.html', ['omega:accessibility']],
-    ['src/assets/css/main.scss', ['omega:accessibility', 'omega:brandcheck']],
-    ['config/omega.json5', ['omega:brandcheck']],
-  ];
+module.exports = defineCases({
+  type: 'group',
+  description: 'agent-plugins-quality',
+  tests: [
+    {
+      name: 'quality: each web surface asks for the skills that own it',
+      run: (ctx) => {
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        const table = [
+          ['src/pages/index.html', ['omega:seo', 'omega:accessibility']],
+          ['src/pages/blog/post.md', ['omega:seo', 'omega:accessibility']],
+          ['core/_layouts/blueprint/index.html', ['omega:seo', 'omega:accessibility']],
+          ['core/_includes/core/head.html', ['omega:seo', 'omega:accessibility']],
+          ['themes/classy/_includes/frontend/sections/nav.html', ['omega:accessibility']],
+          ['src/assets/css/main.scss', ['omega:accessibility', 'omega:brandcheck']],
+          ['config/omega.json5', ['omega:brandcheck']],
+        ];
 
-  for (const [file, skills] of table) {
-    const ctx = context(edited(dir, file, qualitySession()));
-    for (const skill of skills) {
-      assert.match(ctx, new RegExp(skill), `${file} did not ask for ${skill}`);
-    }
-    assert.match(ctx, new RegExp(file.replace(/[/.]/g, '\\$&')), `${file} is not named in the reminder`);
-  }
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+        for (const [file, skills] of table) {
+          const context2 = context(ctx.expect, edited(dir, file, qualitySession()));
+          for (const skill of skills) {
+            ctx.expect(context2, `${file} did not ask for ${skill}`).toMatch(new RegExp(skill));
+          }
+          ctx.expect(context2, `${file} is not named in the reminder`).toMatch(new RegExp(file.replace(/[/.]/g, '\\$&')));
+        }
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: a non-web file is silent', () => {
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  for (const quiet of ['src/lib/helper.js', 'README.md', 'test/build/x.test.js']) {
-    assert.equal(edited(dir, quiet, qualitySession()).stdout, '', `${quiet} was not silent`);
-  }
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+    {
+      name: 'quality: a non-web file is silent',
+      run: (ctx) => {
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        for (const quiet of ['src/lib/helper.js', 'README.md', 'test/build/x.test.js']) {
+          ctx.expect(edited(dir, quiet, qualitySession()).stdout, `${quiet} was not silent`).toBe('');
+        }
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: projects without @omega.js deps are never policed', () => {
-  const dir = project({ name: 'somebody-else', dependencies: { react: '^19.0.0' } });
-  assert.equal(edited(dir, 'src/pages/index.html', qualitySession()).stdout, '');
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+    {
+      name: 'quality: projects without @omega.js deps are never policed',
+      run: (ctx) => {
+        const dir = project({ name: 'somebody-else', dependencies: { react: '^19.0.0' } });
+        ctx.expect(edited(dir, 'src/pages/index.html', qualitySession()).stdout).toBe('');
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: a skill is named once per session, and the Stop pass still counts every file', () => {
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  const session = qualitySession();
-  assert.match(context(edited(dir, 'src/pages/index.html', session)), /omega:seo/);
-  assert.equal(edited(dir, 'src/pages/about.html', session).stdout, '', 'the second page re-asked');
+    {
+      name: 'quality: a skill is named once per session, and the Stop pass still counts every file',
+      run: (ctx) => {
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        const session = qualitySession();
+        ctx.expect(context(ctx.expect, edited(dir, 'src/pages/index.html', session))).toMatch(/omega:seo/);
+        ctx.expect(edited(dir, 'src/pages/about.html', session).stdout, 'the second page re-asked').toBe('');
 
-  const ctx = context(stopped(session));
-  assert.match(ctx, /2 web surface\(s\)/);
-  assert.match(ctx, /index\.html/);
-  assert.match(ctx, /about\.html/);
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+        const context2 = context(ctx.expect, stopped(session));
+        ctx.expect(context2).toMatch(/2 web surface\(s\)/);
+        ctx.expect(context2).toMatch(/index\.html/);
+        ctx.expect(context2).toMatch(/about\.html/);
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: Stop blocks once on edited surfaces, then lets the sign-off through', () => {
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  const session = qualitySession();
-  edited(dir, 'src/assets/css/main.scss', session);
+    {
+      name: 'quality: Stop blocks once on edited surfaces, then lets the sign-off through',
+      run: (ctx) => {
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        const session = qualitySession();
+        edited(dir, 'src/assets/css/main.scss', session);
 
-  const blocked = JSON.parse(stopped(session).stdout);
-  assert.equal(blocked.decision, 'block');
-  assert.match(blocked.reason, /omega:quality/);
-  assert.match(blocked.hookSpecificOutput.additionalContext, /omega:accessibility, omega:brandcheck/);
+        const blocked = JSON.parse(stopped(session).stdout);
+        ctx.expect(blocked.decision).toBe('block');
+        ctx.expect(blocked.reason).toMatch(/omega:quality/);
+        ctx.expect(blocked.hookSpecificOutput.additionalContext).toMatch(/omega:accessibility, omega:brandcheck/);
 
-  assert.equal(stopped(session).stdout, '', 'the block repeated with nothing new edited');
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+        ctx.expect(stopped(session).stdout, 'the block repeated with nothing new edited').toBe('');
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: a path with a space survives the Stop pass whole', () => {
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  const session = qualitySession();
-  const file = 'src/pages/case studies.html';
-  assert.match(context(edited(dir, file, session)), /omega:seo/);
+    {
+      name: 'quality: a path with a space survives the Stop pass whole',
+      run: (ctx) => {
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        const session = qualitySession();
+        const file = 'src/pages/case studies.html';
+        ctx.expect(context(ctx.expect, edited(dir, file, session))).toMatch(/omega:seo/);
 
-  const ctx = context(stopped(session));
-  assert.match(ctx, /case studies\.html/, 'the path was truncated at the space');
-  // The skills line is parsed off the same record — a split path would land a
-  // path fragment where a skill name belongs.
-  const line = ctx.split('\n').find((l) => l.startsWith('Before signing off'));
-  const listed = line.match(/checklists in: (.*?)\./)[1].split(', ');
-  assert.deepEqual(listed, ['omega:accessibility', 'omega:seo']);
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+        const context2 = context(ctx.expect, stopped(session));
+        ctx.expect(context2, 'the path was truncated at the space').toMatch(/case studies\.html/);
+        // The skills line is parsed off the same record — a split path would land a
+        // path fragment where a skill name belongs.
+        const line = context2.split('\n').find((l) => l.startsWith('Before signing off'));
+        const listed = line.match(/checklists in: (.*?)\./)[1].split(', ');
+        ctx.expect(listed).toEqual(['omega:accessibility', 'omega:seo']);
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: Stop is silent with no web edit, and while a block is already active', () => {
-  const clean = qualitySession();
-  assert.equal(stopped(clean).stdout, '');
+    {
+      name: 'quality: Stop is silent with no web edit, and while a block is already active',
+      run: (ctx) => {
+        const clean = qualitySession();
+        ctx.expect(stopped(clean).stdout).toBe('');
 
-  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
-  const session = qualitySession();
-  edited(dir, 'src/pages/index.html', session);
-  assert.equal(stopped(session, true).stdout, '', 'blocked again inside its own block');
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+        const dir = project({ name: 'a-brand', dependencies: { '@omega.js/web': '^1.0.0' } });
+        const session = qualitySession();
+        edited(dir, 'src/pages/index.html', session);
+        ctx.expect(stopped(session, true).stdout, 'blocked again inside its own block').toBe('');
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
 
-test('quality: hooks.json wires the same script on PostToolUse Write|Edit and Stop', () => {
-  const hooks = readJson(path.join(ROOT, 'agent-plugins', 'claude', 'hooks', 'hooks.json')).hooks;
-  const post = hooks.PostToolUse.find((h) => h.matcher === 'Write|Edit');
-  assert.ok(post, 'no PostToolUse Write|Edit entry');
-  assert.match(post.hooks[0].command, /hooks\/quality\/run\.sh/);
-  assert.match(hooks.Stop[0].hooks[0].command, /hooks\/quality\/run\.sh/);
+    {
+      name: 'quality: hooks.json wires the same script on PostToolUse Write|Edit and Stop',
+      run: (ctx) => {
+        const hooks = readJson(path.join(ROOT, 'agent-plugins', 'claude', 'hooks', 'hooks.json')).hooks;
+        const post = hooks.PostToolUse.find((h) => h.matcher === 'Write|Edit');
+        ctx.expect(post, 'no PostToolUse Write|Edit entry').toBeTruthy();
+        ctx.expect(post.hooks[0].command).toMatch(/hooks\/quality\/run\.sh/);
+        ctx.expect(hooks.Stop[0].hooks[0].command).toMatch(/hooks\/quality\/run\.sh/);
+      },
+    },
+  ],
 });

@@ -11,8 +11,7 @@
  * hierarchy, so what these prove is that it stays registered, owns no
  * operation, and writes nothing when a walk passes through it.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -58,47 +57,61 @@ function runService({ root, targets }) {
   });
 }
 
-test('disperse: the service is still registered, on both lanes', () => {
-  assert.ok(SERVICE_ORDER.includes('disperse'), 'the manage walk still runs it');
-  assert.ok(BOOT_SERVICES.includes('disperse'), 'and so does the delivery lane');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'disperse',
+  tests: [
+    {
+      name: 'disperse: the service is still registered, on both lanes',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER.includes('disperse'), 'the manage walk still runs it').toBeTruthy();
+        ctx.expect(BOOT_SERVICES.includes('disperse'), 'and so does the delivery lane').toBeTruthy();
+      },
+    },
 
-test('disperse: it owns NO operations (#891)', () => {
-  assert.deepEqual(OPERATIONS.disperse, []);
-});
+    {
+      name: 'disperse: it owns NO operations (#891)',
+      run: (ctx) => {
+        ctx.expect(OPERATIONS.disperse).toEqual([]);
+      },
+    },
 
-test('disperse: the manage walk reports it skipped, by NAME (#891)', async () => {
-  // The rule's one home is manage.js's runService: a registered service with
-  // an empty operation list is reported skipped with its reason, never
-  // silently passed as a service that ran and found nothing.
-  const brand = stageBrand();
+    {
+      name: 'disperse: the manage walk reports it skipped, by NAME (#891)',
+      run: async (ctx) => {
+        // The rule's one home is manage.js's runService: a registered service with
+        // an empty operation list is reported skipped with its reason, never
+        // silently passed as a service that ran and found nothing.
+        const brand = stageBrand();
 
-  const result = await runManageService('disperse', {
-    id: BRAND_ID,
-    root: brand.root,
-    config: brandConfig(),
-    targets: brand.targets,
-  });
+        const result = await runManageService('disperse', {
+          id: BRAND_ID,
+          root: brand.root,
+          config: brandConfig(),
+          targets: brand.targets,
+        });
 
-  assert.equal(result.status, 'skipped');
-  assert.equal(result.reason, 'no operations');
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toBe('no operations');
 
-  jetpack.remove(brand.root);
-});
+        jetpack.remove(brand.root);
+      },
+    },
 
-test('disperse: a run through it succeeds and writes nothing into the target', async () => {
-  const brand = stageBrand();
+    {
+      name: 'disperse: a run through it succeeds and writes nothing into the target',
+      run: async (ctx) => {
+        const brand = stageBrand();
 
-  const result = await runService(brand);
+        const result = await runService(brand);
 
-  assert.equal(result.status, 'success');
-  assert.equal(result.output, null, 'an op-less service produces no output');
-  assert.equal(jetpack.exists(join(brand.root, 'targets', 'desktop', 'config')), false, 'nothing is copied into the target');
-  assert.equal(
-    jetpack.read(join(brand.root, '.omega', 'certificates', 'apple', 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12')),
-    'p12-bytes',
-    'and the tree is left exactly where it is, to be read in place',
-  );
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.output, 'an op-less service produces no output').toBe(null);
+        ctx.expect(jetpack.exists(join(brand.root, 'targets', 'desktop', 'config')), 'nothing is copied into the target').toBe(false);
+        ctx.expect(jetpack.read(join(brand.root, '.omega', 'certificates', 'apple', 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12')), 'and the tree is left exactly where it is, to be read in place').toBe('p12-bytes');
 
-  jetpack.remove(brand.root);
+        jetpack.remove(brand.root);
+      },
+    },
+  ],
 });

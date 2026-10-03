@@ -4,8 +4,7 @@
 // missing, with the schema's own description as the guiding comment, and never
 // rewrites a value the brand authored. Real files in a temp dir, no mocks.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -46,185 +45,230 @@ function makeBrand(contents = AUTHORED) {
 const configPath = (root) => path.join(root, 'config', 'omega.json5');
 const read = (root) => fs.readFileSync(configPath(root), 'utf8');
 
-test('defaults: a config missing a schema-defaulted block gains it, comments intact', async () => {
-  const root = makeBrand();
+module.exports = defineCases({
+  type: 'group',
+  description: 'config-defaults',
+  tests: [
+    {
+      name: 'defaults: a config missing a schema-defaulted block gains it, comments intact',
+      run: async (ctx) => {
+        const root = makeBrand();
 
-  const result = await defaultsOp({ brandRoot: root, options: {} });
+        const result = await defaultsOp({ brandRoot: root, options: {} });
 
-  const source = read(root);
-  const parsed = JSON5.parse(source);
+        const source = read(root);
+        const parsed = JSON5.parse(source);
 
-  assert.equal(parsed.marketing.campaigns.enabled, true, 'the missing sibling block materialized');
-  assert.equal(parsed.search.providers.searchConsole.enabled, true, 'a whole missing section materialized');
-  assert.deepEqual(parsed.search.providers.searchConsole.sitemapPaths, ['/sitemap.xml']);
+        ctx.expect(parsed.marketing.campaigns.enabled, 'the missing sibling block materialized').toBe(true);
+        ctx.expect(parsed.search.providers.searchConsole.enabled, 'a whole missing section materialized').toBe(true);
+        ctx.expect(parsed.search.providers.searchConsole.sitemapPaths).toEqual(['/sitemap.xml']);
 
-  // Every authored byte survives: comments, quote style, blank lines
-  assert.ok(source.includes('// Fixture Brand — hand-edited'));
-  assert.ok(source.includes("id: 'fixture-brand', // single quotes, stay single"));
-  assert.ok(source.includes('/* marketing — the brand disabled pruning on purpose */'));
+        // Every authored byte survives: comments, quote style, blank lines
+        ctx.expect(source.includes('// Fixture Brand — hand-edited')).toBeTruthy();
+        ctx.expect(source.includes("id: 'fixture-brand', // single quotes, stay single")).toBeTruthy();
+        ctx.expect(source.includes('/* marketing — the brand disabled pruning on purpose */')).toBeTruthy();
 
-  // Every materialized key carries the schema's own guiding comment, wrapped
-  // at its own indent
-  assert.match(source, /\n {8}\/\/ false = skip sitemap submission to Google Search Console\.\n {8}submitSitemap: true,/);
-  assert.match(source, /\/\/ Role-level switch for email marketing[\s\S]*?\n {6}enabled: true,/);
+        // Every materialized key carries the schema's own guiding comment, wrapped
+        // at its own indent
+        ctx.expect(source).toMatch(/\n {8}\/\/ false = skip sitemap submission to Google Search Console\.\n {8}submitSitemap: true,/);
+        ctx.expect(source).toMatch(/\/\/ Role-level switch for email marketing[\s\S]*?\n {6}enabled: true,/);
 
-  assert.ok(result.output.defaults.materialized.includes('search'), 'the run output names what was healed');
-});
+        ctx.expect(result.output.defaults.materialized.includes('search'), 'the run output names what was healed').toBeTruthy();
+      },
+    },
 
-test('#793: a resolution-only default (connections) is never written into the brand file', async () => {
-  // `materialize: false` on the schema rule: the connection cards' presentation
-  // resolves from the framework and is never copied into a brand's config,
-  // where it would drift from the framework it came from.
-  const root = makeBrand();
+    {
+      name: '#793: a resolution-only default (connections) is never written into the brand file',
+      run: async (ctx) => {
+        // `materialize: false` on the schema rule: the connection cards' presentation
+        // resolves from the framework and is never copied into a brand's config,
+        // where it would drift from the framework it came from.
+        const root = makeBrand();
 
-  const result = await defaultsOp({ brandRoot: root, options: {} });
+        const result = await defaultsOp({ brandRoot: root, options: {} });
 
-  const source = read(root);
-  const parsed = JSON5.parse(source);
+        const source = read(root);
+        const parsed = JSON5.parse(source);
 
-  assert.equal(parsed.connections, undefined, `the brand file gained no connections block: ${source}`);
-  assert.ok(!source.includes('Per-provider user-connection settings'), 'nor its schema description as a comment');
-  assert.ok(!result.output.defaults.materialized.includes('connections'), 'and the run never claims to have healed one');
-  assert.ok(result.output.defaults.materialized.includes('search'), 'while the ordinary blocks still materialize');
-});
+        ctx.expect(parsed.connections, `the brand file gained no connections block: ${source}`).toBe(undefined);
+        ctx.expect(!source.includes('Per-provider user-connection settings'), 'nor its schema description as a comment').toBeTruthy();
+        ctx.expect(!result.output.defaults.materialized.includes('connections'), 'and the run never claims to have healed one').toBeTruthy();
+        ctx.expect(result.output.defaults.materialized.includes('search'), 'while the ordinary blocks still materialize').toBeTruthy();
+      },
+    },
 
-test('#883: the repo block is never materialized, because its presence IS the switch', async () => {
-  // A defaulted `repo: { provider: 'github' }` would say every brand hosts its
-  // source somewhere, and the repo service would run for a brand that declared
-  // nothing.
-  const root = makeBrand();
+    {
+      name: '#883: the repo block is never materialized, because its presence IS the switch',
+      run: async (ctx) => {
+        // A defaulted `repo: { provider: 'github' }` would say every brand hosts its
+        // source somewhere, and the repo service would run for a brand that declared
+        // nothing.
+        const root = makeBrand();
 
-  const result = await defaultsOp({ brandRoot: root, options: {} });
+        const result = await defaultsOp({ brandRoot: root, options: {} });
 
-  assert.equal(JSON5.parse(read(root)).repo, undefined);
-  assert.ok(!result.output.defaults.materialized.includes('repo'));
-});
+        ctx.expect(JSON5.parse(read(root)).repo).toBe(undefined);
+        ctx.expect(!result.output.defaults.materialized.includes('repo')).toBeTruthy();
+      },
+    },
 
-test('#943: a target-only default (web meta.index) lands under targets.<name>, where loadConfig reads it', async () => {
-  const { missingDefaults, deepMerge, undeclaredAuthoredPaths } = require('@omega.js/config');
-  const root = makeBrand();
+    {
+      name: '#943: a target-only default (web meta.index) lands under targets.<name>, where loadConfig reads it',
+      run: async (ctx) => {
+        const { missingDefaults, deepMerge, undeclaredAuthoredPaths } = require('@omega.js/config');
+        const root = makeBrand();
 
-  const result = await defaultsOp({ brandRoot: root, options: {} });
+        const result = await defaultsOp({ brandRoot: root, options: {} });
 
-  const parsed = JSON5.parse(read(root));
-  assert.equal(parsed.targets.web.meta.index, true, 'the web refinement materialized in the web entry');
-  assert.equal(parsed.meta, undefined, 'never at the root, which the strict schema reads as shared');
-  assert.deepEqual(undeclaredAuthoredPaths(parsed), [], 'the healed file still validates');
-  assert.ok(result.output.defaults.materialized.includes('targets.web.meta'));
+        const parsed = JSON5.parse(read(root));
+        ctx.expect(parsed.targets.web.meta.index, 'the web refinement materialized in the web entry').toBe(true);
+        ctx.expect(parsed.meta, 'never at the root, which the strict schema reads as shared').toBe(undefined);
+        ctx.expect(undeclaredAuthoredPaths(parsed), 'the healed file still validates').toEqual([]);
+        ctx.expect(result.output.defaults.materialized.includes('targets.web.meta')).toBeTruthy();
 
-  const { targets, ...shared } = parsed;
-  assert.deepEqual(missingDefaults(deepMerge(shared, targets.web), 'web'), [], 'the web view carries every default');
-  assert.equal(await defaultsOp({ brandRoot: root, options: {} }), null, 'and a second run is a no-op');
-});
+        const { targets, ...shared } = parsed;
+        ctx.expect(missingDefaults(deepMerge(shared, targets.web), 'web'), 'the web view carries every default').toEqual([]);
+        ctx.expect(await defaultsOp({ brandRoot: root, options: {} }), 'and a second run is a no-op').toBe(null);
+      },
+    },
 
-test('#943: a target that already answers its own default is left alone', async () => {
-  const root = makeBrand(AUTHORED.replace("web: { type: 'web' },", "web: { type: 'web', meta: { index: false } },"));
+    {
+      name: '#943: a target that already answers its own default is left alone',
+      run: async (ctx) => {
+        const root = makeBrand(AUTHORED.replace("web: { type: 'web' },", "web: { type: 'web', meta: { index: false } },"));
 
-  await defaultsOp({ brandRoot: root, options: {} });
+        await defaultsOp({ brandRoot: root, options: {} });
 
-  assert.equal(JSON5.parse(read(root)).targets.web.meta.index, false);
-});
+        ctx.expect(JSON5.parse(read(root)).targets.web.meta.index).toBe(false);
+      },
+    },
 
-test('defaults: a value the brand authored is never overwritten', async () => {
-  const root = makeBrand();
+    {
+      name: 'defaults: a value the brand authored is never overwritten',
+      run: async (ctx) => {
+        const root = makeBrand();
 
-  await defaultsOp({ brandRoot: root, options: {} });
+        await defaultsOp({ brandRoot: root, options: {} });
 
-  const parsed = JSON5.parse(read(root));
-  assert.equal(parsed.marketing.prune.enabled, false, 'the brand\'s own decision stands');
-  assert.equal(parsed.brand.id, 'fixture-brand');
-});
+        const parsed = JSON5.parse(read(root));
+        ctx.expect(parsed.marketing.prune.enabled, 'the brand\'s own decision stands').toBe(false);
+        ctx.expect(parsed.brand.id).toBe('fixture-brand');
+      },
+    },
 
-test('defaults: marketing.prune.enabled materializes TRUE for a brand that never wrote it', async () => {
-  const root = makeBrand(`{
+    {
+      name: 'defaults: marketing.prune.enabled materializes TRUE for a brand that never wrote it',
+      run: async (ctx) => {
+        const root = makeBrand(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand' },
 }
 `);
 
-  await defaultsOp({ brandRoot: root, options: {} });
+        await defaultsOp({ brandRoot: root, options: {} });
 
-  assert.equal(JSON5.parse(read(root)).marketing.prune.enabled, true);
-});
+        ctx.expect(JSON5.parse(read(root)).marketing.prune.enabled).toBe(true);
+      },
+    },
 
-test('defaults: a second run heals nothing and leaves the file byte-identical', async () => {
-  const root = makeBrand();
+    {
+      name: 'defaults: a second run heals nothing and leaves the file byte-identical',
+      run: async (ctx) => {
+        const root = makeBrand();
 
-  await defaultsOp({ brandRoot: root, options: {} });
-  const healed = read(root);
+        await defaultsOp({ brandRoot: root, options: {} });
+        const healed = read(root);
 
-  const second = await defaultsOp({ brandRoot: root, options: {} });
+        const second = await defaultsOp({ brandRoot: root, options: {} });
 
-  assert.equal(read(root), healed, 'not one byte rewritten');
-  assert.equal(second, null, 'a converged config is a plain no-op');
-});
+        ctx.expect(read(root), 'not one byte rewritten').toBe(healed);
+        ctx.expect(second, 'a converged config is a plain no-op').toBe(null);
+      },
+    },
 
-test('defaults: a dry run reports the blocks and writes nothing', async () => {
-  const root = makeBrand();
-  const before = read(root);
+    {
+      name: 'defaults: a dry run reports the blocks and writes nothing',
+      run: async (ctx) => {
+        const root = makeBrand();
+        const before = read(root);
 
-  const result = await defaultsOp({ brandRoot: root, options: { dryRun: true } });
+        const result = await defaultsOp({ brandRoot: root, options: { dryRun: true } });
 
-  assert.equal(read(root), before, 'a dry run never touches the file');
-  assert.ok(result.output.defaults.planned.includes('search'));
-});
+        ctx.expect(read(root), 'a dry run never touches the file').toBe(before);
+        ctx.expect(result.output.defaults.planned.includes('search')).toBeTruthy();
+      },
+    },
 
-test('defaults: a brand root with no config/omega.json5 steps aside', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-defaults-none-'));
+    {
+      name: 'defaults: a brand root with no config/omega.json5 steps aside',
+      run: async (ctx) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-defaults-none-'));
 
-  assert.equal(await defaultsOp({ brandRoot: root, options: {} }), null);
-});
+        ctx.expect(await defaultsOp({ brandRoot: root, options: {} })).toBe(null);
+      },
+    },
 
-test('defaults op is registered in the workspace OPERATIONS, right after config', () => {
-  const { OPERATIONS } = require('../src/config.js');
-  const names = OPERATIONS.workspace.map((op) => op.name);
+    {
+      name: 'defaults op is registered in the workspace OPERATIONS, right after config',
+      run: (ctx) => {
+        const { OPERATIONS } = require('../src/config.js');
+        const names = OPERATIONS.workspace.map((op) => op.name);
 
-  assert.ok(OPERATIONS.workspace.some((op) => op.name === 'defaults' && op.ensure === true));
-  assert.equal(names.indexOf('defaults'), names.indexOf('config') + 1, 'heals only after the config is known sane');
-});
+        ctx.expect(OPERATIONS.workspace.some((op) => op.name === 'defaults' && op.ensure === true)).toBeTruthy();
+        ctx.expect(names.indexOf('defaults'), 'heals only after the config is known sane').toBe(names.indexOf('config') + 1);
+      },
+    },
 
-test('manager DEFAULTS derive from the schema — one home per default', () => {
-  const { DEFAULTS } = require('../src/config.js');
-  const { schemaDefaults } = require('@omega.js/config');
+    {
+      name: 'manager DEFAULTS derive from the schema — one home per default',
+      run: (ctx) => {
+        const { DEFAULTS } = require('../src/config.js');
+        const { schemaDefaults } = require('@omega.js/config');
 
-  // The schema answer reaches every manager read site through DEFAULTS…
-  assert.equal(DEFAULTS.search.providers.searchConsole.enabled, schemaDefaults().search.providers.searchConsole.enabled);
-  assert.equal(DEFAULTS.marketing.prune.enabled, true);
-  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
-  const schema = schemaDefaults();
-  for (const name of ['enabled', 'server.enabled', 'assets.enabled', 'payment.enabled', 'seo.enabled', 'certificates.enabled', 'account.enabled']) {
-    const read = (config) => name.split('.').reduce((node, key) => node?.[key], config);
-    assert.equal(read(schema), true, `${name} is a schema default`);
-    assert.equal(read(DEFAULTS), true, `${name} reaches the manager from its schema default`);
-  }
+        // The schema answer reaches every manager read site through DEFAULTS…
+        ctx.expect(DEFAULTS.search.providers.searchConsole.enabled).toBe(schemaDefaults().search.providers.searchConsole.enabled);
+        ctx.expect(DEFAULTS.marketing.prune.enabled).toBe(true);
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.enabled).toBe(true);
+        const schema = schemaDefaults();
+        for (const name of ['enabled', 'server.enabled', 'assets.enabled', 'payment.enabled', 'seo.enabled', 'certificates.enabled', 'account.enabled']) {
+          const read = (config) => name.split('.').reduce((node, key) => node?.[key], config);
+          ctx.expect(read(schema), `${name} is a schema default`).toBe(true);
+          ctx.expect(read(DEFAULTS), `${name} reaches the manager from its schema default`).toBe(true);
+        }
 
-  assert.equal(DEFAULTS.edge.providers.cloudflare.settings.ssl, schema.edge.providers.cloudflare.settings.ssl);
+        ctx.expect(DEFAULTS.edge.providers.cloudflare.settings.ssl).toBe(schema.edge.providers.cloudflare.settings.ssl);
 
-  // …and the service-owned data the schema does not declare still lives here
-  assert.equal(DEFAULTS.analytics.providers.google.currency, 'USD');
-});
+        // …and the service-owned data the schema does not declare still lives here
+        ctx.expect(DEFAULTS.analytics.providers.google.currency).toBe('USD');
+      },
+    },
 
-test('no key in MANAGER_DEFAULTS has a schema default', () => {
-  const { MANAGER_DEFAULTS } = require('../src/config.js');
-  const { schemaDefaults, TARGETS } = require('@omega.js/config');
-  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-  const leaves = (node, prefix) => Object.entries(node).flatMap(([key, value]) => {
-    const dotted = prefix ? `${prefix}.${key}` : key;
-    return isObject(value) && Object.keys(value).length > 0 ? leaves(value, dotted) : [dotted];
-  });
+    {
+      name: 'no key in MANAGER_DEFAULTS has a schema default',
+      run: (ctx) => {
+        const { MANAGER_DEFAULTS } = require('../src/config.js');
+        const { schemaDefaults, TARGETS } = require('@omega.js/config');
+        const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const leaves = (node, prefix) => Object.entries(node).flatMap(([key, value]) => {
+          const dotted = prefix ? `${prefix}.${key}` : key;
+          return isObject(value) && Object.keys(value).length > 0 ? leaves(value, dotted) : [dotted];
+        });
 
-  // A schema default at the leaf, above it, or below an empty manager leaf is a second home
-  const defaulted = (defaults, dotted) => {
-    let node = defaults;
-    for (const name of dotted.split('.')) {
-      if (!isObject(node) || !(name in node)) return false;
-      node = node[name];
-      if (!isObject(node)) return true;
-    }
-    return true;
-  };
+        // A schema default at the leaf, above it, or below an empty manager leaf is a second home
+        const defaulted = (defaults, dotted) => {
+          let node = defaults;
+          for (const name of dotted.split('.')) {
+            if (!isObject(node) || !(name in node)) return false;
+            node = node[name];
+            if (!isObject(node)) return true;
+          }
+          return true;
+        };
 
-  const views = [schemaDefaults(), ...TARGETS.map((target) => schemaDefaults(target))];
-  const twins = leaves(MANAGER_DEFAULTS, '').filter((dotted) => views.some((defaults) => defaulted(defaults, dotted)));
+        const views = [schemaDefaults(), ...TARGETS.map((target) => schemaDefaults(target))];
+        const twins = leaves(MANAGER_DEFAULTS, '').filter((dotted) => views.some((defaults) => defaulted(defaults, dotted)));
 
-  assert.deepEqual(twins, [], 'each of these defaults has two homes: the schema and MANAGER_DEFAULTS');
+        ctx.expect(twins, 'each of these defaults has two homes: the schema and MANAGER_DEFAULTS').toEqual([]);
+      },
+    },
+  ],
 });

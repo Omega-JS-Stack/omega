@@ -6,6 +6,10 @@
  * here through run-case.js; an `app` row's driver runs them inside the app and
  * reports each case back by id.
  *
+ * `config.isolation: 'process'` runs each file instead as the main module of
+ * its own node:test child, where `defineCases` registers its cases; node's
+ * events map back to the same results and the same reporters.
+ *
  *   createRunner(config).run({ targets, filter, layer, lane, extended, reporter })
  *     → { passed, failed, skipped, noMatch, durationMs, tests }
  */
@@ -20,13 +24,16 @@ const { normalizeSpec, errorOf } = require('./run-case.js');
 const { layersFor, defaultLayer, needsDriver } = require('./layers.js');
 const { discoverSuites } = require('./discovery.js');
 const { runInitSetups, InitHookError } = require('./init-hooks.js');
-const { markRunnerActive } = require('./define-cases.js');
 const { noMatchMessage } = require('./scope.js');
 const { makeExtendedModeWarning } = require('./extended-mode-warning.js');
 const { createReporter } = require('./reporter.js');
 const { createCaseSession, hostSession, registerSuite } = require('./register-suite.js');
 const { guardStdout } = require('./guard-stdout.js');
 const attachLogFile = require('../attach-log-file.js');
+
+const ISOLATIONS = ['none', 'process'];
+// The preload each `process` child takes, the one every package script names.
+const STDOUT_GUARD = path.join(__dirname, 'stdout-guard.js');
 
 // Registrations waiting for their bootstrap file to load inside node:test's run().
 const plans = new Map();
@@ -108,6 +115,10 @@ function watchStrayErrors() {
  */
 function createRunner(config) {
   const rows = layersFor(config.framework);
+  const isolation = config.isolation === undefined ? 'none' : config.isolation;
+  if (!ISOLATIONS.includes(isolation)) {
+    throw new Error(`Unknown isolation "${isolation}" (known: ${ISOLATIONS.join(', ')})`);
+  }
 
   function record(results, reporter, test) {
     results.tests.push(test);
@@ -249,12 +260,98 @@ function createRunner(config) {
     }
   }
 
+  // The error a node:test failure carries: the case's own error is its cause.
+  function failureOf(error) {
+    const cause = error && error.cause;
+    const source = cause && typeof cause === 'object' && typeof cause.message === 'string' ? cause : error;
+    return { name: source.name || 'Error', message: String(source.message), stack: source.stack };
+  }
+
+  // Run one file in its own node:test child, where it registers its cases through
+  // defineCases. One run() per file: node stamps a case event with where its `it`
+  // was called (register-suite.js), never with the file whose child sent it.
+  async function runInProcess(entry, options, reporter, results, layer) {
+    const { run } = require('node:test');
+    const fail = (error) => recordFailure(results, reporter, { id: entry.file, source: entry.source, file: entry.file, name: entry.rel, layer, error });
+    const ancestors = [];
+    const headed = new Set();
+    let count = 0;
+    const diagnostics = [];
+
+    const settled = (status) => (data) => {
+      const { details } = data;
+
+      // node:test names a test for the file itself when the child reported no test of
+      // its own, or when the child failed outside them (an error after its case ended).
+      if (data.nesting === 0 && data.name === entry.file) {
+        if (status === 'fail') {
+          const when = count > 0 ? 'after its cases reported' : 'before any case reported';
+          const why = diagnostics.length > 0 ? `: ${diagnostics.join('\n')}` : ' (its stderr is above)';
+          fail(new Error(`${entry.rel}: its test process failed ${when}${why}`));
+        } else if (!options.filter) fail(new Error(`${entry.rel} reported no cases: it exports no \`defineCases\` spec, or its process ended before its report`));
+        return;
+      }
+
+      const suite = ancestors.slice(0, data.nesting).join(' > ') || null;
+      if (details.type === 'suite') {
+        if (status === 'fail' && details.error.failureType !== 'subtestsFailed') {
+          recordFailure(results, reporter, { id: `${entry.file}#${data.name}`, source: entry.source, file: entry.file, name: data.name, layer, error: failureOf(details.error) });
+        }
+        return;
+      }
+
+      if (suite && !headed.has(suite)) {
+        headed.add(suite);
+        reporter.suite(suite);
+      }
+      const skipped = status === 'pass' && data.skip !== undefined;
+      record(results, reporter, {
+        id: `${entry.file}#${count++}`,
+        source: entry.source,
+        file: entry.file,
+        suite,
+        name: data.name,
+        layer,
+        status: skipped ? 'skip' : status,
+        durationMs: Math.round(details.duration_ms),
+        ...(skipped ? { reason: typeof data.skip === 'string' ? data.skip : 'skipped' } : {}),
+        ...(status === 'fail' ? { error: failureOf(details.error) } : {}),
+      });
+    };
+
+    const stream = run({
+      files: [entry.file],
+      isolation: 'process',
+      execArgv: ['--require', STDOUT_GUARD],
+      ...(options.filter ? { testNamePatterns: [new RegExp(options.filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))] } : {}),
+    });
+    stream.on('test:start', (data) => {
+      ancestors.length = data.nesting;
+      ancestors.push(data.name);
+    });
+    stream.on('test:pass', settled('pass'));
+    stream.on('test:fail', settled('fail'));
+    // A child's own output reaches this process's streams, so the reporter's run and the tee hold it.
+    stream.on('test:stdout', (data) => process.stdout.write(data.message));
+    stream.on('test:stderr', (data) => process.stderr.write(data.message));
+    // Only a child's diagnostics carry its file (an error raised after its case ended);
+    // the run's own count lines carry none and repeat the Results block.
+    stream.on('test:diagnostic', (data) => {
+      if (!data.file) return;
+      diagnostics.push(data.message);
+      process.stderr.write(`${data.message}\n`);
+    });
+    await new Promise((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+      stream.resume();
+    });
+  }
+
   async function execute(options, reporter, results, stray) {
     const fail = (fields) => recordFailure(results, reporter, fields);
 
     reporter.start();
-    // defineCases only lets a spec through once a real runner is loading it.
-    markRunnerActive();
 
     if (process.env.TEST_EXTENDED_MODE) {
       makeExtendedModeWarning(['Suites call REAL external services instead of skipping them.']).forEach((line) => reporter.note(line));
@@ -294,6 +391,11 @@ function createRunner(config) {
     } catch (e) {
       if (!(e instanceof InitHookError)) throw e;
       fail({ id: e.file, file: e.file, name: path.relative(config.projectRoot, e.file), error: e });
+      return;
+    }
+
+    if (isolation === 'process') {
+      for (const entry of files) await runInProcess(entry, options, reporter, results, wanted[0].name);
       return;
     }
 

@@ -8,8 +8,7 @@
 // service with declared inputs routes through this helper, and the gate's
 // wording has exactly one home.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -50,190 +49,6 @@ function captureLog(fn) {
   }
 }
 
-// ─── the three outcomes ──────────────────────────────────────────────────────
-
-test('service-input: every input present → proceed, nothing asked', async () => {
-  process.env[VAR] = 'already-set';
-  try {
-    const gate = await requestServiceInput({ brandRoot: '/nope', brandConfig: {}, options: {} }, fakeSpec());
-    assert.equal(gate, null);
-  } finally {
-    cleanup(VAR);
-  }
-});
-
-test('service-input: missing + non-interactive → a LOUD skip line and the missingEnv list', async () => {
-  cleanup(VAR, VAR2);
-  const captured = captureLog(() => requestServiceInput(
-    { brandRoot: '/nope', brandConfig: {}, options: {} },
-    fakeSpec([{ name: VAR }, { name: VAR2 }]),
-  ));
-  const gate = await captured.result;
-
-  assert.equal(gate.skip, true);
-  assert.deepEqual(gate.missingEnv, [VAR, VAR2]);
-  assert.match(gate.reason, new RegExp(`${VAR}, ${VAR2}`));
-  assert.match(gate.reason, /rerun interactively/);
-  // Loud: the skip NAMES the keys on its own line, never a silent step-aside
-  assert.match(captured.lines.join('\n'), new RegExp(`${VAR}.*${VAR2}`));
-});
-
-test('service-input: dry run never prompts, even on a TTY', async () => {
-  cleanup(VAR);
-  const tty = openTtyPrompt();
-  try {
-    const gate = await requestServiceInput(
-      { brandRoot: '/nope', brandConfig: {}, options: { dryRun: true } },
-      fakeSpec(),
-    );
-    assert.equal(gate.skip, true);
-    assert.deepEqual(gate.missingEnv, [VAR]);
-  } finally {
-    tty.close();
-  }
-});
-
-test('service-input: PROVIDE → pastes, saves to the brand .env, exports, proceeds', async () => {
-  cleanup(VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
-    await tty.answer('Set up now?', '\r');            // Provide
-    await tty.answer(`Paste ${VAR}`, 'pasted-value\r');
-    const gate = await run;
-
-    assert.equal(gate, null);
-    assert.equal(process.env[VAR], 'pasted-value');
-    const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
-    assert.match(env, /EXISTING_KEY="keep-me"/);
-    assert.match(env, new RegExp(`${VAR}="pasted-value"`));
-    // Providing never disables anything
-    assert.doesNotMatch(readConfigSource(brandRoot), /enabled/);
-  } finally {
-    tty.close();
-    cleanup(VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: SKIP THIS RUN → skips without writing config or .env', async () => {
-  cleanup(VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
-    await tty.answer('Set up now?', `${DOWN}\r`);      // Skip for now
-    const gate = await run;
-
-    assert.equal(gate.skip, true);
-    assert.equal(gate.disabled, undefined);
-    assert.deepEqual(gate.missingEnv, [VAR]);
-    assert.equal(process.env[VAR], undefined);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-    assert.doesNotMatch(readConfigSource(brandRoot), /enabled/);
-  } finally {
-    tty.close();
-    cleanup(VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: DISABLE PERMANENTLY → lands enabled: false in omega.json5 and stops asking', async () => {
-  cleanup(VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  // keep me\n  fake: {},\n}\n');
-  const brandConfig = { brand: { id: 'b' }, fake: {} };
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput({ brandRoot, brandConfig, brandId: 'b', options: {} }, fakeSpec());
-    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
-    const gate = await run;
-
-    assert.equal(gate.skip, true);
-    assert.equal(gate.disabled, true);
-    assert.match(gate.reason, /fake\.enabled/);
-    // Permanent: written to config (comments preserved) and to the in-memory
-    // config, so nothing later in the same run asks again
-    const source = readConfigSource(brandRoot);
-    assert.match(source, /enabled: false/);
-    assert.match(source, /\/\/ keep me/);
-    assert.equal(brandConfig.fake.enabled, false);
-    assert.equal(process.env[VAR], undefined);
-  } finally {
-    tty.close();
-    cleanup(VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: an already-disabled service never prompts again', async () => {
-  cleanup(VAR);
-  const tty = openTtyPrompt();
-  try {
-    const gate = await requestServiceInput(
-      { brandRoot: '/nope', brandConfig: { fake: { enabled: false } }, options: {} },
-      fakeSpec(),
-    );
-    assert.equal(gate.skip, true);
-    assert.match(gate.reason, /fake\.enabled/);
-  } finally {
-    tty.close();
-    cleanup(VAR);
-  }
-});
-
-test('service-input: a url\'d input walks to the exact mint page before the paste', async () => {
-  cleanup(VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const tty = openTtyPrompt();
-  const events = [];
-  try {
-    const run = requestServiceInput(
-      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
-      fakeSpec([{ name: VAR, label: 'Fake token', url: 'https://example.com/mint', hint: 'Create one with scopes: fake:write' }]),
-      { prompt: { pressEnterToOpen: async (url, label) => { events.push([url, label]); return true; } } },
-    );
-    await tty.answer('Set up now?', '\r');
-    await tty.answer(`Paste ${VAR}`, 'v\r');
-    const gate = await run;
-
-    assert.equal(gate, null);
-    assert.deepEqual(events, [['https://example.com/mint', 'the Fake token page']]);
-    assert.equal(process.env[VAR], 'v');
-  } finally {
-    tty.close();
-    cleanup(VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: an empty paste skips this run (no writeback, no export)', async () => {
-  cleanup(VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
-    await tty.answer('Set up now?', '\r');
-    await tty.answer(`Paste ${VAR}`, '   \r');
-    const gate = await run;
-
-    assert.equal(gate.skip, true);
-    assert.deepEqual(gate.missingEnv, [VAR]);
-    assert.equal(process.env[VAR], undefined);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    tty.close();
-    cleanup(VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
 // ─── what a real service asks for: the one function's answer ─────────────────
 
 const REAL_BRAND = {
@@ -262,162 +77,9 @@ async function askHeadless(service, brandConfig) {
   }
 }
 
-test('service-input: captcha asks for its secret while reCAPTCHA is on, and never once it is off', async () => {
-  const gate = await askHeadless('captcha', REAL_BRAND);
-  assert.equal(gate.skip, true);
-  assert.deepEqual(gate.missingEnv, ['RECAPTCHA_SECRET_KEY']);
-
-  const off = await askHeadless('captcha', { ...REAL_BRAND, captcha: { providers: { recaptcha: { enabled: false } } } });
-  assert.equal(off.skip, true);
-  assert.match(off.reason, /captcha\.providers\.recaptcha\.enabled/);
-});
-
-test('service-input: the domain asks for the namecheap pair only when namecheap is the registrar', async () => {
-  const namecheap = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { namecheap: {} } } });
-  assert.deepEqual([...namecheap.missingEnv].sort(), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
-
-  const squarespace = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { squarespace: {} } } });
-  assert.deepEqual(squarespace.missingEnv, ['CLOUDFLARE_TOKEN']);
-});
-
-test('service-input: a real service with its key present proceeds, nothing asked', async () => {
-  process.env.RECAPTCHA_SECRET_KEY = 'already-set';
-  try {
-    const gate = await requestServiceInput({ brandRoot: '/nope', brandConfig: REAL_BRAND, options: {} }, serviceInputSpec('captcha'));
-    assert.equal(gate, null);
-  } finally {
-    cleanup('RECAPTCHA_SECRET_KEY');
-  }
-});
-
 // ─── the mint lane (generated keys) ──────────────────────────────────────────
 
 const GENERATED = 'OMEGA_WEBHOOK_KEY';
-
-test('service-input: a GENERATED key is minted in place — no gate, no paste', async () => {
-  cleanup(GENERATED);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const tty = openTtyPrompt();
-  try {
-    const captured = captureLog(() => requestServiceInput(
-      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
-      { ...fakeSpec([{ name: GENERATED, label: 'Omega webhook key' }]), service: 'payment' },
-    ));
-    // Nothing to answer: OMEGA mints this one for itself
-    const gate = await captured.result;
-
-    assert.equal(gate, null);
-    assert.match(process.env[GENERATED], /^[A-Za-z0-9_-]{43}$/);
-    const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
-    assert.match(env, new RegExp(`^${GENERATED}="[A-Za-z0-9_-]{43}"$`, 'm'));
-    // Names only — the value is never printed
-    const text = captured.lines.join('\n');
-    assert.match(text, new RegExp(`${GENERATED} minted into the brand .env`));
-    assert.ok(!text.includes(process.env[GENERATED]), 'the minted value is never printed');
-    // Nothing was disabled and no gate ran
-    assert.doesNotMatch(readConfigSource(brandRoot), /enabled/);
-  } finally {
-    tty.close();
-    cleanup(GENERATED);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: a generated key is minted even on a headless run — nobody has to be asked', async () => {
-  cleanup(GENERATED);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  try {
-    const gate = await requestServiceInput(
-      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
-      { ...fakeSpec([{ name: GENERATED }]), service: 'campaigns' },
-    );
-
-    assert.equal(gate, null);
-    assert.ok(process.env[GENERATED]);
-  } finally {
-    cleanup(GENERATED);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: a generated key beside a pasted one mints the first and still asks for the second', async () => {
-  cleanup(GENERATED, VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput(
-      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
-      fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
-    );
-    await tty.answer('Set up now?', '\r');
-    await tty.answer(`Paste ${VAR}`, 'pasted-value\r');
-    const gate = await run;
-
-    assert.equal(gate, null);
-    assert.ok(process.env[GENERATED]);
-    assert.equal(process.env[VAR], 'pasted-value');
-  } finally {
-    tty.close();
-    cleanup(GENERATED, VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: a dry run PLANS the mint, writes nothing, and never calls it a missing secret', async () => {
-  cleanup(GENERATED);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-
-  const captured = captureLog(() => requestServiceInput(
-    { brandRoot, brandConfig: {}, brandId: 'b', options: { dryRun: true } },
-    { ...fakeSpec([{ name: GENERATED }]), service: 'newsletter' },
-  ));
-  const gate = await captured.result;
-
-  try {
-    assert.equal(gate.skip, true);
-    // The reason NAMES the key and says who produces it...
-    assert.match(gate.reason, new RegExp(`${GENERATED} will be minted on a real run`));
-    // ...but it is not a missing secret: the 🔑 section must never tell anyone
-    // to paste a key only OMEGA can produce
-    assert.deepEqual(gate.missingEnv, []);
-    assert.equal(process.env[GENERATED], undefined);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-    assert.match(captured.lines.join('\n'), new RegExp(`would mint ${GENERATED}`));
-  } finally {
-    cleanup(GENERATED);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('service-input: DISABLE beside a generated key leaves NO minted secret behind', async () => {
-  cleanup(GENERATED, VAR);
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  fake: {},\n}\n');
-  const brandConfig = { brand: { id: 'b' }, fake: {} };
-
-  const tty = openTtyPrompt();
-  try {
-    const run = requestServiceInput(
-      { brandRoot, brandConfig, brandId: 'b', options: {} },
-      fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
-    );
-    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`);          // Disable (stop prompting)
-    const gate = await run;
-
-    assert.equal(gate.disabled, true);
-    // The gate runs BEFORE the mint: a brand that just opted out never gains
-    // a secret it did not ask for
-    assert.equal(process.env[GENERATED], undefined);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-    // ...and the key nobody can paste is not reported as one to paste
-    assert.deepEqual(gate.missingEnv, [VAR]);
-  } finally {
-    tty.close();
-    cleanup(GENERATED, VAR);
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
 
 // ─── the sweep ───────────────────────────────────────────────────────────────
 
@@ -480,133 +142,554 @@ function shipKeys() {
   return keys;
 }
 
-test('sweep: every credential a service actually reads says in the env schema when it is asked', () => {
-  const keys = serviceInputKeys();
-  // The derivation must not quietly collapse to nothing
-  assert.ok(keys.length > 10, `expected the manager to read many credentials, found ${keys.length}`);
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-input',
+  tests: [
+    // ─── the three outcomes ──────────────────────────────────────────────────────
 
-  // A ship credential is asked through the format table, its one home
-  const ship = shipKeys();
-  const unasked = keys
-    .filter((entry) => typeof entry.askedWhen !== 'function' && !ship.has(entry.name))
-    .map((entry) => `${entry.owner}: ${entry.name}`);
+    {
+      name: 'service-input: every input present → proceed, nothing asked',
+      run: async (ctx) => {
+        process.env[VAR] = 'already-set';
+        try {
+          const gate = await requestServiceInput({ brandRoot: '/nope', brandConfig: {}, options: {} }, fakeSpec());
+          ctx.expect(gate).toBe(null);
+        } finally {
+          cleanup(VAR);
+        }
+      },
+    },
 
-  assert.deepEqual(unasked, [], 'give these an askedWhen in @omega.js/config env-schema.js so manage can ask for them');
-});
+    {
+      name: 'service-input: missing + non-interactive → a LOUD skip line and the missingEnv list',
+      run: async (ctx) => {
+        cleanup(VAR, VAR2);
+        const captured = captureLog(() => requestServiceInput(
+          { brandRoot: '/nope', brandConfig: {}, options: {} },
+          fakeSpec([{ name: VAR }, { name: VAR2 }]),
+        ));
+        const gate = await captured.result;
 
-test('sweep: every GENERATED key a service reads is minted by the workspace before that service runs', () => {
-  // A generated key has nobody to paste it, so it must exist before a service
-  // reads it. The workspace's env-keys op mints every missing one on each
-  // manage, and the workspace walks first. Derived, not listed: the service
-  // names come from the source tree, the key names from the env schema.
-  assert.ok(OPERATIONS.workspace.some((operation) => operation.name === 'env-keys'), 'the workspace mints the generated keys');
-  const workspaceAt = SERVICE_ORDER.indexOf('workspace');
+        ctx.expect(gate.skip).toBe(true);
+        ctx.expect(gate.missingEnv).toEqual([VAR, VAR2]);
+        ctx.expect(gate.reason).toMatch(new RegExp(`${VAR}, ${VAR2}`));
+        ctx.expect(gate.reason).toMatch(/rerun interactively/);
+        // Loud: the skip NAMES the keys on its own line, never a silent step-aside
+        ctx.expect(captured.lines.join('\n')).toMatch(new RegExp(`${VAR}.*${VAR2}`));
+      },
+    },
 
-  const servicesDir = path.join(SRC_DIR, 'services');
-  const generated = Object.keys(generatedEnvKeys());
+    {
+      name: 'service-input: dry run never prompts, even on a TTY',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const tty = openTtyPrompt();
+        try {
+          const gate = await requestServiceInput(
+            { brandRoot: '/nope', brandConfig: {}, options: { dryRun: true } },
+            fakeSpec(),
+          );
+          ctx.expect(gate.skip).toBe(true);
+          ctx.expect(gate.missingEnv).toEqual([VAR]);
+        } finally {
+          tty.close();
+        }
+      },
+    },
 
-  const early = [];
-  for (const service of fs.readdirSync(servicesDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
-    if (service.name === 'workspace') continue;
-    const sources = sourceFiles(path.join(servicesDir, service.name));
+    {
+      name: 'service-input: PROVIDE → pastes, saves to the brand .env, exports, proceeds',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
 
-    for (const name of generated) {
-      // A literal read is what binds the service to the key
-      const reads = sources.some(([, text]) => text.includes(`process.env.${name}`)
-        || text.includes(`process.env[${JSON.stringify(name)}]`));
-      if (reads && SERVICE_ORDER.indexOf(service.name) <= workspaceAt) {
-        early.push(`${service.name}: ${name}`);
-      }
-    }
-  }
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
+          await tty.answer('Set up now?', '\r');            // Provide
+          await tty.answer(`Paste ${VAR}`, 'pasted-value\r');
+          const gate = await run;
 
-  assert.deepEqual(early, [], 'these services read a generated key before the workspace could mint it');
-});
+          ctx.expect(gate).toBe(null);
+          ctx.expect(process.env[VAR]).toBe('pasted-value');
+          const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
+          ctx.expect(env).toMatch(/EXISTING_KEY="keep-me"/);
+          ctx.expect(env).toMatch(new RegExp(`${VAR}="pasted-value"`));
+          // Providing never disables anything
+          ctx.expect(readConfigSource(brandRoot)).not.toMatch(/enabled/);
+        } finally {
+          tty.close();
+          cleanup(VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('sweep: the mint has exactly ONE home', () => {
-  // Both lanes (the workspace env-keys op, the setup contract) go through
-  // lib/env-secret.js's mintGeneratedKey — a second hand-rolled
-  // generate + write + export would drift in wording and in what it exports.
-  // Prose ABOUT the mint is not a second mint, so each line is read up to its
-  // comment marker — the registry annotates its env-keys op with that wording
-  const homes = sourceFiles(SRC_DIR)
-    .filter(([, text]) => text.split('\n')
-      .some((line) => line.split('//')[0].includes('minted into the brand .env')))
-    .map(([file]) => file);
+    {
+      name: 'service-input: SKIP THIS RUN → skips without writing config or .env',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
 
-  assert.deepEqual(homes, ['lib/env-secret.js'], 'the mint is mintGeneratedKey — never a second copy');
-});
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
+          await tty.answer('Set up now?', `${DOWN}\r`);      // Skip for now
+          const gate = await run;
 
-test('sweep: every pasted key says what it is and where to get it (#867)', () => {
-  // The walk opens a gate with the label and walks to the url; a pasted key
-  // with neither is a prompt that says "paste CHROME_REFRESH_TOKEN" and stops.
-  // `url: null` is a legitimate answer (no page mints this value), and it owes
-  // a hint that says where the value does come from.
-  const prompted = ENV_SCHEMA.filter((entry) => entry.askedWhen && !entry.generated);
+          ctx.expect(gate.skip).toBe(true);
+          ctx.expect(gate.disabled).toBe(undefined);
+          ctx.expect(gate.missingEnv).toEqual([VAR]);
+          ctx.expect(process.env[VAR]).toBe(undefined);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+          ctx.expect(readConfigSource(brandRoot)).not.toMatch(/enabled/);
+        } finally {
+          tty.close();
+          cleanup(VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-  assert.ok(prompted.length > 10, `expected many pasted keys, found ${prompted.length}`);
+    {
+      name: 'service-input: DISABLE PERMANENTLY → lands enabled: false in omega.json5 and stops asking',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  // keep me\n  fake: {},\n}\n');
+        const brandConfig = { brand: { id: 'b' }, fake: {} };
 
-  const unlabelled = prompted.filter((entry) => !entry.label).map((entry) => entry.name);
-  assert.deepEqual(unlabelled, [], 'give each one a `label` in env-schema.js');
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput({ brandRoot, brandConfig, brandId: 'b', options: {} }, fakeSpec());
+          await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
+          const gate = await run;
 
-  const homeless = prompted.filter((entry) => !isMachineLocal(entry.name) && !entry.url && !('url' in entry && entry.hint))
-    .map((entry) => entry.name);
-  assert.deepEqual(homeless, [], 'give each one a `url` (the page that mints it), or `url: null` plus a hint saying where it comes from');
-});
+          ctx.expect(gate.skip).toBe(true);
+          ctx.expect(gate.disabled).toBe(true);
+          ctx.expect(gate.reason).toMatch(/fake\.enabled/);
+          // Permanent: written to config (comments preserved) and to the in-memory
+          // config, so nothing later in the same run asks again
+          const source = readConfigSource(brandRoot);
+          ctx.expect(source).toMatch(/enabled: false/);
+          ctx.expect(source).toMatch(/\/\/ keep me/);
+          ctx.expect(brandConfig.fake.enabled).toBe(false);
+          ctx.expect(process.env[VAR]).toBe(undefined);
+        } finally {
+          tty.close();
+          cleanup(VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('sweep: every ship credential a format needs is askable (#867)', () => {
-  // The format table names the keys a platform cannot ship without. Each one
-  // needs its mint page in the schema, or the publish that refuses on it has
-  // nowhere to send the developer.
-  const unaskable = [...shipKeys()]
-    .map((key) => envSchemaEntry(key))
-    .filter((entry) => !entry.label || (!entry.url && !entry.hint))
-    .map((entry) => entry.name);
+    {
+      name: 'service-input: an already-disabled service never prompts again',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const tty = openTtyPrompt();
+        try {
+          const gate = await requestServiceInput(
+            { brandRoot: '/nope', brandConfig: { fake: { enabled: false } }, options: {} },
+            fakeSpec(),
+          );
+          ctx.expect(gate.skip).toBe(true);
+          ctx.expect(gate.reason).toMatch(/fake\.enabled/);
+        } finally {
+          tty.close();
+          cleanup(VAR);
+        }
+      },
+    },
 
-  assert.deepEqual(unaskable, [], 'give each ship credential a label plus a url or a hint in env-schema.js');
-});
+    {
+      name: 'service-input: a url\'d input walks to the exact mint page before the paste',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
 
-test('sweep: every REQUIRES entry can run the three-outcome gate', () => {
-  for (const [service, declaration] of Object.entries(REQUIRES)) {
-    assert.ok(declaration.label, `REQUIRES.${service} needs a label (the gate's human name)`);
-    assert.ok(declaration.disablePath, `REQUIRES.${service} needs a disablePath (where "Disable permanently" lands false)`);
+        const tty = openTtyPrompt();
+        const events = [];
+        try {
+          const run = requestServiceInput(
+            { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+            fakeSpec([{ name: VAR, label: 'Fake token', url: 'https://example.com/mint', hint: 'Create one with scopes: fake:write' }]),
+            { prompt: { pressEnterToOpen: async (url, label) => { events.push([url, label]); return true; } } },
+          );
+          await tty.answer('Set up now?', '\r');
+          await tty.answer(`Paste ${VAR}`, 'v\r');
+          const gate = await run;
 
-    const spec = serviceInputSpec(service);
-    assert.equal(spec.service, service);
-    assert.equal(spec.disablePath, declaration.disablePath);
-  }
-});
+          ctx.expect(gate).toBe(null);
+          ctx.expect(events).toEqual([['https://example.com/mint', 'the Fake token page']]);
+          ctx.expect(process.env[VAR]).toBe('v');
+        } finally {
+          tty.close();
+          cleanup(VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('sweep: every service with declared inputs routes them through the shared helper', () => {
-  const routed = (service) => sourceFiles(path.join(SRC_DIR, 'services', service))
-    .some(([, text]) => text.includes('service-input.js'));
+    {
+      name: 'service-input: an empty paste skips this run (no writeback, no export)',
+      run: async (ctx) => {
+        cleanup(VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
 
-  const handRolled = Object.keys(REQUIRES).filter((service) => !routed(service));
-  assert.deepEqual(handRolled, [], 'these services declare inputs but never call requestServiceInput');
-});
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput({ brandRoot, brandConfig: {}, brandId: 'b', options: {} }, fakeSpec());
+          await tty.answer('Set up now?', '\r');
+          await tty.answer(`Paste ${VAR}`, '   \r');
+          const gate = await run;
 
-test('run-summary: skipped-for-secrets services aggregate into the 🔑 section', () => {
-  const { RunSummary } = require('../src/lib/run-summary.js');
+          ctx.expect(gate.skip).toBe(true);
+          ctx.expect(gate.missingEnv).toEqual([VAR]);
+          ctx.expect(process.env[VAR]).toBe(undefined);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          tty.close();
+          cleanup(VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'edge', { status: 'skipped', reason: 'missing CLOUDFLARE_TOKEN', missingEnv: ['CLOUDFLARE_TOKEN'] });
-  summary.add('brand-a', 'Brand A', 'domain', { status: 'skipped', reason: 'missing NAMECHEAP…', missingEnv: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] });
-  summary.add('brand-a', 'Brand A', 'repo', { status: 'success' });
+    {
+      name: 'service-input: captcha asks for its secret while reCAPTCHA is on, and never once it is off',
+      run: async (ctx) => {
+        const gate = await askHeadless('captcha', REAL_BRAND);
+        ctx.expect(gate.skip).toBe(true);
+        ctx.expect(gate.missingEnv).toEqual(['RECAPTCHA_SECRET_KEY']);
 
-  const { lines } = captureLog(() => summary.printSummary());
+        const off = await askHeadless('captcha', { ...REAL_BRAND, captcha: { providers: { recaptcha: { enabled: false } } } });
+        ctx.expect(off.skip).toBe(true);
+        ctx.expect(off.reason).toMatch(/captcha\.providers\.recaptcha\.enabled/);
+      },
+    },
 
-  const text = lines.join('\n');
-  assert.match(text, /Missing secrets/);
-  assert.match(text, /edge: CLOUDFLARE_TOKEN/);
-  assert.match(text, /domain: NAMECHEAP_USERNAME, NAMECHEAP_API_KEY/);
-  assert.match(text, /--service=edge/);
-  assert.match(text, /--service=domain/);
-});
+    {
+      name: 'service-input: the domain asks for the namecheap pair only when namecheap is the registrar',
+      run: async (ctx) => {
+        const namecheap = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { namecheap: {} } } });
+        ctx.expect([...namecheap.missingEnv].sort()).toEqual(['CLOUDFLARE_TOKEN', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME']);
 
-test('sweep: the Provide / Skip / Disable wording has exactly ONE home', () => {
-  const homes = sourceFiles(SRC_DIR)
-    .filter(([, text]) => text.includes('Disable (stop prompting)'))
-    .map(([file]) => file);
+        const squarespace = await askHeadless('domain', { ...REAL_BRAND, domain: { providers: { squarespace: {} } } });
+        ctx.expect(squarespace.missingEnv).toEqual(['CLOUDFLARE_TOKEN']);
+      },
+    },
 
-  assert.deepEqual(homes, ['lib/config-flow.js'], 'the gate is confirmSetup — never a second copy');
+    {
+      name: 'service-input: a real service with its key present proceeds, nothing asked',
+      run: async (ctx) => {
+        process.env.RECAPTCHA_SECRET_KEY = 'already-set';
+        try {
+          const gate = await requestServiceInput({ brandRoot: '/nope', brandConfig: REAL_BRAND, options: {} }, serviceInputSpec('captcha'));
+          ctx.expect(gate).toBe(null);
+        } finally {
+          cleanup('RECAPTCHA_SECRET_KEY');
+        }
+      },
+    },
+
+    {
+      name: 'service-input: a GENERATED key is minted in place — no gate, no paste',
+      run: async (ctx) => {
+        cleanup(GENERATED);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+        const tty = openTtyPrompt();
+        try {
+          const captured = captureLog(() => requestServiceInput(
+            { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+            { ...fakeSpec([{ name: GENERATED, label: 'Omega webhook key' }]), service: 'payment' },
+          ));
+          // Nothing to answer: OMEGA mints this one for itself
+          const gate = await captured.result;
+
+          ctx.expect(gate).toBe(null);
+          ctx.expect(process.env[GENERATED]).toMatch(/^[A-Za-z0-9_-]{43}$/);
+          const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
+          ctx.expect(env).toMatch(new RegExp(`^${GENERATED}="[A-Za-z0-9_-]{43}"$`, 'm'));
+          // Names only — the value is never printed
+          const text = captured.lines.join('\n');
+          ctx.expect(text).toMatch(new RegExp(`${GENERATED} minted into the brand .env`));
+          ctx.expect(!text.includes(process.env[GENERATED]), 'the minted value is never printed').toBeTruthy();
+          // Nothing was disabled and no gate ran
+          ctx.expect(readConfigSource(brandRoot)).not.toMatch(/enabled/);
+        } finally {
+          tty.close();
+          cleanup(GENERATED);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'service-input: a generated key is minted even on a headless run — nobody has to be asked',
+      run: async (ctx) => {
+        cleanup(GENERATED);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        try {
+          const gate = await requestServiceInput(
+            { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+            { ...fakeSpec([{ name: GENERATED }]), service: 'campaigns' },
+          );
+
+          ctx.expect(gate).toBe(null);
+          ctx.expect(process.env[GENERATED]).toBeTruthy();
+        } finally {
+          cleanup(GENERATED);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'service-input: a generated key beside a pasted one mints the first and still asks for the second',
+      run: async (ctx) => {
+        cleanup(GENERATED, VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput(
+            { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+            fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
+          );
+          await tty.answer('Set up now?', '\r');
+          await tty.answer(`Paste ${VAR}`, 'pasted-value\r');
+          const gate = await run;
+
+          ctx.expect(gate).toBe(null);
+          ctx.expect(process.env[GENERATED]).toBeTruthy();
+          ctx.expect(process.env[VAR]).toBe('pasted-value');
+        } finally {
+          tty.close();
+          cleanup(GENERATED, VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'service-input: a dry run PLANS the mint, writes nothing, and never calls it a missing secret',
+      run: async (ctx) => {
+        cleanup(GENERATED);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+        const captured = captureLog(() => requestServiceInput(
+          { brandRoot, brandConfig: {}, brandId: 'b', options: { dryRun: true } },
+          { ...fakeSpec([{ name: GENERATED }]), service: 'newsletter' },
+        ));
+        const gate = await captured.result;
+
+        try {
+          ctx.expect(gate.skip).toBe(true);
+          // The reason NAMES the key and says who produces it...
+          ctx.expect(gate.reason).toMatch(new RegExp(`${GENERATED} will be minted on a real run`));
+          // ...but it is not a missing secret: the 🔑 section must never tell anyone
+          // to paste a key only OMEGA can produce
+          ctx.expect(gate.missingEnv).toEqual([]);
+          ctx.expect(process.env[GENERATED]).toBe(undefined);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+          ctx.expect(captured.lines.join('\n')).toMatch(new RegExp(`would mint ${GENERATED}`));
+        } finally {
+          cleanup(GENERATED);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'service-input: DISABLE beside a generated key leaves NO minted secret behind',
+      run: async (ctx) => {
+        cleanup(GENERATED, VAR);
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  fake: {},\n}\n');
+        const brandConfig = { brand: { id: 'b' }, fake: {} };
+
+        const tty = openTtyPrompt();
+        try {
+          const run = requestServiceInput(
+            { brandRoot, brandConfig, brandId: 'b', options: {} },
+            fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
+          );
+          await tty.answer('Set up now?', `${DOWN}${DOWN}\r`);          // Disable (stop prompting)
+          const gate = await run;
+
+          ctx.expect(gate.disabled).toBe(true);
+          // The gate runs BEFORE the mint: a brand that just opted out never gains
+          // a secret it did not ask for
+          ctx.expect(process.env[GENERATED]).toBe(undefined);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+          // ...and the key nobody can paste is not reported as one to paste
+          ctx.expect(gate.missingEnv).toEqual([VAR]);
+        } finally {
+          tty.close();
+          cleanup(GENERATED, VAR);
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'sweep: every credential a service actually reads says in the env schema when it is asked',
+      run: (ctx) => {
+        const keys = serviceInputKeys();
+        // The derivation must not quietly collapse to nothing
+        ctx.expect(keys.length > 10, `expected the manager to read many credentials, found ${keys.length}`).toBeTruthy();
+
+        // A ship credential is asked through the format table, its one home
+        const ship = shipKeys();
+        const unasked = keys
+          .filter((entry) => typeof entry.askedWhen !== 'function' && !ship.has(entry.name))
+          .map((entry) => `${entry.owner}: ${entry.name}`);
+
+        ctx.expect(unasked, 'give these an askedWhen in @omega.js/config env-schema.js so manage can ask for them').toEqual([]);
+      },
+    },
+
+    {
+      name: 'sweep: every GENERATED key a service reads is minted by the workspace before that service runs',
+      run: (ctx) => {
+        // A generated key has nobody to paste it, so it must exist before a service
+        // reads it. The workspace's env-keys op mints every missing one on each
+        // manage, and the workspace walks first. Derived, not listed: the service
+        // names come from the source tree, the key names from the env schema.
+        ctx.expect(OPERATIONS.workspace.some((operation) => operation.name === 'env-keys'), 'the workspace mints the generated keys').toBeTruthy();
+        const workspaceAt = SERVICE_ORDER.indexOf('workspace');
+
+        const servicesDir = path.join(SRC_DIR, 'services');
+        const generated = Object.keys(generatedEnvKeys());
+
+        const early = [];
+        for (const service of fs.readdirSync(servicesDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+          if (service.name === 'workspace') continue;
+          const sources = sourceFiles(path.join(servicesDir, service.name));
+
+          for (const name of generated) {
+            // A literal read is what binds the service to the key
+            const reads = sources.some(([, text]) => text.includes(`process.env.${name}`)
+              || text.includes(`process.env[${JSON.stringify(name)}]`));
+            if (reads && SERVICE_ORDER.indexOf(service.name) <= workspaceAt) {
+              early.push(`${service.name}: ${name}`);
+            }
+          }
+        }
+
+        ctx.expect(early, 'these services read a generated key before the workspace could mint it').toEqual([]);
+      },
+    },
+
+    {
+      name: 'sweep: the mint has exactly ONE home',
+      run: (ctx) => {
+        // Both lanes (the workspace env-keys op, the setup contract) go through
+        // lib/env-secret.js's mintGeneratedKey — a second hand-rolled
+        // generate + write + export would drift in wording and in what it exports.
+        // Prose ABOUT the mint is not a second mint, so each line is read up to its
+        // comment marker — the registry annotates its env-keys op with that wording
+        const homes = sourceFiles(SRC_DIR)
+          .filter(([, text]) => text.split('\n')
+            .some((line) => line.split('//')[0].includes('minted into the brand .env')))
+          .map(([file]) => file);
+
+        ctx.expect(homes, 'the mint is mintGeneratedKey — never a second copy').toEqual(['lib/env-secret.js']);
+      },
+    },
+
+    {
+      name: 'sweep: every pasted key says what it is and where to get it (#867)',
+      run: (ctx) => {
+        // The walk opens a gate with the label and walks to the url; a pasted key
+        // with neither is a prompt that says "paste CHROME_REFRESH_TOKEN" and stops.
+        // `url: null` is a legitimate answer (no page mints this value), and it owes
+        // a hint that says where the value does come from.
+        const prompted = ENV_SCHEMA.filter((entry) => entry.askedWhen && !entry.generated);
+
+        ctx.expect(prompted.length > 10, `expected many pasted keys, found ${prompted.length}`).toBeTruthy();
+
+        const unlabelled = prompted.filter((entry) => !entry.label).map((entry) => entry.name);
+        ctx.expect(unlabelled, 'give each one a `label` in env-schema.js').toEqual([]);
+
+        const homeless = prompted.filter((entry) => !isMachineLocal(entry.name) && !entry.url && !('url' in entry && entry.hint))
+          .map((entry) => entry.name);
+        ctx.expect(homeless, 'give each one a `url` (the page that mints it), or `url: null` plus a hint saying where it comes from').toEqual([]);
+      },
+    },
+
+    {
+      name: 'sweep: every ship credential a format needs is askable (#867)',
+      run: (ctx) => {
+        // The format table names the keys a platform cannot ship without. Each one
+        // needs its mint page in the schema, or the publish that refuses on it has
+        // nowhere to send the developer.
+        const unaskable = [...shipKeys()]
+          .map((key) => envSchemaEntry(key))
+          .filter((entry) => !entry.label || (!entry.url && !entry.hint))
+          .map((entry) => entry.name);
+
+        ctx.expect(unaskable, 'give each ship credential a label plus a url or a hint in env-schema.js').toEqual([]);
+      },
+    },
+
+    {
+      name: 'sweep: every REQUIRES entry can run the three-outcome gate',
+      run: (ctx) => {
+        for (const [service, declaration] of Object.entries(REQUIRES)) {
+          ctx.expect(declaration.label, `REQUIRES.${service} needs a label (the gate's human name)`).toBeTruthy();
+          ctx.expect(declaration.disablePath, `REQUIRES.${service} needs a disablePath (where "Disable permanently" lands false)`).toBeTruthy();
+
+          const spec = serviceInputSpec(service);
+          ctx.expect(spec.service).toBe(service);
+          ctx.expect(spec.disablePath).toBe(declaration.disablePath);
+        }
+      },
+    },
+
+    {
+      name: 'sweep: every service with declared inputs routes them through the shared helper',
+      run: (ctx) => {
+        const routed = (service) => sourceFiles(path.join(SRC_DIR, 'services', service))
+          .some(([, text]) => text.includes('service-input.js'));
+
+        const handRolled = Object.keys(REQUIRES).filter((service) => !routed(service));
+        ctx.expect(handRolled, 'these services declare inputs but never call requestServiceInput').toEqual([]);
+      },
+    },
+
+    {
+      name: 'run-summary: skipped-for-secrets services aggregate into the 🔑 section',
+      run: (ctx) => {
+        const { RunSummary } = require('../src/lib/run-summary.js');
+
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'edge', { status: 'skipped', reason: 'missing CLOUDFLARE_TOKEN', missingEnv: ['CLOUDFLARE_TOKEN'] });
+        summary.add('brand-a', 'Brand A', 'domain', { status: 'skipped', reason: 'missing NAMECHEAP…', missingEnv: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] });
+        summary.add('brand-a', 'Brand A', 'repo', { status: 'success' });
+
+        const { lines } = captureLog(() => summary.printSummary());
+
+        const text = lines.join('\n');
+        ctx.expect(text).toMatch(/Missing secrets/);
+        ctx.expect(text).toMatch(/edge: CLOUDFLARE_TOKEN/);
+        ctx.expect(text).toMatch(/domain: NAMECHEAP_USERNAME, NAMECHEAP_API_KEY/);
+        ctx.expect(text).toMatch(/--service=edge/);
+        ctx.expect(text).toMatch(/--service=domain/);
+      },
+    },
+
+    {
+      name: 'sweep: the Provide / Skip / Disable wording has exactly ONE home',
+      run: (ctx) => {
+        const homes = sourceFiles(SRC_DIR)
+          .filter(([, text]) => text.includes('Disable (stop prompting)'))
+          .map(([file]) => file);
+
+        ctx.expect(homes, 'the gate is confirmSetup — never a second copy').toEqual(['lib/config-flow.js']);
+      },
+    },
+  ],
 });

@@ -1,181 +1,247 @@
-const { describe, it, before, beforeEach } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { registerHooks } = require('node:module');
-const { assert } = require('./helpers.js');
+const { createOmega, clearStorage, disposeOmega } = require('./helpers.js');
 
-// #798: Firebase learns a session died at page load and at the hourly refresh
-// and at no other moment, so a revoked, disabled or deleted account keeps an
-// open tab signed in. The probe is the forced token refresh at a moment of
-// doubt: an auth error means the session is gone (sign out, and the policy
-// listener redirects off the onAuthStateChanged emission), a network error
-// keeps the user, because a bad connection never signs anyone out.
-describe('Auth Module: the session probe (#798)', () => {
+const beforeEachHook = clearStorage;
 
-  let Auth;
+module.exports = defineCases({
+  type: 'group',
+  description: 'auth-probe',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    // #798: Firebase learns a session died at page load and at the hourly refresh
+    // and at no other moment, so a revoked, disabled or deleted account keeps an
+    // open tab signed in. The probe is the forced token refresh at a moment of
+    // doubt: an auth error means the session is gone (sign out, and the policy
+    // listener redirects off the onAuthStateChanged emission), a network error
+    // keeps the user, because a bad connection never signs anyone out.
+    ...(() => {
+      const cases = [];
+      let Auth;
 
-  const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
+      const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
 
-  // `getIdToken` and `signOut` both import firebase/auth lazily, so the seam is
-  // the module resolution itself (the #700 firestore stub's pattern): a
-  // synchronous hook swaps that ONE specifier for a stub reading
-  // `globalThis.__omegaAuth`. Scoped to this file, since node's runner gives each
-  // test file its own process.
-  const AUTH_STUB_URL = 'omega-test-stub:firebase-auth';
+      // `getIdToken` and `signOut` both import firebase/auth lazily, so the seam is
+      // the module resolution itself (the #700 firestore stub's pattern): a
+      // synchronous hook swaps that ONE specifier for a stub reading
+      // `globalThis.__omegaAuth`. Scoped to this file, since node's runner gives each
+      // test file its own process.
+      const AUTH_STUB_URL = 'omega-test-stub:firebase-auth';
 
-  const stubAuthModule = () => registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (specifier === 'firebase/auth') {
-        return { url: AUTH_STUB_URL, shortCircuit: true };
-      }
+      const stubAuthModule = () => registerHooks({
+        resolve(specifier, context, nextResolve) {
+          if (specifier === 'firebase/auth') {
+            return { url: AUTH_STUB_URL, shortCircuit: true };
+          }
 
-      return nextResolve(specifier, context);
-    },
-    load(url, context, nextLoad) {
-      if (url === AUTH_STUB_URL) {
-        return {
-          format: 'module',
-          shortCircuit: true,
-          source: `export const getIdToken = (...args) => globalThis.__omegaAuth.getIdToken(...args);
+          return nextResolve(specifier, context);
+        },
+        load(url, context, nextLoad) {
+          if (url === AUTH_STUB_URL) {
+            return {
+              format: 'module',
+              shortCircuit: true,
+              source: `export const getIdToken = (...args) => globalThis.__omegaAuth.getIdToken(...args);
                    export const signOut = (...args) => globalThis.__omegaAuth.signOut(...args);`,
+            };
+          }
+
+          return nextLoad(url, context);
+        },
+      });
+
+      // Minimal Omega stand-in (the #196 harness's shape), plus the record of
+      // every stubbed firebase/auth call the probe makes.
+      function createHarness({ user = USER, refresh } = {}) {
+        const calls = { getIdToken: [], signOut: 0 };
+
+        globalThis.__omegaAuth = {
+          getIdToken: async (target, force) => {
+            calls.getIdToken.push({ uid: target.uid, force });
+            return refresh();
+          },
+          signOut: async () => {
+            calls.signOut++;
+            omega.firebaseAuth.currentUser = null;
+            return true;
+          },
         };
+
+        const omega = {
+          config: {},
+          firebaseAuth: { currentUser: user },
+          // Firebase is configured (the app exists), and Firestore loads through the loader
+          firebaseApp: {},
+          loadFirebaseFirestore: async () => ({}),
+          _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
+          bindings: { update: () => {} },
+          storage: { set: () => {}, get: () => ({}) },
+        };
+
+        return { auth: new Auth(omega), omega, calls };
       }
 
-      return nextLoad(url, context);
-    },
-  });
+      const authError = (code) => Object.assign(new Error(`Firebase: Error (${code}).`), { code });
 
-  // Minimal Omega stand-in (the #196 harness's shape), plus the record of
-  // every stubbed firebase/auth call the probe makes.
-  function createHarness({ user = USER, refresh } = {}) {
-    const calls = { getIdToken: [], signOut: 0 };
+      // Flush the microtask queue so the lazy `import('firebase/auth')` inside
+      // getIdToken has landed and the stub has really been called
+      const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-    globalThis.__omegaAuth = {
-      getIdToken: async (target, force) => {
-        calls.getIdToken.push({ uid: target.uid, force });
-        return refresh();
-      },
-      signOut: async () => {
-        calls.signOut++;
-        omega.firebaseAuth.currentUser = null;
-        return true;
-      },
-    };
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        Auth = (await import('../src/modules/auth.js')).default;
+        // Registered here, not at load: hooks route every later require through the
+        // ESM loader, and the shared helpers' Omega import pulls in CJS that will
+        // not survive the trip.
+        stubAuthModule();
+      })()));
 
-    const omega = {
-      config: {},
-      firebaseAuth: { currentUser: user },
-      // Firebase is configured (the app exists), and Firestore loads through the loader
-      firebaseApp: {},
-      loadFirebaseFirestore: async () => ({}),
-      _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
-      bindings: { update: () => {} },
-      storage: { set: () => {}, get: () => ({}) },
-    };
+      const beforeEachHook2 = () => {
+        delete globalThis.__omegaAuth;
+      };
 
-    return { auth: new Auth(omega), omega, calls };
-  }
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should sign out and report the session gone on an expired token',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls } = createHarness({ refresh: () => { throw authError('auth/user-token-expired'); } });
 
-  const authError = (code) => Object.assign(new Error(`Firebase: Error (${code}).`), { code });
+          ctx.expect(await auth.probeSession()).toBe('gone');
+          ctx.expect(calls.signOut, 'the onAuthStateChanged emission is what drives the policy listener').toBe(1);
+          ctx.expect(calls.getIdToken[0].force, 'the probe is a FORCED refresh, since a cached token proves nothing').toBe(true);
+        },
+      });
 
-  // Flush the microtask queue so the lazy `import('firebase/auth')` inside
-  // getIdToken has landed and the stub has really been called
-  const flush = () => new Promise((resolve) => setImmediate(resolve));
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should sign out on every other non-network auth error',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          for (const code of ['auth/user-disabled', 'auth/invalid-refresh-token']) {
+            const { auth, calls } = createHarness({ refresh: () => { throw authError(code); } });
 
-  before(async () => {
-    Auth = (await import('../src/modules/auth.js')).default;
-    // Registered here, not at load: hooks route every later require through the
-    // ESM loader, and the shared helpers' Omega import pulls in CJS that will
-    // not survive the trip.
-    stubAuthModule();
-  });
+            ctx.expect(await auth.probeSession(), code).toBe('gone');
+            ctx.expect(calls.signOut, code).toBe(1);
+          }
+        },
+      });
 
-  beforeEach(() => {
-    delete globalThis.__omegaAuth;
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should KEEP the user on a network failure, because a bad connection is not a dead session',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/network-request-failed'); } });
 
-  it('should sign out and report the session gone on an expired token', async () => {
-    const { auth, calls } = createHarness({ refresh: () => { throw authError('auth/user-token-expired'); } });
+          ctx.expect(await auth.probeSession()).toBe('unknown');
+          ctx.expect(calls.signOut).toBe(0);
+          ctx.expect(omega.firebaseAuth.currentUser, 'the user survives the "Backend starting" window').toBe(USER);
+        },
+      });
 
-    assert.strictEqual(await auth.probeSession(), 'gone');
-    assert.strictEqual(calls.signOut, 1, 'the onAuthStateChanged emission is what drives the policy listener');
-    assert.strictEqual(calls.getIdToken[0].force, true, 'the probe is a FORCED refresh, since a cached token proves nothing');
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should KEEP the user on auth/too-many-requests, a throttle and not a verdict on the session',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/too-many-requests'); } });
 
-  it('should sign out on every other non-network auth error', async () => {
-    for (const code of ['auth/user-disabled', 'auth/invalid-refresh-token']) {
-      const { auth, calls } = createHarness({ refresh: () => { throw authError(code); } });
+          ctx.expect(await auth.probeSession()).toBe('unknown');
+          ctx.expect(calls.signOut).toBe(0);
+          ctx.expect(omega.firebaseAuth.currentUser, 'a rate limit clears on its own; the session did not die').toBe(USER);
+        },
+      });
 
-      assert.strictEqual(await auth.probeSession(), 'gone', code);
-      assert.strictEqual(calls.signOut, 1, code);
-    }
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should KEEP the user on auth/internal-error, which is the Auth server failing and not answering',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/internal-error'); } });
 
-  it('should KEEP the user on a network failure, because a bad connection is not a dead session', async () => {
-    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/network-request-failed'); } });
+          ctx.expect(await auth.probeSession()).toBe('unknown');
+          ctx.expect(calls.signOut).toBe(0);
+          ctx.expect(omega.firebaseAuth.currentUser, 'a server-side failure is no verdict on this session').toBe(USER);
+        },
+      });
 
-    assert.strictEqual(await auth.probeSession(), 'unknown');
-    assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'the user survives the "Backend starting" window');
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should keep the user on an error carrying no auth code',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls } = createHarness({ refresh: () => { throw new Error('something else broke'); } });
 
-  it('should KEEP the user on auth/too-many-requests, a throttle and not a verdict on the session', async () => {
-    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/too-many-requests'); } });
+          ctx.expect(await auth.probeSession()).toBe('unknown');
+          ctx.expect(calls.signOut).toBe(0);
+        },
+      });
 
-    assert.strictEqual(await auth.probeSession(), 'unknown');
-    assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'a rate limit clears on its own; the session did not die');
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should report the session alive when the refresh succeeds',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls } = createHarness({ refresh: () => 'fresh-id-token' });
 
-  it('should KEEP the user on auth/internal-error, which is the Auth server failing and not answering', async () => {
-    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/internal-error'); } });
+          ctx.expect(await auth.probeSession()).toBe('alive');
+          ctx.expect(calls.signOut).toBe(0);
+          ctx.expect(calls.getIdToken.length).toBe(1);
+        },
+      });
 
-    assert.strictEqual(await auth.probeSession(), 'unknown');
-    assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'a server-side failure is no verdict on this session');
-  });
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should coalesce concurrent probes into ONE refresh',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          let settleRefresh;
+          const { auth, calls } = createHarness({ refresh: () => new Promise((resolve) => { settleRefresh = resolve; }) });
 
-  it('should keep the user on an error carrying no auth code', async () => {
-    const { auth, calls } = createHarness({ refresh: () => { throw new Error('something else broke'); } });
+          const first = auth.probeSession();
+          const second = auth.probeSession();
 
-    assert.strictEqual(await auth.probeSession(), 'unknown');
-    assert.strictEqual(calls.signOut, 0);
-  });
+          await flush();
+          settleRefresh('fresh-id-token');
+          const results = await Promise.all([first, second]);
 
-  it('should report the session alive when the refresh succeeds', async () => {
-    const { auth, calls } = createHarness({ refresh: () => 'fresh-id-token' });
+          ctx.expect(calls.getIdToken.length, 'one probe in flight per Auth instance').toBe(1);
+          ctx.expect(results, 'every caller during it gets the same answer').toEqual(['alive', 'alive']);
 
-    assert.strictEqual(await auth.probeSession(), 'alive');
-    assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(calls.getIdToken.length, 1);
-  });
+          // And the slot is cleared, so the NEXT moment of doubt probes again
+          const third = auth.probeSession();
+          await flush();
+          settleRefresh('fresh-id-token');
 
-  it('should coalesce concurrent probes into ONE refresh', async () => {
-    let settleRefresh;
-    const { auth, calls } = createHarness({ refresh: () => new Promise((resolve) => { settleRefresh = resolve; }) });
+          ctx.expect(await third).toBe('alive');
+          ctx.expect(calls.getIdToken.length).toBe(2);
+        },
+      });
 
-    const first = auth.probeSession();
-    const second = auth.probeSession();
+      cases.push({
+        name: 'Auth Module: the session probe (#798) > should no-op on a signed-out client',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          const { auth, calls } = createHarness({ user: null, refresh: () => { throw new Error('must not be called'); } });
 
-    await flush();
-    settleRefresh('fresh-id-token');
-    const results = await Promise.all([first, second]);
-
-    assert.strictEqual(calls.getIdToken.length, 1, 'one probe in flight per Auth instance');
-    assert.deepStrictEqual(results, ['alive', 'alive'], 'every caller during it gets the same answer');
-
-    // And the slot is cleared, so the NEXT moment of doubt probes again
-    const third = auth.probeSession();
-    await flush();
-    settleRefresh('fresh-id-token');
-
-    assert.strictEqual(await third, 'alive');
-    assert.strictEqual(calls.getIdToken.length, 2);
-  });
-
-  it('should no-op on a signed-out client', async () => {
-    const { auth, calls } = createHarness({ user: null, refresh: () => { throw new Error('must not be called'); } });
-
-    assert.strictEqual(await auth.probeSession(), 'signed-out');
-    assert.strictEqual(calls.getIdToken.length, 0);
-    assert.strictEqual(calls.signOut, 0);
-  });
+          ctx.expect(await auth.probeSession()).toBe('signed-out');
+          ctx.expect(calls.getIdToken.length).toBe(0);
+          ctx.expect(calls.signOut).toBe(0);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

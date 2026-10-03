@@ -6,8 +6,7 @@
 // Fixtures build a miniature monorepo under packages/devkit/.temp/ (gitignored)
 // and vendor from it via the monorepoRoot seam, never the real docs tree.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 const vendorDocs = require('../tools/vendor-docs');
@@ -64,98 +63,125 @@ function makeFixture(label) {
 
 const read = (...parts) => fs.readFileSync(path.join(...parts), 'utf8');
 
-test('vendor-docs: only the manager carries docs; any other package is a no-op', (t) => {
-  const { root, web } = makeFixture('vendor-docs-other');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'vendor-docs',
+  tests: [
+    {
+      name: 'vendor-docs: only the manager carries docs; any other package is a no-op',
+      run: (ctx) => {
+        const { root, web } = makeFixture('vendor-docs-other');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  assert.deepEqual(vendorDocs({ cwd: web, monorepoRoot: root }), { docs: [], removed: [] });
-  assert.equal(fs.existsSync(path.join(web, 'docs')), false);
-});
+        ctx.expect(vendorDocs({ cwd: web, monorepoRoot: root })).toEqual({ docs: [], removed: [] });
+        ctx.expect(fs.existsSync(path.join(web, 'docs'))).toBe(false);
+      },
+    },
 
-test('vendor-docs: the whole docs tree lands in the manager with the same shape', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-tree');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'vendor-docs: the whole docs tree lands in the manager with the same shape',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-tree');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const result = vendorDocs({ cwd: manager, monorepoRoot: root });
+        const result = vendorDocs({ cwd: manager, monorepoRoot: root });
 
-  assert.deepEqual([...result.docs].sort(), [
-    'omega.md', 'shared/config.md', 'web/classy-v2/DIRECTION.md', 'web/classy-v2/shot.png', 'web/index.md',
-  ]);
-  assert.equal(read(manager, 'docs', 'shared', 'config.md'), '# config\n');
-  assert.ok(fs.readFileSync(path.join(manager, 'docs', 'web', 'classy-v2', 'shot.png')).equals(PNG), 'binary files copy byte for byte');
-});
+        ctx.expect([...result.docs].sort()).toEqual([
+          'omega.md', 'shared/config.md', 'web/classy-v2/DIRECTION.md', 'web/classy-v2/shot.png', 'web/index.md',
+        ]);
+        ctx.expect(read(manager, 'docs', 'shared', 'config.md')).toBe('# config\n');
+        ctx.expect(fs.readFileSync(path.join(manager, 'docs', 'web', 'classy-v2', 'shot.png')).equals(PNG), 'binary files copy byte for byte').toBeTruthy();
+      },
+    },
 
-test('vendor-docs: links inside docs keep their shape, links out of it are retargeted', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-links');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'vendor-docs: links inside docs keep their shape, links out of it are retargeted',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-links');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  vendorDocs({ cwd: manager, monorepoRoot: root });
+        vendorDocs({ cwd: manager, monorepoRoot: root });
 
-  const map = read(manager, 'docs', 'omega.md');
-  assert.match(map, /\]\(shared\/config\.md\)/, 'a link inside docs is untouched');
-  assert.match(map, /\]\(web\/index\.md#top\)/, 'its anchor too');
-  assert.match(map, /\]\(\.\.\/\.\.\/account\/src\)/, 'a package source link reaches the sibling in the scope');
-  assert.match(map, /^Plugin: main skill$/m, 'the plugin does not ship, so a link into it keeps its words only');
-  assert.match(map, /^Brand: sandbox$/m, 'a link with no shipped target keeps its words only');
-  assert.match(map, /\]\(https:\/\/github\.com\/Omega-JS-Stack\/omega\)/, 'a web link is untouched');
-  assert.match(map, /\]\(#below\)/, 'a same-page anchor is untouched');
+        const map = read(manager, 'docs', 'omega.md');
+        ctx.expect(map, 'a link inside docs is untouched').toMatch(/\]\(shared\/config\.md\)/);
+        ctx.expect(map, 'its anchor too').toMatch(/\]\(web\/index\.md#top\)/);
+        ctx.expect(map, 'a package source link reaches the sibling in the scope').toMatch(/\]\(\.\.\/\.\.\/account\/src\)/);
+        ctx.expect(map, 'the plugin does not ship, so a link into it keeps its words only').toMatch(/^Plugin: main skill$/m);
+        ctx.expect(map, 'a link with no shipped target keeps its words only').toMatch(/^Brand: sandbox$/m);
+        ctx.expect(map, 'a web link is untouched').toMatch(/\]\(https:\/\/github\.com\/Omega-JS-Stack\/omega\)/);
+        ctx.expect(map, 'a same-page anchor is untouched').toMatch(/\]\(#below\)/);
 
-  const guide = read(manager, 'docs', 'web', 'index.md');
-  assert.match(guide, /\]\(\.\.\/\.\.\/\.\.\/web\/README\.md#usage\)/, 'depth is counted from the nested file');
-  assert.match(guide, /\]\(\.\.\/omega\.md\)/);
-  assert.ok(read(root, 'docs', 'omega.md').includes('](../packages/account/src)'), 'the monorepo source is never touched');
-});
+        const guide = read(manager, 'docs', 'web', 'index.md');
+        ctx.expect(guide, 'depth is counted from the nested file').toMatch(/\]\(\.\.\/\.\.\/\.\.\/web\/README\.md#usage\)/);
+        ctx.expect(guide).toMatch(/\]\(\.\.\/omega\.md\)/);
+        ctx.expect(read(root, 'docs', 'omega.md').includes('](../packages/account/src)'), 'the monorepo source is never touched').toBeTruthy();
+      },
+    },
 
-test('syncDocs: a re-run writes only what changed and removes what the source dropped', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-sync');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'syncDocs: a re-run writes only what changed and removes what the source dropped',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-sync');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  syncDocs({ monorepoRoot: root, packageDir: manager });
-  const untouched = path.join(manager, 'docs', 'shared', 'config.md');
-  const past = new Date('2020-01-01T00:00:00Z');
-  fs.utimesSync(untouched, past, past);
-  fs.writeFileSync(path.join(manager, 'docs', 'AGENTS.md'), '# a stale shipped file\n');
+        syncDocs({ monorepoRoot: root, packageDir: manager });
+        const untouched = path.join(manager, 'docs', 'shared', 'config.md');
+        const past = new Date('2020-01-01T00:00:00Z');
+        fs.utimesSync(untouched, past, past);
+        fs.writeFileSync(path.join(manager, 'docs', 'AGENTS.md'), '# a stale shipped file\n');
 
-  assert.deepEqual(syncDocs({ monorepoRoot: root, packageDir: manager }), { written: [], removed: ['AGENTS.md'] });
-  assert.equal(fs.existsSync(path.join(manager, 'docs', 'AGENTS.md')), false, 'a file the source lacks is removed');
+        ctx.expect(syncDocs({ monorepoRoot: root, packageDir: manager })).toEqual({ written: [], removed: ['AGENTS.md'] });
+        ctx.expect(fs.existsSync(path.join(manager, 'docs', 'AGENTS.md')), 'a file the source lacks is removed').toBe(false);
 
-  fs.writeFileSync(path.join(root, 'docs', 'omega.md'), '# OMEGA v2\n');
-  fs.rmSync(path.join(root, 'docs', 'web', 'classy-v2'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'docs', 'omega.md'), '# OMEGA v2\n');
+        fs.rmSync(path.join(root, 'docs', 'web', 'classy-v2'), { recursive: true });
 
-  const result = syncDocs({ monorepoRoot: root, packageDir: manager });
-  assert.deepEqual(result.written, ['omega.md'], 'only the edited file is written');
-  assert.deepEqual([...result.removed].sort(), ['web/classy-v2/DIRECTION.md', 'web/classy-v2/shot.png']);
-  assert.equal(read(manager, 'docs', 'omega.md'), '# OMEGA v2\n');
-  assert.equal(fs.existsSync(path.join(manager, 'docs', 'web', 'classy-v2')), false, 'the emptied folder is pruned');
-  assert.equal(fs.statSync(untouched).mtime.getTime(), past.getTime(), 'an unchanged file is never rewritten');
-});
+        const result = syncDocs({ monorepoRoot: root, packageDir: manager });
+        ctx.expect(result.written, 'only the edited file is written').toEqual(['omega.md']);
+        ctx.expect([...result.removed].sort()).toEqual(['web/classy-v2/DIRECTION.md', 'web/classy-v2/shot.png']);
+        ctx.expect(read(manager, 'docs', 'omega.md')).toBe('# OMEGA v2\n');
+        ctx.expect(fs.existsSync(path.join(manager, 'docs', 'web', 'classy-v2')), 'the emptied folder is pruned').toBe(false);
+        ctx.expect(fs.statSync(untouched).mtime.getTime(), 'an unchanged file is never rewritten').toBe(past.getTime());
+      },
+    },
 
-test('syncDocs: a dry run reports the same changes and writes nothing', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-dry');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'syncDocs: a dry run reports the same changes and writes nothing',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-dry');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const result = syncDocs({ monorepoRoot: root, packageDir: manager, dryRun: true });
-  assert.equal(result.written.length, 5);
-  assert.equal(fs.existsSync(path.join(manager, 'docs')), false);
-});
+        const result = syncDocs({ monorepoRoot: root, packageDir: manager, dryRun: true });
+        ctx.expect(result.written.length).toBe(5);
+        ctx.expect(fs.existsSync(path.join(manager, 'docs'))).toBe(false);
+      },
+    },
 
-test('syncDocs: a missing docs source fails loudly', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-missing');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'syncDocs: a missing docs source fails loudly',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-missing');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  fs.rmSync(path.join(root, 'docs'), { recursive: true });
-  assert.throws(() => vendorDocs({ cwd: manager, monorepoRoot: root }), /Missing docs source/);
-});
+        fs.rmSync(path.join(root, 'docs'), { recursive: true });
+        ctx.expect(() => vendorDocs({ cwd: manager, monorepoRoot: root })).toThrow(/Missing docs source/);
+      },
+    },
 
-test('vendor-docs: the manager carries no plugin and no marketplace, though the monorepo has both', (t) => {
-  const { root, manager } = makeFixture('vendor-docs-plugin');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'vendor-docs: the manager carries no plugin and no marketplace, though the monorepo has both',
+      run: (ctx) => {
+        const { root, manager } = makeFixture('vendor-docs-plugin');
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  vendorDocs({ cwd: manager, monorepoRoot: root });
+        vendorDocs({ cwd: manager, monorepoRoot: root });
 
-  assert.equal(fs.existsSync(path.join(manager, 'claude-plugin')), false);
-  assert.equal(fs.existsSync(path.join(manager, '.claude-plugin')), false);
-  for (const gone of ['PLUGIN_SOURCE', 'PLUGIN_DIR', 'MARKETPLACE_FILE']) {
-    assert.equal(vendorDocs[gone], undefined, `${gone} named the vendored plugin, which is gone`);
-  }
+        ctx.expect(fs.existsSync(path.join(manager, 'claude-plugin'))).toBe(false);
+        ctx.expect(fs.existsSync(path.join(manager, '.claude-plugin'))).toBe(false);
+        for (const gone of ['PLUGIN_SOURCE', 'PLUGIN_DIR', 'MARKETPLACE_FILE']) {
+          ctx.expect(vendorDocs[gone], `${gone} named the vendored plugin, which is gone`).toBe(undefined);
+        }
+      },
+    },
+  ],
 });

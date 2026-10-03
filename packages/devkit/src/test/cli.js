@@ -4,8 +4,10 @@
  *
  *   node packages/devkit/src/test/cli.js [targets] [--root=<dir>] [--log=<path>]
  *     [--filter=<text>] [--layer=<name>] [--lane=<name>] [--extended] [--reporter=pretty|json]
+ *     [--isolation=none|process]
  *
  * `--root` defaults to `test` and `--log` to `logs/test.log`, both under the cwd.
+ * `--isolation` defaults to `none` (one process); `process` runs each file in its own child.
  * Exits 1 on a failed case, a target that matches nothing, or a broken init hook.
  */
 
@@ -39,6 +41,7 @@ async function main(argv) {
     projectRoot: cwd,
     roots: [{ source: 'project', dir: path.resolve(cwd, flag(args, 'root') || 'test') }],
     log: path.resolve(cwd, flag(args, 'log') || path.join('logs', 'test.log')),
+    isolation: args.isolation,
   });
 
   const results = await runner.run({

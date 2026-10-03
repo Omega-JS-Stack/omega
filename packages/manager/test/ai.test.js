@@ -4,8 +4,7 @@
 // them mid-walk and a brand that does not answers Disable once. Both keys are
 // OPTIONAL (`gates: false`) — preflight never gates a run on them.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -46,142 +45,166 @@ function context(brandRoot, brandConfig = BACKEND_BRAND, options = {}) {
   };
 }
 
-test('ai: the registry declares both provider keys as OPTIONAL inputs', () => {
-  const declaration = REQUIRES.ai;
-  const inputs = serviceInputs('ai');
+module.exports = defineCases({
+  type: 'group',
+  description: 'ai',
+  tests: [
+    {
+      name: 'ai: the registry declares both provider keys as OPTIONAL inputs',
+      run: (ctx) => {
+        const declaration = REQUIRES.ai;
+        const inputs = serviceInputs('ai');
 
-  assert.equal(declaration.label, 'AI providers');
-  assert.equal(declaration.disablePath, 'ai.enabled');
-  assert.deepEqual(inputs.map((entry) => entry.name), KEYS);
+        ctx.expect(declaration.label).toBe('AI providers');
+        ctx.expect(declaration.disablePath).toBe('ai.enabled');
+        ctx.expect(inputs.map((entry) => entry.name)).toEqual(KEYS);
 
-  for (const entry of inputs) {
-    assert.equal(entry.prompted, true, `${entry.name} is collected mid-run on a TTY`);
-    assert.equal(entry.gates, false, `${entry.name} is optional — preflight never gates on it`);
-  }
+        for (const entry of inputs) {
+          ctx.expect(entry.prompted, `${entry.name} is collected mid-run on a TTY`).toBe(true);
+          ctx.expect(entry.gates, `${entry.name} is optional — preflight never gates on it`).toBe(false);
+        }
 
-  // What each key IS and where it is minted comes from the env SCHEMA, its one
-  // home (#867); the spec is where the schema's half meets the registry's
-  for (const input of serviceInputSpec('ai').inputs) {
-    assert.match(input.url, /^https:\/\//, `${input.name} names the page that mints it`);
-    assert.ok(input.hint, `${input.name} says what to make there`);
-  }
+        // What each key IS and where it is minted comes from the env SCHEMA, its one
+        // home (#867); the spec is where the schema's half meets the registry's
+        for (const input of serviceInputSpec('ai').inputs) {
+          ctx.expect(input.url, `${input.name} names the page that mints it`).toMatch(/^https:\/\//);
+          ctx.expect(input.hint, `${input.name} says what to make there`).toBeTruthy();
+        }
 
-  // The ask mirrors the service's own gate: absence means ask
-  const asked = (config) => missingEnvKeys({ ...config, targets: { backend: { type: 'backend' } } }, {}, { verb: 'manage' })
-    .filter((row) => row.service === 'ai')
-    .map((row) => row.key)
-    .sort();
-  assert.deepEqual(asked({}), [...KEYS].sort());
-  assert.deepEqual(asked({ ai: { enabled: false } }), []);
+        // The ask mirrors the service's own gate: absence means ask
+        const asked = (config) => missingEnvKeys({ ...config, targets: { backend: { type: 'backend' } } }, {}, { verb: 'manage' })
+          .filter((row) => row.service === 'ai')
+          .map((row) => row.key)
+          .sort();
+        ctx.expect(asked({})).toEqual([...KEYS].sort());
+        ctx.expect(asked({ ai: { enabled: false } })).toEqual([]);
 
-  assert.ok(SERVICE_ORDER.includes('ai'), 'the walk runs it');
-  assert.deepEqual(serviceInputSpec('ai').inputs.map((entry) => entry.name), KEYS);
-});
+        ctx.expect(SERVICE_ORDER.includes('ai'), 'the walk runs it').toBeTruthy();
+        ctx.expect(serviceInputSpec('ai').inputs.map((entry) => entry.name)).toEqual(KEYS);
+      },
+    },
 
-test('ai: both keys already in the environment → nothing asked', async () => {
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  for (const name of KEYS) process.env[name] = 'already-set';
+    {
+      name: 'ai: both keys already in the environment → nothing asked',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        for (const name of KEYS) process.env[name] = 'already-set';
 
-  try {
-    const result = await run(context(brandRoot));
-    assert.equal(result.status, 'success');
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false, 'nothing was written');
-  } finally {
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+        try {
+          const result = await run(context(brandRoot));
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env')), 'nothing was written').toBe(false);
+        } finally {
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('ai: PROVIDE → both keys land in the brand .env and export for this run', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
+    {
+      name: 'ai: PROVIDE → both keys land in the brand .env and export for this run',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
 
-  const tty = openTtyPrompt();
-  const browser = stubBrowser();
-  try {
-    const running = run(context(brandRoot));
-    await tty.answer('Set up now?', '\r');                       // Provide
-    await tty.answer('Press Enter to open the OpenAI API key page', '\r');
-    await tty.answer('Paste OPENAI_API_KEY', 'openai-fixture\r');
-    await tty.answer('Press Enter to open the Anthropic API key page', '\r');
-    await tty.answer('Paste ANTHROPIC_API_KEY', 'anthropic-fixture\r');
-    const result = await running;
+        const tty = openTtyPrompt();
+        const browser = stubBrowser();
+        try {
+          const running = run(context(brandRoot));
+          await tty.answer('Set up now?', '\r');                       // Provide
+          await tty.answer('Press Enter to open the OpenAI API key page', '\r');
+          await tty.answer('Paste OPENAI_API_KEY', 'openai-fixture\r');
+          await tty.answer('Press Enter to open the Anthropic API key page', '\r');
+          await tty.answer('Paste ANTHROPIC_API_KEY', 'anthropic-fixture\r');
+          const result = await running;
 
-    assert.equal(result.status, 'success');
-    assert.equal(process.env.OPENAI_API_KEY, 'openai-fixture');
-    assert.equal(process.env.ANTHROPIC_API_KEY, 'anthropic-fixture');
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(process.env.OPENAI_API_KEY).toBe('openai-fixture');
+          ctx.expect(process.env.ANTHROPIC_API_KEY).toBe('anthropic-fixture');
 
-    const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
-    assert.match(env, /EXISTING_KEY="keep-me"/);
-    assert.match(env, /OPENAI_API_KEY="openai-fixture"/);
-    assert.match(env, /ANTHROPIC_API_KEY="anthropic-fixture"/);
-    // Providing never disables anything
-    assert.doesNotMatch(readConfigSource(brandRoot), /enabled/);
-    assert.deepEqual(browser.opened, [
-      'https://platform.openai.com/api-keys',
-      'https://console.anthropic.com/settings/keys',
-    ]);
-  } finally {
-    tty.close();
-    browser.restore();
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
+          ctx.expect(env).toMatch(/EXISTING_KEY="keep-me"/);
+          ctx.expect(env).toMatch(/OPENAI_API_KEY="openai-fixture"/);
+          ctx.expect(env).toMatch(/ANTHROPIC_API_KEY="anthropic-fixture"/);
+          // Providing never disables anything
+          ctx.expect(readConfigSource(brandRoot)).not.toMatch(/enabled/);
+          ctx.expect(browser.opened).toEqual([
+            'https://platform.openai.com/api-keys',
+            'https://console.anthropic.com/settings/keys',
+          ]);
+        } finally {
+          tty.close();
+          browser.restore();
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('ai: DISABLE → ai.enabled: false lands in omega.json5 and nothing asks again', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  // keep me\n  ai: {},\n}\n');
-  const brandConfig = { brand: { id: 'b' }, ai: {}, ...BACKEND_BRAND };
+    {
+      name: 'ai: DISABLE → ai.enabled: false lands in omega.json5 and nothing asks again',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  // keep me\n  ai: {},\n}\n');
+        const brandConfig = { brand: { id: 'b' }, ai: {}, ...BACKEND_BRAND };
 
-  const tty = openTtyPrompt();
-  try {
-    const running = run(context(brandRoot, brandConfig));
-    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`);          // Disable
-    const result = await running;
+        const tty = openTtyPrompt();
+        try {
+          const running = run(context(brandRoot, brandConfig));
+          await tty.answer('Set up now?', `${DOWN}${DOWN}\r`);          // Disable
+          const result = await running;
 
-    assert.equal(result.status, 'skipped');
-    assert.match(result.reason, /ai\.enabled/);
-    assert.deepEqual(result.missingEnv, KEYS);
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.reason).toMatch(/ai\.enabled/);
+          ctx.expect(result.missingEnv).toEqual(KEYS);
 
-    const source = readConfigSource(brandRoot);
-    assert.match(source, /enabled: false/);
-    assert.match(source, /\/\/ keep me/);
-    assert.equal(brandConfig.ai.enabled, false);
-    assert.equal(process.env.OPENAI_API_KEY, undefined);
-  } finally {
-    tty.close();
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          const source = readConfigSource(brandRoot);
+          ctx.expect(source).toMatch(/enabled: false/);
+          ctx.expect(source).toMatch(/\/\/ keep me/);
+          ctx.expect(brandConfig.ai.enabled).toBe(false);
+          ctx.expect(process.env.OPENAI_API_KEY).toBe(undefined);
+        } finally {
+          tty.close();
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('ai: a disabled brand skips before any gate opens', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  ai: { enabled: false },\n}\n');
+    {
+      name: 'ai: a disabled brand skips before any gate opens',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  ai: { enabled: false },\n}\n');
 
-  const tty = openTtyPrompt();
-  try {
-    const result = await run(context(brandRoot, { ai: { enabled: false } }));
-    assert.equal(result.status, 'skipped');
-    assert.match(result.reason, /ai\.enabled/);
-  } finally {
-    tty.close();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+        const tty = openTtyPrompt();
+        try {
+          const result = await run(context(brandRoot, { ai: { enabled: false } }));
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.reason).toMatch(/ai\.enabled/);
+        } finally {
+          tty.close();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('ai: a non-interactive run never prompts — it names the keys and moves on', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+    {
+      name: 'ai: a non-interactive run never prompts — it names the keys and moves on',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
 
-  try {
-    const result = await run(context(brandRoot, BACKEND_BRAND, { dryRun: true }));
-    assert.equal(result.status, 'skipped');
-    assert.deepEqual(result.missingEnv, KEYS);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
+        try {
+          const result = await run(context(brandRoot, BACKEND_BRAND, { dryRun: true }));
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.missingEnv).toEqual(KEYS);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

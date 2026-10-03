@@ -76,7 +76,7 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
    * Normalize any of the four case-spec forms (standalone, suite, group, bare array).
    * @param {object|Array} spec - What a case file passed to defineCases.
    * @param {{ file: string }} options - The case file; it prefixes every case id.
-   * @returns {object} `{ file, description, layer, type, stopOnFailure, timeout, skip, cleanup, cases }`.
+   * @returns {object} `{ file, description, layer, type, stopOnFailure, timeout, skip, setup, cleanup, cases }`.
    */
   function normalizeSpec(spec, { file }) {
     if (Array.isArray(spec)) return normalizeSpec({ type: 'group', tests: spec }, { file });
@@ -91,6 +91,7 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
       stopOnFailure: type === 'suite' && spec.stopOnFailure !== false,
       timeout: spec.timeout,
       skip: spec.skip,
+      setup: spec.setup,
       cleanup: spec.cleanup,
     };
 
@@ -103,7 +104,7 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     for (const key of Object.keys(spec)) {
       if (!SUITE_KEYS.includes(key)) own[key] = spec[key];
     }
-    return { ...suite, cleanup: undefined, cases: [normalizeCase(own, 0, file, spec.description)] };
+    return { ...suite, setup: undefined, cleanup: undefined, cases: [normalizeCase(own, 0, file, spec.description)] };
   }
 
   /**
@@ -145,8 +146,23 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     }
   }
 
+  // Run the functions a case registered through `ctx.after`, newest first, each
+  // awaited; resolves to `{ error }` for the first one that throws, else null.
+  async function runAfters(afters) {
+    let failure = null;
+    for (const fn of [...afters].reverse()) {
+      try {
+        await fn();
+      } catch (e) {
+        if (!failure) failure = { error: e };
+      }
+    }
+    return failure;
+  }
+
   /**
-   * Run one normalized case under its timeout.
+   * Run one normalized case under its timeout. The case's ctx gains `after(fn)`:
+   * each registered function runs once the case settles, newest first.
    * @param {object} caseDef - A normalized case.
    * @param {object} ctx - From createContext.
    * @param {{ timeout?: number }} [options] - The suite's (or the default) timeout; the case's own wins.
@@ -155,31 +171,48 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
   async function runCase(caseDef, ctx, { timeout } = {}) {
     if (caseDef.skip) return skipEvent(caseDef, skipReason(caseDef.skip));
 
+    const afters = [];
+    const caseCtx = { ...ctx, after(fn) { afters.push(fn); } };
     const limit = caseDef.timeout || timeout || DEFAULT_TIMEOUT;
     const start = Date.now();
     let timer;
+    let thrown = null;
     try {
       await Promise.race([
-        new Promise((resolve) => resolve(caseDef.run(ctx))),
+        new Promise((resolve) => resolve(caseDef.run(caseCtx))),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Test timeout')), limit); }),
       ]);
     } catch (e) {
-      const durationMs = Date.now() - start;
-      if (e && e.name === 'SkipError') return { ...skipEvent(caseDef, e.message), durationMs };
-      return { id: caseDef.id, name: caseDef.name, status: 'fail', durationMs, error: errorOf(e) };
+      thrown = { error: e, skip: Boolean(e && e.name === 'SkipError') };
     } finally {
       clearTimeout(timer);
     }
 
+    // An `after` that throws fails a case that passed or skipped; a failed case keeps its own error.
+    const afterFailure = await runAfters(afters);
     const durationMs = Date.now() - start;
-    await runCleanup(caseDef.cleanup, ctx, caseDef.name);
+    const failed = (error) => ({ id: caseDef.id, name: caseDef.name, status: 'fail', durationMs, error: errorOf(error) });
+    if (thrown && !thrown.skip) return failed(thrown.error);
+    if (afterFailure) return failed(afterFailure.error);
+    if (thrown) return { ...skipEvent(caseDef, thrown.error.message), durationMs };
+
+    await runCleanup(caseDef.cleanup, caseCtx, caseDef.name);
     return { id: caseDef.id, name: caseDef.name, status: 'pass', durationMs };
   }
 
+  // A suite `setup` that skips or throws settles every case without running one.
+  async function settleAll(suite, report, error) {
+    const skip = Boolean(error && error.name === 'SkipError');
+    for (const caseDef of suite.cases) {
+      if (skip) await report(skipEvent(caseDef, error.message));
+      else await report({ id: caseDef.id, name: caseDef.name, status: 'fail', durationMs: 0, error: errorOf(error) });
+    }
+  }
+
   /**
-   * Run a normalized suite's cases in order with one shared state, then its cleanup.
-   * `extras` is the ctx extras: an object, or a function of `{ ...case, suite }`
-   * (called with `{ suite }` alone for the suite cleanup).
+   * Run a normalized suite's `setup`, its cases in order with one shared state,
+   * then its cleanup. `extras` is the ctx extras: an object, or a function of
+   * `{ ...case, suite }` (called with `{ suite }` alone for setup and cleanup).
    * @param {object} suite - From normalizeSpec.
    * @param {{ expect: Function, extras?: object|Function, defaultTimeout?: number, report: Function }} options
    * @returns {Promise<void>}
@@ -195,8 +228,18 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     const state = {};
     const stopOnFailure = suite.type === 'suite' && suite.stopOnFailure !== false;
     let stopped = false;
+    let setupFailed = false;
 
-    for (const caseDef of suite.cases) {
+    if (typeof suite.setup === 'function') {
+      try {
+        await suite.setup(createContext({ expect, state, layer: suite.layer, extras: await resolveExtras({ suite }) }));
+      } catch (e) {
+        await settleAll(suite, report, e);
+        setupFailed = true;
+      }
+    }
+
+    for (const caseDef of setupFailed ? [] : suite.cases) {
       if (stopped) {
         await report(skipEvent(caseDef, 'suite stopped'));
         continue;

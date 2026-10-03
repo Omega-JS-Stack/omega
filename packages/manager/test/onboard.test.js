@@ -5,8 +5,7 @@
  * brand, the manage handoff, and the manage pins: workspace green on a fresh
  * scaffold, testing honestly nudging toward the update service.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -97,562 +96,6 @@ function stubFrameworks(root, names) {
   fs.writeFileSync(bin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
 }
 
-// ─── Derivation units ────────────────────────────────────────────────────────
-
-test('deriveId/deriveName/deriveUrl: dir names → wizard defaults', () => {
-  assert.equal(deriveId('My Brand 2'), 'my-brand-2');
-  assert.equal(deriveId('acme-demo'), 'acme-demo');
-  assert.equal(deriveId('123-acme'), 'acme'); // ids start with a letter
-  assert.equal(deriveId('!!!'), null);
-
-  assert.equal(deriveName('acme-demo'), 'Acme Demo');
-  assert.equal(deriveUrl('acme-demo'), 'https://acmedemo.com'); // dashes drop out (omega-manager parity)
-});
-
-// ─── Non-interactive (flags + derivation) ────────────────────────────────────
-
-test('fresh onboard initializes git with a first commit that honors .gitignore (cp196)', async () => {
-  const root = tempDir();
-
-  const report = await runOnboard(root, { id: 'gitful', manage: false });
-
-  assert.equal(report.git.initialized, true);
-  assert.equal(report.git.committed, true);
-  assert.ok(fs.existsSync(path.join(root, '.git')), '.git exists');
-
-  const { spawnSync } = require('node:child_process');
-  const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
-  assert.equal(count.stdout.trim(), '1', 'exactly one commit');
-
-  const tracked = spawnSync('git', ['-C', root, 'ls-files'], { encoding: 'utf8' }).stdout;
-  assert.ok(tracked.includes('config/omega.json5'), 'config committed');
-  assert.ok(tracked.includes('package.json'), 'manifest committed');
-  assert.ok(!tracked.includes('.env'), '.env never committed (scaffolded .gitignore is live before the commit)');
-});
-
-test('onboard inside an existing work tree skips git init (cp196)', async () => {
-  const root = tempDir();
-  const { spawnSync } = require('node:child_process');
-  spawnSync('git', ['-C', root, 'init'], { stdio: 'ignore' });
-
-  const report = await runOnboard(root, { id: 'nested', manage: false });
-
-  assert.equal(report.git.initialized, false);
-  assert.equal(report.git.reason, 'existing repository');
-  const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
-  assert.notEqual(count.stdout.trim(), '1', 'no commit was made on the existing repo');
-});
-
-test('non-interactive: full flags scaffold the complete brand monorepo', async () => {
-  const root = tempDir();
-
-  const report = await runOnboard(root, {
-    id: 'acme',
-    name: 'Acme Inc',
-    url: 'https://acme.io',
-    description: 'Rockets and anvils',
-    tagline: 'Beep beep',
-    contactName: 'Wile E. Coyote, CEO',
-    contactImage: 'https://acme.io/wile.jpg',
-    contactUrl: 'https://acme.io/wile',
-    targets: 'web,backend,desktop',
-    manage: false,
-    execFn: toolProbe(),
-  });
-
-  assert.equal(report.mode, 'fresh');
-  assert.equal(report.brandRoot, root);
-  assert.equal(report.valid, true);
-  assert.deepEqual(report.created.sort(), [
-    '.env',
-    '.env.development',
-    '.env.production',
-    '.env.testing',
-    '.gitignore',
-    'README.md',
-    'config/omega.json5',
-    'package.json',
-    'targets/backend/package.json',
-    'targets/desktop/package.json',
-    'targets/web/package.json',
-  ]);
-  assert.deepEqual(report.kept, []);
-
-  const config = readConfig(root);
-  assert.deepEqual(config.brand, {
-    id: 'acme',
-    name: 'Acme Inc',
-    description: 'Rockets and anvils',
-    tagline: 'Beep beep',
-    url: 'https://acme.io',
-    contact: {
-      email: 'support@acme.io',
-      // The human who signs the personal sends — flags answer it
-      // non-interactively; the optionals ride along (#770)
-      person: { name: 'Wile E. Coyote, CEO', image: 'https://acme.io/wile.jpg', url: 'https://acme.io/wile' },
-    },
-  });
-  assert.deepEqual(config.theme, { id: 'classy', appearance: 'system' });
-  // Socials seed EMPTY (#462): every surface that reads the block (the footer
-  // row, sameAs, the /<platform> shortlinks) shows what the brand DECLARED —
-  // a seeded platform key would print a link to a profile nobody owns
-  assert.deepEqual(config.socials, {});
-  assert.deepEqual(Object.keys(config.targets), ['web', 'backend', 'desktop']);
-  // Every entry declares its TYPE (#886): the key is the name and the folder,
-  // the type says which framework runs there
-  assert.deepEqual(config.targets, { web: { type: 'web' }, backend: { type: 'backend' }, desktop: { type: 'desktop' } });
-  // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
-  assert.deepEqual(config.certificates, { providers: { apple: { bundleIdPrefix: 'io.acme' } } });
-  // `targets` is the LAST top-level key in the seeded config (canonical order)
-  assert.equal(Object.keys(config).at(-1), 'targets');
-
-  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  assert.equal(pkg.name, 'acme');
-  assert.equal(pkg.private, true);
-  // npm's own word for closed-source commercial code (#884). Every scaffolded
-  // manifest states it, because a target's license field is what the Firefox
-  // lane sends AMO when it creates the brand's listing (all-rights-reserved)
-  assert.equal(pkg.license, 'UNLICENSED');
-  assert.deepEqual(pkg.workspaces, ['targets/*']);
-  // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
-  // the scaffold must declare it or nothing installs it outside the monorepo
-  // (cp195 journey catch)
-  // Exact pin, the manager's own version — the family ships lockstep (#794)
-  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': MANAGER_VERSION });
-  // Scripts say `omega` — the ONE user-facing verb (the retired omega-manager
-  // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251).
-  // `npm start` boots the dev stack; the manage cycle is the NAMED verb (#229)
-  assert.deepEqual(pkg.scripts, {
-    start: 'omega dev', dev: 'omega dev', manage: 'omega manage', deploy: 'omega deploy',
-  });
-
-  // README speaks `npx omega` too — no user-facing surface names the old bin
-  const readmeText = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.ok(readmeText.includes('npx omega'));
-  assert.ok(!readmeText.includes('omega-manager'), 'README never mentions the retired bin name');
-
-  const targetPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
-  assert.equal(targetPkg.name, 'acme-web');
-
-  // Every target, not just the root: the license travels with the manifest a
-  // store reads it from (#884)
-  for (const target of ['web', 'backend', 'desktop']) {
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'targets', target, 'package.json'), 'utf8'));
-    assert.equal(manifest.license, 'UNLICENSED', `targets/${target} states its license`);
-  }
-
-  // cp95a seeds: framework dep per target — the backend's is a RUNTIME
-  // dependency on its ONE target manifest (src/dist pillar: the stage derives
-  // dist/package.json from it), every other target's is a devDependency —
-  // plus a bootable demo-* cloud project and the starter catalog as a comment
-  assert.deepEqual(targetPkg.devDependencies, { '@omega.js/web': MANAGER_VERSION });
-  const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'));
-  assert.deepEqual(backendPkg.dependencies, { '@omega.js/backend': MANAGER_VERSION });
-  assert.equal(backendPkg.devDependencies, undefined, 'backend framework is a runtime dep, not dev');
-  assert.deepEqual(config.cloud, { provider: 'firebase', config: { projectId: 'demo-acme' } });
-  const rawConfig = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
-  assert.match(rawConfig, /\/\/ payment: \{/, 'starter catalog ships commented');
-  assert.equal(config.payment, undefined, 'catalog is a comment, not config');
-
-  // The .env stub documents the credential entry points: external keys
-  // commented out, omega-owned keys provisioned with generated secrets
-  const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
-  assert.ok(env.includes('# CLOUDFLARE_TOKEN=""'));
-  assert.ok(env.includes('# STRIPE_SECRET_KEY=""'));
-  assert.match(env, /^OMEGA_ADMIN_KEY="[A-Za-z0-9_-]{43}"$/m);
-  assert.match(env, /^OMEGA_WEBHOOK_KEY="[A-Za-z0-9_-]{43}"$/m);
-  assert.match(env, /^OMEGA_NAMESPACE="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"$/m);
-  // The email signing key is minted here too since #569 — a brand that never
-  // gets one crashes on its first order email
-  assert.match(env, /^UNSUBSCRIBE_HMAC_KEY="[0-9a-f]{64}"$/m);
-  assert.notEqual(env.match(/^OMEGA_ADMIN_KEY=(.+)$/m)[1], env.match(/^OMEGA_WEBHOOK_KEY=(.+)$/m)[1]);
-  const uncommented = env.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
-  const generated = Object.keys(require('@omega.js/config').generatedEnvKeys());
-  assert.ok(uncommented.every((line) => generated.some((key) => line.startsWith(`${key}=`))), 'only omega-generated keys are provisioned');
-
-  const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-  // logs/ joins the list with #197 — every verb writes one there now.
-  for (const entry of ['node_modules/', '.omega/', '.env', 'dist/', 'logs/']) {
-    assert.ok(gitignore.includes(entry), `gitignore missing ${entry}`);
-  }
-  assert.ok(gitignore.startsWith('# ========== Default Values ==========\n'), 'the scaffold writes the marked file the workspace service heals');
-  assert.ok(gitignore.endsWith('\n# ========== Custom Values ==========\n'), 'its Custom section is only its marker line');
-});
-
-test('non-interactive: everything derives from the directory name', async () => {
-  const parent = tempDir();
-  const root = path.join(parent, 'sweet-saucy');
-  fs.mkdirSync(root);
-
-  const report = await runOnboard(root, { manage: false });
-
-  assert.equal(report.valid, true);
-  const config = readConfig(root);
-  assert.equal(config.brand.id, 'sweet-saucy');
-  assert.equal(config.brand.name, 'Sweet Saucy');
-  assert.equal(config.brand.url, 'https://sweetsaucy.com');
-  assert.equal(config.brand.contact.email, 'support@sweetsaucy.com');
-  // Optional fields stay OUT of the config instead of landing as empty strings
-  assert.ok(!('description' in config.brand));
-  assert.ok(!('tagline' in config.brand));
-  // Target default: the website alone
-  assert.deepEqual(Object.keys(config.targets), ['web']);
-});
-
-test('non-interactive: underivable id is a clear error, bad flag values throw', async (t) => {
-  // No git user name anywhere, so nothing fills the contact person in
-  emptyGitConfig(t);
-  const parent = tempDir();
-  const root = path.join(parent, '№∆');
-  fs.mkdirSync(root);
-
-  await assert.rejects(() => runOnboard(root, { manage: false }), /--id=<id>/);
-  await assert.rejects(() => runOnboard(root, { id: 'Bad_Id', manage: false }), /Invalid brand id/);
-  await assert.rejects(() => runOnboard(root, { id: 'ok', url: 'ftp://x', manage: false }), /Invalid brand url/);
-  await assert.rejects(() => runOnboard(root, { id: 'ok', targets: 'web,gopher', manage: false }), /Unknown target\(s\): gopher/);
-  // A contact flag with nobody to belong to fails loudly instead of vanishing
-  await assert.rejects(() => runOnboard(root, { id: 'ok', contactImage: 'https://x/y.jpg', manage: false }), /need a --contactName/);
-  // A bare --contactName parses to boolean true; that is not a name
-  await assert.rejects(() => runOnboard(root, { id: 'ok', contactName: true, manage: false }), /Invalid --contactName/);
-
-  // Nothing was written by any failed attempt
-  assert.deepEqual(fs.readdirSync(root), []);
-});
-
-// ─── Interactive wizard (real prompts over fake TTY streams) ─────────────────
-
-test('interactive: the full wizard — typed id, accepted defaults, checkbox targets, manage declined', async () => {
-  const root = tempDir();
-  const tty = openTtyPrompt();
-
-  try {
-    const run = runOnboard(root, {});
-
-    await tty.answer('Brand ID:', 'wizard-brand\r');
-    await tty.answer('Brand name:', '\r');                    // accept derived: Wizard Brand
-    await tty.answer('Brand URL:', '\r');                     // accept derived: https://wizardbrand.com
-    await tty.answer('Company brand id', '\r');               // blank → standalone, no company key
-    await tty.answer('Brand description', 'A wizard-made brand\r');
-    await tty.answer('Brand tagline', '\r');                  // empty → omitted
-    await tty.answer('Contact person (', 'Jane Doe, CEO\r');
-    await tty.answer('Contact person headshot URL', '\r');    // empty → omitted
-    await tty.answer('Contact person link URL', '\r');        // empty → omitted
-    await tty.answer('Targets (', '\r');                      // accept the checked default: web
-    await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
-    await tty.answer('Run manage now?', 'n\r');
-
-    const report = await run;
-
-    assert.equal(report.mode, 'fresh');
-    assert.equal(report.valid, true);
-    assert.equal(report.manageExitCode, null);
-
-    const config = readConfig(root);
-    assert.equal(config.brand.id, 'wizard-brand');
-    assert.equal(config.brand.name, 'Wizard Brand');
-    assert.equal(config.brand.url, 'https://wizardbrand.com');
-    assert.equal(config.brand.description, 'A wizard-made brand');
-    assert.ok(!('tagline' in config.brand));
-    // The person signs the personal sends (#770); the skipped optionals stay
-    // out of the config rather than landing as empty strings
-    assert.deepEqual(config.brand.contact, { email: 'support@wizardbrand.com', person: { name: 'Jane Doe, CEO' } });
-    assert.deepEqual(Object.keys(config.targets), ['web']);
-    // Inherited account list stays unwritten — the source layer keeps owning it
-    assert.ok(!('account' in config));
-    // A blank company answer is the standalone brand: no key at all (#677)
-    assert.ok(!('company' in config));
-  } finally {
-    tty.close();
-  }
-});
-
-test('interactive: customizing the account list writes account.admins into the brand config', async () => {
-  const root = tempDir();
-  const tty = openTtyPrompt();
-
-  try {
-    const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend', execFn: toolProbe() });
-
-    await tty.answer('Company brand id', '\r');
-    await tty.answer('Brand description', '\r');
-    await tty.answer('Brand tagline', '\r');
-    await tty.answer('Contact person (', 'Boss Person\r');
-    await tty.answer('Contact person headshot URL', '\r');
-    await tty.answer('Contact person link URL', '\r');
-    await tty.answer('Keep this account list?', 'n\r');
-    await tty.answer('Account email', 'boss@{domain}\r');
-    await tty.answer('Manage the Firebase Auth account', '\r');   // yes (default)
-    await tty.answer('Sync the contact to marketing providers?', 'n\r');
-    await tty.answer('Add another account?', '\r');               // no (default)
-    await tty.answer('Run manage now?', 'n\r');
-
-    const report = await run;
-    assert.equal(report.valid, true);
-
-    const config = readConfig(root);
-    assert.deepEqual(config.account, {
-      admins: [{ email: 'boss@{domain}', account: true, marketing: false }],
-    });
-  } finally {
-    tty.close();
-  }
-});
-
-test('interactive: dry-run never prompts, even with a TTY, and writes nothing', async () => {
-  const parent = tempDir();
-  const root = path.join(parent, 'dry-brand');
-  fs.mkdirSync(root);
-  const tty = openTtyPrompt();
-
-  try {
-    // No tty.answer() calls — a prompt would hang this until the timeout
-    const report = await runOnboard(root, { dryRun: true });
-
-    assert.equal(report.created.length, 0);
-    assert.ok(report.planned.includes('config/omega.json5'));
-    assert.deepEqual(fs.readdirSync(root), []);
-  } finally {
-    tty.close();
-  }
-});
-
-// ─── Fill-missing semantics ──────────────────────────────────────────────────
-
-test('rerun converges: second onboard keeps every file, existing files are never overwritten', async () => {
-  const root = tempDir();
-  const custom = '{\n  "name": "hand-tuned",\n  "private": true,\n  "workspaces": ["targets/*"]\n}\n';
-  fs.writeFileSync(path.join(root, 'package.json'), custom);
-
-  const first = await runOnboard(root, { id: 'keeper', manage: false });
-  assert.deepEqual(first.kept, ['package.json']);
-  assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), custom);
-
-  const second = await runOnboard(root, { manage: false });
-  assert.equal(second.mode, 'resume');
-  assert.equal(second.created.length, 0);
-  assert.equal(second.kept.length, first.created.length + 1);
-});
-
-test('resume from inside an existing brand: answers come from its config, only gaps fill in', async () => {
-  const root = tempDir();
-  fs.mkdirSync(path.join(root, 'config'));
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
-    brand: { id: 'existing', name: 'Existing Brand', url: 'https://existing.test' },
-    targets: { web: { type: 'web' } },
-  }`);
-  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), '{ "name": "existing-web" }\n');
-
-  // From INSIDE the target dir — the brand root resolves by walk-up
-  const report = await runOnboard(path.join(root, 'targets', 'web'), { manage: false });
-
-  assert.equal(report.mode, 'resume');
-  assert.equal(report.brandRoot, root);
-  assert.deepEqual(report.created.sort(), ['.env', '.env.development', '.env.production', '.env.testing', '.gitignore', 'README.md', 'package.json']);
-
-  // Scaffolded files carry the EXISTING brand's identity, not derived guesses
-  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.ok(readme.startsWith('# Existing Brand'));
-});
-
-test('resume: a target NAMED admin scaffolds targets/admin around its declared type (#886)', async () => {
-  const root = tempDir();
-  fs.mkdirSync(path.join(root, 'config'));
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
-    brand: { id: 'named', name: 'Named Brand', url: 'https://named.test' },
-    targets: { web: { type: 'web' }, admin: { type: 'web' } },
-  }`);
-
-  const report = await runOnboard(root, { manage: false });
-
-  assert.equal(report.mode, 'resume');
-  assert.ok(report.created.includes('targets/admin/package.json'), 'the NAME is the folder');
-
-  // The TYPE picks the framework, so the admin target is a web target
-  const adminPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'admin', 'package.json'), 'utf8'));
-  assert.equal(adminPkg.name, 'named-admin');
-  assert.deepEqual(adminPkg.devDependencies, { '@omega.js/web': MANAGER_VERSION });
-
-  // README lists it by name, and the brand's own config is never rewritten
-  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.match(readme, /`targets\/admin\/`/);
-  assert.deepEqual(Object.keys(readConfig(root).targets), ['web', 'admin']);
-});
-
-test('resume: an existing contact person survives a rerun untouched (#770)', async () => {
-  const root = tempDir();
-  fs.mkdirSync(path.join(root, 'config'));
-  const authored = `{
-    brand: {
-      id: 'personful',
-      name: 'Personful',
-      url: 'https://personful.test',
-      contact: { email: 'support@personful.test', person: { name: 'Jane Doe, CEO' } },
-    },
-    targets: { web: { type: 'web' } },
-  }`;
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), authored);
-
-  const report = await runOnboard(root, { manage: false });
-
-  assert.equal(report.mode, 'resume');
-  // The person is the brand's own answer — a rerun never rewrites it
-  assert.deepEqual(readConfig(root).brand.contact.person, { name: 'Jane Doe, CEO' });
-  assert.equal(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'), authored);
-});
-
-// ─── Legacy port ─────────────────────────────────────────────────────────────
-
-test('port: a carried legacy oauth.json converts ONCE into the canonical google-oauth.json (#501)', async () => {
-  const root = tempDir();
-  const secrets = path.join(root, '.omega', 'secrets');
-  fs.mkdirSync(secrets, { recursive: true });
-  fs.writeFileSync(path.join(secrets, 'oauth.json'), `${JSON.stringify({
-    googleClientId: '1234-abc.apps.googleusercontent.com',
-    googleClientSecret: 'legacy-secret',
-  }, null, 2)}\n`);
-
-  // The write gate holds: a dry run plans and converts nothing
-  const dry = await runOnboard(root, { id: 'ported', manage: false, dryRun: true });
-  assert.equal(dry.legacyOAuth, undefined);
-  assert.equal(fs.existsSync(path.join(secrets, 'google-oauth.json')), false);
-
-  const report = await runOnboard(root, { id: 'ported', manage: false });
-
-  assert.equal(report.legacyOAuth.converted, true);
-  assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(secrets, 'google-oauth.json'), 'utf8')),
-    { clientId: '1234-abc.apps.googleusercontent.com', clientSecret: 'legacy-secret' },
-  );
-  // One-time: the inert legacy file is gone, so nothing dual-reads it later
-  assert.equal(fs.existsSync(path.join(secrets, 'oauth.json')), false);
-
-  const rerun = await runOnboard(root, { manage: false });
-  assert.equal(rerun.legacyOAuth.converted, false);
-});
-
-// ─── The company field (#677) ────────────────────────────────────────────────
-
-test('company: the wizard asks ONE field, and the answer lands as the top-level key', async (t) => {
-  const dir = tempDir('omega-onboard-co-');
-  const root = path.join(dir, 'acme');
-  fs.mkdirSync(root);
-  const tty = openTtyPrompt();
-
-  // The parent on this machine: its own run's registry line is what makes a
-  // child's `company: { id }` resolvable
-  const parent = path.join(dir, 'fixture-co');
-  fs.mkdirSync(path.join(parent, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(parent, 'config', 'omega.json5'), `{
-    brand: { id: 'fixture-co', name: 'Fixture Co', url: 'https://fixture-co.com' },
-    company: { id: 'self' },
-  }`);
-
-  const previousHome = process.env.OMEGA_HOME;
-  process.env.OMEGA_HOME = path.join(dir, 'home');
-  t.after(() => {
-    tty.close();
-    if (previousHome === undefined) delete process.env.OMEGA_HOME;
-    else process.env.OMEGA_HOME = previousHome;
-  });
-  recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.com' });
-
-  const run = runOnboard(root, { id: 'acme', name: 'Acme', url: 'https://acme.com', targets: 'web', manage: false });
-
-  await tty.answer('Company brand id', 'fixture-co\r');
-  await tty.answer('Brand description', '\r');
-  await tty.answer('Brand tagline', '\r');
-  await tty.answer('Contact person (', 'Boss Person\r');
-  await tty.answer('Contact person headshot URL', '\r');
-  await tty.answer('Contact person link URL', '\r');
-  await tty.answer('Keep this account list?', '\r');
-
-  const report = await run;
-
-  assert.equal(report.mode, 'fresh');
-  assert.equal(report.valid, true);
-
-  // The one key, outside `brand`, and nothing else about the relationship
-  const config = readConfig(root);
-  assert.deepEqual(config.company, { id: 'fixture-co' });
-  assert.equal(fs.existsSync(path.join(root, '.omega', 'company.json')), false, 'the stamp is retired (#677)');
-
-  // The signing prefix comes from the COMPANY's domain, not the brand's
-  assert.equal(config.certificates?.providers?.apple?.bundleIdPrefix, undefined, 'no signing target, no prefix written');
-
-  // Onboarding the same brand again converges and keeps the answer; Enter keeps the current targets
-  const rerun = runOnboard(root, { manage: false });
-  await tty.answer('Targets (', '\r');
-  const again = await rerun;
-  assert.equal(again.mode, 'resume');
-  assert.equal(again.created.length, 0);
-  assert.deepEqual(readConfig(root).company, { id: 'fixture-co' });
-});
-
-// ─── Manage pins ─────────────────────────────────────────────────────────────
-
-test('fresh scaffold runs the workspace service green', async () => {
-  const root = tempDir();
-  await runOnboard(root, { id: 'green', targets: 'web,backend', manage: false, execFn: toolProbe() });
-
-  const report = await runManage(root, { service: 'workspace', execFn: toolProbe() });
-
-  assert.equal(report.hasErrors, false);
-  assert.equal(report.results.workspace.status, 'success');
-});
-
-test('full manage on a fresh brand: services skip cleanly, testing honestly nudges toward the frameworks', async () => {
-  const root = tempDir();
-  await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false, execFn: toolProbe() });
-  // Both declared frameworks stubbed (the backend's is a runtime dep on its
-  // target manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
-  stubFrameworks(root, ['@omega.js/web', '@omega.js/backend']);
-
-  const report = await runManage(root, { ...FAKE_FETCH_200, execFn: toolProbe() });
-
-  // The scaffold itself is sound…
-  assert.equal(report.results.workspace.status, 'success');
-  assert.equal(report.results.update.status, 'success');
-
-  // …every external service skips (no credentials, no config)…
-  for (const [service, result] of Object.entries(report.results)) {
-    if (service !== 'testing') {
-      assert.notEqual(result.status, 'error', `${service} should not error on a fresh brand`);
-    }
-  }
-
-  // …and testing names exactly what's missing: the targets' framework internals
-  assert.equal(report.hasErrors, true);
-  assert.equal(report.results.testing.status, 'error');
-  assert.match(report.results.testing.error, /build output/);
-  assert.match(report.results.testing.error, /firebase\.json/);
-});
-
-test('manage handoff: --manage spawns the real CLI in the new brand', async () => {
-  const parent = tempDir();
-  const root = path.join(parent, 'handoff-brand');
-  fs.mkdirSync(root);
-  stubFrameworks(root, ['@omega.js/web']);
-
-  // localhost URL → the testing service's live checks fail fast (connection
-  // refused, no DNS wait); the child's honest exit 1 comes back through
-  const report = await runOnboard(root, {
-    id: 'handoff-brand',
-    url: 'https://localhost:9',
-    targets: 'web',
-    manage: true,
-  });
-
-  assert.notEqual(report.manageExitCode, null);
-  assert.equal(report.manageExitCode, 1); // testing: build output missing — the designed nudge
-
-  // The child actually ran manage: run output landed in .omega/runs/
-  const runs = fs.readdirSync(path.join(root, '.omega', 'runs'));
-  assert.equal(runs.length, 1);
-  const run = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'runs', runs[0]), 'utf8'));
-  assert.equal(run.brandId, 'handoff-brand');
-});
-
 // ─── The Claude plugin offer ─────────────────────────────────────────────────
 
 // `Claude` in an answer list is the install offer
@@ -667,43 +110,665 @@ const WIZARD_ANSWERS = {
   'Keep this account list?': '\r',
 };
 
-test('case 16: in a terminal with claude and no plugin, onboarding offers the install, and yes installs it for the user', async (t) => {
-  const machine = createMachine({ published: MANAGER_VERSION });
-  t.after(machine.activate());
-  const tty = openTtyPrompt();
-  t.after(() => tty.close());
+module.exports = defineCases({
+  type: 'group',
+  description: 'onboard',
+  tests: [
+    // ─── Derivation units ────────────────────────────────────────────────────────
 
-  const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-yes', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'y\r' });
+    {
+      name: 'deriveId/deriveName/deriveUrl: dir names → wizard defaults',
+      run: (ctx) => {
+        ctx.expect(deriveId('My Brand 2')).toBe('my-brand-2');
+        ctx.expect(deriveId('acme-demo')).toBe('acme-demo');
+        ctx.expect(deriveId('123-acme')).toBe('acme'); // ids start with a letter
+        ctx.expect(deriveId('!!!')).toBe(null);
 
-  assert.equal(report.valid, true);
-  assert.ok(asked.includes('Claude'), 'the install was offered');
-  const { records, installed, settings } = machine.state();
-  assert.deepEqual([records.omega.source.source, records.omega.source.repo], ['github', 'Omega-JS-Stack/omega']);
-  assert.equal(installed['omega@omega'][0].scope, 'user');
-  assert.equal(settings.enabledPlugins['omega@omega'], true);
-});
+        ctx.expect(deriveName('acme-demo')).toBe('Acme Demo');
+        ctx.expect(deriveUrl('acme-demo')).toBe('https://acmedemo.com'); // dashes drop out (omega-manager parity)
+      },
+    },
 
-test('case 16: no to the offer changes nothing on the machine', async (t) => {
-  const machine = createMachine({ published: MANAGER_VERSION });
-  t.after(machine.activate());
-  const tty = openTtyPrompt();
-  t.after(() => tty.close());
+    // ─── Non-interactive (flags + derivation) ────────────────────────────────────
 
-  const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-no', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'n\r' });
+    {
+      name: 'fresh onboard initializes git with a first commit that honors .gitignore (cp196)',
+      run: async (ctx) => {
+        const root = tempDir();
 
-  assert.equal(report.valid, true);
-  assert.ok(asked.includes('Claude'), 'the install was offered');
-  assert.deepEqual(machine.mutations(), []);
-  assert.deepEqual(machine.state(), { records: {}, settings: {}, installed: {} });
-});
+        const report = await runOnboard(root, { id: 'gitful', manage: false });
 
-test('case 16: with no terminal, onboarding does not ask and installs nothing', async (t) => {
-  const machine = createMachine({ published: MANAGER_VERSION });
-  t.after(machine.activate());
+        ctx.expect(report.git.initialized).toBe(true);
+        ctx.expect(report.git.committed).toBe(true);
+        ctx.expect(fs.existsSync(path.join(root, '.git')), '.git exists').toBeTruthy();
 
-  const report = await runOnboard(tempDir(), { id: 'offer-headless', ...OFFER_FLAGS });
+        const { spawnSync } = require('node:child_process');
+        const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
+        ctx.expect(count.stdout.trim(), 'exactly one commit').toBe('1');
 
-  assert.equal(report.valid, true);
-  assert.deepEqual(machine.mutations(), []);
-  assert.deepEqual(machine.state().installed, {});
+        const tracked = spawnSync('git', ['-C', root, 'ls-files'], { encoding: 'utf8' }).stdout;
+        ctx.expect(tracked.includes('config/omega.json5'), 'config committed').toBeTruthy();
+        ctx.expect(tracked.includes('package.json'), 'manifest committed').toBeTruthy();
+        ctx.expect(!tracked.includes('.env'), '.env never committed (scaffolded .gitignore is live before the commit)').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'onboard inside an existing work tree skips git init (cp196)',
+      run: async (ctx) => {
+        const root = tempDir();
+        const { spawnSync } = require('node:child_process');
+        spawnSync('git', ['-C', root, 'init'], { stdio: 'ignore' });
+
+        const report = await runOnboard(root, { id: 'nested', manage: false });
+
+        ctx.expect(report.git.initialized).toBe(false);
+        ctx.expect(report.git.reason).toBe('existing repository');
+        const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
+        ctx.expect(count.stdout.trim(), 'no commit was made on the existing repo').not.toBe('1');
+      },
+    },
+
+    {
+      name: 'non-interactive: full flags scaffold the complete brand monorepo',
+      run: async (ctx) => {
+        const root = tempDir();
+
+        const report = await runOnboard(root, {
+          id: 'acme',
+          name: 'Acme Inc',
+          url: 'https://acme.io',
+          description: 'Rockets and anvils',
+          tagline: 'Beep beep',
+          contactName: 'Wile E. Coyote, CEO',
+          contactImage: 'https://acme.io/wile.jpg',
+          contactUrl: 'https://acme.io/wile',
+          targets: 'web,backend,desktop',
+          manage: false,
+          execFn: toolProbe(),
+        });
+
+        ctx.expect(report.mode).toBe('fresh');
+        ctx.expect(report.brandRoot).toBe(root);
+        ctx.expect(report.valid).toBe(true);
+        ctx.expect(report.created.sort()).toEqual([
+          '.env',
+          '.env.development',
+          '.env.production',
+          '.env.testing',
+          '.gitignore',
+          'README.md',
+          'config/omega.json5',
+          'package.json',
+          'targets/backend/package.json',
+          'targets/desktop/package.json',
+          'targets/web/package.json',
+        ]);
+        ctx.expect(report.kept).toEqual([]);
+
+        const config = readConfig(root);
+        ctx.expect(config.brand).toEqual({
+          id: 'acme',
+          name: 'Acme Inc',
+          description: 'Rockets and anvils',
+          tagline: 'Beep beep',
+          url: 'https://acme.io',
+          contact: {
+            email: 'support@acme.io',
+            // The human who signs the personal sends — flags answer it
+            // non-interactively; the optionals ride along (#770)
+            person: { name: 'Wile E. Coyote, CEO', image: 'https://acme.io/wile.jpg', url: 'https://acme.io/wile' },
+          },
+        });
+        ctx.expect(config.theme).toEqual({ id: 'classy', appearance: 'system' });
+        // Socials seed EMPTY (#462): every surface that reads the block (the footer
+        // row, sameAs, the /<platform> shortlinks) shows what the brand DECLARED —
+        // a seeded platform key would print a link to a profile nobody owns
+        ctx.expect(config.socials).toEqual({});
+        ctx.expect(Object.keys(config.targets)).toEqual(['web', 'backend', 'desktop']);
+        // Every entry declares its TYPE (#886): the key is the name and the folder,
+        // the type says which framework runs there
+        ctx.expect(config.targets).toEqual({ web: { type: 'web' }, backend: { type: 'backend' }, desktop: { type: 'desktop' } });
+        // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
+        ctx.expect(config.certificates).toEqual({ providers: { apple: { bundleIdPrefix: 'io.acme' } } });
+        // `targets` is the LAST top-level key in the seeded config (canonical order)
+        ctx.expect(Object.keys(config).at(-1)).toBe('targets');
+
+        const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+        ctx.expect(pkg.name).toBe('acme');
+        ctx.expect(pkg.private).toBe(true);
+        // npm's own word for closed-source commercial code (#884). Every scaffolded
+        // manifest states it, because a target's license field is what the Firefox
+        // lane sends AMO when it creates the brand's listing (all-rights-reserved)
+        ctx.expect(pkg.license).toBe('UNLICENSED');
+        ctx.expect(pkg.workspaces).toEqual(['targets/*']);
+        // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
+        // the scaffold must declare it or nothing installs it outside the monorepo
+        // (cp195 journey catch)
+        // Exact pin, the manager's own version — the family ships lockstep (#794)
+        ctx.expect(pkg.devDependencies).toEqual({ '@omega.js/manager': MANAGER_VERSION });
+        // Scripts say `omega` — the ONE user-facing verb (the retired omega-manager
+        // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251).
+        // `npm start` boots the dev stack; the manage cycle is the NAMED verb (#229)
+        ctx.expect(pkg.scripts).toEqual({
+          start: 'omega dev', dev: 'omega dev', manage: 'omega manage', deploy: 'omega deploy',
+        });
+
+        // README speaks `npx omega` too — no user-facing surface names the old bin
+        const readmeText = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+        ctx.expect(readmeText.includes('npx omega')).toBeTruthy();
+        ctx.expect(!readmeText.includes('omega-manager'), 'README never mentions the retired bin name').toBeTruthy();
+
+        const targetPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
+        ctx.expect(targetPkg.name).toBe('acme-web');
+
+        // Every target, not just the root: the license travels with the manifest a
+        // store reads it from (#884)
+        for (const target of ['web', 'backend', 'desktop']) {
+          const manifest = JSON.parse(fs.readFileSync(path.join(root, 'targets', target, 'package.json'), 'utf8'));
+          ctx.expect(manifest.license, `targets/${target} states its license`).toBe('UNLICENSED');
+        }
+
+        // cp95a seeds: framework dep per target — the backend's is a RUNTIME
+        // dependency on its ONE target manifest (src/dist pillar: the stage derives
+        // dist/package.json from it), every other target's is a devDependency —
+        // plus a bootable demo-* cloud project and the starter catalog as a comment
+        ctx.expect(targetPkg.devDependencies).toEqual({ '@omega.js/web': MANAGER_VERSION });
+        const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'));
+        ctx.expect(backendPkg.dependencies).toEqual({ '@omega.js/backend': MANAGER_VERSION });
+        ctx.expect(backendPkg.devDependencies, 'backend framework is a runtime dep, not dev').toBe(undefined);
+        ctx.expect(config.cloud).toEqual({ provider: 'firebase', config: { projectId: 'demo-acme' } });
+        const rawConfig = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
+        ctx.expect(rawConfig, 'starter catalog ships commented').toMatch(/\/\/ payment: \{/);
+        ctx.expect(config.payment, 'catalog is a comment, not config').toBe(undefined);
+
+        // The .env stub documents the credential entry points: external keys
+        // commented out, omega-owned keys provisioned with generated secrets
+        const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
+        ctx.expect(env.includes('# CLOUDFLARE_TOKEN=""')).toBeTruthy();
+        ctx.expect(env.includes('# STRIPE_SECRET_KEY=""')).toBeTruthy();
+        ctx.expect(env).toMatch(/^OMEGA_ADMIN_KEY="[A-Za-z0-9_-]{43}"$/m);
+        ctx.expect(env).toMatch(/^OMEGA_WEBHOOK_KEY="[A-Za-z0-9_-]{43}"$/m);
+        ctx.expect(env).toMatch(/^OMEGA_NAMESPACE="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"$/m);
+        // The email signing key is minted here too since #569 — a brand that never
+        // gets one crashes on its first order email
+        ctx.expect(env).toMatch(/^UNSUBSCRIBE_HMAC_KEY="[0-9a-f]{64}"$/m);
+        ctx.expect(env.match(/^OMEGA_ADMIN_KEY=(.+)$/m)[1]).not.toBe(env.match(/^OMEGA_WEBHOOK_KEY=(.+)$/m)[1]);
+        const uncommented = env.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
+        const generated = Object.keys(require('@omega.js/config').generatedEnvKeys());
+        ctx.expect(uncommented.every((line) => generated.some((key) => line.startsWith(`${key}=`))), 'only omega-generated keys are provisioned').toBeTruthy();
+
+        const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+        // logs/ joins the list with #197 — every verb writes one there now.
+        for (const entry of ['node_modules/', '.omega/', '.env', 'dist/', 'logs/']) {
+          ctx.expect(gitignore.includes(entry), `gitignore missing ${entry}`).toBeTruthy();
+        }
+        ctx.expect(gitignore.startsWith('# ========== Default Values ==========\n'), 'the scaffold writes the marked file the workspace service heals').toBeTruthy();
+        ctx.expect(gitignore.endsWith('\n# ========== Custom Values ==========\n'), 'its Custom section is only its marker line').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'non-interactive: everything derives from the directory name',
+      run: async (ctx) => {
+        const parent = tempDir();
+        const root = path.join(parent, 'sweet-saucy');
+        fs.mkdirSync(root);
+
+        const report = await runOnboard(root, { manage: false });
+
+        ctx.expect(report.valid).toBe(true);
+        const config = readConfig(root);
+        ctx.expect(config.brand.id).toBe('sweet-saucy');
+        ctx.expect(config.brand.name).toBe('Sweet Saucy');
+        ctx.expect(config.brand.url).toBe('https://sweetsaucy.com');
+        ctx.expect(config.brand.contact.email).toBe('support@sweetsaucy.com');
+        // Optional fields stay OUT of the config instead of landing as empty strings
+        ctx.expect(!('description' in config.brand)).toBeTruthy();
+        ctx.expect(!('tagline' in config.brand)).toBeTruthy();
+        // Target default: the website alone
+        ctx.expect(Object.keys(config.targets)).toEqual(['web']);
+      },
+    },
+
+    {
+      name: 'non-interactive: underivable id is a clear error, bad flag values throw',
+      run: async (ctx) => {
+        // No git user name anywhere, so nothing fills the contact person in
+        emptyGitConfig(ctx);
+        const parent = tempDir();
+        const root = path.join(parent, '№∆');
+        fs.mkdirSync(root);
+
+        await ctx.expect((() => runOnboard(root, { manage: false }))()).rejects.toThrow(/--id=<id>/);
+        await ctx.expect((() => runOnboard(root, { id: 'Bad_Id', manage: false }))()).rejects.toThrow(/Invalid brand id/);
+        await ctx.expect((() => runOnboard(root, { id: 'ok', url: 'ftp://x', manage: false }))()).rejects.toThrow(/Invalid brand url/);
+        await ctx.expect((() => runOnboard(root, { id: 'ok', targets: 'web,gopher', manage: false }))()).rejects.toThrow(/Unknown target\(s\): gopher/);
+        // A contact flag with nobody to belong to fails loudly instead of vanishing
+        await ctx.expect((() => runOnboard(root, { id: 'ok', contactImage: 'https://x/y.jpg', manage: false }))()).rejects.toThrow(/need a --contactName/);
+        // A bare --contactName parses to boolean true; that is not a name
+        await ctx.expect((() => runOnboard(root, { id: 'ok', contactName: true, manage: false }))()).rejects.toThrow(/Invalid --contactName/);
+
+        // Nothing was written by any failed attempt
+        ctx.expect(fs.readdirSync(root)).toEqual([]);
+      },
+    },
+
+    // ─── Interactive wizard (real prompts over fake TTY streams) ─────────────────
+
+    {
+      name: 'interactive: the full wizard — typed id, accepted defaults, checkbox targets, manage declined',
+      run: async (ctx) => {
+        const root = tempDir();
+        const tty = openTtyPrompt();
+
+        try {
+          const run = runOnboard(root, {});
+
+          await tty.answer('Brand ID:', 'wizard-brand\r');
+          await tty.answer('Brand name:', '\r');                    // accept derived: Wizard Brand
+          await tty.answer('Brand URL:', '\r');                     // accept derived: https://wizardbrand.com
+          await tty.answer('Company brand id', '\r');               // blank → standalone, no company key
+          await tty.answer('Brand description', 'A wizard-made brand\r');
+          await tty.answer('Brand tagline', '\r');                  // empty → omitted
+          await tty.answer('Contact person (', 'Jane Doe, CEO\r');
+          await tty.answer('Contact person headshot URL', '\r');    // empty → omitted
+          await tty.answer('Contact person link URL', '\r');        // empty → omitted
+          await tty.answer('Targets (', '\r');                      // accept the checked default: web
+          await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
+          await tty.answer('Run manage now?', 'n\r');
+
+          const report = await run;
+
+          ctx.expect(report.mode).toBe('fresh');
+          ctx.expect(report.valid).toBe(true);
+          ctx.expect(report.manageExitCode).toBe(null);
+
+          const config = readConfig(root);
+          ctx.expect(config.brand.id).toBe('wizard-brand');
+          ctx.expect(config.brand.name).toBe('Wizard Brand');
+          ctx.expect(config.brand.url).toBe('https://wizardbrand.com');
+          ctx.expect(config.brand.description).toBe('A wizard-made brand');
+          ctx.expect(!('tagline' in config.brand)).toBeTruthy();
+          // The person signs the personal sends (#770); the skipped optionals stay
+          // out of the config rather than landing as empty strings
+          ctx.expect(config.brand.contact).toEqual({ email: 'support@wizardbrand.com', person: { name: 'Jane Doe, CEO' } });
+          ctx.expect(Object.keys(config.targets)).toEqual(['web']);
+          // Inherited account list stays unwritten — the source layer keeps owning it
+          ctx.expect(!('account' in config)).toBeTruthy();
+          // A blank company answer is the standalone brand: no key at all (#677)
+          ctx.expect(!('company' in config)).toBeTruthy();
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    {
+      name: 'interactive: customizing the account list writes account.admins into the brand config',
+      run: async (ctx) => {
+        const root = tempDir();
+        const tty = openTtyPrompt();
+
+        try {
+          const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend', execFn: toolProbe() });
+
+          await tty.answer('Company brand id', '\r');
+          await tty.answer('Brand description', '\r');
+          await tty.answer('Brand tagline', '\r');
+          await tty.answer('Contact person (', 'Boss Person\r');
+          await tty.answer('Contact person headshot URL', '\r');
+          await tty.answer('Contact person link URL', '\r');
+          await tty.answer('Keep this account list?', 'n\r');
+          await tty.answer('Account email', 'boss@{domain}\r');
+          await tty.answer('Manage the Firebase Auth account', '\r');   // yes (default)
+          await tty.answer('Sync the contact to marketing providers?', 'n\r');
+          await tty.answer('Add another account?', '\r');               // no (default)
+          await tty.answer('Run manage now?', 'n\r');
+
+          const report = await run;
+          ctx.expect(report.valid).toBe(true);
+
+          const config = readConfig(root);
+          ctx.expect(config.account).toEqual({
+            admins: [{ email: 'boss@{domain}', account: true, marketing: false }],
+          });
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    {
+      name: 'interactive: dry-run never prompts, even with a TTY, and writes nothing',
+      run: async (ctx) => {
+        const parent = tempDir();
+        const root = path.join(parent, 'dry-brand');
+        fs.mkdirSync(root);
+        const tty = openTtyPrompt();
+
+        try {
+          // No tty.answer() calls — a prompt would hang this until the timeout
+          const report = await runOnboard(root, { dryRun: true });
+
+          ctx.expect(report.created.length).toBe(0);
+          ctx.expect(report.planned.includes('config/omega.json5')).toBeTruthy();
+          ctx.expect(fs.readdirSync(root)).toEqual([]);
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    // ─── Fill-missing semantics ──────────────────────────────────────────────────
+
+    {
+      name: 'rerun converges: second onboard keeps every file, existing files are never overwritten',
+      run: async (ctx) => {
+        const root = tempDir();
+        const custom = '{\n  "name": "hand-tuned",\n  "private": true,\n  "workspaces": ["targets/*"]\n}\n';
+        fs.writeFileSync(path.join(root, 'package.json'), custom);
+
+        const first = await runOnboard(root, { id: 'keeper', manage: false });
+        ctx.expect(first.kept).toEqual(['package.json']);
+        ctx.expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(custom);
+
+        const second = await runOnboard(root, { manage: false });
+        ctx.expect(second.mode).toBe('resume');
+        ctx.expect(second.created.length).toBe(0);
+        ctx.expect(second.kept.length).toBe(first.created.length + 1);
+      },
+    },
+
+    {
+      name: 'resume from inside an existing brand: answers come from its config, only gaps fill in',
+      run: async (ctx) => {
+        const root = tempDir();
+        fs.mkdirSync(path.join(root, 'config'));
+        fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+    brand: { id: 'existing', name: 'Existing Brand', url: 'https://existing.test' },
+    targets: { web: { type: 'web' } },
+  }`);
+        fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), '{ "name": "existing-web" }\n');
+
+        // From INSIDE the target dir — the brand root resolves by walk-up
+        const report = await runOnboard(path.join(root, 'targets', 'web'), { manage: false });
+
+        ctx.expect(report.mode).toBe('resume');
+        ctx.expect(report.brandRoot).toBe(root);
+        ctx.expect(report.created.sort()).toEqual(['.env', '.env.development', '.env.production', '.env.testing', '.gitignore', 'README.md', 'package.json']);
+
+        // Scaffolded files carry the EXISTING brand's identity, not derived guesses
+        const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+        ctx.expect(readme.startsWith('# Existing Brand')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'resume: a target NAMED admin scaffolds targets/admin around its declared type (#886)',
+      run: async (ctx) => {
+        const root = tempDir();
+        fs.mkdirSync(path.join(root, 'config'));
+        fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+    brand: { id: 'named', name: 'Named Brand', url: 'https://named.test' },
+    targets: { web: { type: 'web' }, admin: { type: 'web' } },
+  }`);
+
+        const report = await runOnboard(root, { manage: false });
+
+        ctx.expect(report.mode).toBe('resume');
+        ctx.expect(report.created.includes('targets/admin/package.json'), 'the NAME is the folder').toBeTruthy();
+
+        // The TYPE picks the framework, so the admin target is a web target
+        const adminPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'admin', 'package.json'), 'utf8'));
+        ctx.expect(adminPkg.name).toBe('named-admin');
+        ctx.expect(adminPkg.devDependencies).toEqual({ '@omega.js/web': MANAGER_VERSION });
+
+        // README lists it by name, and the brand's own config is never rewritten
+        const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+        ctx.expect(readme).toMatch(/`targets\/admin\/`/);
+        ctx.expect(Object.keys(readConfig(root).targets)).toEqual(['web', 'admin']);
+      },
+    },
+
+    {
+      name: 'resume: an existing contact person survives a rerun untouched (#770)',
+      run: async (ctx) => {
+        const root = tempDir();
+        fs.mkdirSync(path.join(root, 'config'));
+        const authored = `{
+    brand: {
+      id: 'personful',
+      name: 'Personful',
+      url: 'https://personful.test',
+      contact: { email: 'support@personful.test', person: { name: 'Jane Doe, CEO' } },
+    },
+    targets: { web: { type: 'web' } },
+  }`;
+        fs.writeFileSync(path.join(root, 'config', 'omega.json5'), authored);
+
+        const report = await runOnboard(root, { manage: false });
+
+        ctx.expect(report.mode).toBe('resume');
+        // The person is the brand's own answer — a rerun never rewrites it
+        ctx.expect(readConfig(root).brand.contact.person).toEqual({ name: 'Jane Doe, CEO' });
+        ctx.expect(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8')).toBe(authored);
+      },
+    },
+
+    // ─── Legacy port ─────────────────────────────────────────────────────────────
+
+    {
+      name: 'port: a carried legacy oauth.json converts ONCE into the canonical google-oauth.json (#501)',
+      run: async (ctx) => {
+        const root = tempDir();
+        const secrets = path.join(root, '.omega', 'secrets');
+        fs.mkdirSync(secrets, { recursive: true });
+        fs.writeFileSync(path.join(secrets, 'oauth.json'), `${JSON.stringify({
+          googleClientId: '1234-abc.apps.googleusercontent.com',
+          googleClientSecret: 'legacy-secret',
+        }, null, 2)}\n`);
+
+        // The write gate holds: a dry run plans and converts nothing
+        const dry = await runOnboard(root, { id: 'ported', manage: false, dryRun: true });
+        ctx.expect(dry.legacyOAuth).toBe(undefined);
+        ctx.expect(fs.existsSync(path.join(secrets, 'google-oauth.json'))).toBe(false);
+
+        const report = await runOnboard(root, { id: 'ported', manage: false });
+
+        ctx.expect(report.legacyOAuth.converted).toBe(true);
+        ctx.expect(JSON.parse(fs.readFileSync(path.join(secrets, 'google-oauth.json'), 'utf8'))).toEqual({ clientId: '1234-abc.apps.googleusercontent.com', clientSecret: 'legacy-secret' });
+        // One-time: the inert legacy file is gone, so nothing dual-reads it later
+        ctx.expect(fs.existsSync(path.join(secrets, 'oauth.json'))).toBe(false);
+
+        const rerun = await runOnboard(root, { manage: false });
+        ctx.expect(rerun.legacyOAuth.converted).toBe(false);
+      },
+    },
+
+    // ─── The company field (#677) ────────────────────────────────────────────────
+
+    {
+      name: 'company: the wizard asks ONE field, and the answer lands as the top-level key',
+      run: async (ctx) => {
+        const dir = tempDir('omega-onboard-co-');
+        const root = path.join(dir, 'acme');
+        fs.mkdirSync(root);
+        const tty = openTtyPrompt();
+
+        // The parent on this machine: its own run's registry line is what makes a
+        // child's `company: { id }` resolvable
+        const parent = path.join(dir, 'fixture-co');
+        fs.mkdirSync(path.join(parent, 'config'), { recursive: true });
+        fs.writeFileSync(path.join(parent, 'config', 'omega.json5'), `{
+    brand: { id: 'fixture-co', name: 'Fixture Co', url: 'https://fixture-co.com' },
+    company: { id: 'self' },
+  }`);
+
+        const previousHome = process.env.OMEGA_HOME;
+        process.env.OMEGA_HOME = path.join(dir, 'home');
+        ctx.after(() => {
+          tty.close();
+          if (previousHome === undefined) delete process.env.OMEGA_HOME;
+          else process.env.OMEGA_HOME = previousHome;
+        });
+        recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.com' });
+
+        const run = runOnboard(root, { id: 'acme', name: 'Acme', url: 'https://acme.com', targets: 'web', manage: false });
+
+        await tty.answer('Company brand id', 'fixture-co\r');
+        await tty.answer('Brand description', '\r');
+        await tty.answer('Brand tagline', '\r');
+        await tty.answer('Contact person (', 'Boss Person\r');
+        await tty.answer('Contact person headshot URL', '\r');
+        await tty.answer('Contact person link URL', '\r');
+        await tty.answer('Keep this account list?', '\r');
+
+        const report = await run;
+
+        ctx.expect(report.mode).toBe('fresh');
+        ctx.expect(report.valid).toBe(true);
+
+        // The one key, outside `brand`, and nothing else about the relationship
+        const config = readConfig(root);
+        ctx.expect(config.company).toEqual({ id: 'fixture-co' });
+        ctx.expect(fs.existsSync(path.join(root, '.omega', 'company.json')), 'the stamp is retired (#677)').toBe(false);
+
+        // The signing prefix comes from the COMPANY's domain, not the brand's
+        ctx.expect(config.certificates?.providers?.apple?.bundleIdPrefix, 'no signing target, no prefix written').toBe(undefined);
+
+        // Onboarding the same brand again converges and keeps the answer; Enter keeps the current targets
+        const rerun = runOnboard(root, { manage: false });
+        await tty.answer('Targets (', '\r');
+        const again = await rerun;
+        ctx.expect(again.mode).toBe('resume');
+        ctx.expect(again.created.length).toBe(0);
+        ctx.expect(readConfig(root).company).toEqual({ id: 'fixture-co' });
+      },
+    },
+
+    // ─── Manage pins ─────────────────────────────────────────────────────────────
+
+    {
+      name: 'fresh scaffold runs the workspace service green',
+      run: async (ctx) => {
+        const root = tempDir();
+        await runOnboard(root, { id: 'green', targets: 'web,backend', manage: false, execFn: toolProbe() });
+
+        const report = await runManage(root, { service: 'workspace', execFn: toolProbe() });
+
+        ctx.expect(report.hasErrors).toBe(false);
+        ctx.expect(report.results.workspace.status).toBe('success');
+      },
+    },
+
+    {
+      name: 'full manage on a fresh brand: services skip cleanly, testing honestly nudges toward the frameworks',
+      run: async (ctx) => {
+        const root = tempDir();
+        await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false, execFn: toolProbe() });
+        // Both declared frameworks stubbed (the backend's is a runtime dep on its
+        // target manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
+        stubFrameworks(root, ['@omega.js/web', '@omega.js/backend']);
+
+        const report = await runManage(root, { ...FAKE_FETCH_200, execFn: toolProbe() });
+
+        // The scaffold itself is sound…
+        ctx.expect(report.results.workspace.status).toBe('success');
+        ctx.expect(report.results.update.status).toBe('success');
+
+        // …every external service skips (no credentials, no config)…
+        for (const [service, result] of Object.entries(report.results)) {
+          if (service !== 'testing') {
+            ctx.expect(result.status, `${service} should not error on a fresh brand`).not.toBe('error');
+          }
+        }
+
+        // …and testing names exactly what's missing: the targets' framework internals
+        ctx.expect(report.hasErrors).toBe(true);
+        ctx.expect(report.results.testing.status).toBe('error');
+        ctx.expect(report.results.testing.error).toMatch(/build output/);
+        ctx.expect(report.results.testing.error).toMatch(/firebase\.json/);
+      },
+    },
+
+    {
+      name: 'manage handoff: --manage spawns the real CLI in the new brand',
+      run: async (ctx) => {
+        const parent = tempDir();
+        const root = path.join(parent, 'handoff-brand');
+        fs.mkdirSync(root);
+        stubFrameworks(root, ['@omega.js/web']);
+
+        // localhost URL → the testing service's live checks fail fast (connection
+        // refused, no DNS wait); the child's honest exit 1 comes back through
+        const report = await runOnboard(root, {
+          id: 'handoff-brand',
+          url: 'https://localhost:9',
+          targets: 'web',
+          manage: true,
+        });
+
+        ctx.expect(report.manageExitCode).not.toBe(null);
+        ctx.expect(report.manageExitCode).toBe(1); // testing: build output missing — the designed nudge
+
+        // The child actually ran manage: run output landed in .omega/runs/
+        const runs = fs.readdirSync(path.join(root, '.omega', 'runs'));
+        ctx.expect(runs.length).toBe(1);
+        const run = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'runs', runs[0]), 'utf8'));
+        ctx.expect(run.brandId).toBe('handoff-brand');
+      },
+    },
+
+    {
+      name: 'case 16: in a terminal with claude and no plugin, onboarding offers the install, and yes installs it for the user',
+      run: async (ctx) => {
+        const machine = createMachine({ published: MANAGER_VERSION });
+        ctx.after(machine.activate());
+        const tty = openTtyPrompt();
+        ctx.after(() => tty.close());
+
+        const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-yes', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'y\r' });
+
+        ctx.expect(report.valid).toBe(true);
+        ctx.expect(asked.includes('Claude'), 'the install was offered').toBeTruthy();
+        const { records, installed, settings } = machine.state();
+        ctx.expect([records.omega.source.source, records.omega.source.repo]).toEqual(['github', 'Omega-JS-Stack/omega']);
+        ctx.expect(installed['omega@omega'][0].scope).toBe('user');
+        ctx.expect(settings.enabledPlugins['omega@omega']).toBe(true);
+      },
+    },
+
+    {
+      name: 'case 16: no to the offer changes nothing on the machine',
+      run: async (ctx) => {
+        const machine = createMachine({ published: MANAGER_VERSION });
+        ctx.after(machine.activate());
+        const tty = openTtyPrompt();
+        ctx.after(() => tty.close());
+
+        const { report, asked } = await driveWizard(tty, runOnboard(tempDir(), { id: 'offer-no', ...OFFER_FLAGS }), { ...WIZARD_ANSWERS, Claude: 'n\r' });
+
+        ctx.expect(report.valid).toBe(true);
+        ctx.expect(asked.includes('Claude'), 'the install was offered').toBeTruthy();
+        ctx.expect(machine.mutations()).toEqual([]);
+        ctx.expect(machine.state()).toEqual({ records: {}, settings: {}, installed: {} });
+      },
+    },
+
+    {
+      name: 'case 16: with no terminal, onboarding does not ask and installs nothing',
+      run: async (ctx) => {
+        const machine = createMachine({ published: MANAGER_VERSION });
+        ctx.after(machine.activate());
+
+        const report = await runOnboard(tempDir(), { id: 'offer-headless', ...OFFER_FLAGS });
+
+        ctx.expect(report.valid).toBe(true);
+        ctx.expect(machine.mutations()).toEqual([]);
+        ctx.expect(machine.state().installed).toEqual({});
+      },
+    },
+  ],
 });

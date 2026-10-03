@@ -5,8 +5,7 @@
  * filtering, and the independent-targets failure model (no bail — unlike
  * deploy) are asserted from what actually got spawned.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -95,97 +94,6 @@ async function runUpdateCommand(cwd, options = {}) {
   }
 }
 
-// ─── Execution over the staged brand ─────────────────────────────────────────
-
-test('bare run fans out to every target, each spawned `update` in its own cwd', async () => {
-  const { brand } = stageBrand();
-  const code = await runUpdateCommand(brand);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend', 'web']);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['update'], 'bare per-target: only the update command, no flags');
-  }
-  const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
-  assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
-  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'web'));
-  assert.equal(code, undefined, 'all targets green → no error exit code');
-});
-
-test('flags forward verbatim (--dry-run, --major, --min-age); --target= is consumed here', async () => {
-  const { brand } = stageBrand();
-  await runUpdateCommand(brand, { 'dry-run': true, dryRun: true, major: true, 'min-age': 14, minAge: 14 });
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['update', '--dry-run', '--major', '--min-age=14'], 'the camelCase twin never forwards twice');
-  }
-
-  fs.rmSync(path.join(brand, 'calls.log'));
-  await runUpdateCommand(brand, { target: 'web' });
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], '--target= picks and never forwards');
-});
-
-// The retired pickers (#780) — never ignored, never aliased
-test('--only and --except are REFUSED, naming --target=; zero spawns', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runUpdateCommand(brand, { only: 'web' }),
-    (error) => {
-      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-      assert.match(error.message, /--only is retired: pick targets with --target=/);
-      return true;
-    },
-  );
-  await assert.rejects(() => runUpdateCommand(brand, { except: 'backend' }), /--except is retired/);
-
-  assert.deepEqual(readCalls(brand), []);
-});
-
-test('a --target= token matching nothing STOPS the run, never a matched subset', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runUpdateCommand(brand, { target: 'hosting' }),
-    (error) => {
-      assert.equal(error.refusal, true);
-      assert.match(error.message, /Unknown --target token "hosting"/);
-      return true;
-    },
-  );
-
-  // A typo beside a real target never checks the matched half
-  await assert.rejects(() => runUpdateCommand(brand, { target: 'web,hosting' }), /Unknown --target token "hosting"/);
-
-  assert.deepEqual(readCalls(brand), []);
-});
-
-test('targets are INDEPENDENT: a failing target never blocks the rest, still exit 1', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
-  const code = await runUpdateCommand(brand);
-
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend', 'web'], 'web still checked after the backend failure');
-  assert.equal(code, 1);
-});
-
-test('outside any brand: errors with exit 1', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-update-cmd-nobrand-'));
-  const code = await runUpdateCommand(scratch);
-  assert.equal(code, 1);
-});
-
-test('cli routes `update` through ALIASES to the command file', () => {
-  const Main = require('../src/cli.js');
-  assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'update'));
-  assert.deepEqual(Main.config.aliases.update, ['--update'], 'the report-era outdated/out aliases are gone');
-  assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'update.js')));
-});
-
 // ─── The brand root rides the fan-out for its own pin (#794) ────────────────
 
 /**
@@ -217,50 +125,6 @@ function withOfflineUpdate(fn, {
     (error) => { devkitUpdate.runUpdate = original; throw error; },
   );
 }
-
-test('the brand ROOT rides the fan-out for @omega.js/manager, applied with --save-exact (#794)', async () => {
-  const { brand } = stageBrand();
-  write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
-    devDependencies: { '@omega.js/manager': '0.4.0', 'some-brand-tool': '^1.0.0' },
-  }));
-
-  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand));
-
-  assert.deepEqual(commands, ['npm install @omega.js/manager@0.5.0 --save-dev --save-exact'],
-    'the root pin moves with the family, exactly — and nothing else at the root is touched');
-
-  // The targets still fan out exactly as before
-  assert.deepEqual(readCalls(brand).map((c) => c.name).sort(), ['backend', 'web']);
-});
-
-test('--dry-run at the brand root installs nothing for the root pin, and forwards to every target', async () => {
-  const { brand } = stageBrand();
-  write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
-    devDependencies: { '@omega.js/manager': '0.4.0' },
-  }));
-
-  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }));
-
-  assert.deepEqual(commands, [], 'the root leg only reports');
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2, 'both targets were spawned');
-  for (const call of calls) assert.deepEqual(call.argv, ['update', '--dry-run']);
-});
-
-test('a picked run leaves the brand root alone — --target= names targets', async () => {
-  const { brand } = stageBrand();
-  write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
-    devDependencies: { '@omega.js/manager': '0.4.0' },
-  }));
-
-  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { target: 'web' }));
-
-  assert.deepEqual(commands, [], 'nothing ran for the root');
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
-});
 
 // ─── The by-hand steps the manager move crossed ─────────────────────────────
 
@@ -322,80 +186,259 @@ async function captureLines(fn) {
 }
 
 /** The lines printed after the "Update summary" heading. */
-function afterSummary(lines) {
+function afterSummary(expect, lines) {
   const start = lines.findIndex((line) => line.includes('Update summary'));
-  assert.ok(start >= 0, `the run prints its summary:\n${lines.join('\n')}`);
+  expect(start >= 0, `the run prints its summary:\n${lines.join('\n')}`).toBeTruthy();
   return lines.slice(start + 1);
 }
 
-test('a root leg that moved the manager pin ends on the by-hand steps since the old version', async () => {
-  const { brand, file } = stageManagerBrand();
+module.exports = defineCases({
+  type: 'group',
+  description: 'update-command',
+  tests: [
+    // ─── Execution over the staged brand ─────────────────────────────────────────
 
-  let commands;
-  const lines = await captureLines(async () => {
-    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
-  });
-  assert.deepEqual(commands, ['npm install @omega.js/manager@0.55.0 --save-dev --save-exact'], 'the pin moved');
+    {
+      name: 'bare run fans out to every target, each spawned `update` in its own cwd',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const code = await runUpdateCommand(brand);
 
-  const tail = afterSummary(lines);
-  const at = (text) => tail.findIndex((line) => line.includes(text));
-  const header = at('By-hand steps since 0.54.1 (2):');
-  const newest = at('  2026-10-01: the update quarantine exempts the family');
-  const older = at('  2026-09-30: the backend and the router have exports maps');
-  const register = at(`Each entry's step is in: ${file}`);
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        ctx.expect(calls.map((c) => c.name).sort()).toEqual(['backend', 'web']);
+        for (const call of calls) {
+          ctx.expect(call.argv, 'bare per-target: only the update command, no flags').toEqual(['update']);
+        }
+        const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
+        ctx.expect(byName.backend.cwd).toBe(path.join(brand, 'targets', 'backend'));
+        ctx.expect(byName.web.cwd).toBe(path.join(brand, 'targets', 'web'));
+        ctx.expect(code, 'all targets green → no error exit code').toBe(undefined);
+      },
+    },
 
-  assert.ok(header >= 0, `the block opens after the summary:\n${lines.join('\n')}`);
-  assert.ok(header < newest && newest < older && older < register, `entries newest first, then the register path:\n${tail.join('\n')}`);
-  assert.equal(at('2026-09-20'), -1, 'an entry older than the publish day is not due');
-  assert.ok(!tail.some((line) => line.includes('ultimate-jekyll-manager')), 'an undated section is never an entry');
-});
+    {
+      name: 'flags forward verbatim (--dry-run, --major, --min-age); --target= is consumed here',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runUpdateCommand(brand, { 'dry-run': true, dryRun: true, major: true, 'min-age': 14, minAge: 14 });
 
-test('a moved pin with no publish time for the old version prints the one line naming the register', async () => {
-  const { brand, file } = stageManagerBrand();
-  const packument = { ...MANAGER_PACKUMENT, time: { '0.55.0': '2026-10-01T09:00:00.000Z' } };
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv, 'the camelCase twin never forwards twice').toEqual(['update', '--dry-run', '--major', '--min-age=14']);
+        }
 
-  const lines = await captureLines(() => withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument }));
+        fs.rmSync(path.join(brand, 'calls.log'));
+        await runUpdateCommand(brand, { target: 'web' });
+        ctx.expect(readCalls(brand).map((c) => c.name), '--target= picks and never forwards').toEqual(['web']);
+      },
+    },
 
-  const tail = afterSummary(lines);
-  assert.ok(tail.some((line) => line.includes(`By-hand steps for every shape OMEGA changed since 0.54.1: ${file}`)), tail.join('\n'));
-  assert.ok(!tail.some((line) => line.includes('By-hand steps since')), 'no counted header');
-  assert.ok(!tail.some((line) => /\s{2}2026-\d\d-\d\d: /.test(line)), 'no entry line');
-});
+    // The retired pickers (#780) — never ignored, never aliased
+    {
+      name: '--only and --except are REFUSED, naming --target=; zero spawns',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
 
-test('--dry-run prints no by-hand block', async () => {
-  const { brand } = stageManagerBrand();
+        await ctx.expect((() => runUpdateCommand(brand, { only: 'web' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+            ctx.expect(error.message).toMatch(/--only is retired: pick targets with --target=/);
+            return true;
+          });
+        await ctx.expect((() => runUpdateCommand(brand, { except: 'backend' }))()).rejects.toThrow(/--except is retired/);
 
-  const lines = await captureLines(() => withOfflineUpdate(
-    () => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }),
-    { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT },
-  ));
+        ctx.expect(readCalls(brand)).toEqual([]);
+      },
+    },
 
-  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
-  assert.ok(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n'));
-});
+    {
+      name: 'a --target= token matching nothing STOPS the run, never a matched subset',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
 
-test('a run that did not move the manager pin prints no by-hand block', async () => {
-  const { brand } = stageManagerBrand({ pin: '0.55.0' });
+        await ctx.expect((() => runUpdateCommand(brand, { target: 'hosting' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal).toBe(true);
+            ctx.expect(error.message).toMatch(/Unknown --target token "hosting"/);
+            return true;
+          });
 
-  let commands;
-  const lines = await captureLines(async () => {
-    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
-  });
+        // A typo beside a real target never checks the matched half
+        await ctx.expect((() => runUpdateCommand(brand, { target: 'web,hosting' }))()).rejects.toThrow(/Unknown --target token "hosting"/);
 
-  assert.deepEqual(commands, [], 'the pin is already current');
-  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
-});
+        ctx.expect(readCalls(brand)).toEqual([]);
+      },
+    },
 
-test('a moved pin with no due entry in the register prints no by-hand block', async () => {
-  const register = '# Breaking changes\n\n## 2026-09-20: an older shape\n\nAn older step.\n\n## ultimate-jekyll-manager → @omega.js/web\n\nThe legacy section.\n';
-  const { brand } = stageManagerBrand({ register });
+    {
+      name: 'targets are INDEPENDENT: a failing target never blocks the rest, still exit 1',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
+        const code = await runUpdateCommand(brand);
 
-  let commands;
-  const lines = await captureLines(async () => {
-    ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
-  });
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name).sort(), 'web still checked after the backend failure').toEqual(['backend', 'web']);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  assert.deepEqual(commands, ['npm install @omega.js/manager@0.55.0 --save-dev --save-exact'], 'the pin moved');
-  assert.ok(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n'));
-  assert.ok(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n'));
+    {
+      name: 'outside any brand: errors with exit 1',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-update-cmd-nobrand-'));
+        const code = await runUpdateCommand(scratch);
+        ctx.expect(code).toBe(1);
+      },
+    },
+
+    {
+      name: 'cli routes `update` through ALIASES to the command file',
+      run: (ctx) => {
+        const Main = require('../src/cli.js');
+        ctx.expect(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'update')).toBeTruthy();
+        ctx.expect(Main.config.aliases.update, 'the report-era outdated/out aliases are gone').toEqual(['--update']);
+        ctx.expect(fs.existsSync(path.join(Main.config.commandsDir, 'update.js'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'the brand ROOT rides the fan-out for @omega.js/manager, applied with --save-exact (#794)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        write(path.join(brand, 'package.json'), JSON.stringify({
+          name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+          devDependencies: { '@omega.js/manager': '0.4.0', 'some-brand-tool': '^1.0.0' },
+        }));
+
+        const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand));
+
+        ctx.expect(commands, 'the root pin moves with the family, exactly — and nothing else at the root is touched').toEqual(['npm install @omega.js/manager@0.5.0 --save-dev --save-exact']);
+
+        // The targets still fan out exactly as before
+        ctx.expect(readCalls(brand).map((c) => c.name).sort()).toEqual(['backend', 'web']);
+      },
+    },
+
+    {
+      name: '--dry-run at the brand root installs nothing for the root pin, and forwards to every target',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        write(path.join(brand, 'package.json'), JSON.stringify({
+          name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+          devDependencies: { '@omega.js/manager': '0.4.0' },
+        }));
+
+        const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }));
+
+        ctx.expect(commands, 'the root leg only reports').toEqual([]);
+        const calls = readCalls(brand);
+        ctx.expect(calls.length, 'both targets were spawned').toBe(2);
+        for (const call of calls) ctx.expect(call.argv).toEqual(['update', '--dry-run']);
+      },
+    },
+
+    {
+      name: 'a picked run leaves the brand root alone — --target= names targets',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        write(path.join(brand, 'package.json'), JSON.stringify({
+          name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+          devDependencies: { '@omega.js/manager': '0.4.0' },
+        }));
+
+        const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { target: 'web' }));
+
+        ctx.expect(commands, 'nothing ran for the root').toEqual([]);
+        ctx.expect(readCalls(brand).map((c) => c.name)).toEqual(['web']);
+      },
+    },
+
+    {
+      name: 'a root leg that moved the manager pin ends on the by-hand steps since the old version',
+      run: async (ctx) => {
+        const { brand, file } = stageManagerBrand();
+
+        let commands;
+        const lines = await captureLines(async () => {
+          ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+        });
+        ctx.expect(commands, 'the pin moved').toEqual(['npm install @omega.js/manager@0.55.0 --save-dev --save-exact']);
+
+        const tail = afterSummary(ctx.expect, lines);
+        const at = (text) => tail.findIndex((line) => line.includes(text));
+        const header = at('By-hand steps since 0.54.1 (2):');
+        const newest = at('  2026-10-01: the update quarantine exempts the family');
+        const older = at('  2026-09-30: the backend and the router have exports maps');
+        const register = at(`Each entry's step is in: ${file}`);
+
+        ctx.expect(header >= 0, `the block opens after the summary:\n${lines.join('\n')}`).toBeTruthy();
+        ctx.expect(header < newest && newest < older && older < register, `entries newest first, then the register path:\n${tail.join('\n')}`).toBeTruthy();
+        ctx.expect(at('2026-09-20'), 'an entry older than the publish day is not due').toBe(-1);
+        ctx.expect(!tail.some((line) => line.includes('ultimate-jekyll-manager')), 'an undated section is never an entry').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a moved pin with no publish time for the old version prints the one line naming the register',
+      run: async (ctx) => {
+        const { brand, file } = stageManagerBrand();
+        const packument = { ...MANAGER_PACKUMENT, time: { '0.55.0': '2026-10-01T09:00:00.000Z' } };
+
+        const lines = await captureLines(() => withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument }));
+
+        const tail = afterSummary(ctx.expect, lines);
+        ctx.expect(tail.some((line) => line.includes(`By-hand steps for every shape OMEGA changed since 0.54.1: ${file}`)), tail.join('\n')).toBeTruthy();
+        ctx.expect(!tail.some((line) => line.includes('By-hand steps since')), 'no counted header').toBeTruthy();
+        ctx.expect(!tail.some((line) => /\s{2}2026-\d\d-\d\d: /.test(line)), 'no entry line').toBeTruthy();
+      },
+    },
+
+    {
+      name: '--dry-run prints no by-hand block',
+      run: async (ctx) => {
+        const { brand } = stageManagerBrand();
+
+        const lines = await captureLines(() => withOfflineUpdate(
+          () => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }),
+          { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT },
+        ));
+
+        ctx.expect(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n')).toBeTruthy();
+        ctx.expect(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a run that did not move the manager pin prints no by-hand block',
+      run: async (ctx) => {
+        const { brand } = stageManagerBrand({ pin: '0.55.0' });
+
+        let commands;
+        const lines = await captureLines(async () => {
+          ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+        });
+
+        ctx.expect(commands, 'the pin is already current').toEqual([]);
+        ctx.expect(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a moved pin with no due entry in the register prints no by-hand block',
+      run: async (ctx) => {
+        const register = '# Breaking changes\n\n## 2026-09-20: an older shape\n\nAn older step.\n\n## ultimate-jekyll-manager → @omega.js/web\n\nThe legacy section.\n';
+        const { brand } = stageManagerBrand({ register });
+
+        let commands;
+        const lines = await captureLines(async () => {
+          ({ commands } = await withOfflineUpdate(() => runUpdateCommand(brand), { now: REGISTRY_NOW, packument: MANAGER_PACKUMENT }));
+        });
+
+        ctx.expect(commands, 'the pin moved').toEqual(['npm install @omega.js/manager@0.55.0 --save-dev --save-exact']);
+        ctx.expect(!lines.some((line) => line.includes('By-hand steps')), lines.join('\n')).toBeTruthy();
+        ctx.expect(!lines.some((line) => line.includes('Each entry\'s step is in')), lines.join('\n')).toBeTruthy();
+      },
+    },
+  ],
 });

@@ -10,10 +10,11 @@
  * convention — Node has no DOM and the package pulls in no jsdom); the SVG
  * that lands is produced by the REAL icon-core injectSvgAttributes pass.
  */
-const { describe, it, before, beforeEach, afterEach } = require('node:test');
-const assert = require('assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
-require('./helpers.js');
+const { createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'icon-renderer.js');
 const ICONS_DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'icons.js');
@@ -70,419 +71,556 @@ function transport(svgFor = () => RAW_SVG) {
 // The module resolves asynchronously; let the microtask queue drain.
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-describe('icon-renderer', () => {
-  let createIconRenderer;
+module.exports = defineCases({
+  type: 'group',
+  description: 'icon-renderer',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let createIconRenderer;
 
-  before(() => {
-    // Guard against a targeted run testing stale output — dist is built by prepare.
-    assert(require('fs').existsSync(DIST_PATH), 'dist/modules/icon-renderer.js exists after prepare');
-    ({ createIconRenderer } = require(DIST_PATH));
-  });
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => ((ctx) => {
+        // Guard against a targeted run testing stale output — dist is built by prepare.
+        ctx.expect(require('fs').existsSync(DIST_PATH), 'dist/modules/icon-renderer.js exists after prepare').toBeTruthy();
+        ({ createIconRenderer } = require(DIST_PATH));
+      })(ctx)));
 
-  describe('rendering', () => {
-    it('renders a scanned icon and marks it with data-omega-fa', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
+      cases.push(
+        {
+          name: 'icon-renderer > rendering > renders a scanned icon and marks it with data-omega-fa',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icon = makeIcon('fa-solid fa-rocket');
 
-      createIconRenderer({ resolve }).scan(makeRoot([icon]));
-      await settle();
+            createIconRenderer({ resolve }).scan(makeRoot([icon]));
+            await settle();
 
-      assert.deepStrictEqual(calls, ['solid/rocket']);
-      assert.strictEqual(icon.dataset.omegaFa, 'solid/rocket');
-      // The REAL icon-core attribute injection is what lands in the DOM.
-      assert.ok(icon.innerHTML.includes('<svg'));
-      assert.ok(icon.innerHTML.includes('aria-hidden="true"'));
-      assert.ok(icon.innerHTML.includes('viewBox="0 0 512 512"'), 'existing attributes survive');
-    });
+            ctx.expect(calls).toEqual(['solid/rocket']);
+            ctx.expect(icon.dataset.omegaFa).toBe('solid/rocket');
+            // The REAL icon-core attribute injection is what lands in the DOM.
+            ctx.expect(icon.innerHTML.includes('<svg')).toBeTruthy();
+            ctx.expect(icon.innerHTML.includes('aria-hidden="true"')).toBeTruthy();
+            ctx.expect(icon.innerHTML.includes('viewBox="0 0 512 512"'), 'existing attributes survive').toBeTruthy();
+          },
+        },
+        {
+          name: 'icon-renderer > rendering > #619: renders the country-flag namespace through the same lookup',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const flag = makeIcon('omega-flag omega-flag-us');
 
-    it('#619: renders the country-flag namespace through the same lookup', async () => {
-      const { calls, resolve } = transport();
-      const flag = makeIcon('omega-flag omega-flag-us');
+            createIconRenderer({ resolve }).scan(makeRoot([flag]));
+            await settle();
 
-      createIconRenderer({ resolve }).scan(makeRoot([flag]));
-      await settle();
+            ctx.expect(calls).toEqual(['flags/us']);
+            ctx.expect(flag.dataset.omegaFa).toBe('flags/us');
+            ctx.expect(flag.innerHTML.includes('<svg')).toBeTruthy();
+          },
+        },
+        {
+          name: 'icon-renderer > rendering > renders the root itself when the root IS an icon',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icon = makeIcon('fa-brands fa-apple');
 
-      assert.deepStrictEqual(calls, ['flags/us']);
-      assert.strictEqual(flag.dataset.omegaFa, 'flags/us');
-      assert.ok(flag.innerHTML.includes('<svg'));
-    });
+            createIconRenderer({ resolve }).scan(icon);
+            await settle();
 
-    it('renders the root itself when the root IS an icon', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-brands fa-apple');
+            ctx.expect(calls).toEqual(['brands/apple']);
+            ctx.expect(icon.dataset.omegaFa).toBe('brands/apple');
+          },
+        },
+        {
+          name: 'icon-renderer > rendering > resolves the family/base style pair, not just the base',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icons = [
+              makeIcon('fa-sharp fa-light fa-play'),
+              makeIcon('fa-regular fa-user'),
+              makeIcon('fa-rocket'),
+            ];
 
-      createIconRenderer({ resolve }).scan(icon);
-      await settle();
+            createIconRenderer({ resolve }).scan(makeRoot(icons));
+            await settle();
 
-      assert.deepStrictEqual(calls, ['brands/apple']);
-      assert.strictEqual(icon.dataset.omegaFa, 'brands/apple');
-    });
+            ctx.expect(calls.sort()).toEqual(['regular/user', 'sharp-light/play', 'solid/rocket']);
+          },
+        },
+        {
+          name: 'icon-renderer > rendering > caches by style/name — one transport call however many elements',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icons = [
+              makeIcon('fa-solid fa-rocket'),
+              makeIcon('fa-solid fa-rocket'),
+              makeIcon('fa-regular fa-rocket'),
+            ];
+            const renderer = createIconRenderer({ resolve });
 
-    it('resolves the family/base style pair, not just the base', async () => {
-      const { calls, resolve } = transport();
-      const icons = [
-        makeIcon('fa-sharp fa-light fa-play'),
-        makeIcon('fa-regular fa-user'),
-        makeIcon('fa-rocket'),
-      ];
+            renderer.scan(makeRoot(icons));
+            await settle();
+            renderer.scan(makeRoot(icons));
+            await settle();
 
-      createIconRenderer({ resolve }).scan(makeRoot(icons));
-      await settle();
+            ctx.expect(calls.sort()).toEqual(['regular/rocket', 'solid/rocket']);
+            ctx.expect(icons[1].innerHTML.includes('<svg')).toBe(true);
+          },
+        },
+      );
 
-      assert.deepStrictEqual(calls.sort(), ['regular/user', 'sharp-light/play', 'solid/rocket']);
-    });
+      cases.push(
+        {
+          name: 'icon-renderer > missing icons never crash > an unknown icon leaves the element empty but MARKED',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { resolve } = transport(() => null);
+            const icon = makeIcon('fa-solid fa-not-a-real-icon');
 
-    it('caches by style/name — one transport call however many elements', async () => {
-      const { calls, resolve } = transport();
-      const icons = [
-        makeIcon('fa-solid fa-rocket'),
-        makeIcon('fa-solid fa-rocket'),
-        makeIcon('fa-regular fa-rocket'),
-      ];
-      const renderer = createIconRenderer({ resolve });
+            createIconRenderer({ resolve }).scan(makeRoot([icon]));
+            await settle();
 
-      renderer.scan(makeRoot(icons));
-      await settle();
-      renderer.scan(makeRoot(icons));
-      await settle();
+            ctx.expect(icon.innerHTML).toBe('');
+            ctx.expect(icon.dataset.omegaFa).toBe('solid/not-a-real-icon');
+          },
+        },
+        {
+          name: 'icon-renderer > missing icons never crash > a transport that throws resolves to nothing, never a rejection',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const icon = makeIcon('fa-solid fa-rocket');
+            const resolve = async () => { throw new Error('ipc channel closed'); };
 
-      assert.deepStrictEqual(calls.sort(), ['regular/rocket', 'solid/rocket']);
-      assert.strictEqual(icons[1].innerHTML.includes('<svg'), true);
-    });
-  });
+            createIconRenderer({ resolve }).scan(makeRoot([icon]));
+            await settle();
 
-  describe('missing icons never crash', () => {
-    it('an unknown icon leaves the element empty but MARKED', async () => {
-      const { resolve } = transport(() => null);
-      const icon = makeIcon('fa-solid fa-not-a-real-icon');
+            ctx.expect(icon.innerHTML).toBe('');
+            ctx.expect(icon.dataset.omegaFa).toBe('solid/rocket');
+          },
+        },
+        {
+          name: 'icon-renderer > missing icons never crash > classes that parse to no valid icon are not rendered at all',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icons = [
+              makeIcon('fa-solid'),
+              makeIcon('fa-2x fa-fw'),
+              makeIcon('fa-solid fa-Rocket'),
+            ];
 
-      createIconRenderer({ resolve }).scan(makeRoot([icon]));
-      await settle();
+            createIconRenderer({ resolve }).scan(makeRoot(icons));
+            await settle();
 
-      assert.strictEqual(icon.innerHTML, '');
-      assert.strictEqual(icon.dataset.omegaFa, 'solid/not-a-real-icon');
-    });
+            ctx.expect(calls).toEqual([]);
+            ctx.expect(icons.map((icon) => icon.dataset.omegaFa)).toEqual([undefined, undefined, undefined]);
+          },
+        },
+      );
 
-    it('a transport that throws resolves to nothing, never a rejection', async () => {
-      const icon = makeIcon('fa-solid fa-rocket');
-      const resolve = async () => { throw new Error('ipc channel closed'); };
+      cases.push(
+        {
+          name: 'icon-renderer > re-render semantics > a changed class renders the new icon',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icon = makeIcon('fa-solid fa-rocket');
+            const renderer = createIconRenderer({ resolve });
 
-      createIconRenderer({ resolve }).scan(makeRoot([icon]));
-      await settle();
+            renderer.scan(makeRoot([icon]));
+            await settle();
 
-      assert.strictEqual(icon.innerHTML, '');
-      assert.strictEqual(icon.dataset.omegaFa, 'solid/rocket');
-    });
+            icon.className = 'fa-regular fa-star';
+            renderer.scan(makeRoot([icon]));
+            await settle();
 
-    it('classes that parse to no valid icon are not rendered at all', async () => {
-      const { calls, resolve } = transport();
-      const icons = [
-        makeIcon('fa-solid'),
-        makeIcon('fa-2x fa-fw'),
-        makeIcon('fa-solid fa-Rocket'),
-      ];
+            ctx.expect(calls).toEqual(['solid/rocket', 'regular/star']);
+            ctx.expect(icon.dataset.omegaFa).toBe('regular/star');
+          },
+        },
+        {
+          name: 'icon-renderer > re-render semantics > an unchanged element is left alone — no clear, no re-resolve',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { calls, resolve } = transport();
+            const icon = makeIcon('fa-solid fa-rocket');
+            const renderer = createIconRenderer({ resolve });
 
-      createIconRenderer({ resolve }).scan(makeRoot(icons));
-      await settle();
+            renderer.scan(makeRoot([icon]));
+            await settle();
+            const rendered = icon.innerHTML;
 
-      assert.deepStrictEqual(calls, []);
-      assert.deepStrictEqual(icons.map((icon) => icon.dataset.omegaFa), [undefined, undefined, undefined]);
-    });
-  });
+            renderer.scan(makeRoot([icon]));
+            ctx.expect(icon.innerHTML, 'never blanks between frames').toBe(rendered);
+            await settle();
 
-  describe('re-render semantics', () => {
-    it('a changed class renders the new icon', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const renderer = createIconRenderer({ resolve });
+            ctx.expect(calls).toEqual(['solid/rocket']);
+          },
+        },
+        {
+          name: 'icon-renderer > re-render semantics > dropping the icon NAME clears a previously rendered icon',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const { resolve } = transport();
+            const icon = makeIcon('fa-solid fa-rocket');
+            const renderer = createIconRenderer({ resolve });
 
-      renderer.scan(makeRoot([icon]));
-      await settle();
+            renderer.scan(makeRoot([icon]));
+            await settle();
+            ctx.expect(icon.innerHTML.includes('<svg')).toBeTruthy();
 
-      icon.className = 'fa-regular fa-star';
-      renderer.scan(makeRoot([icon]));
-      await settle();
+            // Modifiers only — still an fa- element, but no icon name left.
+            icon.className = 'fa-2x fa-fw';
+            renderer.scan(makeRoot([icon]));
+            await settle();
 
-      assert.deepStrictEqual(calls, ['solid/rocket', 'regular/star']);
-      assert.strictEqual(icon.dataset.omegaFa, 'regular/star');
-    });
+            ctx.expect(icon.innerHTML).toBe('');
+            ctx.expect(icon.dataset.omegaFa).toBe(undefined);
+          },
+        },
+        {
+          name: 'icon-renderer > re-render semantics > a class change mid-flight discards the stale SVG',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const gates = new Map();
+            const calls = [];
+            const resolve = (name, style) => {
+              calls.push(`${style}/${name}`);
+              return new Promise((done) => gates.set(`${style}/${name}`, done));
+            };
+            const icon = makeIcon('fa-solid fa-slow');
+            const renderer = createIconRenderer({ resolve });
 
-    it('an unchanged element is left alone — no clear, no re-resolve', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const renderer = createIconRenderer({ resolve });
+            renderer.scan(makeRoot([icon]));
+            await settle();
 
-      renderer.scan(makeRoot([icon]));
-      await settle();
-      const rendered = icon.innerHTML;
+            // The classes change before the first transport answers.
+            icon.className = 'fa-solid fa-fast';
+            renderer.scan(makeRoot([icon]));
+            await settle();
 
-      renderer.scan(makeRoot([icon]));
-      assert.strictEqual(icon.innerHTML, rendered, 'never blanks between frames');
-      await settle();
+            gates.get('solid/slow')(RAW_SVG);
+            await settle();
+            ctx.expect(icon.innerHTML, 'the stale answer never lands').toBe('');
 
-      assert.deepStrictEqual(calls, ['solid/rocket']);
-    });
+            gates.get('solid/fast')(RAW_SVG);
+            await settle();
+            ctx.expect(icon.innerHTML.includes('<svg'), 'the current answer does').toBeTruthy();
+            ctx.expect(icon.dataset.omegaFa).toBe('solid/fast');
+          },
+        },
+        {
+          name: 'icon-renderer > re-render semantics > a detached element never receives its SVG',
+          run: async (ctx) => {
+            await beforeHook(ctx);
+            await beforeEachHook();
+            const gates = new Map();
+            const resolve = (name, style) => new Promise((done) => gates.set(`${style}/${name}`, done));
+            const icon = makeIcon('fa-solid fa-rocket');
 
-    it('dropping the icon NAME clears a previously rendered icon', async () => {
-      const { resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const renderer = createIconRenderer({ resolve });
+            createIconRenderer({ resolve }).scan(makeRoot([icon]));
+            await settle();
 
-      renderer.scan(makeRoot([icon]));
-      await settle();
-      assert.ok(icon.innerHTML.includes('<svg'));
+            icon.isConnected = false;
+            gates.get('solid/rocket')(RAW_SVG);
+            await settle();
 
-      // Modifiers only — still an fa- element, but no icon name left.
-      icon.className = 'fa-2x fa-fw';
-      renderer.scan(makeRoot([icon]));
-      await settle();
+            ctx.expect(icon.innerHTML).toBe('');
+          },
+        },
+      );
 
-      assert.strictEqual(icon.innerHTML, '');
-      assert.strictEqual(icon.dataset.omegaFa, undefined);
-    });
+      cases.push(
+        ...(() => {
+          const cases = [];
+          // MutationObserver is a platform API Node does not ship; this stand-in
+          // records what the module asks for and lets the test deliver mutations.
+          let observers;
 
-    it('a class change mid-flight discards the stale SVG', async () => {
-      const gates = new Map();
-      const calls = [];
-      const resolve = (name, style) => {
-        calls.push(`${style}/${name}`);
-        return new Promise((done) => gates.set(`${style}/${name}`, done));
-      };
-      const icon = makeIcon('fa-solid fa-slow');
-      const renderer = createIconRenderer({ resolve });
+          const beforeEachHook2 = () => {
+            observers = [];
+            global.MutationObserver = class {
+              constructor(callback) {
+                this.callback = callback;
+                this.options = null;
+                this.disconnected = false;
+                observers.push(this);
+              }
 
-      renderer.scan(makeRoot([icon]));
-      await settle();
+              observe(target, options) {
+                this.target = target;
+                this.options = options;
+              }
 
-      // The classes change before the first transport answers.
-      icon.className = 'fa-solid fa-fast';
-      renderer.scan(makeRoot([icon]));
-      await settle();
+              disconnect() {
+                this.disconnected = true;
+              }
+            };
+          };
 
-      gates.get('solid/slow')(RAW_SVG);
-      await settle();
-      assert.strictEqual(icon.innerHTML, '', 'the stale answer never lands');
+          const afterEachHook = () => {
+            delete global.MutationObserver;
+          };
 
-      gates.get('solid/fast')(RAW_SVG);
-      await settle();
-      assert.ok(icon.innerHTML.includes('<svg'), 'the current answer does');
-      assert.strictEqual(icon.dataset.omegaFa, 'solid/fast');
-    });
+          function makeDoc(children, readyState = 'complete') {
+            const listeners = {};
+            return {
+              readyState,
+              documentElement: makeRoot(children),
+              addEventListener: (event, handler) => { listeners[event] = handler; },
+              fire: (event) => listeners[event] && listeners[event](),
+            };
+          }
 
-    it('a detached element never receives its SVG', async () => {
-      const gates = new Map();
-      const resolve = (name, style) => new Promise((done) => gates.set(`${style}/${name}`, done));
-      const icon = makeIcon('fa-solid fa-rocket');
+          cases.push({
+            name: 'icon-renderer > start / stop > observes insertions AND class changes, then scans what is already there',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { calls, resolve } = transport();
+              const icon = makeIcon('fa-solid fa-rocket');
+              const doc = makeDoc([icon]);
 
-      createIconRenderer({ resolve }).scan(makeRoot([icon]));
-      await settle();
+              createIconRenderer({ resolve }).start(doc);
+              await settle();
 
-      icon.isConnected = false;
-      gates.get('solid/rocket')(RAW_SVG);
-      await settle();
+              ctx.expect(observers.length).toBe(1);
+              ctx.expect(observers[0].target).toBe(doc.documentElement);
+              ctx.expect(observers[0].options).toEqual({
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class'],
+              });
+              ctx.expect(calls).toEqual(['solid/rocket']);
+            },
+          });
 
-      assert.strictEqual(icon.innerHTML, '');
-    });
-  });
+          cases.push({
+            name: 'icon-renderer > start / stop > an inserted element is scanned; a class mutation re-renders its target',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { calls, resolve } = transport();
+              const doc = makeDoc([]);
+              createIconRenderer({ resolve }).start(doc);
+              await settle();
 
-  describe('start / stop', () => {
-    // MutationObserver is a platform API Node does not ship; this stand-in
-    // records what the module asks for and lets the test deliver mutations.
-    let observers;
+              const inserted = makeIcon('fa-solid fa-plus');
+              inserted.nodeType = 1;
+              observers[0].callback([{ type: 'childList', addedNodes: [inserted] }]);
+              await settle();
 
-    beforeEach(() => {
-      observers = [];
-      global.MutationObserver = class {
-        constructor(callback) {
-          this.callback = callback;
-          this.options = null;
-          this.disconnected = false;
-          observers.push(this);
-        }
+              const changed = makeIcon('fa-regular fa-star');
+              observers[0].callback([{ type: 'attributes', target: changed }]);
+              await settle();
 
-        observe(target, options) {
-          this.target = target;
-          this.options = options;
-        }
+              ctx.expect(calls).toEqual(['solid/plus', 'regular/star']);
+              ctx.expect(inserted.dataset.omegaFa).toBe('solid/plus');
+              ctx.expect(changed.dataset.omegaFa).toBe('regular/star');
+            },
+          });
 
-        disconnect() {
-          this.disconnected = true;
-        }
-      };
-    });
+          cases.push({
+            name: 'icon-renderer > start / stop > a class mutation that removes every fa- class still clears the icon',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { resolve } = transport();
+              const icon = makeIcon('fa-solid fa-rocket');
+              const doc = makeDoc([icon]);
+              createIconRenderer({ resolve }).start(doc);
+              await settle();
+              ctx.expect(icon.innerHTML.includes('<svg')).toBeTruthy();
 
-    afterEach(() => {
-      delete global.MutationObserver;
-    });
+              // The element no longer matches i[class*="fa-"] — the data-omega-fa
+              // half of the observer selector is what keeps the clear reachable.
+              icon.className = 'plain';
+              observers[0].callback([{ type: 'attributes', target: icon }]);
+              await settle();
 
-    function makeDoc(children, readyState = 'complete') {
-      const listeners = {};
-      return {
-        readyState,
-        documentElement: makeRoot(children),
-        addEventListener: (event, handler) => { listeners[event] = handler; },
-        fire: (event) => listeners[event] && listeners[event](),
-      };
-    }
+              ctx.expect(icon.innerHTML).toBe('');
+              ctx.expect(icon.dataset.omegaFa).toBe(undefined);
+            },
+          });
 
-    it('observes insertions AND class changes, then scans what is already there', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const doc = makeDoc([icon]);
+          cases.push({
+            name: 'icon-renderer > start / stop > a still-loading document defers until DOMContentLoaded',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { calls, resolve } = transport();
+              const icon = makeIcon('fa-solid fa-rocket');
+              const doc = makeDoc([icon], 'loading');
 
-      createIconRenderer({ resolve }).start(doc);
-      await settle();
+              createIconRenderer({ resolve }).start(doc);
+              await settle();
 
-      assert.strictEqual(observers.length, 1);
-      assert.strictEqual(observers[0].target, doc.documentElement);
-      assert.deepStrictEqual(observers[0].options, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class'],
+              ctx.expect(observers.length).toBe(0);
+              ctx.expect(calls).toEqual([]);
+
+              doc.fire('DOMContentLoaded');
+              await settle();
+
+              ctx.expect(observers.length).toBe(1);
+              ctx.expect(calls).toEqual(['solid/rocket']);
+            },
+          });
+
+          cases.push({
+            name: 'icon-renderer > start / stop > start is idempotent and a doc-less environment is a no-op',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { calls, resolve } = transport();
+              const doc = makeDoc([makeIcon('fa-solid fa-rocket')]);
+              const renderer = createIconRenderer({ resolve });
+
+              renderer.start(doc);
+              renderer.start(doc);
+              await settle();
+
+              ctx.expect(observers.length).toBe(1);
+              ctx.expect(calls).toEqual(['solid/rocket']);
+
+              createIconRenderer({ resolve }).start(null);
+              ctx.expect(observers.length).toBe(1);
+            },
+          });
+
+          cases.push({
+            name: 'icon-renderer > start / stop > stop disconnects the observer and drops the cache',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { calls, resolve } = transport();
+              const doc = makeDoc([makeIcon('fa-solid fa-rocket')]);
+              const renderer = createIconRenderer({ resolve });
+
+              renderer.start(doc);
+              await settle();
+              renderer.stop();
+
+              ctx.expect(observers[0].disconnected).toBe(true);
+
+              // A cleared cache means the next start really re-resolves...
+              renderer.start(makeDoc([makeIcon('fa-solid fa-rocket')]));
+              await settle();
+
+              ctx.expect(calls).toEqual(['solid/rocket', 'solid/rocket']);
+              ctx.expect(observers.length, '...and starts a fresh observer').toBe(2);
+            },
+          });
+
+          cases.push({
+            name: 'icon-renderer > start / stop > stop before start is harmless',
+            run: async (ctx) => {
+              await beforeHook(ctx);
+              await beforeEachHook();
+              beforeEachHook2();
+              ctx.after(afterEachHook);
+              const { resolve } = transport();
+
+              createIconRenderer({ resolve }).stop();
+
+              ctx.expect(observers.length).toBe(0);
+            },
+          });
+          return cases;
+        })(),
+      );
+      return cases;
+    })(),
+
+    ...(() => {
+      const cases = [];
+      let Icons;
+
+      let beforeHook2Run;
+      const beforeHook2 = (ctx) => (beforeHook2Run ||= Promise.resolve().then(() => (() => {
+        Icons = require(ICONS_DIST_PATH).default;
+      })()));
+
+      // A document still parsing: start() defers its observer to
+      // DOMContentLoaded, which this suite never fires, so the transport binding
+      // is all a start() does here.
+      const loadingDoc = () => ({ readyState: 'loading', addEventListener: () => {} });
+
+      cases.push({
+        name: 'Icons (omega.icons) > refuses a scan before start() binds a transport',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          ctx.expect(() => new Icons().scan(makeRoot([]))).toThrow(/before icons\.start\(\)/);
+        },
       });
-      assert.deepStrictEqual(calls, ['solid/rocket']);
-    });
 
-    it('an inserted element is scanned; a class mutation re-renders its target', async () => {
-      const { calls, resolve } = transport();
-      const doc = makeDoc([]);
-      createIconRenderer({ resolve }).start(doc);
-      await settle();
+      cases.push({
+        name: 'Icons (omega.icons) > renders through the transport start() bound, and keeps it on a second start()',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const icons = new Icons();
+          const first = transport();
+          const second = transport();
+          const icon = makeIcon('fa-solid fa-rocket');
 
-      const inserted = makeIcon('fa-solid fa-plus');
-      inserted.nodeType = 1;
-      observers[0].callback([{ type: 'childList', addedNodes: [inserted] }]);
-      await settle();
+          icons.start({ resolve: first.resolve }, loadingDoc());
+          icons.start({ resolve: second.resolve }, loadingDoc());
+          icons.scan(makeRoot([icon]));
+          await settle();
 
-      const changed = makeIcon('fa-regular fa-star');
-      observers[0].callback([{ type: 'attributes', target: changed }]);
-      await settle();
+          ctx.expect(first.calls, 'the first transport answers').toEqual(['solid/rocket']);
+          ctx.expect(second.calls, 'a second start() binds nothing new').toEqual([]);
+          ctx.expect(icon.innerHTML.includes('<svg'), 'the icon rendered').toBeTruthy();
+        },
+      });
 
-      assert.deepStrictEqual(calls, ['solid/plus', 'regular/star']);
-      assert.strictEqual(inserted.dataset.omegaFa, 'solid/plus');
-      assert.strictEqual(changed.dataset.omegaFa, 'regular/star');
-    });
+      cases.push({
+        name: 'Icons (omega.icons) > stop() drops the transport, so a later scan fails loudly until start() again',
+        run: async (ctx) => {
+          await beforeHook2(ctx);
+          await beforeEachHook();
+          const icons = new Icons();
 
-    it('a class mutation that removes every fa- class still clears the icon', async () => {
-      const { resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const doc = makeDoc([icon]);
-      createIconRenderer({ resolve }).start(doc);
-      await settle();
-      assert.ok(icon.innerHTML.includes('<svg'));
+          icons.start({ resolve: transport().resolve }, loadingDoc());
+          icons.stop();
 
-      // The element no longer matches i[class*="fa-"] — the data-omega-fa
-      // half of the observer selector is what keeps the clear reachable.
-      icon.className = 'plain';
-      observers[0].callback([{ type: 'attributes', target: icon }]);
-      await settle();
-
-      assert.strictEqual(icon.innerHTML, '');
-      assert.strictEqual(icon.dataset.omegaFa, undefined);
-    });
-
-    it('a still-loading document defers until DOMContentLoaded', async () => {
-      const { calls, resolve } = transport();
-      const icon = makeIcon('fa-solid fa-rocket');
-      const doc = makeDoc([icon], 'loading');
-
-      createIconRenderer({ resolve }).start(doc);
-      await settle();
-
-      assert.strictEqual(observers.length, 0);
-      assert.deepStrictEqual(calls, []);
-
-      doc.fire('DOMContentLoaded');
-      await settle();
-
-      assert.strictEqual(observers.length, 1);
-      assert.deepStrictEqual(calls, ['solid/rocket']);
-    });
-
-    it('start is idempotent and a doc-less environment is a no-op', async () => {
-      const { calls, resolve } = transport();
-      const doc = makeDoc([makeIcon('fa-solid fa-rocket')]);
-      const renderer = createIconRenderer({ resolve });
-
-      renderer.start(doc);
-      renderer.start(doc);
-      await settle();
-
-      assert.strictEqual(observers.length, 1);
-      assert.deepStrictEqual(calls, ['solid/rocket']);
-
-      createIconRenderer({ resolve }).start(null);
-      assert.strictEqual(observers.length, 1);
-    });
-
-    it('stop disconnects the observer and drops the cache', async () => {
-      const { calls, resolve } = transport();
-      const doc = makeDoc([makeIcon('fa-solid fa-rocket')]);
-      const renderer = createIconRenderer({ resolve });
-
-      renderer.start(doc);
-      await settle();
-      renderer.stop();
-
-      assert.strictEqual(observers[0].disconnected, true);
-
-      // A cleared cache means the next start really re-resolves...
-      renderer.start(makeDoc([makeIcon('fa-solid fa-rocket')]));
-      await settle();
-
-      assert.deepStrictEqual(calls, ['solid/rocket', 'solid/rocket']);
-      assert.strictEqual(observers.length, 2, '...and starts a fresh observer');
-    });
-
-    it('stop before start is harmless', () => {
-      const { resolve } = transport();
-
-      createIconRenderer({ resolve }).stop();
-
-      assert.strictEqual(observers.length, 0);
-    });
-  });
-});
-
-describe('Icons (omega.icons)', () => {
-  let Icons;
-
-  before(() => {
-    Icons = require(ICONS_DIST_PATH).default;
-  });
-
-  // A document still parsing: start() defers its observer to
-  // DOMContentLoaded, which this suite never fires, so the transport binding
-  // is all a start() does here.
-  const loadingDoc = () => ({ readyState: 'loading', addEventListener: () => {} });
-
-  it('refuses a scan before start() binds a transport', () => {
-    assert.throws(() => new Icons().scan(makeRoot([])), /before icons\.start\(\)/);
-  });
-
-  it('renders through the transport start() bound, and keeps it on a second start()', async () => {
-    const icons = new Icons();
-    const first = transport();
-    const second = transport();
-    const icon = makeIcon('fa-solid fa-rocket');
-
-    icons.start({ resolve: first.resolve }, loadingDoc());
-    icons.start({ resolve: second.resolve }, loadingDoc());
-    icons.scan(makeRoot([icon]));
-    await settle();
-
-    assert.deepStrictEqual(first.calls, ['solid/rocket'], 'the first transport answers');
-    assert.deepStrictEqual(second.calls, [], 'a second start() binds nothing new');
-    assert(icon.innerHTML.includes('<svg'), 'the icon rendered');
-  });
-
-  it('stop() drops the transport, so a later scan fails loudly until start() again', () => {
-    const icons = new Icons();
-
-    icons.start({ resolve: transport().resolve }, loadingDoc());
-    icons.stop();
-
-    assert.throws(() => icons.scan(makeRoot([])), /before icons\.start\(\)/);
-  });
+          ctx.expect(() => icons.scan(makeRoot([]))).toThrow(/before icons\.start\(\)/);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

@@ -6,8 +6,7 @@
  * without the Account Settings permissions warns without stopping the walk.
  * A source guard holds the edge service to one account id resolver.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { join, relative } = require('node:path');
 const jetpack = require('fs-jetpack');
 
@@ -50,9 +49,9 @@ async function walk(config, rum) {
 }
 
 /** The log lines the walk printed under the `web-analytics` operation. */
-function operationLog(lines) {
+function operationLog(expect, lines) {
   const start = lines.findIndex((line) => line.trim() === '→ web-analytics');
-  assert.notEqual(start, -1, 'the walk ran the web-analytics operation');
+  expect(start, 'the walk ran the web-analytics operation').not.toBe(-1);
   const end = lines.findIndex((line, i) => i > start && /^\s*→ \S+$/.test(line));
   return lines.slice(start + 1, end === -1 ? undefined : end).join('\n');
 }
@@ -60,136 +59,172 @@ function operationLog(lines) {
 const writes = (api) => api.mutations().map((call) => `${call.method} ${call.endpoint}`);
 const readSites = (api) => api.call('GET', `${RUM_SITES}/list`);
 
-// ─── The reconcile ───────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'edge-web-analytics',
+  tests: [
+    // ─── The reconcile ───────────────────────────────────────────────────────────
 
-test('web-analytics: no site for the zone and the key true creates one, auto-installed, for the zone tag', async () => {
-  const { api, result } = await walk(configWith(true), {
-    sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true })],
-  });
+    {
+      name: 'web-analytics: no site for the zone and the key true creates one, auto-installed, for the zone tag',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(true), {
+          sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true })],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(writes(api), [`POST ${RUM_SITES}`]);
-  const { body } = api.mutations()[0];
-  assert.equal(body.zone_tag, ZONE.id);
-  assert.equal(body.auto_install, true);
-  // Cloudflare's create takes no `enabled`: a new site starts enabled
-  assert.notEqual(body.enabled, false);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(writes(api)).toEqual([`POST ${RUM_SITES}`]);
+        const { body } = api.mutations()[0];
+        ctx.expect(body.zone_tag).toBe(ZONE.id);
+        ctx.expect(body.auto_install).toBe(true);
+        // Cloudflare's create takes no `enabled`: a new site starts enabled
+        ctx.expect(body.enabled).not.toBe(false);
+      },
+    },
 
-test('web-analytics: a site present and disabled with the key true gets one update to enabled', async () => {
-  const { api, result } = await walk(configWith(true), {
-    sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true }), rumSite({ siteTag: 'site-1', enabled: false })],
-  });
+    {
+      name: 'web-analytics: a site present and disabled with the key true gets one update to enabled',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(true), {
+          sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true }), rumSite({ siteTag: 'site-1', enabled: false })],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(writes(api), [`PUT ${RUM_SITES}/site-1`]);
-  assert.equal(api.mutations()[0].body.enabled, true);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(writes(api)).toEqual([`PUT ${RUM_SITES}/site-1`]);
+        ctx.expect(api.mutations()[0].body.enabled).toBe(true);
+      },
+    },
 
-test('web-analytics: a site present and enabled with the key false gets one update to disabled', async () => {
-  const { api, result } = await walk(configWith(false), {
-    sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: false }), rumSite({ siteTag: 'site-1', enabled: true })],
-  });
+    {
+      name: 'web-analytics: a site present and enabled with the key false gets one update to disabled',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(false), {
+          sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: false }), rumSite({ siteTag: 'site-1', enabled: true })],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(writes(api), [`PUT ${RUM_SITES}/site-1`]);
-  assert.equal(api.mutations()[0].body.enabled, false);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(writes(api)).toEqual([`PUT ${RUM_SITES}/site-1`]);
+        ctx.expect(api.mutations()[0].body.enabled).toBe(false);
+      },
+    },
 
-test('web-analytics: no site for the zone and the key false writes nothing', async () => {
-  const { api, result } = await walk(configWith(false), {
-    sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true })],
-  });
+    {
+      name: 'web-analytics: no site for the zone and the key false writes nothing',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(false), {
+          sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: true })],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.ok(readSites(api), "the operation read the account's sites");
-  assert.deepEqual(writes(api), []);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(readSites(api), "the operation read the account's sites").toBeTruthy();
+        ctx.expect(writes(api)).toEqual([]);
+      },
+    },
 
-test('web-analytics: a site already matching writes nothing and reports no change', async () => {
-  const { api, result, lines } = await walk(configWith(true), {
-    sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: false }), rumSite({ siteTag: 'site-1', enabled: true })],
-  });
+    {
+      name: 'web-analytics: a site already matching writes nothing and reports no change',
+      run: async (ctx) => {
+        const { api, result, lines } = await walk(configWith(true), {
+          sites: [rumSite({ ...OTHER_ZONE_SITE, enabled: false }), rumSite({ siteTag: 'site-1', enabled: true })],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.ok(readSites(api), "the operation read the account's sites");
-  assert.deepEqual(writes(api), []);
-  assert.match(operationLog(lines), /No changes needed/);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(readSites(api), "the operation read the account's sites").toBeTruthy();
+        ctx.expect(writes(api)).toEqual([]);
+        ctx.expect(operationLog(ctx.expect, lines)).toMatch(/No changes needed/);
+      },
+    },
 
-test('web-analytics: a 403 warns naming Account Settings Write and every other operation still runs', async () => {
-  const config = configWith(true);
-  const isRum = (call) => call.endpoint.startsWith(RUM_SITES);
-  const otherCalls = (api) => api.calls.filter((call) => !isRum(call)).map((call) => `${call.method} ${call.endpoint}`);
+    {
+      name: 'web-analytics: a 403 warns naming Account Settings Write and every other operation still runs',
+      run: async (ctx) => {
+        const config = configWith(true);
+        const isRum = (call) => call.endpoint.startsWith(RUM_SITES);
+        const otherCalls = (api) => api.calls.filter((call) => !isRum(call)).map((call) => `${call.method} ${call.endpoint}`);
 
-  const baseline = await walk(config, { sites: [rumSite({ siteTag: 'site-1', enabled: true })] });
-  const { api, result } = await walk(config, { sites: [], forbidden: true });
+        const baseline = await walk(config, { sites: [rumSite({ siteTag: 'site-1', enabled: true })] });
+        const { api, result } = await walk(config, { sites: [], forbidden: true });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.failed, undefined, 'the 403 is a warning, never a failed operation');
-  assert.deepEqual(result.warned.map((entry) => entry.operation), ['web-analytics']);
-  assert.match(result.warned[0].reason, /Account Settings Write/);
-  assert.ok(api.calls.some(isRum), 'the operation reached the Web Analytics endpoint');
-  assert.deepEqual(otherCalls(api), otherCalls(baseline.api), 'the walk made every call it makes when the token is allowed');
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.failed, 'the 403 is a warning, never a failed operation').toBe(undefined);
+        ctx.expect(result.warned.map((entry) => entry.operation)).toEqual(['web-analytics']);
+        ctx.expect(result.warned[0].reason).toMatch(/Account Settings Write/);
+        ctx.expect(api.calls.some(isRum), 'the operation reached the Web Analytics endpoint').toBeTruthy();
+        ctx.expect(otherCalls(api), 'the walk made every call it makes when the token is allowed').toEqual(otherCalls(baseline.api));
+      },
+    },
 
-test('web-analytics: the zone\'s site on the list\'s second page is found, so it is updated and never created', async () => {
-  const { api, result } = await walk(configWith(true), {
-    pages: [[rumSite({ ...OTHER_ZONE_SITE, enabled: true })], [rumSite({ siteTag: 'site-1', enabled: false })]],
-  });
+    {
+      name: 'web-analytics: the zone\'s site on the list\'s second page is found, so it is updated and never created',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(true), {
+          pages: [[rumSite({ ...OTHER_ZONE_SITE, enabled: true })], [rumSite({ siteTag: 'site-1', enabled: false })]],
+        });
 
-  assert.equal(result.status, 'success');
-  assert.ok(api.call('GET', `${RUM_SITES}/list?page=2`), 'the operation read the second page');
-  assert.deepEqual(writes(api), [`PUT ${RUM_SITES}/site-1`]);
-  assert.equal(api.mutations()[0].body.enabled, true);
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.call('GET', `${RUM_SITES}/list?page=2`), 'the operation read the second page').toBeTruthy();
+        ctx.expect(writes(api)).toEqual([`PUT ${RUM_SITES}/site-1`]);
+        ctx.expect(api.mutations()[0].body.enabled).toBe(true);
+      },
+    },
 
-test('web-analytics: a 403 known only by its HTTP status warns naming Account Settings Write', async () => {
-  const { api, result } = await walk(configWith(true), { sites: [], forbidden: 'status' });
+    {
+      name: 'web-analytics: a 403 known only by its HTTP status warns naming Account Settings Write',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(true), { sites: [], forbidden: 'status' });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.failed, undefined, 'the 403 is a warning, never a failed operation');
-  assert.deepEqual(result.warned.map((entry) => entry.operation), ['web-analytics']);
-  assert.match(result.warned[0].reason, /Account Settings Write/);
-  assert.ok(api.calls.some((call) => call.endpoint.startsWith(RUM_SITES)), 'the operation reached the Web Analytics endpoint');
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.failed, 'the 403 is a warning, never a failed operation').toBe(undefined);
+        ctx.expect(result.warned.map((entry) => entry.operation)).toEqual(['web-analytics']);
+        ctx.expect(result.warned[0].reason).toMatch(/Account Settings Write/);
+        ctx.expect(api.calls.some((call) => call.endpoint.startsWith(RUM_SITES)), 'the operation reached the Web Analytics endpoint').toBeTruthy();
+      },
+    },
 
-test('web-analytics: a 500 on the update fails the operation instead of passing for converged', async () => {
-  const { api, result } = await walk(configWith(true), {
-    sites: [rumSite({ siteTag: 'site-1', enabled: false })],
-    writeError: true,
-  });
+    {
+      name: 'web-analytics: a 500 on the update fails the operation instead of passing for converged',
+      run: async (ctx) => {
+        const { api, result } = await walk(configWith(true), {
+          sites: [rumSite({ siteTag: 'site-1', enabled: false })],
+          writeError: true,
+        });
 
-  assert.ok(api.call('PUT', `${RUM_SITES}/site-1`), 'the update was attempted');
-  assert.equal(result.status, 'error');
-  assert.deepEqual(result.failed.map((entry) => entry.operation), ['web-analytics']);
-  assert.equal(result.warned, undefined, 'a server error is never downgraded to a warning');
-});
+        ctx.expect(api.call('PUT', `${RUM_SITES}/site-1`), 'the update was attempted').toBeTruthy();
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(result.failed.map((entry) => entry.operation)).toEqual(['web-analytics']);
+        ctx.expect(result.warned, 'a server error is never downgraded to a warning').toBe(undefined);
+      },
+    },
 
-// ─── One account id resolver ─────────────────────────────────────────────────
+    // ─── One account id resolver ─────────────────────────────────────────────────
 
-test('edge source: exactly one function resolves the account id, and every caller uses it', () => {
-  const sources = Object.fromEntries(
-    jetpack.find(EDGE_DIR, { matching: '**/*.js' })
-      .map((file) => [relative(EDGE_DIR, file), jetpack.read(file)]),
-  );
-  const filesMatching = (pattern) => Object.keys(sources).filter((file) => pattern.test(sources[file])).sort();
+    {
+      name: 'edge source: exactly one function resolves the account id, and every caller uses it',
+      run: (ctx) => {
+        const sources = Object.fromEntries(
+          jetpack.find(EDGE_DIR, { matching: '**/*.js' })
+            .map((file) => [relative(EDGE_DIR, file), jetpack.read(file)]),
+        );
+        const filesMatching = (pattern) => Object.keys(sources).filter((file) => pattern.test(sources[file])).sort();
 
-  const definers = filesMatching(/\b(?:async\s+)?function\s+accountId\s*\(|\b(?:const|let)\s+accountId\s*=\s*(?:async\b|function\b)/);
-  assert.equal(definers.length, 1, `one accountId definition, found in: ${definers.join(', ') || 'none'}`);
+        const definers = filesMatching(/\b(?:async\s+)?function\s+accountId\s*\(|\b(?:const|let)\s+accountId\s*=\s*(?:async\b|function\b)/);
+        ctx.expect(definers.length, `one accountId definition, found in: ${definers.join(', ') || 'none'}`).toBe(1);
 
-  // The former private copies: a getAccountId per handler, zone.js's inline /accounts read
-  assert.deepEqual(filesMatching(/\bgetAccountId\b/), [], 'no handler keeps its own getAccountId');
-  const lookups = filesMatching(/\.account\.id\b|makeRequest\(\s*['"`]\/accounts['"`]/);
-  assert.deepEqual(lookups, definers, 'only the helper reads the account id from the API');
+        // The former private copies: a getAccountId per handler, zone.js's inline /accounts read
+        ctx.expect(filesMatching(/\bgetAccountId\b/), 'no handler keeps its own getAccountId').toEqual([]);
+        const lookups = filesMatching(/\.account\.id\b|makeRequest\(\s*['"`]\/accounts['"`]/);
+        ctx.expect(lookups, 'only the helper reads the account id from the API').toEqual(definers);
 
-  // A caller may bind the helper under another name (`{ accountId: resolve }`)
-  for (const caller of ['ensure/zone.js', 'ensure/email-routing.js', 'ensure/workers.js', 'ensure/web-analytics.js']) {
-    const source = sources[caller];
-    assert.ok(source, `${caller} exists`);
-    const imported = source.match(/\{[^}]*\baccountId\b(?:\s*:\s*(\w+))?[^}]*\}\s*=\s*require\(/);
-    assert.ok(imported, `${caller} imports the shared accountId`);
-    const binding = imported[1] || 'accountId';
-    assert.ok(new RegExp(`\\b${binding}\\(`).test(source), `${caller} calls accountId (as ${binding})`);
-  }
+        // A caller may bind the helper under another name (`{ accountId: resolve }`)
+        for (const caller of ['ensure/zone.js', 'ensure/email-routing.js', 'ensure/workers.js', 'ensure/web-analytics.js']) {
+          const source = sources[caller];
+          ctx.expect(source, `${caller} exists`).toBeTruthy();
+          const imported = source.match(/\{[^}]*\baccountId\b(?:\s*:\s*(\w+))?[^}]*\}\s*=\s*require\(/);
+          ctx.expect(imported, `${caller} imports the shared accountId`).toBeTruthy();
+          const binding = imported[1] || 'accountId';
+          ctx.expect(new RegExp(`\\b${binding}\\(`).test(source), `${caller} calls accountId (as ${binding})`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

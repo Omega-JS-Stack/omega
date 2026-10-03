@@ -798,7 +798,7 @@ class EmulatorCommand extends BaseCommand {
    *
    *   The STAGED overlay and the emulator RUNTIME's own environment answer
    *   differ on purpose: functions running under the emulator report `testing`
-   *   (OMEGA_TEST_MODE), while the artifact they read was composed from
+   *   (OMEGA_ENVIRONMENT=testing), while the artifact they read was composed from
    *   `.env.development` — the file lane is the developer's local credentials,
    *   the runtime lane is "don't do real side effects".
    * @returns {Promise<{ child: ChildProcess, shutdown: () => Promise<void>, emulatorPorts: object }>}
@@ -1016,13 +1016,13 @@ class EmulatorCommand extends BaseCommand {
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}`));
 
-    // OMEGA_TEST_MODE=true is passed so Functions skip external API calls (emails, SendGrid)
+    // OMEGA_ENVIRONMENT=testing is passed so Functions skip external API calls (emails, SendGrid)
     // hosting is included so localhost:5002 rewrites work (e.g., /omega -> omega_api)
     // pubsub is included so scheduled functions (omega_cronDaily) can be triggered in tests
     const env = {
       ...process.env,
       FORCE_COLOR: '1',
-      OMEGA_TEST_MODE: 'true',
+      OMEGA_ENVIRONMENT: 'testing',
     };
 
     // Internal calls (omega.getApiUrl) loop through the HTTPS proxy under the

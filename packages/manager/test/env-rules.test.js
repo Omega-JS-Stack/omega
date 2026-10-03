@@ -19,8 +19,7 @@
 // a configured one, and a manage run that refuses to reconcile a brand over a
 // key nobody has pasted yet is a hostage note.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -94,112 +93,6 @@ const GA_KEYS = {
   GOOGLE_ANALYTICS_SECRET: null,
 };
 
-test('env-rules op: the canonical per-target GA id owes its target\'s secret', async () => {
-  const { lines, keys } = await runOp(CANONICAL, {
-    env: { RECAPTCHA_SECRET_KEY: null, ...GA_KEYS },
-  });
-
-  // The flagship rule, on the shape brands actually carry: the id lives at
-  // targets.<t>.analytics.providers.google.id, so a brand-ROOT evaluation
-  // (what this op did before #627's review) found nothing to warn about.
-  assert.deepEqual(keys.sort(), [
-    'GOOGLE_ANALYTICS_SECRET_BACKEND',
-    'GOOGLE_ANALYTICS_SECRET_WEB',
-    'RECAPTCHA_SECRET_KEY',
-  ]);
-
-  const said = lines.join('\n');
-  // The BRAND-level key name — what a human sets in the brand .env — and the
-  // path that requires it.
-  assert.match(said, /GOOGLE_ANALYTICS_SECRET_WEB/);
-  assert.match(said, /analytics\.providers\.google\.id/);
-  assert.match(said, /RECAPTCHA_SECRET_KEY/);
-  assert.match(said, /captcha\.providers\.recaptcha\.siteKey/);
-});
-
-test('env-rules op: a target the brand does not enable owes nothing', async () => {
-  // The SHARED-id shape: one id for every surface. Only the enabled targets'
-  // secrets are owed — the desktop/extension halves of a web+backend brand are
-  // keys nobody could ever fill in for a target that does not exist.
-  const { keys } = await runOp({
-    ...CANONICAL,
-    analytics: { providers: { google: { id: 'G-SHARED' } } },
-    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
-  }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
-
-  assert.deepEqual(keys.sort(), ['GOOGLE_ANALYTICS_SECRET_BACKEND', 'GOOGLE_ANALYTICS_SECRET_WEB']);
-});
-
-test('env-rules op: each target\'s own secret is judged on its own', async () => {
-  const { keys } = await runOp(CANONICAL, {
-    env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS, GOOGLE_ANALYTICS_SECRET_WEB: 'web-secret' },
-  });
-
-  assert.deepEqual(keys, ['GOOGLE_ANALYTICS_SECRET_BACKEND']);
-});
-
-// The target is addressed by NAME and typed by its `type` (#886): the schema's
-// rules are scoped by TYPE, so a renamed target still owes its type's key.
-test('env-rules op: a web target NAMED site still owes GOOGLE_ANALYTICS_SECRET_WEB', async () => {
-  const { keys, lines } = await runOp({
-    brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    analytics: { providers: { google: { id: null } } },
-    targets: { site: { type: 'web', analytics: { providers: { google: { id: 'G-SITE' } } } } },
-  }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
-
-  assert.deepEqual(keys, ['GOOGLE_ANALYTICS_SECRET_WEB'], 'the key is the TYPE\'s, the target is found by it');
-  assert.match(lines.join('\n'), /analytics\.providers\.google\.id/);
-});
-
-test('env-rules op: a target-less entry is judged against the brand config', async () => {
-  // SENTRY_AUTH_TOKEN belongs to the monitoring SERVICE — no target reads it,
-  // so no target's resolved config could ever raise it.
-  const { keys } = await runOp({
-    brand: { id: 'fixture' },
-    monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } },
-    targets: { web: { type: 'web' } },
-  }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
-
-  assert.deepEqual(keys, ['SENTRY_AUTH_TOKEN']);
-});
-
-test('env-rules op: a target-less entry sees the PER-TARGET value too (#683)', async () => {
-  // The canonical Sentry shape: the monitoring service provisions one project
-  // per surface and writes the DSN to targets.<t>.monitoring.providers.sentry.dsn,
-  // leaving the shared slot null (brands/playground-omega is exactly this). A
-  // brand-ROOT read of monitoring.providers.sentry.dsn therefore saw nothing,
-  // so SENTRY_AUTH_TOKEN — the key the service needs to have provisioned any
-  // of it — was never owed on the shape brands actually carry.
-  const { keys } = await runOp({
-    brand: { id: 'fixture' },
-    monitoring: { providers: { sentry: { dsn: null } } },
-    targets: {
-      web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } } },
-      backend: { type: 'backend' },
-    },
-  }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
-
-  assert.deepEqual(keys, ['SENTRY_AUTH_TOKEN']);
-});
-
-test('env-rules op: a key the cascade already serves is not a violation', async () => {
-  const { result } = await runOp(
-    { brand: { id: 'fixture' }, captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } }, targets: { backend: { type: 'backend' } } },
-    { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret' } },
-  );
-
-  assert.deepEqual(result.output.envRules.violations, []);
-});
-
-test('env-rules op: an unconfigured brand owes nothing — the rule is one-directional', async () => {
-  const { result, lines } = await runOp({ brand: { id: 'fixture' }, targets: { web: { type: 'web' }, backend: { type: 'backend' } } }, {
-    env: { RECAPTCHA_SECRET_KEY: null, ...GA_KEYS },
-  });
-
-  assert.deepEqual(result.output.envRules.violations, []);
-  assert.match(lines.join('\n'), /✓/, 'the clean state still says so');
-});
-
 // ─── The DERIVED signing keys (#910) ────────────────────────────────────────
 //
 // CSC_LINK and APPLE_API_KEY are never pasted: the repo service's secrets op
@@ -250,22 +143,164 @@ const APPLE_ENV = {
   SNAPCRAFT_STORE_CREDENTIALS: 'fixture-credentials',
 };
 
-test('env-rules op: a signing tree ANSWERS CSC_LINK and APPLE_API_KEY, so neither is owed (#910)', async () => {
-  const { keys } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV }, stage: stageSigningTree });
+module.exports = defineCases({
+  type: 'group',
+  description: 'env-rules',
+  tests: [
+    {
+      name: 'env-rules op: the canonical per-target GA id owes its target\'s secret',
+      run: async (ctx) => {
+        const { lines, keys } = await runOp(CANONICAL, {
+          env: { RECAPTCHA_SECRET_KEY: null, ...GA_KEYS },
+        });
 
-  assert.deepEqual(keys, [], `the derivation answers both: ${keys.join(', ')}`);
-});
+        // The flagship rule, on the shape brands actually carry: the id lives at
+        // targets.<t>.analytics.providers.google.id, so a brand-ROOT evaluation
+        // (what this op did before #627's review) found nothing to warn about.
+        ctx.expect(keys.sort()).toEqual([
+          'GOOGLE_ANALYTICS_SECRET_BACKEND',
+          'GOOGLE_ANALYTICS_SECRET_WEB',
+          'RECAPTCHA_SECRET_KEY',
+        ]);
 
-test('env-rules op: with no signing tree, both derived keys are still owed (#910)', async () => {
-  const { keys, lines } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV } });
+        const said = lines.join('\n');
+        // The BRAND-level key name — what a human sets in the brand .env — and the
+        // path that requires it.
+        ctx.expect(said).toMatch(/GOOGLE_ANALYTICS_SECRET_WEB/);
+        ctx.expect(said).toMatch(/analytics\.providers\.google\.id/);
+        ctx.expect(said).toMatch(/RECAPTCHA_SECRET_KEY/);
+        ctx.expect(said).toMatch(/captcha\.providers\.recaptcha\.siteKey/);
+      },
+    },
 
-  assert.deepEqual(keys.sort(), ['APPLE_API_KEY', 'CSC_LINK']);
-  assert.match(lines.join('\n'), /certificates\.providers\.apple/);
-});
+    {
+      name: 'env-rules op: a target the brand does not enable owes nothing',
+      run: async (ctx) => {
+        // The SHARED-id shape: one id for every surface. Only the enabled targets'
+        // secrets are owed — the desktop/extension halves of a web+backend brand are
+        // keys nobody could ever fill in for a target that does not exist.
+        const { keys } = await runOp({
+          ...CANONICAL,
+          analytics: { providers: { google: { id: 'G-SHARED' } } },
+          targets: { web: { type: 'web' }, backend: { type: 'backend' } },
+        }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
 
-test('env-rules: the op runs in the workspace service', () => {
-  assert.ok(
-    OPERATIONS.workspace.some((operation) => operation.name === 'env-rules'),
-    'the workspace service walks it',
-  );
+        ctx.expect(keys.sort()).toEqual(['GOOGLE_ANALYTICS_SECRET_BACKEND', 'GOOGLE_ANALYTICS_SECRET_WEB']);
+      },
+    },
+
+    {
+      name: 'env-rules op: each target\'s own secret is judged on its own',
+      run: async (ctx) => {
+        const { keys } = await runOp(CANONICAL, {
+          env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS, GOOGLE_ANALYTICS_SECRET_WEB: 'web-secret' },
+        });
+
+        ctx.expect(keys).toEqual(['GOOGLE_ANALYTICS_SECRET_BACKEND']);
+      },
+    },
+
+    // The target is addressed by NAME and typed by its `type` (#886): the schema's
+    // rules are scoped by TYPE, so a renamed target still owes its type's key.
+    {
+      name: 'env-rules op: a web target NAMED site still owes GOOGLE_ANALYTICS_SECRET_WEB',
+      run: async (ctx) => {
+        const { keys, lines } = await runOp({
+          brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
+          analytics: { providers: { google: { id: null } } },
+          targets: { site: { type: 'web', analytics: { providers: { google: { id: 'G-SITE' } } } } },
+        }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
+
+        ctx.expect(keys, 'the key is the TYPE\'s, the target is found by it').toEqual(['GOOGLE_ANALYTICS_SECRET_WEB']);
+        ctx.expect(lines.join('\n')).toMatch(/analytics\.providers\.google\.id/);
+      },
+    },
+
+    {
+      name: 'env-rules op: a target-less entry is judged against the brand config',
+      run: async (ctx) => {
+        // SENTRY_AUTH_TOKEN belongs to the monitoring SERVICE — no target reads it,
+        // so no target's resolved config could ever raise it.
+        const { keys } = await runOp({
+          brand: { id: 'fixture' },
+          monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } },
+          targets: { web: { type: 'web' } },
+        }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
+
+        ctx.expect(keys).toEqual(['SENTRY_AUTH_TOKEN']);
+      },
+    },
+
+    {
+      name: 'env-rules op: a target-less entry sees the PER-TARGET value too (#683)',
+      run: async (ctx) => {
+        // The canonical Sentry shape: the monitoring service provisions one project
+        // per surface and writes the DSN to targets.<t>.monitoring.providers.sentry.dsn,
+        // leaving the shared slot null (brands/playground-omega is exactly this). A
+        // brand-ROOT read of monitoring.providers.sentry.dsn therefore saw nothing,
+        // so SENTRY_AUTH_TOKEN — the key the service needs to have provisioned any
+        // of it — was never owed on the shape brands actually carry.
+        const { keys } = await runOp({
+          brand: { id: 'fixture' },
+          monitoring: { providers: { sentry: { dsn: null } } },
+          targets: {
+            web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } } },
+            backend: { type: 'backend' },
+          },
+        }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
+
+        ctx.expect(keys).toEqual(['SENTRY_AUTH_TOKEN']);
+      },
+    },
+
+    {
+      name: 'env-rules op: a key the cascade already serves is not a violation',
+      run: async (ctx) => {
+        const { result } = await runOp(
+          { brand: { id: 'fixture' }, captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } }, targets: { backend: { type: 'backend' } } },
+          { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret' } },
+        );
+
+        ctx.expect(result.output.envRules.violations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'env-rules op: an unconfigured brand owes nothing — the rule is one-directional',
+      run: async (ctx) => {
+        const { result, lines } = await runOp({ brand: { id: 'fixture' }, targets: { web: { type: 'web' }, backend: { type: 'backend' } } }, {
+          env: { RECAPTCHA_SECRET_KEY: null, ...GA_KEYS },
+        });
+
+        ctx.expect(result.output.envRules.violations).toEqual([]);
+        ctx.expect(lines.join('\n'), 'the clean state still says so').toMatch(/✓/);
+      },
+    },
+
+    {
+      name: 'env-rules op: a signing tree ANSWERS CSC_LINK and APPLE_API_KEY, so neither is owed (#910)',
+      run: async (ctx) => {
+        const { keys } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV }, stage: stageSigningTree });
+
+        ctx.expect(keys, `the derivation answers both: ${keys.join(', ')}`).toEqual([]);
+      },
+    },
+
+    {
+      name: 'env-rules op: with no signing tree, both derived keys are still owed (#910)',
+      run: async (ctx) => {
+        const { keys, lines } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV } });
+
+        ctx.expect(keys.sort()).toEqual(['APPLE_API_KEY', 'CSC_LINK']);
+        ctx.expect(lines.join('\n')).toMatch(/certificates\.providers\.apple/);
+      },
+    },
+
+    {
+      name: 'env-rules: the op runs in the workspace service',
+      run: (ctx) => {
+        ctx.expect(OPERATIONS.workspace.some((operation) => operation.name === 'env-rules'), 'the workspace service walks it').toBeTruthy();
+      },
+    },
+  ],
 });

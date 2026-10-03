@@ -6,8 +6,7 @@
  * leave the manager link the real ones leave, and their own behavior is
  * devkit's local.test.js. `claude` is a fake machine (test/lib/fake-claude.js).
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -101,100 +100,131 @@ async function omega(cwd, args) {
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-test('omega i live at the brand root restores registry specs once, from the brand root', async (t) => {
-  machine(t);
-  const root = stageBrand();
-  await omega(root, ['i', 'live']);
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].fn, 'restore');
-  assert.equal(calls[0].dir, root);
-  assert.equal(calls[0].dryRun, false);
-});
-
-test('omega i local at the brand root links the whole tree once, from the brand root', async (t) => {
-  machine(t);
-  const root = stageBrand();
-  await omega(root, ['install', 'local']);
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].fn, 'link');
-  assert.equal(calls[0].dir, root);
-  assert.equal(calls[0].monorepoRoot, MONOREPO);
-});
-
 /** omega-local registered through the CLI and declared for the user, on, and omega@omega off. */
-function assertLocalDefault(fake) {
+function assertLocalDefault(expect, fake) {
   const { records, settings } = fake.state();
   const local = { source: 'file', path: LOCAL_MANIFEST_PATH };
-  assert.deepEqual((records['omega-local'] || {}).source, local, `omega-local has a source record: ${JSON.stringify(fake.state())}`);
-  assert.deepEqual(((settings.extraKnownMarketplaces || {})['omega-local'] || {}).source, local);
-  assert.equal(settings.enabledPlugins['omega@omega-local'], true);
-  assert.equal(settings.enabledPlugins['omega@omega'], false);
-  assert.ok(fake.mutations().some((argv) => argv.join(' ').includes(`marketplace add ${LOCAL_MANIFEST_PATH}`)), 'registered through the CLI add');
+  expect((records['omega-local'] || {}).source, `omega-local has a source record: ${JSON.stringify(fake.state())}`).toEqual(local);
+  expect(((settings.extraKnownMarketplaces || {})['omega-local'] || {}).source).toEqual(local);
+  expect(settings.enabledPlugins['omega@omega-local']).toBe(true);
+  expect(settings.enabledPlugins['omega@omega']).toBe(false);
+  expect(fake.mutations().some((argv) => argv.join(' ').includes(`marketplace add ${LOCAL_MANIFEST_PATH}`)), 'registered through the CLI add').toBeTruthy();
 }
 
-for (const [label, seed] of [['a machine with the published copy', PUBLISHED_INSTALLED], ['a machine with no plugin yet', {}]]) {
-  test(`case 11: omega i local on ${label} makes the local copy the user default: omega-local registered and on, omega@omega off`, async (t) => {
-    const fake = machine(t, seed);
-    const root = stageBrand();
-    await omega(root, ['i', 'local']);
+module.exports = defineCases({
+  type: 'group',
+  description: 'install-command',
+  tests: [
+    {
+      name: 'omega i live at the brand root restores registry specs once, from the brand root',
+      run: async (ctx) => {
+        machine(ctx);
+        const root = stageBrand();
+        await omega(root, ['i', 'live']);
 
-    assertLocalDefault(fake);
-  });
-}
+        ctx.expect(calls.length).toBe(1);
+        ctx.expect(calls[0].fn).toBe('restore');
+        ctx.expect(calls[0].dir).toBe(root);
+        ctx.expect(calls[0].dryRun).toBe(false);
+      },
+    },
 
-test('case 11: omega i local on a machine whose user settings declare omega from a folder moves omega to GitHub', async (t) => {
-  const fake = machine(t, {
-    marketplaces: { omega: { source: 'directory', path: '/Users/someone/omega' } },
-    installed: { 'omega@omega': '1.0.0' },
-  });
-  const root = stageBrand();
-  await omega(root, ['i', 'local']);
+    {
+      name: 'omega i local at the brand root links the whole tree once, from the brand root',
+      run: async (ctx) => {
+        machine(ctx);
+        const root = stageBrand();
+        await omega(root, ['install', 'local']);
 
-  const { records, settings } = fake.state();
-  assert.deepEqual([records.omega.source.source, records.omega.source.repo], ['github', 'Omega-JS-Stack/omega']);
-  assert.equal(settings.extraKnownMarketplaces.omega.source.source, 'github', 'one source under the name, never two');
-  assertLocalDefault(fake);
-});
+        ctx.expect(calls.length).toBe(1);
+        ctx.expect(calls[0].fn).toBe('link');
+        ctx.expect(calls[0].dir).toBe(root);
+        ctx.expect(calls[0].monorepoRoot).toBe(MONOREPO);
+      },
+    },
 
-test('omega i local then omega i live swaps the brand\'s plugin with no other step', async (t) => {
-  machine(t);
-  const root = stageBrand();
-  const committed = path.join(root, '.claude', 'settings.json');
-  const privateFile = path.join(root, '.claude', 'settings.local.json');
+    ...(() => {
+      const cases = [];
+      for (const [label, seed] of [['a machine with the published copy', PUBLISHED_INSTALLED], ['a machine with no plugin yet', {}]]) {
+        cases.push({
+          name: `case 11: omega i local on ${label} makes the local copy the user default: omega-local registered and on, omega@omega off`,
+          run: async (ctx) => {
+            const fake = machine(ctx, seed);
+            const root = stageBrand();
+            await omega(root, ['i', 'local']);
 
-  await omega(root, ['i', 'local']);
-  assert.equal(readJson(committed).enabledPlugins['omega@omega'], true, 'the committed file names the published copy either way');
-  const local = readJson(privateFile);
-  assert.equal(local.extraKnownMarketplaces['omega-local'].source.path, LOCAL_MANIFEST_PATH);
-  assert.deepEqual([local.enabledPlugins['omega@omega-local'], local.enabledPlugins['omega@omega']], [true, false]);
+            assertLocalDefault(ctx.expect, fake);
+          },
+        });
+      }
+      return cases;
+    })(),
 
-  await omega(root, ['i', 'live']);
-  assert.equal(fs.existsSync(privateFile), false, 'the live brand loads the published copy again');
-  assert.equal(readJson(committed).enabledPlugins['omega@omega'], true);
-});
+    {
+      name: 'case 11: omega i local on a machine whose user settings declare omega from a folder moves omega to GitHub',
+      run: async (ctx) => {
+        const fake = machine(ctx, {
+          marketplaces: { omega: { source: 'directory', path: '/Users/someone/omega' } },
+          installed: { 'omega@omega': '1.0.0' },
+        });
+        const root = stageBrand();
+        await omega(root, ['i', 'local']);
 
-test('--dry-run reaches the flip as its plan-only switch, and writes no settings and changes no machine', async (t) => {
-  const fake = machine(t);
-  const root = stageBrand();
-  const { lines } = await omega(root, ['i', 'live', '--dry-run']);
+        const { records, settings } = fake.state();
+        ctx.expect([records.omega.source.source, records.omega.source.repo]).toEqual(['github', 'Omega-JS-Stack/omega']);
+        ctx.expect(settings.extraKnownMarketplaces.omega.source.source, 'one source under the name, never two').toBe('github');
+        assertLocalDefault(ctx.expect, fake);
+      },
+    },
 
-  assert.equal(calls[0].dryRun, true);
-  assert.match(lines, /Would restore 1 spec\(s\)/);
-  assert.equal(fs.existsSync(path.join(root, '.claude')), false);
+    {
+      name: 'omega i local then omega i live swaps the brand\'s plugin with no other step',
+      run: async (ctx) => {
+        machine(ctx);
+        const root = stageBrand();
+        const committed = path.join(root, '.claude', 'settings.json');
+        const privateFile = path.join(root, '.claude', 'settings.local.json');
 
-  await omega(root, ['i', 'local', '--dry-run']);
-  assert.equal(fs.existsSync(path.join(root, '.claude')), false);
-  assert.deepEqual(fake.mutations(), []);
-});
+        await omega(root, ['i', 'local']);
+        ctx.expect(readJson(committed).enabledPlugins['omega@omega'], 'the committed file names the published copy either way').toBe(true);
+        const local = readJson(privateFile);
+        ctx.expect(local.extraKnownMarketplaces['omega-local'].source.path).toBe(LOCAL_MANIFEST_PATH);
+        ctx.expect([local.enabledPlugins['omega@omega-local'], local.enabledPlugins['omega@omega']]).toEqual([true, false]);
 
-test('an unknown kind refuses, naming both spellings, and flips nothing', async (t) => {
-  machine(t);
-  const root = stageBrand();
-  const { lines, exitCode } = await omega(root, ['i', 'lcoal']);
+        await omega(root, ['i', 'live']);
+        ctx.expect(fs.existsSync(privateFile), 'the live brand loads the published copy again').toBe(false);
+        ctx.expect(readJson(committed).enabledPlugins['omega@omega']).toBe(true);
+      },
+    },
 
-  assert.equal(calls.length, 0);
-  assert.equal(exitCode, 1);
-  assert.match(lines, /Unknown install kind "lcoal": `omega i` takes local \(local, l, dev, d, development\) or live/);
+    {
+      name: '--dry-run reaches the flip as its plan-only switch, and writes no settings and changes no machine',
+      run: async (ctx) => {
+        const fake = machine(ctx);
+        const root = stageBrand();
+        const { lines } = await omega(root, ['i', 'live', '--dry-run']);
+
+        ctx.expect(calls[0].dryRun).toBe(true);
+        ctx.expect(lines).toMatch(/Would restore 1 spec\(s\)/);
+        ctx.expect(fs.existsSync(path.join(root, '.claude'))).toBe(false);
+
+        await omega(root, ['i', 'local', '--dry-run']);
+        ctx.expect(fs.existsSync(path.join(root, '.claude'))).toBe(false);
+        ctx.expect(fake.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'an unknown kind refuses, naming both spellings, and flips nothing',
+      run: async (ctx) => {
+        machine(ctx);
+        const root = stageBrand();
+        const { lines, exitCode } = await omega(root, ['i', 'lcoal']);
+
+        ctx.expect(calls.length).toBe(0);
+        ctx.expect(exitCode).toBe(1);
+        ctx.expect(lines).toMatch(/Unknown install kind "lcoal": `omega i` takes local \(local, l, dev, d, development\) or live/);
+      },
+    },
+  ],
 });

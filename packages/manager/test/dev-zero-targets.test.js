@@ -5,8 +5,7 @@
  * no target exits 1. The manage cycle, the freshness sweep and every spawn are
  * stubbed before dev.js loads, so nothing real can boot.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -118,36 +117,51 @@ async function runDev(t, root, options, settleMs) {
   return { outcome, exits, exitCode, code, failure, output };
 }
 
-test('#1030 case 4: omega dev on a brand with zero targets prints the zero-target line and exits 0', async (t) => {
-  spawned.length = 0;
-  const from = calls.length;
-  const run = await runDev(t, stageBrand(), {}, 5000);
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-zero-targets',
+  tests: [
+    {
+      name: '#1030 case 4: omega dev on a brand with zero targets prints the zero-target line and exits 0',
+      run: async (ctx) => {
+        spawned.length = 0;
+        const from = calls.length;
+        const run = await runDev(ctx, stageBrand(), {}, 5000);
 
-  assert.notEqual(run.outcome, 'running', 'dev ends instead of holding the terminal');
-  assert.notEqual(run.outcome, 'threw', run.failure && run.failure.stack);
-  assert.ok(run.output.includes(ZERO_TARGET_LINE), `the zero-target line: ${run.output}`);
-  assert.ok(run.exits.every((code) => code === 0), `exits clean: ${JSON.stringify(run.exits)}`);
-  assert.ok(run.exitCode === undefined || run.exitCode === 0, `exit code ${run.exitCode}`);
-  assert.deepEqual(spawned, [], 'nothing spawned');
-  assert.deepEqual(legsSince(from), [], 'no leg started');
-});
+        ctx.expect(run.outcome, 'dev ends instead of holding the terminal').not.toBe('running');
+        ctx.expect(run.outcome, run.failure && run.failure.stack).not.toBe('threw');
+        ctx.expect(run.output.includes(ZERO_TARGET_LINE), `the zero-target line: ${run.output}`).toBeTruthy();
+        ctx.expect(run.exits.every((code) => code === 0), `exits clean: ${JSON.stringify(run.exits)}`).toBeTruthy();
+        ctx.expect(run.exitCode === undefined || run.exitCode === 0, `exit code ${run.exitCode}`).toBeTruthy();
+        ctx.expect(spawned, 'nothing spawned').toEqual([]);
+        ctx.expect(legsSince(from), 'no leg started').toEqual([]);
+      },
+    },
 
-test('#1032 case 5: on a web and backend brand with Java missing, the backend is skipped with the line and the web leg still starts', async (t) => {
-  const from = calls.length;
-  const run = await runDev(t, stageBrand(['web', 'backend']), { execFn: toolProbe('java') }, 500);
+    {
+      name: '#1032 case 5: on a web and backend brand with Java missing, the backend is skipped with the line and the web leg still starts',
+      run: async (ctx) => {
+        const from = calls.length;
+        const run = await runDev(ctx, stageBrand(['web', 'backend']), { execFn: toolProbe('java') }, 500);
 
-  assert.equal(run.outcome, 'running', `the web leg holds the terminal: ${run.output}`);
-  assert.deepEqual(legsSince(from), ['web'], 'only the web leg started');
-  assert.ok(run.output.includes(missingToolLine('backend', 'java')), `the skip names the tool, the target and the install command: ${run.output}`);
-  assert.notEqual(run.code, 1, `the exit code is not 1: ${JSON.stringify(run.exits)} / ${run.exitCode}`);
-});
+        ctx.expect(run.outcome, `the web leg holds the terminal: ${run.output}`).toBe('running');
+        ctx.expect(legsSince(from), 'only the web leg started').toEqual(['web']);
+        ctx.expect(run.output.includes(missingToolLine('backend', 'java')), `the skip names the tool, the target and the install command: ${run.output}`).toBeTruthy();
+        ctx.expect(run.code, `the exit code is not 1: ${JSON.stringify(run.exits)} / ${run.exitCode}`).not.toBe(1);
+      },
+    },
 
-test('#1032 case 6: when the only picked target misses a tool, dev prints the line and exits 1', async (t) => {
-  const from = calls.length;
-  const run = await runDev(t, stageBrand(['backend']), { execFn: toolProbe('java') }, 5000);
+    {
+      name: '#1032 case 6: when the only picked target misses a tool, dev prints the line and exits 1',
+      run: async (ctx) => {
+        const from = calls.length;
+        const run = await runDev(ctx, stageBrand(['backend']), { execFn: toolProbe('java') }, 5000);
 
-  assert.notEqual(run.outcome, 'running', 'nothing is left to boot, so dev ends');
-  assert.ok(run.output.includes(missingToolLine('backend', 'java')), `the line: ${run.output}`);
-  assert.equal(run.code, 1, `exits 1: ${JSON.stringify(run.exits)} / ${run.exitCode}`);
-  assert.deepEqual(legsSince(from), [], 'no leg started');
+        ctx.expect(run.outcome, 'nothing is left to boot, so dev ends').not.toBe('running');
+        ctx.expect(run.output.includes(missingToolLine('backend', 'java')), `the line: ${run.output}`).toBeTruthy();
+        ctx.expect(run.code, `exits 1: ${JSON.stringify(run.exits)} / ${run.exitCode}`).toBe(1);
+        ctx.expect(legsSince(from), 'no leg started').toEqual([]);
+      },
+    },
+  ],
 });

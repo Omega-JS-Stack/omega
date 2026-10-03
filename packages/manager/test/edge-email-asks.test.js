@@ -5,8 +5,7 @@
  * provider routes mail. Driven through real prompts on a fake terminal;
  * every answer lands in a real config/omega.json5.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { stripVTControlCharacters } = require('node:util');
 const JSON5 = require('json5');
 
@@ -152,266 +151,306 @@ async function captureLogAsync(fn) {
 
 const PROVIDER_LINE = /→ Set domain\.email\.providers in config\/omega\.json5/g;
 
-// ─── The provider ask, in the edge setup ─────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'edge-email-asks',
+  tests: [
+    // ─── The provider ask, in the edge setup ─────────────────────────────────────
 
-test('edge setup: the provider ask runs before the dns-records op issues any call', async () => {
-  const config = brandConfig();
-  const api = walkApi(config, [MAILGUN_MX]);
-  const terminal = promptSequence();
+    {
+      name: 'edge setup: the provider ask runs before the dns-records op issues any call',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const api = walkApi(config, [MAILGUN_MX]);
+        const terminal = promptSequence();
 
-  try {
-    const run = runService(config, api, {}, makeBrandRoot(EMAIL_ASK_CONFIG));
-    await terminal.waitForPrompt();
+        try {
+          const run = runService(config, api, {}, makeBrandRoot(EMAIL_ASK_CONFIG));
+          await terminal.waitForPrompt();
 
-    assert.deepEqual(api.calls.filter((c) => c.endpoint.includes('/dns_records')), [], 'the ask came before any record call');
+          ctx.expect(api.calls.filter((c) => c.endpoint.includes('/dns_records')), 'the ask came before any record call').toEqual([]);
 
-    await terminal.answerNext(SKIP);
-    await run;
-    assert.ok(api.call('GET', '/zones/zone-1/dns_records'), 'the dns-records op ran after the ask');
-  } finally {
-    terminal.close();
-  }
-});
+          await terminal.answerNext(SKIP);
+          await run;
+          ctx.expect(api.call('GET', '/zones/zone-1/dns_records'), 'the dns-records op ran after the ask').toBeTruthy();
+        } finally {
+          terminal.close();
+        }
+      },
+    },
 
-test('edge setup: picking the provider the apex MX belongs to deletes no MX record on that walk', async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  const api = walkApi(config, [MAILGUN_MX]);
-  const terminal = promptSequence();
+    {
+      name: 'edge setup: picking the provider the apex MX belongs to deletes no MX record on that walk',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        const api = walkApi(config, [MAILGUN_MX]);
+        const terminal = promptSequence();
 
-  try {
-    const run = runService(config, api, {}, brandRoot);
-    await terminal.answerNext(YES);
-    await terminal.answerNext('squa\r'); // squarespace, the mailgun.org provider
-    await run;
+        try {
+          const run = runService(config, api, {}, brandRoot);
+          await terminal.answerNext(YES);
+          await terminal.answerNext('squa\r'); // squarespace, the mailgun.org provider
+          await run;
 
-    assert.deepEqual(JSON5.parse(readConfigSource(brandRoot)).domain.email.providers, { squarespace: {} });
-    assert.deepEqual(deletedRecordIds(api), []);
-  } finally {
-    terminal.close();
-  }
-});
+          ctx.expect(JSON5.parse(readConfigSource(brandRoot)).domain.email.providers).toEqual({ squarespace: {} });
+          ctx.expect(deletedRecordIds(api)).toEqual([]);
+        } finally {
+          terminal.close();
+        }
+      },
+    },
 
-test('edge setup: picking a different provider deletes the old MX on that walk, and the next walk creates the picked one\'s', { timeout: 20000 }, async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  const api = walkApi(config, [PRIVATEEMAIL_MX]);
-  let terminal = promptSequence();
+    {
+      name: 'edge setup: picking a different provider deletes the old MX on that walk, and the next walk creates the picked one\'s',
+      timeout: 20000,
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        const api = walkApi(config, [PRIVATEEMAIL_MX]);
+        let terminal = promptSequence();
 
-  try {
-    const run = runService(config, api, {}, brandRoot);
-    await terminal.answerNext(YES);
-    await terminal.answerNext('squa\r'); // squarespace, not the privateemail MX at the apex
-    await run;
+        try {
+          const run = runService(config, api, {}, brandRoot);
+          await terminal.answerNext(YES);
+          await terminal.answerNext('squa\r'); // squarespace, not the privateemail MX at the apex
+          await run;
 
-    assert.deepEqual(deletedRecordIds(api), ['mx-private']);
-    assert.deepEqual(createdMx(api), [], 'the old MX blocks creation until its delete has cleared it');
-  } finally {
-    terminal.close();
-  }
+          ctx.expect(deletedRecordIds(api)).toEqual(['mx-private']);
+          ctx.expect(createdMx(api), 'the old MX blocks creation until its delete has cleared it').toEqual([]);
+        } finally {
+          terminal.close();
+        }
 
-  // The next walk loads the landed pick, over a zone the delete cleared
-  const again = brandConfig();
-  again.domain.email.providers = { squarespace: {} };
-  const nextApi = walkApi(again, []);
-  terminal = promptSequence();
-  try {
-    await terminal.noPromptDuring(runService(again, nextApi, {}, brandRoot));
-  } finally {
-    terminal.close();
-  }
+        // The next walk loads the landed pick, over a zone the delete cleared
+        const again = brandConfig();
+        again.domain.email.providers = { squarespace: {} };
+        const nextApi = walkApi(again, []);
+        terminal = promptSequence();
+        try {
+          await terminal.noPromptDuring(runService(again, nextApi, {}, brandRoot));
+        } finally {
+          terminal.close();
+        }
 
-  assert.deepEqual(createdMx(nextApi), ['mxa.mailgun.org', 'mxb.mailgun.org']);
-});
+        ctx.expect(createdMx(nextApi)).toEqual(['mxa.mailgun.org', 'mxb.mailgun.org']);
+      },
+    },
 
-test('edge setup: with no MX at the apex, the picked provider\'s MX records land on that walk', async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  const api = walkApi(config, []);
-  const terminal = promptSequence();
+    {
+      name: 'edge setup: with no MX at the apex, the picked provider\'s MX records land on that walk',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        const api = walkApi(config, []);
+        const terminal = promptSequence();
 
-  try {
-    const run = runService(config, api, {}, brandRoot);
-    await terminal.answerNext(YES);
-    await terminal.answerNext('squa\r'); // squarespace
-    await run;
+        try {
+          const run = runService(config, api, {}, brandRoot);
+          await terminal.answerNext(YES);
+          await terminal.answerNext('squa\r'); // squarespace
+          await run;
 
-    assert.deepEqual(createdMx(api), ['mxa.mailgun.org', 'mxb.mailgun.org']);
-  } finally {
-    terminal.close();
-  }
-});
+          ctx.expect(createdMx(api)).toEqual(['mxa.mailgun.org', 'mxb.mailgun.org']);
+        } finally {
+          terminal.close();
+        }
+      },
+    },
 
-test('edge setup: Skip at the provider ask deletes and creates no MX record and leaves config unchanged', async () => {
-  // The zone id is already landed, so the zone op has nothing to write either
-  const brandRoot = makeBrandRoot(`{
+    {
+      name: 'edge setup: Skip at the provider ask deletes and creates no MX record and leaves config unchanged',
+      run: async (ctx) => {
+        // The zone id is already landed, so the zone op has nothing to write either
+        const brandRoot = makeBrandRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://${DOMAIN}' },
   edge: { providers: { cloudflare: { zone: 'zone-1' } } },
 }
 `);
-  const before = readConfigSource(brandRoot);
-  const config = brandConfig();
-  config.edge.providers.cloudflare.zone = 'zone-1';
-  const api = walkApi(config, [MAILGUN_MX]);
-  const terminal = promptSequence();
+        const before = readConfigSource(brandRoot);
+        const config = brandConfig();
+        config.edge.providers.cloudflare.zone = 'zone-1';
+        const api = walkApi(config, [MAILGUN_MX]);
+        const terminal = promptSequence();
 
-  try {
-    const run = runService(config, api, {}, brandRoot);
-    await terminal.answerNext(SKIP);
-    await run;
+        try {
+          const run = runService(config, api, {}, brandRoot);
+          await terminal.answerNext(SKIP);
+          await run;
 
-    assert.deepEqual(deletedRecordIds(api), []);
-    assert.deepEqual(createdMx(api), []);
-    assert.equal(readConfigSource(brandRoot), before);
-  } finally {
-    terminal.close();
-  }
-});
-
-test('edge setup: Disable at the provider ask lands domain.email.providers: false, deletes no MX, and the next walk does not ask', { timeout: 20000 }, async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  const api = walkApi(config, [MAILGUN_MX]);
-  let terminal = promptSequence();
-
-  try {
-    const run = runService(config, api, {}, brandRoot);
-    await terminal.answerNext(DISABLE);
-    await run;
-
-    assert.equal(JSON5.parse(readConfigSource(brandRoot)).domain.email.providers, false);
-    assert.deepEqual(deletedRecordIds(api), []);
-  } finally {
-    terminal.close();
-  }
-
-  // The next walk loads the landed false
-  const again = brandConfig();
-  again.domain.email.providers = false;
-  terminal = promptSequence();
-  try {
-    await terminal.noPromptDuring(runService(again, walkApi(again, [MAILGUN_MX]), {}, brandRoot));
-  } finally {
-    terminal.close();
-  }
-});
-
-test('edge setup: a headless or dry run never asks, prints the line naming the key, and deletes no MX', { timeout: 20000 }, async () => {
-  // Headless: no terminal to ask in
-  process.env.OMEGA_NON_INTERACTIVE = '1';
-  const headlessApi = walkApi(brandConfig(), [MAILGUN_MX]);
-  try {
-    const printed = await captureLogAsync(() => runService(brandConfig(), headlessApi, {}, makeBrandRoot(EMAIL_ASK_CONFIG)));
-    assert.equal(printed.match(PROVIDER_LINE)?.length, 1, `one provider line in: ${printed}`);
-    assert.deepEqual(deletedRecordIds(headlessApi), []);
-  } finally {
-    delete process.env.OMEGA_NON_INTERACTIVE;
-  }
-
-  // Dry run: a terminal is there, and still nothing is asked
-  const dryApi = walkApi(brandConfig(), [MAILGUN_MX]);
-  const terminal = promptSequence();
-  try {
-    const printed = await captureLogAsync(() => terminal.noPromptDuring(
-      runService(brandConfig(), dryApi, { dryRun: true }, makeBrandRoot(EMAIL_ASK_CONFIG)),
-    ));
-    assert.equal(printed.match(PROVIDER_LINE)?.length, 1, `one provider line in: ${printed}`);
-    assert.deepEqual(deletedRecordIds(dryApi), []);
-  } finally {
-    terminal.close();
-  }
-});
-
-test('edge setup: a subdomain project is never asked for a mail provider', { timeout: 20000 }, async () => {
-  const sub = `app.${DOMAIN}`;
-  const config = brandConfig(`https://${sub}`);
-  const api = fakeApi({
-    zones: [ZONE],
-    responses: {
-      'GET /accounts': [{ id: 'acct-1' }],
-      'GET /zones/zone-1/dns_records': [
-        { id: 's1', type: 'A', name: sub, content: '185.199.108.153', proxied: true, comment: 'GitHub Pages IP' },
-        { id: 's2', type: 'AAAA', name: sub, content: '2606:50c0:8000::153', proxied: true, comment: 'GitHub Pages IP' },
-        MAILGUN_MX,
-      ],
+          ctx.expect(deletedRecordIds(api)).toEqual([]);
+          ctx.expect(createdMx(api)).toEqual([]);
+          ctx.expect(readConfigSource(brandRoot)).toBe(before);
+        } finally {
+          terminal.close();
+        }
+      },
     },
-  });
-  const terminal = promptSequence();
 
-  try {
-    await terminal.noPromptDuring(runService(config, api, {}, makeBrandRoot(EMAIL_ASK_CONFIG)));
-  } finally {
-    terminal.close();
-  }
-});
+    {
+      name: 'edge setup: Disable at the provider ask lands domain.email.providers: false, deletes no MX, and the next walk does not ask',
+      timeout: 20000,
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        const api = walkApi(config, [MAILGUN_MX]);
+        let terminal = promptSequence();
 
-// ─── The forwarding ask, in the email-routing op ─────────────────────────────
+        try {
+          const run = runService(config, api, {}, brandRoot);
+          await terminal.answerNext(DISABLE);
+          await run;
 
-test('email-routing: a routing provider with an empty forwarding list asks, and the two entries land one rule', async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  config.domain.email.providers = { cloudflare: {} };
-  config.domain.email.forwarding = [];
-  const api = routingApi();
-  const terminal = promptSequence();
+          ctx.expect(JSON5.parse(readConfigSource(brandRoot)).domain.email.providers).toBe(false);
+          ctx.expect(deletedRecordIds(api)).toEqual([]);
+        } finally {
+          terminal.close();
+        }
 
-  try {
-    const run = ensureEmailRouting(askContext(config, api, brandRoot));
-    await terminal.answerNext('\r'); // Set up now? Yes
-    await terminal.answerNext('support\r'); // the address to forward
-    await terminal.answerNext('inbox@example.com\r'); // the inbox it goes to
-    await run;
-
-    assert.deepEqual(
-      JSON5.parse(readConfigSource(brandRoot)).domain.email.forwarding,
-      [{ from: 'support', to: 'inbox@example.com' }],
-    );
-    assert.ok(api.call('POST', '/zones/zone-1/email/routing/rules'), 'the pass went on to write the rule it just landed');
-  } finally {
-    terminal.close();
-  }
-});
-
-test('email-routing: Disable at the forwarding ask lands domain.email.forwarding: false; a second run writes no rule and never asks', async () => {
-  const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
-  const config = brandConfig();
-  config.domain.email.providers = { cloudflare: {} };
-  config.domain.email.forwarding = [];
-  const tty = openTtyPrompt(); // interactive: a second-run prompt here would hang
-
-  try {
-    const run = ensureEmailRouting(askContext(config, routingApi(), brandRoot));
-    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
-    await run;
-
-    assert.equal(JSON5.parse(readConfigSource(brandRoot)).domain.email.forwarding, false);
-
-    const again = brandConfig();
-    again.domain.email.providers = { cloudflare: {} };
-    again.domain.email.forwarding = false;
-    const api = routingApi();
-    const result = await ensureEmailRouting(askContext(again, api, brandRoot));
-
-    assert.notEqual(result?.status, 'failed');
-    assert.equal(api.call('POST', '/zones/zone-1/email/routing/rules'), undefined, 'false is "no forwarding rules"');
-  } finally {
-    tty.close();
-  }
-});
-
-test('dns-records: domain.email.providers: false is "none", so no MX record is required', async () => {
-  const config = brandConfig();
-  config.domain.email.providers = false;
-
-  const api = fakeApi({
-    responses: {
-      'GET /zones/zone-1/dns_records': [],
-      'POST /zones/zone-1/dns_records': { id: 'new' },
+        // The next walk loads the landed false
+        const again = brandConfig();
+        again.domain.email.providers = false;
+        terminal = promptSequence();
+        try {
+          await terminal.noPromptDuring(runService(again, walkApi(again, [MAILGUN_MX]), {}, brandRoot));
+        } finally {
+          terminal.close();
+        }
+      },
     },
-  });
 
-  const result = await ensureDns(handlerContext(config, api));
+    {
+      name: 'edge setup: a headless or dry run never asks, prints the line naming the key, and deletes no MX',
+      timeout: 20000,
+      run: async (ctx) => {
+        // Headless: no terminal to ask in
+        process.env.OMEGA_NON_INTERACTIVE = '1';
+        const headlessApi = walkApi(brandConfig(), [MAILGUN_MX]);
+        try {
+          const printed = await captureLogAsync(() => runService(brandConfig(), headlessApi, {}, makeBrandRoot(EMAIL_ASK_CONFIG)));
+          ctx.expect(printed.match(PROVIDER_LINE)?.length, `one provider line in: ${printed}`).toBe(1);
+          ctx.expect(deletedRecordIds(headlessApi)).toEqual([]);
+        } finally {
+          delete process.env.OMEGA_NON_INTERACTIVE;
+        }
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.calls.filter((c) => c.method === 'POST' && c.body.type === 'MX'), []);
+        // Dry run: a terminal is there, and still nothing is asked
+        const dryApi = walkApi(brandConfig(), [MAILGUN_MX]);
+        const terminal = promptSequence();
+        try {
+          const printed = await captureLogAsync(() => terminal.noPromptDuring(
+            runService(brandConfig(), dryApi, { dryRun: true }, makeBrandRoot(EMAIL_ASK_CONFIG)),
+          ));
+          ctx.expect(printed.match(PROVIDER_LINE)?.length, `one provider line in: ${printed}`).toBe(1);
+          ctx.expect(deletedRecordIds(dryApi)).toEqual([]);
+        } finally {
+          terminal.close();
+        }
+      },
+    },
+
+    {
+      name: 'edge setup: a subdomain project is never asked for a mail provider',
+      timeout: 20000,
+      run: async (ctx) => {
+        const sub = `app.${DOMAIN}`;
+        const config = brandConfig(`https://${sub}`);
+        const api = fakeApi({
+          zones: [ZONE],
+          responses: {
+            'GET /accounts': [{ id: 'acct-1' }],
+            'GET /zones/zone-1/dns_records': [
+              { id: 's1', type: 'A', name: sub, content: '185.199.108.153', proxied: true, comment: 'GitHub Pages IP' },
+              { id: 's2', type: 'AAAA', name: sub, content: '2606:50c0:8000::153', proxied: true, comment: 'GitHub Pages IP' },
+              MAILGUN_MX,
+            ],
+          },
+        });
+        const terminal = promptSequence();
+
+        try {
+          await terminal.noPromptDuring(runService(config, api, {}, makeBrandRoot(EMAIL_ASK_CONFIG)));
+        } finally {
+          terminal.close();
+        }
+      },
+    },
+
+    // ─── The forwarding ask, in the email-routing op ─────────────────────────────
+
+    {
+      name: 'email-routing: a routing provider with an empty forwarding list asks, and the two entries land one rule',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        config.domain.email.providers = { cloudflare: {} };
+        config.domain.email.forwarding = [];
+        const api = routingApi();
+        const terminal = promptSequence();
+
+        try {
+          const run = ensureEmailRouting(askContext(config, api, brandRoot));
+          await terminal.answerNext('\r'); // Set up now? Yes
+          await terminal.answerNext('support\r'); // the address to forward
+          await terminal.answerNext('inbox@example.com\r'); // the inbox it goes to
+          await run;
+
+          ctx.expect(JSON5.parse(readConfigSource(brandRoot)).domain.email.forwarding).toEqual([{ from: 'support', to: 'inbox@example.com' }]);
+          ctx.expect(api.call('POST', '/zones/zone-1/email/routing/rules'), 'the pass went on to write the rule it just landed').toBeTruthy();
+        } finally {
+          terminal.close();
+        }
+      },
+    },
+
+    {
+      name: 'email-routing: Disable at the forwarding ask lands domain.email.forwarding: false; a second run writes no rule and never asks',
+      run: async (ctx) => {
+        const brandRoot = makeBrandRoot(EMAIL_ASK_CONFIG);
+        const config = brandConfig();
+        config.domain.email.providers = { cloudflare: {} };
+        config.domain.email.forwarding = [];
+        const tty = openTtyPrompt(); // interactive: a second-run prompt here would hang
+
+        try {
+          const run = ensureEmailRouting(askContext(config, routingApi(), brandRoot));
+          await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
+          await run;
+
+          ctx.expect(JSON5.parse(readConfigSource(brandRoot)).domain.email.forwarding).toBe(false);
+
+          const again = brandConfig();
+          again.domain.email.providers = { cloudflare: {} };
+          again.domain.email.forwarding = false;
+          const api = routingApi();
+          const result = await ensureEmailRouting(askContext(again, api, brandRoot));
+
+          ctx.expect(result?.status).not.toBe('failed');
+          ctx.expect(api.call('POST', '/zones/zone-1/email/routing/rules'), 'false is "no forwarding rules"').toBe(undefined);
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    {
+      name: 'dns-records: domain.email.providers: false is "none", so no MX record is required',
+      run: async (ctx) => {
+        const config = brandConfig();
+        config.domain.email.providers = false;
+
+        const api = fakeApi({
+          responses: {
+            'GET /zones/zone-1/dns_records': [],
+            'POST /zones/zone-1/dns_records': { id: 'new' },
+          },
+        });
+
+        const result = await ensureDns(handlerContext(config, api));
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.calls.filter((c) => c.method === 'POST' && c.body.type === 'MX')).toEqual([]);
+      },
+    },
+  ],
 });

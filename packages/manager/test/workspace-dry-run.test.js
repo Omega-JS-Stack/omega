@@ -4,8 +4,7 @@
 
 require('@omega.js/devkit/test/temp-home');
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -68,28 +67,37 @@ function treeHash(root) {
   return entries;
 }
 
-test('#971: a dry-run workspace walk plans every write and leaves the brand tree byte-identical', async (t) => {
-  // A machine whose plugin is behind: a real walk would update it, a dry run changes nothing
-  const machine = createMachine({
-    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
-    installed: { 'omega@omega': '0.0.1' },
-  });
-  t.after(machine.activate());
-  const root = stageBrand();
-  const before = treeHash(root);
+module.exports = defineCases({
+  type: 'group',
+  description: 'workspace-dry-run',
+  tests: [
+    {
+      name: '#971: a dry-run workspace walk plans every write and leaves the brand tree byte-identical',
+      run: async (ctx) => {
+        // A machine whose plugin is behind: a real walk would update it, a dry run changes nothing
+        const machine = createMachine({
+          marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+          installed: { 'omega@omega': '0.0.1' },
+        });
+        ctx.after(machine.activate());
+        const root = stageBrand();
+        const before = treeHash(root);
 
-  const result = await runService('workspace', loadBrand(root), { dryRun: true });
+        const result = await runService('workspace', loadBrand(root), { dryRun: true });
 
-  assert.deepEqual(treeHash(root), before);
-  assert.deepEqual(machine.mutations(), [], 'the machine is never changed by a dry run');
-  assert.notEqual(result.status, 'error', `the walk reached every op: ${result.error}`);
+        ctx.expect(treeHash(root)).toEqual(before);
+        ctx.expect(machine.mutations(), 'the machine is never changed by a dry run').toEqual([]);
+        ctx.expect(result.status, `the walk reached every op: ${result.error}`).not.toBe('error');
 
-  // Each op had real work, so an identical tree means it was skipped
-  const { output } = result;
-  assert.ok(output.defaults.planned.length > 0);
-  assert.equal(output.gitignore.brand, 'planned');
-  assert.deepEqual([output.link, output.agents], ['planned', 'planned']);
-  assert.match(JSON.stringify(output.claudeSettings), /planned/);
-  assert.equal(output.scripts, 'planned');
-  assert.equal(output.envOrder.brand, 'planned');
+        // Each op had real work, so an identical tree means it was skipped
+        const { output } = result;
+        ctx.expect(output.defaults.planned.length > 0).toBeTruthy();
+        ctx.expect(output.gitignore.brand).toBe('planned');
+        ctx.expect([output.link, output.agents]).toEqual(['planned', 'planned']);
+        ctx.expect(JSON.stringify(output.claudeSettings)).toMatch(/planned/);
+        ctx.expect(output.scripts).toBe('planned');
+        ctx.expect(output.envOrder.brand).toBe('planned');
+      },
+    },
+  ],
 });

@@ -9,8 +9,7 @@
  *
  * Run: node --test scripts/docs-links.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -49,23 +48,35 @@ function danglingLinks(file) {
   return dangling;
 }
 
-test('danglingLinks() flags a missing path and passes real paths, URLs, anchors and code', () => {
-  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'docs-links-'));
-  fs.writeFileSync(path.join(dir, 'there.md'), '# there\n');
-  fs.writeFileSync(path.join(dir, 'page.md'), [
-    '[ok](there.md#part) [web](https://example.com) [top](#title) [mail](mailto:a@b.c)',
-    '[gone](missing.md) `[code](nope.md)` ```` ``` ```` [site](/pricing) [alias](@post/a.jpg)',
-    '```', '[fenced](nope.md)', '```',
-  ].join('\n'));
-  assert.deepEqual(danglingLinks(path.join(dir, 'page.md')), ['missing.md']);
-  fs.rmSync(dir, { recursive: true });
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'docs-links',
+  tests: [
+    {
+      name: 'danglingLinks() flags a missing path and passes real paths, URLs, anchors and code',
+      run: (ctx) => {
+        const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'docs-links-'));
+        fs.writeFileSync(path.join(dir, 'there.md'), '# there\n');
+        fs.writeFileSync(path.join(dir, 'page.md'), [
+          '[ok](there.md#part) [web](https://example.com) [top](#title) [mail](mailto:a@b.c)',
+          '[gone](missing.md) `[code](nope.md)` ```` ``` ```` [site](/pricing) [alias](@post/a.jpg)',
+          '```', '[fenced](nope.md)', '```',
+        ].join('\n'));
+        ctx.expect(danglingLinks(path.join(dir, 'page.md'))).toEqual(['missing.md']);
+        fs.rmSync(dir, { recursive: true });
+      },
+    },
 
-test('no markdown file has a dangling relative link', () => {
-  const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...SCOPES], { cwd: ROOT, encoding: 'utf8' })
-    .split('\0')
-    .filter((file) => file.endsWith('.md') && fs.existsSync(path.join(ROOT, file)));
-  const dangling = files.flatMap((file) => danglingLinks(path.join(ROOT, file))
-    .map((target) => `${file}: ${target}`));
-  assert.deepEqual(dangling, []);
+    {
+      name: 'no markdown file has a dangling relative link',
+      run: (ctx) => {
+        const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...SCOPES], { cwd: ROOT, encoding: 'utf8' })
+          .split('\0')
+          .filter((file) => file.endsWith('.md') && fs.existsSync(path.join(ROOT, file)));
+        const dangling = files.flatMap((file) => danglingLinks(path.join(ROOT, file))
+          .map((target) => `${file}: ${target}`));
+        ctx.expect(dangling).toEqual([]);
+      },
+    },
+  ],
 });

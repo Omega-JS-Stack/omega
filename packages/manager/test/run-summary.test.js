@@ -4,8 +4,7 @@
 // retry command. Full breakdown rendering is exercised by the manage/company
 // integration tests.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { RunSummary } = require('../src/lib/run-summary.js');
 
 /** Print the summary with console.log captured; returns the joined text. */
@@ -21,140 +20,173 @@ function captureSummary(summary) {
   return lines.join('\n');
 }
 
-test('run-summary: needsInteractive markers aggregate into the ⚑ section with the blessed command', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'firebase', {
-    status: 'warned',
-    output: {
-      cloudMessaging: {
-        note: 'no VAPID key pair in state (needs an interactive run)',
-        needsInteractive: 'paste the VAPID key pair from the Cloud Messaging settings',
+module.exports = defineCases({
+  type: 'group',
+  description: 'run-summary',
+  tests: [
+    {
+      name: 'run-summary: needsInteractive markers aggregate into the ⚑ section with the blessed command',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'firebase', {
+          status: 'warned',
+          output: {
+            cloudMessaging: {
+              note: 'no VAPID key pair in state (needs an interactive run)',
+              needsInteractive: 'paste the VAPID key pair from the Cloud Messaging settings',
+            },
+            authentication: { needsInteractive: 'confirm the OAuth client origins + redirect URIs' },
+            hosting: { domains: 2 }, // no marker — never listed
+          },
+        });
+
+        const text = captureSummary(summary);
+
+        ctx.expect(text.includes('Skipped — needs an interactive run:')).toBeTruthy();
+        ctx.expect(text.includes('firebase/cloudMessaging')).toBeTruthy();
+        ctx.expect(text.includes('paste the VAPID key pair')).toBeTruthy();
+        ctx.expect(text.includes('firebase/authentication')).toBeTruthy();
+        ctx.expect(!text.includes('firebase/hosting')).toBeTruthy();
+        ctx.expect(text.includes('npm run manage -- --service=firebase')).toBeTruthy();
+        ctx.expect(!text.includes('Brand A ·')).toBeTruthy(); // single brand → no prefix noise
       },
-      authentication: { needsInteractive: 'confirm the OAuth client origins + redirect URIs' },
-      hosting: { domains: 2 }, // no marker — never listed
     },
-  });
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: no markers → no ⚑ section',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'firebase', {
+          status: 'success',
+          output: { hosting: { domains: 2 } },
+        });
 
-  assert.ok(text.includes('Skipped — needs an interactive run:'));
-  assert.ok(text.includes('firebase/cloudMessaging'));
-  assert.ok(text.includes('paste the VAPID key pair'));
-  assert.ok(text.includes('firebase/authentication'));
-  assert.ok(!text.includes('firebase/hosting'));
-  assert.ok(text.includes('npm run manage -- --service=firebase'));
-  assert.ok(!text.includes('Brand A ·')); // single brand → no prefix noise
-});
+        const text = captureSummary(summary);
 
-test('run-summary: no markers → no ⚑ section', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'firebase', {
-    status: 'success',
-    output: { hosting: { domains: 2 } },
-  });
+        ctx.expect(!text.includes('needs an interactive run')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: multi-brand aggregate prefixes the brand name',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'firebase', {
+          status: 'warned',
+          output: { cloudMessaging: { needsInteractive: 'paste the VAPID key pair' } },
+        });
+        summary.add('brand-b', 'Brand B', 'firebase', { status: 'success', output: {} });
 
-  assert.ok(!text.includes('needs an interactive run'));
-});
+        const text = captureSummary(summary);
 
-test('run-summary: multi-brand aggregate prefixes the brand name', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'firebase', {
-    status: 'warned',
-    output: { cloudMessaging: { needsInteractive: 'paste the VAPID key pair' } },
-  });
-  summary.add('brand-b', 'Brand B', 'firebase', { status: 'success', output: {} });
+        ctx.expect(text.includes('Brand A · ')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: the retry line carries the flags, never a doubled verb (#229)',
+      run: (ctx) => {
+        const originalArgv = process.argv;
+        process.argv = ['node', 'cli-run.js', 'manage', '--service=payment'];
 
-  assert.ok(text.includes('Brand A · '));
-});
+        let text;
+        try {
+          const summary = new RunSummary();
+          summary.add('brand-a', 'Brand A', 'payment', { status: 'error', error: 'boom' });
+          text = captureSummary(summary);
+        } finally {
+          process.argv = originalArgv;
+        }
 
-test('run-summary: the retry line carries the flags, never a doubled verb (#229)', () => {
-  const originalArgv = process.argv;
-  process.argv = ['node', 'cli-run.js', 'manage', '--service=payment'];
+        ctx.expect(text.includes('npm run manage -- --service=payment'), 'the script already IS the verb').toBeTruthy();
+        ctx.expect(!text.includes('manage -- manage'), 'a copy-pasted retry must not run `omega manage manage`').toBeTruthy();
+      },
+    },
 
-  let text;
-  try {
-    const summary = new RunSummary();
-    summary.add('brand-a', 'Brand A', 'payment', { status: 'error', error: 'boom' });
-    text = captureSummary(summary);
-  } finally {
-    process.argv = originalArgv;
-  }
+    {
+      name: 'run-summary: retry command is the blessed npm run manage form, never npx',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'update', { status: 'error', error: 'boom' });
 
-  assert.ok(text.includes('npm run manage -- --service=payment'), 'the script already IS the verb');
-  assert.ok(!text.includes('manage -- manage'), 'a copy-pasted retry must not run `omega manage manage`');
-});
+        const text = captureSummary(summary);
 
-test('run-summary: retry command is the blessed npm run manage form, never npx', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'update', { status: 'error', error: 'boom' });
+        ctx.expect(text.includes('npm run manage')).toBeTruthy();
+        ctx.expect(!text.includes('npx omega-manager')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: the warned breakdown names every recorded operation and its reason (#643)',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'search', {
+          status: 'warned',
+          warned: [
+            { operation: 'property', reason: 'no Cloudflare zone yet' },
+            { operation: 'gaLink', reason: 'link the property in the Analytics console' },
+          ],
+        });
 
-  assert.ok(text.includes('npm run manage'));
-  assert.ok(!text.includes('npx omega-manager'));
-});
+        const text = captureSummary(summary);
 
-test('run-summary: the warned breakdown names every recorded operation and its reason (#643)', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'search', {
-    status: 'warned',
-    warned: [
-      { operation: 'property', reason: 'no Cloudflare zone yet' },
-      { operation: 'gaLink', reason: 'link the property in the Analytics console' },
-    ],
-  });
+        ctx.expect(text.includes('property')).toBeTruthy();
+        ctx.expect(text.includes('no Cloudflare zone yet')).toBeTruthy();
+        ctx.expect(text.includes('gaLink')).toBeTruthy();
+        ctx.expect(text.includes('link the property in the Analytics console')).toBeTruthy();
+        ctx.expect(!text.includes('some operations had issues')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: a warned operation with no reason still names the operation (#643)',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'edge', {
+          status: 'warned',
+          warned: [{ operation: 'rulesets', reason: null }],
+        });
 
-  assert.ok(text.includes('property'));
-  assert.ok(text.includes('no Cloudflare zone yet'));
-  assert.ok(text.includes('gaLink'));
-  assert.ok(text.includes('link the property in the Analytics console'));
-  assert.ok(!text.includes('some operations had issues'));
-});
+        const text = captureSummary(summary);
 
-test('run-summary: a warned operation with no reason still names the operation (#643)', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'edge', {
-    status: 'warned',
-    warned: [{ operation: 'rulesets', reason: null }],
-  });
+        ctx.expect(text.includes('rulesets')).toBeTruthy();
+        ctx.expect(!text.includes('some operations had issues')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: the error breakdown names every recorded failed operation and its reason (#643)',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'edge', {
+          status: 'error',
+          failed: [
+            { operation: 'x', reason: 'kaput' },
+            { operation: 'zzop', reason: null },
+          ],
+        });
 
-  assert.ok(text.includes('rulesets'));
-  assert.ok(!text.includes('some operations had issues'));
-});
+        const text = captureSummary(summary);
 
-test('run-summary: the error breakdown names every recorded failed operation and its reason (#643)', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'edge', {
-    status: 'error',
-    failed: [
-      { operation: 'x', reason: 'kaput' },
-      { operation: 'zzop', reason: null },
-    ],
-  });
+        ctx.expect(text.includes('x')).toBeTruthy();
+        ctx.expect(text.includes('kaput')).toBeTruthy();
+        ctx.expect(text.includes('zzop')).toBeTruthy();
+      },
+    },
 
-  const text = captureSummary(summary);
+    {
+      name: 'run-summary: an error with no failed[] still renders the generic service line (#643)',
+      run: (ctx) => {
+        const summary = new RunSummary();
+        summary.add('brand-a', 'Brand A', 'edge', {
+          status: 'error',
+          error: 'the zone request was refused',
+        });
 
-  assert.ok(text.includes('x'));
-  assert.ok(text.includes('kaput'));
-  assert.ok(text.includes('zzop'));
-});
+        const text = captureSummary(summary);
 
-test('run-summary: an error with no failed[] still renders the generic service line (#643)', () => {
-  const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'edge', {
-    status: 'error',
-    error: 'the zone request was refused',
-  });
-
-  const text = captureSummary(summary);
-
-  assert.ok(text.includes('edge: the zone request was refused'));
+        ctx.expect(text.includes('edge: the zone request was refused')).toBeTruthy();
+      },
+    },
+  ],
 });

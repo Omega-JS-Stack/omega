@@ -7,8 +7,7 @@
  *
  * Run: node --test scripts/package-docs.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -21,26 +20,41 @@ function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
 }
 
-test('no package but the manager has a docs/ folder on disk', () => {
-  const folders = fs.readdirSync(path.join(ROOT, 'packages'))
-    .filter((name) => name !== 'manager' && fs.existsSync(path.join(ROOT, 'packages', name, 'docs')));
-  assert.deepEqual(folders, [], 'a leftover generated docs/ from an old prepare: delete it (docs live in docs/<framework>/)');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'package-docs',
+  tests: [
+    {
+      name: 'no package but the manager has a docs/ folder on disk',
+      run: (ctx) => {
+        const folders = fs.readdirSync(path.join(ROOT, 'packages'))
+          .filter((name) => name !== 'manager' && fs.existsSync(path.join(ROOT, 'packages', name, 'docs')));
+        ctx.expect(folders, 'a leftover generated docs/ from an old prepare: delete it (docs live in docs/<framework>/)').toEqual([]);
+      },
+    },
 
-test('no package but the manager tracks a docs/ folder', () => {
-  const tracked = git(['ls-files', '-z', '--', 'packages/*/docs/'])
-    .split('\0')
-    .filter((file) => PACKAGE_DOCS.test(file) && file.match(PACKAGE_DOCS)[1] !== 'manager');
-  assert.deepEqual(tracked, [], 'these docs belong in docs/<framework>/');
-});
+    {
+      name: 'no package but the manager tracks a docs/ folder',
+      run: (ctx) => {
+        const tracked = git(['ls-files', '-z', '--', 'packages/*/docs/'])
+          .split('\0')
+          .filter((file) => PACKAGE_DOCS.test(file) && file.match(PACKAGE_DOCS)[1] !== 'manager');
+        ctx.expect(tracked, 'these docs belong in docs/<framework>/').toEqual([]);
+      },
+    },
 
-test('no tracked file outside CHANGELOG.md names a package docs/ path', () => {
-  let hits = '';
-  try {
-    hits = git(['grep', '-nE', RETIRED_PATH.source, '--', '.', ':(exclude)CHANGELOG.md']);
-  } catch (error) {
-    // git grep exits 1 when nothing matches, which is the passing case.
-    if (error.status !== 1) throw error;
-  }
-  assert.deepEqual(hits.split('\n').filter(Boolean), [], 'point these at docs/<framework>/');
+    {
+      name: 'no tracked file outside CHANGELOG.md names a package docs/ path',
+      run: (ctx) => {
+        let hits = '';
+        try {
+          hits = git(['grep', '-nE', RETIRED_PATH.source, '--', '.', ':(exclude)CHANGELOG.md']);
+        } catch (error) {
+          // git grep exits 1 when nothing matches, which is the passing case.
+          if (error.status !== 1) throw error;
+        }
+        ctx.expect(hits.split('\n').filter(Boolean), 'point these at docs/<framework>/').toEqual([]);
+      },
+    },
+  ],
 });

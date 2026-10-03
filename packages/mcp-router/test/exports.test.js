@@ -5,8 +5,7 @@
  * Resolve only: requiring the root or ./cli starts the stdio server.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -18,19 +17,31 @@ function specifier(door) {
   return door === '.' ? pkg.name : `${pkg.name}${door.slice(1)}`;
 }
 
-test('the map opens exactly the doors the siblings spell', () => {
-  assert.deepEqual(Object.keys(pkg.exports || {}).sort(), ['.', './cli', './package.json']);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'exports',
+  tests: [
+    {
+      name: 'the map opens exactly the doors the siblings spell',
+      run: (ctx) => {
+        ctx.expect(Object.keys(pkg.exports || {}).sort()).toEqual(['.', './cli', './package.json']);
+      },
+    },
 
-test('every door resolves by package name to the file the map names', () => {
-  for (const [door, target] of Object.entries(pkg.exports)) {
-    assert.equal(require.resolve(specifier(door)), path.join(PACKAGE_ROOT, target), door);
-  }
-});
+    {
+      name: 'every door resolves by package name to the file the map names',
+      run: (ctx) => {
+        for (const [door, target] of Object.entries(pkg.exports)) {
+          ctx.expect(require.resolve(specifier(door)), door).toBe(path.join(PACKAGE_ROOT, target));
+        }
+      },
+    },
 
-test('a path the map does not name is refused', () => {
-  assert.throws(
-    () => require.resolve(`${pkg.name}/bin/mcp-router.js`),
-    { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' }
-  );
+    {
+      name: 'a path the map does not name is refused',
+      run: (ctx) => {
+        ctx.expect(() => require.resolve(`${pkg.name}/bin/mcp-router.js`)).toThrow({ code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
+      },
+    },
+  ],
 });

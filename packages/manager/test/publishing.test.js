@@ -14,8 +14,7 @@
 // publish that dies in CI), and a listing id only a human can create is warned
 // with the manual step instead.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -85,306 +84,336 @@ function edgeOnlyBrand() {
   return { brandRoot: makeBrandRoot(source), brandConfig };
 }
 
-// ─── the registry ────────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'publishing',
+  tests: [
+    // ─── the registry ────────────────────────────────────────────────────────────
 
-test('publishing: the registry declares every ship credential the format table names', () => {
-  const declaration = REQUIRES.publishing;
-  const inputs = serviceInputs('publishing');
+    {
+      name: 'publishing: the registry declares every ship credential the format table names',
+      run: (ctx) => {
+        const declaration = REQUIRES.publishing;
+        const inputs = serviceInputs('publishing');
 
-  assert.equal(declaration.label, 'Publishing');
-  assert.equal(declaration.disablePath, 'publishing.enabled');
-  assert.deepEqual(inputs.map((entry) => entry.name).sort(), [...SHIP_KEYS].sort());
+        ctx.expect(declaration.label).toBe('Publishing');
+        ctx.expect(declaration.disablePath).toBe('publishing.enabled');
+        ctx.expect(inputs.map((entry) => entry.name).sort()).toEqual([...SHIP_KEYS].sort());
 
-  for (const entry of inputs) {
-    assert.equal(entry.prompted, true, `${entry.name} is collected mid-run on a TTY`);
-    assert.equal(entry.gates, false, `${entry.name} is optional: preflight never gates a walk on a ship credential`);
-  }
+        for (const entry of inputs) {
+          ctx.expect(entry.prompted, `${entry.name} is collected mid-run on a TTY`).toBe(true);
+          ctx.expect(entry.gates, `${entry.name} is optional: preflight never gates a walk on a ship credential`).toBe(false);
+        }
 
-  // The human half comes from the schema, never from the registry (#867)
-  const spec = serviceInputSpec('publishing');
-  const chrome = spec.inputs.find((input) => input.name === 'CHROME_CLIENT_ID');
-  assert.equal(chrome.label, 'Chrome Web Store OAuth client ID');
-  assert.match(chrome.url, /^https:\/\//);
-  assert.ok(chrome.hint);
+        // The human half comes from the schema, never from the registry (#867)
+        const spec = serviceInputSpec('publishing');
+        const chrome = spec.inputs.find((input) => input.name === 'CHROME_CLIENT_ID');
+        ctx.expect(chrome.label).toBe('Chrome Web Store OAuth client ID');
+        ctx.expect(chrome.url).toMatch(/^https:\/\//);
+        ctx.expect(chrome.hint).toBeTruthy();
 
-  // It runs after certificates, which keeps the Apple material
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('certificates') + 1], 'publishing');
-  assert.deepEqual(OPERATIONS.publishing.map((operation) => operation.name), ['keys', 'listings']);
-});
+        // It runs after certificates, which keeps the Apple material
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('certificates') + 1]).toBe('publishing');
+        ctx.expect(OPERATIONS.publishing.map((operation) => operation.name)).toEqual(['keys', 'listings']);
+      },
+    },
 
-test('publishing: the ask list follows the brand DECLARATION, not a typed list', () => {
-  // What manage asks the publishing service for, from the one function
-  const asked = (config) => missingEnvKeys(config, {}, { verb: 'manage' })
-    .filter((row) => row.service === 'publishing')
-    .map((row) => row.key)
-    .sort();
-  const sorted = (keys) => [...keys].sort();
+    {
+      name: 'publishing: the ask list follows the brand DECLARATION, not a typed list',
+      run: (ctx) => {
+        // What manage asks the publishing service for, from the one function
+        const asked = (config) => missingEnvKeys(config, {}, { verb: 'manage' })
+          .filter((row) => row.service === 'publishing')
+          .map((row) => row.key)
+          .sort();
+        const sorted = (keys) => [...keys].sort();
 
-  // No desktop and no extension target: nothing to ship, nothing to ask
-  assert.deepEqual(asked({ targets: { web: { type: 'web' } } }), []);
+        // No desktop and no extension target: nothing to ship, nothing to ask
+        ctx.expect(asked({ targets: { web: { type: 'web' } } })).toEqual([]);
 
-  // An undeclared extension ships all three stores, so it owes all seven keys
-  assert.deepEqual(asked({ targets: { extension: { type: 'extension' } } }), sorted([
-    'CHROME_CLIENT_ID', 'CHROME_CLIENT_SECRET', 'CHROME_REFRESH_TOKEN',
-    'FIREFOX_API_KEY', 'FIREFOX_API_SECRET',
-    'EDGE_CLIENT_ID', 'EDGE_API_KEY',
-  ]));
+        // An undeclared extension ships all three stores, so it owes all seven keys
+        ctx.expect(asked({ targets: { extension: { type: 'extension' } } })).toEqual(sorted([
+          'CHROME_CLIENT_ID', 'CHROME_CLIENT_SECRET', 'CHROME_REFRESH_TOKEN',
+          'FIREFOX_API_KEY', 'FIREFOX_API_SECRET',
+          'EDGE_CLIENT_ID', 'EDGE_API_KEY',
+        ]));
 
-  // Dropping a store drops its keys with it
-  assert.deepEqual(
-    asked({ targets: { extension: { type: 'extension', platforms: { chrome: { formats: { store: false } }, edge: false } } } }),
-    sorted(['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']),
-  );
+        // Dropping a store drops its keys with it
+        ctx.expect(asked({ targets: { extension: { type: 'extension', platforms: { chrome: { formats: { store: false } }, edge: false } } } })).toEqual(sorted(['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']));
 
-  // A desktop brand ships the snap and the self-hosted-signed installer by
-  // default, so it owes their keys whether it declares them or not
-  const defaults = sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS']);
-  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop' } } }), defaults);
-  assert.deepEqual(
-    asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: { signing: { strategy: 'self-hosted' } } } } } }),
-    defaults,
-  );
+        // A desktop brand ships the snap and the self-hosted-signed installer by
+        // default, so it owes their keys whether it declares them or not
+        const defaults = sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SNAPCRAFT_STORE_CREDENTIALS']);
+        ctx.expect(asked({ targets: { desktop: { type: 'desktop' } } })).toEqual(defaults);
+        ctx.expect(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: { signing: { strategy: 'self-hosted' } } } } } })).toEqual(defaults);
 
-  // Turning a format off drops its keys, and the Windows set follows the strategy in force
-  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } }), []);
-  assert.deepEqual(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: false } } } } } }), sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']));
-  assert.deepEqual(
-    asked({ targets: { desktop: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } } } }),
-    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT']),
-  );
+        // Turning a format off drops its keys, and the Windows set follows the strategy in force
+        ctx.expect(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } })).toEqual([]);
+        ctx.expect(asked({ targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: false } } } } } })).toEqual(sorted(['WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD']));
+        ctx.expect(asked({ targets: { desktop: { type: 'desktop', platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } } } })).toEqual(sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT']));
 
-  // Two targets in one brand: the union
-  assert.deepEqual(
-    asked({ targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false } }, desktop: { type: 'desktop', platforms: { linux: { formats: { snap: true } } } } } }),
-    sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']),
-  );
-});
+        // Two targets in one brand: the union
+        ctx.expect(asked({ targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false } }, desktop: { type: 'desktop', platforms: { linux: { formats: { snap: true } } } } } })).toEqual(sorted(['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']));
+      },
+    },
 
-// ─── the gates ───────────────────────────────────────────────────────────────
+    // ─── the gates ───────────────────────────────────────────────────────────────
 
-test('publishing: a brand with no desktop or extension target skips before any ask', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  targets: { web: { type: "web" } },\n}\n');
+    {
+      name: 'publishing: a brand with no desktop or extension target skips before any ask',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  targets: { web: { type: "web" } },\n}\n');
 
-  try {
-    const result = await run(context(brandRoot, { brand: { id: 'b' }, targets: { web: { type: 'web' } } }));
-    assert.equal(result.status, 'skipped');
-    assert.match(result.reason, /no desktop or extension target/);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+        try {
+          const result = await run(context(brandRoot, { brand: { id: 'b' }, targets: { web: { type: 'web' } } }));
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.reason).toMatch(/no desktop or extension target/);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: publishing.enabled = false skips the whole service', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  const brandConfig = { publishing: { enabled: false }, targets: { extension: { type: 'extension' } } };
+    {
+      name: 'publishing: publishing.enabled = false skips the whole service',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        const brandConfig = { publishing: { enabled: false }, targets: { extension: { type: 'extension' } } };
 
-  try {
-    const result = await run(context(brandRoot, brandConfig));
-    assert.equal(result.status, 'skipped');
-    assert.match(result.reason, /publishing\.enabled/);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+        try {
+          const result = await run(context(brandRoot, brandConfig));
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(result.reason).toMatch(/publishing\.enabled/);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-// ─── asking ──────────────────────────────────────────────────────────────────
+    // ─── asking ──────────────────────────────────────────────────────────────────
 
-test('publishing: PROVIDE opens the mint page and lands the key in the brand .env', async () => {
-  cleanup();
-  // A desktop brand that ships the snap and no Windows installer owes exactly
-  // one credential, and the Snap Store has no listing id to collect
-  const source = `{\n  brand: { id: 'b' },\n  // keep me\n  targets: {\n    desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } },\n  },\n}\n`;
-  const brandRoot = makeBrandRoot(source);
-  const brandConfig = {
-    brand: { id: 'b' },
-    targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } } },
-  };
-  fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
+    {
+      name: 'publishing: PROVIDE opens the mint page and lands the key in the brand .env',
+      run: async (ctx) => {
+        cleanup();
+        // A desktop brand that ships the snap and no Windows installer owes exactly
+        // one credential, and the Snap Store has no listing id to collect
+        const source = `{\n  brand: { id: 'b' },\n  // keep me\n  targets: {\n    desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } },\n  },\n}\n`;
+        const brandRoot = makeBrandRoot(source);
+        const brandConfig = {
+          brand: { id: 'b' },
+          targets: { desktop: { type: 'desktop', platforms: { linux: { formats: { snap: {} } }, windows: false } } },
+        };
+        fs.writeFileSync(path.join(brandRoot, '.env'), 'EXISTING_KEY="keep-me"\n');
 
-  const tty = openTtyPrompt();
-  const browser = stubBrowser();
-  try {
-    const running = run(context(brandRoot, brandConfig));
-    await tty.answer('Set up now?', '\r');                                     // Provide
-    await tty.answer('Press Enter to open the Snap Store credentials page', '\r');
-    await tty.answer('Paste SNAPCRAFT_STORE_CREDENTIALS', 'snap-blob\r');
-    const result = await running;
+        const tty = openTtyPrompt();
+        const browser = stubBrowser();
+        try {
+          const running = run(context(brandRoot, brandConfig));
+          await tty.answer('Set up now?', '\r');                                     // Provide
+          await tty.answer('Press Enter to open the Snap Store credentials page', '\r');
+          await tty.answer('Paste SNAPCRAFT_STORE_CREDENTIALS', 'snap-blob\r');
+          const result = await running;
 
-    assert.equal(result.status, 'success');
-    assert.equal(process.env.SNAPCRAFT_STORE_CREDENTIALS, 'snap-blob');
-    assert.deepEqual(browser.opened, ['https://snapcraft.io/account']);
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(process.env.SNAPCRAFT_STORE_CREDENTIALS).toBe('snap-blob');
+          ctx.expect(browser.opened).toEqual(['https://snapcraft.io/account']);
 
-    const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
-    assert.match(env, /EXISTING_KEY="keep-me"/);
-    assert.match(env, /SNAPCRAFT_STORE_CREDENTIALS="snap-blob"/);
-    assert.equal(readConfigSource(brandRoot), source, 'a key is never config');
-  } finally {
-    tty.close();
-    browser.restore();
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
+          ctx.expect(env).toMatch(/EXISTING_KEY="keep-me"/);
+          ctx.expect(env).toMatch(/SNAPCRAFT_STORE_CREDENTIALS="snap-blob"/);
+          ctx.expect(readConfigSource(brandRoot), 'a key is never config').toBe(source);
+        } finally {
+          tty.close();
+          browser.restore();
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: the listing id is asked for and lands in CONFIG, never the .env', async () => {
-  cleanup();
-  const { brandRoot, brandConfig } = edgeOnlyBrand();
-  process.env.EDGE_CLIENT_ID = 'edge-client';
-  process.env.EDGE_API_KEY = 'edge-key';
+    {
+      name: 'publishing: the listing id is asked for and lands in CONFIG, never the .env',
+      run: async (ctx) => {
+        cleanup();
+        const { brandRoot, brandConfig } = edgeOnlyBrand();
+        process.env.EDGE_CLIENT_ID = 'edge-client';
+        process.env.EDGE_API_KEY = 'edge-key';
 
-  const tty = openTtyPrompt();
-  const browser = stubBrowser();
-  try {
-    const running = run(context(brandRoot, brandConfig));
-    await tty.answer('Set up now?', '\r');                                     // Provide
-    await tty.answer('Microsoft Edge Add-ons listing id', 'edge-product-guid\r');
-    const result = await running;
+        const tty = openTtyPrompt();
+        const browser = stubBrowser();
+        try {
+          const running = run(context(brandRoot, brandConfig));
+          await tty.answer('Set up now?', '\r');                                     // Provide
+          await tty.answer('Microsoft Edge Add-ons listing id', 'edge-product-guid\r');
+          const result = await running;
 
-    assert.equal(result.status, 'success');
-    assert.deepEqual(browser.opened, ['https://partner.microsoft.com/dashboard/microsoftedge/']);
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(browser.opened).toEqual(['https://partner.microsoft.com/dashboard/microsoftedge/']);
 
-    // The id is CONFIG (#893), and the brand's own file is EDITED
-    const source = readConfigSource(brandRoot);
-    assert.match(source, /id: "edge-product-guid"/);
-    assert.match(source, /\/\/ keep me/);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    tty.close();
-    browser.restore();
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          // The id is CONFIG (#893), and the brand's own file is EDITED
+          const source = readConfigSource(brandRoot);
+          ctx.expect(source).toMatch(/id: "edge-product-guid"/);
+          ctx.expect(source).toMatch(/\/\/ keep me/);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          tty.close();
+          browser.restore();
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: "not yet" on a listing id writes nothing and warns with the manual step', async () => {
-  cleanup();
-  const { brandRoot, brandConfig } = edgeOnlyBrand();
-  process.env.EDGE_CLIENT_ID = 'edge-client';
-  process.env.EDGE_API_KEY = 'edge-key';
+    {
+      name: 'publishing: "not yet" on a listing id writes nothing and warns with the manual step',
+      run: async (ctx) => {
+        cleanup();
+        const { brandRoot, brandConfig } = edgeOnlyBrand();
+        process.env.EDGE_CLIENT_ID = 'edge-client';
+        process.env.EDGE_API_KEY = 'edge-key';
 
-  const tty = openTtyPrompt();
-  const browser = stubBrowser();
-  try {
-    const running = run(context(brandRoot, brandConfig));
-    await tty.answer('Set up now?', `${DOWN}\r`);                              // Skip for now: not yet
-    const result = await running;
+        const tty = openTtyPrompt();
+        const browser = stubBrowser();
+        try {
+          const running = run(context(brandRoot, brandConfig));
+          await tty.answer('Set up now?', `${DOWN}\r`);                              // Skip for now: not yet
+          const result = await running;
 
-    assert.equal(result.status, 'warned');
-    assert.match(result.warned[0].reason, /targets\.extension\.listings\.edge\.id/);
-    assert.doesNotMatch(readConfigSource(brandRoot), /listings/);
-  } finally {
-    tty.close();
-    browser.restore();
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          ctx.expect(result.status).toBe('warned');
+          ctx.expect(result.warned[0].reason).toMatch(/targets\.extension\.listings\.edge\.id/);
+          ctx.expect(readConfigSource(brandRoot)).not.toMatch(/listings/);
+        } finally {
+          tty.close();
+          browser.restore();
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: everything present is asked for nothing and writes nothing', async () => {
-  cleanup();
-  const source = `{\n  brand: { id: 'b' },\n  targets: {\n    extension: { type: 'extension', platforms: { chrome: false, firefox: false }, listings: { edge: { id: 'already' } } },\n  },\n}\n`;
-  const brandRoot = makeBrandRoot(source);
-  const brandConfig = {
-    brand: { id: 'b' },
-    targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false }, listings: { edge: { id: 'already' } } } },
-  };
-  process.env.EDGE_CLIENT_ID = 'edge-client';
-  process.env.EDGE_API_KEY = 'edge-key';
+    {
+      name: 'publishing: everything present is asked for nothing and writes nothing',
+      run: async (ctx) => {
+        cleanup();
+        const source = `{\n  brand: { id: 'b' },\n  targets: {\n    extension: { type: 'extension', platforms: { chrome: false, firefox: false }, listings: { edge: { id: 'already' } } },\n  },\n}\n`;
+        const brandRoot = makeBrandRoot(source);
+        const brandConfig = {
+          brand: { id: 'b' },
+          targets: { extension: { type: 'extension', platforms: { chrome: false, firefox: false }, listings: { edge: { id: 'already' } } } },
+        };
+        process.env.EDGE_CLIENT_ID = 'edge-client';
+        process.env.EDGE_API_KEY = 'edge-key';
 
-  const tty = openTtyPrompt();
-  try {
-    const result = await run(context(brandRoot, brandConfig));
+        const tty = openTtyPrompt();
+        try {
+          const result = await run(context(brandRoot, brandConfig));
 
-    assert.equal(result.status, 'success');
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false, 'nothing was written');
-    assert.equal(readConfigSource(brandRoot), source, 'the brand file is byte-identical');
-  } finally {
-    tty.close();
-    setPromptStreams(null);
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env')), 'nothing was written').toBe(false);
+          ctx.expect(readConfigSource(brandRoot), 'the brand file is byte-identical').toBe(source);
+        } finally {
+          tty.close();
+          setPromptStreams(null);
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-// ─── the runs that cannot ask ────────────────────────────────────────────────
+    // ─── the runs that cannot ask ────────────────────────────────────────────────
 
-test('publishing: a headless run FAILS on a missing developer key, naming the key and the walk', async () => {
-  cleanup();
-  const { brandRoot, brandConfig } = edgeOnlyBrand();
+    {
+      name: 'publishing: a headless run FAILS on a missing developer key, naming the key and the walk',
+      run: async (ctx) => {
+        cleanup();
+        const { brandRoot, brandConfig } = edgeOnlyBrand();
 
-  try {
-    const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
+        try {
+          const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
 
-    assert.equal(result.status, 'error');
-    assert.match(result.error, /EDGE_CLIENT_ID \(required by platforms\.edge\.formats\.store\)/);
-    assert.match(result.error, /EDGE_API_KEY/);
-    assert.match(result.error, /omega manage --service publishing/);
-    // Nothing was asked and nothing was written
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          ctx.expect(result.status).toBe('error');
+          ctx.expect(result.error).toMatch(/EDGE_CLIENT_ID \(required by platforms\.edge\.formats\.store\)/);
+          ctx.expect(result.error).toMatch(/EDGE_API_KEY/);
+          ctx.expect(result.error).toMatch(/omega manage --service publishing/);
+          // Nothing was asked and nothing was written
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: a headless run with the keys present WARNS on the missing listing id', async () => {
-  cleanup();
-  const { brandRoot, brandConfig } = edgeOnlyBrand();
-  process.env.EDGE_CLIENT_ID = 'edge-client';
-  process.env.EDGE_API_KEY = 'edge-key';
+    {
+      name: 'publishing: a headless run with the keys present WARNS on the missing listing id',
+      run: async (ctx) => {
+        cleanup();
+        const { brandRoot, brandConfig } = edgeOnlyBrand();
+        process.env.EDGE_CLIENT_ID = 'edge-client';
+        process.env.EDGE_API_KEY = 'edge-key';
 
-  const lines = [];
-  const realLog = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
-  try {
-    const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
+        const lines = [];
+        const realLog = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
+        try {
+          const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
 
-    assert.equal(result.status, 'warned');
-    assert.match(result.warned[0].reason, /targets\.extension\.listings\.edge\.id/);
+          ctx.expect(result.status).toBe('warned');
+          ctx.expect(result.warned[0].reason).toMatch(/targets\.extension\.listings\.edge\.id/);
 
-    const printed = lines.join('\n');
-    assert.match(printed, /Microsoft Edge Add-ons has no listing id yet/);
-    assert.match(printed, /partner\.microsoft\.com/);
-    assert.match(printed, /targets\.extension\.listings\.edge\.id/);
-  } finally {
-    console.log = realLog;
-    cleanup();
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          const printed = lines.join('\n');
+          ctx.expect(printed).toMatch(/Microsoft Edge Add-ons has no listing id yet/);
+          ctx.expect(printed).toMatch(/partner\.microsoft\.com/);
+          ctx.expect(printed).toMatch(/targets\.extension\.listings\.edge\.id/);
+        } finally {
+          console.log = realLog;
+          cleanup();
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: a headless run FAILS on a desktop target\'s default formats, naming the snap\'s path', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop' } } };
+    {
+      name: 'publishing: a headless run FAILS on a desktop target\'s default formats, naming the snap\'s path',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop' } } };
 
-  try {
-    const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
+        try {
+          const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
 
-    assert.equal(result.status, 'error');
-    assert.match(result.error, /SNAPCRAFT_STORE_CREDENTIALS \(required by platforms\.linux\.formats\.snap\b/);
-    assert.match(result.error, /on by default/);
-    assert.match(result.error, /WIN_EV_TOKEN_PATH/);
-    assert.match(result.error, /WIN_CSC_KEY_PASSWORD/);
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          ctx.expect(result.status).toBe('error');
+          ctx.expect(result.error).toMatch(/SNAPCRAFT_STORE_CREDENTIALS \(required by platforms\.linux\.formats\.snap\b/);
+          ctx.expect(result.error).toMatch(/on by default/);
+          ctx.expect(result.error).toMatch(/WIN_EV_TOKEN_PATH/);
+          ctx.expect(result.error).toMatch(/WIN_CSC_KEY_PASSWORD/);
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('publishing: a desktop brand that turns off the snap and Windows has nothing to collect', async () => {
-  cleanup();
-  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
-  const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } };
+    {
+      name: 'publishing: a desktop brand that turns off the snap and Windows has nothing to collect',
+      run: async (ctx) => {
+        cleanup();
+        const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+        const brandConfig = { brand: { id: 'b' }, targets: { desktop: { type: 'desktop', platforms: { linux: false, windows: false } } } };
 
-  try {
-    const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
+        try {
+          const result = await run(context(brandRoot, brandConfig, { dryRun: true }));
 
-    assert.equal(result.status, 'success');
-    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(fs.existsSync(path.join(brandRoot, '.env'))).toBe(false);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

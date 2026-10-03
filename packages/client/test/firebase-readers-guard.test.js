@@ -5,10 +5,12 @@
  * guard greps every surface that boots the client, so a reader added anywhere
  * fails here without needing a scenario that reaches it.
  */
-const { describe, it } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
-const { assert } = require('./helpers.js');
+const { createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 const PACKAGES = path.resolve(__dirname, '..', '..');
 
@@ -44,33 +46,46 @@ function sourceFiles(dir) {
   });
 }
 
-describe('the removed Firebase getters', () => {
+module.exports = defineCases({
+  type: 'group',
+  description: 'firebase-readers-guard',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    {
+      name: 'the removed Firebase getters > should leave no reader of firebaseFirestore or firebaseMessaging in client, web, desktop or extension source (case 7)',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const offenders = [];
 
-  it('should leave no reader of firebaseFirestore or firebaseMessaging in client, web, desktop or extension source (case 7)', () => {
-    const offenders = [];
+        for (const root of ROOTS) {
+          ctx.expect(fs.existsSync(root), `the guarded root exists: ${path.relative(PACKAGES, root)}`).toBeTruthy();
 
-    for (const root of ROOTS) {
-      assert.ok(fs.existsSync(root), `the guarded root exists: ${path.relative(PACKAGES, root)}`);
-
-      for (const file of sourceFiles(root)) {
-        fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
-          if (REMOVED_READ.test(line)) {
-            offenders.push(`${path.relative(PACKAGES, file)}:${index + 1}: ${line.trim()}`);
+          for (const file of sourceFiles(root)) {
+            fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+              if (REMOVED_READ.test(line)) {
+                offenders.push(`${path.relative(PACKAGES, file)}:${index + 1}: ${line.trim()}`);
+              }
+            });
           }
-        });
-      }
-    }
+        }
 
-    assert.deepStrictEqual(offenders, [], 'read through omega.loadFirebaseFirestore() / omega.loadFirebaseMessaging() instead');
-  });
+        ctx.expect(offenders, 'read through omega.loadFirebaseFirestore() / omega.loadFirebaseMessaging() instead').toEqual([]);
+      },
+    },
 
-  it('should carry neither getter on the instance, only the two loaders', async () => {
-    const { Omega } = await import('../src/index.js');
-    const omega = new Omega();
+    {
+      name: 'the removed Firebase getters > should carry neither getter on the instance, only the two loaders',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const { Omega } = await import('../src/index.js');
+        const omega = new Omega();
 
-    assert.strictEqual('firebaseFirestore' in omega, false);
-    assert.strictEqual('firebaseMessaging' in omega, false);
-    assert.strictEqual(typeof omega.loadFirebaseFirestore, 'function');
-    assert.strictEqual(typeof omega.loadFirebaseMessaging, 'function');
-  });
+        ctx.expect('firebaseFirestore' in omega).toBe(false);
+        ctx.expect('firebaseMessaging' in omega).toBe(false);
+        ctx.expect(typeof omega.loadFirebaseFirestore).toBe('function');
+        ctx.expect(typeof omega.loadFirebaseMessaging).toBe('function');
+      },
+    },
+  ],
 });

@@ -6,8 +6,7 @@
 // child_process.spawn (installed before src/local.js binds it), and the
 // timeout path belongs to a boot, not to a unit lane.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -35,63 +34,6 @@ const SHARED_ROSTER = 'Watching 6 shared packages (change → re-prepare all): d
 
 /** The line a package prints once its first src→dist pass has landed. */
 const readyLine = (name) => `[${name.padEnd(9)}] [17:47:26] 'prepare-package': Ready for changes!`;
-
-test('#670: the roster line sets the count, and the tracker holds until every package reports', () => {
-  const tracker = local.createWatchReadyTracker();
-
-  tracker.push(ROSTER);
-  tracker.push(SHARED_ROSTER);
-  assert.equal(tracker.isReady(), false);
-  // The shared-package watch prints its own roster and never a ready line, so
-  // only the src→dist roster may set the count.
-  assert.deepEqual(tracker.pending(), ['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
-
-  for (const name of ['backend', 'client', 'desktop', 'extension', 'manager']) {
-    tracker.push(readyLine(name));
-    assert.equal(tracker.isReady(), false);
-  }
-
-  tracker.push(readyLine('web'));
-  assert.equal(tracker.isReady(), true);
-});
-
-test('#670: a package repeating its ready line never counts twice', () => {
-  const tracker = local.createWatchReadyTracker();
-  tracker.push(ROSTER);
-
-  for (let i = 0; i < 6; i++) {
-    tracker.push(readyLine('backend'));
-  }
-  assert.equal(tracker.isReady(), false);
-  assert.deepEqual(tracker.pending(), ['client', 'desktop', 'extension', 'manager', 'web']);
-});
-
-test('#670: pending() names the stragglers the timeout warning has to report', () => {
-  const tracker = local.createWatchReadyTracker();
-  tracker.push(ROSTER);
-  ['backend', 'client', 'desktop', 'manager'].forEach((name) => tracker.push(readyLine(name)));
-
-  assert.deepEqual(tracker.pending(), ['extension', 'web']);
-});
-
-test('#670: no roster line means no verdict — the wait falls through to the timeout', () => {
-  const tracker = local.createWatchReadyTracker();
-  ['backend', 'client', 'desktop', 'extension', 'manager', 'web'].forEach((name) => tracker.push(readyLine(name)));
-
-  assert.equal(tracker.isReady(), false);
-  assert.deepEqual(tracker.pending(), []);
-});
-
-test('#670: the watch\'s ordinary prepare chatter moves nothing', () => {
-  const tracker = local.createWatchReadyTracker();
-  tracker.push(ROSTER);
-  tracker.push('[backend  ] > @omega.js/backend@0.1.0 prepare:watch');
-  tracker.push("[backend  ] [17:47:26] 'prepare-package': Running initial prepare...");
-  tracker.push("[backend  ] [17:47:26] 'prepare-package': Starting (copy mode)...");
-
-  assert.equal(tracker.isReady(), false);
-  assert.equal(tracker.pending().length, 6);
-});
 
 // ─── The ALREADY-RUNNING watch's gate (#622) ─────────────────────────────────
 // A boot that reuses a running watch has no child stdout, so the same tracker
@@ -135,182 +77,290 @@ function deadPid() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-test('#622: a long-idle watch answers from its log at once — no boot pays for a settled watch', async () => {
-  const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend', 'web'] }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'watch-ready',
+  tests: [
+    {
+      name: '#670: the roster line sets the count, and the tracker holds until every package reports',
+      run: (ctx) => {
+        const tracker = local.createWatchReadyTracker();
 
-  try {
-    const started = Date.now();
-    assert.equal(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }), 'ready');
-    assert.ok(Date.now() - started < 100, 'the verdict comes off the log already on disk, not off a poll');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        tracker.push(ROSTER);
+        tracker.push(SHARED_ROSTER);
+        ctx.expect(tracker.isReady()).toBe(false);
+        // The shared-package watch prints its own roster and never a ready line, so
+        // only the src→dist roster may set the count.
+        ctx.expect(tracker.pending()).toEqual(['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
 
-test('#622: the gate holds while a package is still preparing, and settles when its ready line lands', async () => {
-  const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend'] }));
-  const logPath = path.join(root, ...local.WATCH_LOG.split(path.sep));
+        for (const name of ['backend', 'client', 'desktop', 'extension', 'manager']) {
+          tracker.push(readyLine(name));
+          ctx.expect(tracker.isReady()).toBe(false);
+        }
 
-  try {
-    let outcome = null;
-    const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
+        tracker.push(readyLine('web'));
+        ctx.expect(tracker.isReady()).toBe(true);
+      },
+    },
 
-    await sleep(300);
-    assert.equal(outcome, null, 'web has not reported — the boot is still waiting');
+    {
+      name: '#670: a package repeating its ready line never counts twice',
+      run: (ctx) => {
+        const tracker = local.createWatchReadyTracker();
+        tracker.push(ROSTER);
 
-    fs.appendFileSync(logPath, `${readyLine('web')}\n`);
-    await ready;
-    assert.equal(outcome, 'ready');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        for (let i = 0; i < 6; i++) {
+          tracker.push(readyLine('backend'));
+        }
+        ctx.expect(tracker.isReady()).toBe(false);
+        ctx.expect(tracker.pending()).toEqual(['client', 'desktop', 'extension', 'manager', 'web']);
+      },
+    },
 
-test('#622: a propagation pass holds the gate even on a fully-reported log', async () => {
-  const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend', 'web'] }));
-  const markerPath = path.join(root, ...local.VENDOR_PROPAGATION_LOCK.split(path.sep));
-  fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-  fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    {
+      name: '#670: pending() names the stragglers the timeout warning has to report',
+      run: (ctx) => {
+        const tracker = local.createWatchReadyTracker();
+        tracker.push(ROSTER);
+        ['backend', 'client', 'desktop', 'manager'].forEach((name) => tracker.push(readyLine(name)));
 
-  try {
-    let outcome = null;
-    const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
+        ctx.expect(tracker.pending()).toEqual(['extension', 'web']);
+      },
+    },
 
-    await sleep(300);
-    assert.equal(outcome, null, 'the watch is idle but a pass is purging framework dists — a leg booting now requires half of one');
+    {
+      name: '#670: no roster line means no verdict — the wait falls through to the timeout',
+      run: (ctx) => {
+        const tracker = local.createWatchReadyTracker();
+        ['backend', 'client', 'desktop', 'extension', 'manager', 'web'].forEach((name) => tracker.push(readyLine(name)));
 
-    fs.rmSync(markerPath, { force: true });
-    await ready;
-    assert.equal(outcome, 'ready');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        ctx.expect(tracker.isReady()).toBe(false);
+        ctx.expect(tracker.pending()).toEqual([]);
+      },
+    },
 
-test('#622: a marker whose owner is gone gates nothing, and is swept', () => {
-  const root = stageWatchRoot();
-  const markerPath = path.join(root, ...local.VENDOR_PROPAGATION_LOCK.split(path.sep));
-  fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-  fs.writeFileSync(markerPath, JSON.stringify({ pid: deadPid(), startedAt: new Date().toISOString() }));
+    {
+      name: '#670: the watch\'s ordinary prepare chatter moves nothing',
+      run: (ctx) => {
+        const tracker = local.createWatchReadyTracker();
+        tracker.push(ROSTER);
+        tracker.push('[backend  ] > @omega.js/backend@0.1.0 prepare:watch');
+        tracker.push("[backend  ] [17:47:26] 'prepare-package': Running initial prepare...");
+        tracker.push("[backend  ] [17:47:26] 'prepare-package': Starting (copy mode)...");
 
-  try {
-    assert.equal(local.vendorPropagationActive(root), false, 'a watch killed mid-pass must not park every later boot');
-    assert.equal(fs.existsSync(markerPath), false, 'the stale marker is cleared, not left behind');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        ctx.expect(tracker.isReady()).toBe(false);
+        ctx.expect(tracker.pending().length).toBe(6);
+      },
+    },
 
-test('#622: a running propagation pass holds its marker for the pass\'s whole life', async () => {
-  const root = stageWatchRoot();
-  const packagesDir = path.join(root, 'packages');
-  fs.mkdirSync(path.join(packagesDir, 'web'), { recursive: true });
-  let heldDuringPrepare = null;
+    {
+      name: '#622: a long-idle watch answers from its log at once — no boot pays for a settled watch',
+      run: async (ctx) => {
+        const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend', 'web'] }));
 
-  const propagation = local.startVendorPropagation({
-    packagesDir,
-    packages: [], // no fs watchers — poke() is the seam the real ones call
-    dependents: [{ name: 'web', dir: path.join(packagesDir, 'web') }],
-    debounceMs: 10,
-    runPrepare: async () => { heldDuringPrepare = local.vendorPropagationActive(root); },
-  });
+        try {
+          const started = Date.now();
+          ctx.expect(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid })).toBe('ready');
+          ctx.expect(Date.now() - started < 100, 'the verdict comes off the log already on disk, not off a poll').toBeTruthy();
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
 
-  try {
-    propagation.poke('devkit');
-    const deadline = Date.now() + 2000;
-    while (heldDuringPrepare === null && Date.now() < deadline) {
-      await sleep(10);
-    }
+    {
+      name: '#622: the gate holds while a package is still preparing, and settles when its ready line lands',
+      run: async (ctx) => {
+        const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend'] }));
+        const logPath = path.join(root, ...local.WATCH_LOG.split(path.sep));
 
-    assert.equal(heldDuringPrepare, true, 'the marker is up before the first dist is touched');
-    while (local.vendorPropagationActive(root) && Date.now() < deadline) {
-      await sleep(10);
-    }
-    assert.equal(local.vendorPropagationActive(root), false, 'the pass clears its own marker when it lands');
-  } finally {
-    propagation.close();
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        try {
+          let outcome = null;
+          const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
 
-test('#622: a log this watch never wrote is not read — a foreign pid header gates nothing', async () => {
-  // watch-all truncates its log at launch, so a header naming anyone else is a
-  // previous run's file: unreadable state, and never a reason to wait 120s.
-  const root = stageWatchRoot(watchLog({ pid: deadPid(), packages: ['backend', 'web'], reported: [] }));
+          await sleep(300);
+          ctx.expect(outcome, 'web has not reported — the boot is still waiting').toBe(null);
 
-  try {
-    const started = Date.now();
-    assert.equal(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }), 'ready');
-    assert.ok(Date.now() - started < 100);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+          fs.appendFileSync(logPath, `${readyLine('web')}\n`);
+          await ready;
+          ctx.expect(outcome).toBe('ready');
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('#622: no log at all — the boot goes straight through instead of waiting on a missing file', async () => {
-  const root = stageWatchRoot();
+    {
+      name: '#622: a propagation pass holds the gate even on a fully-reported log',
+      run: async (ctx) => {
+        const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend', 'web'] }));
+        const markerPath = path.join(root, ...local.VENDOR_PROPAGATION_LOCK.split(path.sep));
+        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+        fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
 
-  try {
-    assert.equal(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }), 'ready');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        try {
+          let outcome = null;
+          const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
 
-test('#622: a watch that dies mid-wait settles the gate at once — nothing is coming', async () => {
-  const gone = deadPid();
-  const root = stageWatchRoot(watchLog({ pid: gone, packages: ['backend', 'web'], reported: ['backend'] }));
+          await sleep(300);
+          ctx.expect(outcome, 'the watch is idle but a pass is purging framework dists — a leg booting now requires half of one').toBe(null);
 
-  try {
-    assert.equal(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: gone }), 'exit');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+          fs.rmSync(markerPath, { force: true });
+          await ready;
+          ctx.expect(outcome).toBe('ready');
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('#622: a relaunched log whose header names another pid settles the gate — its ready lines are not this watch\'s', async () => {
-  // watch-all truncates its log per launch, so a mid-wait SHRINK is a relaunch.
-  // Whoever wrote the new file, the pid this boot waits on no longer owns the
-  // log: those ready lines belong to a different watch and must not be
-  // conflated with the pass this gate is holding for.
-  const chatter = `${Array.from({ length: 40 }, () => "[backend  ] [17:47:26] 'prepare-package': Starting (copy mode)...").join('\n')}\n`;
-  const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend'] }) + chatter);
-  const logPath = path.join(root, ...local.WATCH_LOG.split(path.sep));
+    {
+      name: '#622: a marker whose owner is gone gates nothing, and is swept',
+      run: (ctx) => {
+        const root = stageWatchRoot();
+        const markerPath = path.join(root, ...local.VENDOR_PROPAGATION_LOCK.split(path.sep));
+        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+        fs.writeFileSync(markerPath, JSON.stringify({ pid: deadPid(), startedAt: new Date().toISOString() }));
 
-  try {
-    let outcome = null;
-    const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
+        try {
+          ctx.expect(local.vendorPropagationActive(root), 'a watch killed mid-pass must not park every later boot').toBe(false);
+          ctx.expect(fs.existsSync(markerPath), 'the stale marker is cleared, not left behind').toBe(false);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
 
-    await sleep(300);
-    assert.equal(outcome, null, 'web has not reported — the boot is still waiting');
+    {
+      name: '#622: a running propagation pass holds its marker for the pass\'s whole life',
+      run: async (ctx) => {
+        const root = stageWatchRoot();
+        const packagesDir = path.join(root, 'packages');
+        fs.mkdirSync(path.join(packagesDir, 'web'), { recursive: true });
+        let heldDuringPrepare = null;
 
-    // Shorter than what was read (the shrink IS the relaunch signal), a foreign
-    // pid header, and every package reporting ready.
-    fs.writeFileSync(logPath, watchLog({ pid: deadPid(), packages: ['backend', 'web'], reported: ['backend', 'web'] }));
-    await ready;
+        const propagation = local.startVendorPropagation({
+          packagesDir,
+          packages: [], // no fs watchers — poke() is the seam the real ones call
+          dependents: [{ name: 'web', dir: path.join(packagesDir, 'web') }],
+          debounceMs: 10,
+          runPrepare: async () => { heldDuringPrepare = local.vendorPropagationActive(root); },
+        });
 
-    assert.equal(outcome, 'exit', 'a log this watch no longer owns is unreadable state, never a ready verdict');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
+        try {
+          propagation.poke('devkit');
+          const deadline = Date.now() + 2000;
+          while (heldDuringPrepare === null && Date.now() < deadline) {
+            await sleep(10);
+          }
 
-test('#670: a watch child that exits before reporting settles the wait at once', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-watch-ready-'));
-  const exitHooksBefore = process.listeners('exit');
-  try {
-    const watch = local.startMonorepoWatch({ monorepoRoot: scratch });
-    const child = spawnedWatches[spawnedWatches.length - 1];
+          ctx.expect(heldDuringPrepare, 'the marker is up before the first dist is touched').toBe(true);
+          while (local.vendorPropagationActive(root) && Date.now() < deadline) {
+            await sleep(10);
+          }
+          ctx.expect(local.vendorPropagationActive(root), 'the pass clears its own marker when it lands').toBe(false);
+        } finally {
+          propagation.close();
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
 
-    // Not one ready line printed — a watch that loses the lock race says
-    // "nothing to do" and exits. The boot must not park on the 120s timeout.
-    child.emit('exit', 0, null);
+    {
+      name: '#622: a log this watch never wrote is not read — a foreign pid header gates nothing',
+      run: async (ctx) => {
+        // watch-all truncates its log at launch, so a header naming anyone else is a
+        // previous run's file: unreadable state, and never a reason to wait 120s.
+        const root = stageWatchRoot(watchLog({ pid: deadPid(), packages: ['backend', 'web'], reported: [] }));
 
-    await watch.ready;
-  } finally {
-    process.listeners('exit')
-      .filter((hook) => !exitHooksBefore.includes(hook))
-      .forEach((hook) => process.removeListener('exit', hook));
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
+        try {
+          const started = Date.now();
+          ctx.expect(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid })).toBe('ready');
+          ctx.expect(Date.now() - started < 100).toBeTruthy();
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#622: no log at all — the boot goes straight through instead of waiting on a missing file',
+      run: async (ctx) => {
+        const root = stageWatchRoot();
+
+        try {
+          ctx.expect(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid })).toBe('ready');
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#622: a watch that dies mid-wait settles the gate at once — nothing is coming',
+      run: async (ctx) => {
+        const gone = deadPid();
+        const root = stageWatchRoot(watchLog({ pid: gone, packages: ['backend', 'web'], reported: ['backend'] }));
+
+        try {
+          ctx.expect(await local.awaitRunningWatchReady({ monorepoRoot: root, pid: gone })).toBe('exit');
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#622: a relaunched log whose header names another pid settles the gate — its ready lines are not this watch\'s',
+      run: async (ctx) => {
+        // watch-all truncates its log per launch, so a mid-wait SHRINK is a relaunch.
+        // Whoever wrote the new file, the pid this boot waits on no longer owns the
+        // log: those ready lines belong to a different watch and must not be
+        // conflated with the pass this gate is holding for.
+        const chatter = `${Array.from({ length: 40 }, () => "[backend  ] [17:47:26] 'prepare-package': Starting (copy mode)...").join('\n')}\n`;
+        const root = stageWatchRoot(watchLog({ pid: process.pid, packages: ['backend', 'web'], reported: ['backend'] }) + chatter);
+        const logPath = path.join(root, ...local.WATCH_LOG.split(path.sep));
+
+        try {
+          let outcome = null;
+          const ready = local.awaitRunningWatchReady({ monorepoRoot: root, pid: process.pid }).then((result) => { outcome = result; });
+
+          await sleep(300);
+          ctx.expect(outcome, 'web has not reported — the boot is still waiting').toBe(null);
+
+          // Shorter than what was read (the shrink IS the relaunch signal), a foreign
+          // pid header, and every package reporting ready.
+          fs.writeFileSync(logPath, watchLog({ pid: deadPid(), packages: ['backend', 'web'], reported: ['backend', 'web'] }));
+          await ready;
+
+          ctx.expect(outcome, 'a log this watch no longer owns is unreadable state, never a ready verdict').toBe('exit');
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#670: a watch child that exits before reporting settles the wait at once',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-watch-ready-'));
+        const exitHooksBefore = process.listeners('exit');
+        try {
+          const watch = local.startMonorepoWatch({ monorepoRoot: scratch });
+          const child = spawnedWatches[spawnedWatches.length - 1];
+
+          // Not one ready line printed — a watch that loses the lock race says
+          // "nothing to do" and exits. The boot must not park on the 120s timeout.
+          child.emit('exit', 0, null);
+
+          await watch.ready;
+        } finally {
+          process.listeners('exit')
+            .filter((hook) => !exitHooksBefore.includes(hook))
+            .forEach((hook) => process.removeListener('exit', hook));
+          fs.rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

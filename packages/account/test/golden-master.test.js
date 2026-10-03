@@ -16,8 +16,8 @@
  *   sentinels on both sides before the byte comparison
  * - deepStrictEqual for diffs + JSON.stringify equality for key-order parity
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { mock } = require('node:test');
 const path = require('path');
 
 const UserService = require(path.join(__dirname, '..', '..', 'backend', 'src', 'omega', 'services', 'user.js'));
@@ -29,17 +29,6 @@ const FIXED_NOW_UNIX = Math.floor(FIXED_NOW_MS / 1000);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const API_KEY_RE = /^[A-Za-z0-9]{40,50}$/; // uid-generator, 256-bit base62
 const RANDOM_ID = 'gm-rand8';
-
-// The backend's user service asks its instance's utilities for the 8-char id:
-// the one seam, handed a fixed value so both sides agree
-new UserService({
-  utilities: {
-    randomId: (options) => {
-      assert.deepStrictEqual(options, { size: 8 }, '@omega.js/backend should request an 8-char randomId');
-      return RANDOM_ID;
-    },
-  },
-});
 
 // A User exactly as the backend builds one, as its stored document
 const bemDocument = (fixture) => new User(fixture).toJSON();
@@ -61,15 +50,15 @@ const SENTINEL_GENERATORS = {
   apiKey: () => '<apiKey>',
 };
 
-function normalizeBem(properties, fixture) {
+function normalizeBem(expect, properties, fixture) {
   // Only generated values need normalizing — fixture-supplied api values pass
   // through both engines untouched and stay byte-comparable as-is.
   if (typeof fixture?.api?.clientId !== 'string') {
-    assert.match(properties.api.clientId, UUID_RE, '@omega.js/backend api.clientId should be a v4 uuid');
+    expect(properties.api.clientId, '@omega.js/backend api.clientId should be a v4 uuid').toMatch(UUID_RE);
     properties.api.clientId = '<uuid>';
   }
   if (typeof fixture?.api?.privateKey !== 'string') {
-    assert.match(properties.api.privateKey, API_KEY_RE, '@omega.js/backend api.privateKey should be a uid-generator token');
+    expect(properties.api.privateKey, '@omega.js/backend api.privateKey should be a uid-generator token').toMatch(API_KEY_RE);
     properties.api.privateKey = '<apiKey>';
   }
   return properties;
@@ -166,46 +155,88 @@ const FIXTURES = {
   },
 };
 
-// ─── Byte-parity: resolveAccount vs the backend's new User() ───
+module.exports = defineCases({
+  type: 'group',
+  description: 'golden-master',
+  // The backend's user service asks its instance's utilities for the 8-char id:
+  // the one seam, handed a fixed value so both sides agree
+  setup: (ctx) => {
+    new UserService({
+      utilities: {
+        randomId: (options) => {
+          ctx.expect(options, '@omega.js/backend should request an 8-char randomId').toEqual({ size: 8 });
+          return RANDOM_ID;
+        },
+      },
+    });
+  },
+  // User.generators is process-wide: the next suite gets the empty default back.
+  cleanup: () => {
+    User.generators = {};
+  },
+  tests: [
+    ...(() => {
+      const cases = [];
+      // ─── Byte-parity: resolveAccount vs the backend's new User() ───
 
-for (const [name, fixture] of Object.entries(FIXTURES)) {
-  test(`golden master: ${name}`, (t) => {
-    t.mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+      for (const [name, fixture] of Object.entries(FIXTURES)) {
+        cases.push({
+          name: `golden master: ${name}`,
+          run: (ctx) => {
+            mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+            ctx.after(() => mock.timers.reset());
 
-    const bem = normalizeBem(bemDocument(clone(fixture)), fixture);
-    const ours = resolveAccount(clone(fixture), { generators: SENTINEL_GENERATORS });
+            const bem = normalizeBem(ctx.expect, bemDocument(clone(fixture)), fixture);
+            const ours = resolveAccount(clone(fixture), { generators: SENTINEL_GENERATORS });
 
-    assert.deepStrictEqual(ours, bem);
-    assert.strictEqual(JSON.stringify(ours), JSON.stringify(bem), 'key order must match too');
-  });
+            ctx.expect(ours).toEqual(bem);
+            ctx.expect(JSON.stringify(ours), 'key order must match too').toBe(JSON.stringify(bem));
+          },
+        });
 
-  test(`golden master (subscription getters): ${name}`, (t) => {
-    t.mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+        cases.push({
+          name: `golden master (subscription getters): ${name}`,
+          run: (ctx) => {
+            mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+            ctx.after(() => mock.timers.reset());
 
-    const bem = new User(clone(fixture));
-    const ours = resolveAccount(clone(fixture), { generators: SENTINEL_GENERATORS });
+            const bem = new User(clone(fixture));
+            const ours = resolveAccount(clone(fixture), { generators: SENTINEL_GENERATORS });
 
-    assert.deepStrictEqual(resolveSubscription(ours), subscriptionOf(bem));
-  });
-}
+            ctx.expect(resolveSubscription(ours)).toEqual(subscriptionOf(bem));
+          },
+        });
+      }
+      return cases;
+    })(),
 
-// No document at all: new User()
-test('golden master: no settings at all', (t) => {
-  t.mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+    // No document at all: new User()
+    {
+      name: 'golden master: no settings at all',
+      run: (ctx) => {
+        mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+        ctx.after(() => mock.timers.reset());
 
-  const bem = normalizeBem(new User().toJSON(), undefined);
-  const ours = resolveAccount(undefined, { generators: SENTINEL_GENERATORS });
+        const bem = normalizeBem(ctx.expect, new User().toJSON(), undefined);
+        const ours = resolveAccount(undefined, { generators: SENTINEL_GENERATORS });
 
-  assert.deepStrictEqual(ours, bem);
-  assert.strictEqual(JSON.stringify(ours), JSON.stringify(bem));
-});
+        ctx.expect(ours).toEqual(bem);
+        ctx.expect(JSON.stringify(ours)).toBe(JSON.stringify(bem));
+      },
+    },
 
-// resolveSubscription reads a User instance the way it reads the plain document
-test('golden master: resolveSubscription reads a User instance', (t) => {
-  t.mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+    // resolveSubscription reads a User instance the way it reads the plain document
+    {
+      name: 'golden master: resolveSubscription reads a User instance',
+      run: (ctx) => {
+        mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
+        ctx.after(() => mock.timers.reset());
 
-  const user = new User(clone(FIXTURES['paid premium (everPaid)']));
+        const user = new User(clone(FIXTURES['paid premium (everPaid)']));
 
-  assert.deepStrictEqual(resolveSubscription(user), subscriptionOf(user));
-  assert.strictEqual(user.everPaid, true);
+        ctx.expect(resolveSubscription(user)).toEqual(subscriptionOf(user));
+        ctx.expect(user.everPaid).toBe(true);
+      },
+    },
+  ],
 });

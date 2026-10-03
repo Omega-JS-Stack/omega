@@ -10,8 +10,7 @@
  *
  * Run: node --test scripts/skill-claims.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 
@@ -193,95 +192,140 @@ const liveSurface = () => ({ skills: skillNames(), packages: packageNames(), ver
 
 const FIXTURE_SURFACE = { skills: ['web'], packages: new Set(['@omega.js/web']), verbs: new Set(['dev']) };
 
-test('checker: a missing repo path is reported', () => {
-  const found = checkSkill('fixture', 'Read `docs/web/index.md` then `docs/nope/gone.md`.', FIXTURE_SURFACE);
-  assert.deepEqual(found, ['fixture: repo path "docs/nope/gone.md" does not exist']);
-});
-
-test('checker: trailing punctuation is stripped before the path is checked', () => {
-  assert.deepEqual(checkSkill('fixture', 'The guide is docs/web/index.md.', FIXTURE_SURFACE), []);
-});
-
-test('checker: an #anchor or glued ? ends the path claim', () => {
-  const source = 'See docs/web/index.md#components — or is it docs/web/index.md?';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), []);
-});
-
-test('checker: placeholders and globs are not paths', () => {
-  const source = 'Guides live at docs/<framework>/index.md and tests at scripts/*.test.js.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), []);
-});
-
-test('checker: a consumer node_modules path is translated into packages/', () => {
-  const source = 'Read `node_modules/@omega.js/web/README.md` and `node_modules/@omega.js/web/NOPE.md`.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), [
-    'fixture: consumer path "node_modules/@omega.js/web/NOPE.md" does not resolve to packages/web/NOPE.md',
-  ]);
-});
-
-test('checker: an unknown omega: skill is reported, other namespaces are ignored', () => {
-  const source = 'Invoke `omega:web`, then `omega:ghost`, then `workkit:scout`.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), [
-    'fixture: skill reference "omega:ghost" names no skill the plugin ships',
-  ]);
-});
-
-test('checker: an unknown @omega.js package is reported', () => {
-  const source = '`@omega.js/web` embeds `@omega.js/phantom`.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), [
-    'fixture: package "@omega.js/phantom" is not a package in packages/',
-  ]);
-});
-
-test('checker: an undispatchable CLI verb is reported', () => {
-  const source = 'Run `omega dev`, never `npx omega vanish`.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), [
-    'fixture: CLI verb "vanish" is not dispatchable by any framework CLI',
-  ]);
-});
-
-test('checker: prose after the word omega is not a CLI verb', () => {
-  assert.deepEqual(checkSkill('fixture', 'The omega monorepo ships the omega plugin.', FIXTURE_SURFACE), []);
-});
-
-test('checker: a clean skill reports nothing', () => {
-  const source = 'Read docs/web/index.md, invoke `omega:web`, run `omega dev` on `@omega.js/web`.';
-  assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), []);
-});
-
-// --- the live scan ---
-
-test('surface: the repo answers with skills, packages, and CLI verbs', () => {
-  const surface = liveSurface();
-  assert.ok(surface.skills.includes('main'), 'the hub skill is missing');
-  assert.ok(surface.packages.has('@omega.js/web'), '@omega.js/web is missing from packages/');
-  assert.ok(surface.verbs.has('deploy'), 'no framework CLI dispatches deploy');
-});
-
 // The init skill drives a brand root: its npm scripts and config paths are a standing brand's
 const BRAND_ROOT = path.join(BRANDS_DIR, 'playground-omega');
 
-test('init: every npm script and brand config path the skill names exists at a brand root', () => {
-  const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
-  assert.ok(fs.existsSync(file), 'the init skill ships');
-  const source = fs.readFileSync(file, 'utf8');
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(BRAND_ROOT, 'package.json'), 'utf8'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'skill-claims',
+  tests: [
+    {
+      name: 'checker: a missing repo path is reported',
+      run: (ctx) => {
+        const found = checkSkill('fixture', 'Read `docs/web/index.md` then `docs/nope/gone.md`.', FIXTURE_SURFACE);
+        ctx.expect(found).toEqual(['fixture: repo path "docs/nope/gone.md" does not exist']);
+      },
+    },
 
-  const named = [...source.matchAll(/`npm (?:run ([a-z][\w:-]*)|(start|test)\b)/g)].map((match) => match[1] || match[2]);
-  assert.deepEqual([...new Set(named)].filter((script) => !(script in scripts)), [], 'npm scripts a brand root lacks');
+    {
+      name: 'checker: trailing punctuation is stripped before the path is checked',
+      run: (ctx) => {
+        ctx.expect(checkSkill('fixture', 'The guide is docs/web/index.md.', FIXTURE_SURFACE)).toEqual([]);
+      },
+    },
 
-  const paths = matchAll(source, /`(config\/[^`\s]+)`/g, 1).filter((token) => !isPlaceholder(token));
-  assert.deepEqual(paths.filter((rel) => !fs.existsSync(path.join(BRAND_ROOT, rel))), [], 'config paths a brand root lacks');
-});
+    {
+      name: 'checker: an #anchor or glued ? ends the path claim',
+      run: (ctx) => {
+        const source = 'See docs/web/index.md#components — or is it docs/web/index.md?';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([]);
+      },
+    },
 
-test('skills: every claim in every SKILL.md holds against the live repo', () => {
-  const surface = liveSurface();
-  const violations = [];
+    {
+      name: 'checker: placeholders and globs are not paths',
+      run: (ctx) => {
+        const source = 'Guides live at docs/<framework>/index.md and tests at scripts/*.test.js.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([]);
+      },
+    },
 
-  for (const skill of surface.skills) {
-    const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
-    violations.push(...checkSkill(skill, source, surface));
-  }
+    {
+      name: 'checker: a consumer node_modules path is translated into packages/',
+      run: (ctx) => {
+        const source = 'Read `node_modules/@omega.js/web/README.md` and `node_modules/@omega.js/web/NOPE.md`.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([
+          'fixture: consumer path "node_modules/@omega.js/web/NOPE.md" does not resolve to packages/web/NOPE.md',
+        ]);
+      },
+    },
 
-  assert.deepEqual(violations, [], `stale skill claims:\n  ${violations.join('\n  ')}`);
+    {
+      name: 'checker: an unknown omega: skill is reported, other namespaces are ignored',
+      run: (ctx) => {
+        const source = 'Invoke `omega:web`, then `omega:ghost`, then `workkit:scout`.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([
+          'fixture: skill reference "omega:ghost" names no skill the plugin ships',
+        ]);
+      },
+    },
+
+    {
+      name: 'checker: an unknown @omega.js package is reported',
+      run: (ctx) => {
+        const source = '`@omega.js/web` embeds `@omega.js/phantom`.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([
+          'fixture: package "@omega.js/phantom" is not a package in packages/',
+        ]);
+      },
+    },
+
+    {
+      name: 'checker: an undispatchable CLI verb is reported',
+      run: (ctx) => {
+        const source = 'Run `omega dev`, never `npx omega vanish`.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([
+          'fixture: CLI verb "vanish" is not dispatchable by any framework CLI',
+        ]);
+      },
+    },
+
+    {
+      name: 'checker: prose after the word omega is not a CLI verb',
+      run: (ctx) => {
+        ctx.expect(checkSkill('fixture', 'The omega monorepo ships the omega plugin.', FIXTURE_SURFACE)).toEqual([]);
+      },
+    },
+
+    {
+      name: 'checker: a clean skill reports nothing',
+      run: (ctx) => {
+        const source = 'Read docs/web/index.md, invoke `omega:web`, run `omega dev` on `@omega.js/web`.';
+        ctx.expect(checkSkill('fixture', source, FIXTURE_SURFACE)).toEqual([]);
+      },
+    },
+
+    // --- the live scan ---
+
+    {
+      name: 'surface: the repo answers with skills, packages, and CLI verbs',
+      run: (ctx) => {
+        const surface = liveSurface();
+        ctx.expect(surface.skills.includes('main'), 'the hub skill is missing').toBeTruthy();
+        ctx.expect(surface.packages.has('@omega.js/web'), '@omega.js/web is missing from packages/').toBeTruthy();
+        ctx.expect(surface.verbs.has('deploy'), 'no framework CLI dispatches deploy').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'init: every npm script and brand config path the skill names exists at a brand root',
+      run: (ctx) => {
+        const file = path.join(SKILLS_DIR, 'init', 'SKILL.md');
+        ctx.expect(fs.existsSync(file), 'the init skill ships').toBeTruthy();
+        const source = fs.readFileSync(file, 'utf8');
+        const { scripts } = JSON.parse(fs.readFileSync(path.join(BRAND_ROOT, 'package.json'), 'utf8'));
+
+        const named = [...source.matchAll(/`npm (?:run ([a-z][\w:-]*)|(start|test)\b)/g)].map((match) => match[1] || match[2]);
+        ctx.expect([...new Set(named)].filter((script) => !(script in scripts)), 'npm scripts a brand root lacks').toEqual([]);
+
+        const paths = matchAll(source, /`(config\/[^`\s]+)`/g, 1).filter((token) => !isPlaceholder(token));
+        ctx.expect(paths.filter((rel) => !fs.existsSync(path.join(BRAND_ROOT, rel))), 'config paths a brand root lacks').toEqual([]);
+      },
+    },
+
+    {
+      name: 'skills: every claim in every SKILL.md holds against the live repo',
+      run: (ctx) => {
+        const surface = liveSurface();
+        const violations = [];
+
+        for (const skill of surface.skills) {
+          const source = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
+          violations.push(...checkSkill(skill, source, surface));
+        }
+
+        ctx.expect(violations, `stale skill claims:\n  ${violations.join('\n  ')}`).toEqual([]);
+      },
+    },
+  ],
 });

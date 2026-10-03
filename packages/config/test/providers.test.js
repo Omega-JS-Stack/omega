@@ -5,27 +5,41 @@
  * unset, `false` = disabled, object = chosen) is the contract every
  * single-provider role gates on, which is why it is pinned here.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { chosenProvider } = require('../src/index.js');
 
-test('the present key is the chosen provider', () => {
-  assert.strictEqual(chosenProvider({ namecheap: {} }), 'namecheap');
-  assert.strictEqual(chosenProvider({ ghostii: { orgs: [] } }), 'ghostii');
-  // An empty entry still opts in — presence is the pick, not the contents.
-  assert.strictEqual(chosenProvider({ chatgpt: {} }), 'chatgpt');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'providers',
+  tests: [
+    {
+      name: 'the present key is the chosen provider',
+      run: (ctx) => {
+        ctx.expect(chosenProvider({ namecheap: {} })).toBe('namecheap');
+        ctx.expect(chosenProvider({ ghostii: { orgs: [] } })).toBe('ghostii');
+        // An empty entry still opts in — presence is the pick, not the contents.
+        ctx.expect(chosenProvider({ chatgpt: {} })).toBe('chatgpt');
+      },
+    },
 
-test('no block, an empty block, or a non-object is nothing chosen', () => {
-  assert.strictEqual(chosenProvider(undefined), null);
-  assert.strictEqual(chosenProvider(null), null);
-  assert.strictEqual(chosenProvider({}), null);
-  assert.strictEqual(chosenProvider('cloudflare'), null);
-  assert.strictEqual(chosenProvider([{ cloudflare: {} }]), null);
-});
+    {
+      name: 'no block, an empty block, or a non-object is nothing chosen',
+      run: (ctx) => {
+        ctx.expect(chosenProvider(undefined)).toBe(null);
+        ctx.expect(chosenProvider(null)).toBe(null);
+        ctx.expect(chosenProvider({})).toBe(null);
+        ctx.expect(chosenProvider('cloudflare')).toBe(null);
+        ctx.expect(chosenProvider([{ cloudflare: {} }])).toBe(null);
+      },
+    },
 
-test('false is the deliberate off switch, and the next live entry wins', () => {
-  assert.strictEqual(chosenProvider({ squarespace: false }), null);
-  assert.strictEqual(chosenProvider({ squarespace: false, namecheap: {} }), 'namecheap');
+    {
+      name: 'false is the deliberate off switch, and the next live entry wins',
+      run: (ctx) => {
+        ctx.expect(chosenProvider({ squarespace: false })).toBe(null);
+        ctx.expect(chosenProvider({ squarespace: false, namecheap: {} })).toBe('namecheap');
+      },
+    },
+  ],
 });

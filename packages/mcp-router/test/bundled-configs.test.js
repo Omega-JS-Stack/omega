@@ -5,8 +5,7 @@
  * them is a shipped defect, so it fails here.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -19,58 +18,86 @@ const BUNDLED_ONLY = { overlayDir: path.join(os.tmpdir(), 'mcp-router-no-such-ov
 
 const EXPECTED = ['chrome-devtools', 'chrome-devtools-electron', 'chrome-devtools-extension', 'omega-extension'];
 
-test('the package ships exactly the four default upstreams', () => {
-  assert.deepEqual(fs.readdirSync(BUNDLED_SERVERS_DIR).sort(), EXPECTED);
-  assert.deepEqual(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).sort(), EXPECTED);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'bundled-configs',
+  tests: [
+    {
+      name: 'the package ships exactly the four default upstreams',
+      run: (ctx) => {
+        ctx.expect(fs.readdirSync(BUNDLED_SERVERS_DIR).sort()).toEqual(EXPECTED);
+        ctx.expect(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).sort()).toEqual(EXPECTED);
+      },
+    },
 
-for (const name of EXPECTED) {
-  test(`${name} parses, is enabled, and carries a command and a tools cache`, () => {
-    const raw = fs.readFileSync(path.join(BUNDLED_SERVERS_DIR, name, 'config.json'), 'utf8');
-    assert.doesNotThrow(() => JSON.parse(raw));
-    assert.equal(raw.includes('/Users/'), false, 'a bundled config must carry no personal path');
+    ...(() => {
+      const cases = [];
+      for (const name of EXPECTED) {
+        cases.push({
+          name: `${name} parses, is enabled, and carries a command and a tools cache`,
+          run: (ctx) => {
+            const raw = fs.readFileSync(path.join(BUNDLED_SERVERS_DIR, name, 'config.json'), 'utf8');
+            ctx.expect(() => JSON.parse(raw)).not.toThrow();
+            ctx.expect(raw.includes('/Users/'), 'a bundled config must carry no personal path').toBe(false);
 
-    const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
-    assert.equal(upstream.enabled_on_disk, true);
-    assert.ok(upstream.command, 'no command');
-    assert.ok(upstream.args.length > 0, 'no args');
-    assert.ok(upstream.tools.length > 0, 'empty tools cache');
-    for (const tool of upstream.tools) {
-      assert.ok(tool.name && tool.inputSchema, `tool ${tool.name} has no schema`);
-    }
-  });
-}
+            const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
+            ctx.expect(upstream.enabled_on_disk).toBe(true);
+            ctx.expect(upstream.command, 'no command').toBeTruthy();
+            ctx.expect(upstream.args.length > 0, 'no args').toBeTruthy();
+            ctx.expect(upstream.tools.length > 0, 'empty tools cache').toBeTruthy();
+            for (const tool of upstream.tools) {
+              ctx.expect(tool.name && tool.inputSchema, `tool ${tool.name} has no schema`).toBeTruthy();
+            }
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('the electron upstream carries its port default as a placeholder the router resolves', () => {
-  const upstream = registry.loadUpstream('chrome-devtools-electron', BUNDLED_ONLY);
-  assert.equal(upstream.command, 'npx');
-  const browserUrl = upstream.args.find((arg) => arg.startsWith('--browserUrl='));
-  assert.equal(browserUrl, '--browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222}');
-  assert.equal(upstream.args.join(' ').includes('EM_CDP_PORT'), false, 'the legacy port fallback is gone');
-});
+    {
+      name: 'the electron upstream carries its port default as a placeholder the router resolves',
+      run: (ctx) => {
+        const upstream = registry.loadUpstream('chrome-devtools-electron', BUNDLED_ONLY);
+        ctx.expect(upstream.command).toBe('npx');
+        const browserUrl = upstream.args.find((arg) => arg.startsWith('--browserUrl='));
+        ctx.expect(browserUrl).toBe('--browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222}');
+        ctx.expect(upstream.args.join(' ').includes('EM_CDP_PORT'), 'the legacy port fallback is gone').toBe(false);
+      },
+    },
 
-test('no bundled upstream launches through a shell', () => {
-  // A shell command bypasses resolveBin entirely (Omega-JS-Stack/omega#178) and
-  // hands the child's argv to a word-splitter nobody audits.
-  for (const name of EXPECTED) {
-    const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
-    assert.equal(['sh', 'bash', 'zsh', 'cmd', 'cmd.exe', 'powershell'].includes(upstream.command), false, `${name} launches through a shell`);
-  }
-});
+    {
+      name: 'no bundled upstream launches through a shell',
+      run: (ctx) => {
+        // A shell command bypasses resolveBin entirely (Omega-JS-Stack/omega#178) and
+        // hands the child's argv to a word-splitter nobody audits.
+        for (const name of EXPECTED) {
+          const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
+          ctx.expect(['sh', 'bash', 'zsh', 'cmd', 'cmd.exe', 'powershell'].includes(upstream.command), `${name} launches through a shell`).toBe(false);
+        }
+      },
+    },
 
-test('the launcher upstreams point at scripts this package ships, via the reserved placeholder', () => {
-  const { resolveSpawn } = require('../src/lib/env.js');
-  for (const [name, script] of [['chrome-devtools-extension', 'launch-cft.js'], ['omega-extension', 'launch-omega-extension.js']]) {
-    const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
-    assert.equal(upstream.command, 'node');
-    assert.equal(upstream.args[0], `\${MCP_ROUTER_ROOT}/src/${script}`);
-    assert.equal(fs.existsSync(resolveSpawn(upstream).args[0]), true, `${script} is not on disk`);
-  }
-});
+    {
+      name: 'the launcher upstreams point at scripts this package ships, via the reserved placeholder',
+      run: (ctx) => {
+        const { resolveSpawn } = require('../src/lib/env.js');
+        for (const [name, script] of [['chrome-devtools-extension', 'launch-cft.js'], ['omega-extension', 'launch-omega-extension.js']]) {
+          const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
+          ctx.expect(upstream.command).toBe('node');
+          ctx.expect(upstream.args[0]).toBe(`\${MCP_ROUTER_ROOT}/src/${script}`);
+          ctx.expect(fs.existsSync(resolveSpawn(upstream).args[0]), `${script} is not on disk`).toBe(true);
+        }
+      },
+    },
 
-test('the extension upstream is on-demand; the others load automatically', () => {
-  assert.equal(registry.loadUpstream('chrome-devtools-extension', BUNDLED_ONLY).default, 'on-demand');
-  for (const name of ['chrome-devtools', 'chrome-devtools-electron', 'omega-extension']) {
-    assert.equal(registry.loadUpstream(name, BUNDLED_ONLY).default, 'auto');
-  }
+    {
+      name: 'the extension upstream is on-demand; the others load automatically',
+      run: (ctx) => {
+        ctx.expect(registry.loadUpstream('chrome-devtools-extension', BUNDLED_ONLY).default).toBe('on-demand');
+        for (const name of ['chrome-devtools', 'chrome-devtools-electron', 'omega-extension']) {
+          ctx.expect(registry.loadUpstream(name, BUNDLED_ONLY).default).toBe('auto');
+        }
+      },
+    },
+  ],
 });

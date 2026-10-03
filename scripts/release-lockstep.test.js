@@ -7,8 +7,7 @@
  *
  * Run: node --test scripts/release-lockstep.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -37,44 +36,65 @@ function writePlugin(root, version) {
   fs.writeFileSync(path.join(root, PLUGIN_MANIFEST), JSON.stringify({ name: 'omega', description: 'OMEGA', version }));
 }
 
-test('lockstep: passes when the root and every publishable share one version', () => {
-  const root = familyTree('1.2.3');
-  assert.deepEqual(checkLockstepVersions(root), { ok: true, detail: '1.2.3' });
-  fs.rmSync(root, { recursive: true });
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'release-lockstep',
+  tests: [
+    {
+      name: 'lockstep: passes when the root and every publishable share one version',
+      run: (ctx) => {
+        const root = familyTree('1.2.3');
+        ctx.expect(checkLockstepVersions(root)).toEqual({ ok: true, detail: '1.2.3' });
+        fs.rmSync(root, { recursive: true });
+      },
+    },
 
-test('lockstep: fails when one publishable is off the root version', () => {
-  const root = familyTree('1.2.3');
-  const file = path.join(root, 'packages', 'web', 'package.json');
-  fs.writeFileSync(file, JSON.stringify({ name: '@omega.js/web', version: '1.2.2' }));
+    {
+      name: 'lockstep: fails when one publishable is off the root version',
+      run: (ctx) => {
+        const root = familyTree('1.2.3');
+        const file = path.join(root, 'packages', 'web', 'package.json');
+        fs.writeFileSync(file, JSON.stringify({ name: '@omega.js/web', version: '1.2.2' }));
 
-  const verdict = checkLockstepVersions(root);
-  assert.equal(verdict.ok, false);
-  assert.match(verdict.detail, /web 1\.2\.2/);
-  fs.rmSync(root, { recursive: true });
-});
+        const verdict = checkLockstepVersions(root);
+        ctx.expect(verdict.ok).toBe(false);
+        ctx.expect(verdict.detail).toMatch(/web 1\.2\.2/);
+        fs.rmSync(root, { recursive: true });
+      },
+    },
 
-test('lockstep: fails when only the root was bumped', () => {
-  const root = familyTree('1.2.3');
-  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'omega', version: '1.3.0' }));
+    {
+      name: 'lockstep: fails when only the root was bumped',
+      run: (ctx) => {
+        const root = familyTree('1.2.3');
+        fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'omega', version: '1.3.0' }));
 
-  assert.equal(checkLockstepVersions(root).ok, false);
-  fs.rmSync(root, { recursive: true });
-});
+        ctx.expect(checkLockstepVersions(root).ok).toBe(false);
+        fs.rmSync(root, { recursive: true });
+      },
+    },
 
-test('case 14: fails when the plugin manifest is off the family version, naming both', () => {
-  const root = familyTree('1.2.3');
-  writePlugin(root, '0.1.0');
+    {
+      name: 'case 14: fails when the plugin manifest is off the family version, naming both',
+      run: (ctx) => {
+        const root = familyTree('1.2.3');
+        writePlugin(root, '0.1.0');
 
-  const verdict = checkLockstepVersions(root);
-  assert.equal(verdict.ok, false);
-  assert.match(verdict.detail, /0\.1\.0/, 'names the plugin version');
-  assert.match(verdict.detail, /1\.2\.3/, 'names the family version');
-  assert.match(verdict.detail, /plugin/i, 'says which file is off');
-  fs.rmSync(root, { recursive: true });
-});
+        const verdict = checkLockstepVersions(root);
+        ctx.expect(verdict.ok).toBe(false);
+        ctx.expect(verdict.detail, 'names the plugin version').toMatch(/0\.1\.0/);
+        ctx.expect(verdict.detail, 'names the family version').toMatch(/1\.2\.3/);
+        ctx.expect(verdict.detail, 'says which file is off').toMatch(/plugin/i);
+        fs.rmSync(root, { recursive: true });
+      },
+    },
 
-test('lockstep: the real tree is on one version', () => {
-  const verdict = checkLockstepVersions();
-  assert.equal(verdict.ok, true, `the family is not on one version: ${verdict.detail}`);
+    {
+      name: 'lockstep: the real tree is on one version',
+      run: (ctx) => {
+        const verdict = checkLockstepVersions();
+        ctx.expect(verdict.ok, `the family is not on one version: ${verdict.detail}`).toBe(true);
+      },
+    },
+  ],
 });

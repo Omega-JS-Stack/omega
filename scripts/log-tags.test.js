@@ -18,8 +18,7 @@
  *
  * Run: node --test scripts/log-tags.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 
@@ -96,75 +95,92 @@ function sourceFiles() {
   return files;
 }
 
-test('fixture: hand-written tags are caught', () => {
-  const source = [
-    "console.warn('[Sentry] Caught error:', error);",
-    'logger.log(`[watcher] Watching for changes...`);',
-    "this.logger.log('[AUTH] syncAuth: Already in sync');",
-    "console.log('[DRY-RUN] would write');",
-    "console.log('%c[Checkout Dev] window._checkout available', 'color: #2563EB');",
-  ].join('\n');
+module.exports = defineCases({
+  type: 'group',
+  description: 'log-tags',
+  tests: [
+    {
+      name: 'fixture: hand-written tags are caught',
+      run: (ctx) => {
+        const source = [
+          "console.warn('[Sentry] Caught error:', error);",
+          'logger.log(`[watcher] Watching for changes...`);',
+          "this.logger.log('[AUTH] syncAuth: Already in sync');",
+          "console.log('[DRY-RUN] would write');",
+          "console.log('%c[Checkout Dev] window._checkout available', 'color: #2563EB');",
+        ].join('\n');
 
-  const found = findHandWrittenTags(source);
-  assert.deepEqual(found.map((f) => f.tag), ['Sentry', 'watcher', 'AUTH', 'DRY-RUN', 'Checkout Dev']);
-});
+        const found = findHandWrittenTags(source);
+        ctx.expect(found.map((f) => f.tag)).toEqual(['Sentry', 'watcher', 'AUTH', 'DRY-RUN', 'Checkout Dev']);
+      },
+    },
 
-test('fixture: a chalk-wrapped tag is caught (the manager house style)', () => {
-  const source = [
-    // Chalk as the first argument, and chalk opening a template literal — both
-    // are the same hand-written tag wearing a color.
-    "logger.log(chalk.yellow('[Stripe] Would create product'));",
-    "log(`${chalk.cyan('[SEO]')} Would update description`);",
-  ].join('\n');
+    {
+      name: 'fixture: a chalk-wrapped tag is caught (the manager house style)',
+      run: (ctx) => {
+        const source = [
+          // Chalk as the first argument, and chalk opening a template literal — both
+          // are the same hand-written tag wearing a color.
+          "logger.log(chalk.yellow('[Stripe] Would create product'));",
+          "log(`${chalk.cyan('[SEO]')} Would update description`);",
+        ].join('\n');
 
-  assert.deepEqual(findHandWrittenTags(source).map((f) => f.tag), ['Stripe', 'SEO']);
-});
+        ctx.expect(findHandWrittenTags(source).map((f) => f.tag)).toEqual(['Stripe', 'SEO']);
+      },
+    },
 
-test('fixture: a bare-function line printer is caught (injected `log`/`warn` sinks)', () => {
-  const source = [
-    "warn(`[sections] ${key}: nothing inherited`);",
-    "log('[Migrate] would move the file');",
-    // …while a same-named property access is not a bare call, and words merely
-    // ending in the method name are not calls at all.
-    "const url = catalog('[not-a-tag] x');",
-    "const entry = blog('[not-a-tag] y');",
-  ].join('\n');
+    {
+      name: 'fixture: a bare-function line printer is caught (injected `log`/`warn` sinks)',
+      run: (ctx) => {
+        const source = [
+          "warn(`[sections] ${key}: nothing inherited`);",
+          "log('[Migrate] would move the file');",
+          // …while a same-named property access is not a bare call, and words merely
+          // ending in the method name are not calls at all.
+          "const url = catalog('[not-a-tag] x');",
+          "const entry = blog('[not-a-tag] y');",
+        ].join('\n');
 
-  assert.deepEqual(findHandWrittenTags(source).map((f) => f.tag), ['sections', 'Migrate']);
-});
+        ctx.expect(findHandWrittenTags(source).map((f) => f.tag)).toEqual(['sections', 'Migrate']);
+      },
+    },
 
-test('fixture: the identity tag, the DRY RUN marker, and interpolated brackets pass', () => {
-  const source = [
-    // The runtime tag, hand-written or from a logger — either way it IS the tag.
-    "console.log('[@omega.js/client:push] Subscribed');",
-    "console.log('[@omega.js/client:push:sync] Synced');",
-    // The one surviving mode marker.
-    "console.log('[DRY RUN] would write');",
-    // Data in the message, not an identity tag.
-    'logger.log(`[${lang}] Messages translation saved`);',
-    'logger.log(`[Memory ${label}] RSS: ${mem.rss}MB`);',
-    // A logger that names itself carries no bracket in the message at all.
-    "logger.log('Watching for changes...');",
-    // The marker survives its chalk coat too — this is the manager's live shape
-    // (src/lib/product-create.js), a report row through an injected line
-    // printer, not a module tag.
-    "log(`${chalk.yellow('[DRY RUN]')} Would create ${chalk.cyan(collection)} doc`);",
-  ].join('\n');
+    {
+      name: 'fixture: the identity tag, the DRY RUN marker, and interpolated brackets pass',
+      run: (ctx) => {
+        const source = [
+          // The runtime tag, hand-written or from a logger — either way it IS the tag.
+          "console.log('[@omega.js/client:push] Subscribed');",
+          "console.log('[@omega.js/client:push:sync] Synced');",
+          // The one surviving mode marker.
+          "console.log('[DRY RUN] would write');",
+          // Data in the message, not an identity tag.
+          'logger.log(`[${lang}] Messages translation saved`);',
+          'logger.log(`[Memory ${label}] RSS: ${mem.rss}MB`);',
+          // A logger that names itself carries no bracket in the message at all.
+          "logger.log('Watching for changes...');",
+          // The marker survives its chalk coat too — this is the manager's live shape
+          // (src/lib/product-create.js), a report row through an injected line
+          // printer, not a module tag.
+          "log(`${chalk.yellow('[DRY RUN]')} Would create ${chalk.cyan(collection)} doc`);",
+        ].join('\n');
 
-  assert.deepEqual(findHandWrittenTags(source), []);
-});
+        ctx.expect(findHandWrittenTags(source)).toEqual([]);
+      },
+    },
 
-test('live: no framework source hand-writes a log tag', () => {
-  const offenders = [];
-  for (const file of sourceFiles()) {
-    for (const hit of findHandWrittenTags(fs.readFileSync(file, 'utf8'))) {
-      offenders.push(`${path.relative(ROOT, file)} — ${hit.receiver}.${hit.method}('[${hit.tag}] …`);
-    }
-  }
+    {
+      name: 'live: no framework source hand-writes a log tag',
+      run: (ctx) => {
+        const offenders = [];
+        for (const file of sourceFiles()) {
+          for (const hit of findHandWrittenTags(fs.readFileSync(file, 'utf8'))) {
+            offenders.push(`${path.relative(ROOT, file)} — ${hit.receiver}.${hit.method}('[${hit.tag}] …`);
+          }
+        }
 
-  assert.deepEqual(
-    offenders,
-    [],
-    `hand-written log tags found — route them through the package's logger instead:\n${offenders.join('\n')}`,
-  );
+        ctx.expect(offenders, `hand-written log tags found — route them through the package's logger instead:\n${offenders.join('\n')}`).toEqual([]);
+      },
+    },
+  ],
 });

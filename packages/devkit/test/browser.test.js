@@ -7,8 +7,7 @@
 // launch itself is answered by the fixture package — starting real Chrome
 // proves puppeteer, not this.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -50,107 +49,145 @@ function stageBrand({ manager = true, puppeteer = 'installed', chrome = 'present
   return root;
 }
 
-// ---- puppeteerRoot
+module.exports = defineCases({
+  type: 'group',
+  description: 'browser',
+  tests: [
+    // ---- puppeteerRoot
 
-test('the walk stops at the nearest manifest declaring @omega.js/manager', () => {
-  const root = stageBrand();
-  // A target sits between the lane and the brand root, with its own manifest
-  write(path.join(root, 'targets', 'web', 'package.json'), JSON.stringify({ name: 'web' }));
-  write(path.join(root, 'targets', 'web', 'test', 'e2e', 'run.js'), '');
+    {
+      name: 'the walk stops at the nearest manifest declaring @omega.js/manager',
+      run: (ctx) => {
+        const root = stageBrand();
+        // A target sits between the lane and the brand root, with its own manifest
+        write(path.join(root, 'targets', 'web', 'package.json'), JSON.stringify({ name: 'web' }));
+        write(path.join(root, 'targets', 'web', 'test', 'e2e', 'run.js'), '');
 
-  assert.equal(puppeteerRoot(path.join(root, 'test', 'e2e')), root);
-  assert.equal(puppeteerRoot(path.join(root, 'targets', 'web', 'test', 'e2e')), root,
-    'a target target-root manifest is not the brand root');
-});
+        ctx.expect(puppeteerRoot(path.join(root, 'test', 'e2e'))).toBe(root);
+        ctx.expect(puppeteerRoot(path.join(root, 'targets', 'web', 'test', 'e2e')), 'a target target-root manifest is not the brand root').toBe(root);
+      },
+    },
 
-test('with no manager declared anywhere, the NEAREST manifest answers, never the outermost', () => {
-  const dir = scratch();
-  write(path.join(dir, 'package.json'), JSON.stringify({ name: 'monorepo', workspaces: ['packages/*'] }));
-  const pkgDir = path.join(dir, 'packages', 'devkit');
-  write(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/devkit' }));
+    {
+      name: 'with no manager declared anywhere, the NEAREST manifest answers, never the outermost',
+      run: (ctx) => {
+        const dir = scratch();
+        write(path.join(dir, 'package.json'), JSON.stringify({ name: 'monorepo', workspaces: ['packages/*'] }));
+        const pkgDir = path.join(dir, 'packages', 'devkit');
+        write(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/devkit' }));
 
-  // Resolution only needs a starting point node can climb FROM: the nearest
-  // manifest reaches every install above it, while the outermost would skip a
-  // nearer copy a nested install deliberately put there.
-  assert.equal(puppeteerRoot(pkgDir), pkgDir);
-  assert.equal(puppeteerRoot(path.join(pkgDir, 'test', 'deep')), pkgDir, 'a dir with no manifest of its own climbs to it');
-  assert.equal(puppeteerRoot(dir), dir, 'at the outermost, the outermost IS the nearest');
-});
+        // Resolution only needs a starting point node can climb FROM: the nearest
+        // manifest reaches every install above it, while the outermost would skip a
+        // nearer copy a nested install deliberately put there.
+        ctx.expect(puppeteerRoot(pkgDir)).toBe(pkgDir);
+        ctx.expect(puppeteerRoot(path.join(pkgDir, 'test', 'deep')), 'a dir with no manifest of its own climbs to it').toBe(pkgDir);
+        ctx.expect(puppeteerRoot(dir), 'at the outermost, the outermost IS the nearest').toBe(dir);
+      },
+    },
 
-test('a DECLARING ancestor still wins over the nearer non-declaring one', () => {
-  const root = stageBrand();
-  const targetDir = path.join(root, 'targets', 'web');
-  write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'web' }));
+    {
+      name: 'a DECLARING ancestor still wins over the nearer non-declaring one',
+      run: (ctx) => {
+        const root = stageBrand();
+        const targetDir = path.join(root, 'targets', 'web');
+        write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'web' }));
 
-  // The brand root declares the manager; the target manifest between them does
-  // not, and must not capture the walk.
-  assert.equal(puppeteerRoot(targetDir), root);
-});
+        // The brand root declares the manager; the target manifest between them does
+        // not, and must not capture the walk.
+        ctx.expect(puppeteerRoot(targetDir)).toBe(root);
+      },
+    },
 
-test('an unreadable manifest is walked past, never read as a brand root', () => {
-  const root = stageBrand();
-  write(path.join(root, 'targets', 'web', 'package.json'), '{ not json');
+    {
+      name: 'an unreadable manifest is walked past, never read as a brand root',
+      run: (ctx) => {
+        const root = stageBrand();
+        write(path.join(root, 'targets', 'web', 'package.json'), '{ not json');
 
-  assert.equal(puppeteerRoot(path.join(root, 'targets', 'web')), root);
-});
+        ctx.expect(puppeteerRoot(path.join(root, 'targets', 'web'))).toBe(root);
+      },
+    },
 
-test('inside this monorepo the walk stops at the nearest package (no brand above it)', () => {
-  // No manifest here declares @omega.js/manager, so the fallback answers: this
-  // package. Node climbs from there to the root install that hoisted puppeteer.
-  assert.equal(puppeteerRoot(__dirname), path.resolve(__dirname, '..'));
-});
+    {
+      name: 'inside this monorepo the walk stops at the nearest package (no brand above it)',
+      run: (ctx) => {
+        // No manifest here declares @omega.js/manager, so the fallback answers: this
+        // package. Node climbs from there to the root install that hoisted puppeteer.
+        ctx.expect(puppeteerRoot(__dirname)).toBe(path.resolve(__dirname, '..'));
+      },
+    },
 
-// ---- resolvePuppeteer
+    // ---- resolvePuppeteer
 
-test('resolvePuppeteer loads the brand root\'s puppeteer from a lane deep inside it', () => {
-  const root = stageBrand();
-  const puppeteer = resolvePuppeteer(path.join(root, 'test', 'e2e'));
-  assert.equal(typeof puppeteer.launch, 'function');
-  assert.equal(puppeteer.executablePath(), process.execPath);
-});
+    {
+      name: 'resolvePuppeteer loads the brand root\'s puppeteer from a lane deep inside it',
+      run: (ctx) => {
+        const root = stageBrand();
+        const puppeteer = resolvePuppeteer(path.join(root, 'test', 'e2e'));
+        ctx.expect(typeof puppeteer.launch).toBe('function');
+        ctx.expect(puppeteer.executablePath()).toBe(process.execPath);
+      },
+    },
 
-test('a brand root with no puppeteer installed throws, naming the root and the carrier', () => {
-  const root = stageBrand({ puppeteer: 'absent' });
-  assert.throws(() => resolvePuppeteer(root), new RegExp(`puppeteer is not installed at ${root}`));
-  assert.throws(() => resolvePuppeteer(root), /@omega\.js\/manager carries it/);
-});
+    {
+      name: 'a brand root with no puppeteer installed throws, naming the root and the carrier',
+      run: (ctx) => {
+        const root = stageBrand({ puppeteer: 'absent' });
+        ctx.expect(() => resolvePuppeteer(root)).toThrow(new RegExp(`puppeteer is not installed at ${root}`));
+        ctx.expect(() => resolvePuppeteer(root)).toThrow(/@omega\.js\/manager carries it/);
+      },
+    },
 
-test('an installed puppeteer whose Chrome is missing throws the install line', () => {
-  const root = stageBrand({ chrome: 'absent' });
-  assert.throws(() => resolvePuppeteer(root), /Chrome is not installed at .*no-such-chrome/);
-  assert.throws(() => resolvePuppeteer(root), /puppeteer browsers install chrome/);
-});
+    {
+      name: 'an installed puppeteer whose Chrome is missing throws the install line',
+      run: (ctx) => {
+        const root = stageBrand({ chrome: 'absent' });
+        ctx.expect(() => resolvePuppeteer(root)).toThrow(/Chrome is not installed at .*no-such-chrome/);
+        ctx.expect(() => resolvePuppeteer(root)).toThrow(/puppeteer browsers install chrome/);
+      },
+    },
 
-// ---- launchBrowser
+    // ---- launchBrowser
 
-test('launchBrowser runs headless with the lane args, resolved from the brand root', async () => {
-  const root = stageBrand();
-  const browser = await launchBrowser({ from: path.join(root, 'test', 'e2e') });
+    {
+      name: 'launchBrowser runs headless with the lane args, resolved from the brand root',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const browser = await launchBrowser({ from: path.join(root, 'test', 'e2e') });
 
-  assert.equal(browser.launched.headless, true);
-  assert.deepEqual(browser.launched.args, LAUNCH_ARGS);
-});
+        ctx.expect(browser.launched.headless).toBe(true);
+        ctx.expect(browser.launched.args).toEqual(LAUNCH_ARGS);
+      },
+    },
 
-test('extra args append to the lane args, and other launch options pass through', async () => {
-  const root = stageBrand();
-  const browser = await launchBrowser({
-    from: root,
-    args: ['--host-resolver-rules=MAP * ~NOTFOUND'],
-    devtools: true,
-    headless: 'shell',
-  });
+    {
+      name: 'extra args append to the lane args, and other launch options pass through',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const browser = await launchBrowser({
+          from: root,
+          args: ['--host-resolver-rules=MAP * ~NOTFOUND'],
+          devtools: true,
+          headless: 'shell',
+        });
 
-  assert.deepEqual(browser.launched.args, [...LAUNCH_ARGS, '--host-resolver-rules=MAP * ~NOTFOUND']);
-  assert.equal(browser.launched.devtools, true);
-  assert.equal(browser.launched.headless, 'shell', 'an explicit headless mode wins over the default');
-});
+        ctx.expect(browser.launched.args).toEqual([...LAUNCH_ARGS, '--host-resolver-rules=MAP * ~NOTFOUND']);
+        ctx.expect(browser.launched.devtools).toBe(true);
+        ctx.expect(browser.launched.headless, 'an explicit headless mode wins over the default').toBe('shell');
+      },
+    },
 
-test('an injected puppeteer skips resolution entirely (the lane owns its own driver)', async () => {
-  const calls = [];
-  const fake = { launch: async (options) => { calls.push(options); return { fake: true }; } };
+    {
+      name: 'an injected puppeteer skips resolution entirely (the lane owns its own driver)',
+      run: async (ctx) => {
+        const calls = [];
+        const fake = { launch: async (options) => { calls.push(options); return { fake: true }; } };
 
-  const browser = await launchBrowser({ from: '/nowhere-at-all', puppeteer: fake });
+        const browser = await launchBrowser({ from: '/nowhere-at-all', puppeteer: fake });
 
-  assert.deepEqual(browser, { fake: true });
-  assert.deepEqual(calls[0].args, LAUNCH_ARGS);
+        ctx.expect(browser).toEqual({ fake: true });
+        ctx.expect(calls[0].args).toEqual(LAUNCH_ARGS);
+      },
+    },
+  ],
 });

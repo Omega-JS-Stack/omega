@@ -1,76 +1,93 @@
 /**
- * stdout-guard wiring pin — every node test-runner suite in this repo preloads
- * the guard ([#356](https://github.com/Omega-JS-Stack/omega/issues/356)).
+ * Test-script wiring pin: every package's `test` script, and the root
+ * `test:packages` lane's `scripts/` command, runs the one case runner
+ * (`packages/devkit/src/test/cli.js`) and never spells `node --test` itself.
  *
- * `node --test` spawns one child per file and reads its results as v8 frames on
- * that child's STDOUT; console bytes on the same fd desync node 24's parser and
- * kill a random file ([#321](https://github.com/Omega-JS-Stack/omega/issues/321)).
- * `@omega.js/devkit/test/stdout-guard` reroutes the console side to stderr, and
- * the runner forwards a `--require` to every child — so a suite is protected
- * exactly when its command carries the preload. A new `node --test` script
- * without it is a latent abort, which is what this scan catches.
- *
- * Retires with the guard: when the repo's pinned node reaches >=26.7.0 (the
- * unsigned-length fix), the guard and this pin both go.
- *
- * Run: node --test scripts/stdout-guard-wiring.test.js
+ * `node --test` reads each child file's results as v8 frames on that child's
+ * STDOUT, and console bytes on the same fd desync node 24's parser and kill a
+ * random file. The runner carries the stdout guard itself, so a script is
+ * protected exactly when it runs the runner. The frameworks still on their own
+ * entry are listed by name, and a listed package already on the runner fails
+ * here as a stale entry.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const ROOT = path.join(__dirname, '..');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
+const CLI = path.join(PACKAGES_DIR, 'devkit', 'src', 'test', 'cli.js');
 
-const REQUIRE = '--require @omega.js/devkit/test/stdout-guard';
+// The packages whose `test` script is still their own entry; each leaves the
+// list in the change that moves it onto the runner.
+const OWN_ENTRY = ['web', 'backend', 'desktop', 'extension'];
 
-// The runner flag itself, not its `--test-timeout`/`--test-concurrency` kin
-// (those only ever ride along with the real flag).
+// The runner flag itself, not its `--test-timeout`/`--test-concurrency` kin.
 const RUNS_NODE_TEST = /(^|\s)--test(\s|$)/;
+// What an own entry's `node --test` invocation carries, since no runner guards it.
+const GUARD_PRELOAD = '--require @omega.js/devkit/test/stdout-guard';
 
-/** Every script in a manifest that invokes the node test runner directly. */
-function runnerScripts(manifestPath) {
-  const manifest = JSON.parse(jetpack.read(manifestPath));
-  return Object.entries(manifest.scripts || {})
-    .filter(([, command]) => RUNS_NODE_TEST.test(command));
+/** Every package dir name with a manifest, from a flat listing (a tree walk can hit dist symlink loops). */
+function packageNames() {
+  return jetpack.list(PACKAGES_DIR)
+    .filter((name) => jetpack.exists(path.join(PACKAGES_DIR, name)) === 'dir')
+    .filter((name) => jetpack.exists(path.join(PACKAGES_DIR, name, 'package.json')) === 'file')
+    .sort();
 }
 
-test('stdout-guard wiring: every packages/* script that runs `node --test` preloads the guard', () => {
-  const unguarded = [];
+/** A package's `test` script, or undefined. */
+function testScript(name) {
+  return JSON.parse(jetpack.read(path.join(PACKAGES_DIR, name, 'package.json'))).scripts?.test;
+}
 
-  // A flat listing, never a tree walk: generated dist fixtures under a package
-  // can carry self-referencing node_modules symlinks that recurse a walker.
-  for (const name of jetpack.list(PACKAGES_DIR)) {
-    if (jetpack.exists(path.join(PACKAGES_DIR, name)) !== 'dir') continue;
-    const manifestPath = path.join(PACKAGES_DIR, name, 'package.json');
-    if (!jetpack.exists(manifestPath)) continue;
+/** Whether a command runs the devkit runner: a token that resolves, from `dir`, to its cli. */
+function runsCli(dir, command) {
+  return command.split(/\s+/).some((token) => path.resolve(dir, token) === CLI);
+}
 
-    for (const [script, command] of runnerScripts(manifestPath)) {
-      // A script can run the runner more than once (web runs its watch suite in
-      // a second pass); each invocation needs its own preload.
-      const invocations = command.split('&&').filter((part) => RUNS_NODE_TEST.test(part));
-      for (const invocation of invocations) {
-        if (!invocation.includes(REQUIRE)) {
-          unguarded.push(`packages/${name} → ${script}: ${invocation.trim()}`);
+module.exports = defineCases({
+  type: 'group',
+  description: 'stdout-guard-wiring',
+  tests: [
+    {
+      name: 'every package test script runs the devkit runner and spells no --test, apart from the listed own entries',
+      run: (ctx) => {
+        const offenders = [];
+        for (const name of packageNames().filter((entry) => !OWN_ENTRY.includes(entry))) {
+          const command = testScript(name);
+          if (!command) offenders.push(`packages/${name}: no test script`);
+          else if (!runsCli(path.join(PACKAGES_DIR, name), command) || RUNS_NODE_TEST.test(command)) offenders.push(`packages/${name}: ${command}`);
         }
-      }
-    }
-  }
 
-  assert.deepEqual(unguarded, [], `these suites run the node test runner without \`${REQUIRE}\`:\n  ${unguarded.join('\n  ')}`);
-});
+        ctx.expect(offenders, `these test scripts do not run packages/devkit/src/test/cli.js alone:\n  ${offenders.join('\n  ')}`).toEqual([]);
+      },
+    },
 
-test('stdout-guard wiring: the root scripts lane preloads the guard', () => {
-  for (const [script, command] of runnerScripts(path.join(ROOT, 'package.json'))) {
-    assert.ok(command.includes(REQUIRE), `root script \`${script}\` runs the node test runner without \`${REQUIRE}\`: ${command}`);
-  }
-});
+    {
+      name: 'every listed own entry is a package not on the runner yet, and each of its node --test invocations preloads the guard',
+      run: (ctx) => {
+        const names = packageNames();
+        const stale = OWN_ENTRY.filter((name) => !names.includes(name) || runsCli(path.join(PACKAGES_DIR, name), testScript(name) || ''));
+        const unguarded = OWN_ENTRY.filter((name) => names.includes(name)).flatMap((name) => (testScript(name) || '').split('&&')
+          .filter((invocation) => RUNS_NODE_TEST.test(invocation) && !invocation.includes(GUARD_PRELOAD))
+          .map((invocation) => `packages/${name}: ${invocation.trim()}`));
 
-test('stdout-guard wiring: devkit\'s own runner preloads the guard', () => {
-  // Devkit's test script is a runner script (scripts/run-tests.js), so the scan
-  // above cannot see its `node --test` pass — it reaches the guard by path.
-  const runner = jetpack.read(path.join(PACKAGES_DIR, 'devkit', 'scripts', 'run-tests.js'));
+        ctx.expect(stale, `stale OWN_ENTRY names (gone, or already on the runner): ${stale.join(', ')}`).toEqual([]);
+        ctx.expect(unguarded, `these node --test invocations lack \`${GUARD_PRELOAD}\`:\n  ${unguarded.join('\n  ')}`).toEqual([]);
+      },
+    },
 
-  assert.match(runner, /'--require', STDOUT_GUARD, '--test'/, 'packages/devkit/scripts/run-tests.js must preload the stdout guard on its `node --test` pass');
+    {
+      name: 'the root test:packages lane runs scripts/ through the devkit runner and spells no --test',
+      run: (ctx) => {
+        const lane = JSON.parse(jetpack.read(path.join(ROOT, 'package.json'))).scripts['test:packages'];
+        // `node scripts/lane.js <label> "<command>" ...`: the first quoted command is the scripts/ run
+        const command = (lane.match(/"([^"]*)"/) || [])[1] || '';
+
+        ctx.expect(runsCli(ROOT, command), `test:packages does not open on packages/devkit/src/test/cli.js: ${command}`).toBe(true);
+        ctx.expect(command.split(/\s+/), `test:packages does not run --root=scripts: ${command}`).toContain('--root=scripts');
+        ctx.expect(RUNS_NODE_TEST.test(command), `test:packages spells --test: ${command}`).toBe(false);
+      },
+    },
+  ],
 });

@@ -5,8 +5,7 @@
  * path, every older shape converges, and a brand target keeps none. Real
  * directories in an os.tmpdir() scratch, no mocks.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -47,268 +46,346 @@ function recordingLogger() {
   return { lines, logger: { log: (m) => lines.log.push(m), warn: (m) => lines.warn.push(m), error() {} } };
 }
 
-// ─── The import line and the scope walk ──────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'agents-md',
+  tests: [
+    // ─── The import line and the scope walk ──────────────────────────────────────
 
-test('agents-md: the import line is the scope path to the manager\'s AGENTS.md', () => {
-  assert.equal(IMPORT_LINE, '@node_modules/@omega.js/manager/AGENTS.md');
-});
+    {
+      name: 'agents-md: the import line is the scope path to the manager\'s AGENTS.md',
+      run: (ctx) => {
+        ctx.expect(IMPORT_LINE).toBe('@node_modules/@omega.js/manager/AGENTS.md');
+      },
+    },
 
-test('agents-md: resolveImportLine walks up to a hoisted install and falls back to canonical', () => {
-  const root = tmpdir();
-  const brand = path.join(root, 'targets', 'my-brand');
-  fs.mkdirSync(brand, { recursive: true });
-  assert.equal(resolveImportLine(brand), IMPORT_LINE, 'nothing installed: the canonical project-local path');
+    {
+      name: 'agents-md: resolveImportLine walks up to a hoisted install and falls back to canonical',
+      run: (ctx) => {
+        const root = tmpdir();
+        const brand = path.join(root, 'targets', 'my-brand');
+        fs.mkdirSync(brand, { recursive: true });
+        ctx.expect(resolveImportLine(brand), 'nothing installed: the canonical project-local path').toBe(IMPORT_LINE);
 
-  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  assert.equal(resolveImportLine(brand), `@../../${GUIDE_SUBPATH}`, 'hoisted two levels up');
+        fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
+        ctx.expect(resolveImportLine(brand), 'hoisted two levels up').toBe(`@../../${GUIDE_SUBPATH}`);
 
-  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  assert.equal(resolveImportLine(brand), IMPORT_LINE, 'a project-local install wins');
-});
+        fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js', 'manager'), { recursive: true });
+        ctx.expect(resolveImportLine(brand), 'a project-local install wins').toBe(IMPORT_LINE);
+      },
+    },
 
-test('agents-md: an @omega.js dir without the manager never wins the scope walk', () => {
-  const root = tmpdir();
-  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  const targetDir = path.join(root, 'targets', 'website');
-  fs.mkdirSync(path.join(targetDir, 'node_modules', '@omega.js', 'web'), { recursive: true });
+    {
+      name: 'agents-md: an @omega.js dir without the manager never wins the scope walk',
+      run: (ctx) => {
+        const root = tmpdir();
+        fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
+        const targetDir = path.join(root, 'targets', 'website');
+        fs.mkdirSync(path.join(targetDir, 'node_modules', '@omega.js', 'web'), { recursive: true });
 
-  assert.equal(resolveImportLine(targetDir), `@../../${GUIDE_SUBPATH}`);
-});
+        ctx.expect(resolveImportLine(targetDir)).toBe(`@../../${GUIDE_SUBPATH}`);
+      },
+    },
 
-// ─── The retired scope link ──────────────────────────────────────────────────
+    // ─── The retired scope link ──────────────────────────────────────────────────
 
-test('agents-md: the retired import line converges to the manager import, notes kept', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@${RETIRED_SUBPATH}\n\n# Notes survive\n`);
+    {
+      name: 'agents-md: the retired import line converges to the manager import, notes kept',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@${RETIRED_SUBPATH}\n\n# Notes survive\n`);
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('# Notes survive\n'));
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('# Notes survive\n'));
+      },
+    },
 
-test('agents-md: removeRetiredLink removes the old scope link once, dangling or not', () => {
-  const brand = tmpdir();
-  const scope = path.join(brand, 'node_modules', '@omega.js');
-  fs.mkdirSync(path.join(scope, 'manager'), { recursive: true });
-  const link = path.join(scope, 'AGENTS.md');
-  fs.symlinkSync(path.join(brand, 'gone.md'), link);
+    {
+      name: 'agents-md: removeRetiredLink removes the old scope link once, dangling or not',
+      run: (ctx) => {
+        const brand = tmpdir();
+        const scope = path.join(brand, 'node_modules', '@omega.js');
+        fs.mkdirSync(path.join(scope, 'manager'), { recursive: true });
+        const link = path.join(scope, 'AGENTS.md');
+        fs.symlinkSync(path.join(brand, 'gone.md'), link);
 
-  assert.equal(removeRetiredLink(brand, { dryRun: true }), 'removed');
-  assert.ok(fs.lstatSync(link).isSymbolicLink(), 'a dry run removes nothing');
+        ctx.expect(removeRetiredLink(brand, { dryRun: true })).toBe('removed');
+        ctx.expect(fs.lstatSync(link).isSymbolicLink(), 'a dry run removes nothing').toBeTruthy();
 
-  assert.equal(removeRetiredLink(brand), 'removed');
-  assert.equal(fs.lstatSync(link, { throwIfNoEntry: false }), undefined);
-  assert.equal(removeRetiredLink(brand), 'absent');
-  assert.equal(removeRetiredLink(tmpdir()), 'absent', 'no scope at all');
-});
+        ctx.expect(removeRetiredLink(brand)).toBe('removed');
+        ctx.expect(fs.lstatSync(link, { throwIfNoEntry: false })).toBe(undefined);
+        ctx.expect(removeRetiredLink(brand)).toBe('absent');
+        ctx.expect(removeRetiredLink(tmpdir()), 'no scope at all').toBe('absent');
+      },
+    },
 
-// ─── ensureAgentsMd ──────────────────────────────────────────────────────────
+    // ─── ensureAgentsMd ──────────────────────────────────────────────────────────
 
-test('agents-md: missing AGENTS.md is created: the import under Default, an empty Custom section, no heading', () => {
-  const dir = tmpdir();
-  assert.equal(ensureAgentsMd(dir), 'created');
+    {
+      name: 'agents-md: missing AGENTS.md is created: the import under Default, an empty Custom section, no heading',
+      run: (ctx) => {
+        const dir = tmpdir();
+        ctx.expect(ensureAgentsMd(dir)).toBe('created');
 
-  assert.equal(read(dir, 'AGENTS.md'), shaped());
-  assert.ok(!read(dir, 'AGENTS.md').includes(EM_DASH), 'no em dash in the written AGENTS.md');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped());
+        ctx.expect(!read(dir, 'AGENTS.md').includes(EM_DASH), 'no em dash in the written AGENTS.md').toBeTruthy();
 
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: a stale-depth import in the Default section is healed, the Custom section untouched', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), shaped('# Notes survive\n', `@../../${GUIDE_SUBPATH}`));
+    {
+      name: 'agents-md: a stale-depth import in the Default section is healed, the Custom section untouched',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), shaped('# Notes survive\n', `@../../${GUIDE_SUBPATH}`));
 
-  assert.equal(ensureAgentsMd(dir), 'healed');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('# Notes survive\n'));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('healed');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('# Notes survive\n'));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: the import-on-line-1 shape converges: the skeleton heading drops, every other line lands under Custom in order', () => {
-  for (const heading of ['# OMEGA Playground: brand notes', '# acme-site: project notes']) {
-    const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@../../${GUIDE_SUBPATH}\n<!-- keep this -->\n\n${heading}\n\nOur deploy needs the VPN up.\n\n## Later\n`);
+    {
+      name: 'agents-md: the import-on-line-1 shape converges: the skeleton heading drops, every other line lands under Custom in order',
+      run: (ctx) => {
+        for (const heading of ['# OMEGA Playground: brand notes', '# acme-site: project notes']) {
+          const dir = tmpdir();
+          fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@../../${GUIDE_SUBPATH}\n<!-- keep this -->\n\n${heading}\n\nOur deploy needs the VPN up.\n\n## Later\n`);
 
-    assert.equal(ensureAgentsMd(dir), 'converged');
-    assert.equal(read(dir, 'AGENTS.md'), shaped('<!-- keep this -->\n\nOur deploy needs the VPN up.\n\n## Later\n'));
-    assert.equal(ensureAgentsMd(dir), 'present', 'a second run writes nothing');
-  }
-});
+          ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+          ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('<!-- keep this -->\n\nOur deploy needs the VPN up.\n\n## Later\n'));
+          ctx.expect(ensureAgentsMd(dir), 'a second run writes nothing').toBe('present');
+        }
+      },
+    },
 
-test('agents-md: a heading-only file converges to the fresh file', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# The Daily Build: brand notes\n`);
+    {
+      name: 'agents-md: a heading-only file converges to the fresh file',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# The Daily Build: brand notes\n`);
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped());
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped());
+      },
+    },
 
-test('agents-md: a hand-written file without the import converges, every line kept under Custom', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# My brand\n\nHand-written notes that must survive.\n');
+    {
+      name: 'agents-md: a hand-written file without the import converges, every line kept under Custom',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# My brand\n\nHand-written notes that must survive.\n');
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('# My brand\n\nHand-written notes that must survive.\n'));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('# My brand\n\nHand-written notes that must survive.\n'));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: converging removes a stray mid-file copy of the import, no duplicates ever', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Notes\n\n${IMPORT_LINE}\n\nMore notes.\n`);
+    {
+      name: 'agents-md: converging removes a stray mid-file copy of the import, no duplicates ever',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Notes\n\n${IMPORT_LINE}\n\nMore notes.\n`);
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  const content = read(dir, 'AGENTS.md');
-  assert.equal(content.split('\n').filter((line) => line.trim() === IMPORT_LINE).length, 1);
-  assert.equal(content, shaped('# Notes\n\nMore notes.\n'));
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        const content = read(dir, 'AGENTS.md');
+        ctx.expect(content.split('\n').filter((line) => line.trim() === IMPORT_LINE).length).toBe(1);
+        ctx.expect(content).toBe(shaped('# Notes\n\nMore notes.\n'));
+      },
+    },
 
-// ─── The retired per-framework template converges ────────────────────────────
+    // ─── The retired per-framework template converges ────────────────────────────
 
-test('agents-md: an old-template AGENTS.md converges: framework section gone, consumer notes kept under Custom', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
+    {
+      name: 'agents-md: an old-template AGENTS.md converges: framework section gone, consumer notes kept under Custom',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('Our deploy needs the VPN up.\n'));
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('Our deploy needs the VPN up.\n'));
 
-  assert.equal(ensureAgentsMd(dir), 'present', 'a converged file is the one shape: the next run is a no-op');
-});
+        ctx.expect(ensureAgentsMd(dir), 'a converged file is the one shape: the next run is a no-op').toBe('present');
+      },
+    },
 
-test('agents-md: an old template carrying only its shipped boilerplate converges to the fresh file', () => {
-  for (const custom of [oldTemplate(''), `${DEFAULT_MARKER}\nguidance\n\n${CUSTOM_MARKER}\n<!-- Add your project-specific notes below this line -->\n`]) {
-    const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), custom);
+    {
+      name: 'agents-md: an old template carrying only its shipped boilerplate converges to the fresh file',
+      run: (ctx) => {
+        for (const custom of [oldTemplate(''), `${DEFAULT_MARKER}\nguidance\n\n${CUSTOM_MARKER}\n<!-- Add your project-specific notes below this line -->\n`]) {
+          const dir = tmpdir();
+          fs.writeFileSync(path.join(dir, 'AGENTS.md'), custom);
 
-    assert.equal(ensureAgentsMd(dir), 'converged');
-    assert.equal(read(dir, 'AGENTS.md'), shaped());
-  }
-});
+          ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+          ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped());
+        }
+      },
+    },
 
-test('agents-md: notes quoting the # markers converge once as plain notes, never as the retired template', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# Acme: project notes\n\nThe old template split on:\n${DEFAULT_MARKER}\n${CUSTOM_MARKER}\n`);
+    {
+      name: 'agents-md: notes quoting the # markers converge once as plain notes, never as the retired template',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# Acme: project notes\n\nThe old template split on:\n${DEFAULT_MARKER}\n${CUSTOM_MARKER}\n`);
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped(`The old template split on:\n${DEFAULT_MARKER}\n${CUSTOM_MARKER}\n`));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped(`The old template split on:\n${DEFAULT_MARKER}\n${CUSTOM_MARKER}\n`));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: notes quoting the markdown markers inline take the converge path and lose nothing', () => {
-  const dir = tmpdir();
-  const notes = `# Acme\n\nWe split on \`${MD.defaultMarker}\` and \`${MD.customMarker}\`.\n`;
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), notes);
+    {
+      name: 'agents-md: notes quoting the markdown markers inline take the converge path and lose nothing',
+      run: (ctx) => {
+        const dir = tmpdir();
+        const notes = `# Acme\n\nWe split on \`${MD.defaultMarker}\` and \`${MD.customMarker}\`.\n`;
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), notes);
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped(notes));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped(notes));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: a title above the Default marker of a marked file moves to the top of Custom', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Acme\n\n${shaped('Our deploy needs the VPN up.\n')}`);
+    {
+      name: 'agents-md: a title above the Default marker of a marked file moves to the top of Custom',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Acme\n\n${shaped('Our deploy needs the VPN up.\n')}`);
 
-  assert.equal(ensureAgentsMd(dir), 'healed');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('# Acme\n\nOur deploy needs the VPN up.\n'));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('healed');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('# Acme\n\nOur deploy needs the VPN up.\n'));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: a Custom section holding the import converges once, then is present', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate(`\n${IMPORT_LINE}\n\n# Acme: project notes\n\nOur deploy needs the VPN up.\n`));
+    {
+      name: 'agents-md: a Custom section holding the import converges once, then is present',
+      run: (ctx) => {
+        const dir = tmpdir();
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate(`\n${IMPORT_LINE}\n\n# Acme: project notes\n\nOur deploy needs the VPN up.\n`));
 
-  assert.equal(ensureAgentsMd(dir), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('Our deploy needs the VPN up.\n'));
-  assert.equal(ensureAgentsMd(dir), 'present');
-});
+        ctx.expect(ensureAgentsMd(dir)).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('Our deploy needs the VPN up.\n'));
+        ctx.expect(ensureAgentsMd(dir)).toBe('present');
+      },
+    },
 
-test('agents-md: a dry run reports the convergence and the heal, and writes nothing', () => {
-  const dir = tmpdir();
-  const content = oldTemplate('\nkeep me\n');
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
+    {
+      name: 'agents-md: a dry run reports the convergence and the heal, and writes nothing',
+      run: (ctx) => {
+        const dir = tmpdir();
+        const content = oldTemplate('\nkeep me\n');
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
 
-  assert.equal(ensureAgentsMd(dir, { dryRun: true }), 'converged');
-  assert.equal(read(dir, 'AGENTS.md'), content);
+        ctx.expect(ensureAgentsMd(dir, { dryRun: true })).toBe('converged');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(content);
 
-  const stale = shaped('', `@../${GUIDE_SUBPATH}`);
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), stale);
-  assert.equal(ensureAgentsMd(dir, { dryRun: true }), 'healed');
-  assert.equal(read(dir, 'AGENTS.md'), stale);
-});
+        const stale = shaped('', `@../${GUIDE_SUBPATH}`);
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), stale);
+        ctx.expect(ensureAgentsMd(dir, { dryRun: true })).toBe('healed');
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(stale);
+      },
+    },
 
-// ─── A brand target keeps none ───────────────────────────────────────────────
+    // ─── A brand target keeps none ───────────────────────────────────────────────
 
-test('agents-md: retireAgentsMd removes a copy holding nothing the consumer wrote', () => {
-  for (const content of [shaped(), `${IMPORT_LINE}\n\n# web: project notes\n`, oldTemplate('')]) {
-    const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
-    assert.equal(retireAgentsMd(dir), 'removed');
-    assert.equal(fs.existsSync(path.join(dir, 'AGENTS.md')), false);
-  }
+    {
+      name: 'agents-md: retireAgentsMd removes a copy holding nothing the consumer wrote',
+      run: (ctx) => {
+        for (const content of [shaped(), `${IMPORT_LINE}\n\n# web: project notes\n`, oldTemplate('')]) {
+          const dir = tmpdir();
+          fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
+          ctx.expect(retireAgentsMd(dir)).toBe('removed');
+          ctx.expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+        }
 
-  assert.equal(retireAgentsMd(tmpdir()), 'absent');
-});
+        ctx.expect(retireAgentsMd(tmpdir())).toBe('absent');
+      },
+    },
 
-test('agents-md: retireAgentsMd keeps a copy carrying consumer notes, any shape', () => {
-  for (const content of [shaped('Our deploy needs the VPN up.\n'), oldTemplate('\nOur deploy needs the VPN up.\n'), `${IMPORT_LINE}\n\n# web: project notes\n\nOur deploy needs the VPN up.\n`, '# Hand-written\n']) {
-    const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
+    {
+      name: 'agents-md: retireAgentsMd keeps a copy carrying consumer notes, any shape',
+      run: (ctx) => {
+        for (const content of [shaped('Our deploy needs the VPN up.\n'), oldTemplate('\nOur deploy needs the VPN up.\n'), `${IMPORT_LINE}\n\n# web: project notes\n\nOur deploy needs the VPN up.\n`, '# Hand-written\n']) {
+          const dir = tmpdir();
+          fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
 
-    assert.equal(retireAgentsMd(dir), 'kept');
-    assert.equal(read(dir, 'AGENTS.md'), content);
-  }
-});
+          ctx.expect(retireAgentsMd(dir)).toBe('kept');
+          ctx.expect(read(dir, 'AGENTS.md')).toBe(content);
+        }
+      },
+    },
 
-// ─── The framework scaffold step ─────────────────────────────────────────────
+    // ─── The framework scaffold step ─────────────────────────────────────────────
 
-test('agents-md: scaffoldAgentsMd writes a standalone project the builder\'s file and records it', () => {
-  const dir = path.join(tmpdir(), 'acme-site');
-  fs.mkdirSync(dir);
-  const result = engineResult();
-  const { lines, logger } = recordingLogger();
+    {
+      name: 'agents-md: scaffoldAgentsMd writes a standalone project the builder\'s file and records it',
+      run: (ctx) => {
+        const dir = path.join(tmpdir(), 'acme-site');
+        fs.mkdirSync(dir);
+        const result = engineResult();
+        const { lines, logger } = recordingLogger();
 
-  scaffoldAgentsMd({ outputDir: dir, standalone: true, result, logger });
-  assert.equal(read(dir, 'AGENTS.md'), shaped());
-  assert.deepEqual(result.written, ['AGENTS.md']);
-  assert.ok(lines.log.some((m) => m.includes('AGENTS.md')), 'the write is logged');
+        scaffoldAgentsMd({ outputDir: dir, standalone: true, result, logger });
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped());
+        ctx.expect(result.written).toEqual(['AGENTS.md']);
+        ctx.expect(lines.log.some((m) => m.includes('AGENTS.md')), 'the write is logged').toBeTruthy();
 
-  const again = engineResult();
-  scaffoldAgentsMd({ outputDir: dir, standalone: true, result: again, logger });
-  assert.deepEqual(again, { written: [], merged: [], skipped: ['AGENTS.md'], removed: [] }, 'a rerun writes nothing');
-});
+        const again = engineResult();
+        scaffoldAgentsMd({ outputDir: dir, standalone: true, result: again, logger });
+        ctx.expect(again, 'a rerun writes nothing').toEqual({ written: [], merged: [], skipped: ['AGENTS.md'], removed: [] });
+      },
+    },
 
-test('agents-md: scaffoldAgentsMd converges a standalone old template loudly', () => {
-  const dir = path.join(tmpdir(), 'acme-site');
-  fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
-  const result = engineResult();
-  const { lines, logger } = recordingLogger();
+    {
+      name: 'agents-md: scaffoldAgentsMd converges a standalone old template loudly',
+      run: (ctx) => {
+        const dir = path.join(tmpdir(), 'acme-site');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
+        const result = engineResult();
+        const { lines, logger } = recordingLogger();
 
-  scaffoldAgentsMd({ outputDir: dir, standalone: true, result, logger });
-  assert.deepEqual(result.merged, ['AGENTS.md']);
-  assert.ok(lines.warn.some((m) => /Converged AGENTS\.md/.test(m)), 'the convergence warns');
-  assert.equal(read(dir, 'AGENTS.md'), shaped('Our deploy needs the VPN up.\n'));
-});
+        scaffoldAgentsMd({ outputDir: dir, standalone: true, result, logger });
+        ctx.expect(result.merged).toEqual(['AGENTS.md']);
+        ctx.expect(lines.warn.some((m) => /Converged AGENTS\.md/.test(m)), 'the convergence warns').toBeTruthy();
+        ctx.expect(read(dir, 'AGENTS.md')).toBe(shaped('Our deploy needs the VPN up.\n'));
+      },
+    },
 
-test('agents-md: scaffoldAgentsMd keeps a brand target free of AGENTS.md, never destroying notes', () => {
-  const dir = tmpdir();
-  const result = engineResult();
-  const { lines, logger } = recordingLogger();
+    {
+      name: 'agents-md: scaffoldAgentsMd keeps a brand target free of AGENTS.md, never destroying notes',
+      run: (ctx) => {
+        const dir = tmpdir();
+        const result = engineResult();
+        const { lines, logger } = recordingLogger();
 
-  scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
-  assert.equal(fs.existsSync(path.join(dir, 'AGENTS.md')), false, 'a brand target never gets one');
+        scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
+        ctx.expect(fs.existsSync(path.join(dir, 'AGENTS.md')), 'a brand target never gets one').toBe(false);
 
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate(''));
-  scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
-  assert.deepEqual(result.removed, ['AGENTS.md']);
-  assert.ok(lines.warn.some((m) => /Retired AGENTS\.md/.test(m)));
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate(''));
+        scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
+        ctx.expect(result.removed).toEqual(['AGENTS.md']);
+        ctx.expect(lines.warn.some((m) => /Retired AGENTS\.md/.test(m))).toBeTruthy();
 
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
-  scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
-  assert.match(read(dir, 'AGENTS.md'), /VPN/);
-  assert.ok(lines.warn.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
-  assert.ok(!lines.warn.join('\n').includes(EM_DASH), 'no em dash in the messages');
-});
+        fs.writeFileSync(path.join(dir, 'AGENTS.md'), oldTemplate('\nOur deploy needs the VPN up.\n'));
+        scaffoldAgentsMd({ outputDir: dir, standalone: false, result, logger });
+        ctx.expect(read(dir, 'AGENTS.md')).toMatch(/VPN/);
+        ctx.expect(lines.warn.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints').toBeTruthy();
+        ctx.expect(!lines.warn.join('\n').includes(EM_DASH), 'no em dash in the messages').toBeTruthy();
+      },
+    },
 
-// ─── No CLAUDE.md: Claude Code reads AGENTS.md itself ────────────────────────
+    // ─── No CLAUDE.md: Claude Code reads AGENTS.md itself ────────────────────────
 
-test('agents-md: the lib carries no CLAUDE.md pointer helper', () => {
-  assert.deepEqual(Object.keys(agentsMd).filter((key) => /claude/i.test(key)), []);
+    {
+      name: 'agents-md: the lib carries no CLAUDE.md pointer helper',
+      run: (ctx) => {
+        ctx.expect(Object.keys(agentsMd).filter((key) => /claude/i.test(key))).toEqual([]);
+      },
+    },
+  ],
 });

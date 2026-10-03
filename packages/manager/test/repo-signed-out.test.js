@@ -5,8 +5,7 @@
  * In a terminal, or with no `gh` at all, it stays an error. The `gh` is the
  * fake on PATH (test/lib/fake-gh.js); nothing here reaches GitHub.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
@@ -59,44 +58,62 @@ function walk() {
   }).then((result) => result, (error) => ({ status: 'error', error: error.message }));
 }
 
-test('#1037 a headless walk with a signed-out gh skips the repo service, naming GH_TOKEN and gh auth login', async (t) => {
-  withEnv(t, { OMEGA_NON_INTERACTIVE: '1', GH_TOKEN: undefined, GITHUB_TOKEN: undefined });
-  t.after(useGh(null));
+module.exports = defineCases({
+  type: 'group',
+  description: 'repo-signed-out',
+  tests: [
+    {
+      name: '#1037 a headless walk with a signed-out gh skips the repo service, naming GH_TOKEN and gh auth login',
+      run: async (ctx) => {
+        withEnv(ctx, { OMEGA_NON_INTERACTIVE: '1', GH_TOKEN: undefined, GITHUB_TOKEN: undefined });
+        ctx.after(useGh(null));
 
-  const result = await walk();
+        const result = await walk();
 
-  assert.equal(result.status, 'skipped', JSON.stringify(result));
-  assert.deepEqual(result.missingEnv, ['GH_TOKEN']);
-  assert.match(result.reason, /gh auth login/);
-});
+        ctx.expect(result.status, JSON.stringify(result)).toBe('skipped');
+        ctx.expect(result.missingEnv).toEqual(['GH_TOKEN']);
+        ctx.expect(result.reason).toMatch(/gh auth login/);
+      },
+    },
 
-test('#1037 in a terminal, a signed-out gh is still the repo service\'s error, with the sign-in line', async (t) => {
-  withEnv(t, { OMEGA_NON_INTERACTIVE: undefined, GH_TOKEN: undefined, GITHUB_TOKEN: undefined });
-  t.after(useGh(null));
-  const tty = openTtyPrompt();
-  t.after(() => tty.close());
+    {
+      name: '#1037 in a terminal, a signed-out gh is still the repo service\'s error, with the sign-in line',
+      run: async (ctx) => {
+        withEnv(ctx, { OMEGA_NON_INTERACTIVE: undefined, GH_TOKEN: undefined, GITHUB_TOKEN: undefined });
+        ctx.after(useGh(null));
+        const tty = openTtyPrompt();
+        ctx.after(() => tty.close());
 
-  const result = await walk();
+        const result = await walk();
 
-  assert.equal(result.status, 'error', JSON.stringify(result));
-  assert.ok(String(result.error).includes(SIGN_IN_LINE), result.error);
-});
+        ctx.expect(result.status, JSON.stringify(result)).toBe('error');
+        ctx.expect(String(result.error).includes(SIGN_IN_LINE), result.error).toBeTruthy();
+      },
+    },
 
-test('#1037 a gh that is not installed is the repo service\'s error, with the install line, headless too', async (t) => {
-  withEnv(t, { OMEGA_NON_INTERACTIVE: '1' });
-  t.after(withoutGh());
+    {
+      name: '#1037 a gh that is not installed is the repo service\'s error, with the install line, headless too',
+      run: async (ctx) => {
+        withEnv(ctx, { OMEGA_NON_INTERACTIVE: '1' });
+        ctx.after(withoutGh());
 
-  const result = await walk();
+        const result = await walk();
 
-  assert.equal(result.status, 'error', JSON.stringify(result));
-  assert.ok(String(result.error).includes(INSTALL_LINE), result.error);
-});
+        ctx.expect(result.status, JSON.stringify(result)).toBe('error');
+        ctx.expect(String(result.error).includes(INSTALL_LINE), result.error).toBeTruthy();
+      },
+    },
 
-test('#1037 the journey lane no longer allows a repo service error', () => {
-  const text = jetpack.read(JOURNEY);
-  const allowed = /allowedServiceErrors:\s*\[([^\]]*)\]/.exec(text);
+    {
+      name: '#1037 the journey lane no longer allows a repo service error',
+      run: (ctx) => {
+        const text = jetpack.read(JOURNEY);
+        const allowed = /allowedServiceErrors:\s*\[([^\]]*)\]/.exec(text);
 
-  assert.ok(allowed, 'the journey lane declares its allowed service errors');
-  const names = [...allowed[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
-  assert.ok(!names.includes('repo'), `allowed: ${names.join(', ')}`);
+        ctx.expect(allowed, 'the journey lane declares its allowed service errors').toBeTruthy();
+        const names = [...allowed[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
+        ctx.expect(!names.includes('repo'), `allowed: ${names.join(', ')}`).toBeTruthy();
+      },
+    },
+  ],
 });

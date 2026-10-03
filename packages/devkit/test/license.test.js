@@ -4,8 +4,7 @@
 // base-URL seam to aim a local server at: `transport` is the injected fetch and
 // every case here runs fully offline.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { resolveLicenseVerdict, resolveLicenseStamp, licenseStamp, KEYLESS_STAMP, LICENSE_ENDPOINT } = require('../src/license.js');
 
@@ -38,181 +37,214 @@ const PAID_USER = { subscription: { product: { id: 'pro' }, status: 'active' } }
 const BASIC_USER = { subscription: { product: { id: 'basic' }, status: 'active' } };
 const CANCELLED_USER = { subscription: { product: { id: 'pro' }, status: 'cancelled' } };
 
-test('the endpoint is the omega brand api host, hardcoded', () => {
-  assert.equal(LICENSE_ENDPOINT, 'https://api.omegajs.dev/omega/user');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'license',
+  tests: [
+    {
+      name: 'the endpoint is the omega brand api host, hardcoded',
+      run: (ctx) => {
+        ctx.expect(LICENSE_ENDPOINT).toBe('https://api.omegajs.dev/omega/user');
+      },
+    },
 
-test('no key: the keyless verdict, and nothing is asked of the network', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'no key: the keyless verdict, and nothing is asked of the network',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  const verdict = await resolveLicenseVerdict({ config: LIVE_CONFIG, env: {}, transport });
+        const verdict = await resolveLicenseVerdict({ config: LIVE_CONFIG, env: {}, transport });
 
-  assert.deepEqual(transport.calls, [], 'a keyless context never calls the license server');
-  assert.equal(verdict.licensed, false);
-  assert.equal(verdict.payments, 'gated');
-  assert.equal(verdict.attribution, 'shown');
-  assert.match(verdict.reason, /OMEGA_LICENSE_KEY/);
-});
+        ctx.expect(transport.calls, 'a keyless context never calls the license server').toEqual([]);
+        ctx.expect(verdict.licensed).toBe(false);
+        ctx.expect(verdict.payments).toBe('gated');
+        ctx.expect(verdict.attribution).toBe('shown');
+        ctx.expect(verdict.reason).toMatch(/OMEGA_LICENSE_KEY/);
+      },
+    },
 
-test('an empty/whitespace key is no key', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'an empty/whitespace key is no key',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  for (const value of ['', '   ']) {
-    const verdict = await resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: value }, transport });
-    assert.equal(verdict.licensed, false);
-  }
+        for (const value of ['', '   ']) {
+          const verdict = await resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: value }, transport });
+          ctx.expect(verdict.licensed).toBe(false);
+        }
 
-  assert.deepEqual(transport.calls, [], 'nothing to send means nothing is sent');
-});
+        ctx.expect(transport.calls, 'nothing to send means nothing is sent').toEqual([]);
+      },
+    },
 
-test('a demo-* project is keyless-dev forever, key present or not (spec call 5)', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'a demo-* project is keyless-dev forever, key present or not (spec call 5)',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  const verdict = await resolveLicenseVerdict({
-    config: DEMO_CONFIG,
-    env: { OMEGA_LICENSE_KEY: 'live-key' },
-    transport,
-  });
+        const verdict = await resolveLicenseVerdict({
+          config: DEMO_CONFIG,
+          env: { OMEGA_LICENSE_KEY: 'live-key' },
+          transport,
+        });
 
-  assert.deepEqual(transport.calls, [], 'the test brands never phone the license server');
-  assert.equal(verdict.licensed, false);
-  assert.equal(verdict.payments, 'gated');
-  assert.equal(verdict.attribution, 'shown');
-  assert.match(verdict.reason, /demo-naked-brand/);
-});
+        ctx.expect(transport.calls, 'the test brands never phone the license server').toEqual([]);
+        ctx.expect(verdict.licensed).toBe(false);
+        ctx.expect(verdict.payments).toBe('gated');
+        ctx.expect(verdict.attribution).toBe('shown');
+        ctx.expect(verdict.reason).toMatch(/demo-naked-brand/);
+      },
+    },
 
-test('a paid plan is the LICENSED verdict — payments live, attribution removed', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'a paid plan is the LICENSED verdict — payments live, attribution removed',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  const verdict = await resolveLicenseVerdict({
-    config: LIVE_CONFIG,
-    env: { OMEGA_LICENSE_KEY: 'live-key' },
-    transport,
-  });
+        const verdict = await resolveLicenseVerdict({
+          config: LIVE_CONFIG,
+          env: { OMEGA_LICENSE_KEY: 'live-key' },
+          transport,
+        });
 
-  assert.equal(verdict.licensed, true);
-  assert.equal(verdict.payments, 'live');
-  assert.equal(verdict.attribution, 'removed');
-  assert.match(verdict.reason, /pro/);
-});
+        ctx.expect(verdict.licensed).toBe(true);
+        ctx.expect(verdict.payments).toBe('live');
+        ctx.expect(verdict.attribution).toBe('removed');
+        ctx.expect(verdict.reason).toMatch(/pro/);
+      },
+    },
 
-test('the request carries the key and the brand id (the server counts brands per key)', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'the request carries the key and the brand id (the server counts brands per key)',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  await resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport });
+        await resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport });
 
-  assert.equal(transport.calls.length, 1);
-  const url = new URL(transport.calls[0].url);
-  assert.equal(`${url.origin}${url.pathname}`, LICENSE_ENDPOINT);
-  assert.equal(url.searchParams.get('apiKey'), 'live-key');
-  assert.equal(url.searchParams.get('brandId'), 'acme');
-});
+        ctx.expect(transport.calls.length).toBe(1);
+        const url = new URL(transport.calls[0].url);
+        ctx.expect(`${url.origin}${url.pathname}`).toBe(LICENSE_ENDPOINT);
+        ctx.expect(url.searchParams.get('apiKey')).toBe('live-key');
+        ctx.expect(url.searchParams.get('brandId')).toBe('acme');
+      },
+    },
 
-test('a real account with no live subscription is a keyless verdict, not a throw', async () => {
-  // The `basic` sentinel IS "no subscription": a free omegajs.dev account, and
-  // a cancelled one, which resolves to the same plan.
-  for (const user of [BASIC_USER, CANCELLED_USER]) {
-    const transport = stubTransport(userResponse(user));
+    {
+      name: 'a real account with no live subscription is a keyless verdict, not a throw',
+      run: async (ctx) => {
+        // The `basic` sentinel IS "no subscription": a free omegajs.dev account, and
+        // a cancelled one, which resolves to the same plan.
+        for (const user of [BASIC_USER, CANCELLED_USER]) {
+          const transport = stubTransport(userResponse(user));
 
-    const verdict = await resolveLicenseVerdict({
-      config: LIVE_CONFIG,
-      env: { OMEGA_LICENSE_KEY: 'free-account-key' },
-      transport,
-    });
+          const verdict = await resolveLicenseVerdict({
+            config: LIVE_CONFIG,
+            env: { OMEGA_LICENSE_KEY: 'free-account-key' },
+            transport,
+          });
 
-    assert.equal(verdict.licensed, false);
-    assert.equal(verdict.payments, 'gated');
-    assert.equal(verdict.attribution, 'shown');
-    assert.match(verdict.reason, /no active omegajs\.dev subscription/);
-  }
-});
+          ctx.expect(verdict.licensed).toBe(false);
+          ctx.expect(verdict.payments).toBe('gated');
+          ctx.expect(verdict.attribution).toBe('shown');
+          ctx.expect(verdict.reason).toMatch(/no active omegajs\.dev subscription/);
+        }
+      },
+    },
 
-test('an unreachable server THROWS — a key present is never a quiet gate', async () => {
-  const transport = stubTransport(() => { throw new Error('getaddrinfo ENOTFOUND api.omegajs.dev'); });
+    {
+      name: 'an unreachable server THROWS — a key present is never a quiet gate',
+      run: async (ctx) => {
+        const transport = stubTransport(() => { throw new Error('getaddrinfo ENOTFOUND api.omegajs.dev'); });
 
-  await assert.rejects(
-    () => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport }),
-    /could not be reached.*ENOTFOUND/s,
-  );
-});
+        await ctx.expect((() => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport }))()).rejects.toThrow(/could not be reached.*ENOTFOUND/s);
+      },
+    },
 
-test('a rejected key THROWS — a typo must never ship a gated artifact for a paying brand', async () => {
-  const transport = stubTransport(userResponse(null, { status: 401 }));
+    {
+      name: 'a rejected key THROWS — a typo must never ship a gated artifact for a paying brand',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(null, { status: 401 }));
 
-  await assert.rejects(
-    () => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'typod-key' }, transport }),
-    /rejected.*401/s,
-  );
-});
+        await ctx.expect((() => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'typod-key' }, transport }))()).rejects.toThrow(/rejected.*401/s);
+      },
+    },
 
-test('a key that resolves NOBODY throws too (a 200 with no user)', async () => {
-  const transport = stubTransport(userResponse(undefined));
+    {
+      name: 'a key that resolves NOBODY throws too (a 200 with no user)',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(undefined));
 
-  await assert.rejects(
-    () => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'ghost-key' }, transport }),
-    /resolved no account/,
-  );
-});
+        await ctx.expect((() => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'ghost-key' }, transport }))()).rejects.toThrow(/resolved no account/);
+      },
+    },
 
-test('an unreadable answer throws — never a silent gate', async () => {
-  const transport = stubTransport({
-    ok: true,
-    status: 200,
-    json: async () => { throw new SyntaxError('Unexpected token < in JSON'); },
-  });
+    {
+      name: 'an unreadable answer throws — never a silent gate',
+      run: async (ctx) => {
+        const transport = stubTransport({
+          ok: true,
+          status: 200,
+          json: async () => { throw new SyntaxError('Unexpected token < in JSON'); },
+        });
 
-  await assert.rejects(
-    () => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport }),
-    /could not be read/,
-  );
-});
+        await ctx.expect((() => resolveLicenseVerdict({ config: LIVE_CONFIG, env: { OMEGA_LICENSE_KEY: 'live-key' }, transport }))()).rejects.toThrow(/could not be read/);
+      },
+    },
 
-// ─── The stamp: what every consumer records (#320, half 2) ───
+    // ─── The stamp: what every consumer records (#320, half 2) ───
 
-test('the stamp is the verdict without the reason — one shape for every target', () => {
-  const licensed = licenseStamp({ licensed: true, payments: 'live', attribution: 'removed', reason: 'licensed by the omegajs.dev "pro" subscription' });
+    {
+      name: 'the stamp is the verdict without the reason — one shape for every target',
+      run: (ctx) => {
+        const licensed = licenseStamp({ licensed: true, payments: 'live', attribution: 'removed', reason: 'licensed by the omegajs.dev "pro" subscription' });
 
-  assert.deepEqual(licensed, { status: 'licensed', payments: 'live', attribution: 'removed' });
-  assert.equal('reason' in licensed, false, 'the reason names the account plan — a shipped artifact is public');
-  assert.deepEqual(
-    licenseStamp({ licensed: false, payments: 'gated', attribution: 'shown', reason: 'no key' }),
-    KEYLESS_STAMP,
-  );
-});
+        ctx.expect(licensed).toEqual({ status: 'licensed', payments: 'live', attribution: 'removed' });
+        ctx.expect('reason' in licensed, 'the reason names the account plan — a shipped artifact is public').toBe(false);
+        ctx.expect(licenseStamp({ licensed: false, payments: 'gated', attribution: 'shown', reason: 'no key' })).toEqual(KEYLESS_STAMP);
+      },
+    },
 
-test('a build that runs no check stamps keyless, and asks the network nothing', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'a build that runs no check stamps keyless, and asks the network nothing',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  const stamp = await resolveLicenseStamp({
-    config: LIVE_CONFIG,
-    production: false,
-    env: { OMEGA_LICENSE_KEY: 'live-key' },
-    transport,
-  });
+        const stamp = await resolveLicenseStamp({
+          config: LIVE_CONFIG,
+          production: false,
+          env: { OMEGA_LICENSE_KEY: 'live-key' },
+          transport,
+        });
 
-  assert.deepEqual(transport.calls, [], 'no check runs outside a production build (spec call 5)');
-  assert.deepEqual(stamp, { status: 'keyless', payments: 'gated', attribution: 'shown' });
-});
+        ctx.expect(transport.calls, 'no check runs outside a production build (spec call 5)').toEqual([]);
+        ctx.expect(stamp).toEqual({ status: 'keyless', payments: 'gated', attribution: 'shown' });
+      },
+    },
 
-test('a production build stamps the resolved verdict', async () => {
-  const transport = stubTransport(userResponse(PAID_USER));
+    {
+      name: 'a production build stamps the resolved verdict',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(PAID_USER));
 
-  const stamp = await resolveLicenseStamp({
-    config: LIVE_CONFIG,
-    production: true,
-    env: { OMEGA_LICENSE_KEY: 'live-key' },
-    transport,
-  });
+        const stamp = await resolveLicenseStamp({
+          config: LIVE_CONFIG,
+          production: true,
+          env: { OMEGA_LICENSE_KEY: 'live-key' },
+          transport,
+        });
 
-  assert.equal(transport.calls.length, 1);
-  assert.deepEqual(stamp, { status: 'licensed', payments: 'live', attribution: 'removed' });
-});
+        ctx.expect(transport.calls.length).toBe(1);
+        ctx.expect(stamp).toEqual({ status: 'licensed', payments: 'live', attribution: 'removed' });
+      },
+    },
 
-test('a production build with a dead key throws — the stamp lane gates the deploy too', async () => {
-  const transport = stubTransport(userResponse(null, { status: 401 }));
+    {
+      name: 'a production build with a dead key throws — the stamp lane gates the deploy too',
+      run: async (ctx) => {
+        const transport = stubTransport(userResponse(null, { status: 401 }));
 
-  await assert.rejects(
-    () => resolveLicenseStamp({ config: LIVE_CONFIG, production: true, env: { OMEGA_LICENSE_KEY: 'typod-key' }, transport }),
-    /rejected.*401/s,
-  );
+        await ctx.expect((() => resolveLicenseStamp({ config: LIVE_CONFIG, production: true, env: { OMEGA_LICENSE_KEY: 'typod-key' }, transport }))()).rejects.toThrow(/rejected.*401/s);
+      },
+    },
+  ],
 });

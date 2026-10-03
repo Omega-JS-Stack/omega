@@ -11,15 +11,57 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { parseScript } = TestProvider._internals;
 
 function makeProvider() {
-  // No Omega instance — the provider falls back to the OMEGA_TEST_MODE signal, which the
-  // test runner sets
+  // No Omega instance — the provider falls back to isTesting(), which the test
+  // lane's OMEGA_ENVIRONMENT=testing answers
   return new TestProvider({});
+}
+
+// Build a no-instance provider and run one plain request under the given
+// environment, off the emulator. Returns the refusal, or null when it answered.
+async function attemptUnder(environment) {
+  const saved = { OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT, FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR };
+
+  process.env.OMEGA_ENVIRONMENT = environment;
+  delete process.env.FUNCTIONS_EMULATOR;
+
+  try {
+    await makeProvider().request({ messages: [{ role: 'user', content: 'hello there' }] });
+    return null;
+  } catch (error) {
+    return error;
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 module.exports = defineCases({
   description: 'AI test provider (scripted sequences)',
   type: 'group',
   tests: [
+    // ─── The no-instance gate: the one environment decides ───
+
+    {
+      name: 'no-instance-provider-runs-when-the-one-input-names-testing',
+      async run({ assert }) {
+        const refusal = await attemptUnder('testing');
+
+        assert.equal(refusal, null, `OMEGA_ENVIRONMENT=testing allows the provider, got: ${refusal && refusal.message}`);
+      },
+    },
+
+    {
+      name: 'no-instance-provider-refuses-development-off-the-emulator',
+      async run({ assert }) {
+        const refusal = await attemptUnder('development');
+
+        assert.ok(refusal, 'development with no FUNCTIONS_EMULATOR refuses the provider');
+        assert.match(refusal.message, /AI test provider is only available in development or testing environments/, `the refusal is the environment gate, got: ${refusal.message}`);
+      },
+    },
+
     // ─── Script parsing ───
 
     {

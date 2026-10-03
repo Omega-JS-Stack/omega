@@ -8,8 +8,7 @@
  * management, agent diff-sync with leaf masks, the owner-plan
  * reconciliation through the shared lib, and the dry-run guarantee.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const { mkdtempSync, mkdirSync, writeFileSync } = fs;
 const { tmpdir } = require('node:os');
@@ -124,318 +123,6 @@ function runService(config, { db, options = {}, serviceData = {}, brandRoot } = 
   });
 }
 
-// ─── Registry / defaults pins ────────────────────────────────────────────────
-
-test('chat: registered after forms with the chat + user operations', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('forms') + 1], 'chat');
-  assert.deepEqual(OPERATIONS.chat.map((o) => o.name), ['chat', 'user']);
-});
-
-// #23 D4 — ONE chatsy home. The dotted path pinned here is the SAME string
-// @omega.js/client reads (pinned on that side in packages/web's
-// test/config-rekey.test.js): rename one without the other and both break.
-test('chat: the agent id lands at inbound.chat.providers.chatsy.agentId — the path the client reads', () => {
-  const source = fs.readFileSync(require.resolve('../src/services/chat/index.js'), 'utf8');
-
-  assert.ok(
-    source.includes("landValue(context, 'inbound.chat.providers.chatsy.agentId'"),
-    'the mint writeback lands the ONE path',
-  );
-  assert.ok(
-    source.includes("path: 'inbound.chat.providers.chatsy.agentId'"),
-    'the interactive flow lands the ONE path',
-  );
-  assert.ok(
-    source.includes("disablePath: 'inbound.chat.providers.chatsy'"),
-    'Disable writes false at the section, not at a stale top-level key',
-  );
-  assert.ok(!/'chatsy\.agentId'/.test(source), 'no bare chatsy.* path survives');
-});
-
-test('chat: the widget settings share the provisioning home — schema-declared, one place', () => {
-  const { SHARED_SCHEMA } = require('@omega.js/config');
-  const paths = SHARED_SCHEMA.map((entry) => entry.path);
-
-  assert.ok(paths.includes('inbound.chat.providers.chatsy.agentId'));
-  assert.ok(paths.includes('inbound.chat.providers.chatsy.settings'));
-});
-
-test('chat: defaults carry no agentId, Chatsy\'s top tier, and no company sponsorship URL', () => {
-  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
-  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.updateAgentInfo, true);
-  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.agentId, null);
-  assert.deepEqual(DEFAULTS.inbound.chat.providers.chatsy.plan, { id: 'max', name: 'Max' });
-  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.sponsorshipsUrl, null);
-});
-
-// ─── Baseline knowledge generation ───────────────────────────────────────────
-
-test('chat: baseline knowledge fills every placeholder — including {website} inside the generated pricing', () => {
-  const knowledge = getBaselineKnowledge(brandConfig());
-
-  // omega-manager replaced {website} BEFORE inserting pricing, so agents
-  // shipped with a literal "{website}/pricing" — the port replaces it last
-  assert.deepEqual(knowledge.match(/\{[a-zA-Z]+\}/g), null);
-  assert.ok(knowledge.includes(`Company Description: ${DESCRIPTION}`));
-  assert.ok(knowledge.includes(`${URL}/pricing`));
-  assert.ok(knowledge.includes('- Plus ($10/month or $100/year) (14-day free trial)'));
-});
-
-test('chat: pricing quotes the CATALOG\'s own words, formats free/unlimited, and skips archived ones', () => {
-  // A product names only VALUES (#647); the catalog says what each id is
-  // called, so the agent never quotes a raw config key at a customer.
-  const knowledge = getBaselineKnowledge(brandConfig({
-    features: {
-      requests: { name: 'API Requests', usage: {} },
-      seats: { name: 'Seats', usage: { pace: false } },
-      support: { name: 'Priority support' },
-    },
-    products: [
-      { id: 'free', name: 'Free', type: 'subscription' },
-      { id: 'pro', name: 'Pro', type: 'subscription', prices: { monthly: 5 }, features: { requests: -1, seats: 3, support: true, sso: false } },
-      { id: 'old', name: 'Old', type: 'subscription', prices: { monthly: 1 }, archived: true },
-    ],
-  }));
-
-  assert.ok(knowledge.includes('- Free (free)'));
-  assert.ok(
-    knowledge.includes('- Pro ($5/month) - unlimited API Requests, 3 Seats, Priority support'),
-    knowledge,
-  );
-  assert.ok(!knowledge.includes('sso'), 'a value of false is not part of the tier and is never mentioned');
-  assert.ok(!knowledge.includes('- Old'));
-});
-
-test('chat: the sponsorships URL is config — default {website}/contact, not the company page', () => {
-  const defaulted = getBaselineKnowledge(brandConfig());
-  assert.ok(defaulted.includes(`Direct users to submit requests at ${URL}/contact`));
-  assert.ok(!defaulted.includes('itwcreativeworks.com'));
-
-  const overridden = getBaselineKnowledge(brandConfig({ chatsy: { sponsorshipsUrl: 'https://parent.test/sponsorship' } }));
-  assert.ok(overridden.includes('Direct users to submit requests at https://parent.test/sponsorship'));
-});
-
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('chat: chatsy.enabled = false skips the service', async () => {
-  const result = await runService(brandConfig({ chatsy: { enabled: false } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.enabled/);
-});
-
-test('chat: scalar chatsy: false skips the service', async () => {
-  const result = await runService(brandConfig({ chatsy: false }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.enabled/);
-});
-
-test('chat: a shared agent managed by another brand skips the service', async () => {
-  const result = await runService(brandConfig({ chatsy: { updateAgentInfo: false } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /updateAgentInfo/);
-});
-
-test('chat: skips without a web target (the widget lives on the website)', async () => {
-  const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no web target/);
-});
-
-// The gate is by TYPE (#886): a brand may name its web target anything
-test('chat: a web target named `site` runs the service, key spelling is not the gate', async () => {
-  const config = brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } });
-  const result = await runService(config, { db: fakeDb(convergedResponses(config)) });
-
-  assert.notEqual(result.status, 'skipped');
-});
-
-test('chat: skips without chatsy.agentId', async () => {
-  const result = await runService(brandConfig({ chatsy: { agentId: null } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.agentId/);
-});
-
-test('chat: skips without CHATSY_SERVICE_ACCOUNT in .env', async () => {
-  const result = await runService(brandConfig()); // no injected db → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /CHATSY_SERVICE_ACCOUNT/);
-});
-
-// ─── Converged no-op ─────────────────────────────────────────────────────────
-
-test('chat: fully converged brand is a zero-mutation no-op across both operations', async () => {
-  const config = brandConfig();
-  const db = fakeDb(convergedResponses(config));
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.deepEqual(db.reads(), [`agents/${AGENT_ID}`, `agents/${AGENT_ID}`, `users/${OWNER_UID}`]);
-  assert.equal(result.state.agentId, AGENT_ID);
-  assert.equal(result.state.accountId, OWNER_UID);
-  assert.equal(result.output.chat.synced, true);
-  assert.equal(result.output.user.synced, true);
-});
-
-test('chat: Chatsy-owned agent fields (owner, id, metadata) do not count as drift', async () => {
-  const config = brandConfig();
-  const agent = { ...desiredAgentDoc(config), id: AGENT_ID, metadata: { created: '2024-01-01' } };
-  const db = fakeDb(convergedResponses(config, { agent }));
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
-
-// ─── chat ────────────────────────────────────────────────────────────────────
-
-test('chat: a drifted agent is patched with exactly the managed leaf fields', async () => {
-  const config = brandConfig();
-  const agent = { ...desiredAgentDoc(config), name: 'Old Name' };
-  const db = fakeDb({ ...convergedResponses(config, { agent }), patchDoc: {} });
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  const [path, data, fieldPaths] = db.mutations()[0].args;
-  assert.equal(path, `agents/${AGENT_ID}`);
-  assert.equal(data.name, `${BRAND_NAME} Support`);
-  assert.equal(data.settings.agent.image, BRANDMARK);
-  assert.deepEqual(fieldPaths, [
-    'name',
-    'settings.welcomeMessage',
-    'settings.agent.language',
-    'settings.agent.image',
-    'settings.autoTranslate',
-    'settings.brand.name',
-    'settings.brand.about',
-    'settings.brand.website',
-    'settings.brand.knowledge',
-  ]);
-  assert.equal(result.output.chat.updated, true);
-});
-
-test('chat: without a brandmark the agent image is not managed at all', async () => {
-  const config = brandConfig({ images: {} });
-  // Agent carries an existing image the brand can't express — not drift
-  const agent = desiredAgentDoc(config);
-  agent.settings.agent.image = 'https://chatsy.ai/some-existing-avatar.png';
-  const db = fakeDb(convergedResponses(config, { agent }));
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
-
-test('chat: config/chatsy.md is appended to the baseline with {website} replaced', async () => {
-  const brandRoot = mkdtempSync(join(tmpdir(), 'omega-chatsy-'));
-  mkdirSync(join(brandRoot, 'config'), { recursive: true });
-  writeFileSync(join(brandRoot, 'config', 'chatsy.md'), 'Extra facts live at {website}/docs\n');
-
-  const config = brandConfig();
-  const expected = desiredAgentDoc(config, { brandKnowledge: `Extra facts live at ${URL}/docs` });
-  const agent = desiredAgentDoc(config); // baseline-only knowledge → drift
-  const db = fakeDb({ ...convergedResponses(config, { agent }), patchDoc: {} });
-
-  const result = await runService(config, { db, brandRoot });
-
-  assert.equal(result.status, 'success');
-  const [, data] = db.mutations()[0].args;
-  assert.equal(data.settings.brand.knowledge, expected.settings.brand.knowledge);
-  assert.ok(data.settings.brand.knowledge.endsWith(`Extra facts live at ${URL}/docs`));
-});
-
-test('chat: an agentId pointing at no document errors instead of creating an orphan', async () => {
-  const db = fakeDb({ getDoc: null });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'error');
-  assert.deepEqual(db.mutations(), []);
-  // stopOnError: the user operation never runs after the chat error
-  assert.deepEqual(db.reads(), [`agents/${AGENT_ID}`]);
-});
-
-// ─── user ────────────────────────────────────────────────────────────────────
-
-test('chat: a user on a lower plan is moved to the configured plan', async () => {
-  const config = brandConfig();
-  const db = fakeDb({
-    ...convergedResponses(config, { user: { subscription: subscription('pro', 'Pro') } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[
-    `users/${OWNER_UID}`,
-    { subscription: subscription() },
-    [
-      'subscription.product.id',
-      'subscription.product.name',
-      'subscription.status',
-      'subscription.payment.provider',
-      'subscription.payment.frequency',
-      'subscription.payment.price',
-      'subscription.payment.resourceId',
-      'subscription.payment.orderId',
-    ],
-  ]]);
-  assert.equal(result.output.user.updated, true);
-  assert.equal(result.state.accountId, OWNER_UID);
-});
-
-test('chat: chatsy.plan overrides the default tier', async () => {
-  const config = brandConfig({ chatsy: { plan: { id: 'pro', name: 'Pro' } } });
-  const db = fakeDb({
-    ...convergedResponses(config, { user: { subscription: subscription() } }),
-    patchDoc: {},
-  });
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations()[0].args[1].subscription.product, { id: 'pro', name: 'Pro' });
-  assert.equal(result.output.user.plan, 'pro');
-});
-
-test('chat: an agent without an owner field errors the user operation', async () => {
-  const config = brandConfig();
-  const agent = desiredAgentDoc(config);
-  delete agent.owner;
-  const db = fakeDb(convergedResponses(config, { agent }));
-
-  const result = await runService(config, { db });
-
-  assert.equal(result.status, 'error');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.chat.synced, true); // the chat op itself passed
-});
-
-// ─── Dry run ─────────────────────────────────────────────────────────────────
-
-test('chat: dry run on a fully drifted brand performs zero mutations', async () => {
-  const config = brandConfig();
-  const db = fakeDb({
-    getDoc: (path) => (path === `agents/${AGENT_ID}`
-      ? { name: 'Old Name', owner: OWNER_UID, settings: {} }
-      : null),
-  });
-
-  const result = await runService(config, { db, options: { dryRun: true } });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.chat.planned, 'update');
-  assert.equal(result.output.user.planned, 'max');
-  // no durable state lands in a dry run
-  assert.equal(result.state, null);
-});
-
 // ─── Interactive setup flow (config-landing) ─────────────────────────────────
 
 const DOWN_KEY = '\x1B[B';
@@ -447,90 +134,477 @@ const WRITEBACK_CONFIG = `{
 }
 `;
 
-test('setup: interactive run lands the pasted agent id in omega.json5 and proceeds', async () => {
-  const config = brandConfig({ chatsy: { agentId: null } });
-  const db = fakeDb(convergedResponses(config));
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const opened = [];
-  setBrowserOpener(async (url) => { opened.push(url); return true; });
-  const tty = openTtyPrompt();
+module.exports = defineCases({
+  type: 'group',
+  description: 'chat',
+  tests: [
+    // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-  try {
-    const run = runService(config, { db, brandRoot });
-    await tty.answer('Set up now?', '\r'); // Yes
-    await tty.answer('Chatsy agent ID:', `${AGENT_ID}\r`);
-    const result = await run;
+    {
+      name: 'chat: registered after forms with the chat + user operations',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('forms') + 1]).toBe('chat');
+        ctx.expect(OPERATIONS.chat.map((o) => o.name)).toEqual(['chat', 'user']);
+      },
+    },
 
-    assert.equal(result.state.agentId, AGENT_ID); // the landed id drove the run
-    assert.deepEqual(opened, ['https://chatsy.ai']);
-    const written = readConfigSource(brandRoot);
-    assert.ok(written.includes(`agentId: "${AGENT_ID}"`));
-    assert.ok(written.includes('// agentId lands here')); // comment survived
-  } finally {
-    tty.close();
-    setBrowserOpener(null);
-  }
-});
+    // #23 D4 — ONE chatsy home. The dotted path pinned here is the SAME string
+    // @omega.js/client reads (pinned on that side in packages/web's
+    // test/config-rekey.test.js): rename one without the other and both break.
+    {
+      name: 'chat: the agent id lands at inbound.chat.providers.chatsy.agentId — the path the client reads',
+      run: (ctx) => {
+        const source = fs.readFileSync(require.resolve('../src/services/chat/index.js'), 'utf8');
 
-test('setup: interactive Disable writes chatsy: false and skips the service', async () => {
-  const config = brandConfig({ chatsy: { agentId: null } });
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const tty = openTtyPrompt();
+        ctx.expect(source.includes("landValue(context, 'inbound.chat.providers.chatsy.agentId'"), 'the mint writeback lands the ONE path').toBeTruthy();
+        ctx.expect(source.includes("path: 'inbound.chat.providers.chatsy.agentId'"), 'the interactive flow lands the ONE path').toBeTruthy();
+        ctx.expect(source.includes("disablePath: 'inbound.chat.providers.chatsy'"), 'Disable writes false at the section, not at a stale top-level key').toBeTruthy();
+        ctx.expect(!/'chatsy\.agentId'/.test(source), 'no bare chatsy.* path survives').toBeTruthy();
+      },
+    },
 
-  try {
-    const run = runService(config, { db: fakeDb({}), brandRoot });
-    await tty.answer('Set up now?', `${DOWN_KEY}${DOWN_KEY}\r`); // Disable (stop prompting)
-    const result = await run;
+    {
+      name: 'chat: the widget settings share the provisioning home — schema-declared, one place',
+      run: (ctx) => {
+        const { SHARED_SCHEMA } = require('@omega.js/config');
+        const paths = SHARED_SCHEMA.map((entry) => entry.path);
 
-    assert.equal(result.status, 'skipped');
-    assert.ok(readConfigSource(brandRoot).includes('inbound: { chat: { providers: { chatsy: false } } }, // agentId lands here'));
-  } finally {
-    tty.close();
-  }
-});
+        ctx.expect(paths.includes('inbound.chat.providers.chatsy.agentId')).toBeTruthy();
+        ctx.expect(paths.includes('inbound.chat.providers.chatsy.settings')).toBeTruthy();
+      },
+    },
 
-// ─── 2b create-on-missing (operator SA mints the brand's own agent) ──────────
+    {
+      name: 'chat: defaults carry no agentId, Chatsy\'s top tier, and no company sponsorship URL',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.enabled).toBe(true);
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.updateAgentInfo).toBe(true);
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.agentId).toBe(null);
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.plan).toEqual({ id: 'max', name: 'Max' });
+        ctx.expect(DEFAULTS.inbound.chat.providers.chatsy.sponsorshipsUrl).toBe(null);
+      },
+    },
 
-test('chat 2b: missing agentId + SA + template donor mints the brand-owned agent', async (t) => {
-  process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST = 'fixture-password-123';
-  t.after(() => delete process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST);
+    // ─── Baseline knowledge generation ───────────────────────────────────────────
 
-  const docs = { 'agents/tmplAgent1': { name: 'Donor Agent', owner: 'uid_donor', settings: { welcomeMessage: 'hi' } } };
-  const store = {
-    getDoc: async (p) => structuredClone(docs[p] ?? null),
-    setDoc: async (p, d) => { docs[p] = structuredClone(d); return {}; },
-    patchDoc: async () => ({}),
-  };
-  const authAdmin = {
-    getUserByEmail: async () => null,
-    createUser: async ({ email }) => ({ uid: 'uid_minted2', email }),
-  };
-  const config = brandConfig({ chatsy: { agentId: null, templateAgentId: 'tmplAgent1' } });
-  config.brand.contact = { email: 'support@fixture-brand.test' };
-  const brandRoot = makeBrandRoot(`{
+    {
+      name: 'chat: baseline knowledge fills every placeholder — including {website} inside the generated pricing',
+      run: (ctx) => {
+        const knowledge = getBaselineKnowledge(brandConfig());
+
+        // omega-manager replaced {website} BEFORE inserting pricing, so agents
+        // shipped with a literal "{website}/pricing" — the port replaces it last
+        ctx.expect(knowledge.match(/\{[a-zA-Z]+\}/g)).toEqual(null);
+        ctx.expect(knowledge.includes(`Company Description: ${DESCRIPTION}`)).toBeTruthy();
+        ctx.expect(knowledge.includes(`${URL}/pricing`)).toBeTruthy();
+        ctx.expect(knowledge.includes('- Plus ($10/month or $100/year) (14-day free trial)')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'chat: pricing quotes the CATALOG\'s own words, formats free/unlimited, and skips archived ones',
+      run: (ctx) => {
+        // A product names only VALUES (#647); the catalog says what each id is
+        // called, so the agent never quotes a raw config key at a customer.
+        const knowledge = getBaselineKnowledge(brandConfig({
+          features: {
+            requests: { name: 'API Requests', usage: {} },
+            seats: { name: 'Seats', usage: { pace: false } },
+            support: { name: 'Priority support' },
+          },
+          products: [
+            { id: 'free', name: 'Free', type: 'subscription' },
+            { id: 'pro', name: 'Pro', type: 'subscription', prices: { monthly: 5 }, features: { requests: -1, seats: 3, support: true, sso: false } },
+            { id: 'old', name: 'Old', type: 'subscription', prices: { monthly: 1 }, archived: true },
+          ],
+        }));
+
+        ctx.expect(knowledge.includes('- Free (free)')).toBeTruthy();
+        ctx.expect(knowledge.includes('- Pro ($5/month) - unlimited API Requests, 3 Seats, Priority support'), knowledge).toBeTruthy();
+        ctx.expect(!knowledge.includes('sso'), 'a value of false is not part of the tier and is never mentioned').toBeTruthy();
+        ctx.expect(!knowledge.includes('- Old')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'chat: the sponsorships URL is config — default {website}/contact, not the company page',
+      run: (ctx) => {
+        const defaulted = getBaselineKnowledge(brandConfig());
+        ctx.expect(defaulted.includes(`Direct users to submit requests at ${URL}/contact`)).toBeTruthy();
+        ctx.expect(!defaulted.includes('itwcreativeworks.com')).toBeTruthy();
+
+        const overridden = getBaselineKnowledge(brandConfig({ chatsy: { sponsorshipsUrl: 'https://parent.test/sponsorship' } }));
+        ctx.expect(overridden.includes('Direct users to submit requests at https://parent.test/sponsorship')).toBeTruthy();
+      },
+    },
+
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
+
+    {
+      name: 'chat: chatsy.enabled = false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ chatsy: { enabled: false } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/inbound\.chat\.providers\.chatsy\.enabled/);
+      },
+    },
+
+    {
+      name: 'chat: scalar chatsy: false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ chatsy: false }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/inbound\.chat\.providers\.chatsy\.enabled/);
+      },
+    },
+
+    {
+      name: 'chat: a shared agent managed by another brand skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ chatsy: { updateAgentInfo: false } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/updateAgentInfo/);
+      },
+    },
+
+    {
+      name: 'chat: skips without a web target (the widget lives on the website)',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/no web target/);
+      },
+    },
+
+    // The gate is by TYPE (#886): a brand may name its web target anything
+    {
+      name: 'chat: a web target named `site` runs the service, key spelling is not the gate',
+      run: async (ctx) => {
+        const config = brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } });
+        const result = await runService(config, { db: fakeDb(convergedResponses(config)) });
+
+        ctx.expect(result.status).not.toBe('skipped');
+      },
+    },
+
+    {
+      name: 'chat: skips without chatsy.agentId',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ chatsy: { agentId: null } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/inbound\.chat\.providers\.chatsy\.agentId/);
+      },
+    },
+
+    {
+      name: 'chat: skips without CHATSY_SERVICE_ACCOUNT in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected db → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/CHATSY_SERVICE_ACCOUNT/);
+      },
+    },
+
+    // ─── Converged no-op ─────────────────────────────────────────────────────────
+
+    {
+      name: 'chat: fully converged brand is a zero-mutation no-op across both operations',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const db = fakeDb(convergedResponses(config));
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(db.reads()).toEqual([`agents/${AGENT_ID}`, `agents/${AGENT_ID}`, `users/${OWNER_UID}`]);
+        ctx.expect(result.state.agentId).toBe(AGENT_ID);
+        ctx.expect(result.state.accountId).toBe(OWNER_UID);
+        ctx.expect(result.output.chat.synced).toBe(true);
+        ctx.expect(result.output.user.synced).toBe(true);
+      },
+    },
+
+    {
+      name: 'chat: Chatsy-owned agent fields (owner, id, metadata) do not count as drift',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const agent = { ...desiredAgentDoc(config), id: AGENT_ID, metadata: { created: '2024-01-01' } };
+        const db = fakeDb(convergedResponses(config, { agent }));
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
+
+    // ─── chat ────────────────────────────────────────────────────────────────────
+
+    {
+      name: 'chat: a drifted agent is patched with exactly the managed leaf fields',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const agent = { ...desiredAgentDoc(config), name: 'Old Name' };
+        const db = fakeDb({ ...convergedResponses(config, { agent }), patchDoc: {} });
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        const [path, data, fieldPaths] = db.mutations()[0].args;
+        ctx.expect(path).toBe(`agents/${AGENT_ID}`);
+        ctx.expect(data.name).toBe(`${BRAND_NAME} Support`);
+        ctx.expect(data.settings.agent.image).toBe(BRANDMARK);
+        ctx.expect(fieldPaths).toEqual([
+          'name',
+          'settings.welcomeMessage',
+          'settings.agent.language',
+          'settings.agent.image',
+          'settings.autoTranslate',
+          'settings.brand.name',
+          'settings.brand.about',
+          'settings.brand.website',
+          'settings.brand.knowledge',
+        ]);
+        ctx.expect(result.output.chat.updated).toBe(true);
+      },
+    },
+
+    {
+      name: 'chat: without a brandmark the agent image is not managed at all',
+      run: async (ctx) => {
+        const config = brandConfig({ images: {} });
+        // Agent carries an existing image the brand can't express — not drift
+        const agent = desiredAgentDoc(config);
+        agent.settings.agent.image = 'https://chatsy.ai/some-existing-avatar.png';
+        const db = fakeDb(convergedResponses(config, { agent }));
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'chat: config/chatsy.md is appended to the baseline with {website} replaced',
+      run: async (ctx) => {
+        const brandRoot = mkdtempSync(join(tmpdir(), 'omega-chatsy-'));
+        mkdirSync(join(brandRoot, 'config'), { recursive: true });
+        writeFileSync(join(brandRoot, 'config', 'chatsy.md'), 'Extra facts live at {website}/docs\n');
+
+        const config = brandConfig();
+        const expected = desiredAgentDoc(config, { brandKnowledge: `Extra facts live at ${URL}/docs` });
+        const agent = desiredAgentDoc(config); // baseline-only knowledge → drift
+        const db = fakeDb({ ...convergedResponses(config, { agent }), patchDoc: {} });
+
+        const result = await runService(config, { db, brandRoot });
+
+        ctx.expect(result.status).toBe('success');
+        const [, data] = db.mutations()[0].args;
+        ctx.expect(data.settings.brand.knowledge).toBe(expected.settings.brand.knowledge);
+        ctx.expect(data.settings.brand.knowledge.endsWith(`Extra facts live at ${URL}/docs`)).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'chat: an agentId pointing at no document errors instead of creating an orphan',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null });
+
+        const result = await runService(brandConfig(), { db });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(db.mutations()).toEqual([]);
+        // stopOnError: the user operation never runs after the chat error
+        ctx.expect(db.reads()).toEqual([`agents/${AGENT_ID}`]);
+      },
+    },
+
+    // ─── user ────────────────────────────────────────────────────────────────────
+
+    {
+      name: 'chat: a user on a lower plan is moved to the configured plan',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const db = fakeDb({
+          ...convergedResponses(config, { user: { subscription: subscription('pro', 'Pro') } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[
+          `users/${OWNER_UID}`,
+          { subscription: subscription() },
+          [
+            'subscription.product.id',
+            'subscription.product.name',
+            'subscription.status',
+            'subscription.payment.provider',
+            'subscription.payment.frequency',
+            'subscription.payment.price',
+            'subscription.payment.resourceId',
+            'subscription.payment.orderId',
+          ],
+        ]]);
+        ctx.expect(result.output.user.updated).toBe(true);
+        ctx.expect(result.state.accountId).toBe(OWNER_UID);
+      },
+    },
+
+    {
+      name: 'chat: chatsy.plan overrides the default tier',
+      run: async (ctx) => {
+        const config = brandConfig({ chatsy: { plan: { id: 'pro', name: 'Pro' } } });
+        const db = fakeDb({
+          ...convergedResponses(config, { user: { subscription: subscription() } }),
+          patchDoc: {},
+        });
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()[0].args[1].subscription.product).toEqual({ id: 'pro', name: 'Pro' });
+        ctx.expect(result.output.user.plan).toBe('pro');
+      },
+    },
+
+    {
+      name: 'chat: an agent without an owner field errors the user operation',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const agent = desiredAgentDoc(config);
+        delete agent.owner;
+        const db = fakeDb(convergedResponses(config, { agent }));
+
+        const result = await runService(config, { db });
+
+        ctx.expect(result.status).toBe('error');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.chat.synced).toBe(true); // the chat op itself passed
+      },
+    },
+
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'chat: dry run on a fully drifted brand performs zero mutations',
+      run: async (ctx) => {
+        const config = brandConfig();
+        const db = fakeDb({
+          getDoc: (path) => (path === `agents/${AGENT_ID}`
+            ? { name: 'Old Name', owner: OWNER_UID, settings: {} }
+            : null),
+        });
+
+        const result = await runService(config, { db, options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.chat.planned).toBe('update');
+        ctx.expect(result.output.user.planned).toBe('max');
+        // no durable state lands in a dry run
+        ctx.expect(result.state).toBe(null);
+      },
+    },
+
+    {
+      name: 'setup: interactive run lands the pasted agent id in omega.json5 and proceeds',
+      run: async (ctx) => {
+        const config = brandConfig({ chatsy: { agentId: null } });
+        const db = fakeDb(convergedResponses(config));
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const opened = [];
+        setBrowserOpener(async (url) => { opened.push(url); return true; });
+        const tty = openTtyPrompt();
+
+        try {
+          const run = runService(config, { db, brandRoot });
+          await tty.answer('Set up now?', '\r'); // Yes
+          await tty.answer('Chatsy agent ID:', `${AGENT_ID}\r`);
+          const result = await run;
+
+          ctx.expect(result.state.agentId).toBe(AGENT_ID); // the landed id drove the run
+          ctx.expect(opened).toEqual(['https://chatsy.ai']);
+          const written = readConfigSource(brandRoot);
+          ctx.expect(written.includes(`agentId: "${AGENT_ID}"`)).toBeTruthy();
+          ctx.expect(written.includes('// agentId lands here')).toBeTruthy(); // comment survived
+        } finally {
+          tty.close();
+          setBrowserOpener(null);
+        }
+      },
+    },
+
+    {
+      name: 'setup: interactive Disable writes chatsy: false and skips the service',
+      run: async (ctx) => {
+        const config = brandConfig({ chatsy: { agentId: null } });
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const tty = openTtyPrompt();
+
+        try {
+          const run = runService(config, { db: fakeDb({}), brandRoot });
+          await tty.answer('Set up now?', `${DOWN_KEY}${DOWN_KEY}\r`); // Disable (stop prompting)
+          const result = await run;
+
+          ctx.expect(result.status).toBe('skipped');
+          ctx.expect(readConfigSource(brandRoot).includes('inbound: { chat: { providers: { chatsy: false } } }, // agentId lands here')).toBeTruthy();
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    // ─── 2b create-on-missing (operator SA mints the brand's own agent) ──────────
+
+    {
+      name: 'chat 2b: missing agentId + SA + template donor mints the brand-owned agent',
+      run: async (ctx) => {
+        process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST = 'fixture-password-123';
+        ctx.after(() => delete process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST);
+
+        const docs = { 'agents/tmplAgent1': { name: 'Donor Agent', owner: 'uid_donor', settings: { welcomeMessage: 'hi' } } };
+        const store = {
+          getDoc: async (p) => structuredClone(docs[p] ?? null),
+          setDoc: async (p, d) => { docs[p] = structuredClone(d); return {}; },
+          patchDoc: async () => ({}),
+        };
+        const authAdmin = {
+          getUserByEmail: async () => null,
+          createUser: async ({ email }) => ({ uid: 'uid_minted2', email }),
+        };
+        const config = brandConfig({ chatsy: { agentId: null, templateAgentId: 'tmplAgent1' } });
+        config.brand.contact = { email: 'support@fixture-brand.test' };
+        const brandRoot = makeBrandRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   inbound: { chat: { providers: { chatsy: { enabled: true, templateAgentId: "tmplAgent1" } } } },
 }
 `);
 
-  const result = await service.run({
-    brandId: 'fixture-brand',
-    brandRoot,
-    brandConfig: config,
-    brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
-    targets: [],
-    operations: OPERATIONS.chat,
-    options: {},
-    serviceData: {},
-    chatsyDb: store,
-    chatsyAuthAdmin: authAdmin,
-  });
+        const result = await service.run({
+          brandId: 'fixture-brand',
+          brandRoot,
+          brandConfig: config,
+          brand: { id: 'fixture-brand', config: {}, enabledTargets: ['web', 'backend'], targets: [] },
+          targets: [],
+          operations: OPERATIONS.chat,
+          options: {},
+          serviceData: {},
+          chatsyDb: store,
+          chatsyAuthAdmin: authAdmin,
+        });
 
-  assert.equal(result.status, 'success');
-  const agentId = result.state.agentId;
-  assert.match(agentId, /^[A-Za-z0-9]{14}$/, 'minted id matches the product convention');
-  assert.equal(docs[`agents/${agentId}`].owner, 'uid_minted2', 'minted agent owned by the new user');
-  assert.ok(docs['users/uid_minted2'], 'product user doc written');
-  assert.match(docs['users/uid_minted2'].api.privateKey, /^[A-Za-z0-9]{43}$/, 'real api key generated');
-  assert.ok(readConfigSource(brandRoot).includes(`agentId: "${agentId}"`), 'minted id written back');
+        ctx.expect(result.status).toBe('success');
+        const agentId = result.state.agentId;
+        ctx.expect(agentId, 'minted id matches the product convention').toMatch(/^[A-Za-z0-9]{14}$/);
+        ctx.expect(docs[`agents/${agentId}`].owner, 'minted agent owned by the new user').toBe('uid_minted2');
+        ctx.expect(docs['users/uid_minted2'], 'product user doc written').toBeTruthy();
+        ctx.expect(docs['users/uid_minted2'].api.privateKey, 'real api key generated').toMatch(/^[A-Za-z0-9]{43}$/);
+        ctx.expect(readConfigSource(brandRoot).includes(`agentId: "${agentId}"`), 'minted id written back').toBeTruthy();
+      },
+    },
+  ],
 });

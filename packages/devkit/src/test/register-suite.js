@@ -3,12 +3,12 @@
  * node:test `it`, and every `it` waits on its own case event, reported by id
  * from a SESSION: a host suite run through `runSuite`, or an app layer whose
  * driver runs the cases inside the app. The first case to begin starts its
- * session, so state, stop-on-failure and cleanup follow `runSuite` exactly.
+ * session, so setup, state, stop-on-failure and cleanup follow `runSuite` exactly.
  *
  * Shared by the runner and by `defineCases` when a file registers itself.
  */
 
-const { runSuite, errorOf } = require('./run-case.js');
+const { runSuite, errorOf, SkipError } = require('./run-case.js');
 
 function rebuildError(error) {
   const rebuilt = new Error(error.message);
@@ -58,24 +58,94 @@ function createCaseSession({ cases, start, endedMessage }) {
     return waiting.get(id).promise;
   }
 
-  return { wait, report };
+  // Resolves once the session has run to its end (setup, cases and cleanup), or at once when it never started.
+  function finished() {
+    return started || Promise.resolve();
+  }
+
+  return { wait, report, finished };
+}
+
+/**
+ * Which cases node:test actually calls: a name pattern (`--test-name-pattern`)
+ * filters an `it` out without calling it, so its case body must never run.
+ * node:test calls a suite's `it`s in order, so a case is out once a later one
+ * is called, or once the suite ends.
+ * @param {Array<{id: string}>} cases - The suite's cases, in order.
+ * @returns {{called: Function, wanted: Function, end: Function}} The gate.
+ */
+function createCallGate(cases) {
+  const order = new Map(cases.map((caseDef, position) => [caseDef.id, position]));
+  const pending = new Map();
+  let reached = -1;
+  let ended = false;
+  const called = new Set();
+
+  function settle() {
+    for (const [id, resolve] of pending) {
+      if (called.has(id)) resolve(true);
+      else if (ended || order.get(id) < reached) resolve(false);
+      else continue;
+      pending.delete(id);
+    }
+  }
+
+  return {
+    called(id) {
+      called.add(id);
+      reached = Math.max(reached, order.get(id));
+      settle();
+    },
+    wanted(id) {
+      return new Promise((resolve) => {
+        pending.set(id, resolve);
+        settle();
+      });
+    },
+    end() {
+      ended = true;
+      settle();
+    },
+  };
 }
 
 /**
  * A session that runs one suite on the host through `runSuite`.
  * @param {object} suite - A normalized suite, its `layer` set.
  * @param {{expect: Function, defaultTimeout?: number, extrasFrom?: Function}} options - `extrasFrom()` resolves the ctx extras when the session starts.
- * @returns {{wait: Function, report: Function}} The session.
+ * @returns {{wait: Function, report: Function, finished: Function, end: Function}} The session; `end()` settles the cases node:test never called and resolves once the suite has run.
  */
 function hostSession(suite, { expect, defaultTimeout, extrasFrom }) {
-  return createCaseSession({
+  const gate = createCallGate(suite.cases);
+  // A case node:test filtered out reports a skip nobody waits on, and its body never runs.
+  const cases = suite.cases.map((caseDef) => (typeof caseDef.run !== 'function' ? caseDef : {
+    ...caseDef,
+    run: async (ctx) => {
+      if (!(await gate.wanted(caseDef.id))) throw new SkipError('filtered out by name');
+      return caseDef.run(ctx);
+    },
+  }));
+
+  const session = createCaseSession({
     cases: suite.cases,
     endedMessage: `the ${suite.layer} layer ended before this case reported`,
     start: async (report) => {
       const extras = extrasFrom ? await extrasFrom() : undefined;
-      await runSuite(suite, { expect, extras, defaultTimeout, report });
+      await runSuite({ ...suite, cases }, { expect, extras, defaultTimeout, report });
     },
   });
+
+  return {
+    ...session,
+    wait(id) {
+      gate.called(id);
+      return session.wait(id);
+    },
+    end() {
+      gate.end();
+      return session.finished();
+    },
+  };
 }
 
 /**
@@ -85,8 +155,10 @@ function hostSession(suite, { expect, defaultTimeout, extrasFrom }) {
  * @returns {void}
  */
 function registerSuite(suite, { label, session, onEvent }) {
-  const { describe, it } = require('node:test');
+  const { describe, it, after } = require('node:test');
   describe(label, () => {
+    // A host suite ends inside its describe: its cleanup has run before the next suite begins.
+    if (session.end) after(() => session.end());
     for (const caseDef of suite.cases) {
       it(caseDef.name, async (t) => {
         const event = await session.wait(caseDef.id);

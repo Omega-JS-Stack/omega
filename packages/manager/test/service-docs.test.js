@@ -7,8 +7,7 @@
 // The docs live in the MONOREPO's docs/manager/ (the SSOT); prepare vendors
 // them into the package at publish time, so this reads the source tree.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -35,15 +34,27 @@ function serviceDocNames() {
     .sort();
 }
 
-test('every service folder has a docs/manager/<service>.md', () => {
-  const missing = serviceNames().filter((service) => !fs.existsSync(path.join(DOCS_DIR, `${service}.md`)));
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-docs',
+  tests: [
+    {
+      name: 'every service folder has a docs/manager/<service>.md',
+      run: (ctx) => {
+        const missing = serviceNames().filter((service) => !fs.existsSync(path.join(DOCS_DIR, `${service}.md`)));
 
-  assert.deepEqual(missing, [], `services with no doc: ${missing.join(', ')}`);
-});
+        ctx.expect(missing, `services with no doc: ${missing.join(', ')}`).toEqual([]);
+      },
+    },
 
-test('every service doc names a service that exists', () => {
-  const services = new Set(serviceNames());
-  const orphans = serviceDocNames().filter((doc) => !services.has(doc));
+    {
+      name: 'every service doc names a service that exists',
+      run: (ctx) => {
+        const services = new Set(serviceNames());
+        const orphans = serviceDocNames().filter((doc) => !services.has(doc));
 
-  assert.deepEqual(orphans, [], `docs naming no service: ${orphans.join(', ')}`);
+        ctx.expect(orphans, `docs naming no service: ${orphans.join(', ')}`).toEqual([]);
+      },
+    },
+  ],
 });

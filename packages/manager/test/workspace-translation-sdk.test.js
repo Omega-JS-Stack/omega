@@ -6,8 +6,7 @@
 // mutation, dry run plans without writing, translation off / provider chatgpt
 // is untouched, and the install runs through a recording fake (never npm).
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -65,170 +64,211 @@ const readPkg = (targetPath) => JSON.parse(fs.readFileSync(path.join(targetPath,
 
 const CLAUDE = { languages: ['es'] }; // enabled + provider default to on/claude
 
-// ─── Drift ───────────────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'workspace-translation-sdk',
+  tests: [
+    // ─── Drift ───────────────────────────────────────────────────────────────────
 
-test('translation-sdk: claude translation + no dep → package.json gains it and npm install runs', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: claude translation + no dep → package.json gains it and npm install runs',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
+        const run = fakeRun();
 
-  const result = await translationSdkOp({ brandRoot: root, targets, runCommand: run });
+        const result = await translationSdkOp({ brandRoot: root, targets, runCommand: run });
 
-  assert.deepEqual(result.output.translationSdk, { added: ['website'], installed: true });
+        ctx.expect(result.output.translationSdk).toEqual({ added: ['website'], installed: true });
 
-  const pkg = readPkg(targetPath);
-  assert.equal(pkg.dependencies[SDK], FALLBACK_RANGE, 'the fallback range (no web installed in this fixture)');
-  assert.equal(pkg.dependencies['@omega.js/web'], '^0.1.0', 'existing deps survive');
+        const pkg = readPkg(targetPath);
+        ctx.expect(pkg.dependencies[SDK], 'the fallback range (no web installed in this fixture)').toBe(FALLBACK_RANGE);
+        ctx.expect(pkg.dependencies['@omega.js/web'], 'existing deps survive').toBe('^0.1.0');
 
-  assert.deepEqual(run.calls, [['npm', 'install --no-audit --no-fund', root]]);
-});
+        ctx.expect(run.calls).toEqual([['npm', 'install --no-audit --no-fund', root]]);
+      },
+    },
 
-test('translation-sdk: the range comes from the INSTALLED web package\'s optional peer', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
-  const webRoot = path.join(root, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(webRoot, { recursive: true });
-  fs.writeFileSync(path.join(webRoot, 'package.json'), JSON.stringify({
-    name: '@omega.js/web',
-    peerDependencies: { [SDK]: '>=9.9' },
-  }));
+    {
+      name: 'translation-sdk: the range comes from the INSTALLED web package\'s optional peer',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
+        const webRoot = path.join(root, 'node_modules', '@omega.js', 'web');
+        fs.mkdirSync(webRoot, { recursive: true });
+        fs.writeFileSync(path.join(webRoot, 'package.json'), JSON.stringify({
+          name: '@omega.js/web',
+          peerDependencies: { [SDK]: '>=9.9' },
+        }));
 
-  await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
+        await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
 
-  assert.equal(readPkg(targetPath).dependencies[SDK], '>=9.9');
-});
+        ctx.expect(readPkg(targetPath).dependencies[SDK]).toBe('>=9.9');
+      },
+    },
 
-test('translation-sdk: the fallback range still matches web\'s declared optional peer', () => {
-  const webPkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'web', 'package.json'), 'utf8'));
+    {
+      name: 'translation-sdk: the fallback range still matches web\'s declared optional peer',
+      run: (ctx) => {
+        const webPkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'web', 'package.json'), 'utf8'));
 
-  assert.equal(
-    webPkg.peerDependencies[SDK],
-    FALLBACK_RANGE,
-    'packages/web bumped its optional peer: update FALLBACK_RANGE in ensure/translation-sdk.js',
-  );
-});
+        ctx.expect(webPkg.peerDependencies[SDK], 'packages/web bumped its optional peer: update FALLBACK_RANGE in ensure/translation-sdk.js').toBe(FALLBACK_RANGE);
+      },
+    },
 
-test('translation-sdk: explicit enabled + provider claude drifts the same way', async () => {
-  const { root, targetPath, targets } = stageBrand({
-    translation: { enabled: true, provider: 'claude', languages: ['fr'] },
-  });
+    {
+      name: 'translation-sdk: explicit enabled + provider claude drifts the same way',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({
+          translation: { enabled: true, provider: 'claude', languages: ['fr'] },
+        });
 
-  const result = await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
+        const result = await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
 
-  assert.deepEqual(result.output.translationSdk.added, ['website']);
-  assert.ok(readPkg(targetPath).dependencies[SDK]);
-});
+        ctx.expect(result.output.translationSdk.added).toEqual(['website']);
+        ctx.expect(readPkg(targetPath).dependencies[SDK]).toBeTruthy();
+      },
+    },
 
-test('translation-sdk: a failed install warns and the dep stays declared', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
+    {
+      name: 'translation-sdk: a failed install warns and the dep stays declared',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
 
-  const result = await translationSdkOp({
-    brandRoot: root,
-    targets,
-    runCommand: fakeRun({ success: false, error: 'exit code 1' }),
-  });
+        const result = await translationSdkOp({
+          brandRoot: root,
+          targets,
+          runCommand: fakeRun({ success: false, error: 'exit code 1' }),
+        });
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.translationSdk, { added: ['website'], installed: false, error: 'exit code 1' });
-  assert.ok(readPkg(targetPath).dependencies[SDK]);
-});
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.translationSdk).toEqual({ added: ['website'], installed: false, error: 'exit code 1' });
+        ctx.expect(readPkg(targetPath).dependencies[SDK]).toBeTruthy();
+      },
+    },
 
-// ─── Converged ───────────────────────────────────────────────────────────────
+    // ─── Converged ───────────────────────────────────────────────────────────────
 
-test('translation-sdk: dep already declared → null return, byte-identical package.json, no install', async () => {
-  const { root, targetPath, targets } = stageBrand({
-    translation: CLAUDE,
-    pkg: { name: 'fixture-website', dependencies: { '@omega.js/web': '^0.1.0', [SDK]: '^0.2.138' } },
-  });
-  const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: dep already declared → null return, byte-identical package.json, no install',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({
+          translation: CLAUDE,
+          pkg: { name: 'fixture-website', dependencies: { '@omega.js/web': '^0.1.0', [SDK]: '^0.2.138' } },
+        });
+        const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        const run = fakeRun();
 
-  assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before);
-  assert.deepEqual(run.calls, []);
-});
+        ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(before);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-test('translation-sdk: a devDependency declaration counts as converged', async () => {
-  const { root, targets } = stageBrand({
-    translation: CLAUDE,
-    pkg: { name: 'fixture-website', devDependencies: { [SDK]: '>=0.2' } },
-  });
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: a devDependency declaration counts as converged',
+      run: async (ctx) => {
+        const { root, targets } = stageBrand({
+          translation: CLAUDE,
+          pkg: { name: 'fixture-website', devDependencies: { [SDK]: '>=0.2' } },
+        });
+        const run = fakeRun();
 
-  assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-  assert.deepEqual(run.calls, []);
-});
+        ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-test('translation-sdk: a second pass over a healed target changes nothing', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
+    {
+      name: 'translation-sdk: a second pass over a healed target changes nothing',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
 
-  await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
-  const healed = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        await translationSdkOp({ brandRoot: root, targets, runCommand: fakeRun() });
+        const healed = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
 
-  const run = fakeRun();
-  assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), healed);
-  assert.deepEqual(run.calls, []);
-});
+        const run = fakeRun();
+        ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(healed);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-// ─── Dry run ─────────────────────────────────────────────────────────────────
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
 
-test('translation-sdk: dry run plans the add + install and writes nothing', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
-  const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: dry run plans the add + install and writes nothing',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE });
+        const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        const run = fakeRun();
 
-  const result = await translationSdkOp({ brandRoot: root, targets, options: { dryRun: true }, runCommand: run });
+        const result = await translationSdkOp({ brandRoot: root, targets, options: { dryRun: true }, runCommand: run });
 
-  assert.deepEqual(result.output, { translationSdk: 'planned' });
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before);
-  assert.deepEqual(run.calls, []);
-});
+        ctx.expect(result.output).toEqual({ translationSdk: 'planned' });
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(before);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-// ─── Gates ───────────────────────────────────────────────────────────────────
+    // ─── Gates ───────────────────────────────────────────────────────────────────
 
-test('translation-sdk: translation off (no languages, or enabled false) is untouched', async () => {
-  for (const translation of [undefined, { languages: [] }, { enabled: false, languages: ['es'] }]) {
-    const { root, targetPath, targets } = stageBrand({ translation });
-    const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-    const run = fakeRun();
+    {
+      name: 'translation-sdk: translation off (no languages, or enabled false) is untouched',
+      run: async (ctx) => {
+        for (const translation of [undefined, { languages: [] }, { enabled: false, languages: ['es'] }]) {
+          const { root, targetPath, targets } = stageBrand({ translation });
+          const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+          const run = fakeRun();
 
-    assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-    assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before);
-    assert.deepEqual(run.calls, []);
-  }
-});
+          ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+          ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(before);
+          ctx.expect(run.calls).toEqual([]);
+        }
+      },
+    },
 
-test('translation-sdk: the chatgpt provider needs no SDK, so the target is untouched', async () => {
-  const { root, targetPath, targets } = stageBrand({
-    translation: { languages: ['es'], providers: { chatgpt: {} } },
-  });
-  const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: the chatgpt provider needs no SDK, so the target is untouched',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({
+          translation: { languages: ['es'], providers: { chatgpt: {} } },
+        });
+        const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        const run = fakeRun();
 
-  assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before);
-  assert.deepEqual(run.calls, []);
-});
+        ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(before);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-test('translation-sdk: an unreadable translation section warns instead of halting the walk', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: { languages: ['zz'] } });
-  const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: an unreadable translation section warns instead of halting the walk',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: { languages: ['zz'] } });
+        const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        const run = fakeRun();
 
-  const result = await translationSdkOp({ brandRoot: root, targets, runCommand: run });
+        const result = await translationSdkOp({ brandRoot: root, targets, runCommand: run });
 
-  assert.equal(result.status, 'warned', 'the workspace runner is stopOnError, so this must not throw');
-  assert.equal(result.output.findings.length, 1);
-  assert.match(result.output.findings[0], /^website: Unknown translation language\(s\): zz/);
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before, 'the target is left alone');
-  assert.deepEqual(run.calls, []);
-});
+        ctx.expect(result.status, 'the workspace runner is stopOnError, so this must not throw').toBe('warned');
+        ctx.expect(result.output.findings.length).toBe(1);
+        ctx.expect(result.output.findings[0]).toMatch(/^website: Unknown translation language\(s\): zz/);
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), 'the target is left alone').toBe(before);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
 
-test('translation-sdk: non-web targets are untouched (their framework ships the SDK)', async () => {
-  const { root, targetPath, targets } = stageBrand({ translation: CLAUDE, target: 'extension' });
-  const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
-  const run = fakeRun();
+    {
+      name: 'translation-sdk: non-web targets are untouched (their framework ships the SDK)',
+      run: async (ctx) => {
+        const { root, targetPath, targets } = stageBrand({ translation: CLAUDE, target: 'extension' });
+        const before = fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8');
+        const run = fakeRun();
 
-  assert.equal(await translationSdkOp({ brandRoot: root, targets, runCommand: run }), null);
-  assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), before);
-  assert.deepEqual(run.calls, []);
+        ctx.expect(await translationSdkOp({ brandRoot: root, targets, runCommand: run })).toBe(null);
+        ctx.expect(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8')).toBe(before);
+        ctx.expect(run.calls).toEqual([]);
+      },
+    },
+  ],
 });

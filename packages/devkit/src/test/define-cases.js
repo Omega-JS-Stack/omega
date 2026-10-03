@@ -1,21 +1,10 @@
 // defineCases: the wrapper every OMEGA case file exports its spec through.
-// Under the runner (markRunnerActive(), an ENV var so spawned app children
-// inherit it) the spec passes through untouched. With no runner active, a file
-// loaded by `node --test <file>` or run as `node <file>` registers its own cases
-// with node:test, so they RUN: a host layer with no ctx extras runs as the runner
-// runs it, any other layer registers one failing case naming `npx omega test`.
+// A file the runner requires passes its spec through untouched. A file loaded
+// by `node --test <file>` or run as `node <file>` (the main module) registers its
+// own cases with node:test, so they RUN: a host layer with no ctx extras runs as
+// the runner runs it, any other layer registers one failing case naming `npx omega test`.
 
 const path = require('path');
-
-const RUNNER_ENV = 'OMEGA_CASE_RUNNER';
-
-/**
- * Mark the current process (and anything it spawns) as an OMEGA case run.
- * @returns {void}
- */
-function markRunnerActive() {
-  process.env[RUNNER_ENV] = 'true';
-}
 
 /**
  * Resolve the file that called defineCases.
@@ -55,13 +44,14 @@ function scopedPath(file) {
 }
 
 /**
- * Was the case file loaded to run its cases: by `node --test`, or as the main module?
+ * Was the case file loaded to run its cases: by `node --test`, or as the main
+ * module? A `node --test` child runs the file as its main module; a runner
+ * requires it, so it is never main there.
  * @param {string} file - Absolute path of the case file.
  * @returns {boolean} True when nothing else will run the cases.
  */
 function loadedToRun(file) {
-  return Boolean(process.env.NODE_TEST_CONTEXT)
-    || process.execArgv.includes('--test')
+  return process.execArgv.includes('--test')
     || Boolean(require.main && require.main.filename === file);
 }
 
@@ -124,13 +114,11 @@ function registerSelf(spec, file) {
 }
 
 /**
- * Return a case spec; with no runner active, a file loaded to run registers its own cases.
+ * Return a case spec; a file loaded to run registers its own cases.
  * @param {object|Array} spec - The case-runner spec (suite, group, standalone, or array form).
  * @returns {object|Array} The same spec, unchanged.
  */
 function defineCases(spec) {
-  if (process.env[RUNNER_ENV] === 'true') return spec;
-
   const file = callerFile();
   if (file && loadedToRun(file)) registerSelf(spec, file);
 
@@ -138,5 +126,3 @@ function defineCases(spec) {
 }
 
 module.exports = defineCases;
-module.exports.markRunnerActive = markRunnerActive;
-module.exports.RUNNER_ENV = RUNNER_ENV;

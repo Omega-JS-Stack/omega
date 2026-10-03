@@ -4,8 +4,7 @@
  * every invocation (cwd + argv) to a log, so routing, forwarding, and exit
  * aggregation are asserted from what actually got spawned.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -132,456 +131,564 @@ async function runTestCommand(cwd, targets, flags = {}) {
   }
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
-test('bare run fans out to every target: each spawned bare, in its own cwd', async () => {
-  const { brand } = stageBrand();
-  const code = await runTestCommand(brand, []);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  assert.deepEqual(new Set(calls.map((c) => c.name)), new Set(['web', 'backend']));
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['test'], 'bare per-target: only the test command, no ids');
-  }
-  const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
-  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'web'));
-  assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
-  assert.equal(code, undefined, 'all targets green → no error exit code');
-});
-
-test('per-framework id routes ONLY to the owning target, id forwarded verbatim', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['web:pages/']);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'web');
-  assert.deepEqual(calls[0].argv, ['test', 'web:pages/']);
-});
-
-test('universal framework: forwards to every target', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['framework:']);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['test', 'framework:']);
-  }
-});
-
-test('mixed ids: shared paths to every target, id-scoped only to its owner', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['backend:routes/x', 'checkout']);
-
-  const byName = Object.fromEntries(readCalls(brand).map((c) => [c.name, c]));
-  assert.deepEqual(byName.backend.argv, ['test', 'checkout', 'backend:routes/x']);
-  assert.deepEqual(byName.web.argv, ['test', 'checkout']);
-});
-
-test('id with no matching target: warns, runs nothing, exits clean (target-level filter parity)', async () => {
-  const { brand } = stageBrand();
-  const code = await runTestCommand(brand, ['desktop:']);
-
-  assert.deepEqual(readCalls(brand), []);
-  assert.equal(code, undefined);
-});
-
-test('only-invalid targets fall back to bare-everywhere (scope.js parity)', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['framwork:oops']);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['test']);
-  }
-});
-
-test('a failing target fails the run, but every target still runs (sequential, no bail)', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
-  const code = await runTestCommand(brand, []);
-
-  assert.equal(readCalls(brand).length, 2, 'web still ran after the backend failure');
-  assert.equal(code, 1);
-});
-
-test('#814: a PATH whose framework has no target in this brand fails the run', async () => {
-  // Zero runs executed and a path was named: nothing was tested, which is the
-  // same typo the target-level rule catches. A bare prefix (`desktop:`) names
-  // no file and keeps its warning + exit 0, one case above.
-  const { brand } = stageBrand();
-  const code = await runTestCommand(brand, ['desktop:renderer/typo']);
-
-  assert.deepEqual(readCalls(brand), [], 'no target could be asked');
-  assert.equal(code, 1);
-
-  const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
-  assert.match(log, /No target matches the requested scope/, 'the warning still says which scope missed');
-  assert.match(log, /\[@omega\.js\/manager:test\] No test file matches "desktop:renderer\/typo"\./);
-});
-
-test('#814: the fan-out signal rides every forwarded run', async () => {
-  // The signal is what lets a target tell "this brand root asked every target"
-  // from "a human asked me": a miss is a no-op there and a failure here.
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['checkout']);
-
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.equal(call.fanout, '1', call.name);
-  }
-  assert.equal(process.env.OMEGA_TEST_FANOUT, undefined, 'the signal does not outlive the run');
-});
-
-test('#814: a target that answers no-match is a no-op when another target matched', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
-  const code = await runTestCommand(brand, ['checkout']);
-
-  assert.equal(readCalls(brand).length, 2, 'both targets were still asked');
-  assert.equal(code, undefined, 'the backend carried the path, so the run is green');
-});
-
-test('#814: when EVERY target misses, the brand run fails and names the target', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
-  fs.writeFileSync(path.join(brand, 'NOMATCH-backend'), '');
-  const code = await runTestCommand(brand, ['checkout']);
-
-  assert.equal(code, 1, 'a path no target carries is a typo, not a quiet green');
-
-  const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
-  assert.match(log, /\[@omega\.js\/manager:test\] No test file matches "checkout"\./);
-});
-
-test('#814: a miss beside a real failure still fails the run', async () => {
-  const { brand } = stageBrand();
-  fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
-  fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
-  const code = await runTestCommand(brand, ['checkout']);
-
-  assert.equal(code, 1);
-});
-
-test('outside any brand: errors with exit 1', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-test-cmd-nobrand-'));
-  const code = await runTestCommand(scratch, []);
-  assert.equal(code, 1);
-});
-
-test('cli routes `test` through ALIASES to the command file', () => {
-  const Main = require('../src/cli.js');
-  assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'test'));
-  assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'test.js')));
-});
-
 // ─── A backend in custom-server mode (#584) ──────────────────────────────────
 
 // It is a framework target like any other: the fan-out runs its own `test`
 // script, which in this mode is the brand's command, the scope after `--`.
 const RECORDING_SCRIPT = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'backend-script',cwd:process.cwd(),argv:process.argv.slice(1)})+'\\n')\"";
 
-test('custom-server backend: a bare run takes its own `test` script, forwarding nothing', async () => {
-  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'test-command',
+  tests: [
+    // ─── Tests ───────────────────────────────────────────────────────────────────
 
-  await runTestCommand(brand, []);
+    {
+      name: 'bare run fans out to every target: each spawned bare, in its own cwd',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const code = await runTestCommand(brand, []);
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the web target its own');
-  const script = calls.find((c) => c.name === 'backend-script');
-  assert.equal(script.cwd, path.join(brand, 'targets', 'backend'));
-  assert.deepEqual(script.argv, [], 'a bare run forwards no scope ids and no flags');
-});
-
-test('custom-server backend: a brand-owned test script runs bare', async () => {
-  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
-
-  // A scope is the frameworks' vocabulary: a scoped run never addresses the brand's script
-  await runTestCommand(brand, ['backend:']);
-  assert.deepEqual(readCalls(brand), [], 'nothing ran: the scoped id means nothing to a package script');
-
-  // A bare run reaches it, and a mode flag never does
-  await runTestCommand(brand, [], { extended: true });
-  const script = readCalls(brand).find((c) => c.name === 'backend-script');
-  assert.deepEqual(script.argv, [], 'the brand\'s script hears no scope and no flags');
-});
-
-test('custom-server backend with no `test` script: skipped loudly on a bare run, never failed', async () => {
-  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: {} });
-
-  const code = await runTestCommand(brand, []);
-
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], 'only the web target ran');
-  assert.equal(code, undefined, 'an absent script is a brand that has not wired it, not a failure');
-});
-
-// ─── The --target picker (#775) ──────────────────────────────────────────────
-
-test('--target narrows a bare run to the named targets', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, [], { target: 'web' });
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
-});
-
-test('--target narrows a framework: run the same way it narrows a bare one', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['framework:'], { target: 'backend' });
-
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['backend']);
-  assert.deepEqual(calls[0].argv, ['test', 'framework:'], 'the scope still forwards verbatim');
-});
-
-test('--target composes with a full: run, keeping both sources on the picked target', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['full:auth'], { target: 'web,web' });
-
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['web'], 'a target named twice still runs once');
-  assert.deepEqual(calls[0].argv, ['test', 'full:auth']);
-});
-
-test('a framework scope whose owner --target excludes REFUSES, and nothing ran', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runTestCommand(brand, ['web:pages/'], { target: 'backend' }),
-    (error) => {
-      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-      assert.match(error.message, /refusing --target=backend beside the "web:pages\/" scope/);
-      assert.match(error.message, /targets\/web owns that framework/);
-      return true;
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        ctx.expect(new Set(calls.map((c) => c.name))).toEqual(new Set(['web', 'backend']));
+        for (const call of calls) {
+          ctx.expect(call.argv, 'bare per-target: only the test command, no ids').toEqual(['test']);
+        }
+        const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
+        ctx.expect(byName.web.cwd).toBe(path.join(brand, 'targets', 'web'));
+        ctx.expect(byName.backend.cwd).toBe(path.join(brand, 'targets', 'backend'));
+        ctx.expect(code, 'all targets green → no error exit code').toBe(undefined);
+      },
     },
-  );
 
-  assert.deepEqual(readCalls(brand), []);
-});
+    {
+      name: 'per-framework id routes ONLY to the owning target, id forwarded verbatim',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['web:pages/']);
 
-test('a framework scope whose owner --target includes runs normally', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['web:pages/'], { target: 'web' });
-
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
-});
-
-// The retired pickers (#780) — the same refusal every other brand-root verb
-// gives: never ignored, never aliased onto --target=
-test('--only and --except are REFUSED, naming --target=; nothing ran', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runTestCommand(brand, [], { only: 'web' }),
-    (error) => {
-      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-      assert.match(error.message, /--only is retired: pick targets with --target=/);
-      return true;
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(1);
+        ctx.expect(calls[0].name).toBe('web');
+        ctx.expect(calls[0].argv).toEqual(['test', 'web:pages/']);
+      },
     },
-  );
-  await assert.rejects(() => runTestCommand(brand, [], { except: 'backend' }), /--except is retired/);
 
-  assert.deepEqual(readCalls(brand), []);
-});
+    {
+      name: 'universal framework: forwards to every target',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['framework:']);
 
-test('an unknown --target token STOPS the run — never a matched subset, never test-everything', async () => {
-  const { brand } = stageBrand();
-
-  await assert.rejects(
-    () => runTestCommand(brand, [], { target: 'mobile' }),
-    (error) => {
-      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
-      assert.match(error.message, /Unknown --target token "mobile"/);
-      assert.match(error.message, /this brand's targets are backend, web/, 'the error names what the brand actually has');
-      return true;
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv).toEqual(['test', 'framework:']);
+        }
+      },
     },
-  );
 
-  // A typo beside a real target never tests the matched half — a green exit
-  // must never stand for a target that was silently dropped
-  await assert.rejects(() => runTestCommand(brand, [], { target: 'web,mobile' }), /Unknown --target token "mobile"/);
+    {
+      name: 'mixed ids: shared paths to every target, id-scoped only to its owner',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['backend:routes/x', 'checkout']);
 
-  assert.deepEqual(readCalls(brand), []);
-});
+        const byName = Object.fromEntries(readCalls(brand).map((c) => [c.name, c]));
+        ctx.expect(byName.backend.argv).toEqual(['test', 'checkout', 'backend:routes/x']);
+        ctx.expect(byName.web.argv).toEqual(['test', 'checkout']);
+      },
+    },
 
-// ─── Mode flags fan out (#775) ───────────────────────────────────────────────
+    {
+      name: 'id with no matching target: warns, runs nothing, exits clean (target-level filter parity)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        const code = await runTestCommand(brand, ['desktop:']);
 
-test('--extended reaches every target', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, [], { extended: true });
+        ctx.expect(readCalls(brand)).toEqual([]);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
 
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['test', '--extended']);
-  }
-});
+    {
+      name: 'only-invalid targets fall back to bare-everywhere (scope.js parity)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['framwork:oops']);
 
-test('--extended rides ahead of the forwarded scope ids', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, ['backend:payments'], { extended: true });
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv).toEqual(['test']);
+        }
+      },
+    },
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['backend']);
-  assert.deepEqual(calls[0].argv, ['test', '--extended', 'backend:payments']);
-});
+    {
+      name: 'a failing target fails the run, but every target still runs (sequential, no bail)',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
+        const code = await runTestCommand(brand, []);
 
-test('--lane reaches only the frameworks that DECLARE it; the rest are a clean skip', async () => {
-  const { brand } = stageBrand({ lanes: { '@omega.js/backend': ['stripe-live'] } });
-  const code = await runTestCommand(brand, [], { lane: 'stripe-live' });
+        ctx.expect(readCalls(brand).length, 'web still ran after the backend failure').toBe(2);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name), ['backend']);
-  assert.deepEqual(calls[0].argv, ['test', '--lane=stripe-live']);
-  assert.equal(code, undefined, 'a target with no such lane is not a failure');
-});
+    {
+      name: '#814: a PATH whose framework has no target in this brand fails the run',
+      run: async (ctx) => {
+        // Zero runs executed and a path was named: nothing was tested, which is the
+        // same typo the target-level rule catches. A bare prefix (`desktop:`) names
+        // no file and keeps its warning + exit 0, one case above.
+        const { brand } = stageBrand();
+        const code = await runTestCommand(brand, ['desktop:renderer/typo']);
 
-test('a --lane no framework declares runs nothing and still exits clean', async () => {
-  const { brand } = stageBrand({ lanes: { '@omega.js/backend': ['stripe-live'] } });
-  const code = await runTestCommand(brand, [], { lane: 'nonexistent' });
+        ctx.expect(readCalls(brand), 'no target could be asked').toEqual([]);
+        ctx.expect(code).toBe(1);
 
-  assert.deepEqual(readCalls(brand), []);
-  assert.equal(code, undefined);
-});
+        const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
+        ctx.expect(log, 'the warning still says which scope missed').toMatch(/No target matches the requested scope/);
+        ctx.expect(log).toMatch(/\[@omega\.js\/manager:test\] No test file matches "desktop:renderer\/typo"\./);
+      },
+    },
 
-test('a --lane run reaches a custom-server backend only when its framework declares the lane', async () => {
-  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
-  await runTestCommand(brand, [], { lane: 'stripe-live' });
+    {
+      name: '#814: the fan-out signal rides every forwarded run',
+      run: async (ctx) => {
+        // The signal is what lets a target tell "this brand root asked every target"
+        // from "a human asked me": a miss is a no-op there and a failure here.
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['checkout']);
 
-  assert.deepEqual(readCalls(brand), [], 'the backend framework declares no stripe-live lane here');
-});
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.fanout, call.name).toBe('1');
+        }
+        ctx.expect(process.env.OMEGA_TEST_FANOUT, 'the signal does not outlive the run').toBe(undefined);
+      },
+    },
 
-// ─── The brand's own e2e lane (#775) ─────────────────────────────────────────
+    {
+      name: '#814: a target that answers no-match is a no-op when another target matched',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
+        const code = await runTestCommand(brand, ['checkout']);
 
-test('a bare run walks <brandRoot>/test/e2e/run.js LAST, from the brand root', async () => {
-  const { brand } = stageBrand({ brandE2e: 'entry' });
-  const code = await runTestCommand(brand, []);
+        ctx.expect(readCalls(brand).length, 'both targets were still asked').toBe(2);
+        ctx.expect(code, 'the backend carried the path, so the run is green').toBe(undefined);
+      },
+    },
 
-  const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name).slice(-1), ['brand-e2e'], 'after every target');
-  assert.equal(calls.length, 3);
-  const lane = calls[2];
-  assert.equal(lane.cwd, brand);
-  assert.deepEqual(lane.argv, [], 'a runner script hears no scope ids and no flags');
-  assert.equal(code, undefined);
-});
+    {
+      name: '#814: when EVERY target misses, the brand run fails and names the target',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
+        fs.writeFileSync(path.join(brand, 'NOMATCH-backend'), '');
+        const code = await runTestCommand(brand, ['checkout']);
 
-test('a failing brand e2e lane fails the whole run', async () => {
-  const { brand } = stageBrand({ brandE2e: 'failing' });
-  const code = await runTestCommand(brand, []);
+        ctx.expect(code, 'a path no target carries is a typo, not a quiet green').toBe(1);
 
-  assert.equal(code, 1);
-});
+        const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
+        ctx.expect(log).toMatch(/\[@omega\.js\/manager:test\] No test file matches "checkout"\./);
+      },
+    },
 
-test('a scoped, picked or laned run never addresses the brand e2e lane', async () => {
-  const scoped = stageBrand({ brandE2e: 'entry' }).brand;
-  await runTestCommand(scoped, ['framework:']);
-  assert.equal(readCalls(scoped).some((c) => c.name === 'brand-e2e'), false);
+    {
+      name: '#814: a miss beside a real failure still fails the run',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        fs.writeFileSync(path.join(brand, 'NOMATCH-web'), '');
+        fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
+        const code = await runTestCommand(brand, ['checkout']);
 
-  const picked = stageBrand({ brandE2e: 'entry' }).brand;
-  await runTestCommand(picked, [], { target: 'web' });
-  assert.equal(readCalls(picked).some((c) => c.name === 'brand-e2e'), false);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-  const laned = stageBrand({ brandE2e: 'entry', lanes: { '@omega.js/backend': ['stripe-live'] } }).brand;
-  await runTestCommand(laned, [], { lane: 'stripe-live' });
-  assert.equal(readCalls(laned).some((c) => c.name === 'brand-e2e'), false);
-});
+    {
+      name: 'outside any brand: errors with exit 1',
+      run: async (ctx) => {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-test-cmd-nobrand-'));
+        const code = await runTestCommand(scratch, []);
+        ctx.expect(code).toBe(1);
+      },
+    },
 
-test('a test/e2e/ directory with no run.js is skipped loudly, never failed', async () => {
-  const { brand } = stageBrand({ brandE2e: 'dir-only' });
-  const code = await runTestCommand(brand, []);
+    {
+      name: 'cli routes `test` through ALIASES to the command file',
+      run: (ctx) => {
+        const Main = require('../src/cli.js');
+        ctx.expect(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'test')).toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(Main.config.commandsDir, 'test.js'))).toBeTruthy();
+      },
+    },
 
-  assert.deepEqual(readCalls(brand).map((c) => c.name).sort(), ['backend', 'web']);
-  assert.equal(code, undefined);
-});
+    {
+      name: 'custom-server backend: a bare run takes its own `test` script, forwarding nothing',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
 
-test('a brand with no test/e2e/ at all runs its targets and nothing else', async () => {
-  const { brand } = stageBrand();
-  await runTestCommand(brand, []);
+        await runTestCommand(brand, []);
 
-  assert.equal(readCalls(brand).length, 2);
-});
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name).sort(), 'the backend ran its script, the web target its own').toEqual(['backend-script', 'web']);
+        const script = calls.find((c) => c.name === 'backend-script');
+        ctx.expect(script.cwd).toBe(path.join(brand, 'targets', 'backend'));
+        ctx.expect(script.argv, 'a bare run forwards no scope ids and no flags').toEqual([]);
+      },
+    },
 
-// ─── The real CLI parse, not just the options object (#775) ──────────────────
+    {
+      name: 'custom-server backend: a brand-owned test script runs bare',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
 
-test('`omega test --extended full:` parses as a value-less flag and still carries the scope', async () => {
-  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  assert.ok(BOOLEAN_FLAGS.includes('extended'), '--extended takes no value — it must be declared boolean');
+        // A scope is the frameworks' vocabulary: a scoped run never addresses the brand's script
+        await runTestCommand(brand, ['backend:']);
+        ctx.expect(readCalls(brand), 'nothing ran: the scoped id means nothing to a package script').toEqual([]);
 
-  // The parse the bin really performs. Undeclared, the next token is read as
-  // the flag's VALUE: `extended: 'full:'` with the scope gone, which ran every
-  // target BARE while looking like it had been asked for both.
-  const argv = require('@omega.js/devkit/argv').parseArgv(['test', '--extended', 'full:'], {
-    booleans: BOOLEAN_FLAGS,
-  });
+        // A bare run reaches it, and a mode flag never does
+        await runTestCommand(brand, [], { extended: true });
+        const script = readCalls(brand).find((c) => c.name === 'backend-script');
+        ctx.expect(script.argv, 'the brand\'s script hears no scope and no flags').toEqual([]);
+      },
+    },
 
-  assert.equal(argv.extended, true);
-  assert.deepEqual(argv._, ['test', 'full:'], 'the scope stayed a positional');
+    {
+      name: 'custom-server backend with no `test` script: skipped loudly on a bare run, never failed',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: {} });
 
-  // …and that argv drives the fan-out for real
-  const { brand } = stageBrand();
-  const cwd0 = process.cwd();
-  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
-  process.chdir(brand);
-  try {
-    await testCommand(argv);
-  } finally {
-    restoreTee();
-    process.chdir(cwd0);
-    process.exitCode = undefined;
-  }
+        const code = await runTestCommand(brand, []);
 
-  const calls = readCalls(brand);
-  assert.equal(calls.length, 2);
-  for (const call of calls) {
-    assert.deepEqual(call.argv, ['test', '--extended', 'full:']);
-  }
-});
+        ctx.expect(readCalls(brand).map((c) => c.name), 'only the web target ran').toEqual(['web']);
+        ctx.expect(code, 'an absent script is a brand that has not wired it, not a failure').toBe(undefined);
+      },
+    },
 
-test('the value-taking flags stay value-taking through the same parse', () => {
-  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  const { parseArgv } = require('@omega.js/devkit/argv');
-  const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+    // ─── The --target picker (#775) ──────────────────────────────────────────────
 
-  const argv = parse(['test', '--target=web,backend', '--lane=stripe-live']);
-  assert.equal(argv.target, 'web,backend');
-  assert.equal(argv.lane, 'stripe-live');
-  assert.equal(BOOLEAN_FLAGS.includes('target'), false, 'a picker with a value must never be boolean');
-  assert.equal(BOOLEAN_FLAGS.includes('lane'), false);
+    {
+      name: '--target narrows a bare run to the named targets',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, [], { target: 'web' });
+        ctx.expect(readCalls(brand).map((c) => c.name)).toEqual(['web']);
+      },
+    },
 
-  // And in the SPACE-separated spelling the docs teach for the manage walk
-  // (`omega manage --service publishing`), which nothing declares.
-  const spaced = parse(['manage', '--service', 'publishing']);
-  assert.equal(spaced.service, 'publishing');
-  assert.deepEqual(spaced._, ['manage'], 'the value is the flag\'s, never a positional');
+    {
+      name: '--target narrows a framework: run the same way it narrows a bare one',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['framework:'], { target: 'backend' });
 
-  // A flag the manager never heard of rides through to the target with its
-  // value intact, which is what the fan-out forwards (#920).
-  const forwarded = parse(['test', '--filter', 'auth', '--dry-run']);
-  assert.equal(forwarded.filter, 'auth');
-  assert.equal(forwarded.dryRun, true);
-  assert.deepEqual(forwarded._, ['test']);
-});
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['backend']);
+        ctx.expect(calls[0].argv, 'the scope still forwards verbatim').toEqual(['test', 'framework:']);
+      },
+    },
 
-test('every value-LESS manage flag is declared, and the value-taking one is not', () => {
-  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  const { parseArgv } = require('@omega.js/devkit/argv');
-  const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+    {
+      name: '--target composes with a full: run, keeping both sources on the picked target',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['full:auth'], { target: 'web,web' });
 
-  for (const flag of ['verbose', 'strict', 'dry-run', 'major', 'force-fresh']) {
-    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
-  }
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name), 'a target named twice still runs once').toEqual(['web']);
+        ctx.expect(calls[0].argv).toEqual(['test', 'full:auth']);
+      },
+    },
 
-  // The pin: a declared boolean never eats the token after it.
-  const argv = parse(['manage', '--strict', 'payment']);
-  assert.equal(argv.strict, true);
-  assert.deepEqual(argv._, ['manage', 'payment']);
+    {
+      name: 'a framework scope whose owner --target excludes REFUSES, and nothing ran',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
 
-  // --reset-assets is value-TAKING (bare = both kinds, `logos`/`templates`
-  // names one), so declaring it boolean would drop the kind.
-  assert.equal(BOOLEAN_FLAGS.includes('reset-assets'), false);
-  assert.equal(parse(['manage', '--reset-assets', 'logos']).resetAssets, 'logos');
-  assert.equal(parse(['manage', '--reset-assets']).resetAssets, true, 'and the bare form still means both');
+        await ctx.expect((() => runTestCommand(brand, ['web:pages/'], { target: 'backend' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+            ctx.expect(error.message).toMatch(/refusing --target=backend beside the "web:pages\/" scope/);
+            ctx.expect(error.message).toMatch(/targets\/web owns that framework/);
+            return true;
+          });
+
+        ctx.expect(readCalls(brand)).toEqual([]);
+      },
+    },
+
+    {
+      name: 'a framework scope whose owner --target includes runs normally',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['web:pages/'], { target: 'web' });
+
+        ctx.expect(readCalls(brand).map((c) => c.name)).toEqual(['web']);
+      },
+    },
+
+    // The retired pickers (#780) — the same refusal every other brand-root verb
+    // gives: never ignored, never aliased onto --target=
+    {
+      name: '--only and --except are REFUSED, naming --target=; nothing ran',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+
+        await ctx.expect((() => runTestCommand(brand, [], { only: 'web' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+            ctx.expect(error.message).toMatch(/--only is retired: pick targets with --target=/);
+            return true;
+          });
+        await ctx.expect((() => runTestCommand(brand, [], { except: 'backend' }))()).rejects.toThrow(/--except is retired/);
+
+        ctx.expect(readCalls(brand)).toEqual([]);
+      },
+    },
+
+    {
+      name: 'an unknown --target token STOPS the run — never a matched subset, never test-everything',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+
+        await ctx.expect((() => runTestCommand(brand, [], { target: 'mobile' }))()).rejects.toThrow((error) => {
+            ctx.expect(error.refusal, 'a refusal prints its message alone (no stack)').toBe(true);
+            ctx.expect(error.message).toMatch(/Unknown --target token "mobile"/);
+            ctx.expect(error.message, 'the error names what the brand actually has').toMatch(/this brand's targets are backend, web/);
+            return true;
+          });
+
+        // A typo beside a real target never tests the matched half — a green exit
+        // must never stand for a target that was silently dropped
+        await ctx.expect((() => runTestCommand(brand, [], { target: 'web,mobile' }))()).rejects.toThrow(/Unknown --target token "mobile"/);
+
+        ctx.expect(readCalls(brand)).toEqual([]);
+      },
+    },
+
+    // ─── Mode flags fan out (#775) ───────────────────────────────────────────────
+
+    {
+      name: '--extended reaches every target',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, [], { extended: true });
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv).toEqual(['test', '--extended']);
+        }
+      },
+    },
+
+    {
+      name: '--extended rides ahead of the forwarded scope ids',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, ['backend:payments'], { extended: true });
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['backend']);
+        ctx.expect(calls[0].argv).toEqual(['test', '--extended', 'backend:payments']);
+      },
+    },
+
+    {
+      name: '--lane reaches only the frameworks that DECLARE it; the rest are a clean skip',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ lanes: { '@omega.js/backend': ['stripe-live'] } });
+        const code = await runTestCommand(brand, [], { lane: 'stripe-live' });
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['backend']);
+        ctx.expect(calls[0].argv).toEqual(['test', '--lane=stripe-live']);
+        ctx.expect(code, 'a target with no such lane is not a failure').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a --lane no framework declares runs nothing and still exits clean',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ lanes: { '@omega.js/backend': ['stripe-live'] } });
+        const code = await runTestCommand(brand, [], { lane: 'nonexistent' });
+
+        ctx.expect(readCalls(brand)).toEqual([]);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a --lane run reaches a custom-server backend only when its framework declares the lane',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
+        await runTestCommand(brand, [], { lane: 'stripe-live' });
+
+        ctx.expect(readCalls(brand), 'the backend framework declares no stripe-live lane here').toEqual([]);
+      },
+    },
+
+    // ─── The brand's own e2e lane (#775) ─────────────────────────────────────────
+
+    {
+      name: 'a bare run walks <brandRoot>/test/e2e/run.js LAST, from the brand root',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ brandE2e: 'entry' });
+        const code = await runTestCommand(brand, []);
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.map((c) => c.name).slice(-1), 'after every target').toEqual(['brand-e2e']);
+        ctx.expect(calls.length).toBe(3);
+        const lane = calls[2];
+        ctx.expect(lane.cwd).toBe(brand);
+        ctx.expect(lane.argv, 'a runner script hears no scope ids and no flags').toEqual([]);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a failing brand e2e lane fails the whole run',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ brandE2e: 'failing' });
+        const code = await runTestCommand(brand, []);
+
+        ctx.expect(code).toBe(1);
+      },
+    },
+
+    {
+      name: 'a scoped, picked or laned run never addresses the brand e2e lane',
+      run: async (ctx) => {
+        const scoped = stageBrand({ brandE2e: 'entry' }).brand;
+        await runTestCommand(scoped, ['framework:']);
+        ctx.expect(readCalls(scoped).some((c) => c.name === 'brand-e2e')).toBe(false);
+
+        const picked = stageBrand({ brandE2e: 'entry' }).brand;
+        await runTestCommand(picked, [], { target: 'web' });
+        ctx.expect(readCalls(picked).some((c) => c.name === 'brand-e2e')).toBe(false);
+
+        const laned = stageBrand({ brandE2e: 'entry', lanes: { '@omega.js/backend': ['stripe-live'] } }).brand;
+        await runTestCommand(laned, [], { lane: 'stripe-live' });
+        ctx.expect(readCalls(laned).some((c) => c.name === 'brand-e2e')).toBe(false);
+      },
+    },
+
+    {
+      name: 'a test/e2e/ directory with no run.js is skipped loudly, never failed',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ brandE2e: 'dir-only' });
+        const code = await runTestCommand(brand, []);
+
+        ctx.expect(readCalls(brand).map((c) => c.name).sort()).toEqual(['backend', 'web']);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a brand with no test/e2e/ at all runs its targets and nothing else',
+      run: async (ctx) => {
+        const { brand } = stageBrand();
+        await runTestCommand(brand, []);
+
+        ctx.expect(readCalls(brand).length).toBe(2);
+      },
+    },
+
+    // ─── The real CLI parse, not just the options object (#775) ──────────────────
+
+    {
+      name: '`omega test --extended full:` parses as a value-less flag and still carries the scope',
+      run: async (ctx) => {
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        ctx.expect(BOOLEAN_FLAGS.includes('extended'), '--extended takes no value — it must be declared boolean').toBeTruthy();
+
+        // The parse the bin really performs. Undeclared, the next token is read as
+        // the flag's VALUE: `extended: 'full:'` with the scope gone, which ran every
+        // target BARE while looking like it had been asked for both.
+        const argv = require('@omega.js/devkit/argv').parseArgv(['test', '--extended', 'full:'], {
+          booleans: BOOLEAN_FLAGS,
+        });
+
+        ctx.expect(argv.extended).toBe(true);
+        ctx.expect(argv._, 'the scope stayed a positional').toEqual(['test', 'full:']);
+
+        // …and that argv drives the fan-out for real
+        const { brand } = stageBrand();
+        const cwd0 = process.cwd();
+        const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
+        process.chdir(brand);
+        try {
+          await testCommand(argv);
+        } finally {
+          restoreTee();
+          process.chdir(cwd0);
+          process.exitCode = undefined;
+        }
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect(call.argv).toEqual(['test', '--extended', 'full:']);
+        }
+      },
+    },
+
+    {
+      name: 'the value-taking flags stay value-taking through the same parse',
+      run: (ctx) => {
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+        const argv = parse(['test', '--target=web,backend', '--lane=stripe-live']);
+        ctx.expect(argv.target).toBe('web,backend');
+        ctx.expect(argv.lane).toBe('stripe-live');
+        ctx.expect(BOOLEAN_FLAGS.includes('target'), 'a picker with a value must never be boolean').toBe(false);
+        ctx.expect(BOOLEAN_FLAGS.includes('lane')).toBe(false);
+
+        // And in the SPACE-separated spelling the docs teach for the manage walk
+        // (`omega manage --service publishing`), which nothing declares.
+        const spaced = parse(['manage', '--service', 'publishing']);
+        ctx.expect(spaced.service).toBe('publishing');
+        ctx.expect(spaced._, 'the value is the flag\'s, never a positional').toEqual(['manage']);
+
+        // A flag the manager never heard of rides through to the target with its
+        // value intact, which is what the fan-out forwards (#920).
+        const forwarded = parse(['test', '--filter', 'auth', '--dry-run']);
+        ctx.expect(forwarded.filter).toBe('auth');
+        ctx.expect(forwarded.dryRun).toBe(true);
+        ctx.expect(forwarded._).toEqual(['test']);
+      },
+    },
+
+    {
+      name: 'every value-LESS manage flag is declared, and the value-taking one is not',
+      run: (ctx) => {
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+        for (const flag of ['verbose', 'strict', 'dry-run', 'major', 'force-fresh']) {
+          ctx.expect(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`).toBeTruthy();
+        }
+
+        // The pin: a declared boolean never eats the token after it.
+        const argv = parse(['manage', '--strict', 'payment']);
+        ctx.expect(argv.strict).toBe(true);
+        ctx.expect(argv._).toEqual(['manage', 'payment']);
+
+        // --reset-assets is value-TAKING (bare = both kinds, `logos`/`templates`
+        // names one), so declaring it boolean would drop the kind.
+        ctx.expect(BOOLEAN_FLAGS.includes('reset-assets')).toBe(false);
+        ctx.expect(parse(['manage', '--reset-assets', 'logos']).resetAssets).toBe('logos');
+        ctx.expect(parse(['manage', '--reset-assets']).resetAssets, 'and the bare form still means both').toBe(true);
+      },
+    },
+  ],
 });

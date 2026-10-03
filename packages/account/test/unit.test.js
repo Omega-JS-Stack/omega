@@ -3,311 +3,372 @@
  * the frontend auth-user overlay, and resolveSubscription derivations.
  * (Byte-parity with @omega.js/backend's live user.js is covered by golden-master.test.js.)
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { USER_SCHEMA, resolveAccount, resolveSubscription } = require('../src/index.js');
 
-// ─── Defaults & generators ───
+module.exports = defineCases({
+  type: 'group',
+  description: 'unit',
+  tests: [
+    // ─── Defaults & generators ───
 
-test('empty input resolves full defaults; generated fields are null without generators', () => {
-  const account = resolveAccount({});
+    {
+      name: 'empty input resolves full defaults; generated fields are null without generators',
+      run: (ctx) => {
+        const account = resolveAccount({});
 
-  assert.strictEqual(account.auth.uid, null);
-  assert.strictEqual(account.subscription.product.id, 'basic');
-  assert.strictEqual(account.subscription.status, 'active');
-  assert.strictEqual(account.subscription.expires.timestamp, '1970-01-01T00:00:00.000Z');
-  assert.strictEqual(account.subscription.expires.timestampUNIX, 0);
-  assert.strictEqual(account.flags.signupProcessed, false);
-  assert.strictEqual(account.consent.legal.status, 'revoked');
+        ctx.expect(account.auth.uid).toBe(null);
+        ctx.expect(account.subscription.product.id).toBe('basic');
+        ctx.expect(account.subscription.status).toBe('active');
+        ctx.expect(account.subscription.expires.timestamp).toBe('1970-01-01T00:00:00.000Z');
+        ctx.expect(account.subscription.expires.timestampUNIX).toBe(0);
+        ctx.expect(account.flags.signupProcessed).toBe(false);
+        ctx.expect(account.consent.legal.status).toBe('revoked');
 
-  // No generators injected → null (frontend mode: real values come from the backend)
-  assert.strictEqual(account.api.clientId, null);
-  assert.strictEqual(account.api.privateKey, null);
-  assert.strictEqual(account.affiliate.code, null);
-});
-
-test('#663: personal.location carries postalCode and street, null until filled', () => {
-  const empty = resolveAccount({});
-
-  assert.strictEqual(empty.personal.location.postalCode, null);
-  assert.strictEqual(empty.personal.location.street, null);
-
-  const filled = resolveAccount({ personal: { location: { postalCode: '90210', street: '123 Main Street' } } });
-
-  assert.strictEqual(filled.personal.location.postalCode, '90210');
-  assert.strictEqual(filled.personal.location.street, '123 Main Street');
-});
-
-test('injected generators feed $uuid/$randomId/$apiKey', () => {
-  const account = resolveAccount({}, {
-    generators: { uuid: () => 'u-1', randomId: () => 'r-1', apiKey: () => 'k-1' },
-  });
-
-  assert.strictEqual(account.api.clientId, 'u-1');
-  assert.strictEqual(account.api.privateKey, 'k-1');
-  assert.strictEqual(account.affiliate.code, 'r-1');
-});
-
-test('metadata.created/updated default to now (ISO + unix pair)', () => {
-  const before = Math.floor(Date.now() / 1000);
-  const account = resolveAccount({});
-  const after = Math.floor(Date.now() / 1000);
-
-  assert.ok(account.metadata.created.timestampUNIX >= before && account.metadata.created.timestampUNIX <= after);
-  assert.strictEqual(
-    Math.floor(new Date(account.metadata.created.timestamp).getTime() / 1000),
-    account.metadata.created.timestampUNIX,
-  );
-});
-
-test('array defaults are fresh copies (no shared references)', () => {
-  const first = resolveAccount({});
-  first.affiliate.referrals.push('mutated');
-
-  assert.deepStrictEqual(resolveAccount({}).affiliate.referrals, []);
-});
-
-// ─── Type handling ───
-
-test('coercion: strings/numbers/booleans converge to schema types', () => {
-  const account = resolveAccount({
-    auth: { uid: 12345, temporary: 'true' },
-    subscription: { payment: { price: '4.99' }, trial: { claimed: 1 } },
-    personal: { telephone: { countryCode: '49', national: 'not-a-number' } },
-  });
-
-  assert.strictEqual(account.auth.uid, '12345');
-  assert.strictEqual(account.auth.temporary, true);
-  assert.strictEqual(account.subscription.payment.price, 4.99);
-  assert.strictEqual(account.subscription.trial.claimed, true);
-  assert.strictEqual(account.personal.telephone.countryCode, 49);
-  assert.strictEqual(account.personal.telephone.national, 0); // NaN → default
-});
-
-test('nullable semantics: null survives on nullable fields, resets non-nullable ones', () => {
-  const account = resolveAccount({
-    personal: { gender: null },
-    subscription: { product: { id: null }, payment: { price: null } },
-  });
-
-  assert.strictEqual(account.personal.gender, null);
-  assert.strictEqual(account.subscription.product.id, 'basic');
-  assert.strictEqual(account.subscription.payment.price, 0);
-});
-
-test('array type: non-array input falls back to default', () => {
-  const account = resolveAccount({ affiliate: { referrals: 'not-an-array' } });
-
-  assert.deepStrictEqual(account.affiliate.referrals, []);
-});
-
-// ─── Passthrough & template ───
-
-test('$passthrough keeps unknown keys; plain branches strip them', () => {
-  const account = resolveAccount({
-    roles: { admin: true, customRole: true },
-    connections: { google: { 'google-sub-1': { token: 'tok' } } },
-    unknownTopLevel: { stripped: true },
-  });
-
-  assert.strictEqual(account.roles.customRole, true);
-  assert.deepStrictEqual(account.connections, { google: { 'google-sub-1': { token: 'tok' } } });
-  assert.strictEqual('unknownTopLevel' in account, false);
-});
-
-test('$template resolves dynamic usage keys against the template shape', () => {
-  const account = resolveAccount({
-    usage: { requests: { monthly: '5', last: { timestampUNIX: 1788397430 } } },
-  });
-
-  assert.strictEqual(account.usage.requests.monthly, 5);
-  assert.strictEqual(account.usage.requests.daily, 0);
-  assert.strictEqual(account.usage.requests.total, 0);
-  assert.strictEqual(account.usage.requests.last.timestampUNIX, 1788397430);
-  assert.strictEqual(account.usage.requests.last.timestamp, '1970-01-01T00:00:00.000Z');
-});
-
-test('#647: usage.last carries only WHEN the counter moved — the retired `id` is gone', () => {
-  const account = resolveAccount({ usage: { requests: { monthly: 1 } } });
-
-  assert.deepStrictEqual(
-    Object.keys(account.usage.requests.last),
-    ['timestamp', 'timestampUNIX'],
-    'a schema field nothing writes reads as a fact that is always null',
-  );
-});
-
-// ─── Auth-user overlay (frontend semantic) ───
-
-test('options.user fills missing auth identity but never overrides the doc', () => {
-  const fresh = resolveAccount({}, { user: { uid: 'fb-1', email: 'fb@example.com' } });
-  assert.strictEqual(fresh.auth.uid, 'fb-1');
-  assert.strictEqual(fresh.auth.email, 'fb@example.com');
-
-  const existing = resolveAccount(
-    { auth: { uid: 'doc-1', email: 'doc@example.com' } },
-    { user: { uid: 'fb-1', email: 'fb@example.com' } },
-  );
-  assert.strictEqual(existing.auth.uid, 'doc-1');
-  assert.strictEqual(existing.auth.email, 'doc@example.com');
-});
-
-// ─── The applied discount ───
-
-test('an applied winback discount survives resolution, source and all', () => {
-  // The card that renders it reads the RESOLVED account, and resolution strips
-  // every key the schema does not name — so a claim the route persisted has to
-  // come back out of the engine intact ([#325]).
-  const account = resolveAccount({
-    subscription: {
-      product: { id: 'premium' },
-      status: 'active',
-      discount: {
-        valid: true,
-        code: 'WINBACK50',
-        percent: 50,
-        amount: 0,
-        duration: 'once',
-        source: 'winback',
-        resourceId: 'sub_live',
+        // No generators injected → null (frontend mode: real values come from the backend)
+        ctx.expect(account.api.clientId).toBe(null);
+        ctx.expect(account.api.privateKey).toBe(null);
+        ctx.expect(account.affiliate.code).toBe(null);
       },
     },
-  });
 
-  assert.deepStrictEqual(account.subscription.discount, {
-    valid: true,
-    code: 'WINBACK50',
-    percent: 50,
-    amount: 0,
-    duration: 'once',
-    source: 'winback',
-    resourceId: 'sub_live',
-  });
-});
+    {
+      name: '#663: personal.location carries postalCode and street, null until filled',
+      run: (ctx) => {
+        const empty = resolveAccount({});
 
-test('the discount names the subscription it was applied to', () => {
-  // The stamp is what makes the node clearable ([#333]): the webhook pipeline
-  // compares it against the subscription the event is about, and a mismatch is a
-  // NEW subscription that never claimed this discount. Resolution strips every
-  // key the schema does not name, so a stamp the engine drops is a discount that
-  // rides a resubscribe forever and silently retires the save offer.
-  const account = resolveAccount({
-    subscription: {
-      discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback', resourceId: 'sub_old' },
+        ctx.expect(empty.personal.location.postalCode).toBe(null);
+        ctx.expect(empty.personal.location.street).toBe(null);
+
+        const filled = resolveAccount({ personal: { location: { postalCode: '90210', street: '123 Main Street' } } });
+
+        ctx.expect(filled.personal.location.postalCode).toBe('90210');
+        ctx.expect(filled.personal.location.street).toBe('123 Main Street');
+      },
     },
-  });
 
-  assert.strictEqual(account.subscription.discount.resourceId, 'sub_old');
-});
+    {
+      name: 'injected generators feed $uuid/$randomId/$apiKey',
+      run: (ctx) => {
+        const account = resolveAccount({}, {
+          generators: { uuid: () => 'u-1', randomId: () => 'r-1', apiKey: () => 'k-1' },
+        });
 
-test('a fresh account carries no discount at all', () => {
-  const discount = resolveAccount({}).subscription.discount;
-
-  assert.strictEqual(discount.valid, false, 'absent and denied are the same thing to a reader');
-  assert.strictEqual(discount.code, null);
-  assert.strictEqual(discount.source, null, 'and nothing claims to be a winback claim');
-  assert.strictEqual(discount.resourceId, null, 'and none names a subscription');
-});
-
-test('a checkout discount keeps its OWN source — the winback claim is not the shape', () => {
-  // A code typed at checkout sets this same node, and a winback pitch suppressed
-  // by someone else's promo is an offer silently withheld. `source` is what the
-  // pitch gate reads, so the two are never the same signal.
-  const account = resolveAccount({
-    subscription: {
-      discount: { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once', source: 'checkout' },
+        ctx.expect(account.api.clientId).toBe('u-1');
+        ctx.expect(account.api.privateKey).toBe('k-1');
+        ctx.expect(account.affiliate.code).toBe('r-1');
+      },
     },
-  });
 
-  assert.strictEqual(account.subscription.discount.source, 'checkout');
-  assert.strictEqual(account.subscription.discount.amount, 10);
-  assert.strictEqual(account.subscription.discount.percent, 0, 'the shape it is not reports zero, never undefined');
-});
+    {
+      name: 'metadata.created/updated default to now (ISO + unix pair)',
+      run: (ctx) => {
+        const before = Math.floor(Date.now() / 1000);
+        const account = resolveAccount({});
+        const after = Math.floor(Date.now() / 1000);
 
-// ─── resolveSubscription ───
-
-test('fresh account resolves to basic/inactive/never-paid', () => {
-  assert.deepStrictEqual(resolveSubscription(resolveAccount({})), {
-    plan: 'basic',
-    active: false,
-    trialing: false,
-    cancelling: false,
-    everPaid: false,
-  });
-});
-
-test('active paid plan resolves plan/active/everPaid', () => {
-  const account = resolveAccount({
-    subscription: {
-      product: { id: 'premium' },
-      status: 'active',
-      payment: { startDate: { timestampUNIX: 1735689600 } },
+        ctx.expect(account.metadata.created.timestampUNIX >= before && account.metadata.created.timestampUNIX <= after).toBeTruthy();
+        ctx.expect(Math.floor(new Date(account.metadata.created.timestamp).getTime() / 1000)).toBe(account.metadata.created.timestampUNIX);
+      },
     },
-  });
 
-  assert.deepStrictEqual(resolveSubscription(account), {
-    plan: 'premium',
-    active: true,
-    trialing: false,
-    cancelling: false,
-    everPaid: true,
-  });
-});
+    {
+      name: 'array defaults are fresh copies (no shared references)',
+      run: (ctx) => {
+        const first = resolveAccount({});
+        first.affiliate.referrals.push('mutated');
 
-test('unexpired claimed trial is trialing; cancellation only counts when not trialing', () => {
-  const future = Math.floor(Date.now() / 1000) + 86400;
-
-  const trialing = resolveAccount({
-    subscription: {
-      product: { id: 'premium' },
-      status: 'active',
-      trial: { claimed: true, expires: { timestampUNIX: future } },
-      cancellation: { pending: true },
+        ctx.expect(resolveAccount({}).affiliate.referrals).toEqual([]);
+      },
     },
-  });
-  assert.deepStrictEqual(resolveSubscription(trialing), {
-    plan: 'premium',
-    active: true,
-    trialing: true,
-    cancelling: false,
-    everPaid: false,
-  });
 
-  const cancelling = resolveAccount({
-    subscription: {
-      product: { id: 'premium' },
-      status: 'active',
-      cancellation: { pending: true },
+    // ─── Type handling ───
+
+    {
+      name: 'coercion: strings/numbers/booleans converge to schema types',
+      run: (ctx) => {
+        const account = resolveAccount({
+          auth: { uid: 12345, temporary: 'true' },
+          subscription: { payment: { price: '4.99' }, trial: { claimed: 1 } },
+          personal: { telephone: { countryCode: '49', national: 'not-a-number' } },
+        });
+
+        ctx.expect(account.auth.uid).toBe('12345');
+        ctx.expect(account.auth.temporary).toBe(true);
+        ctx.expect(account.subscription.payment.price).toBe(4.99);
+        ctx.expect(account.subscription.trial.claimed).toBe(true);
+        ctx.expect(account.personal.telephone.countryCode).toBe(49);
+        ctx.expect(account.personal.telephone.national).toBe(0); // NaN → default
+      },
     },
-  });
-  assert.deepStrictEqual(resolveSubscription(cancelling), {
-    plan: 'premium',
-    active: true,
-    trialing: false,
-    cancelling: true,
-    everPaid: false,
-  });
-});
 
-test('suspended paid plan falls back to basic', () => {
-  const account = resolveAccount({
-    subscription: { product: { id: 'premium' }, status: 'suspended' },
-  });
+    {
+      name: 'nullable semantics: null survives on nullable fields, resets non-nullable ones',
+      run: (ctx) => {
+        const account = resolveAccount({
+          personal: { gender: null },
+          subscription: { product: { id: null }, payment: { price: null } },
+        });
 
-  assert.deepStrictEqual(resolveSubscription(account), {
-    plan: 'basic',
-    active: false,
-    trialing: false,
-    cancelling: false,
-    everPaid: false,
-  });
-});
+        ctx.expect(account.personal.gender).toBe(null);
+        ctx.expect(account.subscription.product.id).toBe('basic');
+        ctx.expect(account.subscription.payment.price).toBe(0);
+      },
+    },
 
-// ─── Schema export sanity ───
+    {
+      name: 'array type: non-array input falls back to default',
+      run: (ctx) => {
+        const account = resolveAccount({ affiliate: { referrals: 'not-an-array' } });
 
-test('USER_SCHEMA is exported and carries the canonical branches', () => {
-  for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'connections', 'attribution', 'trackingConsent', 'consent']) {
-    assert.ok(USER_SCHEMA[branch], `missing branch: ${branch}`);
-  }
+        ctx.expect(account.affiliate.referrals).toEqual([]);
+      },
+    },
+
+    // ─── Passthrough & template ───
+
+    {
+      name: '$passthrough keeps unknown keys; plain branches strip them',
+      run: (ctx) => {
+        const account = resolveAccount({
+          roles: { admin: true, customRole: true },
+          connections: { google: { 'google-sub-1': { token: 'tok' } } },
+          unknownTopLevel: { stripped: true },
+        });
+
+        ctx.expect(account.roles.customRole).toBe(true);
+        ctx.expect(account.connections).toEqual({ google: { 'google-sub-1': { token: 'tok' } } });
+        ctx.expect('unknownTopLevel' in account).toBe(false);
+      },
+    },
+
+    {
+      name: '$template resolves dynamic usage keys against the template shape',
+      run: (ctx) => {
+        const account = resolveAccount({
+          usage: { requests: { monthly: '5', last: { timestampUNIX: 1788397430 } } },
+        });
+
+        ctx.expect(account.usage.requests.monthly).toBe(5);
+        ctx.expect(account.usage.requests.daily).toBe(0);
+        ctx.expect(account.usage.requests.total).toBe(0);
+        ctx.expect(account.usage.requests.last.timestampUNIX).toBe(1788397430);
+        ctx.expect(account.usage.requests.last.timestamp).toBe('1970-01-01T00:00:00.000Z');
+      },
+    },
+
+    {
+      name: '#647: usage.last carries only WHEN the counter moved — the retired `id` is gone',
+      run: (ctx) => {
+        const account = resolveAccount({ usage: { requests: { monthly: 1 } } });
+
+        ctx.expect(Object.keys(account.usage.requests.last), 'a schema field nothing writes reads as a fact that is always null').toEqual(['timestamp', 'timestampUNIX']);
+      },
+    },
+
+    // ─── Auth-user overlay (frontend semantic) ───
+
+    {
+      name: 'options.user fills missing auth identity but never overrides the doc',
+      run: (ctx) => {
+        const fresh = resolveAccount({}, { user: { uid: 'fb-1', email: 'fb@example.com' } });
+        ctx.expect(fresh.auth.uid).toBe('fb-1');
+        ctx.expect(fresh.auth.email).toBe('fb@example.com');
+
+        const existing = resolveAccount(
+          { auth: { uid: 'doc-1', email: 'doc@example.com' } },
+          { user: { uid: 'fb-1', email: 'fb@example.com' } },
+        );
+        ctx.expect(existing.auth.uid).toBe('doc-1');
+        ctx.expect(existing.auth.email).toBe('doc@example.com');
+      },
+    },
+
+    // ─── The applied discount ───
+
+    {
+      name: 'an applied winback discount survives resolution, source and all',
+      run: (ctx) => {
+        // The card that renders it reads the RESOLVED account, and resolution strips
+        // every key the schema does not name — so a claim the route persisted has to
+        // come back out of the engine intact ([#325]).
+        const account = resolveAccount({
+          subscription: {
+            product: { id: 'premium' },
+            status: 'active',
+            discount: {
+              valid: true,
+              code: 'WINBACK50',
+              percent: 50,
+              amount: 0,
+              duration: 'once',
+              source: 'winback',
+              resourceId: 'sub_live',
+            },
+          },
+        });
+
+        ctx.expect(account.subscription.discount).toEqual({
+          valid: true,
+          code: 'WINBACK50',
+          percent: 50,
+          amount: 0,
+          duration: 'once',
+          source: 'winback',
+          resourceId: 'sub_live',
+        });
+      },
+    },
+
+    {
+      name: 'the discount names the subscription it was applied to',
+      run: (ctx) => {
+        // The stamp is what makes the node clearable ([#333]): the webhook pipeline
+        // compares it against the subscription the event is about, and a mismatch is a
+        // NEW subscription that never claimed this discount. Resolution strips every
+        // key the schema does not name, so a stamp the engine drops is a discount that
+        // rides a resubscribe forever and silently retires the save offer.
+        const account = resolveAccount({
+          subscription: {
+            discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback', resourceId: 'sub_old' },
+          },
+        });
+
+        ctx.expect(account.subscription.discount.resourceId).toBe('sub_old');
+      },
+    },
+
+    {
+      name: 'a fresh account carries no discount at all',
+      run: (ctx) => {
+        const discount = resolveAccount({}).subscription.discount;
+
+        ctx.expect(discount.valid, 'absent and denied are the same thing to a reader').toBe(false);
+        ctx.expect(discount.code).toBe(null);
+        ctx.expect(discount.source, 'and nothing claims to be a winback claim').toBe(null);
+        ctx.expect(discount.resourceId, 'and none names a subscription').toBe(null);
+      },
+    },
+
+    {
+      name: 'a checkout discount keeps its OWN source — the winback claim is not the shape',
+      run: (ctx) => {
+        // A code typed at checkout sets this same node, and a winback pitch suppressed
+        // by someone else's promo is an offer silently withheld. `source` is what the
+        // pitch gate reads, so the two are never the same signal.
+        const account = resolveAccount({
+          subscription: {
+            discount: { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once', source: 'checkout' },
+          },
+        });
+
+        ctx.expect(account.subscription.discount.source).toBe('checkout');
+        ctx.expect(account.subscription.discount.amount).toBe(10);
+        ctx.expect(account.subscription.discount.percent, 'the shape it is not reports zero, never undefined').toBe(0);
+      },
+    },
+
+    // ─── resolveSubscription ───
+
+    {
+      name: 'fresh account resolves to basic/inactive/never-paid',
+      run: (ctx) => {
+        ctx.expect(resolveSubscription(resolveAccount({}))).toEqual({
+          plan: 'basic',
+          active: false,
+          trialing: false,
+          cancelling: false,
+          everPaid: false,
+        });
+      },
+    },
+
+    {
+      name: 'active paid plan resolves plan/active/everPaid',
+      run: (ctx) => {
+        const account = resolveAccount({
+          subscription: {
+            product: { id: 'premium' },
+            status: 'active',
+            payment: { startDate: { timestampUNIX: 1735689600 } },
+          },
+        });
+
+        ctx.expect(resolveSubscription(account)).toEqual({
+          plan: 'premium',
+          active: true,
+          trialing: false,
+          cancelling: false,
+          everPaid: true,
+        });
+      },
+    },
+
+    {
+      name: 'unexpired claimed trial is trialing; cancellation only counts when not trialing',
+      run: (ctx) => {
+        const future = Math.floor(Date.now() / 1000) + 86400;
+
+        const trialing = resolveAccount({
+          subscription: {
+            product: { id: 'premium' },
+            status: 'active',
+            trial: { claimed: true, expires: { timestampUNIX: future } },
+            cancellation: { pending: true },
+          },
+        });
+        ctx.expect(resolveSubscription(trialing)).toEqual({
+          plan: 'premium',
+          active: true,
+          trialing: true,
+          cancelling: false,
+          everPaid: false,
+        });
+
+        const cancelling = resolveAccount({
+          subscription: {
+            product: { id: 'premium' },
+            status: 'active',
+            cancellation: { pending: true },
+          },
+        });
+        ctx.expect(resolveSubscription(cancelling)).toEqual({
+          plan: 'premium',
+          active: true,
+          trialing: false,
+          cancelling: true,
+          everPaid: false,
+        });
+      },
+    },
+
+    {
+      name: 'suspended paid plan falls back to basic',
+      run: (ctx) => {
+        const account = resolveAccount({
+          subscription: { product: { id: 'premium' }, status: 'suspended' },
+        });
+
+        ctx.expect(resolveSubscription(account)).toEqual({
+          plan: 'basic',
+          active: false,
+          trialing: false,
+          cancelling: false,
+          everPaid: false,
+        });
+      },
+    },
+
+    // ─── Schema export sanity ───
+
+    {
+      name: 'USER_SCHEMA is exported and carries the canonical branches',
+      run: (ctx) => {
+        for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'connections', 'attribution', 'trackingConsent', 'consent']) {
+          ctx.expect(USER_SCHEMA[branch], `missing branch: ${branch}`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

@@ -3,8 +3,7 @@
  * whole file, and dotenv, the reader every OMEGA loader uses, must read each
  * value back exactly as given. A value it cannot throws, naming the key only.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { envLine, serializeEnv } = require('../src/index.js');
 
@@ -21,58 +20,82 @@ const ROUND_TRIP_VALUES = {
   EMPTY: '',
 };
 
-test('envLine: every value reads back through dotenv exactly as written', () => {
-  for (const [key, value] of Object.entries(ROUND_TRIP_VALUES)) {
-    const line = envLine(key, value);
-    assert.strictEqual(line.split('\n').length, 1, `${key} stays on one line`);
-    assert.strictEqual(require('dotenv').parse(line)[key], value, `${key} reads back unchanged`);
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'env-line',
+  tests: [
+    {
+      name: 'envLine: every value reads back through dotenv exactly as written',
+      run: (ctx) => {
+        for (const [key, value] of Object.entries(ROUND_TRIP_VALUES)) {
+          const line = envLine(key, value);
+          ctx.expect(line.split('\n').length, `${key} stays on one line`).toBe(1);
+          ctx.expect(require('dotenv').parse(line)[key], `${key} reads back unchanged`).toBe(value);
+        }
+      },
+    },
 
-test('envLine: quotes and backslashes are written raw, a newline as the two characters \\n', () => {
-  assert.strictEqual(envLine('K', 'say "hi"'), 'K="say "hi""');
-  assert.strictEqual(envLine('K', 'C:\\keys\\'), 'K="C:\\keys\\"');
-  assert.strictEqual(envLine('K', 'line1\nline2'), 'K="line1\\nline2"');
-  assert.strictEqual(envLine('K', ''), 'K=""');
-});
+    {
+      name: 'envLine: quotes and backslashes are written raw, a newline as the two characters \\n',
+      run: (ctx) => {
+        ctx.expect(envLine('K', 'say "hi"')).toBe('K="say "hi""');
+        ctx.expect(envLine('K', 'C:\\keys\\')).toBe('K="C:\\keys\\"');
+        ctx.expect(envLine('K', 'line1\nline2')).toBe('K="line1\\nline2"');
+        ctx.expect(envLine('K', '')).toBe('K=""');
+      },
+    },
 
-test('envLine: a value dotenv would read back changed throws, naming the key and never the value', () => {
-  // dotenv expands a literal backslash-n or backslash-r, and a quote followed
-  // by # ends a double-quoted value, so none of these can round-trip.
-  for (const value of ['a\\nb-secret', 'a\\rb-secret', 'x "y" #secret']) {
-    assert.throws(() => envLine('OMEGA_TEST_KEY', value), (error) => {
-      assert.match(error.message, /OMEGA_TEST_KEY/);
-      assert.ok(!error.message.includes('secret'), 'the value never reaches the message');
-      return true;
-    });
-  }
-});
+    {
+      name: 'envLine: a value dotenv would read back changed throws, naming the key and never the value',
+      run: (ctx) => {
+        // dotenv expands a literal backslash-n or backslash-r, and a quote followed
+        // by # ends a double-quoted value, so none of these can round-trip.
+        for (const value of ['a\\nb-secret', 'a\\rb-secret', 'x "y" #secret']) {
+          ctx.expect(() => envLine('OMEGA_TEST_KEY', value)).toThrow((error) => {
+            ctx.expect(error.message).toMatch(/OMEGA_TEST_KEY/);
+            ctx.expect(!error.message.includes('secret'), 'the value never reaches the message').toBeTruthy();
+            return true;
+          });
+        }
+      },
+    },
 
-test('serializeEnv: the whole file reads back through dotenv exactly as given', () => {
-  const content = serializeEnv(ROUND_TRIP_VALUES);
+    {
+      name: 'serializeEnv: the whole file reads back through dotenv exactly as given',
+      run: (ctx) => {
+        const content = serializeEnv(ROUND_TRIP_VALUES);
 
-  assert.strictEqual(content.split('\n').length, Object.keys(ROUND_TRIP_VALUES).length + 1, 'one line per key');
-  assert.deepStrictEqual(require('dotenv').parse(content), ROUND_TRIP_VALUES);
-});
+        ctx.expect(content.split('\n').length, 'one line per key').toBe(Object.keys(ROUND_TRIP_VALUES).length + 1);
+        ctx.expect(require('dotenv').parse(content)).toEqual(ROUND_TRIP_VALUES);
+      },
+    },
 
-test('serializeEnv: a trailing backslash that would swallow the next line throws', () => {
-  // The escaped closing quote lets dotenv's match run on to the next line's
-  // opening quote, and a value starting with # then reads as a comment.
-  assert.throws(() => serializeEnv({ FIRST: 'x\\', SECOND: ' #z' }), /FIRST/);
-});
+    {
+      name: 'serializeEnv: a trailing backslash that would swallow the next line throws',
+      run: (ctx) => {
+        // The escaped closing quote lets dotenv's match run on to the next line's
+        // opening quote, and a value starting with # then reads as a comment.
+        ctx.expect(() => serializeEnv({ FIRST: 'x\\', SECOND: ' #z' })).toThrow(/FIRST/);
+      },
+    },
 
-// The backend deploy workflow writes its `.env` through this serializer, so a
-// value holding a quote, a backslash or a newline must stay on its own line
-// and never declare a key of its own.
-test('serializeEnv: a hostile value stays on its own line, and never bleeds into the next key', () => {
-  const hostile = 'a"b\\c\nOMEGA_ADMIN_KEY="stolen"';
-  const content = serializeEnv({ FIRST: hostile, SECOND: 'intact' });
+    // The backend deploy workflow writes its `.env` through this serializer, so a
+    // value holding a quote, a backslash or a newline must stay on its own line
+    // and never declare a key of its own.
+    {
+      name: 'serializeEnv: a hostile value stays on its own line, and never bleeds into the next key',
+      run: (ctx) => {
+        const hostile = 'a"b\\c\nOMEGA_ADMIN_KEY="stolen"';
+        const content = serializeEnv({ FIRST: hostile, SECOND: 'intact' });
 
-  assert.strictEqual(content.split('\n').filter(Boolean).length, 2, 'one line per key, whatever the value holds');
+        ctx.expect(content.split('\n').filter(Boolean).length, 'one line per key, whatever the value holds').toBe(2);
 
-  const parsed = require('dotenv').parse(content);
-  assert.deepStrictEqual(Object.keys(parsed), ['FIRST', 'SECOND'], 'the file declares exactly the keys it was given');
-  assert.strictEqual(parsed.SECOND, 'intact', 'the neighbouring key survives the quote');
-  assert.strictEqual(parsed.OMEGA_ADMIN_KEY, undefined, 'a value can never inject a key of its own');
-  assert.strictEqual(parsed.FIRST, hostile, 'the quote, the backslash and the newline all read back as given');
+        const parsed = require('dotenv').parse(content);
+        ctx.expect(Object.keys(parsed), 'the file declares exactly the keys it was given').toEqual(['FIRST', 'SECOND']);
+        ctx.expect(parsed.SECOND, 'the neighbouring key survives the quote').toBe('intact');
+        ctx.expect(parsed.OMEGA_ADMIN_KEY, 'a value can never inject a key of its own').toBe(undefined);
+        ctx.expect(parsed.FIRST, 'the quote, the backslash and the newline all read back as given').toBe(hostile);
+      },
+    },
+  ],
 });

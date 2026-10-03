@@ -7,8 +7,7 @@
 // a unit test must never do. The pieces it stands on are proven in
 // boot-child.test.js, port-hold.test.js and browser.test.js.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -41,124 +40,6 @@ function write(filePath, contents) {
   fs.writeFileSync(filePath, contents);
 }
 
-// ---- discoverTargets
-
-test('discoverTargets finds the backend and web target dirs', () => {
-  const root = makeTempBrand(['targets/backend/package.json', 'targets/web/package.json']);
-  const targets = discoverTargets(root);
-  assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
-  assert.equal(targets.web, path.join(root, 'targets', 'web'));
-});
-
-test('discoverTargets finds the web leg by TYPE, whatever the brand named it (#886)', () => {
-  const root = makeTempBrand(['targets/storefront/package.json', 'targets/api/package.json']);
-  write(path.join(root, 'config', 'omega.json5'), "{ targets: { storefront: { type: 'web' }, api: { type: 'backend' } } }\n");
-
-  const targets = discoverTargets(root);
-  assert.equal(targets.web, path.join(root, 'targets', 'storefront'));
-  assert.equal(targets.backend, path.join(root, 'targets', 'api'));
-});
-
-test('discoverTargets returns nulls for missing targets and a missing targets dir', () => {
-  const partial = makeTempBrand(['targets/web/package.json']);
-  assert.equal(discoverTargets(partial).backend, null);
-  assert.equal(discoverTargets(partial).web, path.join(partial, 'targets', 'web'));
-
-  const bare = makeTempBrand([]);
-  assert.deepEqual(discoverTargets(bare), { backend: null, web: null });
-});
-
-test('discoverTargets ignores dot-dirs and plain files in targets/', () => {
-  const root = makeTempBrand(['targets/.DS_Store', 'targets/notes.md', 'targets/backend/package.json']);
-  const targets = discoverTargets(root);
-  assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
-  assert.equal(targets.web, null);
-});
-
-// ---- the ready markers (the contract with @omega.js/backend and @omega.js/web)
-
-test('the emulator marker is the POST-SEED line, not firebase-tools\' own', () => {
-  assert.match('\n  Emulator ready. Press Ctrl+C to shut down...\n', EMULATOR_READY_MARKER);
-  assert.equal(EMULATOR_READY_MARKER.test('All emulators ready! It is now safe to connect'), false,
-    'seeding runs AFTER that line and starts with a full wipe — waiting on it races the wipe');
-});
-
-test('the dev marker captures the ORIGIN, protocol included (omega dev serves mkcert HTTPS)', () => {
-  assert.equal('Dev server: https://localhost:4001'.match(DEV_READY_MARKER)[1], 'https://localhost:4001');
-  assert.equal('Dev server: http://localhost:4002'.match(DEV_READY_MARKER)[1], 'http://localhost:4002');
-});
-
-// ---- resolveLocalBin
-
-test('resolveLocalBin climbs to the nearest install carrying the bin', () => {
-  const root = makeTempBrand([]);
-  write(path.join(root, 'node_modules', '.bin', 'mgr'), '#!/bin/sh\n');
-  const targetDir = path.join(root, 'targets', 'backend');
-  fs.mkdirSync(targetDir, { recursive: true });
-
-  assert.equal(resolveLocalBin('mgr', targetDir), path.join(root, 'node_modules', '.bin', 'mgr'));
-});
-
-test('resolveLocalBin prefers the NEAREST install over an outer one', () => {
-  const root = makeTempBrand([]);
-  write(path.join(root, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
-  const targetDir = path.join(root, 'targets', 'web');
-  write(path.join(targetDir, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
-
-  assert.equal(resolveLocalBin('omega', targetDir), path.join(targetDir, 'node_modules', '.bin', 'omega'));
-});
-
-test('a missing bin fails loudly, naming the install to run', () => {
-  const root = makeTempBrand(['targets/backend/package.json']);
-  assert.throws(
-    () => resolveLocalBin('mgr', path.join(root, 'targets', 'backend')),
-    /no node_modules\/\.bin\/mgr above .* — run npm install in the brand/,
-  );
-});
-
-// ---- resolveDevTarget: the web leg's precondition
-
-test('a web target declaring @omega.js/web resolves to that framework', () => {
-  const root = makeTempBrand([]);
-  const webDir = path.join(root, 'targets', 'web');
-  write(path.join(webDir, 'package.json'), JSON.stringify({
-    name: 'web', devDependencies: { '@omega.js/web': '*' },
-  }));
-
-  const target = resolveDevTarget(webDir, root);
-  assert.equal(target.kind, 'framework');
-  assert.equal(target.name, '@omega.js/web');
-});
-
-test('a web target declaring NO framework refuses by name (never a stray dispatch)', () => {
-  const root = makeTempBrand([]);
-  write(path.join(root, 'config', 'omega.json5'), "{ targets: { web: { type: 'web' } } }\n");
-  const webDir = path.join(root, 'targets', 'web');
-  write(path.join(webDir, 'package.json'), JSON.stringify({ name: 'web' }));
-
-  assert.throws(
-    () => resolveDevTarget(webDir, root),
-    /^Error: targets\/web declares no web framework dependency, so there is no `omega dev` to boot/,
-  );
-});
-
-// ---- step() accounting
-
-test('step records failures and rethrows; passes do not accumulate', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-
-  await harness.step('passing step', async () => 'detail');
-  assert.equal(harness.failures.length, 0);
-
-  await assert.rejects(
-    () => harness.step('failing step', async () => { throw new Error('boom'); }),
-    /boom/,
-  );
-  assert.equal(harness.failures.length, 1);
-  assert.equal(harness.failures[0].name, 'failing step');
-});
-
 // ---- steps.log: the harness's verdicts on disk (#197)
 
 // exit() ends the process on failure — the ONE thing a unit test must stub (a
@@ -179,136 +60,307 @@ function callExit(harness) {
   return code;
 }
 
-test('the log dir is the lane folder, and every step writes its verdict as it lands', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+module.exports = defineCases({
+  type: 'group',
+  description: 'e2e-harness',
+  tests: [
+    // ---- discoverTargets
 
-  await harness.step('page boots @omega.js/client against the emulators', async () => 'auth :9099');
-  await assert.rejects(
-    () => harness.step('signup creates the auth user', async () => {
-      throw new Error('user doc not created within 90s\n      (last state: null)');
-    }),
-    /user doc not created/,
-  );
+    {
+      name: 'discoverTargets finds the backend and web target dirs',
+      run: (ctx) => {
+        const root = makeTempBrand(['targets/backend/package.json', 'targets/web/package.json']);
+        const targets = discoverTargets(root);
+        ctx.expect(targets.backend).toBe(path.join(root, 'targets', 'backend'));
+        ctx.expect(targets.web).toBe(path.join(root, 'targets', 'web'));
+      },
+    },
 
-  const contents = fs.readFileSync(stepsLog, 'utf8');
-  assert.match(contents, /^PASS {2}page boots @omega\.js\/client against the emulators \(auth :9099\)$/m);
-  // One line per step: the multi-line failure detail collapses
-  assert.match(contents, /^FAIL {2}signup creates the auth user — user doc not created within 90s \(last state: null\)$/m);
-});
+    {
+      name: 'discoverTargets finds the web leg by TYPE, whatever the brand named it (#886)',
+      run: (ctx) => {
+        const root = makeTempBrand(['targets/storefront/package.json', 'targets/api/package.json']);
+        write(path.join(root, 'config', 'omega.json5'), "{ targets: { storefront: { type: 'web' }, api: { type: 'backend' } } }\n");
 
-test('a failure recorded outside step() lands as a preflight verdict on exit', () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+        const targets = discoverTargets(root);
+        ctx.expect(targets.web).toBe(path.join(root, 'targets', 'storefront'));
+        ctx.expect(targets.backend).toBe(path.join(root, 'targets', 'api'));
+      },
+    },
 
-  // What a runner does when launchBrowser()/preparePage() dies before any step
-  // ran — without this the file would hold a header and nothing else.
-  harness.failures.push({ name: 'harness setup', error: new Error('puppeteer.launch failed') });
+    {
+      name: 'discoverTargets returns nulls for missing targets and a missing targets dir',
+      run: (ctx) => {
+        const partial = makeTempBrand(['targets/web/package.json']);
+        ctx.expect(discoverTargets(partial).backend).toBe(null);
+        ctx.expect(discoverTargets(partial).web).toBe(path.join(partial, 'targets', 'web'));
 
-  assert.equal(callExit(harness), 1);
-  assert.match(fs.readFileSync(stepsLog, 'utf8'), /^FAIL {2}preflight — puppeteer\.launch failed$/m);
-});
+        const bare = makeTempBrand([]);
+        ctx.expect(discoverTargets(bare)).toEqual({ backend: null, web: null });
+      },
+    },
 
-test('exit() adds no preflight line when a step already recorded the failure', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+    {
+      name: 'discoverTargets ignores dot-dirs and plain files in targets/',
+      run: (ctx) => {
+        const root = makeTempBrand(['targets/.DS_Store', 'targets/notes.md', 'targets/backend/package.json']);
+        const targets = discoverTargets(root);
+        ctx.expect(targets.backend).toBe(path.join(root, 'targets', 'backend'));
+        ctx.expect(targets.web).toBe(null);
+      },
+    },
 
-  await assert.rejects(() => harness.step('sign out', async () => { throw new Error('currentUser still set'); }));
+    // ---- the ready markers (the contract with @omega.js/backend and @omega.js/web)
 
-  callExit(harness);
+    {
+      name: 'the emulator marker is the POST-SEED line, not firebase-tools\' own',
+      run: (ctx) => {
+        ctx.expect('\n  Emulator ready. Press Ctrl+C to shut down...\n').toMatch(EMULATOR_READY_MARKER);
+        ctx.expect(EMULATOR_READY_MARKER.test('All emulators ready! It is now safe to connect'), 'seeding runs AFTER that line and starts with a full wipe — waiting on it races the wipe').toBe(false);
+      },
+    },
 
-  const contents = fs.readFileSync(stepsLog, 'utf8');
-  const verdicts = contents.split('\n').filter((line) => /^(PASS|FAIL) /.test(line));
-  assert.equal(verdicts.length, 1);
-  assert.equal(/preflight/.test(contents), false);
-});
+    {
+      name: 'the dev marker captures the ORIGIN, protocol included (omega dev serves mkcert HTTPS)',
+      run: (ctx) => {
+        ctx.expect('Dev server: https://localhost:4001'.match(DEV_READY_MARKER)[1]).toBe('https://localhost:4001');
+        ctx.expect('Dev server: http://localhost:4002'.match(DEV_READY_MARKER)[1]).toBe('http://localhost:4002');
+      },
+    },
 
-// ---- childEnv: the port both children need
+    // ---- resolveLocalBin
 
-test('childEnv carries the resolved website port to both children', () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  assert.equal(harness.childEnv.OMEGA_WEBSITE_PORT, undefined, 'nothing is claimed before allocation');
+    {
+      name: 'resolveLocalBin climbs to the nearest install carrying the bin',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        write(path.join(root, 'node_modules', '.bin', 'mgr'), '#!/bin/sh\n');
+        const targetDir = path.join(root, 'targets', 'backend');
+        fs.mkdirSync(targetDir, { recursive: true });
 
-  harness.sitePort = 4001;
-  assert.equal(harness.childEnv.OMEGA_WEBSITE_PORT, '4001');
-  assert.equal(harness.childEnv.PATH, process.env.PATH, 'the rest of the environment rides along');
-});
+        ctx.expect(resolveLocalBin('mgr', targetDir)).toBe(path.join(root, 'node_modules', '.bin', 'mgr'));
+      },
+    },
 
-// ---- preparePage
+    {
+      name: 'resolveLocalBin prefers the NEAREST install over an outer one',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        write(path.join(root, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
+        const targetDir = path.join(root, 'targets', 'web');
+        write(path.join(targetDir, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
 
-test('preparePage wires console capture and injects the resolved emulator map as a FALLBACK (#300)', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  harness.emulatorPorts = { auth: 9199, firestore: 8180, hosting: 5099 };
+        ctx.expect(resolveLocalBin('omega', targetDir)).toBe(path.join(targetDir, 'node_modules', '.bin', 'omega'));
+      },
+    },
 
-  const events = [];
-  const injections = [];
-  const fakePage = {
-    on(event) { events.push(event); },
-    async evaluateOnNewDocument(fn, ports) { injections.push({ fn, ports }); },
-  };
+    {
+      name: 'a missing bin fails loudly, naming the install to run',
+      run: (ctx) => {
+        const root = makeTempBrand(['targets/backend/package.json']);
+        ctx.expect(() => resolveLocalBin('mgr', path.join(root, 'targets', 'backend'))).toThrow(/no node_modules\/\.bin\/mgr above .* — run npm install in the brand/);
+      },
+    },
 
-  await harness.preparePage(fakePage);
+    // ---- resolveDevTarget: the web leg's precondition
 
-  assert.deepEqual(events.sort(), ['console', 'pageerror'], 'console capture wired');
-  assert.equal(injections.length, 1);
-  assert.deepEqual(injections[0].ports, { auth: 9199, firestore: 8180, hosting: 5099 });
-  // The injected function must set the runtime channel the client reads for
-  // the keys a page's own chrome does NOT carry
-  const win = {};
-  const originalWindow = global.window;
-  global.window = win;
-  try {
-    injections[0].fn(injections[0].ports);
-  } finally {
-    global.window = originalWindow;
-  }
-  assert.deepEqual(win.__OMEGA_DEV_PORTS__, { auth: 9199, firestore: 8180, hosting: 5099 });
-});
+    {
+      name: 'a web target declaring @omega.js/web resolves to that framework',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        const webDir = path.join(root, 'targets', 'web');
+        write(path.join(webDir, 'package.json'), JSON.stringify({
+          name: 'web', devDependencies: { '@omega.js/web': '*' },
+        }));
 
-// ---- teardown
+        const target = resolveDevTarget(webDir, root);
+        ctx.expect(target.kind).toBe('framework');
+        ctx.expect(target.name).toBe('@omega.js/web');
+      },
+    },
 
-test('teardown writes page.log (even empty) and releases everything boot() started', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
+    {
+      name: 'a web target declaring NO framework refuses by name (never a stray dispatch)',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        write(path.join(root, 'config', 'omega.json5'), "{ targets: { web: { type: 'web' } } }\n");
+        const webDir = path.join(root, 'targets', 'web');
+        write(path.join(webDir, 'package.json'), JSON.stringify({ name: 'web' }));
 
-  const closed = [];
-  harness.browser = { close: async () => { closed.push('browser'); } };
-  // Children that have already exited: stopChild signals nothing, which is
-  // what a unit test may do — the real group stop is boot-child.test.js's.
-  harness.dev = { child: { exitCode: 0, pid: -1 } };
-  harness.emulator = { child: { exitCode: 0, pid: -1 } };
-  harness.hold = { servers: [{ close: () => closed.push('port') }] };
+        ctx.expect(() => resolveDevTarget(webDir, root)).toThrow(/^targets\/web declares no web framework dependency, so there is no `omega dev` to boot/);
+      },
+    },
 
-  await harness.teardown();
+    // ---- step() accounting
 
-  const pageLog = path.join(root, 'test', 'e2e', '.logs', 'page.log');
-  assert.equal(fs.existsSync(pageLog), true, 'page.log must exist even with no console output');
-  assert.deepEqual(closed, ['browser', 'port']);
-  assert.equal(harness.browser, null);
-  assert.equal(harness.dev, null);
-  assert.equal(harness.emulator, null);
-  assert.equal(harness.hold, null);
-});
+    {
+      name: 'step records failures and rethrows; passes do not accumulate',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
 
-test('teardown is safe on a harness that never booted', async () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  await harness.teardown();
-  assert.equal(fs.existsSync(path.join(root, 'test', 'e2e', '.logs', 'page.log')), true);
-});
+        await harness.step('passing step', async () => 'detail');
+        ctx.expect(harness.failures.length).toBe(0);
 
-// ---- siteUrl
+        await ctx.expect((() => harness.step('failing step', async () => { throw new Error('boom'); }))()).rejects.toThrow(/boom/);
+        ctx.expect(harness.failures.length).toBe(1);
+        ctx.expect(harness.failures[0].name).toBe('failing step');
+      },
+    },
 
-test('siteUrl is the origin the dev server REPORTED, not one composed from a port', () => {
-  const root = makeTempBrand([]);
-  const harness = new E2eHarness(root);
-  assert.equal(harness.siteUrl, null, 'nothing is claimed before the dev server says so');
+    {
+      name: 'the log dir is the lane folder, and every step writes its verdict as it lands',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
 
-  harness._siteUrl = 'https://localhost:4001';
-  assert.equal(harness.siteUrl, 'https://localhost:4001');
+        await harness.step('page boots @omega.js/client against the emulators', async () => 'auth :9099');
+        await ctx.expect((() => harness.step('signup creates the auth user', async () => {
+            throw new Error('user doc not created within 90s\n      (last state: null)');
+          }))()).rejects.toThrow(/user doc not created/);
+
+        const contents = fs.readFileSync(stepsLog, 'utf8');
+        ctx.expect(contents).toMatch(/^PASS {2}page boots @omega\.js\/client against the emulators \(auth :9099\)$/m);
+        // One line per step: the multi-line failure detail collapses
+        ctx.expect(contents).toMatch(/^FAIL {2}signup creates the auth user — user doc not created within 90s \(last state: null\)$/m);
+      },
+    },
+
+    {
+      name: 'a failure recorded outside step() lands as a preflight verdict on exit',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+
+        // What a runner does when launchBrowser()/preparePage() dies before any step
+        // ran — without this the file would hold a header and nothing else.
+        harness.failures.push({ name: 'harness setup', error: new Error('puppeteer.launch failed') });
+
+        ctx.expect(callExit(harness)).toBe(1);
+        ctx.expect(fs.readFileSync(stepsLog, 'utf8')).toMatch(/^FAIL {2}preflight — puppeteer\.launch failed$/m);
+      },
+    },
+
+    {
+      name: 'exit() adds no preflight line when a step already recorded the failure',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+
+        await ctx.expect((() => harness.step('sign out', async () => { throw new Error('currentUser still set'); }))()).rejects.toThrow();
+
+        callExit(harness);
+
+        const contents = fs.readFileSync(stepsLog, 'utf8');
+        const verdicts = contents.split('\n').filter((line) => /^(PASS|FAIL) /.test(line));
+        ctx.expect(verdicts.length).toBe(1);
+        ctx.expect(/preflight/.test(contents)).toBe(false);
+      },
+    },
+
+    // ---- childEnv: the port both children need
+
+    {
+      name: 'childEnv carries the resolved website port to both children',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        ctx.expect(harness.childEnv.OMEGA_WEBSITE_PORT, 'nothing is claimed before allocation').toBe(undefined);
+
+        harness.sitePort = 4001;
+        ctx.expect(harness.childEnv.OMEGA_WEBSITE_PORT).toBe('4001');
+        ctx.expect(harness.childEnv.PATH, 'the rest of the environment rides along').toBe(process.env.PATH);
+      },
+    },
+
+    // ---- preparePage
+
+    {
+      name: 'preparePage wires console capture and injects the resolved emulator map as a FALLBACK (#300)',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        harness.emulatorPorts = { auth: 9199, firestore: 8180, hosting: 5099 };
+
+        const events = [];
+        const injections = [];
+        const fakePage = {
+          on(event) { events.push(event); },
+          async evaluateOnNewDocument(fn, ports) { injections.push({ fn, ports }); },
+        };
+
+        await harness.preparePage(fakePage);
+
+        ctx.expect(events.sort(), 'console capture wired').toEqual(['console', 'pageerror']);
+        ctx.expect(injections.length).toBe(1);
+        ctx.expect(injections[0].ports).toEqual({ auth: 9199, firestore: 8180, hosting: 5099 });
+        // The injected function must set the runtime channel the client reads for
+        // the keys a page's own chrome does NOT carry
+        const win = {};
+        const originalWindow = global.window;
+        global.window = win;
+        try {
+          injections[0].fn(injections[0].ports);
+        } finally {
+          global.window = originalWindow;
+        }
+        ctx.expect(win.__OMEGA_DEV_PORTS__).toEqual({ auth: 9199, firestore: 8180, hosting: 5099 });
+      },
+    },
+
+    // ---- teardown
+
+    {
+      name: 'teardown writes page.log (even empty) and releases everything boot() started',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+
+        const closed = [];
+        harness.browser = { close: async () => { closed.push('browser'); } };
+        // Children that have already exited: stopChild signals nothing, which is
+        // what a unit test may do — the real group stop is boot-child.test.js's.
+        harness.dev = { child: { exitCode: 0, pid: -1 } };
+        harness.emulator = { child: { exitCode: 0, pid: -1 } };
+        harness.hold = { servers: [{ close: () => closed.push('port') }] };
+
+        await harness.teardown();
+
+        const pageLog = path.join(root, 'test', 'e2e', '.logs', 'page.log');
+        ctx.expect(fs.existsSync(pageLog), 'page.log must exist even with no console output').toBe(true);
+        ctx.expect(closed).toEqual(['browser', 'port']);
+        ctx.expect(harness.browser).toBe(null);
+        ctx.expect(harness.dev).toBe(null);
+        ctx.expect(harness.emulator).toBe(null);
+        ctx.expect(harness.hold).toBe(null);
+      },
+    },
+
+    {
+      name: 'teardown is safe on a harness that never booted',
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        await harness.teardown();
+        ctx.expect(fs.existsSync(path.join(root, 'test', 'e2e', '.logs', 'page.log'))).toBe(true);
+      },
+    },
+
+    // ---- siteUrl
+
+    {
+      name: 'siteUrl is the origin the dev server REPORTED, not one composed from a port',
+      run: (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        ctx.expect(harness.siteUrl, 'nothing is claimed before the dev server says so').toBe(null);
+
+        harness._siteUrl = 'https://localhost:4001';
+        ctx.expect(harness.siteUrl).toBe('https://localhost:4001');
+      },
+    },
+  ],
 });

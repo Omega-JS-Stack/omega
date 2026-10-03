@@ -5,8 +5,7 @@
  * Each hook has its own agent-plugins-<hook>.test.js beside this one.
  * Run: node --test scripts/agent-plugins.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,100 +27,126 @@ const frontmatter = (source) => {
   return fields;
 };
 
-test('marketplace: parses, names its owner, and lists at least one plugin', () => {
-  const marketplace = readJson(MARKETPLACE);
-  assert.equal(marketplace.name, 'omega');
-  assert.ok(marketplace.owner && marketplace.owner.name, 'owner.name is required');
-  assert.ok(Array.isArray(marketplace.plugins) && marketplace.plugins.length > 0);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'agent-plugins',
+  tests: [
+    {
+      name: 'marketplace: parses, names its owner, and lists at least one plugin',
+      run: (ctx) => {
+        const marketplace = readJson(MARKETPLACE);
+        ctx.expect(marketplace.name).toBe('omega');
+        ctx.expect(marketplace.owner && marketplace.owner.name, 'owner.name is required').toBeTruthy();
+        ctx.expect(Array.isArray(marketplace.plugins) && marketplace.plugins.length > 0).toBeTruthy();
+      },
+    },
 
-test('marketplace: the local manifest names omega-local and lists the same plugin folder', () => {
-  const local = readJson(LOCAL_MARKETPLACE);
-  assert.equal(local.name, 'omega-local');
-  assert.ok(local.owner && local.owner.name, 'owner.name is required');
-  assert.deepEqual(local.plugins.map((entry) => [entry.name, entry.source]), [['omega', './agent-plugins/claude']]);
-  assert.deepEqual(readJson(MARKETPLACE).plugins.map((entry) => [entry.name, entry.source]), [['omega', './agent-plugins/claude']]);
-});
+    {
+      name: 'marketplace: the local manifest names omega-local and lists the same plugin folder',
+      run: (ctx) => {
+        const local = readJson(LOCAL_MARKETPLACE);
+        ctx.expect(local.name).toBe('omega-local');
+        ctx.expect(local.owner && local.owner.name, 'owner.name is required').toBeTruthy();
+        ctx.expect(local.plugins.map((entry) => [entry.name, entry.source])).toEqual([['omega', './agent-plugins/claude']]);
+        ctx.expect(readJson(MARKETPLACE).plugins.map((entry) => [entry.name, entry.source])).toEqual([['omega', './agent-plugins/claude']]);
+      },
+    },
 
-test('marketplace: every source resolves to a directory holding a manifest', () => {
-  for (const entry of [...readJson(MARKETPLACE).plugins, ...readJson(LOCAL_MARKETPLACE).plugins]) {
-    assert.ok(entry.name, 'a plugin entry needs a name');
-    assert.ok(entry.source.startsWith('./'), `${entry.name}: source must be repo-relative`);
+    {
+      name: 'marketplace: every source resolves to a directory holding a manifest',
+      run: (ctx) => {
+        for (const entry of [...readJson(MARKETPLACE).plugins, ...readJson(LOCAL_MARKETPLACE).plugins]) {
+          ctx.expect(entry.name, 'a plugin entry needs a name').toBeTruthy();
+          ctx.expect(entry.source.startsWith('./'), `${entry.name}: source must be repo-relative`).toBeTruthy();
 
-    const dir = path.join(ROOT, entry.source);
-    assert.ok(fs.existsSync(dir), `${entry.name}: ${entry.source} does not exist`);
+          const dir = path.join(ROOT, entry.source);
+          ctx.expect(fs.existsSync(dir), `${entry.name}: ${entry.source} does not exist`).toBeTruthy();
 
-    const manifest = path.join(dir, '.claude-plugin', 'plugin.json');
-    assert.ok(fs.existsSync(manifest), `${entry.name}: no .claude-plugin/plugin.json in ${entry.source}`);
+          const manifest = path.join(dir, '.claude-plugin', 'plugin.json');
+          ctx.expect(fs.existsSync(manifest), `${entry.name}: no .claude-plugin/plugin.json in ${entry.source}`).toBeTruthy();
 
-    const plugin = readJson(manifest);
-    assert.equal(plugin.name, entry.name, `${entry.name}: manifest name disagrees with the marketplace`);
-    assert.ok(plugin.description, `${entry.name}: manifest needs a description`);
-    assert.match(plugin.version, /^\d+\.\d+\.\d+$/, `${entry.name}: version must be semver`);
-  }
-});
+          const plugin = readJson(manifest);
+          ctx.expect(plugin.name, `${entry.name}: manifest name disagrees with the marketplace`).toBe(entry.name);
+          ctx.expect(plugin.description, `${entry.name}: manifest needs a description`).toBeTruthy();
+          ctx.expect(plugin.version, `${entry.name}: version must be semver`).toMatch(/^\d+\.\d+\.\d+$/);
+        }
+      },
+    },
 
-test('settings: the monorepo turns on the local copy by its own name and turns the published one off', () => {
-  const settings = readJson(path.join(ROOT, '.claude', 'settings.json'));
+    {
+      name: 'settings: the monorepo turns on the local copy by its own name and turns the published one off',
+      run: (ctx) => {
+        const settings = readJson(path.join(ROOT, '.claude', 'settings.json'));
 
-  assert.deepEqual(
-    settings.extraKnownMarketplaces['omega-local'].source,
-    { source: 'file', path: './.claude-plugin/marketplace.local.json' },
-    'the repo IS the local copy: its own manifest, by a relative path',
-  );
-  assert.equal(settings.enabledPlugins['omega@omega-local'], true);
-  assert.equal(settings.enabledPlugins['omega@omega'], false, 'both on at once loads either copy');
-  assert.equal(settings.extraKnownMarketplaces.omega, undefined, 'the monorepo never declares the published name, or it would fight every live brand for its record');
-});
+        ctx.expect(settings.extraKnownMarketplaces['omega-local'].source, 'the repo IS the local copy: its own manifest, by a relative path').toEqual({ source: 'file', path: './.claude-plugin/marketplace.local.json' });
+        ctx.expect(settings.enabledPlugins['omega@omega-local']).toBe(true);
+        ctx.expect(settings.enabledPlugins['omega@omega'], 'both on at once loads either copy').toBe(false);
+        ctx.expect(settings.extraKnownMarketplaces.omega, 'the monorepo never declares the published name, or it would fight every live brand for its record').toBe(undefined);
+      },
+    },
 
-test('settings: the brand writer speaks the same names the manifests declare', () => {
-  const names = require(path.join(ROOT, 'packages', 'manager', 'src', 'lib', 'claude-settings.js'));
-  const published = readJson(MARKETPLACE);
-  const local = readJson(LOCAL_MARKETPLACE);
+    {
+      name: 'settings: the brand writer speaks the same names the manifests declare',
+      run: (ctx) => {
+        const names = require(path.join(ROOT, 'packages', 'manager', 'src', 'lib', 'claude-settings.js'));
+        const published = readJson(MARKETPLACE);
+        const local = readJson(LOCAL_MARKETPLACE);
 
-  assert.equal(names.MARKETPLACE_NAME, published.name);
-  assert.equal(names.LOCAL_MARKETPLACE_NAME, local.name);
-  assert.equal(names.PLUGIN_ID, `${published.plugins[0].name}@${published.name}`);
-  assert.equal(names.LOCAL_PLUGIN_ID, `${local.plugins[0].name}@${local.name}`);
-  assert.ok(fs.existsSync(path.join(ROOT, names.LOCAL_MANIFEST)), `${names.LOCAL_MANIFEST} is a file in this repo`);
-});
+        ctx.expect(names.MARKETPLACE_NAME).toBe(published.name);
+        ctx.expect(names.LOCAL_MARKETPLACE_NAME).toBe(local.name);
+        ctx.expect(names.PLUGIN_ID).toBe(`${published.plugins[0].name}@${published.name}`);
+        ctx.expect(names.LOCAL_PLUGIN_ID).toBe(`${local.plugins[0].name}@${local.name}`);
+        ctx.expect(fs.existsSync(path.join(ROOT, names.LOCAL_MANIFEST)), `${names.LOCAL_MANIFEST} is a file in this repo`).toBeTruthy();
+      },
+    },
 
-test('skills: each one is bare-named, matches its directory, and describes itself', () => {
-  for (const entry of readJson(MARKETPLACE).plugins) {
-    const skillsDir = path.join(ROOT, entry.source, 'skills');
-    if (!fs.existsSync(skillsDir)) continue;
+    {
+      name: 'skills: each one is bare-named, matches its directory, and describes itself',
+      run: (ctx) => {
+        for (const entry of readJson(MARKETPLACE).plugins) {
+          const skillsDir = path.join(ROOT, entry.source, 'skills');
+          if (!fs.existsSync(skillsDir)) continue;
 
-    const dirs = fs.readdirSync(skillsDir, { withFileTypes: true })
-      .filter((item) => item.isDirectory())
-      .map((item) => item.name);
+          const dirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+            .filter((item) => item.isDirectory())
+            .map((item) => item.name);
 
-    for (const name of dirs) {
-      const file = path.join(skillsDir, name, 'SKILL.md');
-      assert.ok(fs.existsSync(file), `${name}: no SKILL.md`);
+          for (const name of dirs) {
+            const file = path.join(skillsDir, name, 'SKILL.md');
+            ctx.expect(fs.existsSync(file), `${name}: no SKILL.md`).toBeTruthy();
 
-      const fields = frontmatter(fs.readFileSync(file, 'utf8'));
-      assert.ok(fields, `${name}: SKILL.md has no frontmatter block`);
-      assert.equal(fields.name, name, `${name}: frontmatter name disagrees with the directory`);
-      assert.ok(!fields.name.includes(':'), `${name}: skill names are bare — the plugin supplies the omega: namespace`);
-      assert.ok(fields.description, `${name}: frontmatter needs a description`);
-    }
-  }
-});
+            const fields = frontmatter(fs.readFileSync(file, 'utf8'));
+            ctx.expect(fields, `${name}: SKILL.md has no frontmatter block`).toBeTruthy();
+            ctx.expect(fields.name, `${name}: frontmatter name disagrees with the directory`).toBe(name);
+            ctx.expect(!fields.name.includes(':'), `${name}: skill names are bare — the plugin supplies the omega: namespace`).toBeTruthy();
+            ctx.expect(fields.description, `${name}: frontmatter needs a description`).toBeTruthy();
+          }
+        }
+      },
+    },
 
-test('mcp: the plugin declares exactly one MCP server — the router', () => {
-  const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
-  assert.deepEqual(Object.keys(mcp.mcpServers), ['mcp-router']);
-  assert.deepEqual(mcp.mcpServers['mcp-router'], {
-    type: 'stdio',
-    command: 'node',
-    args: ['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js'],
-  });
-});
+    {
+      name: 'mcp: the plugin declares exactly one MCP server — the router',
+      run: (ctx) => {
+        const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
+        ctx.expect(Object.keys(mcp.mcpServers)).toEqual(['mcp-router']);
+        ctx.expect(mcp.mcpServers['mcp-router']).toEqual({
+          type: 'stdio',
+          command: 'node',
+          args: ['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js'],
+        });
+      },
+    },
 
-test('mcp: the router entry resolves to a real file from the plugin root', () => {
-  const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
-  const pluginRoot = path.join(ROOT, 'agent-plugins', 'claude');
-  const resolved = mcp.mcpServers['mcp-router'].args[0]
-    .replace('${CLAUDE_PLUGIN_ROOT}', pluginRoot);
-  assert.ok(fs.existsSync(path.resolve(resolved)), `no file at ${resolved}`);
+    {
+      name: 'mcp: the router entry resolves to a real file from the plugin root',
+      run: (ctx) => {
+        const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
+        const pluginRoot = path.join(ROOT, 'agent-plugins', 'claude');
+        const resolved = mcp.mcpServers['mcp-router'].args[0]
+          .replace('${CLAUDE_PLUGIN_ROOT}', pluginRoot);
+        ctx.expect(fs.existsSync(path.resolve(resolved)), `no file at ${resolved}`).toBeTruthy();
+      },
+    },
+  ],
 });

@@ -1,48 +1,80 @@
-const { describe, it, before } = require('node:test');
-const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { getOmega, TEST_CONFIG, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
 
-describe('DOM Module', () => {
+const beforeEachHook = clearStorage;
 
-  before(async () => {
-    await getOmega().initialize(TEST_CONFIG);
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'dom',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        await getOmega().initialize(TEST_CONFIG);
+      })()));
 
-  it('should expose loadScript and ready', () => {
-    const dom = getOmega().dom;
-    assert(typeof dom.loadScript === 'function');
-    assert(typeof dom.ready === 'function');
-  });
+      cases.push({
+        name: 'DOM Module > should expose loadScript and ready',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const dom = getOmega().dom;
+          ctx.expect(typeof dom.loadScript === 'function').toBeTruthy();
+          ctx.expect(typeof dom.ready === 'function').toBeTruthy();
+        },
+      });
 
-  it('ready should resolve immediately when DOM is complete', async () => {
-    await getOmega().dom.ready();
-  });
+      cases.push({
+        name: 'DOM Module > ready should resolve immediately when DOM is complete',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          await getOmega().dom.ready();
+        },
+      });
 
-  it('loadScript should reject when no src provided', async () => {
-    try {
-      await getOmega().dom.loadScript({});
-      assert.fail('Should have thrown');
-    } catch (e) {
-      assert(e.message.includes('source is required'));
-    }
-  });
+      cases.push({
+        name: 'DOM Module > loadScript should reject when no src provided',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          try {
+            await getOmega().dom.loadScript({});
+            ctx.expect.fail('Should have thrown');
+          } catch (e) {
+            ctx.expect(e.message.includes('source is required')).toBeTruthy();
+          }
+        },
+      });
 
-  it('replaceChildren clears and appends where the browser has no native replaceChildren', () => {
-    const calls = [];
-    const el = {
-      children: ['stale'],
-      set innerHTML(value) {
-        calls.push(`innerHTML=${JSON.stringify(value)}`);
-        this.children = [];
-      },
-      append(...nodes) {
-        calls.push('append');
-        this.children.push(...nodes);
-      },
-    };
+      cases.push({
+        name: 'DOM Module > replaceChildren clears and appends where the browser has no native replaceChildren',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          const calls = [];
+          const el = {
+            children: ['stale'],
+            set innerHTML(value) {
+              calls.push(`innerHTML=${JSON.stringify(value)}`);
+              this.children = [];
+            },
+            append(...nodes) {
+              calls.push('append');
+              this.children.push(...nodes);
+            },
+          };
 
-    getOmega().dom.replaceChildren(el, 'a', 'b');
+          getOmega().dom.replaceChildren(el, 'a', 'b');
 
-    assert.deepStrictEqual(calls, ['innerHTML=""', 'append']);
-    assert.deepStrictEqual(el.children, ['a', 'b']);
-  });
+          ctx.expect(calls).toEqual(['innerHTML=""', 'append']);
+          ctx.expect(el.children).toEqual(['a', 'b']);
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

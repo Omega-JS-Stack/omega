@@ -4,8 +4,7 @@
 // (no committed fixtures — trees are tiny and per-test isolation matters), runs
 // applyDefaults, and asserts on the consumer tree + the returned summary.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
@@ -32,171 +31,6 @@ function stage(defaultsFiles, consumerFiles) {
 }
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
-
-test('throws without defaultsDir/outputDir', () => {
-  assert.throws(() => applyDefaults({}), /defaultsDir and outputDir are required/);
-});
-
-test('fresh scaffold: copies files, strips `_.`, skips archive dirs and .DS_Store, .gitkeep creates dir only', () => {
-  const { defaultsDir, outputDir } = stage({
-    'README.md': 'readme',
-    '_.gitignore': 'node_modules/',
-    '_.env': `${DEFAULT_MARKER}\nKEY=""\n${CUSTOM_MARKER}\n`,
-    '_mas/reference.plist': 'archive material',
-    'src/.DS_Store': 'junk',
-    'src/assets/.gitkeep': '',
-    'test/_init.js': 'module.exports = {};',
-  }, {});
-
-  const result = applyDefaults({ defaultsDir, outputDir, logger: quiet });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'README.md')), 'readme');
-  assert.equal(jetpack.read(path.join(outputDir, '.gitignore')), 'node_modules/');
-  assert.ok(jetpack.exists(path.join(outputDir, '.env')));
-  assert.equal(jetpack.exists(path.join(outputDir, '_mas')), false);
-  assert.equal(jetpack.exists(path.join(outputDir, 'src', '.DS_Store')), false);
-  assert.equal(jetpack.exists(path.join(outputDir, 'src', 'assets')), 'dir');
-  assert.equal(jetpack.exists(path.join(outputDir, 'src', 'assets', '.gitkeep')), false);
-  // `_`-prefixed FILENAMES are not archives — they ship.
-  assert.equal(jetpack.read(path.join(outputDir, 'test', '_init.js')), 'module.exports = {};');
-  assert.equal(result.merged.length, 0);
-});
-
-test('overwrite rules: default overwrites, `overwrite: false` preserves the consumer file', () => {
-  const { defaultsDir, outputDir } = stage({
-    'always.txt': 'framework',
-    'docs/page.md': 'framework',
-  }, {
-    'always.txt': 'consumer',
-    'docs/page.md': 'consumer',
-  });
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { '**/*.md': { overwrite: false } },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'always.txt')), 'framework');
-  assert.equal(jetpack.read(path.join(outputDir, 'docs', 'page.md')), 'consumer');
-});
-
-test('skip and overwrite accept functions receiving the item', () => {
-  const { defaultsDir, outputDir } = stage({
-    'pages/a.html': 'a',
-    'pages/b.html': 'b',
-  }, {});
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'pages/**/*': { skip: (item) => item.name === 'b.html' } },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'pages', 'a.html')), 'a');
-  assert.equal(jetpack.exists(path.join(outputDir, 'pages', 'b.html')), false);
-});
-
-test('name and path rules rewrite the destination', () => {
-  const { defaultsDir, outputDir } = stage({ 'tpl/file.txt': 'x' }, {});
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: {
-      'tpl/file.txt': {
-        name: (item) => item.name.replace('file', 'renamed'),
-        path: () => 'moved',
-      },
-    },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'moved', 'renamed.txt')), 'x');
-});
-
-test('template rule renders {{ key.path }}; unknown keys (GitHub ${{ }}) survive', () => {
-  const { defaultsDir, outputDir } = stage({
-    '.nvmrc': 'v{{ versions.node }}',
-    'wf.yml': 'node: {{ versions.node }}\ntoken: ${{ secrets.GH_TOKEN }}',
-  }, {});
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { '{.nvmrc,wf.yml}': { template: { versions: { node: '22' } } } },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, '.nvmrc')), 'v22');
-  assert.equal(jetpack.read(path.join(outputDir, 'wf.yml')), 'node: 22\ntoken: ${{ secrets.GH_TOKEN }}');
-});
-
-test('mergeLines rule: consumer custom values survive, new framework keys arrive, a retired line leaves', () => {
-  const { defaultsDir, outputDir } = stage({
-    '_.env': `${DEFAULT_MARKER}\nGH_TOKEN=""\nNEW_KEY=""\n${CUSTOM_MARKER}\n`,
-    '_.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/*\n${CUSTOM_MARKER}\n`,
-  }, {
-    '.env': `${DEFAULT_MARKER}\nGH_TOKEN="mine"\n${CUSTOM_MARKER}\nCUSTOM="kept"\n`,
-    '.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/\n${CUSTOM_MARKER}\nmy-secret-dir/\n`,
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { '{_.env,_.gitignore}': { mergeLines: true } },
-    logger: quiet,
-  });
-
-  const env = jetpack.read(path.join(outputDir, '.env'));
-  assert.match(env, /GH_TOKEN="mine"/);
-  assert.match(env, /NEW_KEY=""/);
-  assert.match(env, /CUSTOM="kept"/);
-
-  // The framework block is fully managed (#926): a line the new block no longer
-  // carries leaves the consumer instead of moving under the Custom marker.
-  const gitignore = jetpack.read(path.join(outputDir, '.gitignore'));
-  assert.doesNotMatch(gitignore, /^config\/certs\/$/m);
-  assert.match(gitignore, /^config\/certs\/\*$/m);
-  assert.match(gitignore, /my-secret-dir\//);
-
-  assert.deepEqual(result.merged.slice().sort(), ['.env', '.gitignore']);
-});
-
-test('merge rule (JSON5): consumer values + consumer-only keys survive, `default` sentinel replaced', () => {
-  const { defaultsDir, outputDir } = stage({
-    'config/app.json5': JSON5.stringify({ theme: { id: 'classy' }, port: 1000, fresh: true }, null, 2),
-  }, {
-    'config/app.json5': JSON5.stringify({
-      theme: { id: 'custom', retiredSentinel: 'default', retiredValue: 'keep-me' },
-      port: 'default',
-      consumerOnly: { nested: 1 },
-      retiredSentinel: 'default',
-    }, null, 2),
-  });
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'config/app.json5': { merge: true } },
-    logger: quiet,
-  });
-
-  const merged = JSON5.parse(jetpack.read(path.join(outputDir, 'config', 'app.json5')));
-  assert.equal(merged.theme.id, 'custom');
-  assert.equal(merged.port, 1000);
-  assert.equal(merged.fresh, true);
-  assert.deepEqual(merged.consumerOnly, { nested: 1 });
-
-  // A key the framework no longer declares whose value is the `default` sentinel
-  // is the framework's own unset marker, so it drops at every level (#926); a key
-  // holding a real value is the consumer's and stays.
-  assert.equal('retiredSentinel' in merged, false);
-  assert.equal('retiredSentinel' in merged.theme, false);
-  assert.equal(merged.theme.retiredValue, 'keep-me');
-});
 
 // The consumer's config/omega.json5 is hand-edited: comments, blank lines and
 // the trailing newline are theirs, so the merge writes only the differing keys
@@ -236,212 +70,6 @@ const COMMENTED_MERGED = [
   '',
 ].join('\n');
 
-test('merge rule (JSON5): comments, blank lines and formatting survive, the file ends with one newline', () => {
-  const { defaultsDir, outputDir } = stage({
-    'config/app.json5': COMMENTED_DEFAULTS,
-  }, {
-    // No trailing newline: the merge adds the one the consumer's editor dropped.
-    'config/app.json5': COMMENTED_CONSUMER,
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'config/app.json5': { merge: true } },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'config', 'app.json5')), COMMENTED_MERGED);
-  assert.deepEqual(result.merged, [path.join('config', 'app.json5')]);
-});
-
-test('merge rule (JSON5): a rerun with nothing to change writes nothing', () => {
-  const { defaultsDir, outputDir } = stage({
-    'config/app.json5': COMMENTED_DEFAULTS,
-  }, {
-    'config/app.json5': COMMENTED_CONSUMER,
-  });
-  const config = {
-    defaultsDir,
-    outputDir,
-    fileMap: { 'config/app.json5': { merge: true } },
-    logger: quiet,
-  };
-
-  applyDefaults(config);
-  const second = applyDefaults(config);
-
-  assert.deepEqual(second.merged, []);
-  assert.deepEqual(second.skipped, [path.join('config', 'app.json5')]);
-  assert.equal(jetpack.read(path.join(outputDir, 'config', 'app.json5')), COMMENTED_MERGED);
-});
-
-test('files subset (watch single-file mode) processes only the listed source', () => {
-  const { defaultsDir, outputDir } = stage({ 'a.txt': 'a', 'b.txt': 'b' }, {});
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    files: [path.join(defaultsDir, 'a.txt')],
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'a.txt')), 'a');
-  assert.equal(jetpack.exists(path.join(outputDir, 'b.txt')), false);
-});
-
-test('global transform hook runs on text files, never on binaries', () => {
-  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01]);
-  const { defaultsDir, outputDir } = stage({ 'page.md': 'Hello [site.name]' }, {});
-  jetpack.write(path.join(defaultsDir, 'img.png'), png);
-
-  applyDefaults({
-    defaultsDir,
-    outputDir,
-    transform: (contents) => contents.replace('[site.name]', 'Acme'),
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.read(path.join(outputDir, 'page.md')), 'Hello Acme');
-  assert.deepEqual(jetpack.read(path.join(outputDir, 'img.png'), 'buffer'), png);
-});
-
-test('idempotency: a second run writes and merges nothing', () => {
-  const { defaultsDir, outputDir } = stage({
-    'a.txt': 'a',
-    // Blank line before the Custom marker matters: the merge protocol normalizes
-    // to that shape, so a template without it gets one merge-write before stabilizing.
-    '_.env': `${DEFAULT_MARKER}\nKEY=""\n\n${CUSTOM_MARKER}\n`,
-    'config/app.json5': JSON5.stringify({ x: 1 }, null, 2),
-  }, {});
-  const config = {
-    defaultsDir,
-    outputDir,
-    fileMap: {
-      '_.env': { mergeLines: true },
-      'config/app.json5': { merge: true },
-    },
-    logger: quiet,
-  };
-
-  applyDefaults(config);
-  const second = applyDefaults(config);
-
-  assert.equal(second.written.length, 0);
-  assert.equal(second.merged.length, 0);
-});
-
-test('mergeJson5Defaults and renderTemplate are exported for direct use', () => {
-  assert.equal(typeof mergeJson5Defaults, 'function');
-  assert.equal(renderTemplate('v{{ v.n }}', { v: { n: 1 } }), 'v1');
-});
-
-test('retire rule: never scaffolds the file when the consumer lacks it', () => {
-  const { defaultsDir, outputDir } = stage({ 'CLAUDE.md': 'framework doc' }, {});
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: quiet,
-  });
-
-  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
-  assert.deepEqual(result.removed, []);
-  assert.deepEqual(result.skipped, ['CLAUDE.md']);
-});
-
-test('retire rule: deletes a marker-less copy identical to the rendered template, pruning emptied dirs', () => {
-  const { defaultsDir, outputDir } = stage({
-    'docs/README.md': 'Docs for v{{ versions.node }}',
-  }, {
-    'docs/README.md': 'Docs for v22',
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'docs/**/*': { retire: true, template: { versions: { node: '22' } } } },
-    logger: quiet,
-  });
-
-  assert.deepEqual(result.removed, [path.join('docs', 'README.md')]);
-  assert.equal(jetpack.exists(path.join(outputDir, 'docs')), false, 'emptied docs/ dir should be pruned');
-});
-
-test('retire rule: a marker-less copy the consumer edited is kept, with a warning', () => {
-  const warnings = [];
-  const { defaultsDir, outputDir } = stage({
-    'CHANGELOG.md': '# CHANGELOG\n',
-  }, {
-    'CHANGELOG.md': '# CHANGELOG\n\n## 1.0.0\n- consumer release notes\n',
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CHANGELOG.md': { retire: true } },
-    logger: { ...quiet, warn: (m) => warnings.push(m) },
-  });
-
-  assert.deepEqual(result.removed, []);
-  assert.match(jetpack.read(path.join(outputDir, 'CHANGELOG.md')), /consumer release notes/);
-  assert.ok(warnings.some((m) => m.includes('consumer content')), 'should warn to move consumer content to the brand root');
-});
-
-test('retire rule: marker files are judged by their Custom section (pristine boilerplate or whitespace-only = framework-owned)', () => {
-  const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': template,
-  }, {
-    // Pristine boilerplate custom section — even with a STALE default section.
-    'CLAUDE.md': `${DEFAULT_MARKER}\nold framework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`,
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: quiet,
-  });
-
-  assert.deepEqual(result.removed, ['CLAUDE.md']);
-  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
-
-  // Whitespace-only custom section is framework-owned too.
-  const ws = stage({ 'CLAUDE.md': template }, {
-    'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n  \n`,
-  });
-  const wsResult = applyDefaults({
-    defaultsDir: ws.defaultsDir,
-    outputDir: ws.outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: quiet,
-  });
-  assert.deepEqual(wsResult.removed, ['CLAUDE.md']);
-});
-
-test('retire rule: a marker file with real consumer notes is kept, with a warning', () => {
-  const warnings = [];
-  const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': template,
-  }, {
-    'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nOur deploy needs the VPN up.\n`,
-  });
-
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: { ...quiet, warn: (m) => warnings.push(m) },
-  });
-
-  assert.deepEqual(result.removed, []);
-  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
-  assert.ok(warnings.some((m) => m.includes('consumer content')));
-});
-
 // A prior generation's generated CLAUDE.md: the framework's own marker grammar,
 // content that no current template renders, and a Custom section carrying the
 // old template's boilerplate plus lines the merge migrated out of Default.
@@ -462,100 +90,549 @@ const LEGACY_GENERATED_DOC = [
   '',
 ].join('\n');
 
-test('retire rule: a PRIOR-GENERATION marker file is swept even when the current template dropped the markers', () => {
-  // #101: CLAUDE.md became the one-line `@AGENTS.md` pointer, so the rendered
-  // template carries no markers — the legacy generated file must still be
-  // recognized as the framework's own and retired, not kept as consumer content.
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': '@AGENTS.md\n',
-  }, {
-    'CLAUDE.md': LEGACY_GENERATED_DOC,
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'defaults-engine',
+  tests: [
+    {
+      name: 'throws without defaultsDir/outputDir',
+      run: (ctx) => {
+        ctx.expect(() => applyDefaults({})).toThrow(/defaultsDir and outputDir are required/);
+      },
+    },
 
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: quiet,
-  });
+    {
+      name: 'fresh scaffold: copies files, strips `_.`, skips archive dirs and .DS_Store, .gitkeep creates dir only',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'README.md': 'readme',
+          '_.gitignore': 'node_modules/',
+          '_.env': `${DEFAULT_MARKER}\nKEY=""\n${CUSTOM_MARKER}\n`,
+          '_mas/reference.plist': 'archive material',
+          'src/.DS_Store': 'junk',
+          'src/assets/.gitkeep': '',
+          'test/_init.js': 'module.exports = {};',
+        }, {});
 
-  assert.deepEqual(result.removed, ['CLAUDE.md']);
-  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
-});
+        const result = applyDefaults({ defaultsDir, outputDir, logger: quiet });
 
-test('retire rule: a consumer-authored file with NO framework markers is kept against a marker-less template', () => {
-  const warnings = [];
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': '@AGENTS.md\n',
-  }, {
-    'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
-  });
+        ctx.expect(jetpack.read(path.join(outputDir, 'README.md'))).toBe('readme');
+        ctx.expect(jetpack.read(path.join(outputDir, '.gitignore'))).toBe('node_modules/');
+        ctx.expect(jetpack.exists(path.join(outputDir, '.env'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(outputDir, '_mas'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(outputDir, 'src', '.DS_Store'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(outputDir, 'src', 'assets'))).toBe('dir');
+        ctx.expect(jetpack.exists(path.join(outputDir, 'src', 'assets', '.gitkeep'))).toBe(false);
+        // `_`-prefixed FILENAMES are not archives — they ship.
+        ctx.expect(jetpack.read(path.join(outputDir, 'test', '_init.js'))).toBe('module.exports = {};');
+        ctx.expect(result.merged.length).toBe(0);
+      },
+    },
 
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'CLAUDE.md': { retire: true } },
-    logger: { ...quiet, warn: (m) => warnings.push(m) },
-  });
+    {
+      name: 'overwrite rules: default overwrites, `overwrite: false` preserves the consumer file',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'always.txt': 'framework',
+          'docs/page.md': 'framework',
+        }, {
+          'always.txt': 'consumer',
+          'docs/page.md': 'consumer',
+        });
 
-  assert.deepEqual(result.removed, []);
-  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
-  assert.ok(warnings.some((m) => m.includes('consumer content')));
-});
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { '**/*.md': { overwrite: false } },
+          logger: quiet,
+        });
 
-test('overwrite:false heals a PRIOR-GENERATION marker file to the marker-less template', () => {
-  // #101 twin gap: on the standalone upgrade path the retire rule never runs —
-  // the legacy content-bearing CLAUDE.md sat under `overwrite: false` and
-  // survived beside the new AGENTS.md. The framework owns it: heal it.
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': '@AGENTS.md\n',
-  }, {
-    'CLAUDE.md': LEGACY_GENERATED_DOC,
-  });
+        ctx.expect(jetpack.read(path.join(outputDir, 'always.txt'))).toBe('framework');
+        ctx.expect(jetpack.read(path.join(outputDir, 'docs', 'page.md'))).toBe('consumer');
+      },
+    },
 
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { '**/*': { overwrite: false } },
-    logger: quiet,
-  });
+    {
+      name: 'skip and overwrite accept functions receiving the item',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'pages/a.html': 'a',
+          'pages/b.html': 'b',
+        }, {});
 
-  assert.deepEqual(result.written, ['CLAUDE.md']);
-  assert.equal(jetpack.read(path.join(outputDir, 'CLAUDE.md')).trim(), '@AGENTS.md');
-});
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'pages/**/*': { skip: (item) => item.name === 'b.html' } },
+          logger: quiet,
+        });
 
-test('overwrite:false still preserves a consumer file with no framework markers', () => {
-  const { defaultsDir, outputDir } = stage({
-    'CLAUDE.md': '@AGENTS.md\n',
-  }, {
-    'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
-  });
+        ctx.expect(jetpack.read(path.join(outputDir, 'pages', 'a.html'))).toBe('a');
+        ctx.expect(jetpack.exists(path.join(outputDir, 'pages', 'b.html'))).toBe(false);
+      },
+    },
 
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { '**/*': { overwrite: false } },
-    logger: quiet,
-  });
+    {
+      name: 'name and path rules rewrite the destination',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({ 'tpl/file.txt': 'x' }, {});
 
-  assert.deepEqual(result.skipped, ['CLAUDE.md']);
-  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
-});
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: {
+            'tpl/file.txt': {
+              name: (item) => item.name.replace('file', 'renamed'),
+              path: () => 'moved',
+            },
+          },
+          logger: quiet,
+        });
 
-test('retire rule: compares through the global transform (an untouched transformed copy is framework-owned)', () => {
-  const { defaultsDir, outputDir } = stage({
-    'docs/README.md': 'Docs for [site.name]',
-  }, {
-    'docs/README.md': 'Docs for Acme',
-  });
+        ctx.expect(jetpack.read(path.join(outputDir, 'moved', 'renamed.txt'))).toBe('x');
+      },
+    },
 
-  const result = applyDefaults({
-    defaultsDir,
-    outputDir,
-    fileMap: { 'docs/**/*': { retire: true } },
-    transform: (contents) => contents.replace('[site.name]', 'Acme'),
-    logger: quiet,
-  });
+    {
+      name: 'template rule renders {{ key.path }}; unknown keys (GitHub ${{ }}) survive',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          '.nvmrc': 'v{{ versions.node }}',
+          'wf.yml': 'node: {{ versions.node }}\ntoken: ${{ secrets.GH_TOKEN }}',
+        }, {});
 
-  assert.deepEqual(result.removed, [path.join('docs', 'README.md')]);
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { '{.nvmrc,wf.yml}': { template: { versions: { node: '22' } } } },
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.read(path.join(outputDir, '.nvmrc'))).toBe('v22');
+        ctx.expect(jetpack.read(path.join(outputDir, 'wf.yml'))).toBe('node: 22\ntoken: ${{ secrets.GH_TOKEN }}');
+      },
+    },
+
+    {
+      name: 'mergeLines rule: consumer custom values survive, new framework keys arrive, a retired line leaves',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          '_.env': `${DEFAULT_MARKER}\nGH_TOKEN=""\nNEW_KEY=""\n${CUSTOM_MARKER}\n`,
+          '_.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/*\n${CUSTOM_MARKER}\n`,
+        }, {
+          '.env': `${DEFAULT_MARKER}\nGH_TOKEN="mine"\n${CUSTOM_MARKER}\nCUSTOM="kept"\n`,
+          '.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/\n${CUSTOM_MARKER}\nmy-secret-dir/\n`,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { '{_.env,_.gitignore}': { mergeLines: true } },
+          logger: quiet,
+        });
+
+        const env = jetpack.read(path.join(outputDir, '.env'));
+        ctx.expect(env).toMatch(/GH_TOKEN="mine"/);
+        ctx.expect(env).toMatch(/NEW_KEY=""/);
+        ctx.expect(env).toMatch(/CUSTOM="kept"/);
+
+        // The framework block is fully managed (#926): a line the new block no longer
+        // carries leaves the consumer instead of moving under the Custom marker.
+        const gitignore = jetpack.read(path.join(outputDir, '.gitignore'));
+        ctx.expect(gitignore).not.toMatch(/^config\/certs\/$/m);
+        ctx.expect(gitignore).toMatch(/^config\/certs\/\*$/m);
+        ctx.expect(gitignore).toMatch(/my-secret-dir\//);
+
+        ctx.expect(result.merged.slice().sort()).toEqual(['.env', '.gitignore']);
+      },
+    },
+
+    {
+      name: 'merge rule (JSON5): consumer values + consumer-only keys survive, `default` sentinel replaced',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'config/app.json5': JSON5.stringify({ theme: { id: 'classy' }, port: 1000, fresh: true }, null, 2),
+        }, {
+          'config/app.json5': JSON5.stringify({
+            theme: { id: 'custom', retiredSentinel: 'default', retiredValue: 'keep-me' },
+            port: 'default',
+            consumerOnly: { nested: 1 },
+            retiredSentinel: 'default',
+          }, null, 2),
+        });
+
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'config/app.json5': { merge: true } },
+          logger: quiet,
+        });
+
+        const merged = JSON5.parse(jetpack.read(path.join(outputDir, 'config', 'app.json5')));
+        ctx.expect(merged.theme.id).toBe('custom');
+        ctx.expect(merged.port).toBe(1000);
+        ctx.expect(merged.fresh).toBe(true);
+        ctx.expect(merged.consumerOnly).toEqual({ nested: 1 });
+
+        // A key the framework no longer declares whose value is the `default` sentinel
+        // is the framework's own unset marker, so it drops at every level (#926); a key
+        // holding a real value is the consumer's and stays.
+        ctx.expect('retiredSentinel' in merged).toBe(false);
+        ctx.expect('retiredSentinel' in merged.theme).toBe(false);
+        ctx.expect(merged.theme.retiredValue).toBe('keep-me');
+      },
+    },
+
+    {
+      name: 'merge rule (JSON5): comments, blank lines and formatting survive, the file ends with one newline',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'config/app.json5': COMMENTED_DEFAULTS,
+        }, {
+          // No trailing newline: the merge adds the one the consumer's editor dropped.
+          'config/app.json5': COMMENTED_CONSUMER,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'config/app.json5': { merge: true } },
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.read(path.join(outputDir, 'config', 'app.json5'))).toBe(COMMENTED_MERGED);
+        ctx.expect(result.merged).toEqual([path.join('config', 'app.json5')]);
+      },
+    },
+
+    {
+      name: 'merge rule (JSON5): a rerun with nothing to change writes nothing',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'config/app.json5': COMMENTED_DEFAULTS,
+        }, {
+          'config/app.json5': COMMENTED_CONSUMER,
+        });
+        const config = {
+          defaultsDir,
+          outputDir,
+          fileMap: { 'config/app.json5': { merge: true } },
+          logger: quiet,
+        };
+
+        applyDefaults(config);
+        const second = applyDefaults(config);
+
+        ctx.expect(second.merged).toEqual([]);
+        ctx.expect(second.skipped).toEqual([path.join('config', 'app.json5')]);
+        ctx.expect(jetpack.read(path.join(outputDir, 'config', 'app.json5'))).toBe(COMMENTED_MERGED);
+      },
+    },
+
+    {
+      name: 'files subset (watch single-file mode) processes only the listed source',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({ 'a.txt': 'a', 'b.txt': 'b' }, {});
+
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          files: [path.join(defaultsDir, 'a.txt')],
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.read(path.join(outputDir, 'a.txt'))).toBe('a');
+        ctx.expect(jetpack.exists(path.join(outputDir, 'b.txt'))).toBe(false);
+      },
+    },
+
+    {
+      name: 'global transform hook runs on text files, never on binaries',
+      run: (ctx) => {
+        const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01]);
+        const { defaultsDir, outputDir } = stage({ 'page.md': 'Hello [site.name]' }, {});
+        jetpack.write(path.join(defaultsDir, 'img.png'), png);
+
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          transform: (contents) => contents.replace('[site.name]', 'Acme'),
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.read(path.join(outputDir, 'page.md'))).toBe('Hello Acme');
+        ctx.expect(jetpack.read(path.join(outputDir, 'img.png'), 'buffer')).toEqual(png);
+      },
+    },
+
+    {
+      name: 'idempotency: a second run writes and merges nothing',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'a.txt': 'a',
+          // Blank line before the Custom marker matters: the merge protocol normalizes
+          // to that shape, so a template without it gets one merge-write before stabilizing.
+          '_.env': `${DEFAULT_MARKER}\nKEY=""\n\n${CUSTOM_MARKER}\n`,
+          'config/app.json5': JSON5.stringify({ x: 1 }, null, 2),
+        }, {});
+        const config = {
+          defaultsDir,
+          outputDir,
+          fileMap: {
+            '_.env': { mergeLines: true },
+            'config/app.json5': { merge: true },
+          },
+          logger: quiet,
+        };
+
+        applyDefaults(config);
+        const second = applyDefaults(config);
+
+        ctx.expect(second.written.length).toBe(0);
+        ctx.expect(second.merged.length).toBe(0);
+      },
+    },
+
+    {
+      name: 'mergeJson5Defaults and renderTemplate are exported for direct use',
+      run: (ctx) => {
+        ctx.expect(typeof mergeJson5Defaults).toBe('function');
+        ctx.expect(renderTemplate('v{{ v.n }}', { v: { n: 1 } })).toBe('v1');
+      },
+    },
+
+    {
+      name: 'retire rule: never scaffolds the file when the consumer lacks it',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({ 'CLAUDE.md': 'framework doc' }, {});
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.exists(path.join(outputDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(result.removed).toEqual([]);
+        ctx.expect(result.skipped).toEqual(['CLAUDE.md']);
+      },
+    },
+
+    {
+      name: 'retire rule: deletes a marker-less copy identical to the rendered template, pruning emptied dirs',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'docs/README.md': 'Docs for v{{ versions.node }}',
+        }, {
+          'docs/README.md': 'Docs for v22',
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'docs/**/*': { retire: true, template: { versions: { node: '22' } } } },
+          logger: quiet,
+        });
+
+        ctx.expect(result.removed).toEqual([path.join('docs', 'README.md')]);
+        ctx.expect(jetpack.exists(path.join(outputDir, 'docs')), 'emptied docs/ dir should be pruned').toBe(false);
+      },
+    },
+
+    {
+      name: 'retire rule: a marker-less copy the consumer edited is kept, with a warning',
+      run: (ctx) => {
+        const warnings = [];
+        const { defaultsDir, outputDir } = stage({
+          'CHANGELOG.md': '# CHANGELOG\n',
+        }, {
+          'CHANGELOG.md': '# CHANGELOG\n\n## 1.0.0\n- consumer release notes\n',
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CHANGELOG.md': { retire: true } },
+          logger: { ...quiet, warn: (m) => warnings.push(m) },
+        });
+
+        ctx.expect(result.removed).toEqual([]);
+        ctx.expect(jetpack.read(path.join(outputDir, 'CHANGELOG.md'))).toMatch(/consumer release notes/);
+        ctx.expect(warnings.some((m) => m.includes('consumer content')), 'should warn to move consumer content to the brand root').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'retire rule: marker files are judged by their Custom section (pristine boilerplate or whitespace-only = framework-owned)',
+      run: (ctx) => {
+        const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': template,
+        }, {
+          // Pristine boilerplate custom section — even with a STALE default section.
+          'CLAUDE.md': `${DEFAULT_MARKER}\nold framework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: quiet,
+        });
+
+        ctx.expect(result.removed).toEqual(['CLAUDE.md']);
+        ctx.expect(jetpack.exists(path.join(outputDir, 'CLAUDE.md'))).toBe(false);
+
+        // Whitespace-only custom section is framework-owned too.
+        const ws = stage({ 'CLAUDE.md': template }, {
+          'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n  \n`,
+        });
+        const wsResult = applyDefaults({
+          defaultsDir: ws.defaultsDir,
+          outputDir: ws.outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: quiet,
+        });
+        ctx.expect(wsResult.removed).toEqual(['CLAUDE.md']);
+      },
+    },
+
+    {
+      name: 'retire rule: a marker file with real consumer notes is kept, with a warning',
+      run: (ctx) => {
+        const warnings = [];
+        const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': template,
+        }, {
+          'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nOur deploy needs the VPN up.\n`,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: { ...quiet, warn: (m) => warnings.push(m) },
+        });
+
+        ctx.expect(result.removed).toEqual([]);
+        ctx.expect(jetpack.read(path.join(outputDir, 'CLAUDE.md'))).toMatch(/VPN/);
+        ctx.expect(warnings.some((m) => m.includes('consumer content'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'retire rule: a PRIOR-GENERATION marker file is swept even when the current template dropped the markers',
+      run: (ctx) => {
+        // #101: CLAUDE.md became the one-line `@AGENTS.md` pointer, so the rendered
+        // template carries no markers — the legacy generated file must still be
+        // recognized as the framework's own and retired, not kept as consumer content.
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': '@AGENTS.md\n',
+        }, {
+          'CLAUDE.md': LEGACY_GENERATED_DOC,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: quiet,
+        });
+
+        ctx.expect(result.removed).toEqual(['CLAUDE.md']);
+        ctx.expect(jetpack.exists(path.join(outputDir, 'CLAUDE.md'))).toBe(false);
+      },
+    },
+
+    {
+      name: 'retire rule: a consumer-authored file with NO framework markers is kept against a marker-less template',
+      run: (ctx) => {
+        const warnings = [];
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': '@AGENTS.md\n',
+        }, {
+          'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'CLAUDE.md': { retire: true } },
+          logger: { ...quiet, warn: (m) => warnings.push(m) },
+        });
+
+        ctx.expect(result.removed).toEqual([]);
+        ctx.expect(jetpack.read(path.join(outputDir, 'CLAUDE.md'))).toMatch(/VPN/);
+        ctx.expect(warnings.some((m) => m.includes('consumer content'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'overwrite:false heals a PRIOR-GENERATION marker file to the marker-less template',
+      run: (ctx) => {
+        // #101 twin gap: on the standalone upgrade path the retire rule never runs —
+        // the legacy content-bearing CLAUDE.md sat under `overwrite: false` and
+        // survived beside the new AGENTS.md. The framework owns it: heal it.
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': '@AGENTS.md\n',
+        }, {
+          'CLAUDE.md': LEGACY_GENERATED_DOC,
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { '**/*': { overwrite: false } },
+          logger: quiet,
+        });
+
+        ctx.expect(result.written).toEqual(['CLAUDE.md']);
+        ctx.expect(jetpack.read(path.join(outputDir, 'CLAUDE.md')).trim()).toBe('@AGENTS.md');
+      },
+    },
+
+    {
+      name: 'overwrite:false still preserves a consumer file with no framework markers',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'CLAUDE.md': '@AGENTS.md\n',
+        }, {
+          'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { '**/*': { overwrite: false } },
+          logger: quiet,
+        });
+
+        ctx.expect(result.skipped).toEqual(['CLAUDE.md']);
+        ctx.expect(jetpack.read(path.join(outputDir, 'CLAUDE.md'))).toMatch(/VPN/);
+      },
+    },
+
+    {
+      name: 'retire rule: compares through the global transform (an untouched transformed copy is framework-owned)',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({
+          'docs/README.md': 'Docs for [site.name]',
+        }, {
+          'docs/README.md': 'Docs for Acme',
+        });
+
+        const result = applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'docs/**/*': { retire: true } },
+          transform: (contents) => contents.replace('[site.name]', 'Acme'),
+          logger: quiet,
+        });
+
+        ctx.expect(result.removed).toEqual([path.join('docs', 'README.md')]);
+      },
+    },
+  ],
 });

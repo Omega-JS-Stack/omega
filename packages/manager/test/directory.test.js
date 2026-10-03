@@ -7,8 +7,7 @@
  * same document are never touched or counted as drift, and the dry-run
  * zero-mutation guarantee.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/directory/index.js');
@@ -87,245 +86,323 @@ function runService(config, { db, options = {} } = {}) {
   });
 }
 
-// ─── Registry / defaults pins ────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'directory',
+  tests: [
+    // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('directory: registered after server with the entry operation', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('server') + 1], 'directory');
-  assert.deepEqual(OPERATIONS.directory.map((o) => o.name), ['entry']);
-});
-
-test('directory: defaults are OFF — participation is never implicit', () => {
-  assert.deepEqual(DEFAULTS.directory, { enabled: false });
-});
-
-// ─── Gate 1: opt-in ──────────────────────────────────────────────────────────
-
-test('directory: no directory config at all means no push', async () => {
-  const result = await runService(brandConfig({ directory: null }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /directory\.enabled/);
-});
-
-test('directory: directory.enabled = false skips the service', async () => {
-  const result = await runService(brandConfig({ directory: { enabled: false } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /directory\.enabled/);
-});
-
-test('directory: an empty directory block is not opt-in', async () => {
-  // Presence is not consent — only `enabled: true` participates
-  const result = await runService(brandConfig({ directory: {} }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /directory\.enabled/);
-});
-
-// ─── Gate 2: a company to push into (#677) ───────────────────────────────────
-
-test('directory: a brand naming no company has no directory to push into', async () => {
-  const result = await runService(brandConfig({ company: null }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /company/);
-});
-
-test('directory: a standalone resolution (id null) skips the same way', async () => {
-  const result = await runService(brandConfig({ company: { id: null, name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db: fakeDb() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /company/);
-});
-
-test("directory: company.id 'self' still participates (the company is in its own directory)", async () => {
-  const db = fakeDb({ getDoc: desiredEntry() });
-  const result = await runService(brandConfig({ company: { id: 'self', name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db });
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.reads(), [DOC_PATH]);
-});
-
-// ─── Gate 3: demo no-op ──────────────────────────────────────────────────────
-
-test('directory: a demo-* brand no-ops even when it opts in (emulator-only, nothing live to reach)', async () => {
-  const db = fakeDb(); // any call at all throws
-  const result = await runService(brandConfig({ projectId: 'demo-fixture-brand' }), { db });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /demo-fixture-brand.*emulator-only/);
-  assert.deepEqual(db.calls, []);
-});
-
-// ─── Credentials ─────────────────────────────────────────────────────────────
-
-test('directory: skips without DIRECTORY_SERVICE_ACCOUNT in .env', async () => {
-  const result = await runService(brandConfig()); // no injected db → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /DIRECTORY_SERVICE_ACCOUNT/);
-});
-
-// ─── Idempotence ─────────────────────────────────────────────────────────────
-
-test('directory: an entry matching config is a zero-mutation no-op', async () => {
-  const db = fakeDb({ getDoc: desiredEntry() });
-
-  const result = await runService(brandConfig(), { db });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.deepEqual(db.reads(), [DOC_PATH]);
-  assert.equal(result.output.entry.synced, true);
-  assert.deepEqual(result.output.entry.blocks, ['sponsorships']);
-  // no durable state — the directory doc IS the sync target
-  assert.equal(result.state, null);
-});
-
-test('directory: key order differences are not drift', async () => {
-  const db = fakeDb({
-    getDoc: {
-      sponsorships: {
-        prices: { 'link-insertion': 50, 'guest-post': 70 },
-        unacceptable: ['gambling'],
-        acceptable: ['tech', 'marketing'],
+    {
+      name: 'directory: registered after server with the entry operation',
+      run: (ctx) => {
+        ctx.expect(SERVICE_ORDER[SERVICE_ORDER.indexOf('server') + 1]).toBe('directory');
+        ctx.expect(OPERATIONS.directory.map((o) => o.name)).toEqual(['entry']);
       },
-      github: { slug: 'fixture-org/fixture-brand-omega', name: 'fixture-brand-omega', owner: 'fixture-org' },
-      brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
-  });
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'directory: defaults are OFF — participation is never implicit',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.directory).toEqual({ enabled: false });
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
+    // ─── Gate 1: opt-in ──────────────────────────────────────────────────────────
 
-test('directory: hub-owned fields on the same document are not drift', async () => {
-  // The marketplace keeps its own state on the entry (#246 boundary: the hub
-  // is brand code). A converged brand must not rewrite the document because
-  // of fields the framework does not own.
-  const db = fakeDb({ getDoc: { ...desiredEntry(), orderCount: 12, moderation: { status: 'approved' } } });
+    {
+      name: 'directory: no directory config at all means no push',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ directory: null }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/directory\.enabled/);
+      },
+    },
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'directory: directory.enabled = false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ directory: { enabled: false } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/directory\.enabled/);
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-});
+    {
+      name: 'directory: an empty directory block is not opt-in',
+      run: async (ctx) => {
+        // Presence is not consent — only `enabled: true` participates
+        const result = await runService(brandConfig({ directory: {} }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/directory\.enabled/);
+      },
+    },
 
-// ─── The push ────────────────────────────────────────────────────────────────
+    // ─── Gate 2: a company to push into (#677) ───────────────────────────────────
 
-test('directory: a missing entry is created with identity + the declared blocks only', async () => {
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+    {
+      name: 'directory: a brand naming no company has no directory to push into',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ company: null }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/company/);
+      },
+    },
 
-  const result = await runService(brandConfig(), { db });
+    {
+      name: 'directory: a standalone resolution (id null) skips the same way',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ company: { id: null, name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db: fakeDb() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/company/);
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[DOC_PATH, desiredEntry(), OWNED_SECTIONS]]);
-  assert.equal(result.output.entry.created, true);
-});
+    {
+      name: "directory: company.id 'self' still participates (the company is in its own directory)",
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: desiredEntry() });
+        const result = await runService(brandConfig({ company: { id: 'self', name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.reads()).toEqual([DOC_PATH]);
+      },
+    },
 
-test('directory: the write masks only the framework-owned sections', async () => {
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+    // ─── Gate 3: demo no-op ──────────────────────────────────────────────────────
 
-  await runService(brandConfig(), { db });
+    {
+      name: 'directory: a demo-* brand no-ops even when it opts in (emulator-only, nothing live to reach)',
+      run: async (ctx) => {
+        const db = fakeDb(); // any call at all throws
+        const result = await runService(brandConfig({ projectId: 'demo-fixture-brand' }), { db });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/demo-fixture-brand.*emulator-only/);
+        ctx.expect(db.calls).toEqual([]);
+      },
+    },
 
-  // A merge write, never a replace: everything the hub owns survives, and a
-  // section dropped from config is still removed (its path stays in the mask).
-  assert.deepEqual(db.mutations()[0].args[2], ['brand', 'github', 'sponsorships']);
-});
+    // ─── Credentials ─────────────────────────────────────────────────────────────
 
-test('directory: a changed sponsorship price is drift and is pushed', async () => {
-  const stale = desiredEntry();
-  stale.sponsorships.prices['guest-post'] = 30;
-  const db = fakeDb({ getDoc: stale, patchDoc: {} });
+    {
+      name: 'directory: skips without DIRECTORY_SERVICE_ACCOUNT in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected db → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/DIRECTORY_SERVICE_ACCOUNT/);
+      },
+    },
 
-  const result = await runService(brandConfig(), { db });
+    // ─── Idempotence ─────────────────────────────────────────────────────────────
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations().map((c) => c.args), [[DOC_PATH, desiredEntry(), OWNED_SECTIONS]]);
-  assert.equal(result.output.entry.updated, true);
-});
+    {
+      name: 'directory: an entry matching config is a zero-mutation no-op',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: desiredEntry() });
 
-test('directory: drifted brand identity is pushed', async () => {
-  const stale = desiredEntry();
-  stale.brand.name = 'Old Name';
-  const db = fakeDb({ getDoc: stale, patchDoc: {} });
+        const result = await runService(brandConfig(), { db });
 
-  const result = await runService(brandConfig(), { db });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(db.reads()).toEqual([DOC_PATH]);
+        ctx.expect(result.output.entry.synced).toBe(true);
+        ctx.expect(result.output.entry.blocks).toEqual(['sponsorships']);
+        // no durable state — the directory doc IS the sync target
+        ctx.expect(result.state).toBe(null);
+      },
+    },
 
-  assert.deepEqual(db.mutations().map((c) => c.args[1]), [desiredEntry()]);
-});
+    {
+      name: 'directory: key order differences are not drift',
+      run: async (ctx) => {
+        const db = fakeDb({
+          getDoc: {
+            sponsorships: {
+              prices: { 'link-insertion': 50, 'guest-post': 70 },
+              unacceptable: ['gambling'],
+              acceptable: ['tech', 'marketing'],
+            },
+            github: { slug: 'fixture-org/fixture-brand-omega', name: 'fixture-brand-omega', owner: 'fixture-org' },
+            brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
+          },
+        });
 
-test('directory: an undeclared block is omitted from the entry (and its removal is masked)', async () => {
-  const db = fakeDb({ getDoc: desiredEntry(), patchDoc: {} });
+        const result = await runService(brandConfig(), { db });
 
-  const result = await runService(brandConfig({ sponsorships: null }), { db });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  const [path, data, mask] = db.mutations()[0].args;
-  assert.equal(path, DOC_PATH);
-  assert.deepEqual(Object.keys(data), ['brand', 'github']);
-  assert.ok(mask.includes('sponsorships'), 'the mask still names the dropped block, so the directory loses it too');
-  assert.deepEqual(result.output.entry.blocks, []);
-});
+    {
+      name: 'directory: hub-owned fields on the same document are not drift',
+      run: async (ctx) => {
+        // The marketplace keeps its own state on the entry (#246 boundary: the hub
+        // is brand code). A converged brand must not rewrite the document because
+        // of fields the framework does not own.
+        const db = fakeDb({ getDoc: { ...desiredEntry(), orderCount: 12, moderation: { status: 'approved' } } });
 
-test('directory: an empty sponsorships block is not a declared block', async () => {
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+        const result = await runService(brandConfig(), { db });
 
-  await runService(brandConfig({ sponsorships: {} }), { db });
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+      },
+    },
 
-  assert.deepEqual(Object.keys(db.mutations()[0].args[1]), ['brand', 'github']);
-});
+    // ─── The push ────────────────────────────────────────────────────────────────
 
-test('directory: the repo slug comes from the shared derivation, not a local one', async () => {
-  const config = brandConfig();
-  // The owner is the only half configured: the name is `<brand.id>-omega`, the
-  // SOURCE role's derivation (#883), never a value the entry re-invents.
-  config.repo.owner = 'Renamed-Org';
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+    {
+      name: 'directory: a missing entry is created with identity + the declared blocks only',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
 
-  await runService(config, { db });
+        const result = await runService(brandConfig(), { db });
 
-  assert.deepEqual(db.mutations()[0].args[1].github, {
-    owner: 'Renamed-Org',
-    name: 'fixture-brand-omega',
-    slug: 'Renamed-Org/fixture-brand-omega',
-  });
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[DOC_PATH, desiredEntry(), OWNED_SECTIONS]]);
+        ctx.expect(result.output.entry.created).toBe(true);
+      },
+    },
 
-test('directory: an unresolvable repo is omitted rather than pushed half-formed', async () => {
-  const config = brandConfig();
-  delete config.repo; // no owner means no address at all
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+    {
+      name: 'directory: the write masks only the framework-owned sections',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
 
-  await runService(config, { db });
+        await runService(brandConfig(), { db });
 
-  assert.deepEqual(Object.keys(db.mutations()[0].args[1]), ['brand', 'sponsorships']);
-});
+        // A merge write, never a replace: everything the hub owns survives, and a
+        // section dropped from config is still removed (its path stays in the mask).
+        ctx.expect(db.mutations()[0].args[2]).toEqual(['brand', 'github', 'sponsorships']);
+      },
+    },
 
-test('directory: a brand with no url pushes identity without one', async () => {
-  const config = brandConfig();
-  delete config.brand.url;
-  const db = fakeDb({ getDoc: null, patchDoc: {} });
+    {
+      name: 'directory: a changed sponsorship price is drift and is pushed',
+      run: async (ctx) => {
+        const stale = desiredEntry();
+        stale.sponsorships.prices['guest-post'] = 30;
+        const db = fakeDb({ getDoc: stale, patchDoc: {} });
 
-  await runService(config, { db });
+        const result = await runService(brandConfig(), { db });
 
-  assert.deepEqual(db.mutations()[0].args[1].brand, { id: BRAND.id, name: BRAND.name });
-});
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations().map((c) => c.args)).toEqual([[DOC_PATH, desiredEntry(), OWNED_SECTIONS]]);
+        ctx.expect(result.output.entry.updated).toBe(true);
+      },
+    },
 
-// ─── Dry run ─────────────────────────────────────────────────────────────────
+    {
+      name: 'directory: drifted brand identity is pushed',
+      run: async (ctx) => {
+        const stale = desiredEntry();
+        stale.brand.name = 'Old Name';
+        const db = fakeDb({ getDoc: stale, patchDoc: {} });
 
-test('directory: dry run on a drifted entry performs zero mutations', async () => {
-  const stale = desiredEntry();
-  stale.brand.url = 'https://old-url.test';
-  const db = fakeDb({ getDoc: stale });
+        const result = await runService(brandConfig(), { db });
 
-  const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+        ctx.expect(db.mutations().map((c) => c.args[1])).toEqual([desiredEntry()]);
+      },
+    },
 
-  assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.entry.planned, 'update');
-  assert.equal(result.state, null);
-});
+    {
+      name: 'directory: an undeclared block is omitted from the entry (and its removal is masked)',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: desiredEntry(), patchDoc: {} });
 
-test('directory: dry run on a missing entry plans a create', async () => {
-  const db = fakeDb({ getDoc: null });
+        const result = await runService(brandConfig({ sponsorships: null }), { db });
 
-  const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+        ctx.expect(result.status).toBe('success');
+        const [path, data, mask] = db.mutations()[0].args;
+        ctx.expect(path).toBe(DOC_PATH);
+        ctx.expect(Object.keys(data)).toEqual(['brand', 'github']);
+        ctx.expect(mask.includes('sponsorships'), 'the mask still names the dropped block, so the directory loses it too').toBeTruthy();
+        ctx.expect(result.output.entry.blocks).toEqual([]);
+      },
+    },
 
-  assert.deepEqual(db.mutations(), []);
-  assert.equal(result.output.entry.planned, 'create');
+    {
+      name: 'directory: an empty sponsorships block is not a declared block',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
+
+        await runService(brandConfig({ sponsorships: {} }), { db });
+
+        ctx.expect(Object.keys(db.mutations()[0].args[1])).toEqual(['brand', 'github']);
+      },
+    },
+
+    {
+      name: 'directory: the repo slug comes from the shared derivation, not a local one',
+      run: async (ctx) => {
+        const config = brandConfig();
+        // The owner is the only half configured: the name is `<brand.id>-omega`, the
+        // SOURCE role's derivation (#883), never a value the entry re-invents.
+        config.repo.owner = 'Renamed-Org';
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
+
+        await runService(config, { db });
+
+        ctx.expect(db.mutations()[0].args[1].github).toEqual({
+          owner: 'Renamed-Org',
+          name: 'fixture-brand-omega',
+          slug: 'Renamed-Org/fixture-brand-omega',
+        });
+      },
+    },
+
+    {
+      name: 'directory: an unresolvable repo is omitted rather than pushed half-formed',
+      run: async (ctx) => {
+        const config = brandConfig();
+        delete config.repo; // no owner means no address at all
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
+
+        await runService(config, { db });
+
+        ctx.expect(Object.keys(db.mutations()[0].args[1])).toEqual(['brand', 'sponsorships']);
+      },
+    },
+
+    {
+      name: 'directory: a brand with no url pushes identity without one',
+      run: async (ctx) => {
+        const config = brandConfig();
+        delete config.brand.url;
+        const db = fakeDb({ getDoc: null, patchDoc: {} });
+
+        await runService(config, { db });
+
+        ctx.expect(db.mutations()[0].args[1].brand).toEqual({ id: BRAND.id, name: BRAND.name });
+      },
+    },
+
+    // ─── Dry run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'directory: dry run on a drifted entry performs zero mutations',
+      run: async (ctx) => {
+        const stale = desiredEntry();
+        stale.brand.url = 'https://old-url.test';
+        const db = fakeDb({ getDoc: stale });
+
+        const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.entry.planned).toBe('update');
+        ctx.expect(result.state).toBe(null);
+      },
+    },
+
+    {
+      name: 'directory: dry run on a missing entry plans a create',
+      run: async (ctx) => {
+        const db = fakeDb({ getDoc: null });
+
+        const result = await runService(brandConfig(), { db, options: { dryRun: true } });
+
+        ctx.expect(db.mutations()).toEqual([]);
+        ctx.expect(result.output.entry.planned).toBe('create');
+      },
+    },
+  ],
 });

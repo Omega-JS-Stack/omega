@@ -26,8 +26,7 @@
  *
  * Real brand monorepos on disk; no script is ever spawned.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -66,116 +65,143 @@ function makeBrand({ projectType, scripts = {}, files = {} } = {}) {
 
 const backendEntry = (root) => discoverTargets(root).find((entry) => entry.target === 'backend');
 
-// ─── Discovery ───────────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'backend-custom-mode',
+  tests: [
+    // ─── Discovery ───────────────────────────────────────────────────────────────
 
-test('discovery reads the project type off the brand config and marks the backend entry', () => {
-  const custom = backendEntry(makeBrand({ projectType: 'custom' }));
-  assert.equal(custom.target, 'backend', 'a custom-MODE backend is still a framework target');
-  assert.equal(custom.custom, undefined, "and never a custom TARGET (#603's flag)");
-  assert.equal(custom.projectType, 'custom');
+    {
+      name: 'discovery reads the project type off the brand config and marks the backend entry',
+      run: (ctx) => {
+        const custom = backendEntry(makeBrand({ projectType: 'custom' }));
+        ctx.expect(custom.target, 'a custom-MODE backend is still a framework target').toBe('backend');
+        ctx.expect(custom.custom, "and never a custom TARGET (#603's flag)").toBe(undefined);
+        ctx.expect(custom.projectType).toBe('custom');
 
-  assert.equal(backendEntry(makeBrand({ projectType: 'firebase' })).projectType, 'firebase');
-  assert.equal(backendEntry(makeBrand()).projectType, 'firebase', 'unset is the Cloud Functions default');
+        ctx.expect(backendEntry(makeBrand({ projectType: 'firebase' })).projectType).toBe('firebase');
+        ctx.expect(backendEntry(makeBrand()).projectType, 'unset is the Cloud Functions default').toBe('firebase');
 
-  // The mode is a backend fact — nothing else carries it
-  const web = discoverTargets(makeBrand({ projectType: 'custom' })).find((entry) => entry.target === 'web');
-  assert.equal(web.projectType, undefined);
-});
+        // The mode is a backend fact — nothing else carries it
+        const web = discoverTargets(makeBrand({ projectType: 'custom' })).find((entry) => entry.target === 'web');
+        ctx.expect(web.projectType).toBe(undefined);
+      },
+    },
 
-// ─── The verb lanes ──────────────────────────────────────────────────────────
+    // ─── The verb lanes ──────────────────────────────────────────────────────────
 
-test('a custom-mode backend deploys and tests through its OWN scripts, bare', () => {
-  const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { deploy: 'render deploys create', test: 'node --test' } }));
+    {
+      name: 'a custom-mode backend deploys and tests through its OWN scripts, bare',
+      run: (ctx) => {
+        const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { deploy: 'render deploys create', test: 'node --test' } }));
 
-  for (const verb of ['deploy', 'test']) {
-    const run = resolveTargetRun(entry, verb, ['--snapshot=abc']);
-    assert.equal(run.kind, 'framework', 'a custom-MODE backend is still a framework target');
-    assert.equal(run.command, 'npm');
-    assert.deepEqual(run.args, ['run', verb], 'the brand\'s own script hears no framework flags');
-  }
-});
+        for (const verb of ['deploy', 'test']) {
+          const run = resolveTargetRun(entry, verb, ['--snapshot=abc']);
+          ctx.expect(run.kind, 'a custom-MODE backend is still a framework target').toBe('framework');
+          ctx.expect(run.command).toBe('npm');
+          ctx.expect(run.args, 'the brand\'s own script hears no framework flags').toEqual(['run', verb]);
+        }
+      },
+    },
 
-test('a custom-mode backend with no such script steps aside loudly, naming the target and the verb', () => {
-  const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { test: 'node --test' } }));
+    {
+      name: 'a custom-mode backend with no such script steps aside loudly, naming the target and the verb',
+      run: (ctx) => {
+        const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { test: 'node --test' } }));
 
-  const run = resolveTargetRun(entry, 'deploy', []);
-  assert.equal(run.kind, 'skip');
-  assert.match(run.detail, /deploy/);
-  assert.match(run.detail, /targets\/backend/);
-});
+        const run = resolveTargetRun(entry, 'deploy', []);
+        ctx.expect(run.kind).toBe('skip');
+        ctx.expect(run.detail).toMatch(/deploy/);
+        ctx.expect(run.detail).toMatch(/targets\/backend/);
+      },
+    },
 
-test('a custom-mode backend stops at the PLAN on a dry run — its script cannot honor the flag', () => {
-  const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { deploy: 'render deploys create' } }));
+    {
+      name: 'a custom-mode backend stops at the PLAN on a dry run — its script cannot honor the flag',
+      run: (ctx) => {
+        const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { deploy: 'render deploys create' } }));
 
-  const run = resolveTargetRun(entry, 'deploy', [], { dryRun: true });
-  assert.equal(run.kind, 'plan');
-  assert.match(run.detail, /npm run deploy/);
-});
+        const run = resolveTargetRun(entry, 'deploy', [], { dryRun: true });
+        ctx.expect(run.kind).toBe('plan');
+        ctx.expect(run.detail).toMatch(/npm run deploy/);
+      },
+    },
 
-test('a firebase-mode backend runs the same lane, and its own `omega deploy` takes the dry-run flag', () => {
-  const entry = backendEntry(makeBrand({ scripts: { deploy: 'omega deploy' } }));
+    {
+      name: 'a firebase-mode backend runs the same lane, and its own `omega deploy` takes the dry-run flag',
+      run: (ctx) => {
+        const entry = backendEntry(makeBrand({ scripts: { deploy: 'omega deploy' } }));
 
-  const run = resolveTargetRun(entry, 'deploy', ['--dry-run'], { dryRun: true });
-  assert.equal(run.kind, 'framework');
-  assert.equal(run.framework, '@omega.js/backend');
-  assert.deepEqual(run.args, ['run', 'deploy', '--', '--dry-run'], 'the framework verb plans itself');
-});
+        const run = resolveTargetRun(entry, 'deploy', ['--dry-run'], { dryRun: true });
+        ctx.expect(run.kind).toBe('framework');
+        ctx.expect(run.framework).toBe('@omega.js/backend');
+        ctx.expect(run.args, 'the framework verb plans itself').toEqual(['run', 'deploy', '--', '--dry-run']);
+      },
+    },
 
-// ─── The dev leg ─────────────────────────────────────────────────────────────
+    // ─── The dev leg ─────────────────────────────────────────────────────────────
 
-test('the dev leg for a custom-mode backend is its own start script, the one leg every target runs', () => {
-  assert.deepEqual(devCommand.DEV_LEG, ['npm', 'run', 'start']);
-  assert.equal(devCommand.devLegFor, undefined, 'no per-kind leg table: the mode decides what `start` runs, never the manager');
-  assert.equal(devCommand.DEV_LEGS, undefined);
-});
+    {
+      name: 'the dev leg for a custom-mode backend is its own start script, the one leg every target runs',
+      run: (ctx) => {
+        ctx.expect(devCommand.DEV_LEG).toEqual(['npm', 'run', 'start']);
+        ctx.expect(devCommand.devLegFor, 'no per-kind leg table: the mode decides what `start` runs, never the manager').toBe(undefined);
+        ctx.expect(devCommand.DEV_LEGS).toBe(undefined);
+      },
+    },
 
-// ─── The Firebase-only check ─────────────────────────────────────────────────
+    // ─── The Firebase-only check ─────────────────────────────────────────────────
 
-test('the testing service stops demanding a firebase.json a custom backend has no reason to carry', () => {
-  const lines = [];
-  const originalLog = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
+    {
+      name: 'the testing service stops demanding a firebase.json a custom backend has no reason to carry',
+      run: (ctx) => {
+        const lines = [];
+        const originalLog = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
 
-  const recorder = { passed: [], failed: [], notes: [] };
-  const record = {
-    pass: (name) => recorder.passed.push(name),
-    fail: (name, error) => recorder.failed.push({ name, error }),
-    warn: () => {},
-    note: (name, detail) => recorder.notes.push(`${name}: ${detail}`),
-  };
+        const recorder = { passed: [], failed: [], notes: [] };
+        const record = {
+          pass: (name) => recorder.passed.push(name),
+          fail: (name, error) => recorder.failed.push({ name, error }),
+          warn: () => {},
+          note: (name, detail) => recorder.notes.push(`${name}: ${detail}`),
+        };
 
-  try {
-    const root = makeBrand({ projectType: 'custom', files: { 'targets/backend/dist/package.json': { name: 'staged' } } });
-    checkTargetFiles(record, backendEntry(root));
-  } finally {
-    console.log = originalLog;
-  }
+        try {
+          const root = makeBrand({ projectType: 'custom', files: { 'targets/backend/dist/package.json': { name: 'staged' } } });
+          checkTargetFiles(record, backendEntry(root));
+        } finally {
+          console.log = originalLog;
+        }
 
-  assert.deepEqual(recorder.failed, [], 'a custom backend has no firebase.json and that is correct');
-  assert.ok(recorder.passed.includes('backend: staged dist/'), 'the build output is still checked — a custom backend still stages');
-  assert.ok(
-    recorder.notes.some((note) => note.includes('firebase.json') && note.includes('custom')),
-    `the skipped check must say WHY it did not run: ${JSON.stringify(recorder.notes)}`,
-  );
-});
+        ctx.expect(recorder.failed, 'a custom backend has no firebase.json and that is correct').toEqual([]);
+        ctx.expect(recorder.passed.includes('backend: staged dist/'), 'the build output is still checked — a custom backend still stages').toBeTruthy();
+        ctx.expect(recorder.notes.some((note) => note.includes('firebase.json') && note.includes('custom')), `the skipped check must say WHY it did not run: ${JSON.stringify(recorder.notes)}`).toBeTruthy();
+      },
+    },
 
-test('a firebase-mode backend still fails without its firebase.json', () => {
-  const recorder = { passed: [], failed: [], notes: [] };
-  const record = {
-    pass: (name) => recorder.passed.push(name),
-    fail: (name, error) => recorder.failed.push({ name, error }),
-    warn: () => {},
-    note: (name, detail) => recorder.notes.push(`${name}: ${detail}`),
-  };
-  const lines = [];
-  const originalLog = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
+    {
+      name: 'a firebase-mode backend still fails without its firebase.json',
+      run: (ctx) => {
+        const recorder = { passed: [], failed: [], notes: [] };
+        const record = {
+          pass: (name) => recorder.passed.push(name),
+          fail: (name, error) => recorder.failed.push({ name, error }),
+          warn: () => {},
+          note: (name, detail) => recorder.notes.push(`${name}: ${detail}`),
+        };
+        const lines = [];
+        const originalLog = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
 
-  try {
-    checkTargetFiles(record, backendEntry(makeBrand()));
-  } finally {
-    console.log = originalLog;
-  }
+        try {
+          checkTargetFiles(record, backendEntry(makeBrand()));
+        } finally {
+          console.log = originalLog;
+        }
 
-  assert.ok(recorder.failed.some((entry) => entry.name === 'backend: firebase.json'));
+        ctx.expect(recorder.failed.some((entry) => entry.name === 'backend: firebase.json')).toBeTruthy();
+      },
+    },
+  ],
 });

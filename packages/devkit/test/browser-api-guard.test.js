@@ -6,8 +6,7 @@
  * holds `typeof <api>` or `'<name>' in` on its own object, or `?.` on it.
  * Static, the house pattern of packages/web/test/config-reads-guard.test.js.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -178,106 +177,127 @@ function sourceFiles(abs, found = []) {
   return found;
 }
 
-test('an unguarded use fails naming the file, the line and the API; the enclosing typeof check passes it', () => {
-  const unguarded = [
-    'export function signalFor(ms) {',
-    '  const fallback = null;',
-    '  return AbortSignal.timeout(5);',
-    '}',
-    '',
-  ].join('\n');
-  const guarded = [
-    'export function signalFor(ms) {',
-    "  if (typeof AbortSignal.timeout === 'function') {",
-    '    return AbortSignal.timeout(5);',
-    '  }',
-    '  const controller = new AbortController();',
-    '  setTimeout(() => controller.abort(), ms);',
-    '  return controller.signal;',
-    '}',
-    '',
-  ].join('\n');
-
-  const findings = unguardedUses(unguarded, 'fixture.js', NEWER_BROWSER_APIS);
-  assert.deepEqual(findings, [{ file: 'fixture.js', line: 3, api: 'AbortSignal.timeout' }]);
-  assert.equal(describeFinding(findings[0]).startsWith('fixture.js:3 uses AbortSignal.timeout'), true);
-
-  assert.deepEqual(unguardedUses(guarded, 'fixture.js', NEWER_BROWSER_APIS), []);
-});
-
-test("an `in` check on some other object is no guard: 'timeout' in options still fails", () => {
-  const source = [
-    'export function signalFor(options) {',
-    "  if ('timeout' in options) {",
-    '    return AbortSignal.timeout(options.timeout);',
-    '  }',
-    '}',
-    '',
-  ].join('\n');
-
-  assert.deepEqual(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS), [
-    { file: 'fixture.js', line: 3, api: 'AbortSignal.timeout' },
-  ]);
-});
-
-test("an `in` check on the API's own object passes: its owner, the receiver, a prototype or the global", () => {
-  const source = [
-    "if ('timeout' in AbortSignal) {",
-    '  AbortSignal.timeout(5);',
-    '}',
-    "if ('at' in items) {",
-    '  items.at(-1);',
-    '}',
-    "if ('at' in Array.prototype) {",
-    '  list.at(0);',
-    '}',
-    "if ('structuredClone' in window) {",
-    '  structuredClone(value);',
-    '}',
-    "if ('at' in other) {",
-    '  items.at(-1);',
-    '}',
-    '',
-  ].join('\n');
-
-  assert.deepEqual(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS), [
-    { file: 'fixture.js', line: 14, api: 'Array.prototype.at' },
-  ]);
-});
-
-test('a method typeof check guards only its own receiver or a prototype: typeof other.at does not guard items.at(', () => {
-  const source = [
-    "if (typeof other.at === 'function') {",
-    '  items.at(-1);',
-    '}',
-    "if (typeof items.at === 'function') {",
-    '  items.at(-1);',
-    '}',
-    "if (typeof Array.prototype.at === 'function') {",
-    '  list.at(0);',
-    '}',
-    '',
-  ].join('\n');
-
-  assert.deepEqual(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS), [
-    { file: 'fixture.js', line: 2, api: 'Array.prototype.at' },
-  ]);
-});
-
-test('every newer API in the browser sources is guarded or absent', () => {
-  const findings = [];
-  let scanned = 0;
-  for (const root of BROWSER_SOURCES) {
-    const abs = path.join(MONOREPO, root);
-    assert.ok(fs.existsSync(abs), `${root} is listed as a browser source but does not exist`);
-    for (const file of sourceFiles(abs)) {
-      scanned += 1;
-      findings.push(...unguardedUses(fs.readFileSync(file, 'utf8'), path.relative(MONOREPO, file), NEWER_BROWSER_APIS));
-    }
-  }
-
-  assert.ok(scanned > 0, 'the guard must actually read sources');
-  assert.deepEqual(findings, [], findings.map(describeFinding).join('\n'));
-});
-
 module.exports = { unguardedUses, describeFinding };
+
+module.exports = defineCases({
+  type: 'group',
+  description: 'browser-api-guard',
+  tests: [
+    {
+      name: 'an unguarded use fails naming the file, the line and the API; the enclosing typeof check passes it',
+      run: (ctx) => {
+        const unguarded = [
+          'export function signalFor(ms) {',
+          '  const fallback = null;',
+          '  return AbortSignal.timeout(5);',
+          '}',
+          '',
+        ].join('\n');
+        const guarded = [
+          'export function signalFor(ms) {',
+          "  if (typeof AbortSignal.timeout === 'function') {",
+          '    return AbortSignal.timeout(5);',
+          '  }',
+          '  const controller = new AbortController();',
+          '  setTimeout(() => controller.abort(), ms);',
+          '  return controller.signal;',
+          '}',
+          '',
+        ].join('\n');
+
+        const findings = unguardedUses(unguarded, 'fixture.js', NEWER_BROWSER_APIS);
+        ctx.expect(findings).toEqual([{ file: 'fixture.js', line: 3, api: 'AbortSignal.timeout' }]);
+        ctx.expect(describeFinding(findings[0]).startsWith('fixture.js:3 uses AbortSignal.timeout')).toBe(true);
+
+        ctx.expect(unguardedUses(guarded, 'fixture.js', NEWER_BROWSER_APIS)).toEqual([]);
+      },
+    },
+
+    {
+      name: "an `in` check on some other object is no guard: 'timeout' in options still fails",
+      run: (ctx) => {
+        const source = [
+          'export function signalFor(options) {',
+          "  if ('timeout' in options) {",
+          '    return AbortSignal.timeout(options.timeout);',
+          '  }',
+          '}',
+          '',
+        ].join('\n');
+
+        ctx.expect(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS)).toEqual([
+          { file: 'fixture.js', line: 3, api: 'AbortSignal.timeout' },
+        ]);
+      },
+    },
+
+    {
+      name: "an `in` check on the API's own object passes: its owner, the receiver, a prototype or the global",
+      run: (ctx) => {
+        const source = [
+          "if ('timeout' in AbortSignal) {",
+          '  AbortSignal.timeout(5);',
+          '}',
+          "if ('at' in items) {",
+          '  items.at(-1);',
+          '}',
+          "if ('at' in Array.prototype) {",
+          '  list.at(0);',
+          '}',
+          "if ('structuredClone' in window) {",
+          '  structuredClone(value);',
+          '}',
+          "if ('at' in other) {",
+          '  items.at(-1);',
+          '}',
+          '',
+        ].join('\n');
+
+        ctx.expect(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS)).toEqual([
+          { file: 'fixture.js', line: 14, api: 'Array.prototype.at' },
+        ]);
+      },
+    },
+
+    {
+      name: 'a method typeof check guards only its own receiver or a prototype: typeof other.at does not guard items.at(',
+      run: (ctx) => {
+        const source = [
+          "if (typeof other.at === 'function') {",
+          '  items.at(-1);',
+          '}',
+          "if (typeof items.at === 'function') {",
+          '  items.at(-1);',
+          '}',
+          "if (typeof Array.prototype.at === 'function') {",
+          '  list.at(0);',
+          '}',
+          '',
+        ].join('\n');
+
+        ctx.expect(unguardedUses(source, 'fixture.js', NEWER_BROWSER_APIS)).toEqual([
+          { file: 'fixture.js', line: 2, api: 'Array.prototype.at' },
+        ]);
+      },
+    },
+
+    {
+      name: 'every newer API in the browser sources is guarded or absent',
+      run: (ctx) => {
+        const findings = [];
+        let scanned = 0;
+        for (const root of BROWSER_SOURCES) {
+          const abs = path.join(MONOREPO, root);
+          ctx.expect(fs.existsSync(abs), `${root} is listed as a browser source but does not exist`).toBeTruthy();
+          for (const file of sourceFiles(abs)) {
+            scanned += 1;
+            findings.push(...unguardedUses(fs.readFileSync(file, 'utf8'), path.relative(MONOREPO, file), NEWER_BROWSER_APIS));
+          }
+        }
+
+        ctx.expect(scanned > 0, 'the guard must actually read sources').toBeTruthy();
+        ctx.expect(findings, findings.map(describeFinding).join('\n')).toEqual([]);
+      },
+    },
+  ],
+});

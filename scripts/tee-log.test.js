@@ -5,8 +5,7 @@
  * helper and cannot be exercised without stopping the live watcher.
  * Run: node --test scripts/tee-log.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -32,53 +31,71 @@ function runTeed(label, body) {
   return { run, file, contents: fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null };
 }
 
-test('tee-log: a lane label maps to a predictable filesystem-safe file', () => {
-  assert.equal(logFilePath('test:packages'), path.join(__dirname, '..', '.temp', 'logs', 'test-packages.log'));
-  assert.equal(logFilePath('watch-all'), path.join(__dirname, '..', '.temp', 'logs', 'watch-all.log'));
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'tee-log',
+  tests: [
+    {
+      name: 'tee-log: a lane label maps to a predictable filesystem-safe file',
+      run: (ctx) => {
+        ctx.expect(logFilePath('test:packages')).toBe(path.join(__dirname, '..', '.temp', 'logs', 'test-packages.log'));
+        ctx.expect(logFilePath('watch-all')).toBe(path.join(__dirname, '..', '.temp', 'logs', 'watch-all.log'));
+      },
+    },
 
-test('tee-log: console keeps its colors, the file gets the ANSI-stripped line', (t) => {
-  const label = `probe-colors-${process.pid}`;
-  t.after(() => fs.rmSync(logFilePath(label), { force: true }));
+    {
+      name: 'tee-log: console keeps its colors, the file gets the ANSI-stripped line',
+      run: (ctx) => {
+        const label = `probe-colors-${process.pid}`;
+        ctx.after(() => fs.rmSync(logFilePath(label), { force: true }));
 
-  const { run, contents } = runTeed(label, `
+        const { run, contents } = runTeed(label, `
     console.log(${JSON.stringify(`${GREEN}hi${RESET}`)});
     console.error(${JSON.stringify(`${GREEN}broke${RESET}`)});
   `);
 
-  assert.equal(run.status, 0);
-  assert.match(run.stdout, /\u001b\[32mhi\u001b\[0m/);
-  assert.match(run.stderr, /\u001b\[32mbroke\u001b\[0m/);
-  assert.match(contents, /^hi$/m);
-  assert.match(contents, /^broke$/m);
-  assert.doesNotMatch(contents, /\u001b\[/);
-});
+        ctx.expect(run.status).toBe(0);
+        ctx.expect(run.stdout).toMatch(/\u001b\[32mhi\u001b\[0m/);
+        ctx.expect(run.stderr).toMatch(/\u001b\[32mbroke\u001b\[0m/);
+        ctx.expect(contents).toMatch(/^hi$/m);
+        ctx.expect(contents).toMatch(/^broke$/m);
+        ctx.expect(contents).not.toMatch(/\u001b\[/);
+      },
+    },
 
-test('tee-log: a new run truncates the previous run\'s file', (t) => {
-  const label = `probe-truncate-${process.pid}`;
-  t.after(() => fs.rmSync(logFilePath(label), { force: true }));
+    {
+      name: 'tee-log: a new run truncates the previous run\'s file',
+      run: (ctx) => {
+        const label = `probe-truncate-${process.pid}`;
+        ctx.after(() => fs.rmSync(logFilePath(label), { force: true }));
 
-  runTeed(label, `console.log('first run only');`);
-  const { contents } = runTeed(label, `console.log('second run');`);
+        runTeed(label, `console.log('first run only');`);
+        const { contents } = runTeed(label, `console.log('second run');`);
 
-  assert.doesNotMatch(contents, /first run only/);
-  assert.match(contents, /^second run$/m);
-});
+        ctx.expect(contents).not.toMatch(/first run only/);
+        ctx.expect(contents).toMatch(/^second run$/m);
+      },
+    },
 
-test('tee-log: CI writes no file — the runner already captures the output', (t) => {
-  const label = `probe-ci-${process.pid}`;
-  t.after(() => fs.rmSync(logFilePath(label), { force: true }));
+    {
+      name: 'tee-log: CI writes no file — the runner already captures the output',
+      run: (ctx) => {
+        const label = `probe-ci-${process.pid}`;
+        ctx.after(() => fs.rmSync(logFilePath(label), { force: true }));
 
-  const script = `
+        const script = `
     const { teeLog } = require(${JSON.stringify(HELPER)});
     teeLog(${JSON.stringify(label)});
     console.log('ci run');
   `;
-  const run = spawnSync(process.execPath, ['-e', script], {
-    encoding: 'utf8',
-    env: { ...process.env, CI: 'true' },
-  });
+        const run = spawnSync(process.execPath, ['-e', script], {
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+        });
 
-  assert.match(run.stdout, /ci run/);
-  assert.equal(fs.existsSync(logFilePath(label)), false);
+        ctx.expect(run.stdout).toMatch(/ci run/);
+        ctx.expect(fs.existsSync(logFilePath(label))).toBe(false);
+      },
+    },
+  ],
 });

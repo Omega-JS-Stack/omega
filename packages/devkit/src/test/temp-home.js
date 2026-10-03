@@ -1,5 +1,5 @@
 /**
- * The machine home, pointed at a temp dir for the length of ONE test file.
+ * The machine home, pointed at a temp dir for the length of ONE test process.
  *
  * Every `loadConfig()` records its own brand's line in the machine registry
  * (`$OMEGA_HOME/brands.json`, default `~/.omega`), which is what makes a
@@ -7,11 +7,10 @@
  * there: the developer's registry is real machine state, and a fixture root
  * under /tmp is a line about a brand that does not exist.
  *
- * node:test runs each FILE in its own process, so one require at the top of a
- * file that loads a brand fixture (or spawns a verb that does) is the whole
- * contract: no per-test setup, nothing to restore, and every child the file
- * spawns inherits the redirect through its env. The dir goes when the file's
- * process exits.
+ * One require at the top of a file that loads a brand fixture (or spawns a verb
+ * that does) is the whole contract, and every child it spawns inherits the redirect.
+ * The dir lives as long as the process: one file under `--isolation=process`, while
+ * under `none` the first require sets it and every file of the run shares it.
  */
 const fs = require('node:fs');
 const os = require('node:os');

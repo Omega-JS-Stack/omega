@@ -1,0 +1,8 @@
+{
+  "description": "case-109",
+  "fileLacks": ["node:test", "\\bassert\\b"],
+  "fileHas": ["skip: cond", "timeout: 5000"],
+  "tests": [
+    { "name": "a", "skip": "skip-reason-109", "timeout": 5000, "has": ["ctx.expect(true).toBeTruthy()"] }
+  ]
+}

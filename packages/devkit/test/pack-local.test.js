@@ -12,8 +12,7 @@
 // module this one generalizes) are the first four; the workspace-root and
 // two-hop cases are what a BRAND root and the runner's second stage need.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -37,147 +36,6 @@ function writePackage(dir, manifest) {
 }
 
 const read = (file) => jetpack.read(file, 'json');
-
-test('stages the file: deps pointing OUTSIDE the dir, and restores them verbatim', async () => {
-  const tmp = makeTmp();
-
-  // A tiny real package OUTSIDE the staged dir...
-  writePackage(path.join(tmp, 'fakepkg'), { name: '@omega.js/fakepkg', version: '1.0.0' });
-
-  // ...referenced the way a functions dir does it
-  const dir = path.join(tmp, 'functions');
-  writeManifest(dir, {
-    name: 'test-functions',
-    version: '0.0.1',
-    private: true,
-    dependencies: { '@omega.js/fakepkg': 'file:../fakepkg' },
-  });
-
-  const staging = await stageLocalPackages({ dir });
-
-  assert.deepEqual(staging.staged, ['@omega.js/fakepkg']);
-  assert.equal(read(path.join(dir, 'package.json')).dependencies['@omega.js/fakepkg'], 'file:omega_modules/omega.js-fakepkg-1.0.0.tgz');
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-fakepkg-1.0.0.tgz')), 'file');
-
-  const lock = read(path.join(dir, 'package-lock.json'));
-  assert.ok(lock, 'lockfile generated for the staged shape');
-  assert.ok(lock.packages['node_modules/@omega.js/fakepkg'], 'lockfile resolves the staged tarball');
-
-  await staging.restore();
-  assert.equal(read(path.join(dir, 'package.json')).dependencies['@omega.js/fakepkg'], 'file:../fakepkg');
-  assert.equal(jetpack.exists(path.join(dir, 'package-lock.json')), false, 'lockfile absent again (none existed before)');
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules')), false, 'staging dir removed');
-
-  jetpack.remove(tmp);
-});
-
-test('a dir with no outside file: deps stages nothing', async () => {
-  const tmp = makeTmp();
-
-  const dir = path.join(tmp, 'functions');
-  writeManifest(dir, {
-    name: 'fns',
-    version: '1.0.0',
-    private: true,
-    dependencies: { 'firebase-admin': '^13.0.0' },
-  });
-
-  const staging = await stageLocalPackages({ dir });
-
-  assert.deepEqual(staging.staged, []);
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules')), false, 'nothing staged');
-  assert.equal(jetpack.exists(path.join(dir, 'package-lock.json')), false, 'no lockfile regenerated for a no-op');
-  await staging.restore(); // harmless no-op
-
-  jetpack.remove(tmp);
-});
-
-test('#331: a linked @omega.js dep of a packed package rides too, so the lock never asks the registry', async () => {
-  const tmp = makeTmp();
-
-  // A local @omega.js package that exists NOWHERE but this disk: the
-  // registry-404 shape (client under the publish latch)
-  const depDir = path.join(tmp, 'workspace', 'faketransitive');
-  writePackage(depDir, { name: '@omega.js/faketransitive', version: '0.1.0' });
-
-  // The framework package declares it by REGISTRY spec (that is how
-  // @omega.js/backend spells @omega.js/client) and resolves it through a
-  // node_modules SYMLINK, the local-era shape npm workspaces make
-  const pkgDir = path.join(tmp, 'fakeframework');
-  writePackage(pkgDir, {
-    name: '@omega.js/fakeframework',
-    version: '1.0.0',
-    dependencies: { '@omega.js/faketransitive': '^0.1.0' },
-  });
-  jetpack.dir(path.join(pkgDir, 'node_modules', '@omega.js'));
-  fs.symlinkSync(depDir, path.join(pkgDir, 'node_modules', '@omega.js', 'faketransitive'), 'dir');
-
-  const dir = path.join(tmp, 'functions');
-  writeManifest(dir, {
-    name: 'test-functions',
-    version: '0.0.1',
-    private: true,
-    dependencies: { '@omega.js/fakeframework': 'file:../fakeframework' },
-  });
-
-  const staging = await stageLocalPackages({ dir });
-
-  assert.deepEqual(staging.staged, ['@omega.js/fakeframework', '@omega.js/faketransitive']);
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-fakeframework-1.0.0.tgz')), 'file');
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-faketransitive-0.1.0.tgz')), 'file');
-
-  // The framework tarball still declares `^0.1.0` internally, so only an
-  // override redirects that NESTED resolution to the artifact beside it
-  const staged = read(path.join(dir, 'package.json'));
-  assert.equal(staged.dependencies['@omega.js/fakeframework'], 'file:omega_modules/omega.js-fakeframework-1.0.0.tgz');
-  assert.equal(staged.overrides['@omega.js/faketransitive'], 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
-
-  const locked = read(path.join(dir, 'package-lock.json')).packages['node_modules/@omega.js/faketransitive'];
-  assert.ok(locked, 'the linked dependency is in the lockfile');
-  assert.equal(locked.resolved, 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
-
-  await staging.restore();
-  assert.equal(read(path.join(dir, 'package.json')).overrides, undefined, 'staging overrides never survive the restore');
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules')), false, 'staging dir removed');
-
-  jetpack.remove(tmp);
-});
-
-test('#331: a failing stage restores first and throws, so nothing deploys from a half-staged folder', async () => {
-  const tmp = makeTmp();
-
-  writePackage(path.join(tmp, 'fakepkg'), { name: '@omega.js/fakepkg', version: '1.0.0' });
-
-  // The pack succeeds, then the LOCK REGEN fails (a file: spec pointing at a
-  // tarball that does not exist): the failure lands AFTER the manifest was
-  // respelled on disk, which is exactly where the 404 landed
-  const dir = path.join(tmp, 'functions');
-  const original = `${JSON.stringify({
-    name: 'test-functions',
-    version: '0.0.1',
-    private: true,
-    dependencies: {
-      '@omega.js/fakepkg': 'file:../fakepkg',
-      'never-here': 'file:../missing-tarball.tgz',
-    },
-  }, null, 2)}\n`;
-  jetpack.write(path.join(dir, 'package.json'), original);
-
-  let message = '';
-  try {
-    await stageLocalPackages({ dir });
-  } catch (e) {
-    message = e.message;
-  }
-
-  assert.ok(message, 'a failing stage throws, and the deploy stops');
-  assert.match(message, /staging failed/i, `the error names the staging lane: ${message}`);
-  assert.equal(jetpack.read(path.join(dir, 'package.json')), original, 'manifest restored verbatim');
-  assert.equal(jetpack.exists(path.join(dir, 'omega_modules')), false, 'no half-staged tarballs left behind');
-  assert.equal(jetpack.exists(path.join(dir, 'package-lock.json')), false, 'no half-written lockfile left behind');
-
-  jetpack.remove(tmp);
-});
 
 /**
  * A brand-shaped fixture: two linked packages (one pulling the other through a
@@ -214,74 +72,239 @@ function buildBrand(tmp) {
   return { brandRoot, web };
 }
 
-test('a workspace root stages its members too, each spec relative to ITS manifest', async () => {
-  const tmp = makeTmp();
-  const { brandRoot, web } = buildBrand(tmp);
-  const rootManifest = jetpack.read(path.join(brandRoot, 'package.json'));
-  const memberManifest = jetpack.read(path.join(web, 'package.json'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'pack-local',
+  tests: [
+    {
+      name: 'stages the file: deps pointing OUTSIDE the dir, and restores them verbatim',
+      run: async (ctx) => {
+        const tmp = makeTmp();
 
-  const staging = await stageLocalPackages({ dir: brandRoot });
+        // A tiny real package OUTSIDE the staged dir...
+        writePackage(path.join(tmp, 'fakepkg'), { name: '@omega.js/fakepkg', version: '1.0.0' });
 
-  assert.deepEqual(staging.staged, ['@omega.js/liba', '@omega.js/libb']);
-  assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
-  assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-libb-0.1.0.tgz')), 'file');
+        // ...referenced the way a functions dir does it
+        const dir = path.join(tmp, 'functions');
+        writeManifest(dir, {
+          name: 'test-functions',
+          version: '0.0.1',
+          private: true,
+          dependencies: { '@omega.js/fakepkg': 'file:../fakepkg' },
+        });
 
-  const root = read(path.join(brandRoot, 'package.json'));
-  assert.equal(root.devDependencies['@omega.js/liba'], 'file:omega_modules/omega.js-liba-1.0.0.tgz');
-  assert.equal(root.overrides['@omega.js/libb'], 'file:omega_modules/omega.js-libb-0.1.0.tgz');
+        const staging = await stageLocalPackages({ dir });
 
-  // The member's spec is relative to the MEMBER, never to the staged root
-  const member = read(path.join(web, 'package.json'));
-  assert.equal(member.dependencies['@omega.js/liba'], 'file:../../omega_modules/omega.js-liba-1.0.0.tgz');
-  assert.equal(member.overrides, undefined, 'overrides belong to the install root only');
+        ctx.expect(staging.staged).toEqual(['@omega.js/fakepkg']);
+        ctx.expect(read(path.join(dir, 'package.json')).dependencies['@omega.js/fakepkg']).toBe('file:omega_modules/omega.js-fakepkg-1.0.0.tgz');
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-fakepkg-1.0.0.tgz'))).toBe('file');
 
-  const lock = read(path.join(brandRoot, 'package-lock.json'));
-  assert.ok(lock, 'the install root carries the regenerated lockfile');
-  assert.equal(lock.packages['node_modules/@omega.js/liba'].resolved, 'file:omega_modules/omega.js-liba-1.0.0.tgz');
-  assert.equal(lock.packages['node_modules/@omega.js/libb'].resolved, 'file:omega_modules/omega.js-libb-0.1.0.tgz');
+        const lock = read(path.join(dir, 'package-lock.json'));
+        ctx.expect(lock, 'lockfile generated for the staged shape').toBeTruthy();
+        ctx.expect(lock.packages['node_modules/@omega.js/fakepkg'], 'lockfile resolves the staged tarball').toBeTruthy();
 
-  await staging.restore();
-  assert.equal(jetpack.read(path.join(brandRoot, 'package.json')), rootManifest, 'root manifest restored byte-for-byte');
-  assert.equal(jetpack.read(path.join(web, 'package.json')), memberManifest, 'member manifest restored byte-for-byte');
-  assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules')), false, 'staging dir removed');
-  assert.equal(jetpack.exists(path.join(brandRoot, 'package-lock.json')), false, 'lockfile absent again');
+        await staging.restore();
+        ctx.expect(read(path.join(dir, 'package.json')).dependencies['@omega.js/fakepkg']).toBe('file:../fakepkg');
+        ctx.expect(jetpack.exists(path.join(dir, 'package-lock.json')), 'lockfile absent again (none existed before)').toBe(false);
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules')), 'staging dir removed').toBe(false);
 
-  jetpack.remove(tmp);
-});
+        jetpack.remove(tmp);
+      },
+    },
 
-test('second hop: a member of an already-staged tree COPIES the tarballs and packs nothing', async () => {
-  const tmp = makeTmp();
-  const { brandRoot } = buildBrand(tmp);
+    {
+      name: 'a dir with no outside file: deps stages nothing',
+      run: async (ctx) => {
+        const tmp = makeTmp();
 
-  const first = await stageLocalPackages({ dir: brandRoot });
+        const dir = path.join(tmp, 'functions');
+        writeManifest(dir, {
+          name: 'fns',
+          version: '1.0.0',
+          private: true,
+          dependencies: { 'firebase-admin': '^13.0.0' },
+        });
 
-  // What the runner receives: the staged tree ALONE. The package sources the
-  // first hop packed are nowhere near it, so anything this hop tried to pack
-  // again would fail rather than quietly re-packing.
-  const snapshot = path.join(tmp, 'runner', 'brand');
-  jetpack.copy(brandRoot, snapshot);
-  await first.restore();
-  jetpack.remove(path.join(tmp, 'packages'));
+        const staging = await stageLocalPackages({ dir });
 
-  const web = path.join(snapshot, 'targets', 'web');
-  const staging = await stageLocalPackages({ dir: web });
+        ctx.expect(staging.staged).toEqual([]);
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules')), 'nothing staged').toBe(false);
+        ctx.expect(jetpack.exists(path.join(dir, 'package-lock.json')), 'no lockfile regenerated for a no-op').toBe(false);
+        await staging.restore(); // harmless no-op
 
-  assert.deepEqual(staging.staged, ['@omega.js/liba', '@omega.js/libb']);
-  assert.equal(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
-  assert.equal(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-libb-0.1.0.tgz')), 'file', 'the ROOT override travelled with the member');
+        jetpack.remove(tmp);
+      },
+    },
 
-  const member = read(path.join(web, 'package.json'));
-  assert.equal(member.dependencies['@omega.js/liba'], 'file:omega_modules/omega.js-liba-1.0.0.tgz');
-  assert.equal(member.overrides['@omega.js/libb'], 'file:omega_modules/omega.js-libb-0.1.0.tgz');
+    {
+      name: '#331: a linked @omega.js dep of a packed package rides too, so the lock never asks the registry',
+      run: async (ctx) => {
+        const tmp = makeTmp();
 
-  const lock = read(path.join(web, 'package-lock.json'));
-  assert.ok(lock, 'the member is its own install root now');
-  assert.equal(lock.packages['node_modules/@omega.js/liba'].resolved, 'file:omega_modules/omega.js-liba-1.0.0.tgz');
-  assert.equal(lock.packages['node_modules/@omega.js/libb'].resolved, 'file:omega_modules/omega.js-libb-0.1.0.tgz');
+        // A local @omega.js package that exists NOWHERE but this disk: the
+        // registry-404 shape (client under the publish latch)
+        const depDir = path.join(tmp, 'workspace', 'faketransitive');
+        writePackage(depDir, { name: '@omega.js/faketransitive', version: '0.1.0' });
 
-  await staging.restore();
-  assert.equal(read(path.join(web, 'package.json')).dependencies['@omega.js/liba'], 'file:../../omega_modules/omega.js-liba-1.0.0.tgz', 'the first hop\'s spelling is back');
-  assert.equal(jetpack.exists(path.join(web, 'omega_modules')), false, 'staging dir removed');
+        // The framework package declares it by REGISTRY spec (that is how
+        // @omega.js/backend spells @omega.js/client) and resolves it through a
+        // node_modules SYMLINK, the local-era shape npm workspaces make
+        const pkgDir = path.join(tmp, 'fakeframework');
+        writePackage(pkgDir, {
+          name: '@omega.js/fakeframework',
+          version: '1.0.0',
+          dependencies: { '@omega.js/faketransitive': '^0.1.0' },
+        });
+        jetpack.dir(path.join(pkgDir, 'node_modules', '@omega.js'));
+        fs.symlinkSync(depDir, path.join(pkgDir, 'node_modules', '@omega.js', 'faketransitive'), 'dir');
 
-  jetpack.remove(tmp);
+        const dir = path.join(tmp, 'functions');
+        writeManifest(dir, {
+          name: 'test-functions',
+          version: '0.0.1',
+          private: true,
+          dependencies: { '@omega.js/fakeframework': 'file:../fakeframework' },
+        });
+
+        const staging = await stageLocalPackages({ dir });
+
+        ctx.expect(staging.staged).toEqual(['@omega.js/fakeframework', '@omega.js/faketransitive']);
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-fakeframework-1.0.0.tgz'))).toBe('file');
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules', 'omega.js-faketransitive-0.1.0.tgz'))).toBe('file');
+
+        // The framework tarball still declares `^0.1.0` internally, so only an
+        // override redirects that NESTED resolution to the artifact beside it
+        const staged = read(path.join(dir, 'package.json'));
+        ctx.expect(staged.dependencies['@omega.js/fakeframework']).toBe('file:omega_modules/omega.js-fakeframework-1.0.0.tgz');
+        ctx.expect(staged.overrides['@omega.js/faketransitive']).toBe('file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
+
+        const locked = read(path.join(dir, 'package-lock.json')).packages['node_modules/@omega.js/faketransitive'];
+        ctx.expect(locked, 'the linked dependency is in the lockfile').toBeTruthy();
+        ctx.expect(locked.resolved).toBe('file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
+
+        await staging.restore();
+        ctx.expect(read(path.join(dir, 'package.json')).overrides, 'staging overrides never survive the restore').toBe(undefined);
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules')), 'staging dir removed').toBe(false);
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: '#331: a failing stage restores first and throws, so nothing deploys from a half-staged folder',
+      run: async (ctx) => {
+        const tmp = makeTmp();
+
+        writePackage(path.join(tmp, 'fakepkg'), { name: '@omega.js/fakepkg', version: '1.0.0' });
+
+        // The pack succeeds, then the LOCK REGEN fails (a file: spec pointing at a
+        // tarball that does not exist): the failure lands AFTER the manifest was
+        // respelled on disk, which is exactly where the 404 landed
+        const dir = path.join(tmp, 'functions');
+        const original = `${JSON.stringify({
+          name: 'test-functions',
+          version: '0.0.1',
+          private: true,
+          dependencies: {
+            '@omega.js/fakepkg': 'file:../fakepkg',
+            'never-here': 'file:../missing-tarball.tgz',
+          },
+        }, null, 2)}\n`;
+        jetpack.write(path.join(dir, 'package.json'), original);
+
+        let message = '';
+        try {
+          await stageLocalPackages({ dir });
+        } catch (e) {
+          message = e.message;
+        }
+
+        ctx.expect(message, 'a failing stage throws, and the deploy stops').toBeTruthy();
+        ctx.expect(message, `the error names the staging lane: ${message}`).toMatch(/staging failed/i);
+        ctx.expect(jetpack.read(path.join(dir, 'package.json')), 'manifest restored verbatim').toBe(original);
+        ctx.expect(jetpack.exists(path.join(dir, 'omega_modules')), 'no half-staged tarballs left behind').toBe(false);
+        ctx.expect(jetpack.exists(path.join(dir, 'package-lock.json')), 'no half-written lockfile left behind').toBe(false);
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: 'a workspace root stages its members too, each spec relative to ITS manifest',
+      run: async (ctx) => {
+        const tmp = makeTmp();
+        const { brandRoot, web } = buildBrand(tmp);
+        const rootManifest = jetpack.read(path.join(brandRoot, 'package.json'));
+        const memberManifest = jetpack.read(path.join(web, 'package.json'));
+
+        const staging = await stageLocalPackages({ dir: brandRoot });
+
+        ctx.expect(staging.staged).toEqual(['@omega.js/liba', '@omega.js/libb']);
+        ctx.expect(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-liba-1.0.0.tgz'))).toBe('file');
+        ctx.expect(jetpack.exists(path.join(brandRoot, 'omega_modules', 'omega.js-libb-0.1.0.tgz'))).toBe('file');
+
+        const root = read(path.join(brandRoot, 'package.json'));
+        ctx.expect(root.devDependencies['@omega.js/liba']).toBe('file:omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(root.overrides['@omega.js/libb']).toBe('file:omega_modules/omega.js-libb-0.1.0.tgz');
+
+        // The member's spec is relative to the MEMBER, never to the staged root
+        const member = read(path.join(web, 'package.json'));
+        ctx.expect(member.dependencies['@omega.js/liba']).toBe('file:../../omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(member.overrides, 'overrides belong to the install root only').toBe(undefined);
+
+        const lock = read(path.join(brandRoot, 'package-lock.json'));
+        ctx.expect(lock, 'the install root carries the regenerated lockfile').toBeTruthy();
+        ctx.expect(lock.packages['node_modules/@omega.js/liba'].resolved).toBe('file:omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(lock.packages['node_modules/@omega.js/libb'].resolved).toBe('file:omega_modules/omega.js-libb-0.1.0.tgz');
+
+        await staging.restore();
+        ctx.expect(jetpack.read(path.join(brandRoot, 'package.json')), 'root manifest restored byte-for-byte').toBe(rootManifest);
+        ctx.expect(jetpack.read(path.join(web, 'package.json')), 'member manifest restored byte-for-byte').toBe(memberManifest);
+        ctx.expect(jetpack.exists(path.join(brandRoot, 'omega_modules')), 'staging dir removed').toBe(false);
+        ctx.expect(jetpack.exists(path.join(brandRoot, 'package-lock.json')), 'lockfile absent again').toBe(false);
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: 'second hop: a member of an already-staged tree COPIES the tarballs and packs nothing',
+      run: async (ctx) => {
+        const tmp = makeTmp();
+        const { brandRoot } = buildBrand(tmp);
+
+        const first = await stageLocalPackages({ dir: brandRoot });
+
+        // What the runner receives: the staged tree ALONE. The package sources the
+        // first hop packed are nowhere near it, so anything this hop tried to pack
+        // again would fail rather than quietly re-packing.
+        const snapshot = path.join(tmp, 'runner', 'brand');
+        jetpack.copy(brandRoot, snapshot);
+        await first.restore();
+        jetpack.remove(path.join(tmp, 'packages'));
+
+        const web = path.join(snapshot, 'targets', 'web');
+        const staging = await stageLocalPackages({ dir: web });
+
+        ctx.expect(staging.staged).toEqual(['@omega.js/liba', '@omega.js/libb']);
+        ctx.expect(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-liba-1.0.0.tgz'))).toBe('file');
+        ctx.expect(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-libb-0.1.0.tgz')), 'the ROOT override travelled with the member').toBe('file');
+
+        const member = read(path.join(web, 'package.json'));
+        ctx.expect(member.dependencies['@omega.js/liba']).toBe('file:omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(member.overrides['@omega.js/libb']).toBe('file:omega_modules/omega.js-libb-0.1.0.tgz');
+
+        const lock = read(path.join(web, 'package-lock.json'));
+        ctx.expect(lock, 'the member is its own install root now').toBeTruthy();
+        ctx.expect(lock.packages['node_modules/@omega.js/liba'].resolved).toBe('file:omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(lock.packages['node_modules/@omega.js/libb'].resolved).toBe('file:omega_modules/omega.js-libb-0.1.0.tgz');
+
+        await staging.restore();
+        ctx.expect(read(path.join(web, 'package.json')).dependencies['@omega.js/liba'], 'the first hop\'s spelling is back').toBe('file:../../omega_modules/omega.js-liba-1.0.0.tgz');
+        ctx.expect(jetpack.exists(path.join(web, 'omega_modules')), 'staging dir removed').toBe(false);
+
+        jetpack.remove(tmp);
+      },
+    },
+  ],
 });

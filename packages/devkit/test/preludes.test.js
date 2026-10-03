@@ -12,8 +12,7 @@
  * stubbed.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -45,125 +44,6 @@ function scratch(t, prefix) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
-
-// ---- The runner: which preludes a verb selects
-
-test('`all` runs on every verb, and on a boot with no verb at all', () => {
-  const calls = [];
-  const list = [spy('everywhere', 'all', calls)];
-
-  assert.deepEqual(runPreludes({ verb: 'deploy', preludes: list }).ran, ['everywhere']);
-  assert.deepEqual(runPreludes({ verb: 'test', preludes: list }).ran, ['everywhere']);
-  assert.deepEqual(runPreludes({ preludes: list }).ran, ['everywhere'], 'a bare `omega` boots the same preludes');
-  assert.equal(calls.length, 3);
-});
-
-test('one verb runs on that verb alone', () => {
-  const calls = [];
-  const list = [spy('deploy-only', 'deploy', calls)];
-
-  assert.deepEqual(runPreludes({ verb: 'deploy', preludes: list }).ran, ['deploy-only']);
-  assert.deepEqual(runPreludes({ verb: 'build', preludes: list }).ran, []);
-  assert.deepEqual(runPreludes({ preludes: list }).ran, [], 'a targeted prelude never runs on a verb-less boot');
-  assert.equal(calls.length, 1);
-});
-
-test('a list of verbs runs on each of them and nothing else', () => {
-  const calls = [];
-  const list = [spy('shipping', ['deploy', 'release'], calls)];
-
-  assert.deepEqual(runPreludes({ verb: 'deploy', preludes: list }).ran, ['shipping']);
-  assert.deepEqual(runPreludes({ verb: 'release', preludes: list }).ran, ['shipping']);
-  assert.deepEqual(runPreludes({ verb: 'dev', preludes: list }).ran, []);
-});
-
-test('a flag where the verb goes is no verb: `all` runs, a targeted prelude does not', () => {
-  const calls = [];
-  const list = [spy('everywhere', 'all', calls), spy('version-only', 'version', calls)];
-
-  assert.deepEqual(runPreludes({ verb: '--version', preludes: list }).ran, ['everywhere']);
-});
-
-test('the matches run in LIST order, whatever order the verb names them', () => {
-  const calls = [];
-  const list = [spy('first', 'all', calls), spy('second', ['build'], calls), spy('third', 'all', calls)];
-
-  assert.deepEqual(runPreludes({ verb: 'build', preludes: list }).ran, ['first', 'second', 'third']);
-  assert.deepEqual(calls.map((c) => c.name), ['first', 'second', 'third']);
-});
-
-test('every prelude gets the same context: the verb, the brand root, the target dir, the config', () => {
-  const calls = [];
-  const config = { brand: { id: 'acme' } };
-
-  runPreludes({ verb: 'build', brandRoot: '/brands/acme', targetDir: '/brands/acme/targets/web', config, preludes: [spy('probe', 'all', calls)] });
-
-  assert.deepEqual(calls[0].context, { verb: 'build', brandRoot: '/brands/acme', targetDir: '/brands/acme/targets/web', config });
-});
-
-test('the brand root defaults to the one resolved from the target dir', (t) => {
-  const dir = scratch(t, 'omega-prelude-root-');
-  jetpack.write(path.join(dir, 'config', 'omega.json5'), '{ brand: { id: \'acme\' } }\n');
-  jetpack.write(path.join(dir, 'package.json'), '{ "name": "acme" }\n');
-  const calls = [];
-
-  runPreludes({ verb: 'build', targetDir: dir, preludes: [spy('probe', 'all', calls)] });
-
-  assert.equal(calls[0].context.brandRoot, dir);
-});
-
-test('a prelude declaring a bogus `verbs` fails loudly, naming itself', () => {
-  assert.throws(
-    () => runPreludes({ verb: 'build', preludes: [{ name: 'broken', run: () => {} }] }),
-    /broken/,
-  );
-});
-
-test('the shipped list is verb-targeted preludes of one shape', () => {
-  assert.ok(PRELUDES.length >= 1, 'the list ships at least the origin heal');
-  for (const prelude of PRELUDES) {
-    assert.equal(typeof prelude.name, 'string');
-    assert.equal(typeof prelude.run, 'function');
-    assert.ok(prelude.verbs === 'all' || typeof prelude.verbs === 'string' || Array.isArray(prelude.verbs));
-  }
-  assert.ok(PRELUDES.some((prelude) => prelude.name === originHeal.name), 'the origin heal is wired into the list');
-});
-
-test('a prelude that stops the run prints one line and exits 1', (t) => {
-  const dir = scratch(t, 'omega-prelude-stop-');
-  const script = path.join(dir, 'boot.js');
-  jetpack.write(script, [
-    `const { runPreludes } = require(${JSON.stringify(RUNNER)});`,
-    'runPreludes({ verb: \'build\', preludes: [{ name: \'gate\', verbs: \'all\', run: () => { throw new Error(\'the brand config is unreadable\'); } }] });',
-    'console.log(\'THE VERB RAN\');',
-  ].join('\n'));
-
-  const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
-
-  assert.equal(result.status, 1, 'the boot exits 1');
-  assert.doesNotMatch(result.stdout, /THE VERB RAN/, 'the verb never runs');
-  assert.match(result.stderr, /the brand config is unreadable/);
-  assert.equal(result.stderr.trim().split('\n').length, 1, 'one line of why, no stack');
-});
-
-// ---- Parity: the same call, at the same point, in all five CLI entries
-
-test('all five CLI entries run the preludes right after the freshness boot, the same way', () => {
-  for (const [name, file] of CLI_ENTRIES) {
-    const source = fs.readFileSync(file, 'utf8');
-    const freshness = source.indexOf('freshnessBoot(');
-    const preludes = source.indexOf('runPreludes(');
-
-    assert.ok(freshness !== -1, `${name} boots the freshness guard`);
-    assert.ok(preludes !== -1, `${name} runs the boot preludes`);
-    assert.ok(preludes > freshness, `${name} runs the preludes AFTER the freshness guard`);
-    assert.match(
-      source,
-      /require\('@omega\.js\/devkit\/preludes'\)\.runPreludes\(\{ verb: process\.argv\[2\], targetDir: process\.cwd\(\) \}\);/,
-      `${name} uses the one call shape`,
-    );
-  }
-});
 
 // ---- The origin heal: the decision
 
@@ -215,253 +95,442 @@ function brandRoot(t) {
   return dir;
 }
 
-test('a redirected origin is rewritten to the repo GitHub redirects to, and says so in words', (t) => {
-  const root = brandRoot(t);
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'preludes',
+  tests: [
+    // ---- The runner: which preludes a verb selects
 
-  const result = originHeal.run({ brandRoot: root, config: CONFIG, ...injected });
+    {
+      name: '`all` runs on every verb, and on a boot with no verb at all',
+      run: (ctx) => {
+        const calls = [];
+        const list = [spy('everywhere', 'all', calls)];
 
-  assert.deepEqual(
-    calls.find((call) => call[0] === 'resolve'),
-    ['resolve', 'Old-Org', 'acme-omega'],
-    'GitHub is asked about the slug the CHECKOUT carries, and follows its own redirect',
-  );
-  assert.deepEqual(
-    calls.find((call) => call.includes('set-url')),
-    ['git', '-C', root, 'remote', 'set-url', 'origin', `https://github.com/${CURRENT}.git`],
-  );
-  assert.equal(lines.length, 1, 'the heal line, and no drift line: the config owner is where GitHub says it lives');
-  assert.match(lines[0], /origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
-  assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT });
-});
-
-test('the heal keeps the remote\'s own form: an ssh remote stays ssh', (t) => {
-  const root = brandRoot(t);
-  const { calls, seams: injected } = seams({
-    origin: `git@github.com:${STALE}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
-
-  originHeal.run({ brandRoot: root, config: CONFIG, ...injected });
-
-  assert.equal(calls.find((call) => call.includes('set-url')).at(-1), `git@github.com:${CURRENT}.git`);
-});
-
-test('a converged origin is a silent no-op: GitHub answers the slug it was asked about', (t) => {
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${CURRENT}.git\n`,
-    // GitHub's own comparison is case-insensitive, and so is this one.
-    resolved: { full_name: 'acme-org/Acme-Omega' },
-  });
-
-  const result = originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.deepEqual(lines, [], 'nothing is printed');
-  assert.deepEqual(calls.filter((call) => call.includes('set-url')), [], 'the remote is left alone');
-  assert.deepEqual(result, { healed: false, reason: 'converged' });
-});
-
-test('no config at all: the heal is GitHub\'s answer, config or no config', (t) => {
-  // A brand root with a `.git` and no `config/omega.json5` anywhere: the lazy
-  // load fails, which costs the drift check and nothing else.
-  const root = brandRoot(t);
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
-
-  const result = originHeal.run({ brandRoot: root, ...injected });
-
-  assert.equal(calls.find((call) => call.includes('set-url')).at(-1), `https://github.com/${CURRENT}.git`);
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /origin healed from/);
-  assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT });
-});
-
-test('no repo block: the heal still runs, and nothing can drift from an owner nobody typed', (t) => {
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
-
-  originHeal.run({ brandRoot: brandRoot(t), config: { brand: { id: 'acme' } }, ...injected });
-
-  assert.equal(calls.find((call) => call.includes('set-url')).at(-1), `https://github.com/${CURRENT}.git`);
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /origin healed from/);
-});
-
-test('drift: an origin GitHub serves under another owner than the derived source repo is stated, never rewritten', (t) => {
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${CURRENT}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
-
-  const result = originHeal.run({
-    brandRoot: brandRoot(t),
-    config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
-    ...injected,
-  });
-
-  assert.deepEqual(calls.filter((call) => call.includes('set-url')), [], 'the remote is right: it is the config that is wrong');
-  assert.deepEqual(lines, ['omega: origin is Acme-Org/acme-omega but config derives Other-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo']);
-  assert.deepEqual(result, { healed: false, reason: 'converged', drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
-});
-
-test('drift: a RENAME is drift too, the whole slug compared, not the owner alone (#934)', (t) => {
-  // GitHub redirects the old name to the new one under the SAME owner: the
-  // heal follows it, and every reader still derives `<brand.id>-omega`.
-  const { lines, seams: injected } = seams({
-    origin: `https://github.com/${CURRENT}.git\n`,
-    resolved: { full_name: 'Acme-Org/acme-site' },
-  });
-
-  const result = originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.equal(lines.length, 2);
-  assert.match(lines[0], /origin healed from Acme-Org\/acme-omega to Acme-Org\/acme-site/);
-  assert.equal(lines[1], 'omega: origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo');
-  assert.deepEqual(result.drift, { origin: 'Acme-Org/acme-site', derived: CURRENT });
-});
-
-test('a heal and a drift are two lines, the heal first', (t) => {
-  const { lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: { full_name: CURRENT },
-  });
-
-  const result = originHeal.run({
-    brandRoot: brandRoot(t),
-    config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
-    ...injected,
-  });
-
-  assert.equal(lines.length, 2);
-  assert.match(lines[0], /origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
-  assert.match(lines[1], /origin is Acme-Org\/acme-omega but config derives Other-Org\/acme-omega/);
-  assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT, drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
-});
-
-test('a repo GitHub does not have is left alone, silently', (t) => {
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: null,
-  });
-
-  originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.deepEqual(lines, []);
-  assert.deepEqual(calls.filter((call) => call.includes('set-url')), [], 'a slug that resolves to nothing is not a heal');
-});
-
-test('offline is a no-op: a failing GitHub read never stops a verb', (t) => {
-  const { calls, lines, seams: injected } = seams({
-    origin: `https://github.com/${STALE}.git\n`,
-    resolved: new Error('gh api repos/Old-Org/acme-omega failed: network is unreachable'),
-  });
-
-  originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.deepEqual(lines, []);
-  assert.deepEqual(calls.filter((call) => call.includes('set-url')), []);
-});
-
-test('no `.git` at the brand root: no git call, so the heal can never reach an enclosing repo', (t) => {
-  const dir = scratch(t, 'omega-prelude-nogit-');
-  const { calls, lines, seams: injected } = seams({ origin: `https://github.com/${STALE}.git\n` });
-
-  originHeal.run({ brandRoot: dir, config: CONFIG, ...injected });
-
-  assert.deepEqual(calls, [], 'a brand nested in someone else\'s repo is never touched, and GitHub is never asked');
-  assert.deepEqual(lines, []);
-});
-
-test('no brand root at all is a no-op', () => {
-  const { calls, seams: injected } = seams({ origin: `https://github.com/${STALE}.git\n` });
-
-  originHeal.run({ brandRoot: null, config: CONFIG, ...injected });
-
-  assert.deepEqual(calls, []);
-});
-
-test('a repo with no origin remote is a no-op', (t) => {
-  const { calls, lines, seams: injected } = seams({ origin: new Error('error: No such remote \'origin\'') });
-
-  originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.deepEqual(lines, []);
-  assert.deepEqual(calls.filter((call) => call[0] === 'resolve'), [], 'no remote, nothing to resolve');
-});
-
-test('a non-GitHub origin is left alone', (t) => {
-  const { calls, lines, seams: injected } = seams({ origin: `git@gitlab.com:${STALE}.git\n` });
-
-  originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
-
-  assert.deepEqual(lines, []);
-  assert.deepEqual(calls.filter((call) => call.includes('set-url')), []);
-});
-
-// ---- Integration: one real CLI boot, one real git repo
-
-test('a real CLI boot heals a redirected origin before the verb runs', (t) => {
-  // The fixture is the sandbox brand's own config, copied into a scratch dir
-  // with the `repo` block it does not declare, and git-init'd THERE: the
-  // checked-in fixture lives inside this monorepo, so a `.git` and a remote of
-  // its own would be a repo inside a repo and a real remote to rewrite.
-  const dir = scratch(t, 'omega-prelude-boot-');
-  const config = JSON5.parse(fs.readFileSync(path.join(MONOREPO, 'brands', 'sandbox-brand', 'config', 'omega.json5'), 'utf8'));
-  config.repo = { provider: 'github', owner: 'Omega-JS-Stack' };
-  jetpack.write(path.join(dir, 'config', 'omega.json5'), `${JSON5.stringify(config, null, 2)}\n`);
-  jetpack.write(path.join(dir, 'package.json'), '{ "name": "sandbox-brand", "private": true }\n');
-
-  const git = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
-  git('init', '-q', '-b', 'main');
-  git('remote', 'add', 'origin', 'https://github.com/Old-Org/sandbox-brand-omega.git');
-
-  // The one thing a test cannot have: GitHub following its own 301 and naming
-  // where the repo lives now. The stale slug redirects to the transferred one;
-  // every other slug, the transferred one included, answers as itself. Patched
-  // on the module the prelude calls through.
-  const stub = path.join(dir, 'stub-github.js');
-  jetpack.write(stub, [
-    `const github = require(${JSON.stringify(fs.realpathSync(path.join(__dirname, '..', 'src', 'github-repo.js')))});`,
-    "const REDIRECTS = { 'Old-Org/sandbox-brand-omega': 'Omega-JS-Stack/sandbox-brand-omega' };",
-    // A read with no bound would hang the boot on a stuck network: the stub refuses it.
-    'github.getRepo = (owner, name, options) => {',
-    "  if (!options || !(options.timeout > 0)) throw new Error('the boot read must carry a timeout');",
-    '  return { full_name: REDIRECTS[`${owner}/${name}`] || `${owner}/${name}` };',
-    '};',
-  ].join('\n'));
-
-  const boot = () => spawnSync(process.execPath, [path.join(MONOREPO, 'packages', 'manager', 'src', 'cli-run.js'), 'version'], {
-    cwd: dir,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      OMEGA_SKIP_FRESHNESS: '1',       // the sibling boot step, not this one's business
-      OMEGA_HOME: path.join(dir, '.omega-home'),
-      NODE_OPTIONS: `--require ${stub}`,
+        ctx.expect(runPreludes({ verb: 'deploy', preludes: list }).ran).toEqual(['everywhere']);
+        ctx.expect(runPreludes({ verb: 'test', preludes: list }).ran).toEqual(['everywhere']);
+        ctx.expect(runPreludes({ preludes: list }).ran, 'a bare `omega` boots the same preludes').toEqual(['everywhere']);
+        ctx.expect(calls.length).toBe(3);
+      },
     },
-  });
 
-  const first = boot();
+    {
+      name: 'one verb runs on that verb alone',
+      run: (ctx) => {
+        const calls = [];
+        const list = [spy('deploy-only', 'deploy', calls)];
 
-  assert.equal(first.status, 0, `the verb ran: ${first.stderr}`);
-  assert.match(first.stdout, /origin healed from Old-Org\/sandbox-brand-omega to Omega-JS-Stack\/sandbox-brand-omega/);
-  assert.match(first.stdout, /@omega\.js\/manager v/, 'the verb itself still ran');
-  assert.doesNotMatch(first.stdout, /config derives/, 'the config derives the repo GitHub serves it from');
-  assert.equal(git('remote', 'get-url', 'origin'), 'https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
+        ctx.expect(runPreludes({ verb: 'deploy', preludes: list }).ran).toEqual(['deploy-only']);
+        ctx.expect(runPreludes({ verb: 'build', preludes: list }).ran).toEqual([]);
+        ctx.expect(runPreludes({ preludes: list }).ran, 'a targeted prelude never runs on a verb-less boot').toEqual([]);
+        ctx.expect(calls.length).toBe(1);
+      },
+    },
 
-  // A converged brand: the second boot mutates nothing and says nothing, which
-  // is what makes the durable reconciler's walk report zero mutations.
-  const second = boot();
+    {
+      name: 'a list of verbs runs on each of them and nothing else',
+      run: (ctx) => {
+        const calls = [];
+        const list = [spy('shipping', ['deploy', 'release'], calls)];
 
-  assert.equal(second.status, 0);
-  assert.doesNotMatch(second.stdout, /origin healed/);
-  assert.doesNotMatch(second.stdout, /config derives/);
-  assert.equal(git('remote', 'get-url', 'origin'), 'https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
+        ctx.expect(runPreludes({ verb: 'deploy', preludes: list }).ran).toEqual(['shipping']);
+        ctx.expect(runPreludes({ verb: 'release', preludes: list }).ran).toEqual(['shipping']);
+        ctx.expect(runPreludes({ verb: 'dev', preludes: list }).ran).toEqual([]);
+      },
+    },
+
+    {
+      name: 'a flag where the verb goes is no verb: `all` runs, a targeted prelude does not',
+      run: (ctx) => {
+        const calls = [];
+        const list = [spy('everywhere', 'all', calls), spy('version-only', 'version', calls)];
+
+        ctx.expect(runPreludes({ verb: '--version', preludes: list }).ran).toEqual(['everywhere']);
+      },
+    },
+
+    {
+      name: 'the matches run in LIST order, whatever order the verb names them',
+      run: (ctx) => {
+        const calls = [];
+        const list = [spy('first', 'all', calls), spy('second', ['build'], calls), spy('third', 'all', calls)];
+
+        ctx.expect(runPreludes({ verb: 'build', preludes: list }).ran).toEqual(['first', 'second', 'third']);
+        ctx.expect(calls.map((c) => c.name)).toEqual(['first', 'second', 'third']);
+      },
+    },
+
+    {
+      name: 'every prelude gets the same context: the verb, the brand root, the target dir, the config',
+      run: (ctx) => {
+        const calls = [];
+        const config = { brand: { id: 'acme' } };
+
+        runPreludes({ verb: 'build', brandRoot: '/brands/acme', targetDir: '/brands/acme/targets/web', config, preludes: [spy('probe', 'all', calls)] });
+
+        ctx.expect(calls[0].context).toEqual({ verb: 'build', brandRoot: '/brands/acme', targetDir: '/brands/acme/targets/web', config });
+      },
+    },
+
+    {
+      name: 'the brand root defaults to the one resolved from the target dir',
+      run: (ctx) => {
+        const dir = scratch(ctx, 'omega-prelude-root-');
+        jetpack.write(path.join(dir, 'config', 'omega.json5'), '{ brand: { id: \'acme\' } }\n');
+        jetpack.write(path.join(dir, 'package.json'), '{ "name": "acme" }\n');
+        const calls = [];
+
+        runPreludes({ verb: 'build', targetDir: dir, preludes: [spy('probe', 'all', calls)] });
+
+        ctx.expect(calls[0].context.brandRoot).toBe(dir);
+      },
+    },
+
+    {
+      name: 'a prelude declaring a bogus `verbs` fails loudly, naming itself',
+      run: (ctx) => {
+        ctx.expect(() => runPreludes({ verb: 'build', preludes: [{ name: 'broken', run: () => {} }] })).toThrow(/broken/);
+      },
+    },
+
+    {
+      name: 'the shipped list is verb-targeted preludes of one shape',
+      run: (ctx) => {
+        ctx.expect(PRELUDES.length >= 1, 'the list ships at least the origin heal').toBeTruthy();
+        for (const prelude of PRELUDES) {
+          ctx.expect(typeof prelude.name).toBe('string');
+          ctx.expect(typeof prelude.run).toBe('function');
+          ctx.expect(prelude.verbs === 'all' || typeof prelude.verbs === 'string' || Array.isArray(prelude.verbs)).toBeTruthy();
+        }
+        ctx.expect(PRELUDES.some((prelude) => prelude.name === originHeal.name), 'the origin heal is wired into the list').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a prelude that stops the run prints one line and exits 1',
+      run: (ctx) => {
+        const dir = scratch(ctx, 'omega-prelude-stop-');
+        const script = path.join(dir, 'boot.js');
+        jetpack.write(script, [
+          `const { runPreludes } = require(${JSON.stringify(RUNNER)});`,
+          'runPreludes({ verb: \'build\', preludes: [{ name: \'gate\', verbs: \'all\', run: () => { throw new Error(\'the brand config is unreadable\'); } }] });',
+          'console.log(\'THE VERB RAN\');',
+        ].join('\n'));
+
+        const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+
+        ctx.expect(result.status, 'the boot exits 1').toBe(1);
+        ctx.expect(result.stdout, 'the verb never runs').not.toMatch(/THE VERB RAN/);
+        ctx.expect(result.stderr).toMatch(/the brand config is unreadable/);
+        ctx.expect(result.stderr.trim().split('\n').length, 'one line of why, no stack').toBe(1);
+      },
+    },
+
+    // ---- Parity: the same call, at the same point, in all five CLI entries
+
+    {
+      name: 'all five CLI entries run the preludes right after the freshness boot, the same way',
+      run: (ctx) => {
+        for (const [name, file] of CLI_ENTRIES) {
+          const source = fs.readFileSync(file, 'utf8');
+          const freshness = source.indexOf('freshnessBoot(');
+          const preludes = source.indexOf('runPreludes(');
+
+          ctx.expect(freshness !== -1, `${name} boots the freshness guard`).toBeTruthy();
+          ctx.expect(preludes !== -1, `${name} runs the boot preludes`).toBeTruthy();
+          ctx.expect(preludes > freshness, `${name} runs the preludes AFTER the freshness guard`).toBeTruthy();
+          ctx.expect(source, `${name} uses the one call shape`).toMatch(/require\('@omega\.js\/devkit\/preludes'\)\.runPreludes\(\{ verb: process\.argv\[2\], targetDir: process\.cwd\(\) \}\);/);
+        }
+      },
+    },
+
+    {
+      name: 'a redirected origin is rewritten to the repo GitHub redirects to, and says so in words',
+      run: (ctx) => {
+        const root = brandRoot(ctx);
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        const result = originHeal.run({ brandRoot: root, config: CONFIG, ...injected });
+
+        ctx.expect(calls.find((call) => call[0] === 'resolve'), 'GitHub is asked about the slug the CHECKOUT carries, and follows its own redirect').toEqual(['resolve', 'Old-Org', 'acme-omega']);
+        ctx.expect(calls.find((call) => call.includes('set-url'))).toEqual(['git', '-C', root, 'remote', 'set-url', 'origin', `https://github.com/${CURRENT}.git`]);
+        ctx.expect(lines.length, 'the heal line, and no drift line: the config owner is where GitHub says it lives').toBe(1);
+        ctx.expect(lines[0]).toMatch(/origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
+        ctx.expect(result).toEqual({ healed: true, from: STALE, to: CURRENT });
+      },
+    },
+
+    {
+      name: 'the heal keeps the remote\'s own form: an ssh remote stays ssh',
+      run: (ctx) => {
+        const root = brandRoot(ctx);
+        const { calls, seams: injected } = seams({
+          origin: `git@github.com:${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        originHeal.run({ brandRoot: root, config: CONFIG, ...injected });
+
+        ctx.expect(calls.find((call) => call.includes('set-url')).at(-1)).toBe(`git@github.com:${CURRENT}.git`);
+      },
+    },
+
+    {
+      name: 'a converged origin is a silent no-op: GitHub answers the slug it was asked about',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${CURRENT}.git\n`,
+          // GitHub's own comparison is case-insensitive, and so is this one.
+          resolved: { full_name: 'acme-org/Acme-Omega' },
+        });
+
+        const result = originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines, 'nothing is printed').toEqual([]);
+        ctx.expect(calls.filter((call) => call.includes('set-url')), 'the remote is left alone').toEqual([]);
+        ctx.expect(result).toEqual({ healed: false, reason: 'converged' });
+      },
+    },
+
+    {
+      name: 'no config at all: the heal is GitHub\'s answer, config or no config',
+      run: (ctx) => {
+        // A brand root with a `.git` and no `config/omega.json5` anywhere: the lazy
+        // load fails, which costs the drift check and nothing else.
+        const root = brandRoot(ctx);
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        const result = originHeal.run({ brandRoot: root, ...injected });
+
+        ctx.expect(calls.find((call) => call.includes('set-url')).at(-1)).toBe(`https://github.com/${CURRENT}.git`);
+        ctx.expect(lines.length).toBe(1);
+        ctx.expect(lines[0]).toMatch(/origin healed from/);
+        ctx.expect(result).toEqual({ healed: true, from: STALE, to: CURRENT });
+      },
+    },
+
+    {
+      name: 'no repo block: the heal still runs, and nothing can drift from an owner nobody typed',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        originHeal.run({ brandRoot: brandRoot(ctx), config: { brand: { id: 'acme' } }, ...injected });
+
+        ctx.expect(calls.find((call) => call.includes('set-url')).at(-1)).toBe(`https://github.com/${CURRENT}.git`);
+        ctx.expect(lines.length).toBe(1);
+        ctx.expect(lines[0]).toMatch(/origin healed from/);
+      },
+    },
+
+    {
+      name: 'drift: an origin GitHub serves under another owner than the derived source repo is stated, never rewritten',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${CURRENT}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        const result = originHeal.run({
+          brandRoot: brandRoot(ctx),
+          config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
+          ...injected,
+        });
+
+        ctx.expect(calls.filter((call) => call.includes('set-url')), 'the remote is right: it is the config that is wrong').toEqual([]);
+        ctx.expect(lines).toEqual(['omega: origin is Acme-Org/acme-omega but config derives Other-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo']);
+        ctx.expect(result).toEqual({ healed: false, reason: 'converged', drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
+      },
+    },
+
+    {
+      name: 'drift: a RENAME is drift too, the whole slug compared, not the owner alone (#934)',
+      run: (ctx) => {
+        // GitHub redirects the old name to the new one under the SAME owner: the
+        // heal follows it, and every reader still derives `<brand.id>-omega`.
+        const { lines, seams: injected } = seams({
+          origin: `https://github.com/${CURRENT}.git\n`,
+          resolved: { full_name: 'Acme-Org/acme-site' },
+        });
+
+        const result = originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines.length).toBe(2);
+        ctx.expect(lines[0]).toMatch(/origin healed from Acme-Org\/acme-omega to Acme-Org\/acme-site/);
+        ctx.expect(lines[1]).toBe('omega: origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.owner in config/omega.json5 or move the repo');
+        ctx.expect(result.drift).toEqual({ origin: 'Acme-Org/acme-site', derived: CURRENT });
+      },
+    },
+
+    {
+      name: 'a heal and a drift are two lines, the heal first',
+      run: (ctx) => {
+        const { lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+
+        const result = originHeal.run({
+          brandRoot: brandRoot(ctx),
+          config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
+          ...injected,
+        });
+
+        ctx.expect(lines.length).toBe(2);
+        ctx.expect(lines[0]).toMatch(/origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
+        ctx.expect(lines[1]).toMatch(/origin is Acme-Org\/acme-omega but config derives Other-Org\/acme-omega/);
+        ctx.expect(result).toEqual({ healed: true, from: STALE, to: CURRENT, drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
+      },
+    },
+
+    {
+      name: 'a repo GitHub does not have is left alone, silently',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: null,
+        });
+
+        originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines).toEqual([]);
+        ctx.expect(calls.filter((call) => call.includes('set-url')), 'a slug that resolves to nothing is not a heal').toEqual([]);
+      },
+    },
+
+    {
+      name: 'offline is a no-op: a failing GitHub read never stops a verb',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: new Error('gh api repos/Old-Org/acme-omega failed: network is unreachable'),
+        });
+
+        originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines).toEqual([]);
+        ctx.expect(calls.filter((call) => call.includes('set-url'))).toEqual([]);
+      },
+    },
+
+    {
+      name: 'no `.git` at the brand root: no git call, so the heal can never reach an enclosing repo',
+      run: (ctx) => {
+        const dir = scratch(ctx, 'omega-prelude-nogit-');
+        const { calls, lines, seams: injected } = seams({ origin: `https://github.com/${STALE}.git\n` });
+
+        originHeal.run({ brandRoot: dir, config: CONFIG, ...injected });
+
+        ctx.expect(calls, 'a brand nested in someone else\'s repo is never touched, and GitHub is never asked').toEqual([]);
+        ctx.expect(lines).toEqual([]);
+      },
+    },
+
+    {
+      name: 'no brand root at all is a no-op',
+      run: (ctx) => {
+        const { calls, seams: injected } = seams({ origin: `https://github.com/${STALE}.git\n` });
+
+        originHeal.run({ brandRoot: null, config: CONFIG, ...injected });
+
+        ctx.expect(calls).toEqual([]);
+      },
+    },
+
+    {
+      name: 'a repo with no origin remote is a no-op',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({ origin: new Error('error: No such remote \'origin\'') });
+
+        originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines).toEqual([]);
+        ctx.expect(calls.filter((call) => call[0] === 'resolve'), 'no remote, nothing to resolve').toEqual([]);
+      },
+    },
+
+    {
+      name: 'a non-GitHub origin is left alone',
+      run: (ctx) => {
+        const { calls, lines, seams: injected } = seams({ origin: `git@gitlab.com:${STALE}.git\n` });
+
+        originHeal.run({ brandRoot: brandRoot(ctx), config: CONFIG, ...injected });
+
+        ctx.expect(lines).toEqual([]);
+        ctx.expect(calls.filter((call) => call.includes('set-url'))).toEqual([]);
+      },
+    },
+
+    // ---- Integration: one real CLI boot, one real git repo
+
+    {
+      name: 'a real CLI boot heals a redirected origin before the verb runs',
+      run: (ctx) => {
+        // The fixture is the sandbox brand's own config, copied into a scratch dir
+        // with the `repo` block it does not declare, and git-init'd THERE: the
+        // checked-in fixture lives inside this monorepo, so a `.git` and a remote of
+        // its own would be a repo inside a repo and a real remote to rewrite.
+        const dir = scratch(ctx, 'omega-prelude-boot-');
+        const config = JSON5.parse(fs.readFileSync(path.join(MONOREPO, 'brands', 'sandbox-brand', 'config', 'omega.json5'), 'utf8'));
+        config.repo = { provider: 'github', owner: 'Omega-JS-Stack' };
+        jetpack.write(path.join(dir, 'config', 'omega.json5'), `${JSON5.stringify(config, null, 2)}\n`);
+        jetpack.write(path.join(dir, 'package.json'), '{ "name": "sandbox-brand", "private": true }\n');
+
+        const git = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+        git('init', '-q', '-b', 'main');
+        git('remote', 'add', 'origin', 'https://github.com/Old-Org/sandbox-brand-omega.git');
+
+        // The one thing a test cannot have: GitHub following its own 301 and naming
+        // where the repo lives now. The stale slug redirects to the transferred one;
+        // every other slug, the transferred one included, answers as itself. Patched
+        // on the module the prelude calls through.
+        const stub = path.join(dir, 'stub-github.js');
+        jetpack.write(stub, [
+          `const github = require(${JSON.stringify(fs.realpathSync(path.join(__dirname, '..', 'src', 'github-repo.js')))});`,
+          "const REDIRECTS = { 'Old-Org/sandbox-brand-omega': 'Omega-JS-Stack/sandbox-brand-omega' };",
+          // A read with no bound would hang the boot on a stuck network: the stub refuses it.
+          'github.getRepo = (owner, name, options) => {',
+          "  if (!options || !(options.timeout > 0)) throw new Error('the boot read must carry a timeout');",
+          '  return { full_name: REDIRECTS[`${owner}/${name}`] || `${owner}/${name}` };',
+          '};',
+        ].join('\n'));
+
+        const boot = () => spawnSync(process.execPath, [path.join(MONOREPO, 'packages', 'manager', 'src', 'cli-run.js'), 'version'], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            OMEGA_SKIP_FRESHNESS: '1',       // the sibling boot step, not this one's business
+            OMEGA_HOME: path.join(dir, '.omega-home'),
+            NODE_OPTIONS: `--require ${stub}`,
+          },
+        });
+
+        const first = boot();
+
+        ctx.expect(first.status, `the verb ran: ${first.stderr}`).toBe(0);
+        ctx.expect(first.stdout).toMatch(/origin healed from Old-Org\/sandbox-brand-omega to Omega-JS-Stack\/sandbox-brand-omega/);
+        ctx.expect(first.stdout, 'the verb itself still ran').toMatch(/@omega\.js\/manager v/);
+        ctx.expect(first.stdout, 'the config derives the repo GitHub serves it from').not.toMatch(/config derives/);
+        ctx.expect(git('remote', 'get-url', 'origin')).toBe('https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
+
+        // A converged brand: the second boot mutates nothing and says nothing, which
+        // is what makes the durable reconciler's walk report zero mutations.
+        const second = boot();
+
+        ctx.expect(second.status).toBe(0);
+        ctx.expect(second.stdout).not.toMatch(/origin healed/);
+        ctx.expect(second.stdout).not.toMatch(/config derives/);
+        ctx.expect(git('remote', 'get-url', 'origin')).toBe('https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
+      },
+    },
+  ],
 });

@@ -1,8 +1,7 @@
 // Tests for the lockstep boot check in src/lib/preflight.js: every installed
 // @omega.js package in a brand must sit on the manager's family version.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -66,144 +65,164 @@ function stageInstalledBrand(installs, { spec = null } = {}) {
   return { root, targets };
 }
 
-test('lockstep boot check: every installed package on the family version passes', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: MANAGER_VERSION, client: MANAGER_VERSION },
-    backend: { target: 'backend', framework: 'backend', version: MANAGER_VERSION, client: MANAGER_VERSION, clientAt: 'nested' },
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'lockstep',
+  tests: [
+    {
+      name: 'lockstep boot check: every installed package on the family version passes',
+      run: (ctx) => {
+        const { root, targets } = stageInstalledBrand({
+          web: { target: 'web', framework: 'web', version: MANAGER_VERSION, client: MANAGER_VERSION },
+          backend: { target: 'backend', framework: 'backend', version: MANAGER_VERSION, client: MANAGER_VERSION, clientAt: 'nested' },
+        });
 
-  const report = assertFamilyVersions({ brandRoot: root, targets });
+        const report = assertFamilyVersions({ brandRoot: root, targets });
 
-  assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.checked.map((entry) => entry.dir).sort(), ['backend', 'web']);
-  // The client is found wherever npm put it: hoisted at the root, or nested
-  assert.deepEqual(report.checked.map((entry) => `${entry.dir}:${entry.packages.length}`).sort(), ['backend:2', 'web:2']);
-});
-
-test('lockstep boot check: one target behind REFUSES, naming the target, both versions and the fix', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
-    backend: { target: 'backend', framework: 'backend', version: '0.0.9', client: '0.0.9', clientAt: 'nested' },
-  });
-
-  assert.throws(
-    () => assertFamilyVersions({ brandRoot: root, targets }),
-    (error) => {
-      assert.match(error.message, /backend/, 'names the drifted target');
-      assert.match(error.message, /@omega\.js\/backend 0\.0\.9/, 'names the installed version');
-      assert.match(error.message, /@omega\.js\/client 0\.0\.9/, 'names every drifted package under that target');
-      assert.match(error.message, new RegExp(MANAGER_VERSION.replace(/\./g, '\\.')), 'names the manager\'s version');
-      assert.equal(error.refusal, true, 'a refusal prints its message alone, no stack (#706)');
-      assert.match(error.message, /fix: run `omega update` at the brand root/, 'names the verb that installs, bare');
-      assert.ok(!error.message.includes('--apply'), 'no retired switch in the fix');
-      assert.ok(!error.message.includes('web'), 'a target that matches is not listed');
-      return true;
-    },
-  );
-});
-
-test('lockstep boot check: a `file:` spec is exempt: the local era is the monorepo\'s version by construction', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web', version: '9.9.9', client: '9.9.9', clientAt: 'nested' },
-  }, { spec: 'file:../../../omega/packages/web' });
-
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.exempt.map((entry) => entry.dir), ['web']);
-});
-
-test('lockstep boot check: a target with no install yet is skipped, not a mismatch', () => {
-  const { root, targets } = stageInstalledBrand({
-    web: { target: 'web', framework: 'web' },
-  });
-
-  const log = captureLog(() => {
-    const report = assertFamilyVersions({ brandRoot: root, targets });
-    assert.deepEqual(report.mismatched, []);
-    assert.deepEqual(report.skipped.map((entry) => entry.dir), ['web']);
-  });
-
-  assert.match(log, /web/, 'the skip is a line, never silence');
-  assert.match(log, /@omega\.js\/web/);
-});
-
-test('lockstep boot check: a custom target has no framework to compare', () => {
-  const { root } = stageInstalledBrand({});
-  const targets = [{ name: 'worker', dir: 'targets/worker', path: path.join(root, 'targets', 'worker'), target: null, custom: true }];
-
-  const report = assertFamilyVersions({ brandRoot: root, targets });
-
-  assert.deepEqual(report.checked, []);
-  assert.deepEqual(report.skipped, []);
-});
-
-test('lockstep boot check: an installed manifest that cannot be read is a REFUSAL naming the file (#794)', () => {
-  for (const [label, contents] of [['unparseable', '{ not json'], ['versionless', JSON.stringify({ name: '@omega.js/web' })]]) {
-    const { root, targets } = stageInstalledBrand({
-      web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
-    });
-    const manifest = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web', 'package.json');
-    fs.writeFileSync(manifest, contents);
-
-    assert.throws(
-      () => assertFamilyVersions({ brandRoot: root, targets }),
-      (error) => {
-        assert.equal(error.refusal, true);
-        assert.match(error.message, /cannot be read/);
-        assert.ok(error.message.includes(manifest), `${label}: the refusal names the file`);
-        assert.match(error.message, /npm install/, 'the fix is a reinstall');
-        return true;
+        ctx.expect(report.mismatched).toEqual([]);
+        ctx.expect(report.checked.map((entry) => entry.dir).sort()).toEqual(['backend', 'web']);
+        // The client is found wherever npm put it: hoisted at the root, or nested
+        ctx.expect(report.checked.map((entry) => `${entry.dir}:${entry.packages.length}`).sort()).toEqual(['backend:2', 'web:2']);
       },
-      `a ${label} manifest must never pass as "no version, no problem"`,
-    );
-  }
-});
-
-test('lockstep boot check: the framework hoisted at the BRAND ROOT is found by the climb', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-hoist-'));
-  const targetPath = path.join(root, 'targets', 'web');
-  fs.mkdirSync(targetPath, { recursive: true });
-  fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'hoisted-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
-  }));
-  // npm's normal placement in a workspace tree: nothing under the target
-  const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(hoisted, { recursive: true });
-  fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
-
-  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
-
-  assert.throws(
-    () => assertFamilyVersions({ brandRoot: root, targets }),
-    (error) => {
-      assert.match(error.message, /@omega\.js\/web 0\.0\.7/, 'the hoisted copy IS the installed copy');
-      return true;
     },
-  );
-});
 
-test('lockstep boot check: a target-local copy WINS over the hoisted one: nearest, climbing', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-nearest-'));
-  const targetPath = path.join(root, 'targets', 'web');
-  fs.mkdirSync(targetPath, { recursive: true });
-  fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'nearest-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
-  }));
+    {
+      name: 'lockstep boot check: one target behind REFUSES, naming the target, both versions and the fix',
+      run: (ctx) => {
+        const { root, targets } = stageInstalledBrand({
+          web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
+          backend: { target: 'backend', framework: 'backend', version: '0.0.9', client: '0.0.9', clientAt: 'nested' },
+        });
 
-  const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(hoisted, { recursive: true });
-  fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
+        ctx.expect(() => assertFamilyVersions({ brandRoot: root, targets })).toThrow((error) => {
+            ctx.expect(error.message, 'names the drifted target').toMatch(/backend/);
+            ctx.expect(error.message, 'names the installed version').toMatch(/@omega\.js\/backend 0\.0\.9/);
+            ctx.expect(error.message, 'names every drifted package under that target').toMatch(/@omega\.js\/client 0\.0\.9/);
+            ctx.expect(error.message, 'names the manager\'s version').toMatch(new RegExp(MANAGER_VERSION.replace(/\./g, '\\.')));
+            ctx.expect(error.refusal, 'a refusal prints its message alone, no stack (#706)').toBe(true);
+            ctx.expect(error.message, 'names the verb that installs, bare').toMatch(/fix: run `omega update` at the brand root/);
+            ctx.expect(!error.message.includes('--apply'), 'no retired switch in the fix').toBeTruthy();
+            ctx.expect(!error.message.includes('web'), 'a target that matches is not listed').toBeTruthy();
+            return true;
+          });
+      },
+    },
 
-  // The nested copy npm writes when the ranges stop overlapping: what this
-  // target actually loads, so it is what the gate must judge
-  const local = path.join(targetPath, 'node_modules', '@omega.js', 'web');
-  fs.mkdirSync(local, { recursive: true });
-  fs.writeFileSync(path.join(local, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: MANAGER_VERSION }));
+    {
+      name: 'lockstep boot check: a `file:` spec is exempt: the local era is the monorepo\'s version by construction',
+      run: (ctx) => {
+        const { root, targets } = stageInstalledBrand({
+          web: { target: 'web', framework: 'web', version: '9.9.9', client: '9.9.9', clientAt: 'nested' },
+        }, { spec: 'file:../../../omega/packages/web' });
 
-  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
-  const report = assertFamilyVersions({ brandRoot: root, targets });
+        const report = assertFamilyVersions({ brandRoot: root, targets });
 
-  assert.deepEqual(report.mismatched, [], 'the target-local copy matches, so the stale hoisted one is not what runs here');
-  assert.deepEqual(report.checked[0].packages, [{ name: '@omega.js/web', version: MANAGER_VERSION }]);
+        ctx.expect(report.mismatched).toEqual([]);
+        ctx.expect(report.exempt.map((entry) => entry.dir)).toEqual(['web']);
+      },
+    },
+
+    {
+      name: 'lockstep boot check: a target with no install yet is skipped, not a mismatch',
+      run: (ctx) => {
+        const { root, targets } = stageInstalledBrand({
+          web: { target: 'web', framework: 'web' },
+        });
+
+        const log = captureLog(() => {
+          const report = assertFamilyVersions({ brandRoot: root, targets });
+          ctx.expect(report.mismatched).toEqual([]);
+          ctx.expect(report.skipped.map((entry) => entry.dir)).toEqual(['web']);
+        });
+
+        ctx.expect(log, 'the skip is a line, never silence').toMatch(/web/);
+        ctx.expect(log).toMatch(/@omega\.js\/web/);
+      },
+    },
+
+    {
+      name: 'lockstep boot check: a custom target has no framework to compare',
+      run: (ctx) => {
+        const { root } = stageInstalledBrand({});
+        const targets = [{ name: 'worker', dir: 'targets/worker', path: path.join(root, 'targets', 'worker'), target: null, custom: true }];
+
+        const report = assertFamilyVersions({ brandRoot: root, targets });
+
+        ctx.expect(report.checked).toEqual([]);
+        ctx.expect(report.skipped).toEqual([]);
+      },
+    },
+
+    {
+      name: 'lockstep boot check: an installed manifest that cannot be read is a REFUSAL naming the file (#794)',
+      run: (ctx) => {
+        for (const [label, contents] of [['unparseable', '{ not json'], ['versionless', JSON.stringify({ name: '@omega.js/web' })]]) {
+          const { root, targets } = stageInstalledBrand({
+            web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
+          });
+          const manifest = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web', 'package.json');
+          fs.writeFileSync(manifest, contents);
+
+          ctx.expect(() => assertFamilyVersions({ brandRoot: root, targets }), `a ${label} manifest must never pass as "no version, no problem"`).toThrow((error) => {
+              ctx.expect(error.refusal).toBe(true);
+              ctx.expect(error.message).toMatch(/cannot be read/);
+              ctx.expect(error.message.includes(manifest), `${label}: the refusal names the file`).toBeTruthy();
+              ctx.expect(error.message, 'the fix is a reinstall').toMatch(/npm install/);
+              return true;
+            });
+        }
+      },
+    },
+
+    {
+      name: 'lockstep boot check: the framework hoisted at the BRAND ROOT is found by the climb',
+      run: (ctx) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-hoist-'));
+        const targetPath = path.join(root, 'targets', 'web');
+        fs.mkdirSync(targetPath, { recursive: true });
+        fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
+          name: 'hoisted-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
+        }));
+        // npm's normal placement in a workspace tree: nothing under the target
+        const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
+        fs.mkdirSync(hoisted, { recursive: true });
+        fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
+
+        const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
+
+        ctx.expect(() => assertFamilyVersions({ brandRoot: root, targets })).toThrow((error) => {
+            ctx.expect(error.message, 'the hoisted copy IS the installed copy').toMatch(/@omega\.js\/web 0\.0\.7/);
+            return true;
+          });
+      },
+    },
+
+    {
+      name: 'lockstep boot check: a target-local copy WINS over the hoisted one: nearest, climbing',
+      run: (ctx) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-nearest-'));
+        const targetPath = path.join(root, 'targets', 'web');
+        fs.mkdirSync(targetPath, { recursive: true });
+        fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
+          name: 'nearest-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
+        }));
+
+        const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
+        fs.mkdirSync(hoisted, { recursive: true });
+        fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
+
+        // The nested copy npm writes when the ranges stop overlapping: what this
+        // target actually loads, so it is what the gate must judge
+        const local = path.join(targetPath, 'node_modules', '@omega.js', 'web');
+        fs.mkdirSync(local, { recursive: true });
+        fs.writeFileSync(path.join(local, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: MANAGER_VERSION }));
+
+        const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
+        const report = assertFamilyVersions({ brandRoot: root, targets });
+
+        ctx.expect(report.mismatched, 'the target-local copy matches, so the stale hoisted one is not what runs here').toEqual([]);
+        ctx.expect(report.checked[0].packages).toEqual([{ name: '@omega.js/web', version: MANAGER_VERSION }]);
+      },
+    },
+  ],
 });

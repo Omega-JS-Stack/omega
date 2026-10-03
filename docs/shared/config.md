@@ -852,8 +852,10 @@ terminal sniffing.
 environment is how a dev build ships as production and how a production build talks
 to an emulator, and both failures stay silent until a user finds them.
 
-**`setEnvironment(value)` is the only writer**, so a fourth word can never reach
-the variable. Who calls it, and with what:
+**`setEnvironment(value)` is the only writer in a running process**, so a fourth
+word can never reach the variable. A lane that spawns a child names it instead in
+the child env object it builds, as a literal one of the three. Who names it, and
+with what:
 
 | Lane | Names |
 |---|---|
@@ -862,6 +864,7 @@ the variable. Who calls it, and with what:
 | `@omega.js/desktop`'s main process, at `initialize()` | the `environment` its baked config carries, for a packaged app that has no parent lane |
 | `@omega.js/web`'s verbs | `production` for `omega build`, `development` for `omega dev`, `testing` for `omega test` |
 | the desktop test runners, the extension `test` verb | `testing` |
+| `@omega.js/backend`'s `omega test` (the runner child) and emulator (the Functions child), in the child env object | `testing` |
 
 `envEnvironment()` (in `src/env.js`) is the PRODUCER of that input, never a
 second reader of it: it is the sniff a lane runs ONCE to decide what to set, and

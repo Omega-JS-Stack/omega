@@ -8,8 +8,7 @@
  * `--force` override, and the missing/corrupt cache falling back to a full
  * run that rewrites the file.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -85,172 +84,208 @@ function buildStep(result) {
   return result.output.results.website.steps.find((step) => step.phase === 'build');
 }
 
-// ─── Converged skip ──────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'update',
+  tests: [
+    // ─── Converged skip ──────────────────────────────────────────────────────────
 
-test('an unchanged target skips its build and the cache records both fingerprints', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'an unchanged target skips its build and the cache records both fingerprints',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  const first = await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 1, 'first run builds');
-  assert.equal(buildStep(first).skipped, undefined, 'first run really built');
+        const first = await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'first run builds').toBe(1);
+        ctx.expect(buildStep(first).skipped, 'first run really built').toBe(undefined);
 
-  const second = await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 1, 'converged rerun builds nothing');
-  assert.deepEqual(
-    { skipped: buildStep(second).skipped, reason: buildStep(second).reason, success: buildStep(second).success },
-    { skipped: true, reason: 'converged', success: true },
-  );
+        const second = await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'converged rerun builds nothing').toBe(1);
+        ctx.expect({ skipped: buildStep(second).skipped, reason: buildStep(second).reason, success: buildStep(second).success }).toEqual({ skipped: true, reason: 'converged', success: true });
 
-  const cache = readCacheFile(root);
-  assert.equal(cache.version, 2); // v2: the per-target map key is `targets` (#455)
-  assert.ok(cache.targets.website.files, 'target-file fingerprint cached');
-  assert.ok(cache.targets.website.frameworks, 'framework fingerprint cached');
-  assert.ok(cache.targets.website.updatedAt, 'stamped');
-});
+        const cache = readCacheFile(root);
+        ctx.expect(cache.version).toBe(2); // v2: the per-target map key is `targets` (#455)
+        ctx.expect(cache.targets.website.files, 'target-file fingerprint cached').toBeTruthy();
+        ctx.expect(cache.targets.website.frameworks, 'framework fingerprint cached').toBeTruthy();
+        ctx.expect(cache.targets.website.updatedAt, 'stamped').toBeTruthy();
+      },
+    },
 
-// ─── Target files ────────────────────────────────────────────────────────────
+    // ─── Target files ────────────────────────────────────────────────────────────
 
-test('a changed target source file triggers the build again', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'a changed target source file triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
-  jetpack.write(path.join(targetPath, 'src', 'index.md'), '# home, edited\n');
-  await run(root, targetPath);
+        await run(root, targetPath);
+        jetpack.write(path.join(targetPath, 'src', 'index.md'), '# home, edited\n');
+        await run(root, targetPath);
 
-  assert.equal(buildCount(targetPath), 2, 'a source edit is fresh input');
-});
+        ctx.expect(buildCount(targetPath), 'a source edit is fresh input').toBe(2);
+      },
+    },
 
-test('build output, logs and machinery dirs never count as target input', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'build output, logs and machinery dirs never count as target input',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
-  jetpack.write(path.join(targetPath, 'dist', 'index.html'), '<html></html>');
-  jetpack.write(path.join(targetPath, '.temp', 'scratch.json'), { a: 1 });
-  jetpack.write(path.join(targetPath, 'logs', 'website.log'), 'noise');
-  jetpack.write(path.join(targetPath, 'firebase-debug.log'), 'noise');
-  jetpack.write(path.join(targetPath, 'node_modules', 'left-pad', 'index.js'), '//');
-  await run(root, targetPath);
+        await run(root, targetPath);
+        jetpack.write(path.join(targetPath, 'dist', 'index.html'), '<html></html>');
+        jetpack.write(path.join(targetPath, '.temp', 'scratch.json'), { a: 1 });
+        jetpack.write(path.join(targetPath, 'logs', 'website.log'), 'noise');
+        jetpack.write(path.join(targetPath, 'firebase-debug.log'), 'noise');
+        jetpack.write(path.join(targetPath, 'node_modules', 'left-pad', 'index.js'), '//');
+        await run(root, targetPath);
 
-  assert.equal(buildCount(targetPath), 1, 'excluded paths leave the target converged');
-});
+        ctx.expect(buildCount(targetPath), 'excluded paths leave the target converged').toBe(1);
+      },
+    },
 
-test('a brand-level config or .env edit triggers the build again', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'a brand-level config or .env edit triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
-  jetpack.write(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'fixture', name: 'Fixture, renamed' } }`);
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 2, 'a brand config edit is fresh input');
+        await run(root, targetPath);
+        jetpack.write(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'fixture', name: 'Fixture, renamed' } }`);
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a brand config edit is fresh input').toBe(2);
 
-  jetpack.write(path.join(root, '.env'), 'KEY="changed value"\n');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 3, 'a brand .env edit is fresh input');
-});
+        jetpack.write(path.join(root, '.env'), 'KEY="changed value"\n');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a brand .env edit is fresh input').toBe(3);
+      },
+    },
 
-test('#681: a brand `.env.<environment>` overlay edit triggers the build again', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: '#681: a brand `.env.<environment>` overlay edit triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
+        await run(root, targetPath);
 
-  // The overlay is a real layer of the cascade (#586) and it carries the values
-  // that DIFFER per environment, which is exactly what a build bakes in. The
-  // chain fingerprinted the base `.env` by exact path only, so editing the
-  // overlay left the target converged and the build served the old key.
-  jetpack.write(path.join(root, '.env.development'), 'KEY="from the overlay"\n');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 2, 'a new brand overlay is fresh input');
+        // The overlay is a real layer of the cascade (#586) and it carries the values
+        // that DIFFER per environment, which is exactly what a build bakes in. The
+        // chain fingerprinted the base `.env` by exact path only, so editing the
+        // overlay left the target converged and the build served the old key.
+        jetpack.write(path.join(root, '.env.development'), 'KEY="from the overlay"\n');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a new brand overlay is fresh input').toBe(2);
 
-  jetpack.write(path.join(root, '.env.development'), 'KEY="edited in the overlay"\n');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 3, 'a brand overlay edit is fresh input');
+        jetpack.write(path.join(root, '.env.development'), 'KEY="edited in the overlay"\n');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a brand overlay edit is fresh input').toBe(3);
 
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 3, 'an untouched overlay leaves the target converged');
-});
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'an untouched overlay leaves the target converged').toBe(3);
+      },
+    },
 
-// #677: the company layer is part of a build's input set too, and it resolves
-// through the ONE rule: the same relative path inside the company tree.
-test('a company config or .env edit triggers the build again', async () => {
-  const { root, targetPath } = stageBrand();
+    // #677: the company layer is part of a build's input set too, and it resolves
+    // through the ONE rule: the same relative path inside the company tree.
+    {
+      name: 'a company config or .env edit triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  const companyBrandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-update-company-'));
-  jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }');
-  jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="value"\n');
-  recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
-  jetpack.write(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'fixture', name: 'Fixture' }, company: { id: 'fixture-co' } }`);
+        const companyBrandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-update-company-'));
+        jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }');
+        jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="value"\n');
+        recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+        jetpack.write(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'fixture', name: 'Fixture' }, company: { id: 'fixture-co' } }`);
 
-  await run(root, targetPath);
+        await run(root, targetPath);
 
-  jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co-renamed" } } } }');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 2, 'a company config edit is fresh input');
+        jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co-renamed" } } } }');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a company config edit is fresh input').toBe(2);
 
-  jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="changed value"\n');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 3, 'a company .env edit is fresh input');
+        jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="changed value"\n');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a company .env edit is fresh input').toBe(3);
 
-  jetpack.write(path.join(companyBrandRoot, 'company', '.env.development'), 'COMPANY_KEY="from the overlay"\n');
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 4, 'a company overlay is fresh input');
+        jetpack.write(path.join(companyBrandRoot, 'company', '.env.development'), 'COMPANY_KEY="from the overlay"\n');
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a company overlay is fresh input').toBe(4);
 
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 4, 'an untouched company layer leaves the target converged');
-});
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'an untouched company layer leaves the target converged').toBe(4);
+      },
+    },
 
-// ─── Frameworks ──────────────────────────────────────────────────────────────
+    // ─── Frameworks ──────────────────────────────────────────────────────────────
 
-test('an installed framework version bump triggers the build again', async () => {
-  const { root, targetPath, frameworkPath } = stageBrand();
+    {
+      name: 'an installed framework version bump triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath, frameworkPath } = stageBrand();
 
-  await run(root, targetPath);
-  jetpack.write(path.join(frameworkPath, 'package.json'), { name: '@omega.js/web', version: '0.2.0' });
-  await run(root, targetPath);
+        await run(root, targetPath);
+        jetpack.write(path.join(frameworkPath, 'package.json'), { name: '@omega.js/web', version: '0.2.0' });
+        await run(root, targetPath);
 
-  assert.equal(buildCount(targetPath), 2, 'a new installed version is fresh input');
-});
+        ctx.expect(buildCount(targetPath), 'a new installed version is fresh input').toBe(2);
+      },
+    },
 
-test('a locally linked framework rebuild triggers the build again', async () => {
-  const { root, targetPath, frameworkPath } = stageBrand({ linked: true });
+    {
+      name: 'a locally linked framework rebuild triggers the build again',
+      run: async (ctx) => {
+        const { root, targetPath, frameworkPath } = stageBrand({ linked: true });
 
-  await run(root, targetPath);
-  await run(root, targetPath);
-  assert.equal(buildCount(targetPath), 1, 'a link with untouched dist stays converged');
+        await run(root, targetPath);
+        await run(root, targetPath);
+        ctx.expect(buildCount(targetPath), 'a link with untouched dist stays converged').toBe(1);
 
-  jetpack.write(path.join(frameworkPath, 'dist', 'build.js'), 'module.exports = 2; // rebuilt\n');
-  await run(root, targetPath);
+        jetpack.write(path.join(frameworkPath, 'dist', 'build.js'), 'module.exports = 2; // rebuilt\n');
+        await run(root, targetPath);
 
-  assert.equal(buildCount(targetPath), 2, "the link target's build output is fresh input");
-});
+        ctx.expect(buildCount(targetPath), "the link target's build output is fresh input").toBe(2);
+      },
+    },
 
-// ─── Overrides ───────────────────────────────────────────────────────────────
+    // ─── Overrides ───────────────────────────────────────────────────────────────
 
-test('--force rebuilds a converged target', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: '--force rebuilds a converged target',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
-  const forced = await run(root, targetPath, { force: true });
+        await run(root, targetPath);
+        const forced = await run(root, targetPath, { force: true });
 
-  assert.equal(buildCount(targetPath), 2, 'force ignores the cache');
-  assert.equal(buildStep(forced).skipped, undefined, 'forced run really built');
-});
+        ctx.expect(buildCount(targetPath), 'force ignores the cache').toBe(2);
+        ctx.expect(buildStep(forced).skipped, 'forced run really built').toBe(undefined);
+      },
+    },
 
-test('a corrupt cache is treated as fresh and rewritten', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'a corrupt cache is treated as fresh and rewritten',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  await run(root, targetPath);
-  jetpack.write(path.join(root, '.omega', 'cache', 'update.json'), '{ not json');
-  await run(root, targetPath);
+        await run(root, targetPath);
+        jetpack.write(path.join(root, '.omega', 'cache', 'update.json'), '{ not json');
+        await run(root, targetPath);
 
-  assert.equal(buildCount(targetPath), 2, 'an unreadable cache means a full run');
-  assert.ok(readCacheFile(root).targets.website.files, 'and the file is rebuilt');
-});
+        ctx.expect(buildCount(targetPath), 'an unreadable cache means a full run').toBe(2);
+        ctx.expect(readCacheFile(root).targets.website.files, 'and the file is rebuilt').toBeTruthy();
+      },
+    },
 
-test('a dry run neither builds nor writes the cache', async () => {
-  const { root, targetPath } = stageBrand();
+    {
+      name: 'a dry run neither builds nor writes the cache',
+      run: async (ctx) => {
+        const { root, targetPath } = stageBrand();
 
-  const result = await run(root, targetPath, { dryRun: true });
+        const result = await run(root, targetPath, { dryRun: true });
 
-  assert.equal(buildCount(targetPath), 0, 'dry run builds nothing');
-  assert.equal(buildStep(result).dryRun, true);
-  assert.equal(jetpack.exists(path.join(root, '.omega', 'cache', 'update.json')), false, 'no cache written');
+        ctx.expect(buildCount(targetPath), 'dry run builds nothing').toBe(0);
+        ctx.expect(buildStep(result).dryRun).toBe(true);
+        ctx.expect(jetpack.exists(path.join(root, '.omega', 'cache', 'update.json')), 'no cache written').toBe(false);
+      },
+    },
+  ],
 });

@@ -8,8 +8,7 @@
 // from getEnvironment(), so they can never disagree with it, and exactly one is
 // true in every lane.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const {
   ENV_ENVIRONMENTS,
@@ -37,116 +36,149 @@ function withVar(value, fn) {
   }
 }
 
-test('the vocabulary is the three names, and the variable is named once', () => {
-  assert.deepStrictEqual(ENV_ENVIRONMENTS, ['development', 'testing', 'production']);
-  assert.strictEqual(ENVIRONMENT_VAR, 'OMEGA_ENVIRONMENT');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'environment',
+  tests: [
+    {
+      name: 'the vocabulary is the three names, and the variable is named once',
+      run: (ctx) => {
+        ctx.expect(ENV_ENVIRONMENTS).toEqual(['development', 'testing', 'production']);
+        ctx.expect(ENVIRONMENT_VAR).toBe('OMEGA_ENVIRONMENT');
+      },
+    },
 
-test('getEnvironment(): each of the three names, and exactly one is*() true in each', () => {
-  for (const name of ENV_ENVIRONMENTS) {
-    withVar(name, () => {
-      assert.strictEqual(getEnvironment(), name);
-      assert.strictEqual(isDevelopment(), name === 'development', `isDevelopment for ${name}`);
-      assert.strictEqual(isTesting(), name === 'testing', `isTesting for ${name}`);
-      assert.strictEqual(isProduction(), name === 'production', `isProduction for ${name}`);
+    {
+      name: 'getEnvironment(): each of the three names, and exactly one is*() true in each',
+      run: (ctx) => {
+        for (const name of ENV_ENVIRONMENTS) {
+          withVar(name, () => {
+            ctx.expect(getEnvironment()).toBe(name);
+            ctx.expect(isDevelopment(), `isDevelopment for ${name}`).toBe(name === 'development');
+            ctx.expect(isTesting(), `isTesting for ${name}`).toBe(name === 'testing');
+            ctx.expect(isProduction(), `isProduction for ${name}`).toBe(name === 'production');
 
-      const trueCount = [isDevelopment(), isTesting(), isProduction()].filter(Boolean).length;
-      assert.strictEqual(trueCount, 1, `exactly one is*() true for ${name}`);
-    });
-  }
-});
+            const trueCount = [isDevelopment(), isTesting(), isProduction()].filter(Boolean).length;
+            ctx.expect(trueCount, `exactly one is*() true for ${name}`).toBe(1);
+          });
+        }
+      },
+    },
 
-test('isProduction() is a real positive check, never !isDevelopment()', () => {
-  withVar('testing', () => {
-    assert.strictEqual(isDevelopment(), false);
-    assert.strictEqual(isProduction(), false);
-    assert.strictEqual(isTesting(), true);
-  });
-});
+    {
+      name: 'isProduction() is a real positive check, never !isDevelopment()',
+      run: (ctx) => {
+        withVar('testing', () => {
+          ctx.expect(isDevelopment()).toBe(false);
+          ctx.expect(isProduction()).toBe(false);
+          ctx.expect(isTesting()).toBe(true);
+        });
+      },
+    },
 
-test('a missing input is a loud error naming OMEGA_ENVIRONMENT', () => {
-  withVar(undefined, () => {
-    assert.throws(() => getEnvironment(), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => isDevelopment(), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => isProduction(), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => isTesting(), /OMEGA_ENVIRONMENT/);
-  });
-});
+    {
+      name: 'a missing input is a loud error naming OMEGA_ENVIRONMENT',
+      run: (ctx) => {
+        withVar(undefined, () => {
+          ctx.expect(() => getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => isDevelopment()).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => isProduction()).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => isTesting()).toThrow(/OMEGA_ENVIRONMENT/);
+        });
+      },
+    },
 
-test('an unknown name is a loud error naming OMEGA_ENVIRONMENT and the value', () => {
-  withVar('staging', () => {
-    assert.throws(() => getEnvironment(), (error) => {
-      assert.match(error.message, /OMEGA_ENVIRONMENT/);
-      assert.match(error.message, /staging/);
-      return true;
-    });
-  });
-  withVar('', () => assert.throws(() => getEnvironment(), /OMEGA_ENVIRONMENT/));
-});
+    {
+      name: 'an unknown name is a loud error naming OMEGA_ENVIRONMENT and the value',
+      run: (ctx) => {
+        withVar('staging', () => {
+          ctx.expect(() => getEnvironment()).toThrow((error) => {
+            ctx.expect(error.message).toMatch(/OMEGA_ENVIRONMENT/);
+            ctx.expect(error.message).toMatch(/staging/);
+            return true;
+          });
+        });
+        withVar('', () => ctx.expect(() => getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/));
+      },
+    },
 
-test('a browser context reads the baked config.environment, and the variable wins when both exist', () => {
-  const baked = { config: { environment: 'production' } };
+    {
+      name: 'a browser context reads the baked config.environment, and the variable wins when both exist',
+      run: (ctx) => {
+        const baked = { config: { environment: 'production' } };
 
-  withVar(undefined, () => {
-    assert.strictEqual(getEnvironment.call(baked), 'production');
-    assert.strictEqual(isProduction.call(baked), true);
-  });
+        withVar(undefined, () => {
+          ctx.expect(getEnvironment.call(baked)).toBe('production');
+          ctx.expect(isProduction.call(baked)).toBe(true);
+        });
 
-  // Node's own input is the answer wherever it exists: a lane that named one
-  // is never overruled by an artifact's record of what it was BUILT as.
-  withVar('testing', () => {
-    assert.strictEqual(getEnvironment.call(baked), 'testing');
-  });
+        // Node's own input is the answer wherever it exists: a lane that named one
+        // is never overruled by an artifact's record of what it was BUILT as.
+        withVar('testing', () => {
+          ctx.expect(getEnvironment.call(baked)).toBe('testing');
+        });
 
-  // A context carrying an unknown word is the same loud error.
-  withVar(undefined, () => {
-    assert.throws(() => getEnvironment.call({ config: { environment: 'staging' } }), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => getEnvironment.call({ config: {} }), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => getEnvironment.call({}), /OMEGA_ENVIRONMENT/);
-  });
-});
+        // A context carrying an unknown word is the same loud error.
+        withVar(undefined, () => {
+          ctx.expect(() => getEnvironment.call({ config: { environment: 'staging' } })).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => getEnvironment.call({ config: {} })).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => getEnvironment.call({})).toThrow(/OMEGA_ENVIRONMENT/);
+        });
+      },
+    },
 
-test('setEnvironment(): the one writer, it validates, sets the variable and returns it', () => {
-  withVar(undefined, () => {
-    assert.strictEqual(setEnvironment('development'), 'development');
-    assert.strictEqual(process.env[ENVIRONMENT_VAR], 'development');
-    assert.strictEqual(getEnvironment(), 'development');
+    {
+      name: 'setEnvironment(): the one writer, it validates, sets the variable and returns it',
+      run: (ctx) => {
+        withVar(undefined, () => {
+          ctx.expect(setEnvironment('development')).toBe('development');
+          ctx.expect(process.env[ENVIRONMENT_VAR]).toBe('development');
+          ctx.expect(getEnvironment()).toBe('development');
 
-    assert.strictEqual(setEnvironment('production'), 'production');
-    assert.strictEqual(getEnvironment(), 'production');
+          ctx.expect(setEnvironment('production')).toBe('production');
+          ctx.expect(getEnvironment()).toBe('production');
 
-    // A fourth word never reaches the variable.
-    assert.throws(() => setEnvironment('staging'), /OMEGA_ENVIRONMENT/);
-    assert.throws(() => setEnvironment(undefined), /OMEGA_ENVIRONMENT/);
-    assert.strictEqual(process.env[ENVIRONMENT_VAR], 'production', 'the refused value never landed');
-  });
-});
+          // A fourth word never reaches the variable.
+          ctx.expect(() => setEnvironment('staging')).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => setEnvironment(undefined)).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(process.env[ENVIRONMENT_VAR], 'the refused value never landed').toBe('production');
+        });
+      },
+    },
 
-// The rule the desktop and extension BUILD lanes name at load, which each of
-// them carried as its own copy of the same expression.
-test('buildLaneEnvironment(): build mode wins, else the inherited word, else development', () => {
-  withVar(undefined, () => {
-    // 1. The build-mode flag is the lane saying it produces a PRODUCTION
-    // artifact, and it beats anything inherited: a production build spawned
-    // from a test run still bakes production.
-    assert.strictEqual(buildLaneEnvironment(true), 'production');
-  });
+    // The rule the desktop and extension BUILD lanes name at load, which each of
+    // them carried as its own copy of the same expression.
+    {
+      name: 'buildLaneEnvironment(): build mode wins, else the inherited word, else development',
+      run: (ctx) => {
+        withVar(undefined, () => {
+          // 1. The build-mode flag is the lane saying it produces a PRODUCTION
+          // artifact, and it beats anything inherited: a production build spawned
+          // from a test run still bakes production.
+          ctx.expect(buildLaneEnvironment(true)).toBe('production');
+        });
 
-  withVar('testing', () => {
-    assert.strictEqual(buildLaneEnvironment(true), 'production', 'the flag wins over an inherited word');
+        withVar('testing', () => {
+          ctx.expect(buildLaneEnvironment(true), 'the flag wins over an inherited word').toBe('production');
 
-    // 2. Otherwise a lane that already named one keeps it (the test runners
-    // spawn their children with `testing`).
-    assert.strictEqual(buildLaneEnvironment(false), 'testing');
-  });
+          // 2. Otherwise a lane that already named one keeps it (the test runners
+          // spawn their children with `testing`).
+          ctx.expect(buildLaneEnvironment(false)).toBe('testing');
+        });
 
-  // 3. And a bare dev boot is development, never a guessed production.
-  withVar(undefined, () => {
-    assert.strictEqual(buildLaneEnvironment(false), 'development');
-  });
-});
+        // 3. And a bare dev boot is development, never a guessed production.
+        withVar(undefined, () => {
+          ctx.expect(buildLaneEnvironment(false)).toBe('development');
+        });
+      },
+    },
 
-test('no mixin: every framework calls the functions directly, so nothing attaches them to a class', () => {
-  assert.strictEqual(require('../src/environment.js').attachTo, undefined);
-  assert.strictEqual(require('../src/index.js').attachEnvironment, undefined);
+    {
+      name: 'no mixin: every framework calls the functions directly, so nothing attaches them to a class',
+      run: (ctx) => {
+        ctx.expect(require('../src/environment.js').attachTo).toBe(undefined);
+        ctx.expect(require('../src/index.js').attachEnvironment).toBe(undefined);
+      },
+    },
+  ],
 });

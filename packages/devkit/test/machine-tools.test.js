@@ -5,8 +5,7 @@
 // The probes run through an injected execFn that throws for a missing tool, the
 // way a failed child does, so no case here touches the real java or firebase.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { MACHINE_TOOLS, machineToolsFor, missingMachineTools, machineToolLine } = require('../src/machine-tools.js');
 
 const PLATFORMS = ['darwin', 'win32', 'linux'];
@@ -31,123 +30,165 @@ function probeRunner(missing = []) {
   return { execFn, calls };
 }
 
-test('exports the expected surface', () => {
-  assert.equal(typeof MACHINE_TOOLS, 'object');
-  assert.equal(typeof machineToolsFor, 'function');
-  assert.equal(typeof missingMachineTools, 'function');
-  assert.equal(typeof machineToolLine, 'function');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'machine-tools',
+  tests: [
+    {
+      name: 'exports the expected surface',
+      run: (ctx) => {
+        ctx.expect(typeof MACHINE_TOOLS).toBe('object');
+        ctx.expect(typeof machineToolsFor).toBe('function');
+        ctx.expect(typeof missingMachineTools).toBe('function');
+        ctx.expect(typeof machineToolLine).toBe('function');
+      },
+    },
 
-test('the list: a backend needs java and firebase, the other types need nothing npm does not bring', () => {
-  assert.deepEqual(Object.keys(MACHINE_TOOLS).sort(), ['backend', 'desktop', 'extension', 'web']);
-  assert.deepEqual(MACHINE_TOOLS.backend.map((tool) => tool.name), ['java', 'firebase']);
-  for (const type of ['web', 'desktop', 'extension']) assert.deepEqual(MACHINE_TOOLS[type], [], type);
-});
+    {
+      name: 'the list: a backend needs java and firebase, the other types need nothing npm does not bring',
+      run: (ctx) => {
+        ctx.expect(Object.keys(MACHINE_TOOLS).sort()).toEqual(['backend', 'desktop', 'extension', 'web']);
+        ctx.expect(MACHINE_TOOLS.backend.map((tool) => tool.name)).toEqual(['java', 'firebase']);
+        for (const type of ['web', 'desktop', 'extension']) ctx.expect(MACHINE_TOOLS[type], type).toEqual([]);
+      },
+    },
 
-test('every entry carries a probe, a reason and an install command per platform', () => {
-  for (const tool of Object.values(MACHINE_TOOLS).flat()) {
-    assert.ok(Array.isArray(tool.probe) && tool.probe.length > 0, `${tool.name}: probe is [file, ...args]`);
-    assert.equal(typeof tool.probe[0], 'string', `${tool.name}: the probe opens on the file to run`);
-    assert.ok(typeof tool.why === 'string' && tool.why.length > 0, `${tool.name}: why`);
-    assert.deepEqual(Object.keys(tool.install).sort(), [...PLATFORMS].sort(), `${tool.name}: one command per platform`);
-    for (const platform of PLATFORMS) {
-      assert.ok(typeof tool.install[platform] === 'string' && tool.install[platform].length > 0, `${tool.name} on ${platform}`);
-    }
-  }
-});
+    {
+      name: 'every entry carries a probe, a reason and an install command per platform',
+      run: (ctx) => {
+        for (const tool of Object.values(MACHINE_TOOLS).flat()) {
+          ctx.expect(Array.isArray(tool.probe) && tool.probe.length > 0, `${tool.name}: probe is [file, ...args]`).toBeTruthy();
+          ctx.expect(typeof tool.probe[0], `${tool.name}: the probe opens on the file to run`).toBe('string');
+          ctx.expect(typeof tool.why === 'string' && tool.why.length > 0, `${tool.name}: why`).toBeTruthy();
+          ctx.expect(Object.keys(tool.install).sort(), `${tool.name}: one command per platform`).toEqual([...PLATFORMS].sort());
+          for (const platform of PLATFORMS) {
+            ctx.expect(typeof tool.install[platform] === 'string' && tool.install[platform].length > 0, `${tool.name} on ${platform}`).toBeTruthy();
+          }
+        }
+      },
+    },
 
-test('machineToolsFor: a Firebase backend gets the backend list, a custom backend and every other type get none', () => {
-  assert.deepEqual(machineToolsFor({ type: 'backend' }).map((tool) => tool.name), ['java', 'firebase'], 'firebase is the default project type');
-  assert.deepEqual(machineToolsFor({ type: 'backend', projectType: 'firebase' }).map((tool) => tool.name), ['java', 'firebase']);
-  assert.deepEqual(machineToolsFor({ type: 'backend', projectType: 'custom' }), []);
-  for (const type of ['web', 'desktop', 'extension']) assert.deepEqual(machineToolsFor({ type }), [], type);
-});
+    {
+      name: 'machineToolsFor: a Firebase backend gets the backend list, a custom backend and every other type get none',
+      run: (ctx) => {
+        ctx.expect(machineToolsFor({ type: 'backend' }).map((tool) => tool.name), 'firebase is the default project type').toEqual(['java', 'firebase']);
+        ctx.expect(machineToolsFor({ type: 'backend', projectType: 'firebase' }).map((tool) => tool.name)).toEqual(['java', 'firebase']);
+        ctx.expect(machineToolsFor({ type: 'backend', projectType: 'custom' })).toEqual([]);
+        for (const type of ['web', 'desktop', 'extension']) ctx.expect(machineToolsFor({ type }), type).toEqual([]);
+      },
+    },
 
-test('#1032 case 1: a backend whose Java probe fails gets one java row, with the platform\'s install command', () => {
-  for (const platform of PLATFORMS) {
-    const { execFn } = probeRunner(['java']);
+    {
+      name: '#1032 case 1: a backend whose Java probe fails gets one java row, with the platform\'s install command',
+      run: (ctx) => {
+        for (const platform of PLATFORMS) {
+          const { execFn } = probeRunner(['java']);
 
-    const missing = missingMachineTools([{ name: 'backend', type: 'backend' }], { platform, execFn });
+          const missing = missingMachineTools([{ name: 'backend', type: 'backend' }], { platform, execFn });
 
-    assert.equal(missing.length, 1, `${platform}: ${JSON.stringify(missing)}`);
-    assert.deepEqual(missing[0], {
-      target: 'backend',
-      type: 'backend',
-      name: 'java',
-      why: backendTool('java').why,
-      install: backendTool('java').install[platform],
-    });
-  }
-  assert.notEqual(backendTool('java').install.darwin, backendTool('java').install.win32, 'the install command is picked per platform');
-});
+          ctx.expect(missing.length, `${platform}: ${JSON.stringify(missing)}`).toBe(1);
+          ctx.expect(missing[0]).toEqual({
+            target: 'backend',
+            type: 'backend',
+            name: 'java',
+            why: backendTool('java').why,
+            install: backendTool('java').install[platform],
+          });
+        }
+        ctx.expect(backendTool('java').install.darwin, 'the install command is picked per platform').not.toBe(backendTool('java').install.win32);
+      },
+    },
 
-test('#1032 case 1: machineToolLine holds the name, the target and the install command', () => {
-  const line = machineToolLine({
-    target: 'api',
-    type: 'backend',
-    name: 'java',
-    why: 'the Firebase emulators run on it',
-    install: 'brew install openjdk',
-  });
+    {
+      name: '#1032 case 1: machineToolLine holds the name, the target and the install command',
+      run: (ctx) => {
+        const line = machineToolLine({
+          target: 'api',
+          type: 'backend',
+          name: 'java',
+          why: 'the Firebase emulators run on it',
+          install: 'brew install openjdk',
+        });
 
-  assert.equal(line, 'java is not installed (the api target needs it: the Firebase emulators run on it). Install with: brew install openjdk');
-});
+        ctx.expect(line).toBe('java is not installed (the api target needs it: the Firebase emulators run on it). Install with: brew install openjdk');
+      },
+    },
 
-test('#1032 case 1: the row the helper returns reads as the one line', () => {
-  const { execFn } = probeRunner(['java']);
-  const [miss] = missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: 'linux', execFn });
+    {
+      name: '#1032 case 1: the row the helper returns reads as the one line',
+      run: (ctx) => {
+        const { execFn } = probeRunner(['java']);
+        const [miss] = missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: 'linux', execFn });
 
-  const line = machineToolLine(miss);
+        const line = machineToolLine(miss);
 
-  assert.ok(line.startsWith('java is not installed (the backend target needs it: '), line);
-  assert.ok(line.endsWith(`). Install with: ${backendTool('java').install.linux}`), line);
-});
+        ctx.expect(line.startsWith('java is not installed (the backend target needs it: '), line).toBeTruthy();
+        ctx.expect(line.endsWith(`). Install with: ${backendTool('java').install.linux}`), line).toBeTruthy();
+      },
+    },
 
-test('#1032 case 2: with both probes passing, nothing is missing', () => {
-  const { execFn, calls } = probeRunner([]);
+    {
+      name: '#1032 case 2: with both probes passing, nothing is missing',
+      run: (ctx) => {
+        const { execFn, calls } = probeRunner([]);
 
-  assert.deepEqual(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: 'darwin', execFn }), []);
-  assert.deepEqual(calls, MACHINE_TOOLS.backend.map((tool) => tool.probe), 'each tool was probed with its own probe');
-});
+        ctx.expect(missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: 'darwin', execFn })).toEqual([]);
+        ctx.expect(calls, 'each tool was probed with its own probe').toEqual(MACHINE_TOOLS.backend.map((tool) => tool.probe));
+      },
+    },
 
-test('#1032 case 3: a custom backend, or a web, desktop or extension target, is missing nothing even with every probe failing', () => {
-  const targets = [
-    { name: 'api', type: 'backend', projectType: 'custom' },
-    { name: 'web', type: 'web' },
-    { name: 'desktop', type: 'desktop' },
-    { name: 'extension', type: 'extension' },
-  ];
-  const { execFn } = probeRunner(['*']);
+    {
+      name: '#1032 case 3: a custom backend, or a web, desktop or extension target, is missing nothing even with every probe failing',
+      run: (ctx) => {
+        const targets = [
+          { name: 'api', type: 'backend', projectType: 'custom' },
+          { name: 'web', type: 'web' },
+          { name: 'desktop', type: 'desktop' },
+          { name: 'extension', type: 'extension' },
+        ];
+        const { execFn } = probeRunner(['*']);
 
-  assert.deepEqual(missingMachineTools(targets, { platform: 'darwin', execFn }), []);
-});
+        ctx.expect(missingMachineTools(targets, { platform: 'darwin', execFn })).toEqual([]);
+      },
+    },
 
-test('#1032 case 4: a brand with no backend target runs no Java or Firebase probe at all', () => {
-  const { execFn, calls } = probeRunner(['*']);
+    {
+      name: '#1032 case 4: a brand with no backend target runs no Java or Firebase probe at all',
+      run: (ctx) => {
+        const { execFn, calls } = probeRunner(['*']);
 
-  missingMachineTools([{ name: 'web', type: 'web' }, { name: 'desktop', type: 'desktop' }], { platform: 'darwin', execFn });
-  missingMachineTools([], { platform: 'darwin', execFn });
+        missingMachineTools([{ name: 'web', type: 'web' }, { name: 'desktop', type: 'desktop' }], { platform: 'darwin', execFn });
+        missingMachineTools([], { platform: 'darwin', execFn });
 
-  assert.deepEqual(calls, []);
-});
+        ctx.expect(calls).toEqual([]);
+      },
+    },
 
-test('one row per missing tool per target, each naming its own target', () => {
-  const { execFn } = probeRunner(['java', 'firebase']);
+    {
+      name: 'one row per missing tool per target, each naming its own target',
+      run: (ctx) => {
+        const { execFn } = probeRunner(['java', 'firebase']);
 
-  const missing = missingMachineTools([
-    { name: 'api', type: 'backend' },
-    { name: 'web', type: 'web' },
-    { name: 'admin', type: 'backend' },
-  ], { platform: 'darwin', execFn });
+        const missing = missingMachineTools([
+          { name: 'api', type: 'backend' },
+          { name: 'web', type: 'web' },
+          { name: 'admin', type: 'backend' },
+        ], { platform: 'darwin', execFn });
 
-  assert.deepEqual(missing.map((row) => `${row.target}:${row.name}`).sort(), ['admin:firebase', 'admin:java', 'api:firebase', 'api:java']);
-});
+        ctx.expect(missing.map((row) => `${row.target}:${row.name}`).sort()).toEqual(['admin:firebase', 'admin:java', 'api:firebase', 'api:java']);
+      },
+    },
 
-test('the probe\'s shell flag follows the host, never the platform passed in for the install line', () => {
-  const shells = [];
-  const execFn = (file, args, options) => { shells.push(options.shell); return ''; };
+    {
+      name: 'the probe\'s shell flag follows the host, never the platform passed in for the install line',
+      run: (ctx) => {
+        const shells = [];
+        const execFn = (file, args, options) => { shells.push(options.shell); return ''; };
 
-  missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform === 'win32' ? 'linux' : 'win32', execFn });
+        missingMachineTools([{ name: 'backend', type: 'backend' }], { platform: process.platform === 'win32' ? 'linux' : 'win32', execFn });
 
-  assert.deepEqual(shells, MACHINE_TOOLS.backend.map(() => process.platform === 'win32'));
+        ctx.expect(shells).toEqual(MACHINE_TOOLS.backend.map(() => process.platform === 'win32'));
+      },
+    },
+  ],
 });

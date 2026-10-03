@@ -8,8 +8,7 @@
 // mirror. Only the network is injected (the fetch waitForWorkflow polls, and
 // the remote URL, rewritten to the bare repo by the injected exec).
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -83,183 +82,12 @@ function treeOf(bare, ref) {
   return run('git', ['ls-tree', '-r', '--name-only', ref], bare).trim().split('\n').sort();
 }
 
-test('the pushed commit\'s root IS the brand folder, ignored files absent, staged files present', () => {
-  const { repo, brandRoot, bare } = buildFixture();
-  const calls = [];
-  const status = () => run('git', ['status', '--porcelain'], repo);
-  const before = status();
-
-  const sha = pushSnapshot({
-    brandRoot,
-    owner: 'Omega-JS-Stack',
-    repo: 'playground-omega',
-    ref: 'main',
-    token: TOKEN,
-    message: 'chore(deploy): snapshot',
-    // What a LINKED brand's deploy staged, and therefore what this push exists
-    // to carry (#872)
-    require: ['omega_modules', 'package-lock.json'],
-    execFn: localRemote(bare, calls),
-  });
-
-  assert.match(sha, /^[0-9a-f]{40}$/, 'the pushed sha comes back');
-  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), sha, 'the mirror ref points at it');
-
-  // The brand folder is the ROOT of the pushed tree: no brands/playground prefix
-  assert.deepEqual(treeOf(bare, 'main'), [
-    '.gitignore',
-    'omega_modules/omega.js-liba-1.0.0.tgz',
-    'package-lock.json',
-    'package.json',
-    'src/app.js',
-  ]);
-
-  // A mirror carries no history of the repo it was cut from
-  assert.equal(run('git', ['rev-list', '--count', 'main'], bare).trim(), '1');
-
-  // Nothing local moved: no branch, no index change, no working-tree change
-  assert.equal(status(), before, 'the working tree is exactly as it was');
-  assert.equal(run('git', ['branch', '--list'], repo).trim(), '* main', 'no snapshot branch was created');
-
-  // The token travels in the env, never in argv
-  for (const call of calls) {
-    assert.equal(call.args.some((arg) => String(arg).includes(TOKEN)), false, `a ${call.file} argument carried the token`);
-  }
-  const push = calls.find((call) => call.args[0] === 'push');
-  assert.equal(push.options.env.GIT_CONFIG_VALUE_0, `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`, 'the basic form git over https accepts');
-});
-
-// #883: this lane and the web deploy's gh-pages push both push to a repo their
-// checkout is not authenticated for, and each used to spell the delivery and
-// the redaction itself. One helper, so a credential cannot leak out of the lane
-// that forgot a rule the other one kept.
-test('git-auth: the credential travels as config env, and a scrub covers both its forms', () => {
-  assert.deepEqual(gitAuthEnv(TOKEN), {
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
-    GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`,
-  });
-
-  // No token, no half-set config: git asks for credentials itself.
-  assert.deepEqual(gitAuthEnv(null), {});
-  assert.deepEqual(gitAuthEnv(''), {});
-
-  const said = scrubToken(`fatal: https://x-access-token:${TOKEN}@github.com (${gitAuthValue(TOKEN)})`, TOKEN);
-  assert.equal(said.includes(TOKEN), false, 'the raw token is scrubbed');
-  assert.equal(said.includes(gitAuthValue(TOKEN)), false, 'and so is the base64 the header carries');
-  assert.equal(scrubToken('fatal: nothing secret here', null), 'fatal: nothing secret here', 'no token, nothing to scrub');
-});
-
-test('a failed snapshot push is rethrown with the token scrubbed out of git\'s message', () => {
-  const { brandRoot } = buildFixture();
-
-  const failing = (file, args, options) => {
-    if (args[0] === 'push') {
-      throw new Error(`Command failed: git push (AUTHORIZATION: basic ${gitAuthValue(TOKEN)}) token=${TOKEN}`);
-    }
-    return execFileSync(file, args, { encoding: 'utf8', ...options });
-  };
-
-  let thrown = null;
-  try {
-    pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: failing });
-  } catch (error) {
-    thrown = error;
-  }
-
-  assert.match(thrown.message, /Pushing the snapshot to acme\/acme-omega failed/, 'the failure names the mirror it was pushing to');
-  assert.equal(thrown.message.includes(TOKEN), false, 'the raw token never reaches the message');
-  assert.equal(thrown.message.includes(gitAuthValue(TOKEN)), false, 'and neither does its base64');
-});
-
-test('a second snapshot force-updates the mirror', () => {
-  const { brandRoot, bare } = buildFixture();
-  const calls = [];
-  const push = () => pushSnapshot({
-    brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: localRemote(bare, calls),
-  });
-
-  const first = push();
-  jetpack.write(path.join(brandRoot, 'src', 'app.js'), '// edited after the first snapshot\n');
-  const second = push();
-
-  assert.notEqual(second, first, 'a new tree is a new commit');
-  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), second, 'the mirror moved to it');
-  // Siblings, never a fast-forward: only a force push can land the second one
-  assert.equal(run('git', ['rev-list', '--count', 'main'], bare).trim(), '1');
-});
-
-test('a brand that IS its own repo snapshots its whole tree', () => {
-  const { repo, bare } = buildFixture();
-
-  const sha = pushSnapshot({
-    brandRoot: repo, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []),
-  });
-
-  assert.equal(run('git', ['rev-parse', 'omega-deploy'], bare).trim(), sha, 'the snapshot branch carries it');
-  assert.deepEqual(treeOf(bare, 'omega-deploy'), [
-    '.gitignore',
-    'brands/playground/.gitignore',
-    'brands/playground/omega_modules/omega.js-liba-1.0.0.tgz',
-    'brands/playground/package-lock.json',
-    'brands/playground/package.json',
-    'brands/playground/src/app.js',
-    'packages/framework.js',
-  ]);
-});
-
 // ─── The minted favicon and logo set ───
 
 /** The paths a ref's tree carries under .omega/, sorted. */
 function mintedIn(bare, ref) {
   return treeOf(bare, ref).filter((file) => file.startsWith('.omega/'));
 }
-
-test('the minted favicon folder and the three bridged files ride, nothing else under .omega/ (#1027)', () => {
-  const { repo, brandRoot, bare } = buildFixture();
-  const status = () => run('git', ['status', '--porcelain'], repo);
-  const before = status();
-
-  for (const relative of [
-    'assets/favicon/favicon.ico',
-    'assets/favicon/favicon-32x32.png',
-    'assets/favicon/site.webmanifest',
-    'assets/logo/brandmark/color-x.svg',
-    'assets/logo/brandmark/color-512.png',
-    'assets/social/brandmark/color-1024.png',
-    // The rest of the mint stays home: the ladders, the app icons, the state file
-    'assets/logo/brandmark/color-256.png',
-    'assets/logo/brandmark/black-x.svg',
-    'assets/social/brandmark/color-512.png',
-    'assets/icons/icon.icns',
-    'state.json',
-  ]) {
-    jetpack.write(path.join(brandRoot, '.omega', relative), 'minted\n');
-  }
-
-  pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []) });
-
-  assert.deepEqual(mintedIn(bare, 'omega-deploy'), [
-    '.omega/assets/favicon/favicon-32x32.png',
-    '.omega/assets/favicon/favicon.ico',
-    '.omega/assets/favicon/site.webmanifest',
-    '.omega/assets/logo/brandmark/color-512.png',
-    '.omega/assets/logo/brandmark/color-x.svg',
-    '.omega/assets/social/brandmark/color-1024.png',
-  ]);
-  assert.ok(treeOf(bare, 'omega-deploy').includes('src/app.js'), 'the brand tree rides beside them');
-  assert.equal(status(), before, 'the forced adds stayed in the temporary index');
-});
-
-test('a brand with no minted set pushes clean, with no .omega path in the tree (#1027)', () => {
-  const { brandRoot, bare } = buildFixture();
-  jetpack.write(path.join(brandRoot, '.omega', 'state.json'), '{}\n');
-
-  const sha = pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []) });
-
-  assert.equal(run('git', ['rev-parse', 'omega-deploy'], bare).trim(), sha, 'the push landed');
-  assert.deepEqual(mintedIn(bare, 'omega-deploy'), []);
-});
 
 // ─── The staged set rides by force ───
 
@@ -269,57 +97,6 @@ function pushStaged(brandRoot, bare, required = ['omega_modules', 'package-lock.
     brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, require: required, execFn: localRemote(bare, []),
   });
 }
-
-test('a brand whose own ignore rules hide the staged tarballs and lockfile still pushes them', () => {
-  const { repo, brandRoot, bare } = buildFixture();
-  jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
-  const status = () => run('git', ['status', '--porcelain'], repo);
-  const before = status();
-
-  const sha = pushStaged(brandRoot, bare);
-
-  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), sha, 'the push landed');
-  const tree = treeOf(bare, 'main');
-  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode');
-  assert.ok(tree.includes('package-lock.json'), 'and the regenerated lockfile');
-  assert.equal(status(), before, 'the forced adds stayed in the temporary index');
-});
-
-test('a nested brand whose enclosing repo ignores *.tgz still pushes its staged tarballs', () => {
-  const { repo, brandRoot, bare } = buildFixture();
-  // A file pattern the brand inherits from the repo around it, never its own
-  jetpack.append(path.join(repo, '.gitignore'), '*.tgz\n');
-
-  pushStaged(brandRoot, bare);
-
-  assert.ok(treeOf(bare, 'main').includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode');
-});
-
-test('a required path that does not exist is skipped, and the push still lands', () => {
-  const { brandRoot, bare } = buildFixture();
-  jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
-  jetpack.remove(path.join(brandRoot, 'package-lock.json'));
-
-  const sha = pushStaged(brandRoot, bare);
-
-  assert.equal(run('git', ['rev-parse', 'main'], bare).trim(), sha, 'the push landed');
-  const tree = treeOf(bare, 'main');
-  assert.equal(tree.includes('package-lock.json'), false, 'the tree simply lacks the missing path');
-  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'and the present one still rode');
-});
-
-test('an ignored file nobody required stays home', () => {
-  const { brandRoot, bare } = buildFixture();
-  jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\nsecret.txt\n');
-  jetpack.write(path.join(brandRoot, 'secret.txt'), 'never rides\n');
-
-  pushStaged(brandRoot, bare);
-
-  const tree = treeOf(bare, 'main');
-  assert.equal(tree.includes('secret.txt'), false, 'the brand\'s own ignore rule still decides');
-  assert.equal(tree.includes('dist/out.js'), false, 'and so does every other one');
-  assert.ok(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'beside the forced staged set');
-});
 
 // ─── The resolved company layer (#677) ───
 
@@ -354,52 +131,6 @@ function pushWithCompany({ base, brandRoot, bare }) {
     else process.env.OMEGA_HOME = previousHome;
   }
 }
-
-test('the resolved company layer is generated for the push and gone after it', () => {
-  const fixture = buildFixture();
-  const { repo, brandRoot, bare } = fixture;
-
-  pushWithCompany(fixture);
-
-  // It rode the mirror...
-  assert.ok(treeOf(bare, 'main').includes('config/company-resolved.json5'), 'the runner receives what this machine resolved');
-
-  const carried = JSON5.parse(run('git', ['show', 'main:config/company-resolved.json5'], bare));
-  // `webhooks` rides too (#677): the runner's readers need the brand's opt-out
-  // statement as much as its public facts.
-  assert.deepEqual(carried.company, { id: 'acme-co', name: 'Acme Co', url: 'https://acme.test', images: { wordmark: '/wordmark.png' }, webhooks: true });
-  assert.equal(carried.config.monitoring.providers.sentry.org, 'acme-co', 'the company CONFIG layer rides too');
-
-  // ...and the developer's tree is clean again.
-  assert.equal(jetpack.exists(path.join(brandRoot, 'config', 'company-resolved.json5')), false);
-  assert.equal(run('git', ['status', '--porcelain'], repo).includes('company-resolved'), false);
-});
-
-test('the resolved company layer rides even when an ignore rule hides it', () => {
-  const fixture = buildFixture();
-  jetpack.append(path.join(fixture.brandRoot, '.gitignore'), 'config/company-resolved.json5\n');
-
-  pushWithCompany(fixture);
-
-  assert.ok(treeOf(fixture.bare, 'main').includes('config/company-resolved.json5'), 'the runner still receives what this machine resolved');
-});
-
-test('a brand with no company generates nothing', () => {
-  const { base, brandRoot, bare } = buildFixture();
-  jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{ brand: { id: 'playground', name: 'Playground' } }`);
-
-  const previousHome = process.env.OMEGA_HOME;
-  process.env.OMEGA_HOME = path.join(base, 'home');
-
-  try {
-    pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: localRemote(bare, []) });
-  } finally {
-    if (previousHome === undefined) delete process.env.OMEGA_HOME;
-    else process.env.OMEGA_HOME = previousHome;
-  }
-
-  assert.equal(treeOf(bare, 'main').includes('config/company-resolved.json5'), false);
-});
 
 // ─── The composed workflows on the default branch (#915) ───
 //
@@ -490,114 +221,442 @@ function githubDouble({ held = {}, head = 'head0000000000' } = {}) {
   return { fetchFn, calls, written };
 }
 
-test('pushWorkflowFiles: every file already matches, so the default branch is NOT touched (#915)', async () => {
-  const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
-  const brandRoot = brandWithWorkflows({ 'web-build.yml': 'name: web\n', 'backend-deploy.yml': 'name: backend\n' });
-  const lines = [];
-  const github = githubDouble({ held: { 'web-build.yml': 'name: web\n', 'backend-deploy.yml': 'name: backend\n' } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'deploy-snapshot',
+  tests: [
+    {
+      name: 'the pushed commit\'s root IS the brand folder, ignored files absent, staged files present',
+      run: (ctx) => {
+        const { repo, brandRoot, bare } = buildFixture();
+        const calls = [];
+        const status = () => run('git', ['status', '--porcelain'], repo);
+        const before = status();
 
-  const result = await pushWorkflowFiles({
-    brandRoot,
-    owner: 'acme',
-    repo: 'acme-omega',
-    branch: 'main',
-    token: TOKEN,
-    fetchFn: github.fetchFn,
-    logger: { log: (line) => lines.push(line) },
-  });
+        const sha = pushSnapshot({
+          brandRoot,
+          owner: 'Omega-JS-Stack',
+          repo: 'playground-omega',
+          ref: 'main',
+          token: TOKEN,
+          message: 'chore(deploy): snapshot',
+          // What a LINKED brand's deploy staged, and therefore what this push exists
+          // to carry (#872)
+          require: ['omega_modules', 'package-lock.json'],
+          execFn: localRemote(bare, calls),
+        });
 
-  assert.deepEqual(result.pushed, [], 'nothing was written');
-  assert.equal(github.calls.every((call) => call.method === 'GET'), true, 'the branch was READ and nothing more');
-  assert.equal(lines.length, 1, 'one line says so');
-  assert.match(lines[0], /already carries/);
+        ctx.expect(sha, 'the pushed sha comes back').toMatch(/^[0-9a-f]{40}$/);
+        ctx.expect(run('git', ['rev-parse', 'main'], bare).trim(), 'the mirror ref points at it').toBe(sha);
 
-  fs.rmSync(brandRoot, { recursive: true, force: true });
-});
+        // The brand folder is the ROOT of the pushed tree: no brands/playground prefix
+        ctx.expect(treeOf(bare, 'main')).toEqual([
+          '.gitignore',
+          'omega_modules/omega.js-liba-1.0.0.tgz',
+          'package-lock.json',
+          'package.json',
+          'src/app.js',
+        ]);
 
-test('pushWorkflowFiles: one missing and one changed ride ONE conventional commit (#915)', async () => {
-  const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
-  const brandRoot = brandWithWorkflows({
-    'backend-deploy.yml': 'name: backend\n',
-    'desktop-build.yml': 'name: desktop v2\n',
-    'web-build.yml': 'name: web\n',
-  });
-  // backend matches, desktop differs, web is not there at all.
-  const github = githubDouble({
-    held: { 'backend-deploy.yml': 'name: backend\n', 'desktop-build.yml': 'name: desktop\n', 'web-build.yml': null },
-  });
+        // A mirror carries no history of the repo it was cut from
+        ctx.expect(run('git', ['rev-list', '--count', 'main'], bare).trim()).toBe('1');
 
-  const result = await pushWorkflowFiles({
-    brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
-  });
+        // Nothing local moved: no branch, no index change, no working-tree change
+        ctx.expect(status(), 'the working tree is exactly as it was').toBe(before);
+        ctx.expect(run('git', ['branch', '--list'], repo).trim(), 'no snapshot branch was created').toBe('* main');
 
-  assert.deepEqual(result.pushed, ['desktop-build.yml', 'web-build.yml'], 'exactly the two that differ');
-  assert.deepEqual(github.written.blobs, ['name: desktop v2\n', 'name: web\n'], 'and only their bytes became blobs');
-  assert.deepEqual(github.written.tree.tree.map((entry) => entry.path), [
-    '.github/workflows/desktop-build.yml',
-    '.github/workflows/web-build.yml',
-  ]);
-  assert.equal(github.written.tree.base_tree, 'tree-of-head', 'on top of the branch\'s own tree: nothing else changes');
-  assert.equal(github.written.commit.message, 'chore(ci): compose desktop-build.yml, web-build.yml');
-  assert.deepEqual(github.written.commit.parents, ['head0000000000'], 'a commit on the branch\'s head, never a rewrite of it');
-  assert.deepEqual(github.written.ref, {
-    method: 'PATCH',
-    route: '/git/refs/heads/main',
-    body: { sha: 'commit-new-0000' },
-  });
-});
-
-test('pushWorkflowFiles: an EMPTY repo gets a parentless commit and a created ref (#915)', async () => {
-  const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
-  const brandRoot = brandWithWorkflows({ 'web-build.yml': 'name: web\n' });
-  const github = githubDouble({ held: {}, head: null });
-
-  const result = await pushWorkflowFiles({
-    brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
-  });
-
-  assert.deepEqual(result.pushed, ['web-build.yml']);
-  assert.equal(github.written.tree.base_tree, undefined, 'there is no tree to build on');
-  assert.deepEqual(github.written.commit.parents, [], 'and no head to parent it to');
-  assert.deepEqual(github.written.ref, {
-    method: 'POST',
-    route: '/git/refs',
-    body: { ref: 'refs/heads/main', sha: 'commit-new-0000' },
-  });
-
-  fs.rmSync(brandRoot, { recursive: true, force: true });
-});
-
-test('pushWorkflowFiles: a RETIRED composed file leaves in the same commit, a hand-written one stays (#932)', async () => {
-  const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
-  const webHeader = '# GENERATED by the targets/web framework scaffold \u2014 do not edit.\n';
-  const websiteHeader = '# GENERATED by the targets/website framework scaffold \u2014 do not edit.\n';
-  const brandRoot = brandWithWorkflows({ 'web-build.yml': `${webHeader}name: web v2\n` });
-  // The rename left website-build.yml behind; release.yml is the brand's own.
-  const github = githubDouble({
-    held: {
-      'release.yml': 'name: release\n',
-      'web-build.yml': `${webHeader}name: web\n`,
-      'website-build.yml': `${websiteHeader}name: website\n`,
+        // The token travels in the env, never in argv
+        for (const call of calls) {
+          ctx.expect(call.args.some((arg) => String(arg).includes(TOKEN)), `a ${call.file} argument carried the token`).toBe(false);
+        }
+        const push = calls.find((call) => call.args[0] === 'push');
+        ctx.expect(push.options.env.GIT_CONFIG_VALUE_0, 'the basic form git over https accepts').toBe(`AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`);
+      },
     },
-  });
 
-  const result = await pushWorkflowFiles({
-    brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
-  });
+    // #883: this lane and the web deploy's gh-pages push both push to a repo their
+    // checkout is not authenticated for, and each used to spell the delivery and
+    // the redaction itself. One helper, so a credential cannot leak out of the lane
+    // that forgot a rule the other one kept.
+    {
+      name: 'git-auth: the credential travels as config env, and a scrub covers both its forms',
+      run: (ctx) => {
+        ctx.expect(gitAuthEnv(TOKEN)).toEqual({
+          GIT_CONFIG_COUNT: '1',
+          GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+          GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`,
+        });
 
-  assert.deepEqual(result.pushed, ['web-build.yml']);
-  assert.deepEqual(result.removed, ['website-build.yml'], 'the retired composed file, and only it');
-  assert.deepEqual(github.written.tree.tree, [
-    { path: '.github/workflows/web-build.yml', mode: '100644', type: 'blob', sha: 'blob-1' },
-    { path: '.github/workflows/website-build.yml', mode: '100644', type: 'blob', sha: null },
-  ], 'a null sha deletes the file; release.yml is never in the tree');
-  assert.equal(github.written.tree.base_tree, 'tree-of-head');
-  assert.equal(github.written.commit.message, 'chore(ci): compose web-build.yml, retire website-build.yml');
-  assert.deepEqual(github.written.ref, {
-    method: 'PATCH',
-    route: '/git/refs/heads/main',
-    body: { sha: 'commit-new-0000' },
-  });
+        // No token, no half-set config: git asks for credentials itself.
+        ctx.expect(gitAuthEnv(null)).toEqual({});
+        ctx.expect(gitAuthEnv('')).toEqual({});
 
-  fs.rmSync(brandRoot, { recursive: true, force: true });
+        const said = scrubToken(`fatal: https://x-access-token:${TOKEN}@github.com (${gitAuthValue(TOKEN)})`, TOKEN);
+        ctx.expect(said.includes(TOKEN), 'the raw token is scrubbed').toBe(false);
+        ctx.expect(said.includes(gitAuthValue(TOKEN)), 'and so is the base64 the header carries').toBe(false);
+        ctx.expect(scrubToken('fatal: nothing secret here', null), 'no token, nothing to scrub').toBe('fatal: nothing secret here');
+      },
+    },
+
+    {
+      name: 'a failed snapshot push is rethrown with the token scrubbed out of git\'s message',
+      run: (ctx) => {
+        const { brandRoot } = buildFixture();
+
+        const failing = (file, args, options) => {
+          if (args[0] === 'push') {
+            throw new Error(`Command failed: git push (AUTHORIZATION: basic ${gitAuthValue(TOKEN)}) token=${TOKEN}`);
+          }
+          return execFileSync(file, args, { encoding: 'utf8', ...options });
+        };
+
+        let thrown = null;
+        try {
+          pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: failing });
+        } catch (error) {
+          thrown = error;
+        }
+
+        ctx.expect(thrown.message, 'the failure names the mirror it was pushing to').toMatch(/Pushing the snapshot to acme\/acme-omega failed/);
+        ctx.expect(thrown.message.includes(TOKEN), 'the raw token never reaches the message').toBe(false);
+        ctx.expect(thrown.message.includes(gitAuthValue(TOKEN)), 'and neither does its base64').toBe(false);
+      },
+    },
+
+    {
+      name: 'a second snapshot force-updates the mirror',
+      run: (ctx) => {
+        const { brandRoot, bare } = buildFixture();
+        const calls = [];
+        const push = () => pushSnapshot({
+          brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: localRemote(bare, calls),
+        });
+
+        const first = push();
+        jetpack.write(path.join(brandRoot, 'src', 'app.js'), '// edited after the first snapshot\n');
+        const second = push();
+
+        ctx.expect(second, 'a new tree is a new commit').not.toBe(first);
+        ctx.expect(run('git', ['rev-parse', 'main'], bare).trim(), 'the mirror moved to it').toBe(second);
+        // Siblings, never a fast-forward: only a force push can land the second one
+        ctx.expect(run('git', ['rev-list', '--count', 'main'], bare).trim()).toBe('1');
+      },
+    },
+
+    {
+      name: 'a brand that IS its own repo snapshots its whole tree',
+      run: (ctx) => {
+        const { repo, bare } = buildFixture();
+
+        const sha = pushSnapshot({
+          brandRoot: repo, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []),
+        });
+
+        ctx.expect(run('git', ['rev-parse', 'omega-deploy'], bare).trim(), 'the snapshot branch carries it').toBe(sha);
+        ctx.expect(treeOf(bare, 'omega-deploy')).toEqual([
+          '.gitignore',
+          'brands/playground/.gitignore',
+          'brands/playground/omega_modules/omega.js-liba-1.0.0.tgz',
+          'brands/playground/package-lock.json',
+          'brands/playground/package.json',
+          'brands/playground/src/app.js',
+          'packages/framework.js',
+        ]);
+      },
+    },
+
+    {
+      name: 'the minted favicon folder and the three bridged files ride, nothing else under .omega/ (#1027)',
+      run: (ctx) => {
+        const { repo, brandRoot, bare } = buildFixture();
+        const status = () => run('git', ['status', '--porcelain'], repo);
+        const before = status();
+
+        for (const relative of [
+          'assets/favicon/favicon.ico',
+          'assets/favicon/favicon-32x32.png',
+          'assets/favicon/site.webmanifest',
+          'assets/logo/brandmark/color-x.svg',
+          'assets/logo/brandmark/color-512.png',
+          'assets/social/brandmark/color-1024.png',
+          // The rest of the mint stays home: the ladders, the app icons, the state file
+          'assets/logo/brandmark/color-256.png',
+          'assets/logo/brandmark/black-x.svg',
+          'assets/social/brandmark/color-512.png',
+          'assets/icons/icon.icns',
+          'state.json',
+        ]) {
+          jetpack.write(path.join(brandRoot, '.omega', relative), 'minted\n');
+        }
+
+        pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []) });
+
+        ctx.expect(mintedIn(bare, 'omega-deploy')).toEqual([
+          '.omega/assets/favicon/favicon-32x32.png',
+          '.omega/assets/favicon/favicon.ico',
+          '.omega/assets/favicon/site.webmanifest',
+          '.omega/assets/logo/brandmark/color-512.png',
+          '.omega/assets/logo/brandmark/color-x.svg',
+          '.omega/assets/social/brandmark/color-1024.png',
+        ]);
+        ctx.expect(treeOf(bare, 'omega-deploy').includes('src/app.js'), 'the brand tree rides beside them').toBeTruthy();
+        ctx.expect(status(), 'the forced adds stayed in the temporary index').toBe(before);
+      },
+    },
+
+    {
+      name: 'a brand with no minted set pushes clean, with no .omega path in the tree (#1027)',
+      run: (ctx) => {
+        const { brandRoot, bare } = buildFixture();
+        jetpack.write(path.join(brandRoot, '.omega', 'state.json'), '{}\n');
+
+        const sha = pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'omega-deploy', token: TOKEN, execFn: localRemote(bare, []) });
+
+        ctx.expect(run('git', ['rev-parse', 'omega-deploy'], bare).trim(), 'the push landed').toBe(sha);
+        ctx.expect(mintedIn(bare, 'omega-deploy')).toEqual([]);
+      },
+    },
+
+    {
+      name: 'a brand whose own ignore rules hide the staged tarballs and lockfile still pushes them',
+      run: (ctx) => {
+        const { repo, brandRoot, bare } = buildFixture();
+        jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
+        const status = () => run('git', ['status', '--porcelain'], repo);
+        const before = status();
+
+        const sha = pushStaged(brandRoot, bare);
+
+        ctx.expect(run('git', ['rev-parse', 'main'], bare).trim(), 'the push landed').toBe(sha);
+        const tree = treeOf(bare, 'main');
+        ctx.expect(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode').toBeTruthy();
+        ctx.expect(tree.includes('package-lock.json'), 'and the regenerated lockfile').toBeTruthy();
+        ctx.expect(status(), 'the forced adds stayed in the temporary index').toBe(before);
+      },
+    },
+
+    {
+      name: 'a nested brand whose enclosing repo ignores *.tgz still pushes its staged tarballs',
+      run: (ctx) => {
+        const { repo, brandRoot, bare } = buildFixture();
+        // A file pattern the brand inherits from the repo around it, never its own
+        jetpack.append(path.join(repo, '.gitignore'), '*.tgz\n');
+
+        pushStaged(brandRoot, bare);
+
+        ctx.expect(treeOf(bare, 'main').includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'the staged tarball rode').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a required path that does not exist is skipped, and the push still lands',
+      run: (ctx) => {
+        const { brandRoot, bare } = buildFixture();
+        jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\npackage-lock.json\n');
+        jetpack.remove(path.join(brandRoot, 'package-lock.json'));
+
+        const sha = pushStaged(brandRoot, bare);
+
+        ctx.expect(run('git', ['rev-parse', 'main'], bare).trim(), 'the push landed').toBe(sha);
+        const tree = treeOf(bare, 'main');
+        ctx.expect(tree.includes('package-lock.json'), 'the tree simply lacks the missing path').toBe(false);
+        ctx.expect(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'and the present one still rode').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'an ignored file nobody required stays home',
+      run: (ctx) => {
+        const { brandRoot, bare } = buildFixture();
+        jetpack.write(path.join(brandRoot, '.gitignore'), 'dist/\nomega_modules/\nsecret.txt\n');
+        jetpack.write(path.join(brandRoot, 'secret.txt'), 'never rides\n');
+
+        pushStaged(brandRoot, bare);
+
+        const tree = treeOf(bare, 'main');
+        ctx.expect(tree.includes('secret.txt'), 'the brand\'s own ignore rule still decides').toBe(false);
+        ctx.expect(tree.includes('dist/out.js'), 'and so does every other one').toBe(false);
+        ctx.expect(tree.includes('omega_modules/omega.js-liba-1.0.0.tgz'), 'beside the forced staged set').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'the resolved company layer is generated for the push and gone after it',
+      run: (ctx) => {
+        const fixture = buildFixture();
+        const { repo, brandRoot, bare } = fixture;
+
+        pushWithCompany(fixture);
+
+        // It rode the mirror...
+        ctx.expect(treeOf(bare, 'main').includes('config/company-resolved.json5'), 'the runner receives what this machine resolved').toBeTruthy();
+
+        const carried = JSON5.parse(run('git', ['show', 'main:config/company-resolved.json5'], bare));
+        // `webhooks` rides too (#677): the runner's readers need the brand's opt-out
+        // statement as much as its public facts.
+        ctx.expect(carried.company).toEqual({ id: 'acme-co', name: 'Acme Co', url: 'https://acme.test', images: { wordmark: '/wordmark.png' }, webhooks: true });
+        ctx.expect(carried.config.monitoring.providers.sentry.org, 'the company CONFIG layer rides too').toBe('acme-co');
+
+        // ...and the developer's tree is clean again.
+        ctx.expect(jetpack.exists(path.join(brandRoot, 'config', 'company-resolved.json5'))).toBe(false);
+        ctx.expect(run('git', ['status', '--porcelain'], repo).includes('company-resolved')).toBe(false);
+      },
+    },
+
+    {
+      name: 'the resolved company layer rides even when an ignore rule hides it',
+      run: (ctx) => {
+        const fixture = buildFixture();
+        jetpack.append(path.join(fixture.brandRoot, '.gitignore'), 'config/company-resolved.json5\n');
+
+        pushWithCompany(fixture);
+
+        ctx.expect(treeOf(fixture.bare, 'main').includes('config/company-resolved.json5'), 'the runner still receives what this machine resolved').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a brand with no company generates nothing',
+      run: (ctx) => {
+        const { base, brandRoot, bare } = buildFixture();
+        jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{ brand: { id: 'playground', name: 'Playground' } }`);
+
+        const previousHome = process.env.OMEGA_HOME;
+        process.env.OMEGA_HOME = path.join(base, 'home');
+
+        try {
+          pushSnapshot({ brandRoot, owner: 'acme', repo: 'acme-omega', ref: 'main', token: TOKEN, execFn: localRemote(bare, []) });
+        } finally {
+          if (previousHome === undefined) delete process.env.OMEGA_HOME;
+          else process.env.OMEGA_HOME = previousHome;
+        }
+
+        ctx.expect(treeOf(bare, 'main').includes('config/company-resolved.json5')).toBe(false);
+      },
+    },
+
+    {
+      name: 'pushWorkflowFiles: every file already matches, so the default branch is NOT touched (#915)',
+      run: async (ctx) => {
+        const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
+        const brandRoot = brandWithWorkflows({ 'web-build.yml': 'name: web\n', 'backend-deploy.yml': 'name: backend\n' });
+        const lines = [];
+        const github = githubDouble({ held: { 'web-build.yml': 'name: web\n', 'backend-deploy.yml': 'name: backend\n' } });
+
+        const result = await pushWorkflowFiles({
+          brandRoot,
+          owner: 'acme',
+          repo: 'acme-omega',
+          branch: 'main',
+          token: TOKEN,
+          fetchFn: github.fetchFn,
+          logger: { log: (line) => lines.push(line) },
+        });
+
+        ctx.expect(result.pushed, 'nothing was written').toEqual([]);
+        ctx.expect(github.calls.every((call) => call.method === 'GET'), 'the branch was READ and nothing more').toBe(true);
+        ctx.expect(lines.length, 'one line says so').toBe(1);
+        ctx.expect(lines[0]).toMatch(/already carries/);
+
+        fs.rmSync(brandRoot, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'pushWorkflowFiles: one missing and one changed ride ONE conventional commit (#915)',
+      run: async (ctx) => {
+        const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
+        const brandRoot = brandWithWorkflows({
+          'backend-deploy.yml': 'name: backend\n',
+          'desktop-build.yml': 'name: desktop v2\n',
+          'web-build.yml': 'name: web\n',
+        });
+        // backend matches, desktop differs, web is not there at all.
+        const github = githubDouble({
+          held: { 'backend-deploy.yml': 'name: backend\n', 'desktop-build.yml': 'name: desktop\n', 'web-build.yml': null },
+        });
+
+        const result = await pushWorkflowFiles({
+          brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
+        });
+
+        ctx.expect(result.pushed, 'exactly the two that differ').toEqual(['desktop-build.yml', 'web-build.yml']);
+        ctx.expect(github.written.blobs, 'and only their bytes became blobs').toEqual(['name: desktop v2\n', 'name: web\n']);
+        ctx.expect(github.written.tree.tree.map((entry) => entry.path)).toEqual([
+          '.github/workflows/desktop-build.yml',
+          '.github/workflows/web-build.yml',
+        ]);
+        ctx.expect(github.written.tree.base_tree, 'on top of the branch\'s own tree: nothing else changes').toBe('tree-of-head');
+        ctx.expect(github.written.commit.message).toBe('chore(ci): compose desktop-build.yml, web-build.yml');
+        ctx.expect(github.written.commit.parents, 'a commit on the branch\'s head, never a rewrite of it').toEqual(['head0000000000']);
+        ctx.expect(github.written.ref).toEqual({
+          method: 'PATCH',
+          route: '/git/refs/heads/main',
+          body: { sha: 'commit-new-0000' },
+        });
+      },
+    },
+
+    {
+      name: 'pushWorkflowFiles: an EMPTY repo gets a parentless commit and a created ref (#915)',
+      run: async (ctx) => {
+        const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
+        const brandRoot = brandWithWorkflows({ 'web-build.yml': 'name: web\n' });
+        const github = githubDouble({ held: {}, head: null });
+
+        const result = await pushWorkflowFiles({
+          brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
+        });
+
+        ctx.expect(result.pushed).toEqual(['web-build.yml']);
+        ctx.expect(github.written.tree.base_tree, 'there is no tree to build on').toBe(undefined);
+        ctx.expect(github.written.commit.parents, 'and no head to parent it to').toEqual([]);
+        ctx.expect(github.written.ref).toEqual({
+          method: 'POST',
+          route: '/git/refs',
+          body: { ref: 'refs/heads/main', sha: 'commit-new-0000' },
+        });
+
+        fs.rmSync(brandRoot, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'pushWorkflowFiles: a RETIRED composed file leaves in the same commit, a hand-written one stays (#932)',
+      run: async (ctx) => {
+        const { pushWorkflowFiles } = require('../src/deploy-snapshot.js');
+        const webHeader = '# GENERATED by the targets/web framework scaffold \u2014 do not edit.\n';
+        const websiteHeader = '# GENERATED by the targets/website framework scaffold \u2014 do not edit.\n';
+        const brandRoot = brandWithWorkflows({ 'web-build.yml': `${webHeader}name: web v2\n` });
+        // The rename left website-build.yml behind; release.yml is the brand's own.
+        const github = githubDouble({
+          held: {
+            'release.yml': 'name: release\n',
+            'web-build.yml': `${webHeader}name: web\n`,
+            'website-build.yml': `${websiteHeader}name: website\n`,
+          },
+        });
+
+        const result = await pushWorkflowFiles({
+          brandRoot, owner: 'acme', repo: 'acme-omega', branch: 'main', token: TOKEN, fetchFn: github.fetchFn,
+        });
+
+        ctx.expect(result.pushed).toEqual(['web-build.yml']);
+        ctx.expect(result.removed, 'the retired composed file, and only it').toEqual(['website-build.yml']);
+        ctx.expect(github.written.tree.tree, 'a null sha deletes the file; release.yml is never in the tree').toEqual([
+          { path: '.github/workflows/web-build.yml', mode: '100644', type: 'blob', sha: 'blob-1' },
+          { path: '.github/workflows/website-build.yml', mode: '100644', type: 'blob', sha: null },
+        ]);
+        ctx.expect(github.written.tree.base_tree).toBe('tree-of-head');
+        ctx.expect(github.written.commit.message).toBe('chore(ci): compose web-build.yml, retire website-build.yml');
+        ctx.expect(github.written.ref).toEqual({
+          method: 'PATCH',
+          route: '/git/refs/heads/main',
+          body: { sha: 'commit-new-0000' },
+        });
+
+        fs.rmSync(brandRoot, { recursive: true, force: true });
+      },
+    },
+  ],
 });

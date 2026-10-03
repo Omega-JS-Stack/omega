@@ -14,8 +14,7 @@
  * shipped 30s default is untouched.
  */
 
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -45,42 +44,6 @@ const schema = { type: 'object', properties: {} };
 let client;
 let refresh;
 
-before(async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-timeout-'));
-  const overlayDir = path.join(root, 'servers');
-
-  const entries = {
-    // Every bundled default off, by the one-key overlay the layering promises.
-    ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
-    'fixture-stall-list': {
-      enabled: true,
-      command: 'node',
-      args: [STALL_LIST_SERVER, TAG],
-      tools: [{ name: 'ping', description: 'The stale cached entry a refresh would replace.', inputSchema: schema }],
-    },
-  };
-  for (const [name, config] of Object.entries(entries)) {
-    fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
-    fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
-  }
-
-  client = new Client({ name: 'router-refresh-timeout-e2e', version: '1.0.0' }, { capabilities: {} });
-  await client.connect(new StdioClientTransport({
-    command: process.execPath,
-    args: [ROUTER],
-    env: {
-      ...process.env,
-      MCP_ROUTER_SERVERS_DIR: overlayDir,
-      MCP_ROUTER_SPAWN_TIMEOUT_MS: String(BUDGET_MS),
-    },
-    stderr: 'ignore',
-  }));
-});
-
-after(async () => {
-  await client.close();
-});
-
 const callTool = async (name, args) => {
   const started = Date.now();
   const result = await client.callTool({ name, arguments: args });
@@ -101,34 +64,86 @@ const liveChildren = () => {
   }
 };
 
-test('a refresh whose child stalls on the tools/list read fails on a timeout', async () => {
-  refresh = await callTool('router__refresh_upstream', { name: 'fixture-stall-list' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'refresh-timeout',
+  setup: async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-timeout-'));
+    const overlayDir = path.join(root, 'servers');
 
-  assert.equal(refresh.isError, true);
-  // The SDK's own words for a request that hit its deadline. The child
-  // handshaked and stayed on the wire, so nothing here is a transport failure.
-  assert.match(refresh.text, /Refresh failed for "fixture-stall-list": .*Request timed out/);
-});
+    const entries = {
+      // Every bundled default off, by the one-key overlay the layering promises.
+      ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
+      'fixture-stall-list': {
+        enabled: true,
+        command: 'node',
+        args: [STALL_LIST_SERVER, TAG],
+        tools: [{ name: 'ping', description: 'The stale cached entry a refresh would replace.', inputSchema: schema }],
+      },
+    };
+    for (const [name, config] of Object.entries(entries)) {
+      fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
+      fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+    }
 
-test('the stalled read answers on the router budget, not the SDK default', () => {
-  assert.ok(refresh.elapsed >= BUDGET_MS, `waited ${refresh.elapsed}ms, expected at least the budget`);
-  // Generous, but far below the SDK's own 60s request timeout: what answered
-  // here was the budget the router passed, not the client's default.
-  assert.ok(refresh.elapsed < 15000, `waited ${refresh.elapsed}ms, expected the budget to answer`);
-});
+    client = new Client({ name: 'router-refresh-timeout-e2e', version: '1.0.0' }, { capabilities: {} });
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [ROUTER],
+      env: {
+        ...process.env,
+        MCP_ROUTER_SERVERS_DIR: overlayDir,
+        MCP_ROUTER_SPAWN_TIMEOUT_MS: String(BUDGET_MS),
+      },
+      stderr: 'ignore',
+    }));
+  },
+  cleanup: async () => {
+    await client.close();
+  },
+  tests: [
+    {
+      name: 'a refresh whose child stalls on the tools/list read fails on a timeout',
+      run: async (ctx) => {
+        refresh = await callTool('router__refresh_upstream', { name: 'fixture-stall-list' });
 
-test('the stalled refresh child does not outlive the call', () => {
-  // The failure path closes the transport, which ends the child's stdin and
-  // waits for it to go. Nothing else would ever stop it: the fixture's server
-  // holds its own loop open, so a leaked child lives until the router exits.
-  assert.deepEqual(liveChildren(), [], 'the one-shot child was terminated');
-});
+        ctx.expect(refresh.isError).toBe(true);
+        // The SDK's own words for a request that hit its deadline. The child
+        // handshaked and stayed on the wire, so nothing here is a transport failure.
+        ctx.expect(refresh.text).toMatch(/Refresh failed for "fixture-stall-list": .*Request timed out/);
+      },
+    },
 
-test('the timed-out refresh is recorded in last_error', async () => {
-  const rows = JSON.parse((await callTool('router__list_upstreams', {})).text);
-  const row = rows.find((entry) => entry.name === 'fixture-stall-list');
+    {
+      name: 'the stalled read answers on the router budget, not the SDK default',
+      run: (ctx) => {
+        ctx.expect(refresh.elapsed >= BUDGET_MS, `waited ${refresh.elapsed}ms, expected at least the budget`).toBeTruthy();
+        // Generous, but far below the SDK's own 60s request timeout: what answered
+        // here was the budget the router passed, not the client's default.
+        ctx.expect(refresh.elapsed < 15000, `waited ${refresh.elapsed}ms, expected the budget to answer`).toBeTruthy();
+      },
+    },
 
-  assert.match(row.last_error, /Request timed out/);
-  // The refresh runs its own one-shot client; the session's own slot stays cold.
-  assert.equal(row.spawned, false);
+    {
+      name: 'the stalled refresh child does not outlive the call',
+      run: (ctx) => {
+        // The failure path closes the transport, which ends the child's stdin and
+        // waits for it to go. Nothing else would ever stop it: the fixture's server
+        // holds its own loop open, so a leaked child lives until the router exits.
+        ctx.expect(liveChildren(), 'the one-shot child was terminated').toEqual([]);
+      },
+    },
+
+    {
+      name: 'the timed-out refresh is recorded in last_error',
+      run: async (ctx) => {
+        const rows = JSON.parse((await callTool('router__list_upstreams', {})).text);
+        const row = rows.find((entry) => entry.name === 'fixture-stall-list');
+
+        ctx.expect(row.last_error).toMatch(/Request timed out/);
+        // The refresh runs its own one-shot client; the session's own slot stays cold.
+        ctx.expect(row.spawned).toBe(false);
+      },
+    },
+  ],
 });

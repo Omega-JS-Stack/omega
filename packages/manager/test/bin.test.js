@@ -8,8 +8,7 @@
  *
  * Real processes, real bin files: what npm links is exactly what runs here.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -28,14 +27,15 @@ const MANIFEST = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf
 
 /**
  * Run one of the manager's bin files as a real process.
+ * @param {Function} expect - The calling case's `ctx.expect`.
  * @param {string} name - Bin file name under bin/.
  * @param {string[]} args - CLI arguments.
  * @param {string} cwd - Working directory the dispatcher resolves from.
  * @returns {{ stdout: string, stderr: string }}
  */
-function runBin(name, args, cwd) {
+function runBin(expect, name, args, cwd) {
   const result = spawnBin(name, args, cwd);
-  assert.equal(result.status, 0, `bin/${name} ${args.join(' ')} exited ${result.status}\n${result.stderr}`);
+  expect(result.status, `bin/${name} ${args.join(' ')} exited ${result.status}\n${result.stderr}`).toBe(0);
   return result;
 }
 
@@ -64,68 +64,6 @@ function scratchRepo(prefix) {
   fs.mkdirSync(path.join(dir, '.git'), { recursive: true });
   return dir;
 }
-
-test('package: the manager declares the frameworks\' three bins, and ships them', () => {
-  // Parity with every framework's bin block — `mgr` is the same file as
-  // `omega`, and the retired `omega-manager` name never comes back.
-  assert.deepEqual(MANIFEST.bin, {
-    omega: 'bin/omega',
-    omg: 'bin/omg',
-    mgr: 'bin/omega',
-  });
-  assert.ok(MANIFEST.files.includes('bin/'), 'the published tarball carries the bin files');
-
-  for (const relative of new Set(Object.values(MANIFEST.bin))) {
-    const abs = path.join(PKG, relative);
-    assert.ok(fs.existsSync(abs), `${relative} exists`);
-    assert.match(fs.readFileSync(abs, 'utf8'), /^#!\/usr\/bin\/env node\n/, `${relative} is a node script`);
-    assert.ok(fs.statSync(abs).mode & 0o111, `${relative} is executable`);
-  }
-});
-
-test('bin: a fresh dir with nothing installed answers with the manager CLI (npx omega onboard\'s home)', () => {
-  const scratch = scratchRepo('omega-manager-bin-fresh-');
-
-  const { stdout, stderr } = runBin('omega', [], scratch);
-
-  assert.match(stdout, /OMEGA — brand orchestration/, 'the manager\'s own help, not another package\'s');
-  assert.match(stdout, /omega onboard/, 'the verb a stranger with an empty clone needs');
-  // The bootstrap note only the dispatcher prints — the bin routes through
-  // omega-bin, it is not hard-wired straight to the manager CLI.
-  assert.match(stderr, /no target context found[\s\S]*running @omega\.js\/manager/);
-
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
-
-test('bin: omg is the same entry as omega', () => {
-  const scratch = scratchRepo('omega-manager-bin-omg-');
-
-  assert.equal(runBin('omg', [], scratch).stdout, runBin('omega', [], scratch).stdout);
-
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
-
-test('bin: at a brand root with the manager installed, the bin runs the INSTALLED manager\'s CLI', () => {
-  // The fresh-clone case proper: the brand template declares @omega.js/manager,
-  // `npm install` links its bin, and `npx omega onboard` has to land here.
-  const scratch = scratchRepo('omega-manager-bin-brand-');
-  fs.mkdirSync(path.join(scratch, 'config'), { recursive: true });
-  fs.writeFileSync(
-    path.join(scratch, 'package.json'),
-    JSON.stringify({ name: 'acme', private: true, workspaces: ['targets/*'], devDependencies: { '@omega.js/manager': '*' } })
-  );
-  fs.writeFileSync(path.join(scratch, 'config', 'omega.json5'), '{ brand: { id: "acme" } }\n');
-  fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
-  fs.symlinkSync(PKG, path.join(scratch, 'node_modules', '@omega.js', 'manager'), 'dir');
-
-  const { stdout, stderr } = runBin('omega', [], scratch);
-
-  assert.match(stdout, /omega onboard/, 'the manager CLI answered at the brand root');
-  assert.doesNotMatch(stderr, /no target context found/, 'the brand root IS a context');
-  assert.doesNotMatch(stderr, /is not installed/, 'and its manager resolved from there');
-
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
 
 /**
  * A brand with the manager installed at its root (linked to this package) and
@@ -160,165 +98,275 @@ function stageBrandWithTarget(prefix) {
   return { scratch, targetDir };
 }
 
-test('bin: inside a target, the manager\'s bin hands a verb the target owns to the target\'s framework', () => {
-  // The manager winning npm's bin link inside a target never runs the manager there
-  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-target-');
+module.exports = defineCases({
+  type: 'group',
+  description: 'bin',
+  tests: [
+    {
+      name: 'package: the manager declares the frameworks\' three bins, and ships them',
+      run: (ctx) => {
+        // Parity with every framework's bin block — `mgr` is the same file as
+        // `omega`, and the retired `omega-manager` name never comes back.
+        ctx.expect(MANIFEST.bin).toEqual({
+          omega: 'bin/omega',
+          omg: 'bin/omg',
+          mgr: 'bin/omega',
+        });
+        ctx.expect(MANIFEST.files.includes('bin/'), 'the published tarball carries the bin files').toBeTruthy();
 
-  const { status, stdout, stderr } = spawnBin('omega', ['build'], targetDir);
+        for (const relative of new Set(Object.values(MANIFEST.bin))) {
+          const abs = path.join(PKG, relative);
+          ctx.expect(fs.existsSync(abs), `${relative} exists`).toBeTruthy();
+          ctx.expect(fs.readFileSync(abs, 'utf8'), `${relative} is a node script`).toMatch(/^#!\/usr\/bin\/env node\n/);
+          ctx.expect(fs.statSync(abs).mode & 0o111, `${relative} is executable`).toBeTruthy();
+        }
+      },
+    },
 
-  assert.equal(status, 0, stderr);
-  assert.match(stdout, /WEB-CLI-RAN/, 'the target\'s framework ran in place');
-  assert.doesNotMatch(stdout, /brand orchestration/, 'the manager did not');
+    {
+      name: 'bin: a fresh dir with nothing installed answers with the manager CLI (npx omega onboard\'s home)',
+      run: (ctx) => {
+        const scratch = scratchRepo('omega-manager-bin-fresh-');
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        const { stdout, stderr } = runBin(ctx.expect, 'omega', [], scratch);
 
-test('bin: inside a target, a brand-wide verb refuses and prints the brand root form', () => {
-  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-brandwide-');
+        ctx.expect(stdout, 'the manager\'s own help, not another package\'s').toMatch(/OMEGA — brand orchestration/);
+        ctx.expect(stdout, 'the verb a stranger with an empty clone needs').toMatch(/omega onboard/);
+        // The bootstrap note only the dispatcher prints — the bin routes through
+        // omega-bin, it is not hard-wired straight to the manager CLI.
+        ctx.expect(stderr).toMatch(/no target context found[\s\S]*running @omega\.js\/manager/);
 
-  const { status, stdout, stderr } = spawnBin('omega', ['install', 'local'], targetDir);
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  assert.equal(status, 1, stderr);
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
-  assert.doesNotMatch(stdout, /brand orchestration/, 'nor did the manager');
-  assert.ok(stderr.includes(`cd ${scratch} && npx omega install local`), stderr);
+    {
+      name: 'bin: omg is the same entry as omega',
+      run: (ctx) => {
+        const scratch = scratchRepo('omega-manager-bin-omg-');
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(runBin(ctx.expect, 'omg', [], scratch).stdout).toBe(runBin(ctx.expect, 'omega', [], scratch).stdout);
 
-test('bin: at the brand root, `omega test --target=` still dispatches to the manager', () => {
-  // The picker is the manager's to read: an unknown token earns ITS refusal,
-  // naming the brand's real targets, and no target CLI starts.
-  const { scratch } = stageBrandWithTarget('omega-manager-bin-picker-');
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { status, stdout, stderr } = spawnBin('omega', ['test', '--target=nope'], scratch);
+    {
+      name: 'bin: at a brand root with the manager installed, the bin runs the INSTALLED manager\'s CLI',
+      run: (ctx) => {
+        // The fresh-clone case proper: the brand template declares @omega.js/manager,
+        // `npm install` links its bin, and `npx omega onboard` has to land here.
+        const scratch = scratchRepo('omega-manager-bin-brand-');
+        fs.mkdirSync(path.join(scratch, 'config'), { recursive: true });
+        fs.writeFileSync(
+          path.join(scratch, 'package.json'),
+          JSON.stringify({ name: 'acme', private: true, workspaces: ['targets/*'], devDependencies: { '@omega.js/manager': '*' } })
+        );
+        fs.writeFileSync(path.join(scratch, 'config', 'omega.json5'), '{ brand: { id: "acme" } }\n');
+        fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
+        fs.symlinkSync(PKG, path.join(scratch, 'node_modules', '@omega.js', 'manager'), 'dir');
 
-  assert.notEqual(status, 0);
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/);
-  assert.match(`${stdout}${stderr}`, /Unknown --target token "nope": this brand's targets are site\. Nothing ran\./);
+        const { stdout, stderr } = runBin(ctx.expect, 'omega', [], scratch);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(stdout, 'the manager CLI answered at the brand root').toMatch(/omega onboard/);
+        ctx.expect(stderr, 'the brand root IS a context').not.toMatch(/no target context found/);
+        ctx.expect(stderr, 'and its manager resolved from there').not.toMatch(/is not installed/);
 
-test('bin: at the brand root, `omega migrate` runs the manager\'s ONE verb: a report, exit 1 while steps are due', () => {
-  const { scratch } = stageBrandWithTarget('omega-manager-bin-migrate-');
-  // A retired key the config pass reports, beside the target the walk visits
-  fs.writeFileSync(
-    path.join(scratch, 'config', 'omega.json5'),
-    '{ brand: { id: "acme" }, slapform: { endpoint: "https://slapform.test/f/abc" }, targets: { site: { type: "web" } } }\n',
-  );
-  const before = fs.readFileSync(path.join(scratch, 'config', 'omega.json5'), 'utf8');
-  // …and a renamed env key in the brand root .env, its value a marker never printed
-  const env = 'OAUTH2_GOOGLE_CLIENT_ID="bin-value-marker"\n';
-  fs.writeFileSync(path.join(scratch, '.env'), env);
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { status, stdout, stderr } = spawnBin('omega', ['migrate'], scratch);
+    {
+      name: 'bin: inside a target, the manager\'s bin hands a verb the target owns to the target\'s framework',
+      run: (ctx) => {
+        // The manager winning npm's bin link inside a target never runs the manager there
+        const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-target-');
 
-  assert.equal(status, 1, `${stdout}\n${stderr}`);
-  assert.match(stdout, /remove slapform/, 'the config pass reported the retired key');
-  assert.match(stdout, /rename OAUTH2_GOOGLE_CLIENT_ID → CONNECTIONS_GOOGLE_CLIENT_ID/, 'the env pass reported the renamed key');
-  assert.ok(!`${stdout}${stderr}`.includes('bin-value-marker'), 'an env value never reaches the report');
-  assert.equal(fs.readFileSync(path.join(scratch, '.env'), 'utf8'), env, 'a report writes no .env either');
-  assert.match(stdout, /^site/m, 'the walk visited the target, headed by its name');
-  assert.match(stdout, /error\s+@omega\.js\/web exposes no migrate entry \(update it\)/, 'a framework with no migrate entry is a loud error line, never a skip');
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'no framework CLI started: the leg runs in-process');
-  assert.match(stdout.trimEnd().split('\n').pop(), /docs\/shared\/breaking-changes\.md/, 'the report ends on the register line');
-  assert.equal(fs.readFileSync(path.join(scratch, 'config', 'omega.json5'), 'utf8'), before, 'a report writes nothing');
+        const { status, stdout, stderr } = spawnBin('omega', ['build'], targetDir);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(status, stderr).toBe(0);
+        ctx.expect(stdout, 'the target\'s framework ran in place').toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stdout, 'the manager did not').not.toMatch(/brand orchestration/);
 
-test('#1031 case 10: `omega status` typed inside a target is the manager\'s, reporting from the brand root', () => {
-  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-status-');
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], targetDir);
+    {
+      name: 'bin: inside a target, a brand-wide verb refuses and prints the brand root form',
+      run: (ctx) => {
+        const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-brandwide-');
 
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
-  assert.doesNotMatch(stderr, /refusing|runs at the brand root/, stderr);
-  const report = JSON.parse(stdout);
-  assert.equal(report.brandRoot, scratch);
-  assert.ok(JSON.stringify(report.inTarget).includes('"site"'), `inTarget names the target: ${stdout}`);
+        const { status, stdout, stderr } = spawnBin('omega', ['install', 'local'], targetDir);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(status, stderr).toBe(1);
+        ctx.expect(stdout, 'the target\'s framework never ran').not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stdout, 'nor did the manager').not.toMatch(/brand orchestration/);
+        ctx.expect(stderr.includes(`cd ${scratch} && npx omega install local`), stderr).toBeTruthy();
 
-test('#1031 status reads only: no boot prelude and no freshness heal runs, so the origin, the brand and stdout stay clean', () => {
-  // An origin the heal would move, a gh that answers with the move, and the manager linked to this checkout
-  const { scratch } = stageBrandWithTarget('omega-manager-bin-status-prelude-');
-  const origin = 'https://github.com/old-owner/acme-omega.git';
-  const git = (...args) => spawnSync('git', ['-C', scratch, ...args], { encoding: 'utf8' }).stdout.trim();
-  git('init', '-q');
-  git('remote', 'add', 'origin', origin);
-  const ghDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-moved-gh-'));
-  const ghLog = path.join(ghDir, 'calls.log');
-  fs.writeFileSync(path.join(ghDir, 'gh'), `#!/bin/sh\necho "$@" >> "${ghLog}"\necho '{"full_name":"moved-owner/acme-omega"}'\n`, { mode: 0o755 });
-  const env = { ...process.env, PATH: [ghDir, process.env.PATH].join(path.delimiter) };
-  delete env.OMEGA_SKIP_FRESHNESS;
-  const before = snapshot(scratch);
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch, env);
+    {
+      name: 'bin: at the brand root, `omega test --target=` still dispatches to the manager',
+      run: (ctx) => {
+        // The picker is the manager's to read: an unknown token earns ITS refusal,
+        // naming the brand's real targets, and no target CLI starts.
+        const { scratch } = stageBrandWithTarget('omega-manager-bin-picker-');
 
-  assert.doesNotThrow(() => JSON.parse(stdout), `stdout is one JSON object:\n${stdout}\n${stderr}`);
-  assert.equal(git('remote', 'get-url', 'origin'), origin, 'the origin heal never ran');
-  assert.equal(fs.existsSync(ghLog), false, 'gh was never asked');
-  assert.deepEqual(snapshot(scratch), before, 'no file under the brand changed');
+        const { status, stdout, stderr } = spawnBin('omega', ['test', '--target=nope'], scratch);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-  fs.rmSync(ghDir, { recursive: true, force: true });
-});
+        ctx.expect(status).not.toBe(0);
+        ctx.expect(stdout).not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(`${stdout}${stderr}`).toMatch(/Unknown --target token "nope": this brand's targets are site\. Nothing ran\./);
 
-test('#1031 case 10: `omega status` typed in a folder with no brand is the manager\'s', () => {
-  const scratch = fs.realpathSync(scratchRepo('omega-manager-bin-status-nobrand-'));
-  fs.writeFileSync(path.join(scratch, 'notes.txt'), 'not a brand\n');
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch);
+    {
+      name: 'bin: at the brand root, `omega migrate` runs the manager\'s ONE verb: a report, exit 1 while steps are due',
+      run: (ctx) => {
+        const { scratch } = stageBrandWithTarget('omega-manager-bin-migrate-');
+        // A retired key the config pass reports, beside the target the walk visits
+        fs.writeFileSync(
+          path.join(scratch, 'config', 'omega.json5'),
+          '{ brand: { id: "acme" }, slapform: { endpoint: "https://slapform.test/f/abc" }, targets: { site: { type: "web" } } }\n',
+        );
+        const before = fs.readFileSync(path.join(scratch, 'config', 'omega.json5'), 'utf8');
+        // …and a renamed env key in the brand root .env, its value a marker never printed
+        const env = 'OAUTH2_GOOGLE_CLIENT_ID="bin-value-marker"\n';
+        fs.writeFileSync(path.join(scratch, '.env'), env);
 
-  assert.match(stderr, /running @omega\.js\/manager/);
-  assert.equal(JSON.parse(stdout).state, 'unrelated', stdout);
+        const { status, stdout, stderr } = spawnBin('omega', ['migrate'], scratch);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(status, `${stdout}\n${stderr}`).toBe(1);
+        ctx.expect(stdout, 'the config pass reported the retired key').toMatch(/remove slapform/);
+        ctx.expect(stdout, 'the env pass reported the renamed key').toMatch(/rename OAUTH2_GOOGLE_CLIENT_ID → CONNECTIONS_GOOGLE_CLIENT_ID/);
+        ctx.expect(!`${stdout}${stderr}`.includes('bin-value-marker'), 'an env value never reaches the report').toBeTruthy();
+        ctx.expect(fs.readFileSync(path.join(scratch, '.env'), 'utf8'), 'a report writes no .env either').toBe(env);
+        ctx.expect(stdout, 'the walk visited the target, headed by its name').toMatch(/^site/m);
+        ctx.expect(stdout, 'a framework with no migrate entry is a loud error line, never a skip').toMatch(/error\s+@omega\.js\/web exposes no migrate entry \(update it\)/);
+        ctx.expect(stdout, 'no framework CLI started: the leg runs in-process').not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stdout.trimEnd().split('\n').pop(), 'the report ends on the register line').toMatch(/docs\/shared\/breaking-changes\.md/);
+        ctx.expect(fs.readFileSync(path.join(scratch, 'config', 'omega.json5'), 'utf8'), 'a report writes nothing').toBe(before);
 
-test('#1031 case 10: `omega onboard` typed inside a target is the manager\'s', (t) => {
-  // A fake claude and gh, so the wizard's machine checks never reach the real ones
-  t.after(createMachine({
-    marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
-    installed: { 'omega@omega': MANIFEST.version },
-    published: MANIFEST.version,
-  }).activate());
-  activateGh();
-  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-onboard-');
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const { status, stdout, stderr } = spawnBin('omega', ['onboard', '--dry-run'], targetDir);
+    {
+      name: '#1031 case 10: `omega status` typed inside a target is the manager\'s, reporting from the brand root',
+      run: (ctx) => {
+        const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-status-');
 
-  assert.equal(status, 0, `${stdout}\n${stderr}`);
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
-  assert.match(stdout, /Onboarding/, 'the manager\'s wizard answered');
-  assert.match(stdout, /Dry run/, 'and wrote nothing');
+        const { stdout, stderr } = spawnBin('omega', ['status', '--json'], targetDir);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        ctx.expect(stdout, 'the target\'s framework never ran').not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stderr, stderr).not.toMatch(/refusing|runs at the brand root/);
+        const report = JSON.parse(stdout);
+        ctx.expect(report.brandRoot).toBe(scratch);
+        ctx.expect(JSON.stringify(report.inTarget).includes('"site"'), `inTarget names the target: ${stdout}`).toBeTruthy();
 
-test('help: every verb the manager owns in the verb table is in its help list', () => {
-  const scratch = scratchRepo('omega-manager-bin-help-');
-  const { stdout } = runBin('omega', ['help'], scratch);
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
 
-  const owned = VERBS.filter((row) => row.owners.includes('@omega.js/manager') && row.name !== 'help');
-  const unlisted = owned.map((row) => row.name).filter((name) => !new RegExp(`omega ${name}\\b`).test(stdout));
-  assert.deepEqual(unlisted, [], `verbs the help list leaves out:\n${stdout}`);
+    {
+      name: '#1031 status reads only: no boot prelude and no freshness heal runs, so the origin, the brand and stdout stay clean',
+      run: (ctx) => {
+        // An origin the heal would move, a gh that answers with the move, and the manager linked to this checkout
+        const { scratch } = stageBrandWithTarget('omega-manager-bin-status-prelude-');
+        const origin = 'https://github.com/old-owner/acme-omega.git';
+        const git = (...args) => spawnSync('git', ['-C', scratch, ...args], { encoding: 'utf8' }).stdout.trim();
+        git('init', '-q');
+        git('remote', 'add', 'origin', origin);
+        const ghDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-moved-gh-'));
+        const ghLog = path.join(ghDir, 'calls.log');
+        fs.writeFileSync(path.join(ghDir, 'gh'), `#!/bin/sh\necho "$@" >> "${ghLog}"\necho '{"full_name":"moved-owner/acme-omega"}'\n`, { mode: 0o755 });
+        const env = { ...process.env, PATH: [ghDir, process.env.PATH].join(path.delimiter) };
+        delete env.OMEGA_SKIP_FRESHNESS;
+        const before = snapshot(scratch);
 
-  fs.rmSync(scratch, { recursive: true, force: true });
-});
+        const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch, env);
 
-test('bin: inside a target, `omega migrate` refuses and prints the brand root form', () => {
-  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-migrate-target-');
+        ctx.expect(() => JSON.parse(stdout), `stdout is one JSON object:\n${stdout}\n${stderr}`).not.toThrow();
+        ctx.expect(git('remote', 'get-url', 'origin'), 'the origin heal never ran').toBe(origin);
+        ctx.expect(fs.existsSync(ghLog), 'gh was never asked').toBe(false);
+        ctx.expect(snapshot(scratch), 'no file under the brand changed').toEqual(before);
 
-  const { status, stdout, stderr } = spawnBin('omega', ['migrate'], targetDir);
+        fs.rmSync(scratch, { recursive: true, force: true });
+        fs.rmSync(ghDir, { recursive: true, force: true });
+      },
+    },
 
-  assert.equal(status, 1, stderr);
-  assert.doesNotMatch(stdout, /WEB-CLI-RAN/);
-  assert.ok(stderr.includes(`cd ${scratch} && npx omega migrate`), stderr);
-  assert.doesNotMatch(stderr, /--target=/, 'a brand-wide verb picks no target');
+    {
+      name: '#1031 case 10: `omega status` typed in a folder with no brand is the manager\'s',
+      run: (ctx) => {
+        const scratch = fs.realpathSync(scratchRepo('omega-manager-bin-status-nobrand-'));
+        fs.writeFileSync(path.join(scratch, 'notes.txt'), 'not a brand\n');
 
-  fs.rmSync(scratch, { recursive: true, force: true });
+        const { stdout, stderr } = spawnBin('omega', ['status', '--json'], scratch);
+
+        ctx.expect(stderr).toMatch(/running @omega\.js\/manager/);
+        ctx.expect(JSON.parse(stdout).state, stdout).toBe('unrelated');
+
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: '#1031 case 10: `omega onboard` typed inside a target is the manager\'s',
+      run: (ctx) => {
+        // A fake claude and gh, so the wizard's machine checks never reach the real ones
+        ctx.after(createMachine({
+          marketplaces: { omega: { source: 'github', repo: 'Omega-JS-Stack/omega' } },
+          installed: { 'omega@omega': MANIFEST.version },
+          published: MANIFEST.version,
+        }).activate());
+        activateGh();
+        const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-onboard-');
+
+        const { status, stdout, stderr } = spawnBin('omega', ['onboard', '--dry-run'], targetDir);
+
+        ctx.expect(status, `${stdout}\n${stderr}`).toBe(0);
+        ctx.expect(stdout, 'the target\'s framework never ran').not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stdout, 'the manager\'s wizard answered').toMatch(/Onboarding/);
+        ctx.expect(stdout, 'and wrote nothing').toMatch(/Dry run/);
+
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'help: every verb the manager owns in the verb table is in its help list',
+      run: (ctx) => {
+        const scratch = scratchRepo('omega-manager-bin-help-');
+        const { stdout } = runBin(ctx.expect, 'omega', ['help'], scratch);
+
+        const owned = VERBS.filter((row) => row.owners.includes('@omega.js/manager') && row.name !== 'help');
+        const unlisted = owned.map((row) => row.name).filter((name) => !new RegExp(`omega ${name}\\b`).test(stdout));
+        ctx.expect(unlisted, `verbs the help list leaves out:\n${stdout}`).toEqual([]);
+
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'bin: inside a target, `omega migrate` refuses and prints the brand root form',
+      run: (ctx) => {
+        const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-migrate-target-');
+
+        const { status, stdout, stderr } = spawnBin('omega', ['migrate'], targetDir);
+
+        ctx.expect(status, stderr).toBe(1);
+        ctx.expect(stdout).not.toMatch(/WEB-CLI-RAN/);
+        ctx.expect(stderr.includes(`cd ${scratch} && npx omega migrate`), stderr).toBeTruthy();
+        ctx.expect(stderr, 'a brand-wide verb picks no target').not.toMatch(/--target=/);
+
+        fs.rmSync(scratch, { recursive: true, force: true });
+      },
+    },
+  ],
 });

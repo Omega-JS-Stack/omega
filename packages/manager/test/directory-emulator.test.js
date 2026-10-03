@@ -16,8 +16,7 @@
  * the firebase CLI or a JVM, matching how every other emulator-dependent lane
  * in this repo handles a missing tool.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const os = require('node:os');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -138,16 +137,6 @@ function runService(config, db) {
   });
 }
 
-// ─── The fixture's own proof (no emulator) ───────────────────────────────────
-
-test('the fixture names its parent the way a brand does: company.id resolves through the registry (#677)', () => {
-  const company = resolveCompany(BRAND_ROOT, brandConfig(70));
-
-  assert.equal(company.id, COMPANY_ID);
-  assert.equal(company.root, COMPANY_ROOT, 'the registered parent root is what the resolver answers');
-  assert.equal(company.name, 'Parent Brand');
-});
-
 // ─── The lane ────────────────────────────────────────────────────────────────
 
 const unavailable = missingTool();
@@ -156,56 +145,79 @@ const unavailable = missingTool();
 // nothing.
 const laneOptions = unavailable ? { skip: unavailable } : {};
 
-test('directory: a config price change lands in the parent doc; an unchanged config writes nothing', laneOptions, async (t) => {
-  const emulator = await startEmulator({ projectId: PROJECT_ID, prefix: 'omega-directory-emulator' });
-  t.after(async () => {
-    await emulator.stop();
-    jetpack.remove(emulator.dir);
-  });
-
-  const db = emulatorClient(emulator.port);
-
-  // The hub's own field on the entry: it must survive every push (#246 —
-  // the framework owes the entry, the marketplace owns everything else).
-  await db.seed(DOC_PATH, { orderCount: 7 });
-
-  // ── First walk: the entry is created ──────────────────────────────────────
-  const created = await runService(brandConfig(70), db);
-  assert.equal(created.status, 'success');
-  assert.equal(created.output.entry.updated, true, 'the seeded doc already existed, so this is an update');
-
-  let doc = await db.getDoc(DOC_PATH);
-  assert.equal(doc.sponsorships.prices['guest-post'], 70);
-  assert.deepEqual(doc.brand, { id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' });
-  assert.deepEqual(doc.github, { owner: 'emulator-org', name: `${BRAND_ID}-omega`, slug: `emulator-org/${BRAND_ID}-omega` });
-  assert.equal(doc.orderCount, 7, 'the hub-owned field survived the push');
-
-  // ── Second walk, unchanged config: zero writes, untouched document ────────
-  const settled = await db.updateTime(DOC_PATH);
-  const writesBefore = db.writes;
-
-  const rerun = await runService(brandConfig(70), db);
-  assert.equal(rerun.status, 'success');
-  assert.equal(rerun.output.entry.synced, true);
-  assert.equal(db.writes, writesBefore, 'an unchanged config performs no write');
-  assert.equal(await db.updateTime(DOC_PATH), settled, 'the parent document was not touched');
-
-  // ── Third walk, a price change: it lands ──────────────────────────────────
-  const changed = await runService(brandConfig(95), db);
-  assert.equal(changed.output.entry.updated, true);
-  assert.equal(db.writes, writesBefore + 1, 'exactly one write for one change');
-
-  doc = await db.getDoc(DOC_PATH);
-  assert.equal(doc.sponsorships.prices['guest-post'], 95, 'the new price is live in the parent doc');
-  assert.equal(doc.sponsorships.prices['link-insertion'], 50, 'the untouched placement kept its price');
-  assert.equal(doc.orderCount, 7, 'the hub-owned field survived again');
-
-  // ── Fourth walk: converged again ─────────────────────────────────────────
-  const converged = await runService(brandConfig(95), db);
-  assert.equal(converged.output.entry.synced, true);
-  assert.equal(db.writes, writesBefore + 1, 'the push is idempotent');
-});
-
 if (unavailable) {
   console.log(`directory-emulator: SKIPPED — ${unavailable}`);
 }
+
+module.exports = defineCases({
+  type: 'group',
+  description: 'directory-emulator',
+  tests: [
+    // ─── The fixture's own proof (no emulator) ───────────────────────────────────
+
+    {
+      name: 'the fixture names its parent the way a brand does: company.id resolves through the registry (#677)',
+      run: (ctx) => {
+        const company = resolveCompany(BRAND_ROOT, brandConfig(70));
+
+        ctx.expect(company.id).toBe(COMPANY_ID);
+        ctx.expect(company.root, 'the registered parent root is what the resolver answers').toBe(COMPANY_ROOT);
+        ctx.expect(company.name).toBe('Parent Brand');
+      },
+    },
+
+    {
+      name: 'directory: a config price change lands in the parent doc; an unchanged config writes nothing',
+      ...laneOptions,
+      run: async (ctx) => {
+        const emulator = await startEmulator({ projectId: PROJECT_ID, prefix: 'omega-directory-emulator' });
+        ctx.after(async () => {
+          await emulator.stop();
+          jetpack.remove(emulator.dir);
+        });
+
+        const db = emulatorClient(emulator.port);
+
+        // The hub's own field on the entry: it must survive every push (#246 —
+        // the framework owes the entry, the marketplace owns everything else).
+        await db.seed(DOC_PATH, { orderCount: 7 });
+
+        // ── First walk: the entry is created ──────────────────────────────────────
+        const created = await runService(brandConfig(70), db);
+        ctx.expect(created.status).toBe('success');
+        ctx.expect(created.output.entry.updated, 'the seeded doc already existed, so this is an update').toBe(true);
+
+        let doc = await db.getDoc(DOC_PATH);
+        ctx.expect(doc.sponsorships.prices['guest-post']).toBe(70);
+        ctx.expect(doc.brand).toEqual({ id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' });
+        ctx.expect(doc.github).toEqual({ owner: 'emulator-org', name: `${BRAND_ID}-omega`, slug: `emulator-org/${BRAND_ID}-omega` });
+        ctx.expect(doc.orderCount, 'the hub-owned field survived the push').toBe(7);
+
+        // ── Second walk, unchanged config: zero writes, untouched document ────────
+        const settled = await db.updateTime(DOC_PATH);
+        const writesBefore = db.writes;
+
+        const rerun = await runService(brandConfig(70), db);
+        ctx.expect(rerun.status).toBe('success');
+        ctx.expect(rerun.output.entry.synced).toBe(true);
+        ctx.expect(db.writes, 'an unchanged config performs no write').toBe(writesBefore);
+        ctx.expect(await db.updateTime(DOC_PATH), 'the parent document was not touched').toBe(settled);
+
+        // ── Third walk, a price change: it lands ──────────────────────────────────
+        const changed = await runService(brandConfig(95), db);
+        ctx.expect(changed.output.entry.updated).toBe(true);
+        ctx.expect(db.writes, 'exactly one write for one change').toBe(writesBefore + 1);
+
+        doc = await db.getDoc(DOC_PATH);
+        ctx.expect(doc.sponsorships.prices['guest-post'], 'the new price is live in the parent doc').toBe(95);
+        ctx.expect(doc.sponsorships.prices['link-insertion'], 'the untouched placement kept its price').toBe(50);
+        ctx.expect(doc.orderCount, 'the hub-owned field survived again').toBe(7);
+
+        // ── Fourth walk: converged again ─────────────────────────────────────────
+        const converged = await runService(brandConfig(95), db);
+        ctx.expect(converged.output.entry.synced).toBe(true);
+        ctx.expect(db.writes, 'the push is idempotent').toBe(writesBefore + 1);
+      },
+    },
+  ],
+});

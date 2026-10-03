@@ -7,8 +7,7 @@
  * provider's records are pinned as literal values, so the registry that
  * builds them cannot drift them.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { SHARED_SCHEMA, undeclaredPaths } = require('@omega.js/config');
 const { DOMAIN_PROVIDERS } = require('../src/services/domain/lib/providers.js');
@@ -33,44 +32,6 @@ function withProvider(block, name) {
   return config;
 }
 
-for (const [role, block] of [['registrar', 'domain.providers'], ['mailbox', 'domain.email.providers']]) {
-  test(`the ${role} registry is exactly the set the schema accepts at ${block}`, () => {
-    assert.deepEqual(Object.keys(DOMAIN_PROVIDERS[role]).sort(), schemaNames(block));
-    for (const name of Object.keys(DOMAIN_PROVIDERS[role])) {
-      assert.deepEqual(undeclaredPaths(withProvider(block, name)), [], `${block}.${name} loads`);
-    }
-    assert.deepEqual(undeclaredPaths(withProvider(block, 'unlisted')), [`${block}.unlisted`]);
-  });
-}
-
-test('each mailbox provider builds its own MX and SPF include', () => {
-  const mx = (provider) => buildRequiredRecords(DOMAIN, {}, false, provider)
-    .filter((r) => r.type === 'MX')
-    .map((r) => [r.content, r.priority, r.comment]);
-  const spf = (provider) => buildRequiredRecords(DOMAIN, {}, false, provider)
-    .find((r) => r.type === 'TXT' && r.content.includes('v=spf1'))?.content;
-
-  assert.deepEqual(mx('squarespace'), [
-    ['mxa.mailgun.org', 10, 'Squarespace email forwarding'],
-    ['mxb.mailgun.org', 10, 'Squarespace email forwarding'],
-  ]);
-  assert.deepEqual(mx('privateemail'), [
-    ['mx1.privateemail.com', 10, 'Private email forwarding (Namecheap)'],
-    ['mx2.privateemail.com', 10, 'Private email forwarding (Namecheap)'],
-  ]);
-  assert.deepEqual(mx('cloudflare'), [
-    ['route1.mx.cloudflare.net', 36, 'Cloudflare Email Routing'],
-    ['route2.mx.cloudflare.net', 4, 'Cloudflare Email Routing'],
-    ['route3.mx.cloudflare.net', 24, 'Cloudflare Email Routing'],
-  ]);
-  assert.deepEqual(mx(null), []);
-
-  assert.equal(spf('squarespace'), '"v=spf1 include:mailgun.org ~all"');
-  assert.equal(spf('privateemail'), '"v=spf1 include:spf.privateemail.com ~all"');
-  assert.equal(spf('cloudflare'), '"v=spf1 include:_spf.mx.cloudflare.net ~all"');
-  assert.equal(spf(null), undefined);
-});
-
 // An apex MX of each registry provider, plus one no provider serves
 const EXISTING_MX = [
   { id: 'a', type: 'MX', name: DOMAIN, content: 'mx3.mailgun.org' },
@@ -79,27 +40,90 @@ const EXISTING_MX = [
   { id: 'd', type: 'MX', name: DOMAIN, content: 'aspmx.l.google.com' },
 ];
 
-test('with no mailbox provider picked, no MX record is obsolete', () => {
-  assert.deepEqual(findObsoleteMxRecords(EXISTING_MX, DOMAIN, null), []);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'domain-providers',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const [role, block] of [['registrar', 'domain.providers'], ['mailbox', 'domain.email.providers']]) {
+        cases.push({
+          name: `the ${role} registry is exactly the set the schema accepts at ${block}`,
+          run: (ctx) => {
+            ctx.expect(Object.keys(DOMAIN_PROVIDERS[role]).sort()).toEqual(schemaNames(block));
+            for (const name of Object.keys(DOMAIN_PROVIDERS[role])) {
+              ctx.expect(undeclaredPaths(withProvider(block, name)), `${block}.${name} loads`).toEqual([]);
+            }
+            ctx.expect(undeclaredPaths(withProvider(block, 'unlisted'))).toEqual([`${block}.unlisted`]);
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test("an MX record of another mailbox provider is obsolete, the chosen one's is kept", () => {
-  const obsolete = (provider) => findObsoleteMxRecords(EXISTING_MX, DOMAIN, provider).map((r) => r.id);
+    {
+      name: 'each mailbox provider builds its own MX and SPF include',
+      run: (ctx) => {
+        const mx = (provider) => buildRequiredRecords(DOMAIN, {}, false, provider)
+          .filter((r) => r.type === 'MX')
+          .map((r) => [r.content, r.priority, r.comment]);
+        const spf = (provider) => buildRequiredRecords(DOMAIN, {}, false, provider)
+          .find((r) => r.type === 'TXT' && r.content.includes('v=spf1'))?.content;
 
-  assert.deepEqual(obsolete('squarespace'), ['b', 'c']);
-  assert.deepEqual(obsolete('privateemail'), ['a', 'c']);
-  assert.deepEqual(obsolete('cloudflare'), ['a', 'b']);
-});
+        ctx.expect(mx('squarespace')).toEqual([
+          ['mxa.mailgun.org', 10, 'Squarespace email forwarding'],
+          ['mxb.mailgun.org', 10, 'Squarespace email forwarding'],
+        ]);
+        ctx.expect(mx('privateemail')).toEqual([
+          ['mx1.privateemail.com', 10, 'Private email forwarding (Namecheap)'],
+          ['mx2.privateemail.com', 10, 'Private email forwarding (Namecheap)'],
+        ]);
+        ctx.expect(mx('cloudflare')).toEqual([
+          ['route1.mx.cloudflare.net', 36, 'Cloudflare Email Routing'],
+          ['route2.mx.cloudflare.net', 4, 'Cloudflare Email Routing'],
+          ['route3.mx.cloudflare.net', 24, 'Cloudflare Email Routing'],
+        ]);
+        ctx.expect(mx(null)).toEqual([]);
 
-test('an existing MX record is labelled by the mailbox provider that serves it', () => {
-  const label = (content, comment = 'kept') => determineComment({ type: 'MX', name: DOMAIN, content, comment }, DOMAIN);
+        ctx.expect(spf('squarespace')).toBe('"v=spf1 include:mailgun.org ~all"');
+        ctx.expect(spf('privateemail')).toBe('"v=spf1 include:spf.privateemail.com ~all"');
+        ctx.expect(spf('cloudflare')).toBe('"v=spf1 include:_spf.mx.cloudflare.net ~all"');
+        ctx.expect(spf(null)).toBe(undefined);
+      },
+    },
 
-  assert.equal(label('mxb.mailgun.org'), 'Squarespace email forwarding');
-  assert.equal(label('mx2.privateemail.com'), 'Private email forwarding (Namecheap)');
-  assert.equal(label('aspmx.l.google.com'), 'kept');
+    {
+      name: 'with no mailbox provider picked, no MX record is obsolete',
+      run: (ctx) => {
+        ctx.expect(findObsoleteMxRecords(EXISTING_MX, DOMAIN, null)).toEqual([]);
+      },
+    },
 
-  // Email Routing's own records keep the comment they carry; only a bare one is labelled
-  assert.equal(label('route2.mx.cloudflare.net'), 'kept');
-  assert.equal(label('route2.mx.cloudflare.net', ''), 'Cloudflare Email Routing');
-  assert.equal(label('route2.mx.cloudflare.net', null), 'Cloudflare Email Routing');
+    {
+      name: "an MX record of another mailbox provider is obsolete, the chosen one's is kept",
+      run: (ctx) => {
+        const obsolete = (provider) => findObsoleteMxRecords(EXISTING_MX, DOMAIN, provider).map((r) => r.id);
+
+        ctx.expect(obsolete('squarespace')).toEqual(['b', 'c']);
+        ctx.expect(obsolete('privateemail')).toEqual(['a', 'c']);
+        ctx.expect(obsolete('cloudflare')).toEqual(['a', 'b']);
+      },
+    },
+
+    {
+      name: 'an existing MX record is labelled by the mailbox provider that serves it',
+      run: (ctx) => {
+        const label = (content, comment = 'kept') => determineComment({ type: 'MX', name: DOMAIN, content, comment }, DOMAIN);
+
+        ctx.expect(label('mxb.mailgun.org')).toBe('Squarespace email forwarding');
+        ctx.expect(label('mx2.privateemail.com')).toBe('Private email forwarding (Namecheap)');
+        ctx.expect(label('aspmx.l.google.com')).toBe('kept');
+
+        // Email Routing's own records keep the comment they carry; only a bare one is labelled
+        ctx.expect(label('route2.mx.cloudflare.net')).toBe('kept');
+        ctx.expect(label('route2.mx.cloudflare.net', '')).toBe('Cloudflare Email Routing');
+        ctx.expect(label('route2.mx.cloudflare.net', null)).toBe('Cloudflare Email Routing');
+      },
+    },
+  ],
 });

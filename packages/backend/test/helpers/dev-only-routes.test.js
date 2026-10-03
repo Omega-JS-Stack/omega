@@ -45,7 +45,7 @@ function listDevOnlyRoutes() {
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): clear the lot
 // for a clean slate per case, and restore afterward (mirrors helpers/environment).
 function withEnv(overrides, fn) {
-  const KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_TEST_MODE', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
+  const KEYS = ['OMEGA_ENVIRONMENT', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
   const saved = {};
   for (const k of KEYS) saved[k] = process.env[k];
   try {

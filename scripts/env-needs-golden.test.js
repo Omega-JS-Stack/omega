@@ -9,8 +9,7 @@
  * company layer from resolving, so no answer depends on the machine.
  * Run: node --test scripts/env-needs-golden.test.js
  */
-const { test, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,11 +19,8 @@ const FIXTURE = path.join(__dirname, 'env-needs-golden.json');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
 const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'env-needs-golden-'));
 
-// Set before any framework module loads: a scratch registry, and one fixed
-// environment so no overlay or ambient answer depends on the shell.
-const SAVED_PROCESS_ENV = { ...process.env };
-process.env.OMEGA_HOME = path.join(SCRATCH, 'omega-home');
-process.env.OMEGA_ENVIRONMENT = 'production';
+// The env the group's setup replaced, restored whole by its cleanup.
+let savedProcessEnv;
 
 const {
   loadConfig, targetEntries, TARGETS, ENV_SCHEMA, generatedEnvKeys, serializeEnv, FORMATS, formatKeys, missingEnvKeys,
@@ -332,13 +328,14 @@ function formatKeysAnswer(view, type) {
 
 /**
  * Record one brand tree: one entry per caller, each holding its answer per env.
+ * @param {Function} expect - The calling case's `ctx.expect`.
  * @param {string} brandRoot - The scratch brand root.
  * @returns {object} The record.
  */
-function record(brandRoot) {
+function record(expect, brandRoot) {
   const brand = loadBrand(brandRoot);
-  assert.equal(brand.configError, null, `the config at ${brandRoot} must load`);
-  assert.deepEqual(brand.configErrors, [], `the config at ${brandRoot} loads clean`);
+  expect(brand.configError, `the config at ${brandRoot} must load`).toBe(null);
+  expect(brand.configErrors, `the config at ${brandRoot} loads clean`).toEqual([]);
 
   const targets = targetEntries(brand.config)
     .filter((entry) => TARGETS.includes(entry.type))
@@ -477,83 +474,119 @@ const CONFIGS = {
 const recorded = {};
 const golden = UPDATE ? null : JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 
-after(() => {
-  // A partial record is never written: a config that failed to record keeps the old fixture
-  if (UPDATE && Object.keys(recorded).length === Object.keys(CONFIGS).length) {
-    fs.writeFileSync(FIXTURE, `${JSON.stringify(sortKeys(recorded), null, 2)}\n`);
-  }
-
-  for (const key of Object.keys(process.env)) {
-    if (!(key in SAVED_PROCESS_ENV)) delete process.env[key];
-  }
-  Object.assign(process.env, SAVED_PROCESS_ENV);
-  fs.rmSync(SCRATCH, { recursive: true, force: true });
-});
-
-test('the fixture records exactly the configs this file builds', { skip: UPDATE }, () => {
-  assert.deepEqual(Object.keys(golden).sort(), Object.keys(CONFIGS).sort());
-});
-
-test('the fixture holds key names only, never a value', { skip: UPDATE }, () => {
-  const strays = stringLeaves(golden).filter((leaf) => !SCHEMA_NAMES.has(leaf));
-  assert.deepEqual(strays, []);
-});
-
-test('the comparison lets through a named change and stops any other', () => {
-  const deploy = (keys) => ({ 'devkit.missingRequiredSecrets@backend': { empty: keys } });
-  const ga = 'GOOGLE_ANALYTICS_SECRET_BACKEND';
-
-  assert.deepEqual(unexplainedChanges('brand:playground-omega', deploy([]), deploy([ga])), [], 'the GA miss is now reported');
-  assert.deepEqual(unexplainedChanges('brand:playground-omega', deploy([ga]), deploy([])), [
-    `brand:playground-omega: removed /devkit.missingRequiredSecrets@backend/empty ${ga}`,
-  ], 'dropping it again is no named change');
-  assert.deepEqual(unexplainedChanges('synthetic:real-project', deploy(['OMEGA_ADMIN_KEY']), deploy([])), [
-    'synthetic:real-project: removed /devkit.missingRequiredSecrets@backend/empty OMEGA_ADMIN_KEY',
-  ]);
-
-  // Case 1's removal holds only for a brand with no backend target
-  const preflight = (keys) => ({ 'manager.runPreflight': { empty: { captcha: keys } } });
-  assert.deepEqual(unexplainedChanges('synthetic:no-backend', preflight(['RECAPTCHA_SECRET_KEY']), preflight([])), []);
-  assert.deepEqual(unexplainedChanges('synthetic:real-project', preflight(['SENDGRID_API_KEY']), preflight([])), [
-    'synthetic:real-project: removed /manager.runPreflight/empty/captcha SENDGRID_API_KEY',
-  ]);
-
-  // A default desktop format's keys may be added on the named configs only, never dropped
-  const ship = (keys) => ({ 'devkit.missingShipKeys@desktop': { empty: keys } });
-  const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
-  assert.deepEqual(unexplainedChanges('brand:playground-omega', ship([]), ship(owed)), []);
-  assert.deepEqual(unexplainedChanges('brand:playground-omega', ship(owed), ship([])), owed.map((key) => `brand:playground-omega: removed /devkit.missingShipKeys@desktop/empty ${key}`));
-  assert.deepEqual(unexplainedChanges('synthetic:desktop-azure', ship([]), ship(['WIN_EV_TOKEN_PATH'])), [
-    'synthetic:desktop-azure: added /devkit.missingShipKeys@desktop/empty WIN_EV_TOKEN_PATH',
-  ], 'the cloud strategy owes no self-hosted key');
-});
-
-test('every named disagreement names schema keys', () => {
-  for (const named of DISAGREEMENTS) {
-    assert.deepEqual(named.keys.filter((key) => !SCHEMA_NAMES.has(key)), [], named.why);
-  }
-});
-
-for (const [name, build] of Object.entries(CONFIGS)) {
-  test(`${name}: every caller answers as recorded, apart from the named disagreements`, () => {
-    recorded[name] = record(build());
-
-    if (!UPDATE) {
-      const now = sortKeys(recorded[name]);
-      assert.deepEqual(Object.keys(now), Object.keys(golden[name]), 'the same callers answer');
-      assert.deepEqual(unexplainedChanges(name, golden[name], now), []);
+module.exports = defineCases({
+  type: 'group',
+  description: 'env-needs-golden',
+  setup: () => {
+    // Set for this group's cases alone (the suites share a process): a scratch
+    // registry, and one fixed environment so no overlay or ambient answer depends on the shell.
+    savedProcessEnv = { ...process.env };
+    process.env.OMEGA_HOME = path.join(SCRATCH, 'omega-home');
+    process.env.OMEGA_ENVIRONMENT = 'production';
+  },
+  cleanup: () => {
+    // A partial record is never written: a config that failed to record keeps the old fixture
+    if (UPDATE && Object.keys(recorded).length === Object.keys(CONFIGS).length) {
+      fs.writeFileSync(FIXTURE, `${JSON.stringify(sortKeys(recorded), null, 2)}\n`);
     }
-  });
-}
 
-test('brand:playground-omega ships the default desktop formats, so its desktop rows hold their three keys', () => {
-  const answers = recorded['brand:playground-omega'];
-  assert.ok(answers, 'the playground brand was recorded above');
-  const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+    for (const key of Object.keys(process.env)) {
+      if (!(key in savedProcessEnv)) delete process.env[key];
+    }
+    Object.assign(process.env, savedProcessEnv);
+    fs.rmSync(SCRATCH, { recursive: true, force: true });
+  },
+  tests: [
+    {
+      name: 'the fixture records exactly the configs this file builds',
+      skip: UPDATE,
+      run: (ctx) => {
+        ctx.expect(Object.keys(golden).sort()).toEqual(Object.keys(CONFIGS).sort());
+      },
+    },
 
-  for (const caller of ['desktop.assertShipKeys@desktop', 'devkit.missingShipKeys@desktop', 'devkit.missingRequiredSecrets@desktop', 'manager.publishing.keys']) {
-    assert.deepEqual(owed.filter((key) => !answers[caller].empty.includes(key)), [], caller);
-  }
-  assert.deepEqual(answers['config.formatKeys@desktop']['linux.snap'], ['SNAPCRAFT_STORE_CREDENTIALS']);
-  assert.deepEqual(answers['config.formatKeys@desktop']['windows.nsis'], ['WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH']);
+    {
+      name: 'the fixture holds key names only, never a value',
+      skip: UPDATE,
+      run: (ctx) => {
+        const strays = stringLeaves(golden).filter((leaf) => !SCHEMA_NAMES.has(leaf));
+        ctx.expect(strays).toEqual([]);
+      },
+    },
+
+    {
+      name: 'the comparison lets through a named change and stops any other',
+      run: (ctx) => {
+        const deploy = (keys) => ({ 'devkit.missingRequiredSecrets@backend': { empty: keys } });
+        const ga = 'GOOGLE_ANALYTICS_SECRET_BACKEND';
+
+        ctx.expect(unexplainedChanges('brand:playground-omega', deploy([]), deploy([ga])), 'the GA miss is now reported').toEqual([]);
+        ctx.expect(unexplainedChanges('brand:playground-omega', deploy([ga]), deploy([])), 'dropping it again is no named change').toEqual([
+          `brand:playground-omega: removed /devkit.missingRequiredSecrets@backend/empty ${ga}`,
+        ]);
+        ctx.expect(unexplainedChanges('synthetic:real-project', deploy(['OMEGA_ADMIN_KEY']), deploy([]))).toEqual([
+          'synthetic:real-project: removed /devkit.missingRequiredSecrets@backend/empty OMEGA_ADMIN_KEY',
+        ]);
+
+        // Case 1's removal holds only for a brand with no backend target
+        const preflight = (keys) => ({ 'manager.runPreflight': { empty: { captcha: keys } } });
+        ctx.expect(unexplainedChanges('synthetic:no-backend', preflight(['RECAPTCHA_SECRET_KEY']), preflight([]))).toEqual([]);
+        ctx.expect(unexplainedChanges('synthetic:real-project', preflight(['SENDGRID_API_KEY']), preflight([]))).toEqual([
+          'synthetic:real-project: removed /manager.runPreflight/empty/captcha SENDGRID_API_KEY',
+        ]);
+
+        // A default desktop format's keys may be added on the named configs only, never dropped
+        const ship = (keys) => ({ 'devkit.missingShipKeys@desktop': { empty: keys } });
+        const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+        ctx.expect(unexplainedChanges('brand:playground-omega', ship([]), ship(owed))).toEqual([]);
+        ctx.expect(unexplainedChanges('brand:playground-omega', ship(owed), ship([]))).toEqual(owed.map((key) => `brand:playground-omega: removed /devkit.missingShipKeys@desktop/empty ${key}`));
+        ctx.expect(unexplainedChanges('synthetic:desktop-azure', ship([]), ship(['WIN_EV_TOKEN_PATH'])), 'the cloud strategy owes no self-hosted key').toEqual([
+          'synthetic:desktop-azure: added /devkit.missingShipKeys@desktop/empty WIN_EV_TOKEN_PATH',
+        ]);
+      },
+    },
+
+    {
+      name: 'every named disagreement names schema keys',
+      run: (ctx) => {
+        for (const named of DISAGREEMENTS) {
+          ctx.expect(named.keys.filter((key) => !SCHEMA_NAMES.has(key)), named.why).toEqual([]);
+        }
+      },
+    },
+
+    ...(() => {
+      const cases = [];
+      for (const [name, build] of Object.entries(CONFIGS)) {
+        cases.push({
+          name: `${name}: every caller answers as recorded, apart from the named disagreements`,
+          run: (ctx) => {
+            recorded[name] = record(ctx.expect, build());
+
+            if (!UPDATE) {
+              const now = sortKeys(recorded[name]);
+              ctx.expect(Object.keys(now), 'the same callers answer').toEqual(Object.keys(golden[name]));
+              ctx.expect(unexplainedChanges(name, golden[name], now)).toEqual([]);
+            }
+          },
+        });
+      }
+      return cases;
+    })(),
+
+    {
+      name: 'brand:playground-omega ships the default desktop formats, so its desktop rows hold their three keys',
+      run: (ctx) => {
+        const answers = recorded['brand:playground-omega'];
+        ctx.expect(answers, 'the playground brand was recorded above').toBeTruthy();
+        const owed = ['SNAPCRAFT_STORE_CREDENTIALS', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH'];
+
+        for (const caller of ['desktop.assertShipKeys@desktop', 'devkit.missingShipKeys@desktop', 'devkit.missingRequiredSecrets@desktop', 'manager.publishing.keys']) {
+          ctx.expect(owed.filter((key) => !answers[caller].empty.includes(key)), caller).toEqual([]);
+        }
+        ctx.expect(answers['config.formatKeys@desktop']['linux.snap']).toEqual(['SNAPCRAFT_STORE_CREDENTIALS']);
+        ctx.expect(answers['config.formatKeys@desktop']['windows.nsis']).toEqual(['WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH']);
+      },
+    },
+  ],
 });

@@ -6,20 +6,28 @@
  * signed under one id and registered under another. The policy is config's
  * now, so both readers compose the same identifier.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { deriveBundleIdPrefix, composeBundleId } = require('../src/index.js');
 
-test('bundle-id: reverse-DNS derivation plus dash-to-dot composition', () => {
-  assert.equal(deriveBundleIdPrefix('https://itwcreativeworks.com'), 'com.itwcreativeworks');
-  assert.equal(deriveBundleIdPrefix('https://www.acme.io/some/path'), 'io.acme');
-  assert.equal(deriveBundleIdPrefix('https://playground.omegajs.dev'), 'dev.omegajs.playground');
-  assert.equal(deriveBundleIdPrefix('not a url'), null);
+module.exports = defineCases({
+  type: 'group',
+  description: 'bundle-id',
+  tests: [
+    {
+      name: 'bundle-id: reverse-DNS derivation plus dash-to-dot composition',
+      run: (ctx) => {
+        ctx.expect(deriveBundleIdPrefix('https://itwcreativeworks.com')).toBe('com.itwcreativeworks');
+        ctx.expect(deriveBundleIdPrefix('https://www.acme.io/some/path')).toBe('io.acme');
+        ctx.expect(deriveBundleIdPrefix('https://playground.omegajs.dev')).toBe('dev.omegajs.playground');
+        ctx.expect(deriveBundleIdPrefix('not a url')).toBe(null);
 
-  assert.equal(composeBundleId('com.itwcreativeworks', 'omega-playground'), 'com.itwcreativeworks.omega.playground');
-  assert.equal(composeBundleId('com.fixture', 'fixture-brand'), 'com.fixture.fixture.brand');
-  // The id the desktop build composes for a company brand (#909): the prefix
-  // plus the brand id, every dash its own segment.
-  assert.equal(composeBundleId('com.itwcreativeworks', 'my-app'), 'com.itwcreativeworks.my.app');
+        ctx.expect(composeBundleId('com.itwcreativeworks', 'omega-playground')).toBe('com.itwcreativeworks.omega.playground');
+        ctx.expect(composeBundleId('com.fixture', 'fixture-brand')).toBe('com.fixture.fixture.brand');
+        // The id the desktop build composes for a company brand (#909): the prefix
+        // plus the brand id, every dash its own segment.
+        ctx.expect(composeBundleId('com.itwcreativeworks', 'my-app')).toBe('com.itwcreativeworks.my.app');
+      },
+    },
+  ],
 });

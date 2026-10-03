@@ -7,8 +7,7 @@
  * child_process.spawn is replaced (before run-command.js binds it), so nothing
  * real starts.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -83,99 +82,132 @@ async function atRoot(root, fn) {
   }
 }
 
-test('translate --target=web at the brand root runs web\'s own `npm run translate`, the args after --', async () => {
-  const root = stageBrand();
-  const argv0 = process.argv;
-  const args = ['translate', '--target=web', '--lang', 'de', 'framework:'];
-  process.argv = [process.execPath, 'omega', ...args];
-  try {
-    await atRoot(root, () => new Main().process(parseArgv(args, { booleans: BOOLEAN_FLAGS })));
-  } finally {
-    process.argv = argv0;
-  }
+module.exports = defineCases({
+  type: 'group',
+  description: 'verb-passthrough',
+  tests: [
+    {
+      name: 'translate --target=web at the brand root runs web\'s own `npm run translate`, the args after --',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const argv0 = process.argv;
+        const args = ['translate', '--target=web', '--lang', 'de', 'framework:'];
+        process.argv = [process.execPath, 'omega', ...args];
+        try {
+          await atRoot(root, () => new Main().process(parseArgv(args, { booleans: BOOLEAN_FLAGS })));
+        } finally {
+          process.argv = argv0;
+        }
 
-  assert.equal(spawned.length, 1);
-  assert.equal(spawned[0].command, 'npm');
-  assert.deepEqual(spawned[0].args, ['run', 'translate', '--', '--lang', 'de', 'framework:']);
-  assert.equal(spawned[0].cwd, path.join(root, 'targets', 'web'));
-  assert.equal(spawned[0].env.OMEGA_ROOT_DISPATCH, undefined, 'the child needs no marker inside the target');
-});
+        ctx.expect(spawned.length).toBe(1);
+        ctx.expect(spawned[0].command).toBe('npm');
+        ctx.expect(spawned[0].args).toEqual(['run', 'translate', '--', '--lang', 'de', 'framework:']);
+        ctx.expect(spawned[0].cwd).toBe(path.join(root, 'targets', 'web'));
+        ctx.expect(spawned[0].env.OMEGA_ROOT_DISPATCH, 'the child needs no marker inside the target').toBe(undefined);
+      },
+    },
 
-test('translate with no picker runs every web target and every custom target, and no other framework', async () => {
-  const root = stageBrand();
-  await atRoot(root, () => runPassThrough('translate', ['translate']));
+    {
+      name: 'translate with no picker runs every web target and every custom target, and no other framework',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await atRoot(root, () => runPassThrough('translate', ['translate']));
 
-  assert.deepEqual(spawned.map((call) => path.basename(call.cwd)).sort(), ['admin', 'api', 'web'], 'a fan-out verb is each target\'s own script, custom included');
-  assert.ok(spawned.every((call) => call.command === 'npm' && call.args.join(' ') === 'run translate'));
-});
+        ctx.expect(spawned.map((call) => path.basename(call.cwd)).sort(), 'a fan-out verb is each target\'s own script, custom included').toEqual(['admin', 'api', 'web']);
+        ctx.expect(spawned.every((call) => call.command === 'npm' && call.args.join(' ') === 'run translate')).toBeTruthy();
+      },
+    },
 
-test('a single-target command passes through to the framework CLI with the alias as typed, never an npm script', async () => {
-  const root = stageBrand();
-  await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '{"a":1}']));
+    {
+      name: 'a single-target command passes through to the framework CLI with the alias as typed, never an npm script',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '{"a":1}']));
 
-  assert.equal(spawned.length, 1);
-  assert.equal(spawned[0].command, process.execPath);
-  assert.deepEqual(spawned[0].args, [binOf(root, 'backend'), 'firestore:set', 'users/abc', '{"a":1}']);
-  assert.equal(spawned[0].cwd, path.join(root, 'targets', 'backend'));
-});
+        ctx.expect(spawned.length).toBe(1);
+        ctx.expect(spawned[0].command).toBe(process.execPath);
+        ctx.expect(spawned[0].args).toEqual([binOf(root, 'backend'), 'firestore:set', 'users/abc', '{"a":1}']);
+        ctx.expect(spawned[0].cwd).toBe(path.join(root, 'targets', 'backend'));
+      },
+    },
 
-test('a single-target command on a custom target steps aside loudly, and nothing fails', async () => {
-  const root = stageBrand();
-  const { lines, exitCode } = await atRoot(root, () => runPassThrough('emulators', ['emulators', '--target=api']));
+    {
+      name: 'a single-target command on a custom target steps aside loudly, and nothing fails',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const { lines, exitCode } = await atRoot(root, () => runPassThrough('emulators', ['emulators', '--target=api']));
 
-  assert.equal(spawned.length, 0);
-  assert.match(lines, /emulators is a @omega\.js\/backend command; api is custom/);
-  assert.equal(exitCode, undefined);
-});
+        ctx.expect(spawned.length).toBe(0);
+        ctx.expect(lines).toMatch(/emulators is a @omega\.js\/backend command; api is custom/);
+        ctx.expect(exitCode).toBe(undefined);
+      },
+    },
 
-test('launch with no picker refuses, naming the desktop targets; with one it runs there', async () => {
-  const root = stageBrand();
-  await atRoot(root, () => assert.rejects(runPassThrough('launch', ['launch']), (error) => {
-    assert.equal(error.refusal, true);
-    assert.match(error.message, /"launch" runs on one target: npx omega launch --target=<name>, the name one of desktop\. Nothing ran\./);
-    return true;
-  }));
-  assert.equal(spawned.length, 0);
+    {
+      name: 'launch with no picker refuses, naming the desktop targets; with one it runs there',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await atRoot(root, () => ctx.expect(runPassThrough('launch', ['launch'])).rejects.toThrow((error) => {
+          ctx.expect(error.refusal).toBe(true);
+          ctx.expect(error.message).toMatch(/"launch" runs on one target: npx omega launch --target=<name>, the name one of desktop\. Nothing ran\./);
+          return true;
+        }));
+        ctx.expect(spawned.length).toBe(0);
 
-  await atRoot(root, () => runPassThrough('launch', ['launch', '--target', 'desktop']));
-  assert.deepEqual(spawned.map((call) => call.args), [[binOf(root, 'desktop'), 'launch']]);
-});
+        await atRoot(root, () => runPassThrough('launch', ['launch', '--target', 'desktop']));
+        ctx.expect(spawned.map((call) => call.args)).toEqual([[binOf(root, 'desktop'), 'launch']]);
+      },
+    },
 
-test('--dry-run on a fan-out verb reaches the walk: a brand-owned script plans, the framework\'s own hears the flag', async () => {
-  const root = stageBrand();
-  const { lines } = await atRoot(root, () => runPassThrough('translate', ['translate', '--dry-run']));
+    {
+      name: '--dry-run on a fan-out verb reaches the walk: a brand-owned script plans, the framework\'s own hears the flag',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const { lines } = await atRoot(root, () => runPassThrough('translate', ['translate', '--dry-run']));
 
-  assert.deepEqual(spawned.map((call) => path.basename(call.cwd)).sort(), ['admin', 'web'], 'only the framework scripts ran');
-  assert.ok(spawned.every((call) => call.args.join(' ') === 'run translate -- --dry-run'));
-  assert.match(lines, /api: dry run .*would run npm run translate in targets\/api/, 'the custom target stopped at its plan');
-});
+        ctx.expect(spawned.map((call) => path.basename(call.cwd)).sort(), 'only the framework scripts ran').toEqual(['admin', 'web']);
+        ctx.expect(spawned.every((call) => call.args.join(' ') === 'run translate -- --dry-run')).toBeTruthy();
+        ctx.expect(lines, 'the custom target stopped at its plan').toMatch(/api: dry run .*would run npm run translate in targets\/api/);
+      },
+    },
 
-test('--dry-run on a single-target command prints the plan and spawns nothing', async () => {
-  const root = stageBrand();
-  const { lines, exitCode } = await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '--dry-run']));
+    {
+      name: '--dry-run on a single-target command prints the plan and spawns nothing',
+      run: async (ctx) => {
+        const root = stageBrand();
+        const { lines, exitCode } = await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '--dry-run']));
 
-  assert.equal(spawned.length, 0);
-  assert.match(lines, /would run @omega\.js\/backend firestore:set users\/abc --dry-run in targets\/backend/);
-  assert.equal(exitCode, undefined);
-});
+        ctx.expect(spawned.length).toBe(0);
+        ctx.expect(lines).toMatch(/would run @omega\.js\/backend firestore:set users\/abc --dry-run in targets\/backend/);
+        ctx.expect(exitCode).toBe(undefined);
+      },
+    },
 
-test('audit --target=backend refuses by name: the backend does not own audit', async () => {
-  const root = stageBrand();
-  await atRoot(root, () => assert.rejects(runPassThrough('audit', ['audit', '--target=backend']), (error) => {
-    assert.equal(error.refusal, true);
-    assert.match(error.message, /"audit" is @omega\.js\/web's verb, and backend \(@omega\.js\/backend\) cannot run it\. Nothing ran\./);
-    return true;
-  }));
-  assert.equal(spawned.length, 0);
-});
+    {
+      name: 'audit --target=backend refuses by name: the backend does not own audit',
+      run: async (ctx) => {
+        const root = stageBrand();
+        await atRoot(root, () => ctx.expect(runPassThrough('audit', ['audit', '--target=backend'])).rejects.toThrow((error) => {
+          ctx.expect(error.refusal).toBe(true);
+          ctx.expect(error.message).toMatch(/"audit" is @omega\.js\/web's verb, and backend \(@omega\.js\/backend\) cannot run it\. Nothing ran\./);
+          return true;
+        }));
+        ctx.expect(spawned.length).toBe(0);
+      },
+    },
 
-test('a verb no row knows gets the manager\'s unknown-verb answer', async () => {
-  const root = stageBrand();
-  assert.equal(passThroughRow('notaverb'), null);
-  assert.equal(passThroughRow('dev'), null, 'a root row is the manager\'s own command, never passed through');
+    {
+      name: 'a verb no row knows gets the manager\'s unknown-verb answer',
+      run: async (ctx) => {
+        const root = stageBrand();
+        ctx.expect(passThroughRow('notaverb')).toBe(null);
+        ctx.expect(passThroughRow('dev'), 'a root row is the manager\'s own command, never passed through').toBe(null);
 
-  const { lines, exitCode } = await atRoot(root, () => new Main().process(parseArgv(['notaverb'], { booleans: BOOLEAN_FLAGS })));
-  assert.match(lines, /Unknown command "notaverb"\. Available: /);
-  assert.equal(exitCode, 1);
-  assert.equal(spawned.length, 0);
+        const { lines, exitCode } = await atRoot(root, () => new Main().process(parseArgv(['notaverb'], { booleans: BOOLEAN_FLAGS })));
+        ctx.expect(lines).toMatch(/Unknown command "notaverb"\. Available: /);
+        ctx.expect(exitCode).toBe(1);
+        ctx.expect(spawned.length).toBe(0);
+      },
+    },
+  ],
 });

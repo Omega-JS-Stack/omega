@@ -3,51 +3,92 @@
  * `[@omega.js/client:<module>] message` with NO timestamp (devtools stamps
  * runtime lines; only the build-time devkit logger prefixes [HH:MM:SS]).
  */
-const { describe, it, before, beforeEach, afterEach } = require('node:test');
-const { assert } = require('./helpers.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { createOmega, clearStorage, disposeOmega } = require('./helpers.js');
 
-describe('Logger Module', () => {
-  let createLogger;
+const beforeEachHook = clearStorage;
 
-  before(async () => {
-    ({ createLogger } = await import('../src/modules/logger.js'));
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'logger',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    ...(() => {
+      const cases = [];
+      let createLogger;
 
-  // Capture one console[method] call; returns its raw args.
-  const captured = {};
-  const originals = {};
-  beforeEach(() => {
-    ['log', 'info', 'warn', 'error', 'debug'].forEach((method) => {
-      originals[method] = console[method];
-      console[method] = (...args) => { captured[method] = args; };
-    });
-  });
-  afterEach(() => {
-    Object.keys(originals).forEach((method) => { console[method] = originals[method]; });
-  });
+      let beforeHookRun;
+      const beforeHook = (ctx) => (beforeHookRun ||= Promise.resolve().then(() => (async () => {
+        ({ createLogger } = await import('../src/modules/logger.js'));
+      })()));
 
-  it('prefixes exactly [@omega.js/client:<module>] with no timestamp', () => {
-    createLogger('push').log('Subscribed');
-    assert.strictEqual(captured.log[0], '[@omega.js/client:push]');
-    assert.strictEqual(captured.log[1], 'Subscribed');
-  });
+      // Capture one console[method] call; returns its raw args.
+      const captured = {};
+      const originals = {};
+      const beforeEachHook2 = () => {
+        ['log', 'info', 'warn', 'error', 'debug'].forEach((method) => {
+          originals[method] = console[method];
+          console[method] = (...args) => { captured[method] = args; };
+        });
+      };
+      const afterEachHook = () => {
+        Object.keys(originals).forEach((method) => { console[method] = originals[method]; });
+      };
 
-  it('carries sub-module segments verbatim', () => {
-    createLogger('push:sync').log('Synced');
-    assert.strictEqual(captured.log[0], '[@omega.js/client:push:sync]');
-  });
+      cases.push({
+        name: 'Logger Module > prefixes exactly [@omega.js/client:<module>] with no timestamp',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          ctx.after(afterEachHook);
+          createLogger('push').log('Subscribed');
+          ctx.expect(captured.log[0]).toBe('[@omega.js/client:push]');
+          ctx.expect(captured.log[1]).toBe('Subscribed');
+        },
+      });
 
-  it('exposes log/info/warn/error/debug, each routed to its own console method', () => {
-    const logger = createLogger('verts');
-    ['log', 'info', 'warn', 'error', 'debug'].forEach((method) => {
-      logger[method]('m', { a: 1 });
-      assert.strictEqual(captured[method][0], '[@omega.js/client:verts]');
-      assert.strictEqual(captured[method][1], 'm');
-      assert.deepStrictEqual(captured[method][2], { a: 1 });
-    });
-  });
+      cases.push({
+        name: 'Logger Module > carries sub-module segments verbatim',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          ctx.after(afterEachHook);
+          createLogger('push:sync').log('Synced');
+          ctx.expect(captured.log[0]).toBe('[@omega.js/client:push:sync]');
+        },
+      });
 
-  it('exposes the tag itself', () => {
-    assert.strictEqual(createLogger('device').tag, '[@omega.js/client:device]');
-  });
+      cases.push({
+        name: 'Logger Module > exposes log/info/warn/error/debug, each routed to its own console method',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          ctx.after(afterEachHook);
+          const logger = createLogger('verts');
+          ['log', 'info', 'warn', 'error', 'debug'].forEach((method) => {
+            logger[method]('m', { a: 1 });
+            ctx.expect(captured[method][0]).toBe('[@omega.js/client:verts]');
+            ctx.expect(captured[method][1]).toBe('m');
+            ctx.expect(captured[method][2]).toEqual({ a: 1 });
+          });
+        },
+      });
+
+      cases.push({
+        name: 'Logger Module > exposes the tag itself',
+        run: async (ctx) => {
+          await beforeHook(ctx);
+          await beforeEachHook();
+          beforeEachHook2();
+          ctx.after(afterEachHook);
+          ctx.expect(createLogger('device').tag).toBe('[@omega.js/client:device]');
+        },
+      });
+      return cases;
+    })(),
+  ],
 });

@@ -1,5 +1,7 @@
-const { describe, it } = require('node:test');
-const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const { getOmega, TEST_CONFIG, createOmega, clearStorage, disposeOmega } = require('./helpers.js');
+
+const beforeEachHook = clearStorage;
 
 // The release tag every browser surface reports under. `init()` builds the
 // @sentry/browser options for real and only THEN hands them to the SDK, whose
@@ -17,42 +19,57 @@ async function initOptions(config) {
   return sentry.config;
 }
 
-describe('Sentry release tagging', () => {
+module.exports = defineCases({
+  type: 'group',
+  description: 'sentry',
+  setup: createOmega,
+  cleanup: disposeOmega,
+  tests: [
+    {
+      name: 'Sentry release tagging > should tag the release brand.id@version when the host blob carries a version',
+      run: async (ctx) => {
+        await beforeEachHook();
+        // @omega.js/extension's build bakes the app's package version into the blob.
+        const options = await initOptions({ version: '1.2.3', buildTime: 1755648000000 });
+        ctx.expect(options.release).toBe('test@1.2.3');
+      },
+    },
 
-  it('should tag the release brand.id@version when the host blob carries a version', async () => {
-    // @omega.js/extension's build bakes the app's package version into the blob.
-    const options = await initOptions({ version: '1.2.3', buildTime: 1755648000000 });
-    assert.strictEqual(options.release, 'test@1.2.3');
-  });
+    {
+      name: 'Sentry release tagging > should fall back to the build stamp on a host whose blob carries no version',
+      run: async (ctx) => {
+        await beforeEachHook();
+        // @omega.js/web and the @omega.js/desktop renderer ship no version yet.
+        const options = await initOptions({ buildTime: 1755648000000 });
+        ctx.expect(options.release).toBe('test@1755648000000');
+      },
+    },
 
-  it('should fall back to the build stamp on a host whose blob carries no version', async () => {
-    // @omega.js/web and the @omega.js/desktop renderer ship no version yet.
-    const options = await initOptions({ buildTime: 1755648000000 });
-    assert.strictEqual(options.release, 'test@1755648000000');
-  });
-});
+    // #817: the environment an event is tagged with comes from the ONE environment
+    // surface, the same module every OMEGA target answers from, never off
+    // `config.environment` by hand.
+    {
+      name: 'Sentry environment tagging > should tag the environment the one surface answers',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const options = await initOptions({ environment: 'development' });
+        ctx.expect(options.environment).toBe('development');
+      },
+    },
 
-// #817: the environment an event is tagged with comes from the ONE environment
-// surface, the same module every OMEGA target answers from, never off
-// `config.environment` by hand.
-describe('Sentry environment tagging', () => {
+    {
+      name: 'Sentry environment tagging > should refuse to initialize by name when the artifact baked no environment',
+      run: async (ctx) => {
+        await beforeEachHook();
+        const omega = getOmega();
+        const { environment, ...withoutEnvironment } = TEST_CONFIG;
 
-  it('should tag the environment the one surface answers', async () => {
-    const options = await initOptions({ environment: 'development' });
-    assert.strictEqual(options.environment, 'development');
-  });
+        // A build that baked no environment is a broken artifact, so the reporter
+        // says which fact is missing instead of tagging every event `undefined`.
+        await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
 
-  it('should refuse to initialize by name when the artifact baked no environment', async () => {
-    const omega = getOmega();
-    const { environment, ...withoutEnvironment } = TEST_CONFIG;
-
-    // A build that baked no environment is a broken artifact, so the reporter
-    // says which fact is missing instead of tagging every event `undefined`.
-    await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
-
-    await assert.rejects(
-      () => omega.sentry.init({ dsn: 'https://key@o1.ingest.sentry.io/1' }),
-      /OMEGA_ENVIRONMENT/,
-    );
-  });
+        await ctx.expect((() => omega.sentry.init({ dsn: 'https://key@o1.ingest.sentry.io/1' }))()).rejects.toThrow(/OMEGA_ENVIRONMENT/);
+      },
+    },
+  ],
 });

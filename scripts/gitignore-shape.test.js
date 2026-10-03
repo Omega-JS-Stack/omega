@@ -8,8 +8,7 @@
  *
  * Run: node --test scripts/gitignore-shape.test.js
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const path = require('path');
@@ -33,52 +32,73 @@ function packageIgnores() {
     .filter(({ file }) => fs.existsSync(file));
 }
 
-test('patterns() treats anchored and unanchored spellings as one pattern', () => {
-  const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gitignore-shape-'));
-  const file = path.join(tmp, '.gitignore');
-  fs.writeFileSync(file, '# note\n/.cache/\n.temp\n!keep.me\n\n*.log\n');
-  assert.deepEqual(patterns(file), ['.cache', '.temp', '*.log']);
-  fs.rmSync(tmp, { recursive: true });
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'gitignore-shape',
+  tests: [
+    {
+      name: 'patterns() treats anchored and unanchored spellings as one pattern',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gitignore-shape-'));
+        const file = path.join(tmp, '.gitignore');
+        fs.writeFileSync(file, '# note\n/.cache/\n.temp\n!keep.me\n\n*.log\n');
+        ctx.expect(patterns(file)).toEqual(['.cache', '.temp', '*.log']);
+        fs.rmSync(tmp, { recursive: true });
+      },
+    },
 
-test('no package .gitignore repeats a root pattern', () => {
-  const root = new Set(patterns(path.join(ROOT, '.gitignore')));
-  const repeats = packageIgnores().flatMap(({ name, file }) => patterns(file)
-    .filter((pattern) => root.has(pattern))
-    .map((pattern) => `packages/${name}/.gitignore: ${pattern}`));
-  assert.deepEqual(repeats, [], 'these lines already live in the root .gitignore');
-});
+    {
+      name: 'no package .gitignore repeats a root pattern',
+      run: (ctx) => {
+        const root = new Set(patterns(path.join(ROOT, '.gitignore')));
+        const repeats = packageIgnores().flatMap(({ name, file }) => patterns(file)
+          .filter((pattern) => root.has(pattern))
+          .map((pattern) => `packages/${name}/.gitignore: ${pattern}`));
+        ctx.expect(repeats, 'these lines already live in the root .gitignore').toEqual([]);
+      },
+    },
 
-test('no two package .gitignores share a pattern', () => {
-  const owners = new Map();
-  for (const { name, file } of packageIgnores()) {
-    for (const pattern of patterns(file)) {
-      owners.set(pattern, [...(owners.get(pattern) || []), name]);
-    }
-  }
-  const shared = [...owners].filter(([, names]) => names.length > 1)
-    .map(([pattern, names]) => `${pattern}: ${names.join(', ')}`);
-  assert.deepEqual(shared, [], 'a line more than one package needs lives in the root .gitignore');
-});
+    {
+      name: 'no two package .gitignores share a pattern',
+      run: (ctx) => {
+        const owners = new Map();
+        for (const { name, file } of packageIgnores()) {
+          for (const pattern of patterns(file)) {
+            owners.set(pattern, [...(owners.get(pattern) || []), name]);
+          }
+        }
+        const shared = [...owners].filter(([, names]) => names.length > 1)
+          .map(([pattern, names]) => `${pattern}: ${names.join(', ')}`);
+        ctx.expect(shared, 'a line more than one package needs lives in the root .gitignore').toEqual([]);
+      },
+    },
 
-test('every package build output is ignored, and a tracked fixture dist is not', () => {
-  const ignored = (file) => {
-    try {
-      execFileSync('git', ['check-ignore', '-q', '--no-index', file], { cwd: ROOT });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  for (const name of fs.readdirSync(PACKAGES_DIR)) {
-    assert.ok(ignored(`packages/${name}/dist/index.js`), `packages/${name}/dist is ignored`);
-  }
-  assert.equal(ignored('packages/extension/src/test/fixtures/consumer-extension/dist/new.js'), false);
-});
+    {
+      name: 'every package build output is ignored, and a tracked fixture dist is not',
+      run: (ctx) => {
+        const ignored = (file) => {
+          try {
+            execFileSync('git', ['check-ignore', '-q', '--no-index', file], { cwd: ROOT });
+            return true;
+          } catch {
+            return false;
+          }
+        };
+        for (const name of fs.readdirSync(PACKAGES_DIR)) {
+          ctx.expect(ignored(`packages/${name}/dist/index.js`), `packages/${name}/dist is ignored`).toBeTruthy();
+        }
+        ctx.expect(ignored('packages/extension/src/test/fixtures/consumer-extension/dist/new.js')).toBe(false);
+      },
+    },
 
-test('only the manager ignores docs: it is the one package the docs lane writes into', () => {
-  const docsLines = packageIgnores().flatMap(({ name, file }) => patterns(file)
-    .filter((pattern) => pattern === 'docs' || pattern.startsWith('docs/'))
-    .map((pattern) => `${name}: ${pattern}`));
-  assert.deepEqual(docsLines, ['manager: docs']);
+    {
+      name: 'only the manager ignores docs: it is the one package the docs lane writes into',
+      run: (ctx) => {
+        const docsLines = packageIgnores().flatMap(({ name, file }) => patterns(file)
+          .filter((pattern) => pattern === 'docs' || pattern.startsWith('docs/'))
+          .map((pattern) => `${name}: ${pattern}`));
+        ctx.expect(docsLines).toEqual(['manager: docs']);
+      },
+    },
+  ],
 });

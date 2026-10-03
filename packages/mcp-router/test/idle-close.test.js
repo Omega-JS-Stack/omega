@@ -15,8 +15,7 @@
  * the sweep cadence down with it; the shipped 15 minutes is untouched.
  */
 
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -44,65 +43,6 @@ const schema = { type: 'object', properties: {} };
 let client;
 let firstPid;
 let stubbornPidFile;
-
-before(async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-idle-'));
-  const overlayDir = path.join(root, 'servers');
-  stubbornPidFile = path.join(root, 'stubborn.pids');
-
-  const entries = {
-    // Every bundled default off, by the one-key overlay the layering promises.
-    ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
-    'fixture-idle': {
-      enabled: true,
-      command: 'node',
-      args: [SLEEP_SERVER],
-      tools: [
-        { name: 'ping', description: 'Answer with pong.', inputSchema: schema },
-        { name: 'sleep', description: 'Answer after the given number of milliseconds.', inputSchema: schema },
-      ],
-    },
-    'fixture-stubborn': {
-      enabled: true,
-      command: 'node',
-      args: [STUBBORN_SERVER],
-      env: { SLEEP_PID_FILE: stubbornPidFile },
-      tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
-    },
-  };
-  for (const [name, config] of Object.entries(entries)) {
-    fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
-    fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
-  }
-
-  client = new Client({ name: 'router-idle-e2e', version: '1.0.0' }, { capabilities: {} });
-  await client.connect(new StdioClientTransport({
-    command: process.execPath,
-    args: [ROUTER],
-    env: {
-      ...process.env,
-      MCP_ROUTER_SERVERS_DIR: overlayDir,
-      MCP_ROUTER_IDLE_MS: String(IDLE_MS),
-    },
-    stderr: 'ignore',
-  }));
-});
-
-after(async () => {
-  await client.close();
-  // The stubborn fixture outlives a polite close by design, and the client's
-  // own teardown can cut the router off mid-shutdown: whatever this run
-  // started, this run ends.
-  if (fs.existsSync(stubbornPidFile)) {
-    for (const line of fs.readFileSync(stubbornPidFile, 'utf8').trim().split('\n').filter(Boolean)) {
-      try {
-        process.kill(Number(line), 'SIGKILL');
-      } catch {
-        // already gone — fine
-      }
-    }
-  }
-});
 
 const callTool = async (name, args) => {
   const result = await client.callTool({ name, arguments: args });
@@ -143,79 +83,157 @@ const waitFor = async (condition, timeout) => {
   return answer;
 };
 
-test('a cold call spawns a child the row can name', async () => {
-  const result = await callTool('fixture-idle__ping', {});
-  assert.equal(result.isError, false, result.text);
-  assert.equal(result.text, 'pong');
+module.exports = defineCases({
+  type: 'group',
+  description: 'idle-close',
+  setup: async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-idle-'));
+    const overlayDir = path.join(root, 'servers');
+    stubbornPidFile = path.join(root, 'stubborn.pids');
 
-  const row = await idleRow();
-  assert.equal(row.spawned, true);
-  assert.ok(Number.isInteger(row.pid), `expected a child pid on the row, got ${JSON.stringify(row.pid)}`);
-  assert.ok(row.idle_ms >= 0 && row.idle_ms < 5000, `idle_ms was ${row.idle_ms}`);
-  assert.ok(alive(row.pid), 'the child is running');
+    const entries = {
+      // Every bundled default off, by the one-key overlay the layering promises.
+      ...Object.fromEntries(Object.keys(registry.loadUpstreams(BUNDLED_ONLY)).map((name) => [name, { enabled: false }])),
+      'fixture-idle': {
+        enabled: true,
+        command: 'node',
+        args: [SLEEP_SERVER],
+        tools: [
+          { name: 'ping', description: 'Answer with pong.', inputSchema: schema },
+          { name: 'sleep', description: 'Answer after the given number of milliseconds.', inputSchema: schema },
+        ],
+      },
+      'fixture-stubborn': {
+        enabled: true,
+        command: 'node',
+        args: [STUBBORN_SERVER],
+        env: { SLEEP_PID_FILE: stubbornPidFile },
+        tools: [{ name: 'ping', description: 'Answer with pong.', inputSchema: schema }],
+      },
+    };
+    for (const [name, config] of Object.entries(entries)) {
+      fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
+      fs.writeFileSync(path.join(overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+    }
 
-  firstPid = row.pid;
-});
+    client = new Client({ name: 'router-idle-e2e', version: '1.0.0' }, { capabilities: {} });
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [ROUTER],
+      env: {
+        ...process.env,
+        MCP_ROUTER_SERVERS_DIR: overlayDir,
+        MCP_ROUTER_IDLE_MS: String(IDLE_MS),
+      },
+      stderr: 'ignore',
+    }));
+  },
+  cleanup: async () => {
+    await client.close();
+    // The stubborn fixture outlives a polite close by design, and the client's
+    // own teardown can cut the router off mid-shutdown: whatever this run
+    // started, this run ends.
+    if (fs.existsSync(stubbornPidFile)) {
+      for (const line of fs.readFileSync(stubbornPidFile, 'utf8').trim().split('\n').filter(Boolean)) {
+        try {
+          process.kill(Number(line), 'SIGKILL');
+        } catch {
+          // already gone — fine
+        }
+      }
+    }
+  },
+  tests: [
+    {
+      name: 'a cold call spawns a child the row can name',
+      run: async (ctx) => {
+        const result = await callTool('fixture-idle__ping', {});
+        ctx.expect(result.isError, result.text).toBe(false);
+        ctx.expect(result.text).toBe('pong');
 
-test('an upstream nobody is using is closed under the idle limit', async () => {
-  // Meta-tools are not upstream traffic: polling the row does not keep the
-  // child alive, which is the whole point of measuring PROXIED calls.
-  const row = await waitFor(async () => {
-    const current = await idleRow();
-    return current.spawned === false ? current : null;
-  }, SWEEP_MS * 4);
+        const row = await idleRow();
+        ctx.expect(row.spawned).toBe(true);
+        ctx.expect(Number.isInteger(row.pid), `expected a child pid on the row, got ${JSON.stringify(row.pid)}`).toBeTruthy();
+        ctx.expect(row.idle_ms >= 0 && row.idle_ms < 5000, `idle_ms was ${row.idle_ms}`).toBeTruthy();
+        ctx.expect(alive(row.pid), 'the child is running').toBeTruthy();
 
-  assert.ok(row, `the child was still spawned ${SWEEP_MS * 4}ms after its last call`);
-  assert.equal(row.pid, null, 'no pid is reported for a closed upstream');
-  assert.equal(row.idle_ms, null, 'idle is only measured for a spawned child');
-  assert.equal(row.active_this_session, true, 'a closed upstream stays active for the session');
-  assert.ok(await waitFor(() => !alive(firstPid), 2000), `pid ${firstPid} outlived the idle close`);
-});
+        firstPid = row.pid;
+      },
+    },
 
-test('the next call spawns a fresh child through the unchanged lazy path', async () => {
-  const result = await callTool('fixture-idle__ping', {});
-  assert.equal(result.isError, false, result.text);
-  assert.equal(result.text, 'pong');
+    {
+      name: 'an upstream nobody is using is closed under the idle limit',
+      run: async (ctx) => {
+        // Meta-tools are not upstream traffic: polling the row does not keep the
+        // child alive, which is the whole point of measuring PROXIED calls.
+        const row = await waitFor(async () => {
+          const current = await idleRow();
+          return current.spawned === false ? current : null;
+        }, SWEEP_MS * 4);
 
-  const row = await idleRow();
-  assert.equal(row.spawned, true);
-  assert.notEqual(row.pid, firstPid, 'a NEW child answered the call');
-  assert.ok(alive(row.pid));
-});
+        ctx.expect(row, `the child was still spawned ${SWEEP_MS * 4}ms after its last call`).toBeTruthy();
+        ctx.expect(row.pid, 'no pid is reported for a closed upstream').toBe(null);
+        ctx.expect(row.idle_ms, 'idle is only measured for a spawned child').toBe(null);
+        ctx.expect(row.active_this_session, 'a closed upstream stays active for the session').toBe(true);
+        ctx.expect(await waitFor(() => !alive(firstPid), 2000), `pid ${firstPid} outlived the idle close`).toBeTruthy();
+      },
+    },
 
-test('a call landing while a close runs is served by a fresh child', async () => {
-  // This fixture only dies on SIGKILL, so its close walks the SDK's whole
-  // escalation and runs for ~4s. That is the window: long enough to fire a
-  // call INTO it, which is what a call arriving mid-sweep really is.
-  assert.equal((await callTool('fixture-stubborn__ping', {})).text, 'pong');
-  const closingPid = (await idleRow('fixture-stubborn')).pid;
+    {
+      name: 'the next call spawns a fresh child through the unchanged lazy path',
+      run: async (ctx) => {
+        const result = await callTool('fixture-idle__ping', {});
+        ctx.expect(result.isError, result.text).toBe(false);
+        ctx.expect(result.text).toBe('pong');
 
-  // A tick later the sweep has started closing it, with seconds of close left
-  // to run.
-  await new Promise((resolve) => setTimeout(resolve, SWEEP_MS + 500));
-  assert.ok(alive(closingPid), `the close of ${closingPid} was already over`);
-  assert.equal((await idleRow('fixture-stubborn')).spawned, false, 'the slot is emptied when the close STARTS');
+        const row = await idleRow();
+        ctx.expect(row.spawned).toBe(true);
+        ctx.expect(row.pid, 'a NEW child answered the call').not.toBe(firstPid);
+        ctx.expect(alive(row.pid)).toBeTruthy();
+      },
+    },
 
-  const result = await callTool('fixture-stubborn__ping', {});
+    {
+      name: 'a call landing while a close runs is served by a fresh child',
+      run: async (ctx) => {
+        // This fixture only dies on SIGKILL, so its close walks the SDK's whole
+        // escalation and runs for ~4s. That is the window: long enough to fire a
+        // call INTO it, which is what a call arriving mid-sweep really is.
+        ctx.expect((await callTool('fixture-stubborn__ping', {})).text).toBe('pong');
+        const closingPid = (await idleRow('fixture-stubborn')).pid;
 
-  // Against a client that was still closing, this call used to fail outright:
-  // one error handed to the session for a close it never asked about.
-  assert.equal(result.isError, false, result.text);
-  assert.equal(result.text, 'pong');
-  assert.notEqual((await idleRow('fixture-stubborn')).pid, closingPid, 'a NEW child served it');
-});
+        // A tick later the sweep has started closing it, with seconds of close left
+        // to run.
+        await new Promise((resolve) => setTimeout(resolve, SWEEP_MS + 500));
+        ctx.expect(alive(closingPid), `the close of ${closingPid} was already over`).toBeTruthy();
+        ctx.expect((await idleRow('fixture-stubborn')).spawned, 'the slot is emptied when the close STARTS').toBe(false);
 
-test('a call in flight is never closed under it', async () => {
-  assert.equal((await callTool('fixture-idle__ping', {})).text, 'pong');
-  const pid = (await idleRow()).pid;
+        const result = await callTool('fixture-stubborn__ping', {});
 
-  // Longer than the sweep cadence, so a sweep RUNS while the call is in
-  // flight: by the clock alone this child is long past the limit, and only the
-  // in-flight counter stands between it and a kill mid-answer.
-  const result = await callTool('fixture-idle__sleep', { ms: SWEEP_MS + 500 });
+        // Against a client that was still closing, this call used to fail outright:
+        // one error handed to the session for a close it never asked about.
+        ctx.expect(result.isError, result.text).toBe(false);
+        ctx.expect(result.text).toBe('pong');
+        ctx.expect((await idleRow('fixture-stubborn')).pid, 'a NEW child served it').not.toBe(closingPid);
+      },
+    },
 
-  assert.equal(result.isError, false, result.text);
-  assert.equal(result.text, `slept ${SWEEP_MS + 500}ms`);
-  assert.ok(alive(pid), 'the child that served the call was killed under it');
-  assert.equal((await idleRow()).pid, pid, 'the same child answered, not a respawn');
+    {
+      name: 'a call in flight is never closed under it',
+      run: async (ctx) => {
+        ctx.expect((await callTool('fixture-idle__ping', {})).text).toBe('pong');
+        const pid = (await idleRow()).pid;
+
+        // Longer than the sweep cadence, so a sweep RUNS while the call is in
+        // flight: by the clock alone this child is long past the limit, and only the
+        // in-flight counter stands between it and a kill mid-answer.
+        const result = await callTool('fixture-idle__sleep', { ms: SWEEP_MS + 500 });
+
+        ctx.expect(result.isError, result.text).toBe(false);
+        ctx.expect(result.text).toBe(`slept ${SWEEP_MS + 500}ms`);
+        ctx.expect(alive(pid), 'the child that served the call was killed under it').toBeTruthy();
+        ctx.expect((await idleRow()).pid, 'the same child answered, not a respawn').toBe(pid);
+      },
+    },
+  ],
 });

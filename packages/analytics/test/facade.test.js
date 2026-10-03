@@ -2,8 +2,7 @@
  * Facade tests — the one consumer call: consent, resolution, transport,
  * the dev log, and the unknown-name contract.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const analytics = require('../src/index.js');
 
@@ -44,212 +43,268 @@ function captureLog(run) {
   return lines;
 }
 
-test('a mapped event reaches every provider through the transport', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+module.exports = defineCases({
+  type: 'group',
+  description: 'facade',
+  tests: [
+    {
+      name: 'a mapped event reaches every provider through the transport',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  const result = analytics.event('sign_up', { method: 'email' });
+        const result = analytics.event('sign_up', { method: 'email' });
 
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['ga4', 'meta', 'tiktok']);
-  assert.deepEqual(transport.sent.map((d) => d.name), ['sign_up', 'CompleteRegistration', 'CompleteRegistration']);
-  assert.deepEqual(result.results.map((r) => r.outcome), ['sent', 'sent', 'sent']);
-});
+        ctx.expect(transport.sent.map((d) => d.provider)).toEqual(['ga4', 'meta', 'tiktok']);
+        ctx.expect(transport.sent.map((d) => d.name)).toEqual(['sign_up', 'CompleteRegistration', 'CompleteRegistration']);
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['sent', 'sent', 'sent']);
+      },
+    },
 
-test('an unmapped provider is skipped, never a throw', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+    {
+      name: 'an unmapped provider is skipped, never a throw',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  const result = analytics.event('vert_click', { vert_id: 'omega-promo', vert_lane: 'promo' });
+        const result = analytics.event('vert_click', { vert_id: 'omega-promo', vert_lane: 'promo' });
 
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['ga4'], 'only the mapped provider is executed');
-  assert.deepEqual(result.results.map((r) => r.outcome), ['sent', 'skipped (no mapping)', 'skipped (no mapping)']);
-});
+        ctx.expect(transport.sent.map((d) => d.provider), 'only the mapped provider is executed').toEqual(['ga4']);
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['sent', 'skipped (no mapping)', 'skipped (no mapping)']);
+      },
+    },
 
-test('a zero-provider event fires nothing and dev-logs all-skipped', () => {
-  const transport = recordingTransport();
-  reset({ transport, environment: 'development' });
+    {
+      name: 'a zero-provider event fires nothing and dev-logs all-skipped',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport, environment: 'development' });
 
-  let result;
-  const lines = captureLog(() => {
-    result = analytics.event('logout');
-  });
+        let result;
+        const lines = captureLog(() => {
+          result = analytics.event('logout');
+        });
 
-  assert.deepEqual(transport.sent, [], 'logout reaches no provider');
-  assert.deepEqual(result.results.map((r) => r.outcome), ['skipped (no mapping)', 'skipped (no mapping)', 'skipped (no mapping)']);
-  assert.deepEqual(lines, ['[@omega.js/analytics:events] logout → ga4 skipped (no mapping), meta skipped (no mapping), tiktok skipped (no mapping)']);
-});
+        ctx.expect(transport.sent, 'logout reaches no provider').toEqual([]);
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['skipped (no mapping)', 'skipped (no mapping)', 'skipped (no mapping)']);
+        ctx.expect(lines).toEqual(['[@omega.js/analytics:events] logout → ga4 skipped (no mapping), meta skipped (no mapping), tiktok skipped (no mapping)']);
+      },
+    },
 
-test('the dev log prints one tagged line per fire', () => {
-  const transport = recordingTransport();
-  reset({ transport, environment: 'development' });
+    {
+      name: 'the dev log prints one tagged line per fire',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport, environment: 'development' });
 
-  const lines = captureLog(() => analytics.event('sign_up', { method: 'email' }));
+        const lines = captureLog(() => analytics.event('sign_up', { method: 'email' }));
 
-  assert.deepEqual(lines, ['[@omega.js/analytics:events] sign_up → ga4 sent, meta sent, tiktok sent']);
-});
+        ctx.expect(lines).toEqual(['[@omega.js/analytics:events] sign_up → ga4 sent, meta sent, tiktok sent']);
+      },
+    },
 
-test('production prints nothing per fire', () => {
-  reset({ transport: recordingTransport() });
+    {
+      name: 'production prints nothing per fire',
+      run: (ctx) => {
+        reset({ transport: recordingTransport() });
 
-  const lines = captureLog(() => analytics.event('sign_up', { method: 'email' }));
+        const lines = captureLog(() => analytics.event('sign_up', { method: 'email' }));
 
-  assert.deepEqual(lines, []);
-});
+        ctx.expect(lines).toEqual([]);
+      },
+    },
 
-test('an unknown event name throws in development', () => {
-  reset({ transport: recordingTransport(), environment: 'development' });
+    {
+      name: 'an unknown event name throws in development',
+      run: (ctx) => {
+        reset({ transport: recordingTransport(), environment: 'development' });
 
-  assert.throws(() => analytics.event('sign_upp', { method: 'email' }), /Unknown analytics event "sign_upp"/);
-});
+        ctx.expect(() => analytics.event('sign_upp', { method: 'email' })).toThrow(/Unknown analytics event "sign_upp"/);
+      },
+    },
 
-test('an unknown event name is logged and skipped in production', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+    {
+      name: 'an unknown event name is logged and skipped in production',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  const warnings = [];
-  const real = console.warn;
-  console.warn = (...args) => warnings.push(args.join(' '));
-  let result;
-  try {
-    result = analytics.event('sign_upp', { method: 'email' });
-  } finally {
-    console.warn = real;
-  }
+        const warnings = [];
+        const real = console.warn;
+        console.warn = (...args) => warnings.push(args.join(' '));
+        let result;
+        try {
+          result = analytics.event('sign_upp', { method: 'email' });
+        } finally {
+          console.warn = real;
+        }
 
-  assert.deepEqual(result.results, [], 'nothing resolves');
-  assert.deepEqual(transport.sent, [], 'nothing is sent');
-  assert.match(warnings[0], /^\[@omega\.js\/analytics:events\] Unknown event "sign_upp"/);
-});
+        ctx.expect(result.results, 'nothing resolves').toEqual([]);
+        ctx.expect(transport.sent, 'nothing is sent').toEqual([]);
+        ctx.expect(warnings[0]).toMatch(/^\[@omega\.js\/analytics:events\] Unknown event "sign_upp"/);
+      },
+    },
 
-test('marketing denied blocks meta and tiktok; ga4 still fires', () => {
-  const transport = recordingTransport();
-  reset({
-    transport,
-    consent: analytics.createConsentGate(() => ({ analytics: true, marketing: false })),
-  });
+    {
+      name: 'marketing denied blocks meta and tiktok; ga4 still fires',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({
+          transport,
+          consent: analytics.createConsentGate(() => ({ analytics: true, marketing: false })),
+        });
 
-  const result = analytics.event('purchase', { value: 10, currency: 'USD', items: [{ item_id: 'pro' }] });
+        const result = analytics.event('purchase', { value: 10, currency: 'USD', items: [{ item_id: 'pro' }] });
 
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['ga4']);
-  assert.deepEqual(result.results.map((r) => r.outcome), ['sent', 'skipped (consent: marketing)', 'skipped (consent: marketing)']);
-});
+        ctx.expect(transport.sent.map((d) => d.provider)).toEqual(['ga4']);
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['sent', 'skipped (consent: marketing)', 'skipped (consent: marketing)']);
+      },
+    },
 
-test('analytics denied blocks ga4 while the ad platforms still fire', () => {
-  const transport = recordingTransport();
-  reset({
-    transport,
-    consent: analytics.createConsentGate(() => ({ analytics: false, marketing: true })),
-  });
+    {
+      name: 'analytics denied blocks ga4 while the ad platforms still fire',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({
+          transport,
+          consent: analytics.createConsentGate(() => ({ analytics: false, marketing: true })),
+        });
 
-  analytics.event('purchase', { value: 10, currency: 'USD', items: [{ item_id: 'pro' }] });
+        analytics.event('purchase', { value: 10, currency: 'USD', items: [{ item_id: 'pro' }] });
 
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['meta', 'tiktok']);
-});
+        ctx.expect(transport.sent.map((d) => d.provider)).toEqual(['meta', 'tiktok']);
+      },
+    },
 
-test('the consent gate is read live, so a mid-session accept counts', () => {
-  const transport = recordingTransport();
-  let marketing = false;
-  reset({
-    transport,
-    consent: analytics.createConsentGate(() => ({ analytics: true, marketing })),
-  });
+    {
+      name: 'the consent gate is read live, so a mid-session accept counts',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        let marketing = false;
+        reset({
+          transport,
+          consent: analytics.createConsentGate(() => ({ analytics: true, marketing })),
+        });
 
-  analytics.event('sign_up', { method: 'email' });
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['ga4']);
+        analytics.event('sign_up', { method: 'email' });
+        ctx.expect(transport.sent.map((d) => d.provider)).toEqual(['ga4']);
 
-  marketing = true;
-  analytics.event('sign_up', { method: 'email' });
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['ga4', 'ga4', 'meta', 'tiktok']);
-});
+        marketing = true;
+        analytics.event('sign_up', { method: 'email' });
+        ctx.expect(transport.sent.map((d) => d.provider)).toEqual(['ga4', 'ga4', 'meta', 'tiktok']);
+      },
+    },
 
-test('a missing consent category reads as denied', () => {
-  const transport = recordingTransport();
-  reset({ transport, consent: analytics.createConsentGate(() => ({})) });
+    {
+      name: 'a missing consent category reads as denied',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport, consent: analytics.createConsentGate(() => ({})) });
 
-  analytics.event('sign_up', { method: 'email' });
+        analytics.event('sign_up', { method: 'email' });
 
-  assert.deepEqual(transport.sent, [], 'nothing is granted by omission');
-});
+        ctx.expect(transport.sent, 'nothing is granted by omission').toEqual([]);
+      },
+    },
 
-test('with no transport configured the walk still resolves and reports', () => {
-  reset();
+    {
+      name: 'with no transport configured the walk still resolves and reports',
+      run: (ctx) => {
+        reset();
 
-  const result = analytics.event('sign_up', { method: 'email' });
+        const result = analytics.event('sign_up', { method: 'email' });
 
-  assert.deepEqual(result.results.map((r) => r.outcome), ['skipped (no transport)', 'skipped (no transport)', 'skipped (no transport)']);
-  assert.strictEqual(result.results[0].descriptor.name, 'sign_up');
-});
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['skipped (no transport)', 'skipped (no transport)', 'skipped (no transport)']);
+        ctx.expect(result.results[0].descriptor.name).toBe('sign_up');
+      },
+    },
 
-test('a transport that could not deliver reports blocked, never throws', () => {
-  reset({ transport: recordingTransport(false), environment: 'development' });
+    {
+      name: 'a transport that could not deliver reports blocked, never throws',
+      run: (ctx) => {
+        reset({ transport: recordingTransport(false), environment: 'development' });
 
-  let result;
-  const lines = captureLog(() => {
-    result = analytics.event('page_view', { page_path: '/' });
-  });
+        let result;
+        const lines = captureLog(() => {
+          result = analytics.event('page_view', { page_path: '/' });
+        });
 
-  assert.strictEqual(result.results[0].outcome, 'blocked (no global)');
-  assert.deepEqual(lines, ['[@omega.js/analytics:events] page_view → ga4 blocked (no global), meta blocked (no global), tiktok blocked (no global)']);
-});
+        ctx.expect(result.results[0].outcome).toBe('blocked (no global)');
+        ctx.expect(lines).toEqual(['[@omega.js/analytics:events] page_view → ga4 blocked (no global), meta blocked (no global), tiktok blocked (no global)']);
+      },
+    },
 
-// ─── The two-half fire (a browser twin of a server event) ───
+    // ─── The two-half fire (a browser twin of a server event) ───
 
-test('an eventId rides onto every descriptor the fire resolves', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+    {
+      name: 'an eventId rides onto every descriptor the fire resolves',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  analytics.event('sign_up', { method: 'email' }, { eventId: 'sign_up.uid-9' });
+        analytics.event('sign_up', { method: 'email' }, { eventId: 'sign_up.uid-9' });
 
-  assert.deepEqual(
-    transport.sent.map((d) => d.eventId),
-    ['sign_up.uid-9', 'sign_up.uid-9', 'sign_up.uid-9'],
-    'both halves of a conversion can name the same id',
-  );
-});
+        ctx.expect(transport.sent.map((d) => d.eventId), 'both halves of a conversion can name the same id').toEqual(['sign_up.uid-9', 'sign_up.uid-9', 'sign_up.uid-9']);
+      },
+    },
 
-test('without an eventId no descriptor carries one', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+    {
+      name: 'without an eventId no descriptor carries one',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  analytics.event('sign_up', { method: 'email' });
+        analytics.event('sign_up', { method: 'email' });
 
-  assert.deepEqual(transport.sent.map((d) => d.eventId), [undefined, undefined, undefined]);
-});
+        ctx.expect(transport.sent.map((d) => d.eventId)).toEqual([undefined, undefined, undefined]);
+      },
+    },
 
-test('a providers restriction fires only the half this side owns', () => {
-  const transport = recordingTransport();
-  reset({ transport });
+    {
+      name: 'a providers restriction fires only the half this side owns',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({ transport });
 
-  // A half naming the providers it owns. (The live purchase pixel names all
-  // three — GA4 dedupes on transaction_id, [#656] — so this is the mechanism
-  // under test, not that page's policy.)
-  const result = analytics.event(
-    'purchase',
-    { transaction_id: 'ORD-1', value: 10, currency: 'USD', items: [{ item_id: 'pro' }] },
-    { providers: ['meta', 'tiktok'], eventId: 'purchase.ORD-1' },
-  );
+        // A half naming the providers it owns. (The live purchase pixel names all
+        // three — GA4 dedupes on transaction_id, [#656] — so this is the mechanism
+        // under test, not that page's policy.)
+        const result = analytics.event(
+          'purchase',
+          { transaction_id: 'ORD-1', value: 10, currency: 'USD', items: [{ item_id: 'pro' }] },
+          { providers: ['meta', 'tiktok'], eventId: 'purchase.ORD-1' },
+        );
 
-  assert.deepEqual(transport.sent.map((d) => d.provider), ['meta', 'tiktok'], 'GA4 is never asked');
-  assert.deepEqual(result.results.map((r) => r.outcome), ['skipped (not selected)', 'sent', 'sent']);
-  assert.deepEqual(transport.sent.map((d) => d.eventId), ['purchase.ORD-1', 'purchase.ORD-1']);
-});
+        ctx.expect(transport.sent.map((d) => d.provider), 'GA4 is never asked').toEqual(['meta', 'tiktok']);
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['skipped (not selected)', 'sent', 'sent']);
+        ctx.expect(transport.sent.map((d) => d.eventId)).toEqual(['purchase.ORD-1', 'purchase.ORD-1']);
+      },
+    },
 
-test('selection comes before consent — an unselected provider is never asked', () => {
-  const transport = recordingTransport();
-  reset({
-    transport,
-    consent: analytics.createConsentGate(() => ({ analytics: true, marketing: false })),
-  });
+    {
+      name: 'selection comes before consent — an unselected provider is never asked',
+      run: (ctx) => {
+        const transport = recordingTransport();
+        reset({
+          transport,
+          consent: analytics.createConsentGate(() => ({ analytics: true, marketing: false })),
+        });
 
-  const result = analytics.event('purchase', { value: 10 }, { providers: ['ga4'] });
+        const result = analytics.event('purchase', { value: 10 }, { providers: ['ga4'] });
 
-  assert.deepEqual(result.results.map((r) => r.outcome), ['sent', 'skipped (not selected)', 'skipped (not selected)']);
-});
+        ctx.expect(result.results.map((r) => r.outcome)).toEqual(['sent', 'skipped (not selected)', 'skipped (not selected)']);
+      },
+    },
 
-test('the pure pieces are exported for hosts that skip the facade', () => {
-  assert.ok(analytics.catalog.purchase, 'the catalog');
-  assert.ok(analytics.adapters.ga4 && analytics.adapters.meta && analytics.adapters.tiktok, 'the adapters');
-  assert.strictEqual(typeof analytics.core.deriveNamespace, 'function', 'the moved core');
-  assert.strictEqual(typeof analytics.transports.browser.send, 'function', 'the browser transport');
-  assert.deepEqual(analytics.CONSENT_CATEGORIES, ['analytics', 'marketing']);
+    {
+      name: 'the pure pieces are exported for hosts that skip the facade',
+      run: (ctx) => {
+        ctx.expect(analytics.catalog.purchase, 'the catalog').toBeTruthy();
+        ctx.expect(analytics.adapters.ga4 && analytics.adapters.meta && analytics.adapters.tiktok, 'the adapters').toBeTruthy();
+        ctx.expect(typeof analytics.core.deriveNamespace, 'the moved core').toBe('function');
+        ctx.expect(typeof analytics.transports.browser.send, 'the browser transport').toBe('function');
+        ctx.expect(analytics.CONSENT_CATEGORIES).toEqual(['analytics', 'marketing']);
+      },
+    },
+  ],
 });

@@ -10,8 +10,7 @@
  * post-automation re-verify pinned to what the API reports), the
  * min-diff webhook patch, and the dry-run zero-mutation guarantee.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const net = require('node:net');
 const WebSocket = require('ws');
 
@@ -123,151 +122,6 @@ function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKe
   });
 }
 
-// ─── Setup / skip semantics ──────────────────────────────────────────────────
-
-test('newsletter: skips without BEEHIIV_API_KEY in .env', async () => {
-  const result = await runService(brandConfig()); // no injected api → the creds check applies
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /BEEHIIV_API_KEY/);
-});
-
-test('newsletter: marketing.newsletter.enabled = false skips the service', async () => {
-  const result = await runService(brandConfig({ newsletter: { enabled: false } }), { beehiiv: fakeBeehiiv() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /marketing\.newsletter\.enabled/);
-});
-
-test('newsletter: a different newsletter provider skips the service', async () => {
-  const result = await runService(brandConfig({ newsletter: { providers: { other: {} } } }), { beehiiv: fakeBeehiiv() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /marketing\.newsletter\.providers\.other/);
-});
-
-test('newsletter: an empty providers block means none chosen — the service skips (#425)', async () => {
-  const result = await runService(brandConfig({ newsletter: { providers: {} } }), { beehiiv: fakeBeehiiv() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no marketing\.newsletter\.providers entry/);
-});
-
-test('newsletter: skips without brand.url', async () => {
-  const result = await runService(brandConfig({ url: '' }), { beehiiv: fakeBeehiiv() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /brand\.url/);
-});
-
-test('newsletter: the newsletter defaults carry no company values', () => {
-  assert.equal(DEFAULTS.marketing.newsletter.providers.beehiiv.publicationId, null);
-});
-
-// ─── Converged no-op ─────────────────────────────────────────────────────────
-
-test('newsletter: fully converged brand is a zero-mutation no-op across all 4 operations', async () => {
-  const api = fakeBeehiiv(convergedResponses());
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.mutations(), []);
-  assert.equal(result.state.publicationId, PUB_ID);
-  assert.equal(result.output.customFields.created, 0);
-  assert.deepEqual(result.output.segments.missing, []);
-  assert.equal(result.output.webhook.url, 'converged');
-});
-
-// ─── publication ─────────────────────────────────────────────────────────────
-
-test('newsletter: an inaccessible configured publication warns and gates the downstream operations', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    getPublication: () => null,
-  });
-
-  const result = await runService(brandConfig({ publicationId: 'pub_gone' }), { beehiiv: api });
-
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.publication.accessible, false);
-  // No publication resolved → fields/segments/webhook have nothing to work on
-  assert.equal(api.callsTo('getCustomFields').length, 0);
-  assert.equal(api.callsTo('getSegments').length, 0);
-  assert.equal(api.callsTo('listWebhooks').length, 0);
-});
-
-test('newsletter: no configured id auto-matches a publication by brand name into config', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    listPublications: [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }],
-  });
-
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const result = await runService(brandConfig(), { beehiiv: api, brandRoot });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.state.publicationId, PUB_ID);
-  assert.equal(api.callsTo('getPublication').length, 0); // nothing known to verify
-  assert.deepEqual(api.mutations(), []);
-
-  const written = readConfigSource(brandRoot);
-  assert.ok(written.includes(`publicationId: "${PUB_ID}",`));
-  assert.ok(written.includes('enabled: true, // the resolved id lands next to this'));
-});
-
-test('newsletter: no matching publication warns with the values to copy into the dashboard', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    listPublications: [{ id: 'pub_other', name: 'Unrelated' }],
-  });
-
-  const result = await runService(brandConfig(), { beehiiv: api });
-
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.publication.missing, true);
-  assert.equal(result.output.publication.suggestedName, BRAND_NAME);
-});
-
-// ─── custom-fields ───────────────────────────────────────────────────────────
-
-test('newsletter: missing and kind-mismatched fields are created/recreated, diffed by display', async () => {
-  const converged = convergedResponses().getCustomFields;
-  const initial = converged.slice(1); // first field missing
-  initial[0] = { ...initial[0], kind: initial[0].kind === 'string' ? 'integer' : 'string' }; // second mismatched
-
-  let reads = 0;
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    getCustomFields: () => (reads += 1) === 1 ? structuredClone(initial) : structuredClone(converged),
-    deleteCustomField: null,
-    createCustomField: { id: 'bf_new' },
-  });
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.callsTo('deleteCustomField')[0].args, [PUB_ID, initial[0].id]);
-  assert.equal(api.callsTo('createCustomField').length, 2);
-  // Exact creation payload: (publicationId, name, display, kind)
-  const missingField = BEEHIIV_FIELDS[0];
-  assert.deepEqual(api.callsTo('createCustomField')[0].args, [PUB_ID, missingField.name, missingField.display, KIND_MAP[missingField.type]]);
-  assert.equal(result.output.customFields.created, 1);
-  assert.equal(result.output.customFields.recreated, 1);
-});
-
-// ─── segments (verify-only — no create API) ──────────────────────────────────
-
-test('newsletter: missing segments warn with instructions and NEVER mutate', async () => {
-  const list = convergedResponses().getSegments;
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    getSegments: list.slice(2), // first two missing
-  });
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.segments.missing, [BEEHIIV_SEGMENTS[0].name, BEEHIIV_SEGMENTS[1].name]);
-  // The Beehiiv API has no segment writes — nothing to call even when drifted
-  assert.deepEqual(api.mutations(), []);
-});
-
 /** Ephemeral port for the automation server (parallel-safe). */
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -310,211 +164,428 @@ function startFakeExtension(port) {
   return { commands, stop: () => { stopped = true; ws?.terminate(); } };
 }
 
-test('newsletter: interactive Skip choice leaves the segments warned', async () => {
-  const list = convergedResponses().getSegments;
-  const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) });
-
-  const tty = openTtyPrompt();
-  try {
-    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-    await tty.answer('Create missing segments?', '[B[B\r'); // ↓↓ to "Skip"
-    const result = await running;
-
-    assert.equal(result.status, 'warned');
-    assert.deepEqual(result.output.segments.missing, [BEEHIIV_SEGMENTS[0].name]);
-    assert.deepEqual(api.mutations(), []);
-  } finally {
-    tty.close();
-  }
-});
-
-test('newsletter: extension automation creates the missing segment and the re-verify confirms it', async () => {
-  const full = convergedResponses().getSegments;
-  let segmentsCalls = 0;
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    // First list: one missing. After the automation "created" it in the
-    // dashboard, Beehiiv reports the full set.
-    getSegments: () => (segmentsCalls++ === 0 ? full.slice(1) : full),
-  });
-
-  const port = await freePort();
-  process.env.OMEGA_EXTENSION_PORT = String(port);
-  const ext = startFakeExtension(port);
-
-  setBrowserOpener(async () => true); // the Enter gate always opens — never a real browser in tests
-  const tty = openTtyPrompt();
-  try {
-    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-    await tty.answer('Create missing segments?', '\r');   // default: Automate via extension
-    await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
-    await tty.answer('(enter)=done', '\r');               // publication selected — start the automation
-    const result = await running;
-
-    assert.equal(result.status, 'success');
-    assert.deepEqual(result.output.segments.missing, []);
-    assert.deepEqual(result.output.segments.created, [BEEHIIV_SEGMENTS[0].name]);
-
-    // The automation drove the real protocol: navigation to the segment
-    // builder, the trusted-typed name, and the save click
-    assert.equal(ext.commands[0].command, 'navigate');
-    assert.equal(ext.commands[0].params.url, 'https://app.beehiiv.com/segments/new');
-    const typed = ext.commands.find((c) => c.command === 'type');
-    assert.equal(typed.params.text, BEEHIIV_SEGMENTS[0].name);
-    assert.ok(ext.commands.some((c) => c.command === 'evaluate' && c.params.expression.includes('save segment')));
-
-    // Still zero Beehiiv API writes — creation happened in the browser
-    assert.deepEqual(api.mutations(), []);
-  } finally {
-    tty.close();
-    ext.stop();
-    setBrowserOpener(null);
-    delete process.env.OMEGA_EXTENSION_PORT;
-  }
-});
-
-test('newsletter: manual choice re-verifies — still-missing segments stay warned', async () => {
-  const list = convergedResponses().getSegments;
-  const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) }); // never created
-
-  setBrowserOpener(async () => true);
-  const tty = openTtyPrompt();
-  try {
-    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-    await tty.answer('Create missing segments?', '[B\r'); // ↓ to "Open dashboard (manual)"
-    await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
-    await tty.answer('(enter)=done', '\r');               // done (nothing actually created)
-    const result = await running;
-
-    assert.equal(result.status, 'warned');
-    assert.deepEqual(result.output.segments.missing, [BEEHIIV_SEGMENTS[0].name]);
-    assert.equal(result.output.segments.created, undefined);
-    assert.equal(api.callsTo('getSegments').length, 2); // verified again after the manual window
-  } finally {
-    tty.close();
-    setBrowserOpener(null);
-  }
-});
-
-// ─── webhook ─────────────────────────────────────────────────────────────────
-
-test('newsletter: webhook drift is patched with the minimum diff (matched by managed description)', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    listWebhooks: [{ id: 'wh_1', url: 'https://api.old-parent.test/hook', event_types: ['subscription.unsubscribed'], description: WEBHOOK_DESCRIPTION, enabled: true }],
-    updateWebhook: {},
-  });
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.callsTo('updateWebhook')[0].args, [PUB_ID, 'wh_1', { url: WEBHOOK_URL, event_types: EVENT_TYPES }]);
-});
-
-test('newsletter: no webhook yet → created with the exact consent-pipeline payload', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    listWebhooks: [],
-    createWebhook: { data: { id: 'wh_new' } },
-  });
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: 'https://parent-brand.test', images: {} } }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.deepEqual(api.callsTo('createWebhook')[0].args, [PUB_ID, {
-    url: `https://api.parent-brand.test/omega/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`,
-    event_types: EVENT_TYPES,
-    description: WEBHOOK_DESCRIPTION,
-  }]);
-  assert.equal(result.output.webhook.created, true);
-});
-
-test('newsletter: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook is managed, never skipped (#635)', async () => {
-  const api = fakeBeehiiv({ ...convergedResponses(), updateWebhook: {} });
-
-  await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
-
-  // OMEGA mints its own key, so the run never steps aside for it
-  const minted = process.env.OMEGA_WEBHOOK_KEY;
-  assert.match(minted, /^[A-Za-z0-9_-]{43}$/);
-  // ...and the freshly minted key is what the forwarder URL is built from
-  assert.equal(api.callsTo('listWebhooks').length, 1);
-  assert.deepEqual(api.callsTo('updateWebhook')[0].args, [
-    PUB_ID, 'wh_1', { url: `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=beehiiv&key=${minted}` },
-  ]);
-});
-
-test('newsletter: a company that resolved no url → nothing to point the webhook at', async () => {
-  const api = fakeBeehiiv(convergedResponses());
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: null, images: {} } }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.equal(api.callsTo('listWebhooks').length, 0);
-  assert.equal(result.output.webhook, undefined);
-});
-
-test('newsletter: company.webhooks = false is the deliberate account opt-out (#677)', async () => {
-  const api = fakeBeehiiv(convergedResponses());
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID, webhooks: false }), { beehiiv: api });
-
-  assert.equal(result.status, 'success');
-  assert.equal(api.callsTo('listWebhooks').length, 0);
-  assert.equal(result.output.webhook, undefined);
-});
-
-// ─── Dry-run ─────────────────────────────────────────────────────────────────
-
-test('newsletter: dry-run on a fully drifted brand performs zero mutations', async () => {
-  const api = fakeBeehiiv({
-    ...convergedResponses(),
-    getCustomFields: [],
-    getSegments: [],
-    listWebhooks: [],
-  });
-
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, options: { dryRun: true } });
-
-  assert.deepEqual(api.mutations(), []);
-  assert.equal(result.output.customFields.planned.create.length, BEEHIIV_FIELDS.length);
-  assert.equal(result.output.segments.missing.length, BEEHIIV_SEGMENTS.length); // verify-only op: dry-run ≡ normal run
-  assert.deepEqual(result.output.webhook.planned, ['create']);
-});
-
 // ─── Interactive create-publication flow (browser open + poll) ────────────────
 
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 
-test('publication: interactive run opens the create page and polls until the new publication auto-matches', async () => {
-  const api = fakeBeehiiv(convergedResponses());
-  // First list: nothing matches; after the user "creates" it in the browser,
-  // the poll's re-list finds it
-  let listCalls = 0;
-  api.listPublications = async () => {
-    api.calls.push({ method: 'listPublications', args: [] });
-    listCalls++;
-    return listCalls === 1
-      ? [{ id: 'pub_other', name: 'Unrelated' }]
-      : [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }];
-  };
-  const opened = [];
-  setBrowserOpener(async (url) => { opened.push(url); return true; });
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-  const tty = openTtyPrompt();
+module.exports = defineCases({
+  type: 'group',
+  description: 'newsletter',
+  tests: [
+    // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-  try {
-    const run = runService(brandConfig(), { beehiiv: api, brandRoot });
-    await tty.answer('Press Enter to open the Beehiiv workspace settings', '\r');
-    const result = await run;
+    {
+      name: 'newsletter: skips without BEEHIIV_API_KEY in .env',
+      run: async (ctx) => {
+        const result = await runService(brandConfig()); // no injected api → the creds check applies
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/BEEHIIV_API_KEY/);
+      },
+    },
 
-    assert.equal(result.state.publicationId, PUB_ID);
-    assert.deepEqual(opened, ['https://app.beehiiv.com/settings/workspace/overview?create_publication=true']);
-    assert.equal(listCalls, 2); // initial match attempt + one poll check
-    const written = readConfigSource(brandRoot);
-    assert.ok(written.includes(`publicationId: "${PUB_ID}",`));
-  } finally {
-    tty.close();
-    setBrowserOpener(null);
-  }
+    {
+      name: 'newsletter: marketing.newsletter.enabled = false skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ newsletter: { enabled: false } }), { beehiiv: fakeBeehiiv() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/marketing\.newsletter\.enabled/);
+      },
+    },
+
+    {
+      name: 'newsletter: a different newsletter provider skips the service',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ newsletter: { providers: { other: {} } } }), { beehiiv: fakeBeehiiv() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/marketing\.newsletter\.providers\.other/);
+      },
+    },
+
+    {
+      name: 'newsletter: an empty providers block means none chosen — the service skips (#425)',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ newsletter: { providers: {} } }), { beehiiv: fakeBeehiiv() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/no marketing\.newsletter\.providers entry/);
+      },
+    },
+
+    {
+      name: 'newsletter: skips without brand.url',
+      run: async (ctx) => {
+        const result = await runService(brandConfig({ url: '' }), { beehiiv: fakeBeehiiv() });
+        ctx.expect(result.status).toBe('skipped');
+        ctx.expect(result.reason).toMatch(/brand\.url/);
+      },
+    },
+
+    {
+      name: 'newsletter: the newsletter defaults carry no company values',
+      run: (ctx) => {
+        ctx.expect(DEFAULTS.marketing.newsletter.providers.beehiiv.publicationId).toBe(null);
+      },
+    },
+
+    // ─── Converged no-op ─────────────────────────────────────────────────────────
+
+    {
+      name: 'newsletter: fully converged brand is a zero-mutation no-op across all 4 operations',
+      run: async (ctx) => {
+        const api = fakeBeehiiv(convergedResponses());
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(result.state.publicationId).toBe(PUB_ID);
+        ctx.expect(result.output.customFields.created).toBe(0);
+        ctx.expect(result.output.segments.missing).toEqual([]);
+        ctx.expect(result.output.webhook.url).toBe('converged');
+      },
+    },
+
+    // ─── publication ─────────────────────────────────────────────────────────────
+
+    {
+      name: 'newsletter: an inaccessible configured publication warns and gates the downstream operations',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          getPublication: () => null,
+        });
+
+        const result = await runService(brandConfig({ publicationId: 'pub_gone' }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.publication.accessible).toBe(false);
+        // No publication resolved → fields/segments/webhook have nothing to work on
+        ctx.expect(api.callsTo('getCustomFields').length).toBe(0);
+        ctx.expect(api.callsTo('getSegments').length).toBe(0);
+        ctx.expect(api.callsTo('listWebhooks').length).toBe(0);
+      },
+    },
+
+    {
+      name: 'newsletter: no configured id auto-matches a publication by brand name into config',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          listPublications: [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }],
+        });
+
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const result = await runService(brandConfig(), { beehiiv: api, brandRoot });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(result.state.publicationId).toBe(PUB_ID);
+        ctx.expect(api.callsTo('getPublication').length).toBe(0); // nothing known to verify
+        ctx.expect(api.mutations()).toEqual([]);
+
+        const written = readConfigSource(brandRoot);
+        ctx.expect(written.includes(`publicationId: "${PUB_ID}",`)).toBeTruthy();
+        ctx.expect(written.includes('enabled: true, // the resolved id lands next to this')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'newsletter: no matching publication warns with the values to copy into the dashboard',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          listPublications: [{ id: 'pub_other', name: 'Unrelated' }],
+        });
+
+        const result = await runService(brandConfig(), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.publication.missing).toBe(true);
+        ctx.expect(result.output.publication.suggestedName).toBe(BRAND_NAME);
+      },
+    },
+
+    // ─── custom-fields ───────────────────────────────────────────────────────────
+
+    {
+      name: 'newsletter: missing and kind-mismatched fields are created/recreated, diffed by display',
+      run: async (ctx) => {
+        const converged = convergedResponses().getCustomFields;
+        const initial = converged.slice(1); // first field missing
+        initial[0] = { ...initial[0], kind: initial[0].kind === 'string' ? 'integer' : 'string' }; // second mismatched
+
+        let reads = 0;
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          getCustomFields: () => (reads += 1) === 1 ? structuredClone(initial) : structuredClone(converged),
+          deleteCustomField: null,
+          createCustomField: { id: 'bf_new' },
+        });
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.callsTo('deleteCustomField')[0].args).toEqual([PUB_ID, initial[0].id]);
+        ctx.expect(api.callsTo('createCustomField').length).toBe(2);
+        // Exact creation payload: (publicationId, name, display, kind)
+        const missingField = BEEHIIV_FIELDS[0];
+        ctx.expect(api.callsTo('createCustomField')[0].args).toEqual([PUB_ID, missingField.name, missingField.display, KIND_MAP[missingField.type]]);
+        ctx.expect(result.output.customFields.created).toBe(1);
+        ctx.expect(result.output.customFields.recreated).toBe(1);
+      },
+    },
+
+    // ─── segments (verify-only — no create API) ──────────────────────────────────
+
+    {
+      name: 'newsletter: missing segments warn with instructions and NEVER mutate',
+      run: async (ctx) => {
+        const list = convergedResponses().getSegments;
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          getSegments: list.slice(2), // first two missing
+        });
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('warned');
+        ctx.expect(result.output.segments.missing).toEqual([BEEHIIV_SEGMENTS[0].name, BEEHIIV_SEGMENTS[1].name]);
+        // The Beehiiv API has no segment writes — nothing to call even when drifted
+        ctx.expect(api.mutations()).toEqual([]);
+      },
+    },
+
+    {
+      name: 'newsletter: interactive Skip choice leaves the segments warned',
+      run: async (ctx) => {
+        const list = convergedResponses().getSegments;
+        const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) });
+
+        const tty = openTtyPrompt();
+        try {
+          const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+          await tty.answer('Create missing segments?', '[B[B\r'); // ↓↓ to "Skip"
+          const result = await running;
+
+          ctx.expect(result.status).toBe('warned');
+          ctx.expect(result.output.segments.missing).toEqual([BEEHIIV_SEGMENTS[0].name]);
+          ctx.expect(api.mutations()).toEqual([]);
+        } finally {
+          tty.close();
+        }
+      },
+    },
+
+    {
+      name: 'newsletter: extension automation creates the missing segment and the re-verify confirms it',
+      run: async (ctx) => {
+        const full = convergedResponses().getSegments;
+        let segmentsCalls = 0;
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          // First list: one missing. After the automation "created" it in the
+          // dashboard, Beehiiv reports the full set.
+          getSegments: () => (segmentsCalls++ === 0 ? full.slice(1) : full),
+        });
+
+        const port = await freePort();
+        process.env.OMEGA_EXTENSION_PORT = String(port);
+        const ext = startFakeExtension(port);
+
+        setBrowserOpener(async () => true); // the Enter gate always opens — never a real browser in tests
+        const tty = openTtyPrompt();
+        try {
+          const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+          await tty.answer('Create missing segments?', '\r');   // default: Automate via extension
+          await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
+          await tty.answer('(enter)=done', '\r');               // publication selected — start the automation
+          const result = await running;
+
+          ctx.expect(result.status).toBe('success');
+          ctx.expect(result.output.segments.missing).toEqual([]);
+          ctx.expect(result.output.segments.created).toEqual([BEEHIIV_SEGMENTS[0].name]);
+
+          // The automation drove the real protocol: navigation to the segment
+          // builder, the trusted-typed name, and the save click
+          ctx.expect(ext.commands[0].command).toBe('navigate');
+          ctx.expect(ext.commands[0].params.url).toBe('https://app.beehiiv.com/segments/new');
+          const typed = ext.commands.find((c) => c.command === 'type');
+          ctx.expect(typed.params.text).toBe(BEEHIIV_SEGMENTS[0].name);
+          ctx.expect(ext.commands.some((c) => c.command === 'evaluate' && c.params.expression.includes('save segment'))).toBeTruthy();
+
+          // Still zero Beehiiv API writes — creation happened in the browser
+          ctx.expect(api.mutations()).toEqual([]);
+        } finally {
+          tty.close();
+          ext.stop();
+          setBrowserOpener(null);
+          delete process.env.OMEGA_EXTENSION_PORT;
+        }
+      },
+    },
+
+    {
+      name: 'newsletter: manual choice re-verifies — still-missing segments stay warned',
+      run: async (ctx) => {
+        const list = convergedResponses().getSegments;
+        const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) }); // never created
+
+        setBrowserOpener(async () => true);
+        const tty = openTtyPrompt();
+        try {
+          const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+          await tty.answer('Create missing segments?', '[B\r'); // ↓ to "Open dashboard (manual)"
+          await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
+          await tty.answer('(enter)=done', '\r');               // done (nothing actually created)
+          const result = await running;
+
+          ctx.expect(result.status).toBe('warned');
+          ctx.expect(result.output.segments.missing).toEqual([BEEHIIV_SEGMENTS[0].name]);
+          ctx.expect(result.output.segments.created).toBe(undefined);
+          ctx.expect(api.callsTo('getSegments').length).toBe(2); // verified again after the manual window
+        } finally {
+          tty.close();
+          setBrowserOpener(null);
+        }
+      },
+    },
+
+    // ─── webhook ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'newsletter: webhook drift is patched with the minimum diff (matched by managed description)',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          listWebhooks: [{ id: 'wh_1', url: 'https://api.old-parent.test/hook', event_types: ['subscription.unsubscribed'], description: WEBHOOK_DESCRIPTION, enabled: true }],
+          updateWebhook: {},
+        });
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.callsTo('updateWebhook')[0].args).toEqual([PUB_ID, 'wh_1', { url: WEBHOOK_URL, event_types: EVENT_TYPES }]);
+      },
+    },
+
+    {
+      name: 'newsletter: no webhook yet → created with the exact consent-pipeline payload',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          listWebhooks: [],
+          createWebhook: { data: { id: 'wh_new' } },
+        });
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: 'https://parent-brand.test', images: {} } }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.callsTo('createWebhook')[0].args).toEqual([PUB_ID, {
+          url: `https://api.parent-brand.test/omega/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`,
+          event_types: EVENT_TYPES,
+          description: WEBHOOK_DESCRIPTION,
+        }]);
+        ctx.expect(result.output.webhook.created).toBe(true);
+      },
+    },
+
+    {
+      name: 'newsletter: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook is managed, never skipped (#635)',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({ ...convergedResponses(), updateWebhook: {} });
+
+        await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
+
+        // OMEGA mints its own key, so the run never steps aside for it
+        const minted = process.env.OMEGA_WEBHOOK_KEY;
+        ctx.expect(minted).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        // ...and the freshly minted key is what the forwarder URL is built from
+        ctx.expect(api.callsTo('listWebhooks').length).toBe(1);
+        ctx.expect(api.callsTo('updateWebhook')[0].args).toEqual([
+          PUB_ID, 'wh_1', { url: `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=beehiiv&key=${minted}` },
+        ]);
+      },
+    },
+
+    {
+      name: 'newsletter: a company that resolved no url → nothing to point the webhook at',
+      run: async (ctx) => {
+        const api = fakeBeehiiv(convergedResponses());
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: null, images: {} } }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.callsTo('listWebhooks').length).toBe(0);
+        ctx.expect(result.output.webhook).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'newsletter: company.webhooks = false is the deliberate account opt-out (#677)',
+      run: async (ctx) => {
+        const api = fakeBeehiiv(convergedResponses());
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID, webhooks: false }), { beehiiv: api });
+
+        ctx.expect(result.status).toBe('success');
+        ctx.expect(api.callsTo('listWebhooks').length).toBe(0);
+        ctx.expect(result.output.webhook).toBe(undefined);
+      },
+    },
+
+    // ─── Dry-run ─────────────────────────────────────────────────────────────────
+
+    {
+      name: 'newsletter: dry-run on a fully drifted brand performs zero mutations',
+      run: async (ctx) => {
+        const api = fakeBeehiiv({
+          ...convergedResponses(),
+          getCustomFields: [],
+          getSegments: [],
+          listWebhooks: [],
+        });
+
+        const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, options: { dryRun: true } });
+
+        ctx.expect(api.mutations()).toEqual([]);
+        ctx.expect(result.output.customFields.planned.create.length).toBe(BEEHIIV_FIELDS.length);
+        ctx.expect(result.output.segments.missing.length).toBe(BEEHIIV_SEGMENTS.length); // verify-only op: dry-run ≡ normal run
+        ctx.expect(result.output.webhook.planned).toEqual(['create']);
+      },
+    },
+
+    {
+      name: 'publication: interactive run opens the create page and polls until the new publication auto-matches',
+      run: async (ctx) => {
+        const api = fakeBeehiiv(convergedResponses());
+        // First list: nothing matches; after the user "creates" it in the browser,
+        // the poll's re-list finds it
+        let listCalls = 0;
+        api.listPublications = async () => {
+          api.calls.push({ method: 'listPublications', args: [] });
+          listCalls++;
+          return listCalls === 1
+            ? [{ id: 'pub_other', name: 'Unrelated' }]
+            : [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }];
+        };
+        const opened = [];
+        setBrowserOpener(async (url) => { opened.push(url); return true; });
+        const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+        const tty = openTtyPrompt();
+
+        try {
+          const run = runService(brandConfig(), { beehiiv: api, brandRoot });
+          await tty.answer('Press Enter to open the Beehiiv workspace settings', '\r');
+          const result = await run;
+
+          ctx.expect(result.state.publicationId).toBe(PUB_ID);
+          ctx.expect(opened).toEqual(['https://app.beehiiv.com/settings/workspace/overview?create_publication=true']);
+          ctx.expect(listCalls).toBe(2); // initial match attempt + one poll check
+          const written = readConfigSource(brandRoot);
+          ctx.expect(written.includes(`publicationId: "${PUB_ID}",`)).toBeTruthy();
+        } finally {
+          tty.close();
+          setBrowserOpener(null);
+        }
+      },
+    },
+  ],
 });

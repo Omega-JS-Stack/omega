@@ -443,7 +443,7 @@ async function syncMarketingContact(ctx, uid, email) {
   const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldSend) {
-    ctx.log(`signup(): Skipping marketing sync (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
+    ctx.log(`signup(): Skipping marketing sync (OMEGA_ENVIRONMENT=testing, TEST_EXTENDED_MODE not set)`);
     return;
   }
 

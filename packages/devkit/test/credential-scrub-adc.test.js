@@ -8,8 +8,7 @@
  * Real library, stand-in credentials file (made-up values) in a temp HOME.
  * No network: a fixed project id keeps the library off gcloud and the metadata server.
  */
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -72,37 +71,49 @@ function applicationDefault() {
   return new GoogleAuth({ projectId: 'demo-adc' }).getApplicationDefault();
 }
 
-test('with the scrub\'s variable, the auth library rejects and names the missing path', async () => {
-  const fixture = adcFixture();
+module.exports = defineCases({
+  type: 'group',
+  description: 'credential-scrub-adc',
+  tests: [
+    {
+      name: 'with the scrub\'s variable, the auth library rejects and names the missing path',
+      run: async (ctx) => {
+        const fixture = adcFixture();
 
-  try {
-    const scrubbed = scrubCredentialEnv({ ...process.env, HOME: fixture.home }, fixture.homeRoot);
-    const missing = path.join(fixture.homeRoot, 'gcloud', 'application_default_credentials.json');
+        try {
+          const scrubbed = scrubCredentialEnv({ ...process.env, HOME: fixture.home }, fixture.homeRoot);
+          const missing = path.join(fixture.homeRoot, 'gcloud', 'application_default_credentials.json');
 
-    await withProcessEnv(scrubbed, async () => {
-      await assert.rejects(applicationDefault(), (error) => {
-        assert.ok(error.message.includes(missing), `the rejection names ${missing}: ${error.message}`);
-        return true;
-      });
-    });
-  } finally {
-    fixture.cleanup();
-  }
-});
+          await withProcessEnv(scrubbed, async () => {
+            await ctx.expect(applicationDefault()).rejects.toThrow((error) => {
+              ctx.expect(error.message.includes(missing), `the rejection names ${missing}: ${error.message}`).toBeTruthy();
+              return true;
+            });
+          });
+        } finally {
+          fixture.cleanup();
+        }
+      },
+    },
 
-test('without the scrub\'s variable, the auth library loads the stored file under HOME', async () => {
-  const fixture = adcFixture();
+    {
+      name: 'without the scrub\'s variable, the auth library loads the stored file under HOME',
+      run: async (ctx) => {
+        const fixture = adcFixture();
 
-  try {
-    const scrubbed = scrubCredentialEnv({ ...process.env, HOME: fixture.home }, fixture.homeRoot);
-    delete scrubbed.GOOGLE_APPLICATION_CREDENTIALS;
+        try {
+          const scrubbed = scrubCredentialEnv({ ...process.env, HOME: fixture.home }, fixture.homeRoot);
+          delete scrubbed.GOOGLE_APPLICATION_CREDENTIALS;
 
-    await withProcessEnv(scrubbed, async () => {
-      const { credential } = await applicationDefault();
-      assert.ok(credential instanceof UserRefreshClient, 'the stand-in authorized_user file loaded');
-      assert.strictEqual(credential._clientId, STAND_IN.client_id);
-    });
-  } finally {
-    fixture.cleanup();
-  }
+          await withProcessEnv(scrubbed, async () => {
+            const { credential } = await applicationDefault();
+            ctx.expect(credential instanceof UserRefreshClient, 'the stand-in authorized_user file loaded').toBeTruthy();
+            ctx.expect(credential._clientId).toBe(STAND_IN.client_id);
+          });
+        } finally {
+          fixture.cleanup();
+        }
+      },
+    },
+  ],
 });

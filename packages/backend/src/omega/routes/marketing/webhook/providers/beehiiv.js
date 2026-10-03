@@ -184,7 +184,7 @@ async function handleEvent({ omega, ctx, parsed }) {
       ctx.error(`beehiiv webhook: cross-provider sync failed for ${email}:`, e);
     }
   } else {
-    ctx.log('beehiiv webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
+    ctx.log('beehiiv webhook: skipping cross-provider sync (OMEGA_ENVIRONMENT=testing)');
   }
 
   return { handled: true, uid, email, eventType };

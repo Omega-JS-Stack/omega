@@ -8,8 +8,7 @@
  * refusal proves a non-finite path is never written, and the integration
  * case renders the real font that found the bug when it is installed.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const opentype = require('opentype.js');
@@ -26,59 +25,75 @@ const SEMIBOLD_N_SEGMENT = [
 
 const SEMIBOLD_PATH = '/Library/Fonts/SourceSansPro-Semibold.otf';
 
-// ─── Rendering ───────────────────────────────────────────────────────────────
-
-test('svg-logo-generator: float-noise coordinates render clean (opentype yields NaN)', () => {
-  // Red: upstream's own renderer poisons this path
-  const path = new opentype.Path();
-  path.extend(SEMIBOLD_N_SEGMENT);
-  assert.match(path.toPathData(4), /NaN/);
-
-  // Green: ours rounds correctly
-  assert.equal(renderPathData(SEMIBOLD_N_SEGMENT), 'M0 0L18-26.496Z');
-});
-
-test('svg-logo-generator: every command type packs like SVG path data', () => {
-  const rendered = renderPathData([
-    { type: 'M', x: 1.5, y: -2 },
-    { type: 'L', x: 3, y: 4.00001 },
-    { type: 'C', x1: 1, y1: -1, x2: 2, y2: -2, x: 3, y: -3 },
-    { type: 'Q', x1: 0.12345, y1: 5, x: 6, y: 7 },
-    { type: 'Z' },
-  ]);
-
-  assert.equal(rendered, 'M1.5-2L3 4C1-1 2-2 3-3Q0.1235 5 6 7Z');
-});
-
-// ─── The refusal ─────────────────────────────────────────────────────────────
-
-test('svg-logo-generator: a non-finite coordinate is refused, naming the font and the text', () => {
-  const font = {
-    getPath: () => ({
-      commands: [{ type: 'M', x: 0, y: 0 }, { type: 'L', x: NaN, y: 12 }],
-      getBoundingBox: () => ({ x1: 0, y1: 0, x2: 40, y2: 20 }),
-    }),
-  };
-
-  assert.throws(
-    () => generateWordmark('Notifly', font, '/Library/Fonts/Broken-Font.otf'),
-    (error) => /Broken-Font\.otf/.test(error.message) && /Notifly/.test(error.message),
-  );
-});
-
 // ─── The real font ───────────────────────────────────────────────────────────
 
 const semiboldMissing = fs.existsSync(SEMIBOLD_PATH) ? null : `${SEMIBOLD_PATH} is not installed`;
 // `skip` must be ABSENT to run: node's runner reports `skip: null` as SKIP
 const semiboldOptions = semiboldMissing ? { skip: semiboldMissing } : {};
 
-test('svg-logo-generator: the wordmark that found the bug renders clean', semiboldOptions, () => {
-  const loaded = loadFont('SourceSansPro-Semibold', os.tmpdir());
-  assert.ok(loaded, 'the installed font resolves');
+module.exports = defineCases({
+  type: 'group',
+  description: 'svg-logo-generator',
+  tests: [
+    // ─── Rendering ───────────────────────────────────────────────────────────────
 
-  const svg = generateWordmark('Notifly', loaded.font, loaded.fontPath);
+    {
+      name: 'svg-logo-generator: float-noise coordinates render clean (opentype yields NaN)',
+      run: (ctx) => {
+        // Red: upstream's own renderer poisons this path
+        const path = new opentype.Path();
+        path.extend(SEMIBOLD_N_SEGMENT);
+        ctx.expect(path.toPathData(4)).toMatch(/NaN/);
 
-  assert.doesNotMatch(svg, /NaN|Infinity/);
-  const pathData = svg.match(/<path d="([^"]+)"/)[1];
-  assert.ok(pathData.length > 200, `wordmark path is substantial (got ${pathData.length} chars)`);
+        // Green: ours rounds correctly
+        ctx.expect(renderPathData(SEMIBOLD_N_SEGMENT)).toBe('M0 0L18-26.496Z');
+      },
+    },
+
+    {
+      name: 'svg-logo-generator: every command type packs like SVG path data',
+      run: (ctx) => {
+        const rendered = renderPathData([
+          { type: 'M', x: 1.5, y: -2 },
+          { type: 'L', x: 3, y: 4.00001 },
+          { type: 'C', x1: 1, y1: -1, x2: 2, y2: -2, x: 3, y: -3 },
+          { type: 'Q', x1: 0.12345, y1: 5, x: 6, y: 7 },
+          { type: 'Z' },
+        ]);
+
+        ctx.expect(rendered).toBe('M1.5-2L3 4C1-1 2-2 3-3Q0.1235 5 6 7Z');
+      },
+    },
+
+    // ─── The refusal ─────────────────────────────────────────────────────────────
+
+    {
+      name: 'svg-logo-generator: a non-finite coordinate is refused, naming the font and the text',
+      run: (ctx) => {
+        const font = {
+          getPath: () => ({
+            commands: [{ type: 'M', x: 0, y: 0 }, { type: 'L', x: NaN, y: 12 }],
+            getBoundingBox: () => ({ x1: 0, y1: 0, x2: 40, y2: 20 }),
+          }),
+        };
+
+        ctx.expect(() => generateWordmark('Notifly', font, '/Library/Fonts/Broken-Font.otf')).toThrow((error) => /Broken-Font\.otf/.test(error.message) && /Notifly/.test(error.message));
+      },
+    },
+
+    {
+      name: 'svg-logo-generator: the wordmark that found the bug renders clean',
+      ...semiboldOptions,
+      run: (ctx) => {
+        const loaded = loadFont('SourceSansPro-Semibold', os.tmpdir());
+        ctx.expect(loaded, 'the installed font resolves').toBeTruthy();
+
+        const svg = generateWordmark('Notifly', loaded.font, loaded.fontPath);
+
+        ctx.expect(svg).not.toMatch(/NaN|Infinity/);
+        const pathData = svg.match(/<path d="([^"]+)"/)[1];
+        ctx.expect(pathData.length > 200, `wordmark path is substantial (got ${pathData.length} chars)`).toBeTruthy();
+      },
+    },
+  ],
 });

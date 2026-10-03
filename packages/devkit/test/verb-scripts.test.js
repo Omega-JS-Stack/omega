@@ -3,56 +3,75 @@
  * every fan-out verb the framework owns is `"<verb>": "omega <verb>"`, and
  * the framework's declared projectScripts merge over that set.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { VERBS } = require('../src/verbs.js');
 const { verbScripts, projectScripts } = require('../src/verb-scripts.js');
 
 const FRAMEWORKS = ['@omega.js/web', '@omega.js/backend', '@omega.js/desktop', '@omega.js/extension'];
 
-test('verbScripts: every fan-out (`each`) row a framework owns, as its bare `omega <verb>`', () => {
-  for (const framework of FRAMEWORKS) {
-    const expected = VERBS
-      .filter((row) => row.owners.includes(framework) && row.fanout === 'each')
-      .map((row) => row.name);
-    const { start, ...scripts } = verbScripts(framework);
+module.exports = defineCases({
+  type: 'group',
+  description: 'verb-scripts',
+  tests: [
+    {
+      name: 'verbScripts: every fan-out (`each`) row a framework owns, as its bare `omega <verb>`',
+      run: (ctx) => {
+        for (const framework of FRAMEWORKS) {
+          const expected = VERBS
+            .filter((row) => row.owners.includes(framework) && row.fanout === 'each')
+            .map((row) => row.name);
+          const { start, ...scripts } = verbScripts(framework);
 
-    assert.deepEqual(Object.keys(scripts), expected, framework);
-    for (const [verb, command] of Object.entries(scripts)) assert.equal(command, `omega ${verb}`);
-  }
-});
+          ctx.expect(Object.keys(scripts), framework).toEqual(expected);
+          for (const [verb, command] of Object.entries(scripts)) ctx.expect(command).toBe(`omega ${verb}`);
+        }
+      },
+    },
 
-test('verbScripts: the `dev` row derives npm\'s own `start` script on every framework', () => {
-  for (const framework of FRAMEWORKS) {
-    const scripts = verbScripts(framework);
-    assert.equal(scripts.start, 'omega dev', framework);
-    assert.equal(scripts.dev, undefined, `${framework}: dev lands as start, never as its own key`);
-  }
-});
+    {
+      name: 'verbScripts: the `dev` row derives npm\'s own `start` script on every framework',
+      run: (ctx) => {
+        for (const framework of FRAMEWORKS) {
+          const scripts = verbScripts(framework);
+          ctx.expect(scripts.start, framework).toBe('omega dev');
+          ctx.expect(scripts.dev, `${framework}: dev lands as start, never as its own key`).toBe(undefined);
+        }
+      },
+    },
 
-test('verbScripts: a brand-wide or root-run verb is never a target script', () => {
-  const web = verbScripts('@omega.js/web');
-  for (const verb of ['install', 'manage', 'migrate', 'dev', 'help', 'version']) {
-    assert.equal(web[verb], undefined, verb);
-  }
-  assert.deepEqual(['build', 'clean', 'deploy', 'test', 'translate'].map((verb) => web[verb]),
-    ['omega build', 'omega clean', 'omega deploy', 'omega test', 'omega translate']);
-  assert.equal(verbScripts('@omega.js/extension').package, undefined, 'a verb another framework owns never lands');
-});
+    {
+      name: 'verbScripts: a brand-wide or root-run verb is never a target script',
+      run: (ctx) => {
+        const web = verbScripts('@omega.js/web');
+        for (const verb of ['install', 'manage', 'migrate', 'dev', 'help', 'version']) {
+          ctx.expect(web[verb], verb).toBe(undefined);
+        }
+        ctx.expect(['build', 'clean', 'deploy', 'test', 'translate'].map((verb) => web[verb])).toEqual(['omega build', 'omega clean', 'omega deploy', 'omega test', 'omega translate']);
+        ctx.expect(verbScripts('@omega.js/extension').package, 'a verb another framework owns never lands').toBe(undefined);
+      },
+    },
 
-test('verbScripts: a single-target command (`fanout: none`) is never a target script', () => {
-  const desktop = verbScripts('@omega.js/desktop');
-  const backend = verbScripts('@omega.js/backend');
-  for (const verb of ['runner', 'sign-windows', 'logs', 'launch', 'publish']) assert.equal(desktop[verb], undefined, verb);
-  for (const verb of ['cwd', 'logs', 'emulator', 'serve', 'firestore:get']) assert.equal(backend[verb], undefined, verb);
-});
+    {
+      name: 'verbScripts: a single-target command (`fanout: none`) is never a target script',
+      run: (ctx) => {
+        const desktop = verbScripts('@omega.js/desktop');
+        const backend = verbScripts('@omega.js/backend');
+        for (const verb of ['runner', 'sign-windows', 'logs', 'launch', 'publish']) ctx.expect(desktop[verb], verb).toBe(undefined);
+        for (const verb of ['cwd', 'logs', 'emulator', 'serve', 'firestore:get']) ctx.expect(backend[verb], verb).toBe(undefined);
+      },
+    },
 
-test('projectScripts: the framework\'s declared scripts merge over the derived set', () => {
-  const scripts = projectScripts({ name: '@omega.js/web', projectScripts: { gulp: 'gulp', test: 'node --test' } });
+    {
+      name: 'projectScripts: the framework\'s declared scripts merge over the derived set',
+      run: (ctx) => {
+        const scripts = projectScripts({ name: '@omega.js/web', projectScripts: { gulp: 'gulp', test: 'node --test' } });
 
-  assert.equal(scripts.gulp, 'gulp', 'a declared non-verb script lands');
-  assert.equal(scripts.test, 'node --test', 'a declared script wins over the derived one');
-  assert.equal(scripts.build, 'omega build', 'the derived set fills the rest');
-  assert.deepEqual(projectScripts({ name: '@omega.js/web' }), verbScripts('@omega.js/web'), 'no declarations, the derived set alone');
+        ctx.expect(scripts.gulp, 'a declared non-verb script lands').toBe('gulp');
+        ctx.expect(scripts.test, 'a declared script wins over the derived one').toBe('node --test');
+        ctx.expect(scripts.build, 'the derived set fills the rest').toBe('omega build');
+        ctx.expect(projectScripts({ name: '@omega.js/web' }), 'no declarations, the derived set alone').toEqual(verbScripts('@omega.js/web'));
+      },
+    },
+  ],
 });

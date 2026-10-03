@@ -8,8 +8,7 @@
  * always had (explicit env wins, company tree, brand tree, nothing set) plus
  * the two ways a file can be there and unusable.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
@@ -86,103 +85,136 @@ function stage(t, { company = false, config = {} } = {}) {
   return { root, targetDir, brandTree: certsSourceDir(root), companyTree };
 }
 
-test('signing-env: derives CSC_LINK from the BRAND tree when the password opens it', (t) => {
-  const { targetDir, brandTree } = stage(t);
-  jetpack.write(path.join(brandTree, CERT_REL), P12);
+module.exports = defineCases({
+  type: 'group',
+  description: 'signing-env',
+  tests: [
+    {
+      name: 'signing-env: derives CSC_LINK from the BRAND tree when the password opens it',
+      run: (ctx) => {
+        const { targetDir, brandTree } = stage(ctx);
+        jetpack.write(path.join(brandTree, CERT_REL), P12);
 
-  const env = { CSC_KEY_PASSWORD: PASSWORD };
-  const { derived, problems } = deriveSigningEnv({ env, targetDir });
+        const env = { CSC_KEY_PASSWORD: PASSWORD };
+        const { derived, problems } = deriveSigningEnv({ env, targetDir });
 
-  assert.deepEqual(problems, []);
-  assert.deepEqual(derived, [{ key: 'CSC_LINK', value: path.join(brandTree, CERT_REL) }]);
-  assert.equal(env.CSC_LINK, path.join(brandTree, CERT_REL));
-  assert.ok(path.isAbsolute(env.CSC_LINK), 'the derived path is absolute');
-});
+        ctx.expect(problems).toEqual([]);
+        ctx.expect(derived).toEqual([{ key: 'CSC_LINK', value: path.join(brandTree, CERT_REL) }]);
+        ctx.expect(env.CSC_LINK).toBe(path.join(brandTree, CERT_REL));
+        ctx.expect(path.isAbsolute(env.CSC_LINK), 'the derived path is absolute').toBeTruthy();
+      },
+    },
 
-test('signing-env: the COMPANY tree wins over the brand tree', (t) => {
-  const { targetDir, brandTree, companyTree } = stage(t, { company: true });
-  jetpack.write(path.join(brandTree, CERT_REL), P12);
-  jetpack.write(path.join(companyTree, CERT_REL), P12);
+    {
+      name: 'signing-env: the COMPANY tree wins over the brand tree',
+      run: (ctx) => {
+        const { targetDir, brandTree, companyTree } = stage(ctx, { company: true });
+        jetpack.write(path.join(brandTree, CERT_REL), P12);
+        jetpack.write(path.join(companyTree, CERT_REL), P12);
 
-  const env = { CSC_KEY_PASSWORD: PASSWORD };
-  deriveSigningEnv({ env, targetDir });
+        const env = { CSC_KEY_PASSWORD: PASSWORD };
+        deriveSigningEnv({ env, targetDir });
 
-  assert.equal(env.CSC_LINK, path.join(companyTree, CERT_REL));
-});
+        ctx.expect(env.CSC_LINK).toBe(path.join(companyTree, CERT_REL));
+      },
+    },
 
-test('signing-env: an explicit CSC_LINK always wins and is never overwritten', (t) => {
-  const { targetDir, brandTree } = stage(t);
-  jetpack.write(path.join(brandTree, CERT_REL), P12);
+    {
+      name: 'signing-env: an explicit CSC_LINK always wins and is never overwritten',
+      run: (ctx) => {
+        const { targetDir, brandTree } = stage(ctx);
+        jetpack.write(path.join(brandTree, CERT_REL), P12);
 
-  const env = { CSC_LINK: 'config/certs/mine.p12', CSC_KEY_PASSWORD: PASSWORD };
-  const { derived } = deriveSigningEnv({ env, targetDir });
+        const env = { CSC_LINK: 'config/certs/mine.p12', CSC_KEY_PASSWORD: PASSWORD };
+        const { derived } = deriveSigningEnv({ env, targetDir });
 
-  assert.deepEqual(derived, []);
-  assert.equal(env.CSC_LINK, 'config/certs/mine.p12');
-});
+        ctx.expect(derived).toEqual([]);
+        ctx.expect(env.CSC_LINK).toBe('config/certs/mine.p12');
+      },
+    },
 
-test('signing-env: a .p12 the password does not open is a PROBLEM, and the key stays unset', (t) => {
-  const { targetDir, brandTree } = stage(t);
-  jetpack.write(path.join(brandTree, CERT_REL), P12);
+    {
+      name: 'signing-env: a .p12 the password does not open is a PROBLEM, and the key stays unset',
+      run: (ctx) => {
+        const { targetDir, brandTree } = stage(ctx);
+        jetpack.write(path.join(brandTree, CERT_REL), P12);
 
-  const env = { CSC_KEY_PASSWORD: 'the-wrong-password' };
-  const { derived, problems } = deriveSigningEnv({ env, targetDir });
+        const env = { CSC_KEY_PASSWORD: 'the-wrong-password' };
+        const { derived, problems } = deriveSigningEnv({ env, targetDir });
 
-  assert.deepEqual(derived, []);
-  assert.equal(env.CSC_LINK, undefined, 'Keychain discovery stays the default');
-  assert.equal(problems.length, 1);
-  assert.equal(problems[0].key, 'CSC_LINK');
-  assert.match(problems[0].reason, /CSC_KEY_PASSWORD does not open/);
-});
+        ctx.expect(derived).toEqual([]);
+        ctx.expect(env.CSC_LINK, 'Keychain discovery stays the default').toBe(undefined);
+        ctx.expect(problems.length).toBe(1);
+        ctx.expect(problems[0].key).toBe('CSC_LINK');
+        ctx.expect(problems[0].reason).toMatch(/CSC_KEY_PASSWORD does not open/);
+      },
+    },
 
-test('signing-env: a .p12 with no CSC_KEY_PASSWORD at all is a PROBLEM, not a silent skip', (t) => {
-  const { targetDir, brandTree } = stage(t);
-  jetpack.write(path.join(brandTree, CERT_REL), P12);
+    {
+      name: 'signing-env: a .p12 with no CSC_KEY_PASSWORD at all is a PROBLEM, not a silent skip',
+      run: (ctx) => {
+        const { targetDir, brandTree } = stage(ctx);
+        jetpack.write(path.join(brandTree, CERT_REL), P12);
 
-  const { derived, problems } = deriveSigningEnv({ env: {}, targetDir });
+        const { derived, problems } = deriveSigningEnv({ env: {}, targetDir });
 
-  assert.deepEqual(derived, []);
-  assert.equal(problems.length, 1);
-  assert.match(problems[0].reason, /CSC_KEY_PASSWORD is unset/);
-});
+        ctx.expect(derived).toEqual([]);
+        ctx.expect(problems.length).toBe(1);
+        ctx.expect(problems[0].reason).toMatch(/CSC_KEY_PASSWORD is unset/);
+      },
+    },
 
-test('signing-env: no tree at all derives nothing and reports nothing', (t) => {
-  const { targetDir } = stage(t);
+    {
+      name: 'signing-env: no tree at all derives nothing and reports nothing',
+      run: (ctx) => {
+        const { targetDir } = stage(ctx);
 
-  assert.deepEqual(deriveSigningEnv({ env: { CSC_KEY_PASSWORD: PASSWORD }, targetDir }), { derived: [], problems: [] });
-});
+        ctx.expect(deriveSigningEnv({ env: { CSC_KEY_PASSWORD: PASSWORD }, targetDir })).toEqual({ derived: [], problems: [] });
+      },
+    },
 
-test('signing-env: APPLE_API_KEY is derived from AuthKey_<id>.p8, and an unset id skips the key', (t) => {
-  const { targetDir, brandTree } = stage(t);
-  jetpack.write(path.join(brandTree, `AuthKey_${KEY_ID}.p8`), 'authkey-bytes');
+    {
+      name: 'signing-env: APPLE_API_KEY is derived from AuthKey_<id>.p8, and an unset id skips the key',
+      run: (ctx) => {
+        const { targetDir, brandTree } = stage(ctx);
+        jetpack.write(path.join(brandTree, `AuthKey_${KEY_ID}.p8`), 'authkey-bytes');
 
-  const withoutId = {};
-  assert.deepEqual(deriveSigningEnv({ env: withoutId, targetDir }).derived, []);
-  assert.equal(withoutId.APPLE_API_KEY, undefined, 'no id means no filename to look for');
+        const withoutId = {};
+        ctx.expect(deriveSigningEnv({ env: withoutId, targetDir }).derived).toEqual([]);
+        ctx.expect(withoutId.APPLE_API_KEY, 'no id means no filename to look for').toBe(undefined);
 
-  const env = { APPLE_API_KEY_ID: KEY_ID };
-  const { derived } = deriveSigningEnv({ env, targetDir });
+        const env = { APPLE_API_KEY_ID: KEY_ID };
+        const { derived } = deriveSigningEnv({ env, targetDir });
 
-  assert.deepEqual(derived, [{ key: 'APPLE_API_KEY', value: path.join(brandTree, `AuthKey_${KEY_ID}.p8`) }]);
-});
+        ctx.expect(derived).toEqual([{ key: 'APPLE_API_KEY', value: path.join(brandTree, `AuthKey_${KEY_ID}.p8`) }]);
+      },
+    },
 
-test('signing-env: a target outside a brand derives nothing', (t) => {
-  const outside = fs.mkdtempSync(path.join(tmpdir(), 'omega-loose-'));
-  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+    {
+      name: 'signing-env: a target outside a brand derives nothing',
+      run: (ctx) => {
+        const outside = fs.mkdtempSync(path.join(tmpdir(), 'omega-loose-'));
+        ctx.after(() => fs.rmSync(outside, { recursive: true, force: true }));
 
-  assert.deepEqual(deriveSigningEnv({ env: { CSC_KEY_PASSWORD: PASSWORD }, targetDir: outside }), { derived: [], problems: [] });
-  assert.deepEqual(signingPathCandidates({ env: {}, targetDir: outside }), []);
-});
+        ctx.expect(deriveSigningEnv({ env: { CSC_KEY_PASSWORD: PASSWORD }, targetDir: outside })).toEqual({ derived: [], problems: [] });
+        ctx.expect(signingPathCandidates({ env: {}, targetDir: outside })).toEqual([]);
+      },
+    },
 
-test('signing-env: the candidate paths name both tiers, company first', (t) => {
-  const { targetDir, brandTree, companyTree } = stage(t, { company: true });
+    {
+      name: 'signing-env: the candidate paths name both tiers, company first',
+      run: (ctx) => {
+        const { targetDir, brandTree, companyTree } = stage(ctx, { company: true });
 
-  const candidates = signingPathCandidates({ env: { APPLE_API_KEY_ID: KEY_ID }, targetDir });
+        const candidates = signingPathCandidates({ env: { APPLE_API_KEY_ID: KEY_ID }, targetDir });
 
-  assert.deepEqual(candidates.map((entry) => entry.key), ['CSC_LINK', 'APPLE_API_KEY']);
-  assert.deepEqual(candidates[0].paths, [path.join(companyTree, CERT_REL), path.join(brandTree, CERT_REL)]);
-  assert.deepEqual(candidates[1].paths, [
-    path.join(companyTree, `AuthKey_${KEY_ID}.p8`),
-    path.join(brandTree, `AuthKey_${KEY_ID}.p8`),
-  ]);
+        ctx.expect(candidates.map((entry) => entry.key)).toEqual(['CSC_LINK', 'APPLE_API_KEY']);
+        ctx.expect(candidates[0].paths).toEqual([path.join(companyTree, CERT_REL), path.join(brandTree, CERT_REL)]);
+        ctx.expect(candidates[1].paths).toEqual([
+          path.join(companyTree, `AuthKey_${KEY_ID}.p8`),
+          path.join(brandTree, `AuthKey_${KEY_ID}.p8`),
+        ]);
+      },
+    },
+  ],
 });
