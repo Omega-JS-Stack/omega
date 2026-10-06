@@ -22,7 +22,7 @@
  * boundary is WIRED live in test/routes/admin/email-content-html.test.js and
  * test/routes/marketing/campaign.test.js.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const prepare = require('../../dist/omega/libraries/email/prepare.js');
 const { buildCampaignDoc } = require('../../dist/omega/routes/marketing/campaign/utils.js');
 const { validate } = require('../../dist/omega/helpers/schema.js');
@@ -68,10 +68,10 @@ module.exports = defineCases({
           data: { content: { html: '<img src=x onerror="alert(1)">' } },
         });
 
-        assert.ok(fault instanceof Error, 'no fault returned for data.content.html');
-        assert.equal(fault.code, 400, `fault must be a permanent 400, got ${fault.code}`);
-        assert.ok(fault.message.includes('data.content.html'), `message must name the field: ${fault.message}`);
-        assert.ok(/internal-caller only/.test(fault.message), `message must state the rule: ${fault.message}`);
+        expect(fault instanceof Error, 'no fault returned for data.content.html').toBeTruthy();
+        expect(fault.code, `fault must be a permanent 400, got ${fault.code}`).toBe(400);
+        expect(fault.message.includes('data.content.html'), `message must name the field: ${fault.message}`).toBeTruthy();
+        expect(/internal-caller only/.test(fault.message), `message must state the rule: ${fault.message}`).toBeTruthy();
       },
     },
 
@@ -81,8 +81,8 @@ module.exports = defineCases({
       run() {
         // An external caller has no legitimate reason to send the key at all — the
         // presence of it is the fault, not its contents.
-        assert.ok(prepare.internalOnlyFieldFault({ data: { content: { html: '' } } }) instanceof Error, 'empty html passed');
-        assert.ok(prepare.internalOnlyFieldFault({ data: { content: { html: null } } }) instanceof Error, 'null html passed');
+        expect(prepare.internalOnlyFieldFault({ data: { content: { html: '' } } }) instanceof Error, 'empty html passed').toBeTruthy();
+        expect(prepare.internalOnlyFieldFault({ data: { content: { html: null } } }) instanceof Error, 'null html passed').toBeTruthy();
       },
     },
 
@@ -90,10 +90,10 @@ module.exports = defineCases({
       name: 'external lane passes ordinary markdown settings through clean',
 
       run() {
-        assert.equal(prepare.internalOnlyFieldFault({ data: { content: { message: '**hi**' } } }), null);
-        assert.equal(prepare.internalOnlyFieldFault({ data: {} }), null);
-        assert.equal(prepare.internalOnlyFieldFault({}), null);
-        assert.equal(prepare.internalOnlyFieldFault(undefined), null);
+        expect(prepare.internalOnlyFieldFault({ data: { content: { message: '**hi**' } } })).toBe(null);
+        expect(prepare.internalOnlyFieldFault({ data: {} })).toBe(null);
+        expect(prepare.internalOnlyFieldFault({})).toBe(null);
+        expect(prepare.internalOnlyFieldFault(undefined)).toBe(null);
       },
     },
 
@@ -111,13 +111,13 @@ module.exports = defineCases({
           html: '<img src=x onerror="alert(1)">',
         });
 
-        assert.ok(fault instanceof Error, 'no fault returned for top-level html');
-        assert.equal(fault.code, 400, `fault must be a permanent 400, got ${fault.code}`);
-        assert.ok(fault.message.includes('html'), `message must name the field: ${fault.message}`);
-        assert.ok(/internal-caller only/.test(fault.message), `message must state the rule: ${fault.message}`);
+        expect(fault instanceof Error, 'no fault returned for top-level html').toBeTruthy();
+        expect(fault.code, `fault must be a permanent 400, got ${fault.code}`).toBe(400);
+        expect(fault.message.includes('html'), `message must name the field: ${fault.message}`).toBeTruthy();
+        expect(/internal-caller only/.test(fault.message), `message must state the rule: ${fault.message}`).toBeTruthy();
 
         // Presence is the fault, same as every other field on the list.
-        assert.ok(prepare.internalOnlyFieldFault({ html: '' }) instanceof Error, 'empty html passed');
+        expect(prepare.internalOnlyFieldFault({ html: '' }) instanceof Error, 'empty html passed').toBeTruthy();
       },
     },
 
@@ -130,8 +130,8 @@ module.exports = defineCases({
         // the lane is advertising the bypass again.
         const sendEmail = require('../../dist/mcp/tools.js').find((tool) => tool.name === 'send_email');
 
-        assert.ok(sendEmail, 'send_email tool not found — update this test');
-        assert.equal(sendEmail.inputSchema.properties.html, undefined, 'send_email re-advertises the html parameter');
+        expect(sendEmail, 'send_email tool not found — update this test').toBeTruthy();
+        expect(sendEmail.inputSchema.properties.html, 'send_email re-advertises the html parameter').toBe(undefined);
       },
     },
 
@@ -147,9 +147,9 @@ module.exports = defineCases({
           contentHtml: '<img src=x onerror="alert(1)">',
         });
 
-        assert.ok(fault instanceof Error, 'no fault returned for contentHtml');
-        assert.equal(fault.code, 400, `fault must be a permanent 400, got ${fault.code}`);
-        assert.ok(fault.message.includes('contentHtml'), `message must name the field: ${fault.message}`);
+        expect(fault instanceof Error, 'no fault returned for contentHtml').toBeTruthy();
+        expect(fault.code, `fault must be a permanent 400, got ${fault.code}`).toBe(400);
+        expect(fault.message.includes('contentHtml'), `message must name the field: ${fault.message}`).toBeTruthy();
       },
     },
 
@@ -165,9 +165,9 @@ module.exports = defineCases({
           data: { content: { message: '<a href="javascript:alert(1)">x</a>' } },
         });
 
-        assert.ok(fault instanceof Error, 'no fault returned for trustedContent');
-        assert.equal(fault.code, 400, `fault must be a permanent 400, got ${fault.code}`);
-        assert.ok(fault.message.includes('trustedContent'), `message must name the field: ${fault.message}`);
+        expect(fault instanceof Error, 'no fault returned for trustedContent').toBeTruthy();
+        expect(fault.code, `fault must be a permanent 400, got ${fault.code}`).toBe(400);
+        expect(fault.message.includes('trustedContent'), `message must name the field: ${fault.message}`).toBeTruthy();
       },
     },
 
@@ -175,7 +175,7 @@ module.exports = defineCases({
       name: 'external lane rejects trustedContent: false too — presence is the fault',
 
       run() {
-        assert.ok(prepare.internalOnlyFieldFault({ trustedContent: false }) instanceof Error, 'trustedContent: false passed');
+        expect(prepare.internalOnlyFieldFault({ trustedContent: false }) instanceof Error, 'trustedContent: false passed').toBeTruthy();
       },
     },
 
@@ -193,8 +193,8 @@ module.exports = defineCases({
 
         const { campaignSettings } = buildCampaignDoc(hostile);
 
-        assert.ok('contentHtml' in campaignSettings, 'buildCampaignDoc no longer persists contentHtml — update this test');
-        assert.ok(prepare.internalOnlyFieldFault(hostile) instanceof Error, 'the payload that persists was not rejected');
+        expect('contentHtml' in campaignSettings, 'buildCampaignDoc no longer persists contentHtml — update this test').toBeTruthy();
+        expect(prepare.internalOnlyFieldFault(hostile) instanceof Error, 'the payload that persists was not rejected').toBeTruthy();
       },
     },
 
@@ -220,19 +220,19 @@ module.exports = defineCases({
           data: { content: { html: '<img src=x onerror=alert(1)>' } },
         });
 
-        assert.equal(email.html, undefined, 'admin/email schema admitted the top-level html override');
-        assert.equal(email.contentHtml, undefined, 'admin/email schema admitted contentHtml');
-        assert.equal(email.trustedContent, undefined, 'admin/email schema admitted trustedContent');
+        expect(email.html, 'admin/email schema admitted the top-level html override').toBe(undefined);
+        expect(email.contentHtml, 'admin/email schema admitted contentHtml').toBe(undefined);
+        expect(email.trustedContent, 'admin/email schema admitted trustedContent').toBe(undefined);
 
         // ...but data is a passthrough, which is exactly why data.content.html needs
         // the handler guard rather than a schema strip.
-        assert.equal(email.data.content.html, '<img src=x onerror=alert(1)>', 'data.content.html no longer passes the schema — update this test');
+        expect(email.data.content.html, 'data.content.html no longer passes the schema — update this test').toBe('<img src=x onerror=alert(1)>');
 
         const campaignSchema = require('../../dist/omega/schemas/marketing/campaign/post.js')();
         const { data: campaign } = validate(campaignSchema, { name: 'n', subject: 's', contentHtml: '<img src=x>', trustedContent: true });
 
-        assert.equal(campaign.contentHtml, undefined, 'campaign schema admitted contentHtml');
-        assert.equal(campaign.trustedContent, undefined, 'campaign schema admitted trustedContent');
+        expect(campaign.contentHtml, 'campaign schema admitted contentHtml').toBe(undefined);
+        expect(campaign.trustedContent, 'campaign schema admitted trustedContent').toBe(undefined);
       },
     },
 
@@ -247,8 +247,8 @@ module.exports = defineCases({
           data: { content: { html: '<p id="prerendered">first-party <b>html</b></p>' } },
         });
 
-        assert.ok(html.includes('id="prerendered"'), `pre-rendered html did not reach the payload: ${html}`);
-        assert.ok(/<b>html<\/b>/.test(html), 'pre-rendered markup was escaped for an internal caller');
+        expect(html.includes('id="prerendered"'), `pre-rendered html did not reach the payload: ${html}`).toBeTruthy();
+        expect(/<b>html<\/b>/.test(html), 'pre-rendered markup was escaped for an internal caller').toBeTruthy();
       },
     },
 
@@ -263,7 +263,7 @@ module.exports = defineCases({
           html: '<html><body id="whole-document">first-party</body></html>',
         });
 
-        assert.equal(html, '<html><body id="whole-document">first-party</body></html>', `the override did not replace the body: ${html}`);
+        expect(html, `the override did not replace the body: ${html}`).toBe('<html><body id="whole-document">first-party</body></html>');
       },
     },
   ],

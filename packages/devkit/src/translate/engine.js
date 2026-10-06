@@ -7,6 +7,8 @@
  * and get positionally-aligned translations back.
  */
 
+const { mapLimited } = require('../map-limited.js');
+
 // Alignment sentinel — appended to every batch, must return unchanged
 const CONTROL = 'OMEGA-TRANSLATION-CONTROL';
 
@@ -155,29 +157,6 @@ async function splitBatch(ctx, batch) {
 }
 
 /**
- * Run a worker over every item with at most CONCURRENCY of them in flight,
- * returning results in the ITEMS' order — never completion order.
- * @param {Array} items - the work items
- * @param {Function} worker - (item) → Promise
- * @returns {Promise<Array>} results, positionally aligned with items
- */
-async function mapLimited(items, worker) {
-  const results = new Array(items.length);
-  let next = 0;
-
-  const drain = async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await worker(items[index]);
-    }
-  };
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, drain));
-
-  return results;
-}
-
-/**
  * Translate an array of strings, batching + validating along the way.
  * @param {object} options
  * @param {string[]} options.strings - source strings
@@ -225,7 +204,7 @@ async function translateStrings(options) {
   // Batches fly CONCURRENCY-wide (#604) and are stitched back in BATCH order:
   // the sentinel, the alignment checks, and the #523 split backstop all stay
   // per batch, so what a batch does on its own is exactly what it always did.
-  const outcomes = await mapLimited(batches, (batch) => translateBatch(ctx, batch, 0));
+  const outcomes = await mapLimited(batches, CONCURRENCY, (batch) => translateBatch(ctx, batch, 0));
 
   outcomes.forEach((outcome, i) => {
     translated.push(...outcome.result.map((text, j) => preserveWhitespace(batches[i][j], text)));

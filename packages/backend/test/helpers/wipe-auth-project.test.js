@@ -74,69 +74,50 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-runner-env-carries-this-projects-id',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         // The root cause: the runner's child env (buildTestCommand) shipped the
         // emulator hosts but never the project they belong to.
-        assert.equal(
-          process.env.GCLOUD_PROJECT,
-          config.cloud.config.projectId,
-          'the test runner env must name the project the emulator booted with',
-        );
+        expect(process.env.GCLOUD_PROJECT, 'the test runner env must name the project the emulator booted with').toBe(config.cloud.config.projectId);
       },
     },
 
     {
       name: 'the-wiped-store-is-the-one-holding-the-personas',
-      async run({ assert, omega, config }) {
+      async run({ expect, omega, config }) {
         const admin = omega.firebase.admin;
         const projectId = resolveWipeProjectId(admin);
 
-        assert.equal(projectId, config.cloud.config.projectId);
+        expect(projectId).toBe(config.cloud.config.projectId);
 
         // The store the wipe's URL names holds the accounts the wipe exists to
         // remove. This is the assertion the old id failed.
         const targeted = await listEmulatorAccounts(projectId);
-        assert.equal(
-          targeted.includes(TEST_ACCOUNTS.basic.uid),
-          true,
-          `project "${projectId}" should hold the seeded personas the wipe clears`,
-        );
+        expect(targeted.includes(TEST_ACCOUNTS.basic.uid), `project "${projectId}" should hold the seeded personas the wipe clears`).toBe(true);
 
         // ...and the id it used to fall back to names a store none of them live
         // in, which is why clearing it returned 200 and removed nothing.
         const fallback = await listEmulatorAccounts(HARDCODED_DEFAULT);
-        assert.equal(
-          fallback.includes(TEST_ACCOUNTS.basic.uid),
-          false,
-          `project "${HARDCODED_DEFAULT}" is not where this run's accounts live`,
-        );
+        expect(fallback.includes(TEST_ACCOUNTS.basic.uid), `project "${HARDCODED_DEFAULT}" is not where this run's accounts live`).toBe(false);
       },
     },
 
     {
       name: 'a-project-id-disagreement-throws-instead-of-clearing-a-stranger',
-      async run({ assert, omega, config }) {
+      async run({ expect, omega, config }) {
         const admin = omega.firebase.admin;
 
         // A stale GCLOUD_PROJECT from another brand's shell would send the wipe
         // at a store this process never reads or writes — success there is the
         // #292 failure wearing a different hat, so it throws.
-        assert.match(
-          messageOf(() => resolveWipeProjectId(admin, { GCLOUD_PROJECT: 'demo-somebody-else' })),
-          /demo-somebody-else/,
-          'a project id that disagrees with the admin app must abort the wipe',
-        );
+        expect(messageOf(() => resolveWipeProjectId(admin, { GCLOUD_PROJECT: 'demo-somebody-else' })), 'a project id that disagrees with the admin app must abort the wipe').toMatch(/demo-somebody-else/);
 
         // Agreement is the normal case, from either source alone.
-        assert.equal(resolveWipeProjectId(admin, {}), config.cloud.config.projectId);
-        assert.equal(
-          resolveWipeProjectId(undefined, { GCLOUD_PROJECT: config.cloud.config.projectId }),
-          config.cloud.config.projectId,
-        );
+        expect(resolveWipeProjectId(admin, {})).toBe(config.cloud.config.projectId);
+        expect(resolveWipeProjectId(undefined, { GCLOUD_PROJECT: config.cloud.config.projectId })).toBe(config.cloud.config.projectId);
 
         // Nothing to resolve is never a silent default — the old `|| 'demo-test'`
         // is exactly how a wipe with no identity reported success.
-        assert.match(messageOf(() => resolveWipeProjectId(undefined, {})), /project id/);
+        expect(messageOf(() => resolveWipeProjectId(undefined, {}))).toMatch(/project id/);
       },
     },
   ],

@@ -33,7 +33,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'project-scripts-fix-preserves-npm-added-deps',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-sync-'));
         const stale = { name: 'sync-app', dependencies: { '@omega.js/backend': '*' } };
         // Disk moved on: an npm fix added firebase-admin after boot
@@ -46,12 +46,9 @@ module.exports = defineCases({
         await instance.fix();
 
         const written = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-        assert.equal(written.dependencies['firebase-admin'], '^13.0.0',
-          'the npm-added dep must survive a manifest-writing fix');
-        assert.equal(written.scripts.deploy, 'omega deploy',
-          'the fix still lands every framework-owned script');
-        assert.equal(instance.self.package.dependencies['firebase-admin'], '^13.0.0',
-          'the shared in-memory manifest resyncs to disk truth');
+        expect(written.dependencies['firebase-admin'], 'the npm-added dep must survive a manifest-writing fix').toBe('^13.0.0');
+        expect(written.scripts.deploy, 'the fix still lands every framework-owned script').toBe('omega deploy');
+        expect(instance.self.package.dependencies['firebase-admin'], 'the shared in-memory manifest resyncs to disk truth').toBe('^13.0.0');
 
         fs.rmSync(dir, { recursive: true, force: true });
       },
@@ -59,7 +56,7 @@ module.exports = defineCases({
 
     {
       name: 'manifest-writing-fix-keeps-the-trailing-newline',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-sync-'));
         const manifest = { name: 'newline-app', scripts: {} };
         // ensure-target's byte contract: npm's shape, trailing newline included
@@ -69,9 +66,8 @@ module.exports = defineCases({
         await instance.fix();
 
         const bytes = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
-        assert.equal(bytes.endsWith('\n'), true,
-          'a setup-test fix keeps the trailing newline every sibling writer writes');
-        assert.equal(bytes.endsWith('\n\n'), false, 'exactly one, never a growing tail');
+        expect(bytes.endsWith('\n'), 'a setup-test fix keeps the trailing newline every sibling writer writes').toBe(true);
+        expect(bytes.endsWith('\n\n'), 'exactly one, never a growing tail').toBe(false);
 
         fs.rmSync(dir, { recursive: true, force: true });
       },
@@ -79,23 +75,17 @@ module.exports = defineCases({
 
     {
       name: 'install-command-carries-ignore-scripts',
-      async run({ assert }) {
+      async run({ expect }) {
         const instance = makeInstance(BaseTest, os.tmpdir(), {});
 
-        assert.equal(
-          instance.buildInstallCommand('firebase-functions', '@^7.2.5'),
-          'npm i firebase-functions@^7.2.5 --ignore-scripts',
-        );
-        assert.equal(
-          instance.buildInstallCommand('some-tool', null, 'dev'),
-          'npm i some-tool@latest --save-dev --ignore-scripts',
-        );
+        expect(instance.buildInstallCommand('firebase-functions', '@^7.2.5')).toBe('npm i firebase-functions@^7.2.5 --ignore-scripts');
+        expect(instance.buildInstallCommand('some-tool', null, 'dev')).toBe('npm i some-tool@latest --save-dev --ignore-scripts');
       },
     },
 
     {
       name: 'readTargetManifest-refreshes-in-place-keeping-object-identity',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-sync-'));
         fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fresh', dependencies: { x: '1' } }));
 
@@ -103,10 +93,10 @@ module.exports = defineCases({
         const instance = makeInstance(BaseTest, dir, stale);
         const returned = instance.readTargetManifest();
 
-        assert.equal(returned === stale, true, 'same object identity — every context view stays live');
-        assert.equal(stale.name, 'fresh', 'contents come from disk');
-        assert.equal(stale.scripts, undefined, 'stale keys are gone');
-        assert.equal(stale.dependencies.x, '1', 'disk keys are present');
+        expect(returned === stale, 'same object identity — every context view stays live').toBe(true);
+        expect(stale.name, 'contents come from disk').toBe('fresh');
+        expect(stale.scripts, 'stale keys are gone').toBe(undefined);
+        expect(stale.dependencies.x, 'disk keys are present').toBe('1');
 
         fs.rmSync(dir, { recursive: true, force: true });
       },

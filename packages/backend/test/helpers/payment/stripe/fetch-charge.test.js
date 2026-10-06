@@ -51,7 +51,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'retrieves-the-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const charge = {
           id: CHARGE_ID,
@@ -64,17 +64,17 @@ module.exports = defineCases({
           return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
-        assert.equal(resource.id, CHARGE_ID, 'The charge itself is the resource');
-        assert.equal(resource.metadata.orderId, '1111-2222-3333', 'The charge metadata comes through');
-        assert.equal(calls.length, 1, 'The charge should be retrieved once');
-        assert.equal(calls[0].id, CHARGE_ID, 'The retrieve should name the charge');
-        assert.ok(calls[0].params?.expand?.includes('payment_intent'), 'The PaymentIntent behind the charge should be expanded');
+        expect(resource.id, 'The charge itself is the resource').toBe(CHARGE_ID);
+        expect(resource.metadata.orderId, 'The charge metadata comes through').toBe('1111-2222-3333');
+        expect(calls.length, 'The charge should be retrieved once').toBe(1);
+        expect(calls[0].id, 'The retrieve should name the charge').toBe(CHARGE_ID);
+        expect(calls[0].params?.expand?.includes('payment_intent'), 'The PaymentIntent behind the charge should be expanded').toBeTruthy();
       },
     },
 
     {
       name: 'takes-metadata-from-the-payment-intent-when-the-charge-has-none',
-      async run({ assert }) {
+      async run({ expect }) {
         // Stripe copies payment_intent_data.metadata onto the charge, but a charge
         // created any other way (an API charge, an older integration) carries none —
         // the expanded intent is then the only place uid/orderId/productId live
@@ -92,15 +92,15 @@ module.exports = defineCases({
           return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
-        assert.equal(Stripe.getUid(resource), '_test-intent-uid', 'The uid should resolve from the PaymentIntent');
-        assert.equal(Stripe.getOrderId(resource), '4444-5555-6666', 'The orderId should resolve from the PaymentIntent');
-        assert.equal(resource.metadata.productId, 'credits-100', 'The productId should resolve from the PaymentIntent');
+        expect(Stripe.getUid(resource), 'The uid should resolve from the PaymentIntent').toBe('_test-intent-uid');
+        expect(Stripe.getOrderId(resource), 'The orderId should resolve from the PaymentIntent').toBe('4444-5555-6666');
+        expect(resource.metadata.productId, 'The productId should resolve from the PaymentIntent').toBe('credits-100');
       },
     },
 
     {
       name: 'the-charge-own-metadata-wins',
-      async run({ assert }) {
+      async run({ expect }) {
         const charge = {
           id: CHARGE_ID,
           object: 'charge',
@@ -112,14 +112,14 @@ module.exports = defineCases({
           return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
-        assert.equal(Stripe.getUid(resource), '_test-charge-uid', 'The charge is the newer record of the two');
-        assert.equal(Stripe.getOrderId(resource), '7777-8888-9999', 'What only the intent carries still comes through');
+        expect(Stripe.getUid(resource), 'The charge is the newer record of the two').toBe('_test-charge-uid');
+        expect(Stripe.getOrderId(resource), 'What only the intent carries still comes through').toBe('7777-8888-9999');
       },
     },
 
     {
       name: 'a-failed-retrieve-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // The charge the pipeline acts on is the one Stripe answered with. A
         // retrieve that fails has no answer to give ([#506]).
         const sdk = {
@@ -138,9 +138,9 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed retrieve must throw');
-        assert.equal(threw.notFound, false, 'An unreachable Stripe is transient, not a charge that does not exist');
-        assert.match(threw.message, /could not be reached/, 'The failure says the lookup never got an answer');
+        expect(threw, 'A failed retrieve must throw').toBeTruthy();
+        expect(threw.notFound, 'An unreachable Stripe is transient, not a charge that does not exist').toBe(false);
+        expect(threw.message, 'The failure says the lookup never got an answer').toMatch(/could not be reached/);
       },
     },
   ],

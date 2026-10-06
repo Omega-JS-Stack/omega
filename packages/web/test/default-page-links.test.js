@@ -25,10 +25,9 @@
  * This file supplies the half that is its own: the emitted URL set as the
  * resolution table, with assets excused.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 const { scanLinks, applyExceptions, normalize, HTML_OUTPUT } = require('../src/link-resolver.js');
@@ -55,17 +54,26 @@ function scanDefaults() {
   return building;
 }
 
-test('#427: the default pages emit no link to a route the build never wrote', async () => {
-  const { pages, unresolved } = await scanDefaults();
+module.exports = defineCases({
+  type: 'group',
+  description: 'default-page-links',
+  tests: [
+    {
+      name: '#427: the default pages emit no link to a route the build never wrote',
+      run: async (ctx) => {
+        const { pages, unresolved } = await scanDefaults();
 
-  // The defaults really did build — an empty build would pass vacuously.
-  assert.ok(pages.has('/dashboard/account'), 'the account default is in the build');
-  assert.ok(pages.has('/admin'), 'the admin default is in the build');
-  assert.ok(pages.has('/test/translation'), 'the translation test default is in the build');
+        // The defaults really did build — an empty build would pass vacuously.
+        ctx.expect(pages.has('/dashboard/account'), 'the account default is in the build').toBeTruthy();
+        ctx.expect(pages.has('/admin'), 'the admin default is in the build').toBeTruthy();
+        ctx.expect(pages.has('/test/translation'), 'the translation test default is in the build').toBeTruthy();
 
-  // ZERO exceptions is the framework's acceptance state (#430): a brand
-  // inherits these pages, so a gap here would be one every brand must declare.
-  const { offenders } = applyExceptions(unresolved, {});
+        // ZERO exceptions is the framework's acceptance state (#430): a brand
+        // inherits these pages, so a gap here would be one every brand must declare.
+        const { offenders } = applyExceptions(unresolved, {});
 
-  assert.deepStrictEqual(offenders, [], 'these links 404 in every brand build — fix the href or drop the link');
+        ctx.expect(offenders, 'these links 404 in every brand build — fix the href or drop the link').toEqual([]);
+      },
+    },
+  ],
 });

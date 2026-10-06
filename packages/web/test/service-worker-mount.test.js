@@ -3,8 +3,7 @@
 // hands the value over on the script URL's query string; every site URL the
 // worker builds is mounted under it. The unprefixed default must stay exactly
 // what it is today.
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -96,46 +95,64 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
   };
 }
 
-test('service worker at the domain root: today’s URLs, unchanged', () => {
-  const worker = loadWorker('https://example.com/service-worker.js');
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-worker-mount',
+  tests: [
+    {
+      name: 'service worker at the domain root: today’s URLs, unchanged',
+      run: (ctx) => {
+        const worker = loadWorker('https://example.com/service-worker.js');
 
-  assert.equal(worker.importedScripts[0], '/build.js?cb=1700000000000', 'the config transport is fetched root-relative');
+        ctx.expect(worker.importedScripts[0], 'the config transport is fetched root-relative').toBe('/build.js?cb=1700000000000');
 
-  worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
-  assert.equal(worker.notifications[0].options.icon, '/assets/images/favicon/favicon-192x192.png');
+        worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
+        ctx.expect(worker.notifications[0].options.icon).toBe('/assets/images/favicon/favicon-192x192.png');
 
-  worker.notificationClick();
-  assert.deepEqual(worker.opened, ['/']);
-});
+        worker.notificationClick();
+        ctx.expect(worker.opened).toEqual(['/']);
+      },
+    },
 
-test('service worker under a mount: every site URL it builds carries the prefix', () => {
-  const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit');
+    {
+      name: 'service worker under a mount: every site URL it builds carries the prefix',
+      run: (ctx) => {
+        const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit');
 
-  assert.equal(worker.importedScripts[0], '/workkit/build.js?cb=1700000000000', 'the config transport lives under the mount');
+        ctx.expect(worker.importedScripts[0], 'the config transport lives under the mount').toBe('/workkit/build.js?cb=1700000000000');
 
-  worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
-  assert.equal(worker.notifications[0].options.icon, '/workkit/assets/images/favicon/favicon-192x192.png');
+        worker.pushBackgroundMessage({ notification: { title: 'Hello' } });
+        ctx.expect(worker.notifications[0].options.icon).toBe('/workkit/assets/images/favicon/favicon-192x192.png');
 
-  worker.notificationClick();
-  assert.deepEqual(worker.opened, ['/workkit/'], 'the default click target is the mounted home page');
-});
+        worker.notificationClick();
+        ctx.expect(worker.opened, 'the default click target is the mounted home page').toEqual(['/workkit/']);
+      },
+    },
 
-test('service worker under a mount: cache warming mounts the caller’s pages too', async () => {
-  const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit', { cacheWarming: true });
+    {
+      name: 'service worker under a mount: cache warming mounts the caller’s pages too',
+      run: async (ctx) => {
+        const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit', { cacheWarming: true });
 
-  // The shape the update-cache message carries: site-relative pages, the same
-  // shape the defaults are written in.
-  await worker.updateCache(['/pricing', '/blog/']);
+        // The shape the update-cache message carries: site-relative pages, the same
+        // shape the defaults are written in.
+        await worker.updateCache(['/pricing', '/blog/']);
 
-  assert.deepEqual(worker.cached, ['/workkit/', '/workkit/pricing', '/workkit/blog/'], 'defaults AND caller pages live under the mount');
-});
+        ctx.expect(worker.cached, 'defaults AND caller pages live under the mount').toEqual(['/workkit/', '/workkit/pricing', '/workkit/blog/']);
+      },
+    },
 
-test('service worker under a mount: URLs the payload supplies pass through', () => {
-  const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit');
+    {
+      name: 'service worker under a mount: URLs the payload supplies pass through',
+      run: (ctx) => {
+        const worker = loadWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit');
 
-  worker.pushBackgroundMessage({ notification: { title: 'Hello', icon: 'https://cdn.example.com/icon.png' } });
-  assert.equal(worker.notifications[0].options.icon, 'https://cdn.example.com/icon.png');
+        worker.pushBackgroundMessage({ notification: { title: 'Hello', icon: 'https://cdn.example.com/icon.png' } });
+        ctx.expect(worker.notifications[0].options.icon).toBe('https://cdn.example.com/icon.png');
 
-  worker.notificationClick('https://example.com/workkit/pricing');
-  assert.deepEqual(worker.opened, ['https://example.com/workkit/pricing']);
+        worker.notificationClick('https://example.com/workkit/pricing');
+        ctx.expect(worker.opened).toEqual(['https://example.com/workkit/pricing']);
+      },
+    },
+  ],
 });

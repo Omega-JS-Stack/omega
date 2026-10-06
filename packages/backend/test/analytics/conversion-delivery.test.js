@@ -226,7 +226,7 @@ module.exports = defineCases({
       name: 'meta-user-data-carries-the-full-match-block',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({ ctx, omega });
         const body = conversions.buildMetaBody({
           descriptor: descriptorFor(results, 'meta'),
@@ -241,28 +241,28 @@ module.exports = defineCases({
 
         const event = body.data[0];
 
-        assert.equal(event.event_name, 'Purchase', 'the catalog names the Meta event');
-        assert.equal(event.event_id, 'purchase._test-webhook-event', 'the dedupe id rides the event');
-        assert.equal(event.action_source, 'website');
+        expect(event.event_name, 'the catalog names the Meta event').toBe('Purchase');
+        expect(event.event_id, 'the dedupe id rides the event').toBe('purchase._test-webhook-event');
+        expect(event.action_source).toBe('website');
 
         // Identity — hashed, never raw
-        assert.equal(event.user_data.em, sha256('buyer@example.com'), 'email is SHA256 of the trimmed lowercase address');
-        assert.equal(event.user_data.ph, sha256('15550102030'), 'phone is SHA256 of the digits, country code included');
-        assert.equal(event.user_data.external_id, UID, 'Meta only RECOMMENDS hashing external_id, and its Pixel half sends the raw uid (#410)');
-        assert.equal(JSON.stringify(event).includes(EMAIL), false, 'the raw email must never appear anywhere in the body');
-        assert.equal(JSON.stringify(event).includes('5550102030'), false, 'the raw phone number must never appear anywhere in the body');
+        expect(event.user_data.em, 'email is SHA256 of the trimmed lowercase address').toBe(sha256('buyer@example.com'));
+        expect(event.user_data.ph, 'phone is SHA256 of the digits, country code included').toBe(sha256('15550102030'));
+        expect(event.user_data.external_id, 'Meta only RECOMMENDS hashing external_id, and its Pixel half sends the raw uid (#410)').toBe(UID);
+        expect(JSON.stringify(event).includes(EMAIL), 'the raw email must never appear anywhere in the body').toBe(false);
+        expect(JSON.stringify(event).includes('5550102030'), 'the raw phone number must never appear anywhere in the body').toBe(false);
 
         // Same-device match
-        assert.equal(event.user_data.client_ip_address, IP);
-        assert.equal(event.user_data.client_user_agent, USER_AGENT);
-        assert.equal(event.user_data.fbc, 'fb.1.1754006400000.REAL-COOKIE', 'the real cookie wins over any construction');
-        assert.equal(event.user_data.fbp, 'fb.1.1754006400000.987654321');
+        expect(event.user_data.client_ip_address).toBe(IP);
+        expect(event.user_data.client_user_agent).toBe(USER_AGENT);
+        expect(event.user_data.fbc, 'the real cookie wins over any construction').toBe('fb.1.1754006400000.REAL-COOKIE');
+        expect(event.user_data.fbp).toBe('fb.1.1754006400000.987654321');
 
         // Commerce, in Meta's own vocabulary (the catalog's map)
-        assert.equal(event.custom_data.value, 9.99);
-        assert.equal(event.custom_data.currency, 'USD');
-        assert.deepEqual(event.custom_data.content_ids, ['premium']);
-        assert.equal(event.custom_data.fbc, undefined, 'match data never rides the custom data');
+        expect(event.custom_data.value).toBe(9.99);
+        expect(event.custom_data.currency).toBe('USD');
+        expect(event.custom_data.content_ids).toEqual(['premium']);
+        expect(event.custom_data.fbc, 'match data never rides the custom data').toBe(undefined);
       },
     },
 
@@ -277,7 +277,7 @@ module.exports = defineCases({
       name: 'a-billed-charge-tells-meta-system-generated-and-a-checkout-website',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const identity = matchData.buildIdentity({ uid: UID, email: EMAIL, request: { ip: IP, userAgent: USER_AGENT } });
         const actionSourceFor = (event) => conversions.buildMetaBody({
           descriptor: descriptorFor(deliver({ ctx, omega, event: event }), 'meta'),
@@ -286,11 +286,11 @@ module.exports = defineCases({
         }).data[0].action_source;
 
         for (const event of ['subscription_renew', 'payment_recovered', 'trial_convert']) {
-          assert.equal(actionSourceFor(event), 'system_generated', `${event} bills a card with nobody present`);
+          expect(actionSourceFor(event), `${event} bills a card with nobody present`).toBe('system_generated');
         }
 
         for (const event of ['purchase', 'trial_start', 'subscription_cancel']) {
-          assert.equal(actionSourceFor(event), 'website', `${event} is something a person did on the site`);
+          expect(actionSourceFor(event), `${event} is something a person did on the site`).toBe('website');
         }
       },
     },
@@ -306,7 +306,7 @@ module.exports = defineCases({
       name: 'a-full-account-fills-every-meta-parameter',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const identity = matchData.buildIdentity({
           uid: UID,
           user: FULL_USER_DOC,
@@ -320,17 +320,13 @@ module.exports = defineCases({
           eventId: 'purchase._test-webhook-event',
         }).data[0].user_data;
 
-        assert.deepEqual(
-          Object.keys(userData).sort(),
-          ['client_ip_address', 'client_user_agent', 'country', 'ct', 'db', 'em', 'external_id', 'fbc', 'fbp', 'fn', 'ge', 'ln', 'ph', 'st', 'zp'],
-          'every parameter Meta accepts from this account rides the body',
-        );
+        expect(Object.keys(userData).sort(), 'every parameter Meta accepts from this account rides the body').toEqual(['client_ip_address', 'client_user_agent', 'country', 'ct', 'db', 'em', 'external_id', 'fbc', 'fbp', 'fn', 'ge', 'ln', 'ph', 'st', 'zp']);
 
         // The email and phone still come off the SAME reader — a call site that
         // passes a doc must not lose the two keys it always had.
-        assert.equal(userData.em, sha256('ada.lovelace@example.com'), 'the doc\'s email is read and normalized like any other');
-        assert.equal(userData.ph, sha256('15550102030'), 'and its telephone pair');
-        assert.equal(JSON.stringify(userData).includes('Lovelace'), false, 'no raw personal value anywhere in the block');
+        expect(userData.em, 'the doc\'s email is read and normalized like any other').toBe(sha256('ada.lovelace@example.com'));
+        expect(userData.ph, 'and its telephone pair').toBe(sha256('15550102030'));
+        expect(JSON.stringify(userData).includes('Lovelace'), 'no raw personal value anywhere in the block').toBe(false);
       },
     },
 
@@ -342,7 +338,7 @@ module.exports = defineCases({
       name: 'the-fire-log-names-the-match-keys-sent-and-the-ones-that-were-empty',
       auth: 'none',
 
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const lines = [];
         const record = (...args) => lines.push(args.map((arg) => String(arg)).join(' '));
         const identity = matchData.buildIdentity({ uid: UID, email: EMAIL, request: { ip: IP, userAgent: USER_AGENT } });
@@ -360,11 +356,11 @@ module.exports = defineCases({
 
         const summary = lines.find((line) => line.startsWith('deliverConversion: purchase →'));
 
-        assert.equal(!!summary, true, `the walk logs one summary line: ${lines.join(' | ')}`);
-        assert.equal(summary.includes('meta blocked (dev) sent em,external_id,client_ip_address,client_user_agent;'), true, `the line names what went: ${summary}`);
-        assert.equal(summary.includes('empty ph,fn,ln,ct,st,zp,country,db,ge,fbc,fbp'), true, `and what the platform accepts but this fire had nothing for: ${summary}`);
-        assert.equal(summary.includes(EMAIL), false, 'never the raw value');
-        assert.equal(summary.includes(identity.emailHash), false, 'and never the hashed one either');
+        expect(!!summary, `the walk logs one summary line: ${lines.join(' | ')}`).toBe(true);
+        expect(summary.includes('meta blocked (dev) sent em,external_id,client_ip_address,client_user_agent;'), `the line names what went: ${summary}`).toBe(true);
+        expect(summary.includes('empty ph,fn,ln,ct,st,zp,country,db,ge,fbc,fbp'), `and what the platform accepts but this fire had nothing for: ${summary}`).toBe(true);
+        expect(summary.includes(EMAIL), 'never the raw value').toBe(false);
+        expect(summary.includes(identity.emailHash), 'and never the hashed one either').toBe(false);
       },
     },
 
@@ -372,7 +368,7 @@ module.exports = defineCases({
       name: 'meta-constructs-fbc-from-the-captured-fbclid',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The cookie never made it to checkout (cleared jar, ITP, another device)
         const attribution = fullAttribution();
         delete attribution.cookies.fbc;
@@ -381,8 +377,8 @@ module.exports = defineCases({
         const descriptor = descriptorFor(results, 'meta');
         const capturedMs = Date.parse('2026-08-01T00:00:00.000Z');
 
-        assert.equal(descriptor.userData.fbc, `fb.1.${capturedMs}.FB-CLICK`, 'fbc is built per Meta spec from the click id, stamped when it was captured');
-        assert.equal(descriptor.userData.fbp, 'fb.1.1754006400000.987654321', 'the browser cookie is untouched by the construction');
+        expect(descriptor.userData.fbc, 'fbc is built per Meta spec from the click id, stamped when it was captured').toBe(`fb.1.${capturedMs}.FB-CLICK`);
+        expect(descriptor.userData.fbp, 'the browser cookie is untouched by the construction').toBe('fb.1.1754006400000.987654321');
 
         // Nothing to build from is not an error — the fire still goes with what it has
         const noClick = fullAttribution();
@@ -390,7 +386,7 @@ module.exports = defineCases({
         delete noClick.last.clickIds.fbclid;
 
         const bare = descriptorFor(deliver({ ctx, omega, attribution: noClick }), 'meta');
-        assert.equal(bare.userData.fbc, undefined, 'no cookie and no fbclid means no fbc, never a malformed one');
+        expect(bare.userData.fbc, 'no cookie and no fbclid means no fbc, never a malformed one').toBe(undefined);
       },
     },
 
@@ -404,7 +400,7 @@ module.exports = defineCases({
       name: 'tiktok-user-block-carries-the-full-match-block',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({ ctx, omega });
         const body = conversions.buildTikTokBody({
           descriptor: descriptorFor(results, 'tiktok'),
@@ -420,23 +416,23 @@ module.exports = defineCases({
 
         const event = body.data[0];
 
-        assert.equal(event.event, 'Purchase', 'the catalog names the TikTok event — Purchase, since CompletePayment was retired ([#652])');
-        assert.equal(event.event_id, 'purchase._test-webhook-event');
-        assert.equal(event.user.email, sha256('buyer@example.com'), 'TikTok takes the email hashed too');
-        assert.equal(event.user.phone, sha256('+15550102030'), 'TikTok\'s spec is the E.164 number, plus included');
-        assert.equal(event.user.external_id, UID_DIGEST, 'TikTok REQUIRES external_id hashed, and a raw one matches nobody (#410)');
-        assert.equal(JSON.stringify(event).includes(UID_TRIMMED), false, 'the raw uid must not ride a TikTok body under any key');
-        assert.equal(event.user.ttp, 'TTP-COOKIE');
-        assert.equal(event.user.ttclid, 'TT-CLICK', 'the click id is a match key like any other in 2.0');
-        assert.equal(event.user.ip, IP);
-        assert.equal(event.user.user_agent, USER_AGENT);
-        assert.equal(event.properties.contents[0].content_id, 'premium', 'TikTok commerce rides its documented `contents` array ([#652])');
-        assert.equal(event.properties.value, 9.99);
+        expect(event.event, 'the catalog names the TikTok event — Purchase, since CompletePayment was retired ([#652])').toBe('Purchase');
+        expect(event.event_id).toBe('purchase._test-webhook-event');
+        expect(event.user.email, 'TikTok takes the email hashed too').toBe(sha256('buyer@example.com'));
+        expect(event.user.phone, 'TikTok\'s spec is the E.164 number, plus included').toBe(sha256('+15550102030'));
+        expect(event.user.external_id, 'TikTok REQUIRES external_id hashed, and a raw one matches nobody (#410)').toBe(UID_DIGEST);
+        expect(JSON.stringify(event).includes(UID_TRIMMED), 'the raw uid must not ride a TikTok body under any key').toBe(false);
+        expect(event.user.ttp).toBe('TTP-COOKIE');
+        expect(event.user.ttclid, 'the click id is a match key like any other in 2.0').toBe('TT-CLICK');
+        expect(event.user.ip).toBe(IP);
+        expect(event.user.user_agent).toBe(USER_AGENT);
+        expect(event.properties.contents[0].content_id, 'TikTok commerce rides its documented `contents` array ([#652])').toBe('premium');
+        expect(event.properties.value).toBe(9.99);
 
         // The v1.2 nesting is GONE, not duplicated alongside — a body carrying
         // both shapes is how the two drift apart on the next edit.
-        assert.equal(Object.hasOwn(event, 'context'), false, 'the v1.2 context block never rides along');
-        assert.equal(JSON.stringify(event).includes('phone_number'), false, 'nor its key names');
+        expect(Object.hasOwn(event, 'context'), 'the v1.2 context block never rides along').toBe(false);
+        expect(JSON.stringify(event).includes('phone_number'), 'nor its key names').toBe(false);
       },
     },
 
@@ -449,7 +445,7 @@ module.exports = defineCases({
       name: 'the-tiktok-item-stamps-event-time-in-unix-seconds',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const before = Math.floor(Date.now() / 1000);
         const results = deliver({ ctx, omega });
         const event = conversions.buildTikTokBody({
@@ -459,14 +455,14 @@ module.exports = defineCases({
           pixelCode: TIKTOK_PIXEL,
         }).data[0];
 
-        assert.equal(Number.isInteger(event.event_time), true, `event_time is an integer of seconds, not ${JSON.stringify(event.event_time)}`);
-        assert.equal(event.event_time >= before, true, 'stamped at build time');
-        assert.equal(event.event_time <= Math.floor(Date.now() / 1000), true, 'and never in the future');
+        expect(Number.isInteger(event.event_time), `event_time is an integer of seconds, not ${JSON.stringify(event.event_time)}`).toBe(true);
+        expect(event.event_time >= before, 'stamped at build time').toBe(true);
+        expect(event.event_time <= Math.floor(Date.now() / 1000), 'and never in the future').toBe(true);
         // Milliseconds pass Number.isInteger too, and are the failure the unit
         // gets wrong silently: a 13-digit stamp reads as the year 46,000.
-        assert.equal(String(event.event_time).length, 10, 'seconds, not milliseconds');
-        assert.equal(Object.hasOwn(event, 'timestamp'), false, 'the v1.2 ISO field is replaced, not kept beside it');
-        assert.equal(JSON.stringify(event).includes('T00:00:00'), false, 'no ISO stamp rides the item under any key');
+        expect(String(event.event_time).length, 'seconds, not milliseconds').toBe(10);
+        expect(Object.hasOwn(event, 'timestamp'), 'the v1.2 ISO field is replaced, not kept beside it').toBe(false);
+        expect(JSON.stringify(event).includes('T00:00:00'), 'no ISO stamp rides the item under any key').toBe(false);
       },
     },
 
@@ -481,7 +477,7 @@ module.exports = defineCases({
       name: 'the-tiktok-body-names-the-pixel-in-event-source-id',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({ ctx, omega });
         const body = conversions.buildTikTokBody({
           descriptor: descriptorFor(results, 'tiktok'),
@@ -490,9 +486,9 @@ module.exports = defineCases({
           pixelCode: TIKTOK_PIXEL,
         });
 
-        assert.equal(body.event_source_id, TIKTOK_PIXEL, 'the configured pixel id is the event source id TikTok validates');
-        assert.equal(body.event_source, 'web', 'a conversion for a website is the web source');
-        assert.equal(body.data[0].pixel_code, undefined, 'one home for the id — a second copy in the data item is what drifted');
+        expect(body.event_source_id, 'the configured pixel id is the event source id TikTok validates').toBe(TIKTOK_PIXEL);
+        expect(body.event_source, 'a conversion for a website is the web source').toBe('web');
+        expect(body.data[0].pixel_code, 'one home for the id — a second copy in the data item is what drifted').toBe(undefined);
       },
     },
 
@@ -500,22 +496,22 @@ module.exports = defineCases({
       name: 'the-tiktok-send-puts-the-configured-pixel-on-the-wire',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The body test above proves the SHAPE; this one proves the id actually
         // reaches it — the resolution step (#465) is where the send went wrong.
         const { calls, lines } = fireOnRecordedWire({ production: true });
         const tiktok = calls.find((call) => call.url.includes('business-api.tiktok.com'));
 
-        assert.equal(!!tiktok, true, `a configured brand in production must reach TikTok: ${lines.join(' | ')}`);
-        assert.equal(tiktok.options.body.event_source_id, TIKTOK_PIXEL, 'the id on the wire is the one config resolved');
-        assert.equal(tiktok.options.body.event_source, 'web');
-        assert.equal(JSON.stringify(tiktok.options.body).includes('pixel_code'), false, 'the v1.2 field never rides along');
+        expect(!!tiktok, `a configured brand in production must reach TikTok: ${lines.join(' | ')}`).toBe(true);
+        expect(tiktok.options.body.event_source_id, 'the id on the wire is the one config resolved').toBe(TIKTOK_PIXEL);
+        expect(tiktok.options.body.event_source).toBe('web');
+        expect(JSON.stringify(tiktok.options.body).includes('pixel_code'), 'the v1.2 field never rides along').toBe(false);
 
         // The other transport is the control: it was delivering all along.
         const meta = calls.find((call) => call.url.includes('graph.facebook.com'));
 
-        assert.equal(!!meta, true, `Meta must still be reached: ${lines.join(' | ')}`);
-        assert.equal(meta.url.includes(`/${META_PIXEL}/events`), true, 'Meta names its pixel in the path');
+        expect(!!meta, `Meta must still be reached: ${lines.join(' | ')}`).toBe(true);
+        expect(meta.url.includes(`/${META_PIXEL}/events`), 'Meta names its pixel in the path').toBe(true);
       },
     },
 
@@ -529,11 +525,11 @@ module.exports = defineCases({
       name: 'the-page-the-conversion-happened-on-rides-both-ad-bodies',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const context = matchData.buildAttributionContext(fullAttribution());
 
-        assert.equal(context.url, 'https://brand.test/pricing?utm_source=meta', 'the CREDITED touch\'s url reaches the adapters');
-        assert.equal(context.referrer, 'https://facebook.com/', 'and the referrer it landed from');
+        expect(context.url, 'the CREDITED touch\'s url reaches the adapters').toBe('https://brand.test/pricing?utm_source=meta');
+        expect(context.referrer, 'and the referrer it landed from').toBe('https://facebook.com/');
 
         const results = deliver({ ctx, omega });
         const identity = matchData.buildIdentity({ uid: UID });
@@ -551,19 +547,19 @@ module.exports = defineCases({
           pixelCode: TIKTOK_PIXEL,
         }).data[0];
 
-        assert.equal(meta.event_source_url, 'https://brand.test/pricing?utm_source=meta', 'Meta reads the conversion\'s page as event_source_url');
-        assert.deepEqual(tiktok.page, { url: 'https://brand.test/pricing?utm_source=meta', referrer: 'https://facebook.com/' }, 'TikTok 2.0 reads it as the item\'s page object');
+        expect(meta.event_source_url, 'Meta reads the conversion\'s page as event_source_url').toBe('https://brand.test/pricing?utm_source=meta');
+        expect(tiktok.page, 'TikTok 2.0 reads it as the item\'s page object').toEqual({ url: 'https://brand.test/pricing?utm_source=meta', referrer: 'https://facebook.com/' });
 
         // It is context, not commerce and not a match key — a url in either
         // block is an off-spec field the platform reads as neither.
-        assert.equal(meta.custom_data.url, undefined, 'the page never rides Meta\'s custom data');
-        assert.equal(tiktok.properties.url, undefined, 'nor TikTok\'s properties');
-        assert.equal(tiktok.user.url, undefined, 'nor either match block');
-        assert.equal(meta.user_data.url, undefined);
+        expect(meta.custom_data.url, 'the page never rides Meta\'s custom data').toBe(undefined);
+        expect(tiktok.properties.url, 'nor TikTok\'s properties').toBe(undefined);
+        expect(tiktok.user.url, 'nor either match block').toBe(undefined);
+        expect(meta.user_data.url).toBe(undefined);
 
         // GA4's Measurement Protocol gets no invented slot: the campaign params
         // are what its half of this attribution has always been.
-        assert.equal(descriptorFor(results, 'ga4').payload.url, undefined, 'GA4 gains no url param');
+        expect(descriptorFor(results, 'ga4').payload.url, 'GA4 gains no url param').toBe(undefined);
       },
     },
 
@@ -571,7 +567,7 @@ module.exports = defineCases({
       name: 'a-direct-landing-sends-a-page-of-the-url-alone',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The landing capture writes `referrer: null` for a visit that came from
         // no page at all (a typed url, an app link). An empty referrer key is a
         // field we tried and failed to send.
@@ -594,9 +590,9 @@ module.exports = defineCases({
           pixelCode: TIKTOK_PIXEL,
         }).data[0];
 
-        assert.equal(meta.event_source_url, 'https://brand.test/pricing?utm_source=meta', 'the url still goes — a referrer was never part of Meta\'s field');
-        assert.deepEqual(tiktok.page, { url: 'https://brand.test/pricing?utm_source=meta' }, 'the page is the url alone');
-        assert.equal(Object.hasOwn(tiktok.page, 'referrer'), false, 'never an empty referrer beside it');
+        expect(meta.event_source_url, 'the url still goes — a referrer was never part of Meta\'s field').toBe('https://brand.test/pricing?utm_source=meta');
+        expect(tiktok.page, 'the page is the url alone').toEqual({ url: 'https://brand.test/pricing?utm_source=meta' });
+        expect(Object.hasOwn(tiktok.page, 'referrer'), 'never an empty referrer beside it').toBe(false);
       },
     },
 
@@ -604,7 +600,7 @@ module.exports = defineCases({
       name: 'no-touch-url-means-no-page-and-no-event-source-url',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The raw-API recovery lane: no browser was ever involved, so there is
         // no touch and no url. An invented one is worse than an absent one —
         // the brand's home page would credit every recovered order to a page
@@ -625,8 +621,8 @@ module.exports = defineCases({
           pixelCode: TIKTOK_PIXEL,
         }).data[0];
 
-        assert.equal(Object.hasOwn(meta, 'event_source_url'), false, 'Meta gets no key at all, never an empty string');
-        assert.equal(Object.hasOwn(tiktok, 'page'), false, 'and TikTok no empty page object');
+        expect(Object.hasOwn(meta, 'event_source_url'), 'Meta gets no key at all, never an empty string').toBe(false);
+        expect(Object.hasOwn(tiktok, 'page'), 'and TikTok no empty page object').toBe(false);
       },
     },
 
@@ -634,18 +630,18 @@ module.exports = defineCases({
       name: 'ga4-gains-the-campaign-params-and-gclid',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const descriptor = descriptorFor(deliver({ ctx, omega }), 'ga4');
 
-        assert.equal(descriptor.name, 'purchase');
-        assert.equal(descriptor.payload.source, 'meta', 'last touch is the credited one');
-        assert.equal(descriptor.payload.medium, 'cpc');
-        assert.equal(descriptor.payload.campaign, 'launch');
-        assert.equal(descriptor.payload.term, 'omega');
-        assert.equal(descriptor.payload.content, 'hero');
-        assert.equal(descriptor.payload.gclid, 'G-CLICK', 'the Google click id rides as an event param');
-        assert.equal(descriptor.payload.value, 9.99, 'the commerce params are untouched');
-        assert.equal(descriptor.payload.fbc, undefined, 'another platform\'s match data never rides GA4');
+        expect(descriptor.name).toBe('purchase');
+        expect(descriptor.payload.source, 'last touch is the credited one').toBe('meta');
+        expect(descriptor.payload.medium).toBe('cpc');
+        expect(descriptor.payload.campaign).toBe('launch');
+        expect(descriptor.payload.term).toBe('omega');
+        expect(descriptor.payload.content).toBe('hero');
+        expect(descriptor.payload.gclid, 'the Google click id rides as an event param').toBe('G-CLICK');
+        expect(descriptor.payload.value, 'the commerce params are untouched').toBe(9.99);
+        expect(descriptor.payload.fbc, 'another platform\'s match data never rides GA4').toBe(undefined);
       },
     },
 
@@ -653,7 +649,7 @@ module.exports = defineCases({
       name: 'campaign-falls-back-to-the-first-touch',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // A user who arrived on a tagged link and never came back through one:
         // last touch is only ever written by a tagged visit (#384).
         const attribution = fullAttribution();
@@ -661,9 +657,9 @@ module.exports = defineCases({
 
         const descriptor = descriptorFor(deliver({ ctx, omega, attribution }), 'ga4');
 
-        assert.equal(descriptor.payload.source, 'newsletter', 'first touch credits the conversion when there is no last');
-        assert.equal(descriptor.payload.medium, 'email');
-        assert.equal(descriptor.payload.campaign, undefined, 'a param the touch never carried is absent, not empty');
+        expect(descriptor.payload.source, 'first touch credits the conversion when there is no last').toBe('newsletter');
+        expect(descriptor.payload.medium).toBe('email');
+        expect(descriptor.payload.campaign, 'a param the touch never carried is absent, not empty').toBe(undefined);
       },
     },
 
@@ -671,17 +667,17 @@ module.exports = defineCases({
       name: 'marketing-declined-blocks-meta-and-tiktok-but-not-ga4',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({
           ctx,
           omega,
           trackingConsent: { analytics: true, marketing: false, region: 'opt-in', version: 1 },
         });
 
-        assert.equal(outcomeFor(results, 'meta'), 'skipped (consent: marketing)', 'an opted-out user reaches no ad platform');
-        assert.equal(outcomeFor(results, 'tiktok'), 'skipped (consent: marketing)');
-        assert.equal(descriptorFor(results, 'meta'), undefined, 'a blocked provider never even resolves its payload');
-        assert.equal(outcomeFor(results, 'ga4').startsWith('skipped (consent'), false, 'analytics was granted, so GA4 still counts it');
+        expect(outcomeFor(results, 'meta'), 'an opted-out user reaches no ad platform').toBe('skipped (consent: marketing)');
+        expect(outcomeFor(results, 'tiktok')).toBe('skipped (consent: marketing)');
+        expect(descriptorFor(results, 'meta'), 'a blocked provider never even resolves its payload').toBe(undefined);
+        expect(outcomeFor(results, 'ga4').startsWith('skipped (consent'), 'analytics was granted, so GA4 still counts it').toBe(false);
       },
     },
 
@@ -689,15 +685,15 @@ module.exports = defineCases({
       name: 'analytics-declined-blocks-ga4-but-not-the-ad-platforms',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({
           ctx,
           omega,
           trackingConsent: { analytics: false, marketing: true, region: 'opt-in', version: 1 },
         });
 
-        assert.equal(outcomeFor(results, 'ga4'), 'skipped (consent: analytics)');
-        assert.equal(outcomeFor(results, 'meta').startsWith('skipped (consent'), false, 'the two categories gate independently');
+        expect(outcomeFor(results, 'ga4')).toBe('skipped (consent: analytics)');
+        expect(outcomeFor(results, 'meta').startsWith('skipped (consent'), 'the two categories gate independently').toBe(false);
       },
     },
 
@@ -705,20 +701,20 @@ module.exports = defineCases({
       name: 'an-absent-snapshot-is-not-a-denial',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // A legacy order, or one minted by the raw-API recovery lane, carries no
         // snapshot at all. Blocking it would be a silent revenue hole.
         for (const snapshot of [null, undefined, {}]) {
           const granted = conversions.resolveTrackingConsent(snapshot);
 
-          assert.equal(granted.analytics, true, `${JSON.stringify(snapshot)} allows analytics`);
-          assert.equal(granted.marketing, true, `${JSON.stringify(snapshot)} allows marketing`);
+          expect(granted.analytics, `${JSON.stringify(snapshot)} allows analytics`).toBe(true);
+          expect(granted.marketing, `${JSON.stringify(snapshot)} allows marketing`).toBe(true);
         }
 
         const results = deliver({ ctx, omega, trackingConsent: null });
 
         for (const provider of ['ga4', 'meta', 'tiktok']) {
-          assert.equal(outcomeFor(results, provider).startsWith('skipped (consent'), false, `${provider} fires without a snapshot`);
+          expect(outcomeFor(results, provider).startsWith('skipped (consent'), `${provider} fires without a snapshot`).toBe(false);
         }
       },
     },
@@ -727,7 +723,7 @@ module.exports = defineCases({
       name: 'an-order-with-no-attribution-still-fires-on-external-id',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The raw-API recovery lane: no browser was ever involved, so there is no
         // attribution, no cookies and no request pair.
         const results = deliver({
@@ -743,7 +739,7 @@ module.exports = defineCases({
           eventId: 'purchase._test-webhook-event',
         });
 
-        assert.deepEqual(body.data[0].user_data, { external_id: UID }, 'external_id alone — no empty match keys invented');
+        expect(body.data[0].user_data, 'external_id alone — no empty match keys invented').toEqual({ external_id: UID });
 
         // The lane where external_id is the ONLY match key is exactly where its
         // shape decides whether the fire matches anybody at all (#410).
@@ -754,10 +750,10 @@ module.exports = defineCases({
           pixelCode: '_TEST_PIXEL',
         });
 
-        assert.deepEqual(tiktok.data[0].user, { external_id: UID_DIGEST }, 'TikTok\'s lone match key is the digest its Events API requires');
+        expect(tiktok.data[0].user, 'TikTok\'s lone match key is the digest its Events API requires').toEqual({ external_id: UID_DIGEST });
 
-        assert.equal(descriptorFor(results, 'ga4').payload.source, undefined, 'no campaign params either');
-        assert.equal(outcomeFor(results, 'meta').startsWith('skipped (consent'), false, 'missing match data never blocks the fire');
+        expect(descriptorFor(results, 'ga4').payload.source, 'no campaign params either').toBe(undefined);
+        expect(outcomeFor(results, 'meta').startsWith('skipped (consent'), 'missing match data never blocks the fire').toBe(false);
       },
     },
 
@@ -770,7 +766,7 @@ module.exports = defineCases({
       name: 'a-provider-the-other-half-owns-is-never-fired',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const results = deliver({
           ctx,
           omega,
@@ -779,19 +775,19 @@ module.exports = defineCases({
           providers: ['meta', 'tiktok'],
         });
 
-        assert.equal(outcomeFor(results, 'ga4'), 'skipped (not selected)', 'GA4 must not be fired by a half that cannot dedupe against the other');
-        assert.equal(descriptorFor(results, 'ga4'), undefined, 'an unselected provider never even resolves its payload');
+        expect(outcomeFor(results, 'ga4'), 'GA4 must not be fired by a half that cannot dedupe against the other').toBe('skipped (not selected)');
+        expect(descriptorFor(results, 'ga4'), 'an unselected provider never even resolves its payload').toBe(undefined);
 
         // The two that DO dedupe are resolved and handed to their transport.
         for (const provider of ['meta', 'tiktok']) {
-          assert.equal(descriptorFor(results, provider).name, 'CompleteRegistration', `${provider} resolves its native event`);
-          assert.equal(outcomeFor(results, provider).startsWith('skipped (not selected)'), false, `${provider} is this half's to fire`);
+          expect(descriptorFor(results, provider).name, `${provider} resolves its native event`).toBe('CompleteRegistration');
+          expect(outcomeFor(results, provider).startsWith('skipped (not selected)'), `${provider} is this half's to fire`).toBe(false);
         }
 
         // Unrestricted stays unrestricted — the seam is opt-in per fire.
         const everyProvider = deliver({ ctx, omega, event: 'sign_up', params: { method: 'email', user_id: UID } });
 
-        assert.equal(outcomeFor(everyProvider, 'ga4').startsWith('skipped (not selected)'), false, 'a fire that names no providers reaches every mapped one');
+        expect(outcomeFor(everyProvider, 'ga4').startsWith('skipped (not selected)'), 'a fire that names no providers reaches every mapped one').toBe(false);
       },
     },
 
@@ -799,24 +795,24 @@ module.exports = defineCases({
       name: 'an-account-with-no-phone-sends-no-phone-hash',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The account schema stores the pair as NUMBERS defaulting to 0. Hashing
         // that would give every phoneless account the same match key — junk the
         // platforms would happily match strangers to each other on.
         for (const hash of [matchData.hashPhone, matchData.hashPhoneE164]) {
-          assert.equal(hash({ countryCode: 0, national: 0 }), null, 'the schema default is no phone');
-          assert.equal(hash(undefined), null);
+          expect(hash({ countryCode: 0, national: 0 }), 'the schema default is no phone').toBe(null);
+          expect(hash(undefined)).toBe(null);
         }
 
-        assert.equal(matchData.hashPhone({ countryCode: 1, national: 5550102030 }), sha256('15550102030'), 'a real number still hashes');
+        expect(matchData.hashPhone({ countryCode: 1, national: 5550102030 }), 'a real number still hashes').toBe(sha256('15550102030'));
 
         // Firebase Auth hands the trigger an E.164 string instead of the pair.
-        assert.equal(matchData.hashPhone('+1 555-010-2030'), sha256('15550102030'), 'the Auth record shape hashes to the same digest');
+        expect(matchData.hashPhone('+1 555-010-2030'), 'the Auth record shape hashes to the same digest').toBe(sha256('15550102030'));
 
         const identity = matchData.buildIdentity({ uid: UID, telephone: { countryCode: 0, national: 0 } });
 
-        assert.equal(Object.hasOwn(identity, 'metaPhoneHash'), false, 'an unresolvable match key is absent, never empty');
-        assert.equal(Object.hasOwn(identity, 'tiktokPhoneHash'), false, 'and neither normalization invents one');
+        expect(Object.hasOwn(identity, 'metaPhoneHash'), 'an unresolvable match key is absent, never empty').toBe(false);
+        expect(Object.hasOwn(identity, 'tiktokPhoneHash'), 'and neither normalization invents one').toBe(false);
       },
     },
 
@@ -829,13 +825,13 @@ module.exports = defineCases({
       name: 'the-phone-hash-is-normalized-per-provider-spec',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         const telephone = { countryCode: 1, national: 5550102030 };
         const identity = matchData.buildIdentity({ uid: UID, telephone: telephone });
 
-        assert.equal(identity.metaPhoneHash, sha256('15550102030'), 'Meta hashes the bare digits');
-        assert.equal(identity.tiktokPhoneHash, sha256('+15550102030'), 'TikTok hashes the E.164 number');
-        assert.equal(identity.metaPhoneHash === identity.tiktokPhoneHash, false, 'two specs, two digests — never one hash for both');
+        expect(identity.metaPhoneHash, 'Meta hashes the bare digits').toBe(sha256('15550102030'));
+        expect(identity.tiktokPhoneHash, 'TikTok hashes the E.164 number').toBe(sha256('+15550102030'));
+        expect(identity.metaPhoneHash === identity.tiktokPhoneHash, 'two specs, two digests — never one hash for both').toBe(false);
 
         // The same normalizers the browser half uses (`@omega.js/analytics/identity`),
         // so a server conversion and a pixel event carry the SAME match key.
@@ -844,8 +840,8 @@ module.exports = defineCases({
         const meta = conversions.buildMetaBody({ descriptor: descriptorFor(results, 'meta'), identity: identity, eventId: 'purchase._test-webhook-event' });
         const tiktok = conversions.buildTikTokBody({ descriptor: descriptorFor(results, 'tiktok'), identity: identity, eventId: 'purchase._test-webhook-event', pixelCode: '_TEST_PIXEL' });
 
-        assert.equal(meta.data[0].user_data.ph, sha256('15550102030'), 'the Meta body carries the digits-only digest');
-        assert.equal(tiktok.data[0].user.phone, sha256('+15550102030'), 'the TikTok body carries the E.164 digest');
+        expect(meta.data[0].user_data.ph, 'the Meta body carries the digits-only digest').toBe(sha256('15550102030'));
+        expect(tiktok.data[0].user.phone, 'the TikTok body carries the E.164 digest').toBe(sha256('+15550102030'));
       },
     },
 
@@ -853,7 +849,7 @@ module.exports = defineCases({
       name: 'an-event-name-the-catalog-does-not-know-is-loud-and-harmless',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // A typo in a canonical name used to be SILENT: every adapter returned
         // null, and the fire read exactly like `subscription_plan_change` on Meta — a
         // deliberate non-mapping. So a webhook could stop reporting revenue and the logs
@@ -872,13 +868,13 @@ module.exports = defineCases({
         });
 
         for (const provider of ['ga4', 'meta', 'tiktok']) {
-          assert.equal(outcomeFor(results, provider), 'skipped (unknown event)', `${provider} must say the NAME was wrong, not that the provider declined to map a real event`);
+          expect(outcomeFor(results, provider), `${provider} must say the NAME was wrong, not that the provider declined to map a real event`).toBe('skipped (unknown event)');
         }
 
         const loud = warnings.filter((line) => line.includes('[unknown canonical event]'));
 
-        assert.equal(loud.length, 1, `exactly one loud line, not one per provider: ${warnings.join(' | ')}`);
-        assert.equal(loud[0].includes('purchsae'), true, `the line must name the offender: ${loud[0]}`);
+        expect(loud.length, `exactly one loud line, not one per provider: ${warnings.join(' | ')}`).toBe(1);
+        expect(loud[0].includes('purchsae'), `the line must name the offender: ${loud[0]}`).toBe(true);
       },
     },
 
@@ -886,7 +882,7 @@ module.exports = defineCases({
       name: 'the-outcomes-an-ad-platform-has-no-use-for-reach-ga4-only',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The catalog maps none of these on Meta or TikTok — an unmapped provider
         // is a decision, and the adapter skips rather than inventing an event.
         // `trial_lapse` is the deliberate omission of the exclusion lane below
@@ -897,9 +893,9 @@ module.exports = defineCases({
         for (const event of ['subscription_uncancel', 'subscription_plan_change', 'trial_lapse']) {
           const results = deliver({ ctx, omega, event });
 
-          assert.equal(descriptorFor(results, 'ga4').name, event, `${event} resolves on GA4 under its own name`);
-          assert.equal(outcomeFor(results, 'meta'), 'skipped (no mapping)', `${event} has no Meta mapping`);
-          assert.equal(outcomeFor(results, 'tiktok'), 'skipped (no mapping)', `${event} has no TikTok mapping`);
+          expect(descriptorFor(results, 'ga4').name, `${event} resolves on GA4 under its own name`).toBe(event);
+          expect(outcomeFor(results, 'meta'), `${event} has no Meta mapping`).toBe('skipped (no mapping)');
+          expect(outcomeFor(results, 'tiktok'), `${event} has no TikTok mapping`).toBe('skipped (no mapping)');
         }
       },
     },
@@ -908,7 +904,7 @@ module.exports = defineCases({
       name: 'a-cancellation-and-a-refund-build-exclusion-audiences-worth-zero',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The churn moments an ad platform CAN use
         // ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)): neither
         // Meta nor TikTok can subtract revenue and neither optimizes against an
@@ -923,30 +919,30 @@ module.exports = defineCases({
           const meta = descriptorFor(results, 'meta');
           const tiktok = descriptorFor(results, 'tiktok');
 
-          assert.equal(google.name, event, `${event} still resolves on GA4 under its own name`);
-          assert.equal(google.payload.value, 9.99, 'GA4 keeps the real number — its revenue report is where a refund nets out');
+          expect(google.name, `${event} still resolves on GA4 under its own name`).toBe(event);
+          expect(google.payload.value, 'GA4 keeps the real number — its revenue report is where a refund nets out').toBe(9.99);
 
-          assert.equal(meta.name, native, `${event} reaches Meta as ${native}`);
-          assert.equal(meta.kind, 'custom', 'Meta defines no churn event, so the pixel command is trackCustom');
-          assert.equal(meta.payload.value, 0, 'a churn signal must never book revenue in an ad account');
-          assert.deepEqual(meta.payload.content_ids, ['premium'], 'the plan is what makes the audience worth building');
+          expect(meta.name, `${event} reaches Meta as ${native}`).toBe(native);
+          expect(meta.kind, 'Meta defines no churn event, so the pixel command is trackCustom').toBe('custom');
+          expect(meta.payload.value, 'a churn signal must never book revenue in an ad account').toBe(0);
+          expect(meta.payload.content_ids, 'the plan is what makes the audience worth building').toEqual(['premium']);
 
-          assert.equal(tiktok.name, native, `${event} reaches TikTok as ${native}`);
-          assert.equal(tiktok.kind, 'custom');
-          assert.equal(tiktok.payload.value, 0, 'TikTok cannot subtract revenue either');
-          assert.equal(tiktok.payload.contents[0].content_id, 'premium');
-          assert.equal(tiktok.payload.contents[0].price, undefined, 'the per-item price would put the amount back on the wire');
-          assert.equal(tiktok.payload.contents[0].quantity, undefined, 'so it comes off with the value, like Meta\'s signal');
+          expect(tiktok.name, `${event} reaches TikTok as ${native}`).toBe(native);
+          expect(tiktok.kind).toBe('custom');
+          expect(tiktok.payload.value, 'TikTok cannot subtract revenue either').toBe(0);
+          expect(tiktok.payload.contents[0].content_id).toBe('premium');
+          expect(tiktok.payload.contents[0].price, 'the per-item price would put the amount back on the wire').toBe(undefined);
+          expect(tiktok.payload.contents[0].quantity, 'so it comes off with the value, like Meta\'s signal').toBe(undefined);
 
           // The bodies that would go on the wire carry the same zero.
           const body = conversions.buildMetaBody({ descriptor: meta, identity: {}, eventId: `${event}._test-webhook-event` });
           const tiktokBody = conversions.buildTikTokBody({ descriptor: tiktok, identity: {}, eventId: `${event}._test-webhook-event`, pixelCode: '_TEST_PIXEL' });
 
-          assert.equal(body.data[0].event_name, native);
-          assert.equal(body.data[0].custom_data.value, 0);
-          assert.equal(tiktokBody.data[0].event, native);
-          assert.equal(tiktokBody.data[0].properties.value, 0);
-          assert.equal(JSON.stringify(tiktokBody).includes('9.99'), false, 'no amount rides a churn body under ANY key');
+          expect(body.data[0].event_name).toBe(native);
+          expect(body.data[0].custom_data.value).toBe(0);
+          expect(tiktokBody.data[0].event).toBe(native);
+          expect(tiktokBody.data[0].properties.value).toBe(0);
+          expect(JSON.stringify(tiktokBody).includes('9.99'), 'no amount rides a churn body under ANY key').toBe(false);
         }
       },
     },
@@ -955,7 +951,7 @@ module.exports = defineCases({
       name: 'a-trial-conversion-reaches-all-three-as-real-revenue',
       auth: 'none',
 
-      async run({ assert, ctx, omega }) {
+      async run({ expect, ctx, omega }) {
         // The one [#407] addition where money actually moved, so unlike the four
         // above it carries a full mapping: GA4's standard purchase (revenue
         // belongs in the revenue report) and each ad platform's Purchase, which
@@ -969,13 +965,13 @@ module.exports = defineCases({
 
         const google = descriptorFor(results, 'ga4');
 
-        assert.equal(google.name, 'purchase', 'the first real charge lands in GA4 revenue');
-        assert.equal(google.payload.value, 9.99);
-        assert.equal(google.payload.is_trial, true, 'the flag pair is what marks it inside GA4 purchase');
-        assert.equal(google.payload.is_recurring, false);
+        expect(google.name, 'the first real charge lands in GA4 revenue').toBe('purchase');
+        expect(google.payload.value).toBe(9.99);
+        expect(google.payload.is_trial, 'the flag pair is what marks it inside GA4 purchase').toBe(true);
+        expect(google.payload.is_recurring).toBe(false);
 
-        assert.equal(descriptorFor(results, 'meta').name, 'Purchase');
-        assert.equal(descriptorFor(results, 'tiktok').name, 'Purchase');
+        expect(descriptorFor(results, 'meta').name).toBe('Purchase');
+        expect(descriptorFor(results, 'tiktok').name).toBe('Purchase');
       },
     },
 
@@ -989,24 +985,24 @@ module.exports = defineCases({
       name: 'a-dev-run-resolves-the-whole-walk-and-delivers-nothing',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { results, calls, lines } = fireOnRecordedWire({ production: false });
 
-        assert.equal(calls.length, 0, `an emulator run must reach no platform: ${calls.map((call) => call.url).join(', ')}`);
+        expect(calls.length, `an emulator run must reach no platform: ${calls.map((call) => call.url).join(', ')}`).toBe(0);
 
         for (const [provider, native] of [['meta', 'Purchase'], ['tiktok', 'Purchase']]) {
-          assert.equal(outcomeFor(results, provider), 'blocked (dev)', `${provider} says it was blocked, not that it sent`);
-          assert.equal(descriptorFor(results, provider).name, native, `${provider} still resolves — the dev trace names what WOULD have fired`);
+          expect(outcomeFor(results, provider), `${provider} says it was blocked, not that it sent`).toBe('blocked (dev)');
+          expect(descriptorFor(results, provider).name, `${provider} still resolves — the dev trace names what WOULD have fired`).toBe(native);
 
           const blocked = lines.filter((line) => line.includes(`[${provider}]`) && line.includes('blocked (dev)'));
 
-          assert.equal(blocked.length, 1, `exactly one blocked line for ${provider}: ${lines.join(' | ')}`);
-          assert.equal(blocked[0].includes('purchase'), true, `the line names the event: ${blocked[0]}`);
+          expect(blocked.length, `exactly one blocked line for ${provider}: ${lines.join(' | ')}`).toBe(1);
+          expect(blocked[0].includes('purchase'), `the line names the event: ${blocked[0]}`).toBe(true);
         }
 
         // And the same fire in production is the proof the gate reads the
         // environment rather than simply never sending.
-        assert.equal(fireOnRecordedWire({ production: true }).calls.length, 2, 'production still delivers to both platforms');
+        expect(fireOnRecordedWire({ production: true }).calls.length, 'production still delivers to both platforms').toBe(2);
       },
     },
   ],

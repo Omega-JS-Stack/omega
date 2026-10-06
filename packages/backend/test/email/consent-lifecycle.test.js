@@ -70,7 +70,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert }) {
+      async run({ accounts, expect }) {
         const granted = accounts['consent-granted'];
         const declined = accounts['consent-declined'];
 
@@ -87,10 +87,10 @@ module.exports = defineCases({
         const grantedBh = await pollProvider(() => beehiivProvider.findContact(granted.email), false);
         const declinedBh = await pollProvider(() => beehiivProvider.findContact(declined.email), false);
 
-        assert.equal(grantedSg, null, 'granted account should be absent from SendGrid');
-        assert.equal(declinedSg, null, 'declined account should be absent from SendGrid');
-        assert.equal(grantedBh, null, 'granted account should be absent from Beehiiv');
-        assert.equal(declinedBh, null, 'declined account should be absent from Beehiiv');
+        expect(grantedSg, 'granted account should be absent from SendGrid').toBe(null);
+        expect(declinedSg, 'declined account should be absent from SendGrid').toBe(null);
+        expect(grantedBh, 'granted account should be absent from Beehiiv').toBe(null);
+        expect(declinedBh, 'declined account should be absent from Beehiiv').toBe(null);
       },
     },
 
@@ -102,7 +102,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, omega, ctx, config }) {
+      async run({ accounts, expect, omega, ctx, config }) {
         const granted = accounts['consent-granted'];
         const admin = omega.firebase.admin;
 
@@ -134,8 +134,8 @@ module.exports = defineCases({
 
         // Trigger marketing sync via the Email() surface
         const result = await ctx.email.sync(granted.uid);
-        assert.ok(result, 'sync should return a result');
-        assert.notEqual(result.blocked, 'validation', 'sync should not be blocked by validation (uses _test.allow_*)');
+        expect(result, 'sync should return a result').toBeTruthy();
+        expect(result.blocked, 'sync should not be blocked by validation (uses _test.allow_*)').not.toBe('validation');
 
         // Poll providers until they reflect the upsert. SendGrid's upsert is
         // an async background job (returns a job_id, not the inserted contact)
@@ -144,9 +144,9 @@ module.exports = defineCases({
         const sgContact = await pollProvider(() => sendgridProvider.findContact(granted.email), true);
         const bhContact = await pollProvider(() => beehiivProvider.findContact(granted.email), true);
 
-        assert.ok(sgContact, 'granted account should now exist in SendGrid');
+        expect(sgContact, 'granted account should now exist in SendGrid').toBeTruthy();
         if (config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
-          assert.ok(bhContact, 'granted account should now exist in Beehiiv');
+          expect(bhContact, 'granted account should now exist in Beehiiv').toBeTruthy();
         }
       },
     },
@@ -161,7 +161,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, omega, ctx }) {
+      async run({ accounts, expect, omega, ctx }) {
         const declined = accounts['consent-declined'];
         const admin = omega.firebase.admin;
 
@@ -201,8 +201,8 @@ module.exports = defineCases({
         const sgContact = await sendgridProvider.findContact(declined.email);
         const bhContact = await beehiivProvider.findContact(declined.email);
 
-        assert.equal(sgContact, null, 'declined account should remain absent from SendGrid');
-        assert.equal(bhContact, null, 'declined account should remain absent from Beehiiv');
+        expect(sgContact, 'declined account should remain absent from SendGrid').toBe(null);
+        expect(bhContact, 'declined account should remain absent from Beehiiv').toBe(null);
       },
     },
 
@@ -214,19 +214,19 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, omega, ctx }) {
+      async run({ accounts, expect, omega, ctx }) {
         const granted = accounts['consent-granted'];
 
         // Trigger removal — simulates the email-preferences opt-out flow
         const result = await ctx.email.remove(granted.email);
-        assert.ok(result, 'remove should return a result');
+        expect(result, 'remove should return a result').toBeTruthy();
 
         // Poll for absence — SendGrid's contact delete is also an async job.
         const sgContact = await pollProvider(() => sendgridProvider.findContact(granted.email), false);
         const bhContact = await pollProvider(() => beehiivProvider.findContact(granted.email), false);
 
-        assert.equal(sgContact, null, 'granted account should now be absent from SendGrid');
-        assert.equal(bhContact, null, 'granted account should now be absent from Beehiiv');
+        expect(sgContact, 'granted account should now be absent from SendGrid').toBe(null);
+        expect(bhContact, 'granted account should now be absent from Beehiiv').toBe(null);
       },
     },
 
@@ -238,20 +238,20 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ assert, omega, ctx }) {
+      async run({ expect, omega, ctx }) {
         // _test.never-reaches-providers@... is NOT _test.allow_* → should be blocked
         const blockedEmail = '_test.never-reaches-providers@somiibo.com';
 
         const result = await ctx.email.add({ email: blockedEmail });
 
-        assert.equal(result.blocked, 'validation', 'non-allow _test.* email should be blocked by validation');
+        expect(result.blocked, 'non-allow _test.* email should be blocked by validation').toBe('validation');
 
         // And the provider lookup should show nothing
         const sgContact = await sendgridProvider.findContact(blockedEmail);
         const bhContact = await beehiivProvider.findContact(blockedEmail);
 
-        assert.equal(sgContact, null, 'blocked email should never appear in SendGrid');
-        assert.equal(bhContact, null, 'blocked email should never appear in Beehiiv');
+        expect(sgContact, 'blocked email should never appear in SendGrid').toBe(null);
+        expect(bhContact, 'blocked email should never appear in Beehiiv').toBe(null);
       },
     },
   ],

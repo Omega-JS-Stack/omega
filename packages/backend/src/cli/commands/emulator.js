@@ -9,9 +9,9 @@ const powertools = require('node-powertools');
 const WatchCommand = require('./watch');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv, isPortFree } = require('@omega.js/config');
-const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
+const { EXTENDED_MODE_WARNING } = require('../../test/extended-mode-lines.js');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
-const { seed } = require('../../test/seed.js');
+const { seedProject } = require('../../test/seed.js');
 const { createChildLog } = require('../utils/attach-log-file');
 const { refuseWhenCustom, refuseWhenToolsMissing } = require('../utils/project-type');
 const emulatorOrphans = require('./emulator-orphans');
@@ -762,7 +762,7 @@ class EmulatorCommand extends BaseCommand {
       }
 
       const { TEST_ACCOUNT_PASSWORD } = require('../../test/test-accounts.js');
-      const result = await seed({
+      const result = await seedProject({
         admin: firebaseAdmin,
         domain,
         config,
@@ -1276,8 +1276,8 @@ class EmulatorCommand extends BaseCommand {
    *
    * No current caller — `npx omega emulator`'s keep-alive flow boots through
    * execute() now; kept for programmatic embedding.
-   * `npx omega test`'s auto-start path uses startEmulators() directly so it can tee the
-   * test command's output to its own log (test.log) separate from emulator.log.
+   * `npx omega test`'s auto-start path uses startEmulators() directly, so the runner
+   * child's output rides the verb's own tee (`logs/test.log`), apart from emulator.log.
    *
    * @param {string} command - shell command to run while emulators are up
    */

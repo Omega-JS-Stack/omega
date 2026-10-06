@@ -200,93 +200,93 @@ module.exports = defineCases({
     {
       name: 'stripe-an-amount-code-creates-an-amount_off-coupon-in-cents',
       auth: 'none',
-      async run({ assert, omega, config }) {
+      async run({ expect, omega, config }) {
         const captured = await stripeCheckout(omega, AMOUNT_CODE);
         const created = captured.created;
 
-        assert.ok(created, 'The provider should have created a coupon');
-        assert.equal(created.amount_off, 1000, 'Stripe takes amount_off in CENTS — $10 is 1000');
-        assert.equal(created.currency, expectedCurrency(config).toLowerCase(), 'Stripe requires a currency alongside amount_off');
-        assert.equal('percent_off' in created, false, 'An amount coupon must not carry percent_off at all');
-        assert.equal(created.duration, 'once', 'Every code is first-charge only');
-        assert.equal(created.id, captured.retrieved, 'The id it created is the id it looked for');
-        assert.match(created.id, /WELCOME10OFF/, 'The id names the code');
-        assert.equal(captured.session.discounts[0].coupon, created.id, 'The checkout session applies the coupon it just made');
+        expect(created, 'The provider should have created a coupon').toBeTruthy();
+        expect(created.amount_off, 'Stripe takes amount_off in CENTS — $10 is 1000').toBe(1000);
+        expect(created.currency, 'Stripe requires a currency alongside amount_off').toBe(expectedCurrency(config).toLowerCase());
+        expect('percent_off' in created, 'An amount coupon must not carry percent_off at all').toBe(false);
+        expect(created.duration, 'Every code is first-charge only').toBe('once');
+        expect(created.id, 'The id it created is the id it looked for').toBe(captured.retrieved);
+        expect(created.id, 'The id names the code').toMatch(/WELCOME10OFF/);
+        expect(captured.session.discounts[0].coupon, 'The checkout session applies the coupon it just made').toBe(created.id);
       },
     },
 
     {
       name: 'stripe-a-percent-code-is-unchanged',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const captured = await stripeCheckout(omega, PERCENT_CODE);
         const created = captured.created;
 
         // The id is byte-identical to what it has always been — coupons already
         // live in a brand's Stripe account keep resolving instead of being
         // duplicated under a new id
-        assert.equal(captured.retrieved, `BEM_${PERCENT_CODE}_15OFF_ONCE`, 'The percent coupon id is unchanged');
-        assert.equal(created.percent_off, 15, 'A percent coupon still carries percent_off');
-        assert.equal('amount_off' in created, false, 'A percent coupon carries no amount_off');
-        assert.equal('currency' in created, false, 'A percent coupon needs no currency');
-        assert.equal(created.name, `${PERCENT_CODE} (15% off first payment)`, 'The dashboard label is unchanged');
+        expect(captured.retrieved, 'The percent coupon id is unchanged').toBe(`BEM_${PERCENT_CODE}_15OFF_ONCE`);
+        expect(created.percent_off, 'A percent coupon still carries percent_off').toBe(15);
+        expect('amount_off' in created, 'A percent coupon carries no amount_off').toBe(false);
+        expect('currency' in created, 'A percent coupon needs no currency').toBe(false);
+        expect(created.name, 'The dashboard label is unchanged').toBe(`${PERCENT_CODE} (15% off first payment)`);
       },
     },
 
     {
       name: 'stripe-the-two-shapes-never-share-a-coupon-id',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const amount = await stripeCheckout(omega, AMOUNT_CODE);
         const percent = await stripeCheckout(omega, PERCENT_CODE);
 
-        assert.notEqual(amount.retrieved, percent.retrieved, 'A $10-off coupon and a 15%-off coupon are different coupons');
+        expect(amount.retrieved, 'A $10-off coupon and a 15%-off coupon are different coupons').not.toBe(percent.retrieved);
       },
     },
 
     {
       name: 'stripe-an-existing-amount-coupon-is-reused-not-recreated',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const captured = await stripeCheckout(omega, AMOUNT_CODE, { couponExists: true });
 
-        assert.ok(captured.retrieved, 'It should have looked the coupon up');
-        assert.equal(captured.created, undefined, 'An existing coupon is reused, never re-created');
-        assert.equal(captured.session.discounts[0].coupon, captured.retrieved, 'The session applies the coupon it found');
+        expect(captured.retrieved, 'It should have looked the coupon up').toBeTruthy();
+        expect(captured.created, 'An existing coupon is reused, never re-created').toBe(undefined);
+        expect(captured.session.discounts[0].coupon, 'The session applies the coupon it found').toBe(captured.retrieved);
       },
     },
 
     {
       name: 'chargebee-an-amount-code-creates-a-fixed_amount-coupon',
       auth: 'none',
-      async run({ assert, omega, config }) {
+      async run({ expect, omega, config }) {
         const captured = await chargebeeCheckout(omega, AMOUNT_CODE);
         const created = captured.created;
 
-        assert.ok(created, 'The provider should have created a coupon');
-        assert.equal(created.discount_type, 'fixed_amount', 'A flat-dollar code is a fixed_amount coupon');
-        assert.equal(created.discount_amount, 1000, 'Chargebee takes the amount in the currency\'s minor unit — $10 is 1000');
-        assert.equal(created.currency_code, expectedCurrency(config).toUpperCase(), 'A fixed_amount coupon names its currency');
-        assert.equal('discount_percentage' in created, false, 'An amount coupon must not carry a percentage');
-        assert.equal(created.duration_type, 'one_time', 'Every code is first-charge only');
-        assert.equal(created.id, captured.retrieved, 'The id it created is the id it looked for');
-        assert.equal(captured.checkout.coupon_ids[0], created.id, 'The hosted page applies the coupon it just made');
+        expect(created, 'The provider should have created a coupon').toBeTruthy();
+        expect(created.discount_type, 'A flat-dollar code is a fixed_amount coupon').toBe('fixed_amount');
+        expect(created.discount_amount, 'Chargebee takes the amount in the currency\'s minor unit — $10 is 1000').toBe(1000);
+        expect(created.currency_code, 'A fixed_amount coupon names its currency').toBe(expectedCurrency(config).toUpperCase());
+        expect('discount_percentage' in created, 'An amount coupon must not carry a percentage').toBe(false);
+        expect(created.duration_type, 'Every code is first-charge only').toBe('one_time');
+        expect(created.id, 'The id it created is the id it looked for').toBe(captured.retrieved);
+        expect(captured.checkout.coupon_ids[0], 'The hosted page applies the coupon it just made').toBe(created.id);
       },
     },
 
     {
       name: 'chargebee-a-percent-code-is-unchanged',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const captured = await chargebeeCheckout(omega, PERCENT_CODE);
         const created = captured.created;
 
-        assert.equal(captured.retrieved, `BEM_${PERCENT_CODE}_15OFF_ONCE`, 'The percent coupon id is unchanged');
-        assert.equal(created.discount_type, 'percentage', 'A percent code is still a percentage coupon');
-        assert.equal(created.discount_percentage, 15, 'It still carries its percentage');
-        assert.equal('discount_amount' in created, false, 'A percent coupon carries no amount');
-        assert.equal('currency_code' in created, false, 'A percent coupon needs no currency');
-        assert.equal(created.apply_on, 'invoice_amount', 'Unchanged: the coupon applies to the invoice amount');
+        expect(captured.retrieved, 'The percent coupon id is unchanged').toBe(`BEM_${PERCENT_CODE}_15OFF_ONCE`);
+        expect(created.discount_type, 'A percent code is still a percentage coupon').toBe('percentage');
+        expect(created.discount_percentage, 'It still carries its percentage').toBe(15);
+        expect('discount_amount' in created, 'A percent coupon carries no amount').toBe(false);
+        expect('currency_code' in created, 'A percent coupon needs no currency').toBe(false);
+        expect(created.apply_on, 'Unchanged: the coupon applies to the invoice amount').toBe('invoice_amount');
       },
     },
   ],

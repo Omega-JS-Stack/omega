@@ -12,56 +12,56 @@ module.exports = defineCases({
   tests: [
     {
       name: 'rejects-missing-code',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/payments/discount');
 
-        assert.isError(response, 400, 'Should reject missing code');
+        expect(response, 'Should reject missing code').toBeError(400);
       },
     },
 
     {
       name: 'returns-valid-for-known-code',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/payments/discount', {
           code: 'FLASH20',
         });
 
-        assert.isSuccess(response, 'Should succeed for valid code');
-        assert.equal(response.data.valid, true, 'Should be valid');
-        assert.equal(response.data.code, 'FLASH20', 'Should return normalized code');
-        assert.equal(response.data.percent, 20, 'Should return correct percent');
-        assert.equal(response.data.duration, 'once', 'Should return duration');
+        expect(response, 'Should succeed for valid code').toBeSuccess();
+        expect(response.data.valid, 'Should be valid').toBe(true);
+        expect(response.data.code, 'Should return normalized code').toBe('FLASH20');
+        expect(response.data.percent, 'Should return correct percent').toBe(20);
+        expect(response.data.duration, 'Should return duration').toBe('once');
       },
     },
 
     {
       name: 'returns-valid-case-insensitive',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/payments/discount', {
           code: 'flash20',
         });
 
-        assert.isSuccess(response, 'Should succeed for lowercase code');
-        assert.equal(response.data.valid, true, 'Should be valid (case-insensitive)');
-        assert.equal(response.data.code, 'FLASH20', 'Should return uppercase code');
+        expect(response, 'Should succeed for lowercase code').toBeSuccess();
+        expect(response.data.valid, 'Should be valid (case-insensitive)').toBe(true);
+        expect(response.data.code, 'Should return uppercase code').toBe('FLASH20');
       },
     },
 
     {
       name: 'returns-invalid-for-unknown-code',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/payments/discount', {
           code: 'NOTAREALCODE',
         });
 
-        assert.isSuccess(response, 'Should return 200 even for invalid code');
-        assert.equal(response.data.valid, false, 'Should be invalid');
+        expect(response, 'Should return 200 even for invalid code').toBeSuccess();
+        expect(response.data.valid, 'Should be invalid').toBe(false);
       },
     },
 
     {
       name: 'validates-all-known-codes',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const codes = [
           { code: 'FLASH20', percent: 20 },
           { code: 'SAVE10', percent: 10 },
@@ -71,10 +71,10 @@ module.exports = defineCases({
         for (const { code, percent } of codes) {
           const response = await http.as('none').get('omega/payments/discount', { code });
 
-          assert.isSuccess(response, `Should succeed for ${code}`);
-          assert.equal(response.data.valid, true, `${code} should be valid`);
-          assert.equal(response.data.percent, percent, `${code} should be ${percent}%`);
-          assert.equal(response.data.duration, 'once', `${code} should be once`);
+          expect(response, `Should succeed for ${code}`).toBeSuccess();
+          expect(response.data.valid, `${code} should be valid`).toBe(true);
+          expect(response.data.percent, `${code} should be ${percent}%`).toBe(percent);
+          expect(response.data.duration, `${code} should be once`).toBe('once');
         }
       },
     },

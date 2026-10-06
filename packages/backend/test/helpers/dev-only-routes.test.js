@@ -67,28 +67,24 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the folder is not empty — the disk read this suite depends on works',
-      async run({ assert }) {
+      async run({ expect }) {
         const routes = listDevOnlyRoutes();
 
-        assert.ok(routes.length > 1, `Expected several ${DEV_ONLY_ROUTE_FOLDER}/ routes, got ${routes.length}`);
-        assert.contains(routes, 'test/usage', 'the usage route is one of them');
-        assert.contains(routes, 'test/redirect', 'and the redirect route');
+        expect(routes.length > 1, `Expected several ${DEV_ONLY_ROUTE_FOLDER}/ routes, got ${routes.length}`).toBeTruthy();
+        expect(routes, 'the usage route is one of them').toContain('test/usage');
+        expect(routes, 'and the redirect route').toContain('test/redirect');
       },
     },
 
     {
       name: 'every route in the dev-only folder is refused in production',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = omega.getEnvironment();
-          assert.equal(environment, 'production', 'the real omega resolves production');
+          expect(environment, 'the real omega resolves production').toBe('production');
 
           for (const route of listDevOnlyRoutes()) {
-            assert.equal(
-              isDevOnlyRouteBlocked(route, environment),
-              true,
-              `${route} should be refused in production`
-            );
+            expect(isDevOnlyRouteBlocked(route, environment), `${route} should be refused in production`).toBe(true);
           }
         });
       },
@@ -96,22 +92,18 @@ module.exports = defineCases({
 
     {
       name: 'a route added to the folder later is refused without touching the guard',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           // Not a file that exists — the point is that the gate keys off the
           // FOLDER, so a handler nobody has written yet is already covered.
-          assert.equal(
-            isDevOnlyRouteBlocked(`${DEV_ONLY_ROUTE_FOLDER}/some-future-debug-route`, omega.getEnvironment()),
-            true,
-            'a not-yet-written test route is gated by default'
-          );
+          expect(isDevOnlyRouteBlocked(`${DEV_ONLY_ROUTE_FOLDER}/some-future-debug-route`, omega.getEnvironment()), 'a not-yet-written test route is gated by default').toBe(true);
         });
       },
     },
 
     {
       name: 'the same routes serve under the emulator (development AND testing)',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const scenarios = [
           { env: { OMEGA_ENVIRONMENT: 'development' }, expect: 'development' },
           { env: { OMEGA_ENVIRONMENT: 'testing' }, expect: 'testing' },
@@ -120,14 +112,10 @@ module.exports = defineCases({
         for (const scenario of scenarios) {
           withEnv(scenario.env, () => {
             const environment = omega.getEnvironment();
-            assert.equal(environment, scenario.expect, `the real omega resolves ${scenario.expect}`);
+            expect(environment, `the real omega resolves ${scenario.expect}`).toBe(scenario.expect);
 
             for (const route of listDevOnlyRoutes()) {
-              assert.equal(
-                isDevOnlyRouteBlocked(route, environment),
-                false,
-                `${route} must still serve in ${scenario.expect}`
-              );
+              expect(isDevOnlyRouteBlocked(route, environment), `${route} must still serve in ${scenario.expect}`).toBe(false);
             }
           });
         }
@@ -136,32 +124,28 @@ module.exports = defineCases({
 
     {
       name: 'test/health is no carve-out either — the folder gate has none',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // It WAS the one exception: @omega.js/manager's live API check read it
         // on a PRODUCTION host, so gating it would have broken `omega manage`
         // against a real brand. The probe is a REAL route now (`routes/health`,
         // covered by test/routes/health.test.js) and every reader points there,
         // so the exception list — and the mechanism behind it — is gone.
-        assert.equal(pipeline.DEV_ONLY_ROUTE_EXCEPTIONS, undefined, 'the exception mechanism is gone, not just emptied');
+        expect(pipeline.DEV_ONLY_ROUTE_EXCEPTIONS, 'the exception mechanism is gone, not just emptied').toBe(undefined);
 
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
-          assert.equal(isDevOnlyRouteBlocked('test/health', omega.getEnvironment()), true, 'the old probe path is refused in production like every other test route');
+          expect(isDevOnlyRouteBlocked('test/health', omega.getEnvironment()), 'the old probe path is refused in production like every other test route').toBe(true);
         });
       },
     },
 
     {
       name: 'routes outside the folder are never gated',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = omega.getEnvironment();
 
           for (const route of ['', 'user/sign-up', 'payments/intent', 'general/uuid', 'testing/thing', 'contest']) {
-            assert.equal(
-              isDevOnlyRouteBlocked(route, environment),
-              false,
-              `${route || '<root>'} is a real route and must answer in production`
-            );
+            expect(isDevOnlyRouteBlocked(route, environment), `${route || '<root>'} is a real route and must answer in production`).toBe(false);
           }
         });
       },
@@ -169,7 +153,7 @@ module.exports = defineCases({
 
     {
       name: 'the URL shapes the function path hands in are normalized before the check',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = omega.getEnvironment();
 
@@ -177,14 +161,14 @@ module.exports = defineCases({
           // trailing slash, a .js suffix or a case variant must not walk past
           // the gate.
           for (const route of ['test/usage', 'test/usage/', '/test/usage', 'test/usage.js', 'TEST/usage', 'Test/Usage']) {
-            assert.equal(isDevOnlyRouteBlocked(route, environment), true, `${route} is refused in production`);
+            expect(isDevOnlyRouteBlocked(route, environment), `${route} is refused in production`).toBe(true);
           }
 
           // Dot segments: the loader's path.resolve() collapses these to
           // routes/test/usage, so the gate has to read them the same way or a
           // caller reaches the handler with a `./` in front of it.
           for (const route of ['./test/usage', './/test/usage', 'x/../test/usage', './/./test/usage']) {
-            assert.equal(isDevOnlyRouteBlocked(route, environment), true, `${route} resolves into the folder and is refused`);
+            expect(isDevOnlyRouteBlocked(route, environment), `${route} resolves into the folder and is refused`).toBe(true);
           }
         });
       },
@@ -192,7 +176,7 @@ module.exports = defineCases({
 
     {
       name: 'a route path may not escape the routes directory',
-      async run({ assert }) {
+      async run({ expect }) {
         // path.resolve() rewrites the path the loader require()s, so these are
         // refused on their SHAPE — environment plays no part.
         const escaping = [
@@ -209,16 +193,16 @@ module.exports = defineCases({
         ];
 
         for (const route of escaping) {
-          assert.equal(isRouteOutsideRoutesDir(route), true, `${route} must be refused before the loader sees it`);
+          expect(isRouteOutsideRoutesDir(route), `${route} must be refused before the loader sees it`).toBe(true);
         }
       },
     },
 
     {
       name: 'ordinary route paths are not mistaken for an escape',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const route of ['', 'test/usage', './test/usage', 'x/../test/usage', 'user/sign-up', 'general/uuid', 'items/export']) {
-          assert.equal(isRouteOutsideRoutesDir(route), false, `${route || '<root>'} stays inside the routes directory`);
+          expect(isRouteOutsideRoutesDir(route), `${route || '<root>'} stays inside the routes directory`).toBe(false);
         }
       },
     },

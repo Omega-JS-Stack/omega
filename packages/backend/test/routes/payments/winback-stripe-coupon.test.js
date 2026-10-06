@@ -102,24 +102,20 @@ module.exports = defineCases({
     {
       name: 'stripe-attaches-the-default-offers-coupon-to-the-live-subscription',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The framework default — 50% off the next cycle — is the offer a brand
         // that configures nothing makes, and its coupon id is derived from it,
         // never invented here.
         const discount = winback.toDiscount(winback.resolveOffer());
         const captured = await applyOffer(omega, discount);
 
-        assert.equal(captured.retrieved, 'BEM_WINBACK50_50OFF_ONCE', 'The offer resolves to the checkout plumbing\'s deterministic coupon id');
-        assert.equal(captured.created.percent_off, 50, 'A percent offer builds a percent_off coupon');
-        assert.equal(captured.created.duration, 'once', 'and a `once` offer discounts exactly the next cycle');
+        expect(captured.retrieved, 'The offer resolves to the checkout plumbing\'s deterministic coupon id').toBe('BEM_WINBACK50_50OFF_ONCE');
+        expect(captured.created.percent_off, 'A percent offer builds a percent_off coupon').toBe(50);
+        expect(captured.created.duration, 'and a `once` offer discounts exactly the next cycle').toBe('once');
 
-        assert.ok(captured.updated, 'It should have updated the subscription');
-        assert.equal(captured.updated.id, RESOURCE_ID, 'the LIVE subscription named by the route');
-        assert.deepEqual(
-          captured.updated.params,
-          { discounts: [{ coupon: 'BEM_WINBACK50_50OFF_ONCE' }] },
-          'attaching the coupon it just resolved and NOTHING else — the plan, the cadence and the renewal date are untouched',
-        );
+        expect(captured.updated, 'It should have updated the subscription').toBeTruthy();
+        expect(captured.updated.id, 'the LIVE subscription named by the route').toBe(RESOURCE_ID);
+        expect(captured.updated.params, 'attaching the coupon it just resolved and NOTHING else — the plan, the cadence and the renewal date are untouched').toEqual({ discounts: [{ coupon: 'BEM_WINBACK50_50OFF_ONCE' }] });
       },
     },
   ],

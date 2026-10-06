@@ -6,10 +6,9 @@
  *     empty state (generatePageOnEmptyData keeps /blog alive)
  *  3. the FIRST consumer post suppresses every sample (mini-site fixture)
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, buildWith, BARE } = require('./lib/build.js');
 
@@ -25,58 +24,73 @@ function buildBare(environment, name) {
   return buildSite(BARE, bareData, { environment }, name);
 }
 
-test('dev build without consumer posts injects the sample posts', async () => {
-  const pages = await buildBare('development', 'sample-posts-dev');
+module.exports = defineCases({
+  type: 'group',
+  description: 'sample-posts',
+  tests: [
+    {
+      name: 'dev build without consumer posts injects the sample posts',
+      run: async (ctx) => {
+        const pages = await buildBare('development', 'sample-posts-dev');
 
-  // Sample posts render on the real posts lane
-  const welcome = pages.get('/blog/welcome-to-the-blog');
-  assert.ok(welcome, 'sample post gets its /blog/<slug> URL');
-  assert.ok(welcome.includes('Welcome to the blog'), 'post title renders');
+        // Sample posts render on the real posts lane
+        const welcome = pages.get('/blog/welcome-to-the-blog');
+        ctx.expect(welcome, 'sample post gets its /blog/<slug> URL').toBeTruthy();
+        ctx.expect(welcome.includes('Welcome to the blog'), 'post title renders').toBeTruthy();
 
-  // Blog index lists them newest-first (no empty state)
-  const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
-  assert.ok(blogUrl, 'blog index exists');
-  const blog = pages.get(blogUrl);
-  assert.ok(blog.includes('Ship the docs with the diff'), 'blog index lists the newest sample posts');
+        // Blog index lists them newest-first (no empty state)
+        const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
+        ctx.expect(blogUrl, 'blog index exists').toBeTruthy();
+        const blog = pages.get(blogUrl);
+        ctx.expect(blog.includes('Ship the docs with the diff'), 'blog index lists the newest sample posts').toBeTruthy();
 
-  // Author-less samples fall back to the brand byline, never a broken row
-  assert.ok(blog.includes('BareCo'), 'author fallback renders the brand name');
+        // Author-less samples fall back to the brand byline, never a broken row
+        ctx.expect(blog.includes('BareCo'), 'author fallback renders the brand name').toBeTruthy();
 
-  // Taxonomy rides along
-  const category = [...pages.keys()].find((u) => u.startsWith('/blog/categories/'));
-  assert.ok(category, 'sample categories aggregate into taxonomy pages');
+        // Taxonomy rides along
+        const category = [...pages.keys()].find((u) => u.startsWith('/blog/categories/'));
+        ctx.expect(category, 'sample categories aggregate into taxonomy pages').toBeTruthy();
 
-  // 11 samples at pagination size 6 → a real page 2 (Ian 2026-07-16:
-  // pagination must be VISIBLE with sample content). The two image-less
-  // samples are the oldest, so the designed no-media panel proves there.
-  const page2 = [...pages.keys()].find((u) => u === '/blog/page/2' || u === '/blog/page/2/');
-  assert.ok(page2, 'sample volume exercises pagination (page 2 exists)');
-  assert.ok(pages.get(page2).includes('Welcome to the blog'), 'oldest samples paginate to page 2');
-  assert.ok(pages.get(page2).includes('omega-post-card__media--pattern'), 'image-less samples use the designed no-media panel');
+        // 11 samples at pagination size 6 → a real page 2 (Ian 2026-07-16:
+        // pagination must be VISIBLE with sample content). The two image-less
+        // samples are the oldest, so the designed no-media panel proves there.
+        const page2 = [...pages.keys()].find((u) => u === '/blog/page/2' || u === '/blog/page/2/');
+        ctx.expect(page2, 'sample volume exercises pagination (page 2 exists)').toBeTruthy();
+        ctx.expect(pages.get(page2).includes('Welcome to the blog'), 'oldest samples paginate to page 2').toBeTruthy();
+        ctx.expect(pages.get(page2).includes('omega-post-card__media--pattern'), 'image-less samples use the designed no-media panel').toBeTruthy();
 
-  // Sample updates ride the same lane (/updates release feed)
-  const update = pages.get('/updates/v1.3.0');
-  assert.ok(update, 'sample update gets its /updates/<version> URL');
-  const updatesUrl = [...pages.keys()].find((u) => u === '/updates/' || u === '/updates');
-  assert.ok(pages.get(updatesUrl).includes('1.3.0'), 'updates index lists sample releases');
-});
+        // Sample updates ride the same lane (/updates release feed)
+        const update = pages.get('/updates/v1.3.0');
+        ctx.expect(update, 'sample update gets its /updates/<version> URL').toBeTruthy();
+        const updatesUrl = [...pages.keys()].find((u) => u === '/updates/' || u === '/updates');
+        ctx.expect(pages.get(updatesUrl).includes('1.3.0'), 'updates index lists sample releases').toBeTruthy();
+      },
+    },
 
-test('production build never ships sample posts', async () => {
-  const pages = await buildBare('production', 'sample-posts-prod');
+    {
+      name: 'production build never ships sample posts',
+      run: async (ctx) => {
+        const pages = await buildBare('production', 'sample-posts-prod');
 
-  assert.strictEqual(pages.get('/blog/welcome-to-the-blog'), undefined, 'no sample post URLs in production');
+        ctx.expect(pages.get('/blog/welcome-to-the-blog'), 'no sample post URLs in production').toBe(undefined);
 
-  const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
-  assert.ok(blogUrl, '/blog stays alive (generatePageOnEmptyData)');
-  assert.ok(!pages.get(blogUrl).includes('Welcome to the blog'), 'blog index carries no sample content');
+        const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
+        ctx.expect(blogUrl, '/blog stays alive (generatePageOnEmptyData)').toBeTruthy();
+        ctx.expect(!pages.get(blogUrl).includes('Welcome to the blog'), 'blog index carries no sample content').toBeTruthy();
 
-  assert.strictEqual(pages.get('/updates/v1.3.0'), undefined, 'no sample update URLs in production');
-});
+        ctx.expect(pages.get('/updates/v1.3.0'), 'no sample update URLs in production').toBe(undefined);
+      },
+    },
 
-test('a consumer with their own posts never sees samples (dev included)', async () => {
-  const { miniData } = require('./lib/build.js');
-  const pages = await buildWith(miniData, { environment: 'development' }, 'sample-posts-consumer');
+    {
+      name: 'a consumer with their own posts never sees samples (dev included)',
+      run: async (ctx) => {
+        const { miniData } = require('./lib/build.js');
+        const pages = await buildWith(miniData, { environment: 'development' }, 'sample-posts-consumer');
 
-  assert.strictEqual(pages.get('/blog/welcome-to-the-blog'), undefined, 'samples suppressed by consumer posts');
-  assert.ok(pages.get('/blog/first-post'), 'consumer posts still render');
+        ctx.expect(pages.get('/blog/welcome-to-the-blog'), 'samples suppressed by consumer posts').toBe(undefined);
+        ctx.expect(pages.get('/blog/first-post'), 'consumer posts still render').toBeTruthy();
+      },
+    },
+  ],
 });

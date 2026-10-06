@@ -11,8 +11,7 @@
  * Same convention as the wakeup-ping suite: the REAL module through esbuild
  * behind its bundler aliases, with the instance stubbed at its boundary.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -93,25 +92,37 @@ async function boot(buildJson) {
   return { initialized };
 }
 
-test('#894: bootMain hands the web runtime the page\'s OMEGA_BUILD_JSON.config', async () => {
-  const config = {
-    runtime: 'web',
-    environment: 'production',
-    brand: { id: 'boot', name: 'Boot' },
-    client: { consent: { enabled: true } },
-  };
-  const { initialized } = await boot({ config, package: { name: 'boot', version: '1.0.0' }, mode: { environment: 'production' } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'boot-build-json',
+  tests: [
+    {
+      name: '#894: bootMain hands the web runtime the page\'s OMEGA_BUILD_JSON.config',
+      run: async (ctx) => {
+        const config = {
+          runtime: 'web',
+          environment: 'production',
+          brand: { id: 'boot', name: 'Boot' },
+          client: { consent: { enabled: true } },
+        };
+        const { initialized } = await boot({ config, package: { name: 'boot', version: '1.0.0' }, mode: { environment: 'production' } });
 
-  assert.strictEqual(initialized.length, 1, 'the instance is initialized exactly once');
-  // The `config` blob and nothing around it: the wrapper's own facts (package,
-  // mode, license, builtAt) are never part of the client contract.
-  assert.deepStrictEqual(initialized[0], config);
-});
+        ctx.expect(initialized.length, 'the instance is initialized exactly once').toBe(1);
+        // The `config` blob and nothing around it: the wrapper's own facts (package,
+        // mode, license, builtAt) are never part of the client contract.
+        ctx.expect(initialized[0]).toEqual(config);
+      },
+    },
 
-test('#894: a page with no bake initializes with undefined, never a crash', async () => {
-  // A minimal fixture page (no foot include) still boots: the client fills its
-  // own defaults, and a TypeError here would take every page module with it.
-  const { initialized } = await boot(undefined);
+    {
+      name: '#894: a page with no bake initializes with undefined, never a crash',
+      run: async (ctx) => {
+        // A minimal fixture page (no foot include) still boots: the client fills its
+        // own defaults, and a TypeError here would take every page module with it.
+        const { initialized } = await boot(undefined);
 
-  assert.deepStrictEqual(initialized, [undefined]);
+        ctx.expect(initialized).toEqual([undefined]);
+      },
+    },
+  ],
 });

@@ -18,8 +18,7 @@
  * esbuild — the convention checkout-discount.test.js sets — with the client
  * stubbed.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -92,70 +91,77 @@ async function bindingsFor(product, { frequency = 'annually' } = {}) {
   return modules.buildBindingsState();
 }
 
-test('#558: a one-time product\'s summary line reads the one-time price', async () => {
-  const bound = await bindingsFor(ONE_TIME);
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-one-time-summary',
+  tests: [
+    {
+      name: '#558: a one-time product\'s summary line reads the one-time price',
+      run: async (ctx) => {
+        const bound = await bindingsFor(ONE_TIME);
 
-  assert.strictEqual(bound.checkout.product.isSubscription, false, 'a one-time buy is not a subscription');
-  assert.strictEqual(
-    bound.checkout.pricing.frequencyPaymentText,
-    '$49.99 one-time',
-    'the line under the product name prices the thing being bought',
-  );
-  assert.strictEqual(bound.checkout.pricing.subtotal, '$49.99', 'and agrees with the SUBTOTAL row');
-  assert.strictEqual(bound.order.total, '$49.99', 'and with TOTAL DUE TODAY');
-});
+        ctx.expect(bound.checkout.product.isSubscription, 'a one-time buy is not a subscription').toBe(false);
+        ctx.expect(bound.checkout.pricing.frequencyPaymentText, 'the line under the product name prices the thing being bought').toBe('$49.99 one-time');
+        ctx.expect(bound.checkout.pricing.subtotal, 'and agrees with the SUBTOTAL row').toBe('$49.99');
+        ctx.expect(bound.order.total, 'and with TOTAL DUE TODAY').toBe('$49.99');
+      },
+    },
 
-test('#558: nothing a one-time summary renders says a cadence word or $0.00', async () => {
-  // The live symptom was one line, but the whole pricing block is what the
-  // summary renders — no value in it may claim a recurring charge that does
-  // not exist, or a zero the card will not be charged. Both halves of it: the
-  // build-config prices and the money line eligibility settles (#637).
-  const bound = await bindingsFor(ONE_TIME);
+    {
+      name: '#558: nothing a one-time summary renders says a cadence word or $0.00',
+      run: async (ctx) => {
+        // The live symptom was one line, but the whole pricing block is what the
+        // summary renders — no value in it may claim a recurring charge that does
+        // not exist, or a zero the card will not be charged. Both halves of it: the
+        // build-config prices and the money line eligibility settles (#637).
+        const bound = await bindingsFor(ONE_TIME);
 
-  for (const [key, value] of Object.entries({ ...bound.checkout.pricing, ...bound.order })) {
-    if (typeof value !== 'string' || value === '') {
-      continue;
-    }
+        for (const [key, value] of Object.entries({ ...bound.checkout.pricing, ...bound.order })) {
+          if (typeof value !== 'string' || value === '') {
+            continue;
+          }
 
-    assert.doesNotMatch(value, CADENCE_WORDS, `${key} claims no billing cycle: ${value}`);
-    assert.ok(!value.includes('$0.00'), `${key} quotes no zero amount: ${value}`);
-  }
+          ctx.expect(value, `${key} claims no billing cycle: ${value}`).not.toMatch(CADENCE_WORDS);
+          ctx.expect(!value.includes('$0.00'), `${key} quotes no zero amount: ${value}`).toBeTruthy();
+        }
 
-  assert.strictEqual(bound.order.showTerms, false, 'and no subscription terms sentence rides along');
-});
+        ctx.expect(bound.order.showTerms, 'and no subscription terms sentence rides along').toBe(false);
+      },
+    },
 
-test('#558: a subscription keeps its cadence line exactly as it was', async () => {
-  const annual = await bindingsFor(SUBSCRIPTION, { frequency: 'annually' });
-  assert.strictEqual(annual.checkout.pricing.frequencyPaymentText, '$100.00 annually', 'the annual cycle still names itself');
+    {
+      name: '#558: a subscription keeps its cadence line exactly as it was',
+      run: async (ctx) => {
+        const annual = await bindingsFor(SUBSCRIPTION, { frequency: 'annually' });
+        ctx.expect(annual.checkout.pricing.frequencyPaymentText, 'the annual cycle still names itself').toBe('$100.00 annually');
 
-  const monthly = await bindingsFor(SUBSCRIPTION, { frequency: 'monthly' });
-  assert.strictEqual(monthly.checkout.pricing.frequencyPaymentText, '$10.00 monthly', 'and so does the monthly one');
-  assert.strictEqual(monthly.checkout.product.isSubscription, true, 'the cadence tiles still render for a plan');
-});
+        const monthly = await bindingsFor(SUBSCRIPTION, { frequency: 'monthly' });
+        ctx.expect(monthly.checkout.pricing.frequencyPaymentText, 'and so does the monthly one').toBe('$10.00 monthly');
+        ctx.expect(monthly.checkout.product.isSubscription, 'the cadence tiles still render for a plan').toBe(true);
+      },
+    },
 
-test('#637: a one-time buy never waits on trial eligibility — its money line paints at once', async () => {
-  // A one-time product has no trial to be eligible for, so asking the server
-  // buys nothing and costs the buyer a shimmering total and a "Checking your
-  // plan" placeholder for as long as a cold backend takes to answer.
-  const { updates, requests, form } = await bootCheckout({
-    search: '?product=launch-kit',
-    product: ONE_TIME,
-  });
+    {
+      name: '#637: a one-time buy never waits on trial eligibility — its money line paints at once',
+      run: async (ctx) => {
+        // A one-time product has no trial to be eligible for, so asking the server
+        // buys nothing and costs the buyer a shimmering total and a "Checking your
+        // plan" placeholder for as long as a cold backend takes to answer.
+        const { updates, requests, form } = await bootCheckout({
+          search: '?product=launch-kit',
+          product: ONE_TIME,
+        });
 
-  assert.ok(
-    !requests.some((request) => request.url.includes('trial-eligibility')),
-    'the page never asks a question a one-time buy cannot have an answer to',
-  );
+        ctx.expect(!requests.some((request) => request.url.includes('trial-eligibility')), 'the page never asks a question a one-time buy cannot have an answer to').toBeTruthy();
 
-  const orderPaint = updates.find((update) => update.order);
-  assert.ok(orderPaint, 'the order root is published in the first frame, not after a wait');
-  assert.strictEqual(orderPaint.order.total, '$49.99', 'the total is the one-time price');
-  assert.strictEqual(orderPaint.order.showTerms, false, 'and no subscription terms ride along');
-  assert.strictEqual(orderPaint.order.trial.show, false, 'nor a trial note');
+        const orderPaint = updates.find((update) => update.order);
+        ctx.expect(orderPaint, 'the order root is published in the first frame, not after a wait').toBeTruthy();
+        ctx.expect(orderPaint.order.total, 'the total is the one-time price').toBe('$49.99');
+        ctx.expect(orderPaint.order.showTerms, 'and no subscription terms ride along').toBe(false);
+        ctx.expect(orderPaint.order.trial.show, 'nor a trial note').toBe(false);
 
-  assert.deepStrictEqual(
-    [...form.resolved].sort(),
-    ['eligibility', 'recaptcha'],
-    'both gates are already settled, so the pay buttons are armed',
-  );
+        ctx.expect([...form.resolved].sort(), 'both gates are already settled, so the pay buttons are armed').toEqual(['eligibility', 'recaptcha']);
+      },
+    },
+  ],
 });

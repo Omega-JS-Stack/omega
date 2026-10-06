@@ -24,7 +24,7 @@ module.exports = defineCases({
     // --- Edge case tests ---
     {
       name: 'signup-with-invalid-affiliate-code',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Try to sign up with a non-existent affiliate code
         // Use dedicated account so it doesn't affect other tests
         const signupResponse = await http.as('signup-referred-invalid').post('omega/user/signup', {
@@ -34,14 +34,14 @@ module.exports = defineCases({
         });
 
         // Should succeed but without referral tracking (invalid code is ignored)
-        assert.isSuccess(signupResponse, 'Signup should succeed even with invalid affiliate code');
+        expect(signupResponse, 'Signup should succeed even with invalid affiliate code').toBeSuccess();
       },
     },
 
     // --- Main signup flow tests ---
     {
       name: 'verify-referrer-exists',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         // Use the pre-created static referrer account
         state.referrerUid = accounts.referrer.uid;
         state.referrerEmail = accounts.referrer.email;
@@ -50,18 +50,14 @@ module.exports = defineCases({
         // Verify the referrer account exists and has the affiliate code
         const referrerDoc = await firestore.get(`users/${state.referrerUid}`);
 
-        assert.ok(referrerDoc, 'Referrer user doc should exist');
-        assert.equal(
-          referrerDoc?.affiliate?.code,
-          state.referrerAffiliateCode,
-          'Referrer should have affiliate code set'
-        );
+        expect(referrerDoc, 'Referrer user doc should exist').toBeTruthy();
+        expect(referrerDoc?.affiliate?.code, 'Referrer should have affiliate code set').toBe(state.referrerAffiliateCode);
       },
     },
 
     {
       name: 'verify-referred-exists',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         // Use the pre-created static referred account
         state.referredUid = accounts['signup-referred'].uid;
         state.referredEmail = accounts['signup-referred'].email;
@@ -69,13 +65,13 @@ module.exports = defineCases({
         // Verify the referred account exists
         const referredDoc = await firestore.get(`users/${state.referredUid}`);
 
-        assert.ok(referredDoc, 'Referred user doc should exist');
+        expect(referredDoc, 'Referred user doc should exist').toBeTruthy();
       },
     },
 
     {
       name: 'call-user-signup-with-affiliate',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Call POST /user/signup as the referred user with the new attribution format
         // This triggers the referral tracking logic
         // Use .as('signup-referred') to authenticate as that specific user via privateKey
@@ -122,17 +118,17 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(signupResponse, `POST /user/signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `POST /user/signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         // @omega.js/backend API returns { data: { signedUp: true } }, http-client wraps in { data: response }
         const signedUp = signupResponse.data?.data?.signedUp || signupResponse.data?.signedUp;
-        assert.ok(signedUp === true, `Should return signedUp: true (got: ${JSON.stringify(signupResponse.data)})`);
+        expect(signedUp === true, `Should return signedUp: true (got: ${JSON.stringify(signupResponse.data)})`).toBeTruthy();
       },
     },
 
     {
       name: 'duplicate-signup-blocked',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Try to call POST /user/signup again for the same user
         // This should be blocked since signup has already been processed
         const signupResponse = await http.as('signup-referred').post('omega/user/signup', {
@@ -141,17 +137,14 @@ module.exports = defineCases({
           },
         });
 
-        assert.isError(signupResponse, 400, 'Duplicate signup should be blocked');
-        assert.ok(
-          signupResponse.error?.includes('already been processed'),
-          `Error should mention already processed: ${signupResponse.error}`
-        );
+        expect(signupResponse, 'Duplicate signup should be blocked').toBeError(400);
+        expect(signupResponse.error?.includes('already been processed'), `Error should mention already processed: ${signupResponse.error}`).toBeTruthy();
       },
     },
 
     {
       name: 'wait-for-referral-update',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Wait for the referral to be recorded
         // The user signup endpoint calls updateReferral() which updates the referrer
 
@@ -166,61 +159,61 @@ module.exports = defineCases({
           return referrals.some(r => r.uid === state.referredUid);
         }, 30000, 1000); // Wait up to 30s, check every 1s
 
-        assert.ok(referralFound, 'Referrer should have referred user in referrals array');
+        expect(referralFound, 'Referrer should have referred user in referrals array').toBeTruthy();
       },
     },
 
     {
       name: 'verify-referrer-has-referral',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         // Verify the referrer now has the referred user in their referrals
         const referrerDoc = await firestore.get(`users/${state.referrerUid}`);
 
-        assert.ok(referrerDoc, 'Should read referrer doc');
+        expect(referrerDoc, 'Should read referrer doc').toBeTruthy();
 
         const referrals = referrerDoc?.affiliate?.referrals || [];
 
-        assert.ok(referrals.length > 0, 'Referrer should have at least one referral');
+        expect(referrals.length > 0, 'Referrer should have at least one referral').toBeTruthy();
 
         const foundReferral = referrals.find(r => r.uid === state.referredUid);
 
-        assert.ok(foundReferral, `Referrer should have ${state.referredUid} in referrals`);
-        assert.ok(foundReferral.timestamp, 'Referral should have timestamp');
+        expect(foundReferral, `Referrer should have ${state.referredUid} in referrals`).toBeTruthy();
+        expect(foundReferral.timestamp, 'Referral should have timestamp').toBeTruthy();
       },
     },
 
     {
       name: 'verify-attribution-data-saved',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         // Verify the attribution data was saved correctly
         const referredDoc = await firestore.get(`users/${state.referredUid}`);
 
-        assert.ok(referredDoc, 'Should read referred user doc');
+        expect(referredDoc, 'Should read referred user doc').toBeTruthy();
 
         // Check attribution object (single source of truth for referrer info)
         const attribution = referredDoc?.attribution;
-        assert.ok(attribution, 'Attribution object should exist');
-        assert.ok(attribution?.affiliate?.code === state.referrerAffiliateCode, 'Attribution should have affiliate code');
-        assert.ok(attribution?.first?.tags?.utm_source === 'test', 'Attribution should have first-touch UTM source');
-        assert.ok(attribution?.first?.tags?.utm_campaign === 'signup-test', 'Attribution should have first-touch UTM campaign');
-        assert.ok(attribution?.first?.referrer === 'https://google.com', 'Attribution should have the first-touch referrer');
-        assert.ok(attribution?.last?.clickIds?.gclid === 'G-SIGNUP-1', 'Attribution should have the last-touch click id');
+        expect(attribution, 'Attribution object should exist').toBeTruthy();
+        expect(attribution?.affiliate?.code === state.referrerAffiliateCode, 'Attribution should have affiliate code').toBeTruthy();
+        expect(attribution?.first?.tags?.utm_source === 'test', 'Attribution should have first-touch UTM source').toBeTruthy();
+        expect(attribution?.first?.tags?.utm_campaign === 'signup-test', 'Attribution should have first-touch UTM campaign').toBeTruthy();
+        expect(attribution?.first?.referrer === 'https://google.com', 'Attribution should have the first-touch referrer').toBeTruthy();
+        expect(attribution?.last?.clickIds?.gclid === 'G-SIGNUP-1', 'Attribution should have the last-touch click id').toBeTruthy();
 
         // Check activity context was merged
         const activity = referredDoc?.activity;
-        assert.ok(activity, 'Activity object should exist');
-        assert.ok(activity?.referrer === 'https://google.com', 'Activity should have referrer from context');
-        assert.ok(activity?.landingPage === 'https://example.com/', 'Activity should have landingPage from context');
+        expect(activity, 'Activity object should exist').toBeTruthy();
+        expect(activity?.referrer === 'https://google.com', 'Activity should have referrer from context').toBeTruthy();
+        expect(activity?.landingPage === 'https://example.com/', 'Activity should have landingPage from context').toBeTruthy();
 
         // Check flags
-        assert.ok(referredDoc?.flags?.signupProcessed === true, 'signupProcessed flag should be true');
+        expect(referredDoc?.flags?.signupProcessed === true, 'signupProcessed flag should be true').toBeTruthy();
       },
     },
 
     // --- Disposable email referral test ---
     {
       name: 'disposable-email-referral-skipped',
-      async run({ http, firestore, assert, state, accounts }) {
+      async run({ http, firestore, expect, state, accounts }) {
         // Record current referral count before disposable signup
         const referrerBefore = await firestore.get(`users/${state.referrerUid}`);
         const referralsBefore = referrerBefore?.affiliate?.referrals || [];
@@ -235,7 +228,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(signupResponse, 'Disposable email signup should succeed');
+        expect(signupResponse, 'Disposable email signup should succeed').toBeSuccess();
 
         // Verify NO new referral was added to the referrer
         // Small delay to ensure any async writes would have completed
@@ -244,21 +237,17 @@ module.exports = defineCases({
         const referrerAfter = await firestore.get(`users/${state.referrerUid}`);
         const referralsAfter = referrerAfter?.affiliate?.referrals || [];
 
-        assert.equal(
-          referralsAfter.length,
-          state.referralCountBefore,
-          `Referrer should NOT get credit for disposable email referral (before=${state.referralCountBefore}, after=${referralsAfter.length})`
-        );
+        expect(referralsAfter.length, `Referrer should NOT get credit for disposable email referral (before=${state.referralCountBefore}, after=${referralsAfter.length})`).toBe(state.referralCountBefore);
 
         const disposableReferral = referralsAfter.find(r => r.uid === accounts['signup-referred-disposable'].uid);
-        assert.ok(!disposableReferral, 'Disposable account should NOT appear in referrals');
+        expect(!disposableReferral, 'Disposable account should NOT appear in referrals').toBeTruthy();
       },
     },
 
     // --- Consent capture tests ---
     {
       name: 'consent-granted-both-records-canonical-shape',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const consentText = {
           legal: 'I agree to the Terms of Service and Privacy Policy.',
           marketing: 'Send me product updates and newsletters. You can unsubscribe anytime.',
@@ -272,44 +261,41 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${accounts['consent-granted'].uid}`);
 
         // Legal
-        assert.equal(userDoc?.consent?.legal?.status, 'granted', 'consent.legal.status should be granted');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.source, 'signup', 'legal grantedAt.source should be signup-form');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.text, consentText.legal, 'legal grantedAt.text should match client payload');
-        assert.ok(userDoc?.consent?.legal?.grantedAt?.timestamp, 'legal grantedAt.timestamp should be set');
-        assert.equal(typeof userDoc?.consent?.legal?.grantedAt?.timestampUNIX, 'number', 'legal grantedAt.timestampUNIX should be number');
+        expect(userDoc?.consent?.legal?.status, 'consent.legal.status should be granted').toBe('granted');
+        expect(userDoc?.consent?.legal?.grantedAt?.source, 'legal grantedAt.source should be signup-form').toBe('signup');
+        expect(userDoc?.consent?.legal?.grantedAt?.text, 'legal grantedAt.text should match client payload').toBe(consentText.legal);
+        expect(userDoc?.consent?.legal?.grantedAt?.timestamp, 'legal grantedAt.timestamp should be set').toBeTruthy();
+        expect(typeof userDoc?.consent?.legal?.grantedAt?.timestampUNIX, 'legal grantedAt.timestampUNIX should be number').toBe('number');
 
         // Server-derived time MUST be used (the client-supplied 2000-01-01 should NOT appear).
         // grantedAt is stamped from Auth's creationTime, the same source as metadata.created,
         // so the two must be equal — and the client's 2000-01-01 (UNIX 946684800) is rejected.
         const legalUNIX = userDoc.consent.legal.grantedAt.timestampUNIX;
         const createdUNIX = userDoc.metadata.created.timestampUNIX;
-        assert.equal(
-          legalUNIX, createdUNIX,
-          `legal grantedAt.timestampUNIX (${legalUNIX}) should match metadata.created (${createdUNIX}) — both from Auth creationTime`
-        );
-        assert.notEqual(legalUNIX, 946684800, 'legal grantedAt must NOT be the client-supplied 2000-01-01 time');
+        expect(legalUNIX, `legal grantedAt.timestampUNIX (${legalUNIX}) should match metadata.created (${createdUNIX}) — both from Auth creationTime`).toBe(createdUNIX);
+        expect(legalUNIX, 'legal grantedAt must NOT be the client-supplied 2000-01-01 time').not.toBe(946684800);
 
         // Marketing
-        assert.equal(userDoc?.consent?.marketing?.status, 'granted', 'consent.marketing.status should be granted');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.source, 'signup', 'marketing grantedAt.source should be signup-form');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.text, consentText.marketing, 'marketing grantedAt.text should match client payload');
-        assert.equal(typeof userDoc?.consent?.marketing?.grantedAt?.timestampUNIX, 'number', 'marketing grantedAt.timestampUNIX should be number');
+        expect(userDoc?.consent?.marketing?.status, 'consent.marketing.status should be granted').toBe('granted');
+        expect(userDoc?.consent?.marketing?.grantedAt?.source, 'marketing grantedAt.source should be signup-form').toBe('signup');
+        expect(userDoc?.consent?.marketing?.grantedAt?.text, 'marketing grantedAt.text should match client payload').toBe(consentText.marketing);
+        expect(typeof userDoc?.consent?.marketing?.grantedAt?.timestampUNIX, 'marketing grantedAt.timestampUNIX should be number').toBe('number');
 
         // revokedAt should be all-null sibling object (NOT undefined, NOT missing)
-        assert.ok(userDoc?.consent?.marketing?.revokedAt, 'marketing.revokedAt object should exist (not null)');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.timestamp, null, 'marketing revokedAt.timestamp should be null');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, null, 'marketing revokedAt.source should be null');
+        expect(userDoc?.consent?.marketing?.revokedAt, 'marketing.revokedAt object should exist (not null)').toBeTruthy();
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'marketing revokedAt.timestamp should be null').toBe(null);
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'marketing revokedAt.source should be null').toBe(null);
       },
     },
 
     {
       name: 'consent-marketing-declined-records-revokedAt',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const legalText = 'I agree to the Terms of Service and Privacy Policy.';
 
         const signupResponse = await http.as('consent-declined').post('omega/user/signup', {
@@ -319,52 +305,52 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${accounts['consent-declined'].uid}`);
 
         // Legal — granted normally
-        assert.equal(userDoc?.consent?.legal?.status, 'granted', 'legal.status should be granted');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.source, 'signup', 'legal grantedAt.source should be signup-form');
+        expect(userDoc?.consent?.legal?.status, 'legal.status should be granted').toBe('granted');
+        expect(userDoc?.consent?.legal?.grantedAt?.source, 'legal grantedAt.source should be signup-form').toBe('signup');
 
         // Marketing — revoked at signup
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'marketing.status should be revoked');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status should be revoked').toBe('revoked');
 
         // grantedAt MUST be all-null (never granted, even though client passed text)
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.timestamp, null, 'marketing grantedAt.timestamp should be null');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.source, null, 'marketing grantedAt.source should be null');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.text, null, 'marketing grantedAt.text should be null (declined)');
+        expect(userDoc?.consent?.marketing?.grantedAt?.timestamp, 'marketing grantedAt.timestamp should be null').toBe(null);
+        expect(userDoc?.consent?.marketing?.grantedAt?.source, 'marketing grantedAt.source should be null').toBe(null);
+        expect(userDoc?.consent?.marketing?.grantedAt?.text, 'marketing grantedAt.text should be null (declined)').toBe(null);
 
         // revokedAt MUST have signup-form-declined source + server time
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'signup', 'marketing revokedAt.source should be signup-form-declined');
-        assert.ok(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'marketing revokedAt.timestamp should be set');
-        assert.equal(typeof userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, 'number', 'marketing revokedAt.timestampUNIX should be number');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.text, null, 'marketing revokedAt.text should be null (decline has no message)');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'marketing revokedAt.source should be signup-form-declined').toBe('signup');
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'marketing revokedAt.timestamp should be set').toBeTruthy();
+        expect(typeof userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, 'marketing revokedAt.timestampUNIX should be number').toBe('number');
+        expect(userDoc?.consent?.marketing?.revokedAt?.text, 'marketing revokedAt.text should be null (decline has no message)').toBe(null);
       },
     },
 
     {
       name: 'consent-missing-defaults-to-revoked',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         // Client sends NO consent field at all (legacy or malformed payload).
         // Expected: both legal + marketing default to revoked. No crash, no marketing sync.
         const signupResponse = await http.as('consent-missing').post('omega/user/signup', {});
 
-        assert.isSuccess(signupResponse, `Signup should succeed even with no consent: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed even with no consent: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${accounts['consent-missing'].uid}`);
 
-        assert.ok(userDoc?.consent, 'consent object should exist');
-        assert.equal(userDoc?.consent?.legal?.status, 'revoked', 'legal.status should default to revoked');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.timestamp, null, 'legal grantedAt.timestamp should be null');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.source, null, 'legal grantedAt.source should be null');
+        expect(userDoc?.consent, 'consent object should exist').toBeTruthy();
+        expect(userDoc?.consent?.legal?.status, 'legal.status should default to revoked').toBe('revoked');
+        expect(userDoc?.consent?.legal?.grantedAt?.timestamp, 'legal grantedAt.timestamp should be null').toBe(null);
+        expect(userDoc?.consent?.legal?.grantedAt?.source, 'legal grantedAt.source should be null').toBe(null);
 
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'marketing.status should default to revoked');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.timestamp, null, 'marketing grantedAt.timestamp should be null');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status should default to revoked').toBe('revoked');
+        expect(userDoc?.consent?.marketing?.grantedAt?.timestamp, 'marketing grantedAt.timestamp should be null').toBe(null);
 
         // Even when consent is missing entirely, the revokedAt block gets stamped with signup-form-declined.
         // This ensures the user doc has a recorded decline event for audit.
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'signup', 'marketing revokedAt.source should be signup-form-declined when consent missing');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'marketing revokedAt.source should be signup-form-declined when consent missing').toBe('signup');
       },
     },
 
@@ -376,7 +362,7 @@ module.exports = defineCases({
     // actually granted months ago. The guard preserves any existing 'granted' status.
     {
       name: 'consent-empty-payload-preserves-existing-grant',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['consent-preserve'].uid;
 
         // Seed the doc as an established account whose consent is already granted (as a real
@@ -400,27 +386,27 @@ module.exports = defineCases({
 
         // Re-fire signup with NO consent payload (the legacy page-load case).
         const signupResponse = await http.as('consent-preserve').post('omega/user/signup', {});
-        assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${uid}`);
 
         // CRITICAL: the prior grants must survive — NOT be downgraded to revoked.
-        assert.equal(userDoc?.consent?.legal?.status, 'granted', 'legal.status must stay granted (not downgraded by empty payload)');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.text, 'Legacy legal grant', 'legal grantedAt must be the preserved original, not wiped');
-        assert.equal(userDoc?.consent?.legal?.grantedAt?.timestampUNIX, 1735689600, 'legal grantedAt timestamp must be preserved');
+        expect(userDoc?.consent?.legal?.status, 'legal.status must stay granted (not downgraded by empty payload)').toBe('granted');
+        expect(userDoc?.consent?.legal?.grantedAt?.text, 'legal grantedAt must be the preserved original, not wiped').toBe('Legacy legal grant');
+        expect(userDoc?.consent?.legal?.grantedAt?.timestampUNIX, 'legal grantedAt timestamp must be preserved').toBe(1735689600);
 
-        assert.equal(userDoc?.consent?.marketing?.status, 'granted', 'marketing.status must stay granted (not downgraded by empty payload)');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.text, 'Legacy marketing grant', 'marketing grantedAt must be the preserved original');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status must stay granted (not downgraded by empty payload)').toBe('granted');
+        expect(userDoc?.consent?.marketing?.grantedAt?.text, 'marketing grantedAt must be the preserved original').toBe('Legacy marketing grant');
         // No spurious revokedAt should have been stamped over the preserved grant.
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.timestamp, null, 'marketing revokedAt must stay null (no decline was recorded)');
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'marketing revokedAt must stay null (no decline was recorded)').toBe(null);
 
         // signupProcessed should now be flipped true by this run.
-        assert.equal(userDoc?.flags?.signupProcessed, true, 'signupProcessed should be set true after the run');
+        expect(userDoc?.flags?.signupProcessed, 'signupProcessed should be set true after the run').toBe(true);
       },
     },
     {
       name: 'consent-explicit-decline-does-not-downgrade-existing-grant',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['consent-preserve'].uid;
 
         // Re-seed: granted marketing + UNSET signupProcessed so the route processes this call.
@@ -445,15 +431,15 @@ module.exports = defineCases({
             marketing: { granted: false, text: 'Declining marketing' },
           },
         });
-        assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${uid}`);
 
         // Legal newly granted this call.
-        assert.equal(userDoc?.consent?.legal?.status, 'granted', 'legal.status should be granted from this call');
+        expect(userDoc?.consent?.legal?.status, 'legal.status should be granted from this call').toBe('granted');
         // Marketing was already granted; an explicit decline must NOT downgrade it.
-        assert.equal(userDoc?.consent?.marketing?.status, 'granted', 'marketing.status must stay granted (decline cannot downgrade an existing grant on signup path)');
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.text, 'Prior marketing grant', 'marketing grant must be the preserved original');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status must stay granted (decline cannot downgrade an existing grant on signup path)').toBe('granted');
+        expect(userDoc?.consent?.marketing?.grantedAt?.text, 'marketing grant must be the preserved original').toBe('Prior marketing grant');
       },
     },
 
@@ -464,7 +450,7 @@ module.exports = defineCases({
     // map-replace wiping nested data. These tests seed adversarial existing state and verify.
     {
       name: 'merge-preserves-existing-and-fills-schema',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['signup-merge'].uid;
 
         // Capture the REAL api keys onCreate generated — the signup write must preserve these
@@ -495,53 +481,49 @@ module.exports = defineCases({
           },
           trackingConsent: { analytics: true, marketing: false, region: 'opt-in', timestamp: '2026-08-01T00:00:00.000Z', version: 1 },
         });
-        assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
+        expect(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`).toBeSuccess();
 
         const doc = await firestore.get(`users/${uid}`);
 
         // (b) Existing real values must survive untouched — NOT regenerated/reset by the schema layer.
-        assert.equal(doc?.api?.clientId, realClientId, 'api.clientId must be preserved (not regenerated)');
-        assert.equal(doc?.api?.privateKey, realPrivateKey, 'api.privateKey must be preserved (not regenerated)');
-        assert.equal(doc?.affiliate?.code, realAffiliateCode, 'affiliate.code must be preserved (not regenerated)');
-        assert.equal(doc?.subscription?.product?.id, 'pro', 'subscription must be preserved (not reset to basic)');
-        assert.equal(doc?.roles?.admin, true, 'roles.admin must be preserved (not reset to false)');
+        expect(doc?.api?.clientId, 'api.clientId must be preserved (not regenerated)').toBe(realClientId);
+        expect(doc?.api?.privateKey, 'api.privateKey must be preserved (not regenerated)').toBe(realPrivateKey);
+        expect(doc?.affiliate?.code, 'affiliate.code must be preserved (not regenerated)').toBe(realAffiliateCode);
+        expect(doc?.subscription?.product?.id, 'subscription must be preserved (not reset to basic)').toBe('pro');
+        expect(doc?.roles?.admin, 'roles.admin must be preserved (not reset to false)').toBe(true);
 
         // (b) Custom non-schema field must survive the merge.
-        assert.equal(doc?.myCustomIntegration?.slackWebhook, 'https://hooks.slack.com/services/XXX', 'custom non-schema field must survive');
+        expect(doc?.myCustomIntegration?.slackWebhook, 'custom non-schema field must survive').toBe('https://hooks.slack.com/services/XXX');
 
         // (a) Every attribution leaf must be present (the bug: partial write flattened the map).
-        assert.hasProperty(doc, 'attribution.affiliate.code', 'attribution.affiliate.code must exist');
-        assert.hasProperty(doc, 'attribution.affiliate.url', 'attribution.affiliate.url must exist (filled)');
-        assert.hasProperty(doc, 'attribution.affiliate.page', 'attribution.affiliate.page must exist (filled)');
-        assert.hasProperty(doc, 'attribution.affiliate.timestamp', 'attribution.affiliate.timestamp must exist (filled)');
-        assert.hasProperty(doc, 'attribution.first.url', 'attribution.first.url must exist (filled)');
-        assert.hasProperty(doc, 'attribution.first.timestamp', 'attribution.first.timestamp must exist (filled)');
-        assert.hasProperty(doc, 'attribution.first.clickIds', 'attribution.first.clickIds must exist (filled)');
-        assert.hasProperty(doc, 'attribution.last.url', 'attribution.last.url must exist (filled)');
-        assert.hasProperty(doc, 'attribution.last.referrer', 'attribution.last.referrer must exist (filled)');
+        expect(doc, 'attribution.affiliate.code must exist').toHaveProperty('attribution.affiliate.code');
+        expect(doc, 'attribution.affiliate.url must exist (filled)').toHaveProperty('attribution.affiliate.url');
+        expect(doc, 'attribution.affiliate.page must exist (filled)').toHaveProperty('attribution.affiliate.page');
+        expect(doc, 'attribution.affiliate.timestamp must exist (filled)').toHaveProperty('attribution.affiliate.timestamp');
+        expect(doc, 'attribution.first.url must exist (filled)').toHaveProperty('attribution.first.url');
+        expect(doc, 'attribution.first.timestamp must exist (filled)').toHaveProperty('attribution.first.timestamp');
+        expect(doc, 'attribution.first.clickIds must exist (filled)').toHaveProperty('attribution.first.clickIds');
+        expect(doc, 'attribution.last.url must exist (filled)').toHaveProperty('attribution.last.url');
+        expect(doc, 'attribution.last.referrer must exist (filled)').toHaveProperty('attribution.last.referrer');
         // filled leaves should be null, not undefined/missing
-        assert.equal(doc?.attribution?.affiliate?.url, null, 'unset attribution leaf should be null');
+        expect(doc?.attribution?.affiliate?.url, 'unset attribution leaf should be null').toBe(null);
 
         // (c) Signup data applied on top.
-        assert.equal(doc?.attribution?.affiliate?.code, 'PARTIALONLY', 'pre-existing affiliate.code preserved (signup did not send one)');
-        assert.equal(doc?.attribution?.first?.tags?.utm_source, 'newsletter', 'signup first-touch utm tag applied');
-        assert.equal(doc?.attribution?.first?.referrer, 'https://news.ycombinator.com/', 'signup first-touch referrer applied');
-        assert.equal(doc?.attribution?.last?.tags?.utm_source, 'meta', 'signup last-touch utm tag applied');
-        assert.equal(doc?.attribution?.last?.clickIds?.fbclid, 'FB1', 'signup last-touch click id applied');
-        assert.equal(doc?.flags?.signupProcessed, true, 'flags.signupProcessed set true');
-        assert.equal(doc?.consent?.legal?.status, 'granted', 'consent applied');
+        expect(doc?.attribution?.affiliate?.code, 'pre-existing affiliate.code preserved (signup did not send one)').toBe('PARTIALONLY');
+        expect(doc?.attribution?.first?.tags?.utm_source, 'signup first-touch utm tag applied').toBe('newsletter');
+        expect(doc?.attribution?.first?.referrer, 'signup first-touch referrer applied').toBe('https://news.ycombinator.com/');
+        expect(doc?.attribution?.last?.tags?.utm_source, 'signup last-touch utm tag applied').toBe('meta');
+        expect(doc?.attribution?.last?.clickIds?.fbclid, 'signup last-touch click id applied').toBe('FB1');
+        expect(doc?.flags?.signupProcessed, 'flags.signupProcessed set true').toBe(true);
+        expect(doc?.consent?.legal?.status, 'consent applied').toBe('granted');
         // The tracking-consent snapshot is stored VERBATIM beside attribution — its own
         // top-level field, never folded into the legal/marketing consent record.
-        assert.deepEqual(
-          doc?.trackingConsent,
-          { analytics: true, marketing: false, region: 'opt-in', timestamp: '2026-08-01T00:00:00.000Z', version: 1 },
-          'trackingConsent stored verbatim beside attribution'
-        );
+        expect(doc?.trackingConsent, 'trackingConsent stored verbatim beside attribution').toEqual({ analytics: true, marketing: false, region: 'opt-in', timestamp: '2026-08-01T00:00:00.000Z', version: 1 });
       },
     },
     {
       name: 'merge-fills-all-leaves-on-schema-complete-doc',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         // Sanity: after signup, the doc must contain the full set of top-level schema sections,
         // so a subsequent migration finds NOTHING to backfill. Reuses the signup-merge account
         // (already processed above → re-fire is rejected, but the doc from the prior test is the
@@ -550,21 +532,21 @@ module.exports = defineCases({
         const doc = await firestore.get(`users/${uid}`);
 
         for (const section of ['auth', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'personal', 'attribution', 'trackingConsent', 'consent', 'subscription']) {
-          assert.hasProperty(doc, section, `doc must have top-level '${section}' section after signup`);
+          expect(doc, `doc must have top-level '${section}' section after signup`).toHaveProperty(section);
         }
         // Nested completeness spot-checks across the sections signup writes.
-        assert.hasProperty(doc, 'activity.geolocation.ip', 'activity.geolocation.ip must exist');
-        assert.hasProperty(doc, 'activity.client.userAgent', 'activity.client.userAgent must exist');
-        assert.hasProperty(doc, 'personal.name.first', 'personal.name.first must exist');
-        assert.hasProperty(doc, 'consent.marketing.revokedAt.source', 'consent.marketing.revokedAt.source must exist');
-        assert.hasProperty(doc, 'metadata.created.timestampUNIX', 'metadata.created.timestampUNIX must exist');
+        expect(doc, 'activity.geolocation.ip must exist').toHaveProperty('activity.geolocation.ip');
+        expect(doc, 'activity.client.userAgent must exist').toHaveProperty('activity.client.userAgent');
+        expect(doc, 'personal.name.first must exist').toHaveProperty('personal.name.first');
+        expect(doc, 'consent.marketing.revokedAt.source must exist').toHaveProperty('consent.marketing.revokedAt.source');
+        expect(doc, 'metadata.created.timestampUNIX must exist').toHaveProperty('metadata.created.timestampUNIX');
       },
     },
 
     // --- Auth rejection test (at end per convention) ---
     {
       name: 'unauthenticated-rejected',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Try to call POST /user/signup without authentication
         const signupResponse = await http.as('none').post('omega/user/signup', {
           attribution: {
@@ -572,7 +554,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isError(signupResponse, 401, 'Signup should fail without authentication');
+        expect(signupResponse, 'Signup should fail without authentication').toBeError(401);
       },
     },
   ],

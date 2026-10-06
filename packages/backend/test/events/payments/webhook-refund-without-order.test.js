@@ -17,7 +17,7 @@
  * emulator would need a persona, a purchase and a deliberately missing order write
  * per permutation to reach the same state; the stand-in seeds it exactly.
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -101,8 +101,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runRefund();
 
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'a refund must never define a purchase');
-        assert.ok(!store.get(`payments-intents/${ORDER_ID}`), 'nothing completed, so no intent is closed out');
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'a refund must never define a purchase').toBeTruthy();
+        expect(!store.get(`payments-intents/${ORDER_ID}`), 'nothing completed, so no intent is closed out').toBeTruthy();
       },
     },
 
@@ -113,12 +113,12 @@ module.exports = defineCases({
         const { store } = await runRefund();
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.ok(event.refusal, 'the event doc carries the refusal durably');
-        assert.equal(event.refusal.reason, 'refund-without-order', 'the stamp names what is wrong');
-        assert.equal(event.refusal.captureId, CAPTURE_ID, 'the capture from links.up — the pointer back to the purchase');
-        assert.equal(event.owner, UID, 'the owner it resolved to');
-        assert.equal(event.orderId, ORDER_ID, 'the order the refund named, which does not exist');
-        assert.equal(event.raw?.data?.object?.id, REFUND_ID, 'the refund payload as delivered is already on the doc');
+        expect(event.refusal, 'the event doc carries the refusal durably').toBeTruthy();
+        expect(event.refusal.reason, 'the stamp names what is wrong').toBe('refund-without-order');
+        expect(event.refusal.captureId, 'the capture from links.up — the pointer back to the purchase').toBe(CAPTURE_ID);
+        expect(event.owner, 'the owner it resolved to').toBe(UID);
+        expect(event.orderId, 'the order the refund named, which does not exist').toBe(ORDER_ID);
+        expect(event.raw?.data?.object?.id, 'the refund payload as delivered is already on the doc').toBe(REFUND_ID);
       },
     },
 
@@ -129,10 +129,10 @@ module.exports = defineCases({
         const { store, logs } = await runRefund();
         const output = logs.join('\n');
 
-        assert.match(output, /REFUND WITHOUT ORDER/, 'the refusal is loud');
-        assert.ok(!output.includes('Transition detected: one-time/purchase-refunded'), 'no purchase was refunded, so the trail must not say one was');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.transition, null, 'the webhook records no transition');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'completed', 'the event reached a decision — it is not a retryable failure');
+        expect(output, 'the refusal is loud').toMatch(/REFUND WITHOUT ORDER/);
+        expect(!output.includes('Transition detected: one-time/purchase-refunded'), 'no purchase was refunded, so the trail must not say one was').toBeTruthy();
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.transition, 'the webhook records no transition').toBe(null);
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'the event reached a decision — it is not a retryable failure').toBe('completed');
       },
     },
 
@@ -143,11 +143,11 @@ module.exports = defineCases({
         const { store } = await runRefund({ seed: { [`payments-orders/${ORDER_ID}`]: existingOrder() } });
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a refund with a purchase behind it is refused nothing');
-        assert.equal(order.unified.status, 'refunded', 'the purchase is marked refunded');
-        assert.equal(order.unified.product.id, 'premium', 'the purchase keeps its product');
-        assert.equal(order.resourceId, CHECKOUT_ID, 'the purchase keeps the resource it was bought through');
-        assert.equal(order.unified.payment.refund.amount, '9.99', 'the refund is recorded on the purchase');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a refund with a purchase behind it is refused nothing').toBeTruthy();
+        expect(order.unified.status, 'the purchase is marked refunded').toBe('refunded');
+        expect(order.unified.product.id, 'the purchase keeps its product').toBe('premium');
+        expect(order.resourceId, 'the purchase keeps the resource it was bought through').toBe(CHECKOUT_ID);
+        expect(order.unified.payment.refund.amount, 'the refund is recorded on the purchase').toBe('9.99');
       },
     },
 
@@ -163,7 +163,7 @@ module.exports = defineCases({
         const { logs } = await runRefund({ eventType: 'PAYMENT.SALE.REFUNDED', resourceType: 'sale', payload: payload });
         const output = logs.join('\n');
 
-        assert.match(output, /Fetched resource: type=sale, id=_test-refund-id, status=refunded, source=provider API/, 'a v1 sale fetch logs its real state');
+        expect(output, 'a v1 sale fetch logs its real state').toMatch(/Fetched resource: type=sale, id=_test-refund-id, status=refunded, source=provider API/);
       },
     },
   ],

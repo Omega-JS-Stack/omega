@@ -77,7 +77,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'ctx-log-opens-with-the-identity-tag',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         const calls = withConsoleRecorder((recorded) => {
@@ -85,18 +85,18 @@ module.exports = defineCases({
           return recorded;
         });
 
-        assert.equal(calls.log[0][0].endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), true, calls.log[0][0]);
-        assert.equal(calls.log[0][1], 'Created user');
+        expect(calls.log[0][0].endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), calls.log[0][0]).toBe(true);
+        expect(calls.log[0][1]).toBe('Created user');
       },
     },
 
     {
       name: 'outside-production-the-line-opens-with-a-local-timestamp',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         // The suite's own environment is non-production — that IS the local branch.
-        assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
+        expect(ctx.isProduction(), 'the suite must run outside production for this test').toBe(false);
 
         const calls = withConsoleRecorder((recorded) => {
           ctx.log('Created user');
@@ -106,18 +106,18 @@ module.exports = defineCases({
         const prefix = calls.log[0][0];
 
         // Nothing stamps a plain local run, so the logger does it.
-        assert.equal(LOCAL_LINE.test(prefix), true, `local line should open with [HH:MM:SS] then the tag, got: ${prefix}`);
-        assert.equal(prefix.endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), true, prefix);
+        expect(LOCAL_LINE.test(prefix), `local line should open with [HH:MM:SS] then the tag, got: ${prefix}`).toBe(true);
+        expect(prefix.endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), prefix).toBe(true);
       },
     },
 
     {
       name: 'in-production-the-tag-stands-alone-no-timestamp-bracket',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const line = withProductionEnvironment(() => {
           const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
-          assert.equal(ctx.isProduction(), true, 'the production branch was not reached');
+          expect(ctx.isProduction(), 'the production branch was not reached').toBe(true);
 
           const calls = withConsoleRecorder((recorded) => {
             ctx.log('Created user');
@@ -128,15 +128,15 @@ module.exports = defineCases({
         });
 
         // Cloud Logging stamps the entry; a hand-written time would be a second one.
-        assert.equal(line.prefix, `[@omega.js/backend:user-signup] ${line.id}:`, line.prefix);
-        assert.equal(/^\[\d{2}:\d{2}:\d{2}\]/.test(line.prefix), false, `production line carries a timestamp: ${line.prefix}`);
-        assert.equal(/^\[\d{4}-\d{2}-\d{2}T/.test(line.prefix), false, `production line carries a timestamp: ${line.prefix}`);
+        expect(line.prefix, line.prefix).toBe(`[@omega.js/backend:user-signup] ${line.id}:`);
+        expect(/^\[\d{2}:\d{2}:\d{2}\]/.test(line.prefix), `production line carries a timestamp: ${line.prefix}`).toBe(false);
+        expect(/^\[\d{4}-\d{2}-\d{2}T/.test(line.prefix), `production line carries a timestamp: ${line.prefix}`).toBe(false);
       },
     },
 
     {
       name: 'under-the-emulator-the-line-is-stamped-like-any-local-run',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const saved = process.env.FUNCTIONS_EMULATOR;
         const savedEnvironment = process.env.ENVIRONMENT;
         const savedInput = process.env.OMEGA_ENVIRONMENT;
@@ -152,7 +152,7 @@ module.exports = defineCases({
 
           // The emulator's `>` functions prefix carries no time, so emulator lines
           // are stamped exactly like any other non-production run.
-          assert.equal(omega.getEnvironment(), 'development', 'the emulator branch must resolve as development');
+          expect(omega.getEnvironment(), 'the emulator branch must resolve as development').toBe('development');
 
           const calls = withConsoleRecorder((recorded) => {
             ctx.log('Created user');
@@ -160,8 +160,8 @@ module.exports = defineCases({
           });
 
           const prefix = calls.log[0][0];
-          assert.equal(LOCAL_LINE.test(prefix), true, `emulator line should open with [HH:MM:SS], got: ${prefix}`);
-          assert.equal(prefix.endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), true, prefix);
+          expect(LOCAL_LINE.test(prefix), `emulator line should open with [HH:MM:SS], got: ${prefix}`).toBe(true);
+          expect(prefix.endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), prefix).toBe(true);
         } finally {
           if (saved === undefined) {
             delete process.env.FUNCTIONS_EMULATOR;
@@ -184,7 +184,7 @@ module.exports = defineCases({
 
     {
       name: 'a-log-prefix-follows-the-tag',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'cron' });
 
         ctx.setLogPrefix('cron/daily()');
@@ -194,13 +194,13 @@ module.exports = defineCases({
           return recorded;
         });
 
-        assert.equal(calls.log[0][0].endsWith(`[@omega.js/backend:cron] ${ctx.id} cron/daily():`), true, calls.log[0][0]);
+        expect(calls.log[0][0].endsWith(`[@omega.js/backend:cron] ${ctx.id} cron/daily():`), calls.log[0][0]).toBe(true);
       },
     },
 
     {
       name: 'every-level-carries-the-same-tag',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         const calls = withConsoleRecorder((recorded) => {
@@ -208,9 +208,9 @@ module.exports = defineCases({
           return recorded;
         });
 
-        assert.equal(calls.error[0][0].endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), true, calls.error[0][0]);
-        assert.equal(LOCAL_LINE.test(calls.error[0][0]), true, `every level gets the local stamp: ${calls.error[0][0]}`);
-        assert.equal(calls.error[0][1], 'Something broke');
+        expect(calls.error[0][0].endsWith(`[@omega.js/backend:user-signup] ${ctx.id}:`), calls.error[0][0]).toBe(true);
+        expect(LOCAL_LINE.test(calls.error[0][0]), `every level gets the local stamp: ${calls.error[0][0]}`).toBe(true);
+        expect(calls.error[0][1]).toBe('Something broke');
       },
     },
   ],

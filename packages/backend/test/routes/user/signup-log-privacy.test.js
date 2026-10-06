@@ -69,43 +69,43 @@ module.exports = defineCases({
   tests: [
     {
       name: 'starting-line-names-the-uid-and-the-shape-only',
-      async run({ assert }) {
+      async run({ expect }) {
         const line = await captureStartingLine();
 
-        assert.ok(line, 'no signup(): Starting line was logged');
-        assert.ok(line.includes('user-632'), `line does not name the account: ${line}`);
-        assert.ok(line.includes('consent'), `line lost the payload shape: ${line}`);
+        expect(line, 'no signup(): Starting line was logged').toBeTruthy();
+        expect(line.includes('user-632'), `line does not name the account: ${line}`).toBeTruthy();
+        expect(line.includes('consent'), `line lost the payload shape: ${line}`).toBeTruthy();
       },
     },
 
     {
       name: 'starting-line-never-serializes-the-settings-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         const line = await captureStartingLine();
 
-        assert.ok(!line.includes('privateKey'), `nested payload serialized into the line: ${line}`);
-        assert.ok(!line.includes(LEAKED_KEY), `private key written to the line: ${line}`);
-        assert.ok(!line.includes(LEAKED_IP), `request IP written to the line: ${line}`);
+        expect(!line.includes('privateKey'), `nested payload serialized into the line: ${line}`).toBeTruthy();
+        expect(!line.includes(LEAKED_KEY), `private key written to the line: ${line}`).toBeTruthy();
+        expect(!line.includes(LEAKED_IP), `request IP written to the line: ${line}`).toBeTruthy();
       },
     },
 
     {
       name: 'user-record-renders-as-key-names-never-values',
-      async run({ assert }) {
+      async run({ expect }) {
         const rendered = keyNames(USER_RECORD);
 
-        assert.ok(rendered.includes('api'), `the record shape is gone: ${rendered}`);
-        assert.ok(!rendered.includes('privateKey'), `a nested key leaked: ${rendered}`);
-        assert.ok(!rendered.includes(LEAKED_KEY), `the private key leaked: ${rendered}`);
-        assert.ok(!rendered.includes(LEAKED_IP), `the request IP leaked: ${rendered}`);
+        expect(rendered.includes('api'), `the record shape is gone: ${rendered}`).toBeTruthy();
+        expect(!rendered.includes('privateKey'), `a nested key leaked: ${rendered}`).toBeTruthy();
+        expect(!rendered.includes(LEAKED_KEY), `the private key leaked: ${rendered}`).toBeTruthy();
+        expect(!rendered.includes(LEAKED_IP), `the request IP leaked: ${rendered}`).toBeTruthy();
       },
     },
 
     {
       name: 'nothing-to-render-says-none',
-      async run({ assert }) {
-        assert.equal(keyNames({}), '(none)', 'an empty payload renders as (none)');
-        assert.equal(keyNames(null), '(none)', 'a missing payload renders as (none)');
+      async run({ expect }) {
+        expect(keyNames({}), 'an empty payload renders as (none)').toBe('(none)');
+        expect(keyNames(null), 'a missing payload renders as (none)').toBe('(none)');
       },
     },
   ],

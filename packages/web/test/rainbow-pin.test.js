@@ -5,10 +5,10 @@
  * ones. The palette lives in both languages, so nothing but a test can keep
  * them equal: change the stops in both places or in neither.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { PKG } = require('./lib/build.js');
 
@@ -24,26 +24,27 @@ const MOTION = path.join(PKG, '..', 'client', 'src', 'modules', 'motion.js');
  */
 function readStops(source, pattern, label) {
   const match = source.match(pattern);
-  assert.ok(match, `${label} not found — the rainbow pin needs updating with the code it pins`);
+  expect(match, `${label} not found — the rainbow pin needs updating with the code it pins`).toBeTruthy();
   const hexes = match[1].match(/#[0-9a-fA-F]{6}/g) || [];
   return hexes.map((hex) => hex.toLowerCase());
 }
 
-test('the rainbow palette is ONE list: the classy ring and the dotfield carry the same stops', () => {
-  const scss = fs.readFileSync(UTILITIES, 'utf8');
-  const motion = fs.readFileSync(MOTION, 'utf8');
+module.exports = defineCases({
+  type: 'group',
+  description: 'rainbow-pin',
+  tests: [
+    {
+      name: 'the rainbow palette is ONE list: the classy ring and the dotfield carry the same stops',
+      run: (ctx) => {
+        const scss = fs.readFileSync(UTILITIES, 'utf8');
+        const motion = fs.readFileSync(MOTION, 'utf8');
 
-  const scssStops = readStops(scss, /--omega-gradient-stops:\s*([^;]+);/, '--omega-gradient-stops');
-  const jsStops = readStops(motion, /const RAINBOW_STOPS = \[([^\]]+)\]/, 'RAINBOW_STOPS');
+        const scssStops = readStops(scss, /--omega-gradient-stops:\s*([^;]+);/, '--omega-gradient-stops');
+        const jsStops = readStops(motion, /const RAINBOW_STOPS = \[([^\]]+)\]/, 'RAINBOW_STOPS');
 
-  assert.deepStrictEqual(
-    scssStops,
-    ['#f2d478', '#f2a288', '#f094c2', '#bd97f2', '#88b4f2', '#7fd9cf', '#a5e08c', '#f2d478'],
-    'the hand-mixed pastel ramp: butter → coral → pink → lavender → periwinkle → aqua → soft green, first stop repeated so the wrap is seamless',
-  );
-  assert.deepStrictEqual(
-    jsStops,
-    scssStops,
-    'motion.js RAINBOW_STOPS drifted from --omega-gradient-stops — the ring and the dotfield are the same palette: change both or neither',
-  );
+        ctx.expect(scssStops, 'the hand-mixed pastel ramp: butter → coral → pink → lavender → periwinkle → aqua → soft green, first stop repeated so the wrap is seamless').toEqual(['#f2d478', '#f2a288', '#f094c2', '#bd97f2', '#88b4f2', '#7fd9cf', '#a5e08c', '#f2d478']);
+        ctx.expect(jsStops, 'motion.js RAINBOW_STOPS drifted from --omega-gradient-stops — the ring and the dotfield are the same palette: change both or neither').toEqual(scssStops);
+      },
+    },
+  ],
 });

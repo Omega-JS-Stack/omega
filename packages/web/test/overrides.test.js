@@ -9,11 +9,10 @@
  * the bug. The consumer side is a temp tree (the commands-clean pattern): the
  * verbs read process.cwd() through consumerPaths.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const customize = require('../src/commands/customize.js');
 const { buildAssets } = require('../src/assets.js');
@@ -100,190 +99,241 @@ async function compileCss(t, root) {
     .join('\n');
 }
 
-test('the map covers every shadowable lane — sections, includes, css, pages', (t) => {
-  const entries = mapFor(consumer(t));
-  const kinds = new Set(entries.map((entry) => entry.kind));
+module.exports = defineCases({
+  type: 'group',
+  description: 'overrides',
+  tests: [
+    {
+      name: 'the map covers every shadowable lane — sections, includes, css, pages',
+      run: (ctx) => {
+        const entries = mapFor(consumer(ctx));
+        const kinds = new Set(entries.map((entry) => entry.kind));
 
-  assert.deepEqual([...kinds].sort(), ['css', 'include', 'page', 'section'], 'all four lanes are listed');
-  assert.ok(entries.some((entry) => entry.path === BASE_FOOTER), 'the theme footer include is shadowable');
-  assert.ok(entries.some((entry) => entry.kind === 'section' && /^_sections\/.*\/section\.html$/.test(entry.path)), 'section markup is listed by its entry path');
-  assert.ok(entries.every((entry) => entry.kind !== 'css' || entry.path.startsWith('assets/css/')), 'css paths carry the consumer asset-layer prefix');
-});
+        ctx.expect([...kinds].sort(), 'all four lanes are listed').toEqual(['css', 'include', 'page', 'section']);
+        ctx.expect(entries.some((entry) => entry.path === BASE_FOOTER), 'the theme footer include is shadowable').toBeTruthy();
+        ctx.expect(entries.some((entry) => entry.kind === 'section' && /^_sections\/.*\/section\.html$/.test(entry.path)), 'section markup is listed by its entry path').toBeTruthy();
+        ctx.expect(entries.every((entry) => entry.kind !== 'css' || entry.path.startsWith('assets/css/')), 'css paths carry the consumer asset-layer prefix').toBeTruthy();
+      },
+    },
 
-test('every non-page path is the path that shadows it — relative to the consumer src', (t) => {
-  const root = consumer(t);
-  const entries = mapFor(root).filter((entry) => entry.kind !== 'page');
+    {
+      name: 'every non-page path is the path that shadows it — relative to the consumer src',
+      run: (ctx) => {
+        const root = consumer(ctx);
+        const entries = mapFor(root).filter((entry) => entry.kind !== 'page');
 
-  for (const entry of entries) {
-    assert.equal(entry.target, path.join(root, 'src', entry.path), `${entry.path} lands where the map says`);
-    assert.ok(fs.existsSync(entry.source), `${entry.path} names a real source file`);
-  }
-});
+        for (const entry of entries) {
+          ctx.expect(entry.target, `${entry.path} lands where the map says`).toBe(path.join(root, 'src', entry.path));
+          ctx.expect(fs.existsSync(entry.source), `${entry.path} names a real source file`).toBeTruthy();
+        }
+      },
+    },
 
-test('owning layers are the build\'s own chain: framework core, theme layers, consumer', (t) => {
-  const entries = mapFor(consumer(t));
-  const footer = entries.find((entry) => entry.path === BASE_FOOTER);
-  const layers = new Set(entries.map((entry) => entry.layer));
+    {
+      name: 'owning layers are the build\'s own chain: framework core, theme layers, consumer',
+      run: (ctx) => {
+        const entries = mapFor(consumer(ctx));
+        const footer = entries.find((entry) => entry.path === BASE_FOOTER);
+        const layers = new Set(entries.map((entry) => entry.layer));
 
-  assert.equal(footer.layer, 'theme:base', 'the footer comes from the base layer');
-  assert.equal(footer.shadowed, false, 'a bare consumer shadows nothing');
-  assert.ok(layers.has('framework'), 'the core layer owns files too');
-  assert.ok([...layers].every((layer) => layer === 'framework' || layer === 'consumer' || layer.startsWith('theme:')), 'no other layer label exists');
-});
+        ctx.expect(footer.layer, 'the footer comes from the base layer').toBe('theme:base');
+        ctx.expect(footer.shadowed, 'a bare consumer shadows nothing').toBe(false);
+        ctx.expect(layers.has('framework'), 'the core layer owns files too').toBeTruthy();
+        ctx.expect([...layers].every((layer) => layer === 'framework' || layer === 'consumer' || layer.startsWith('theme:')), 'no other layer label exists').toBeTruthy();
+      },
+    },
 
-test('the active theme decides the winner — newsflash beats classy where it owns the file', (t) => {
-  const root = consumer(t, { theme: 'newsflash' });
-  const entries = mapFor(root, 'newsflash');
-  const winners = new Map(entries.map((entry) => [entry.path, entry]));
+    {
+      name: 'the active theme decides the winner — newsflash beats classy where it owns the file',
+      run: (ctx) => {
+        const root = consumer(ctx, { theme: 'newsflash' });
+        const entries = mapFor(root, 'newsflash');
+        const winners = new Map(entries.map((entry) => [entry.path, entry]));
 
-  const themed = entries.filter((entry) => entry.layer === 'theme:newsflash');
-  assert.ok(themed.length, 'the active theme owns files in the map');
-  for (const entry of themed) {
-    assert.ok(entry.source.includes(path.join('themes', 'newsflash')), `${entry.path} resolves to the active theme's copy`);
-  }
-  assert.equal(winners.get(BASE_FOOTER).layer, 'theme:base', 'what newsflash does not own still flows from the base layer');
-});
+        const themed = entries.filter((entry) => entry.layer === 'theme:newsflash');
+        ctx.expect(themed.length, 'the active theme owns files in the map').toBeTruthy();
+        for (const entry of themed) {
+          ctx.expect(entry.source.includes(path.join('themes', 'newsflash')), `${entry.path} resolves to the active theme's copy`).toBeTruthy();
+        }
+        ctx.expect(winners.get(BASE_FOOTER).layer, 'what newsflash does not own still flows from the base layer').toBe('theme:base');
+      },
+    },
 
-test('a consumer file shadows its layer — the map says so and points at the file it hides', (t) => {
-  const root = consumer(t, { extra: { [`src/${BASE_FOOTER}`]: '<footer>mine</footer>' } });
-  const footer = mapFor(root).find((entry) => entry.path === BASE_FOOTER);
+    {
+      name: 'a consumer file shadows its layer — the map says so and points at the file it hides',
+      run: (ctx) => {
+        const root = consumer(ctx, { extra: { [`src/${BASE_FOOTER}`]: '<footer>mine</footer>' } });
+        const footer = mapFor(root).find((entry) => entry.path === BASE_FOOTER);
 
-  assert.equal(footer.layer, 'consumer', 'the consumer copy wins');
-  assert.equal(footer.shadowed, true, 'and is reported as a shadow');
-  assert.deepEqual(footer.shadows, ['theme:base'], 'naming the layer underneath it');
-  assert.ok(footer.source.includes(path.join('themes', 'base')), 'source stays the framework file — what a materialize would copy');
-});
+        ctx.expect(footer.layer, 'the consumer copy wins').toBe('consumer');
+        ctx.expect(footer.shadowed, 'and is reported as a shadow').toBe(true);
+        ctx.expect(footer.shadows, 'naming the layer underneath it').toEqual(['theme:base']);
+        ctx.expect(footer.source.includes(path.join('themes', 'base')), 'source stays the framework file — what a materialize would copy').toBeTruthy();
+      },
+    },
 
-// ─── omega customize --list ──────────────────────────────────────────────────
+    // ─── omega customize --list ──────────────────────────────────────────────────
 
-test('--list prints every lane with its owning layer and the consumer\'s shadows', async (t) => {
-  const root = consumer(t, { extra: { [`src/${BASE_FOOTER}`]: '<footer>mine</footer>' } });
+    {
+      name: '--list prints every lane with its owning layer and the consumer\'s shadows',
+      run: async (ctx) => {
+        const root = consumer(ctx, { extra: { [`src/${BASE_FOOTER}`]: '<footer>mine</footer>' } });
 
-  const output = await runIn(t, root, { list: true });
+        const output = await runIn(ctx, root, { list: true });
 
-  assert.match(output, /Sections & components/, 'the section lane is printed');
-  assert.match(output, /Includes/, 'the include lane is printed');
-  assert.match(output, /Stylesheets/, 'the css lane is printed');
-  assert.match(output, /Pages \(omega customize <url>\)/, 'the page lane is printed');
-  assert.match(output, new RegExp(`${BASE_FOOTER}\\s+shadowed by you`), 'an owned path reads as shadowed, with its file');
-  assert.match(output, /assets\/css\/main\.scss\s+from (framework|theme:classy)/, 'an un-owned path names the layer it comes from');
-});
+        ctx.expect(output, 'the section lane is printed').toMatch(/Sections & components/);
+        ctx.expect(output, 'the include lane is printed').toMatch(/Includes/);
+        ctx.expect(output, 'the css lane is printed').toMatch(/Stylesheets/);
+        ctx.expect(output, 'the page lane is printed').toMatch(/Pages \(omega customize <url>\)/);
+        ctx.expect(output, 'an owned path reads as shadowed, with its file').toMatch(new RegExp(`${BASE_FOOTER}\\s+shadowed by you`));
+        ctx.expect(output, 'an un-owned path names the layer it comes from').toMatch(/assets\/css\/main\.scss\s+from (framework|theme:classy)/);
+      },
+    },
 
-// ─── omega customize <path> ──────────────────────────────────────────────────
+    // ─── omega customize <path> ──────────────────────────────────────────────────
 
-test('a single include materializes at its shadow path, with a provenance header', async (t) => {
-  const root = consumer(t);
+    {
+      name: 'a single include materializes at its shadow path, with a provenance header',
+      run: async (ctx) => {
+        const root = consumer(ctx);
 
-  const output = await runIn(t, root, { _: ['customize', BASE_FOOTER] });
-  const written = fs.readFileSync(path.join(root, 'src', BASE_FOOTER), 'utf8');
-  const source = fs.readFileSync(mapFor(root).find((entry) => entry.path === BASE_FOOTER).source, 'utf8');
+        const output = await runIn(ctx, root, { _: ['customize', BASE_FOOTER] });
+        const written = fs.readFileSync(path.join(root, 'src', BASE_FOOTER), 'utf8');
+        const source = fs.readFileSync(mapFor(root).find((entry) => entry.path === BASE_FOOTER).source, 'utf8');
 
-  assert.match(output, /Materialized src\/_includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file/);
-  assert.match(written, /^\{% comment %\}\n {2}omega:consumer-override: materialized by omega customize _includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file\./, 'the header names the source layer in Liquid comment form (never rendered)');
-  assert.ok(written.endsWith(source), 'the file itself is a verbatim copy');
-});
+        ctx.expect(output).toMatch(/Materialized src\/_includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file/);
+        ctx.expect(written, 'the header names the source layer in Liquid comment form (never rendered)').toMatch(/^\{% comment %\}\n {2}omega:consumer-override: materialized by omega customize _includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file\./);
+        ctx.expect(written.endsWith(source), 'the file itself is a verbatim copy').toBeTruthy();
+      },
+    },
 
-test('a stylesheet materializes into the consumer asset layer with a scss comment header', async (t) => {
-  const root = consumer(t);
-  const entry = mapFor(root).find((e) => e.kind === 'css' && e.path === 'assets/css/main.scss');
+    {
+      name: 'a stylesheet materializes into the consumer asset layer with a scss comment header',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        const entry = mapFor(root).find((e) => e.kind === 'css' && e.path === 'assets/css/main.scss');
 
-  await runIn(t, root, { _: ['customize', entry.path] });
-  const written = fs.readFileSync(path.join(root, 'src', 'assets', 'css', 'main.scss'), 'utf8');
+        await runIn(ctx, root, { _: ['customize', entry.path] });
+        const written = fs.readFileSync(path.join(root, 'src', 'assets', 'css', 'main.scss'), 'utf8');
 
-  assert.match(written, /^\/\/ omega:consumer-override: materialized by omega customize assets\/css\/main\.scss/, 'scss carries // comments, not liquid');
-  assert.ok(written.endsWith(fs.readFileSync(entry.source, 'utf8')), 'verbatim below the header');
-});
+        ctx.expect(written, 'scss carries // comments, not liquid').toMatch(/^\/\/ omega:consumer-override: materialized by omega customize assets\/css\/main\.scss/);
+        ctx.expect(written.endsWith(fs.readFileSync(entry.source, 'utf8')), 'verbatim below the header').toBeTruthy();
+      },
+    },
 
-test('the provenance header carries the consumer-override marker in the first five lines', async (t) => {
-  const root = consumer(t);
+    {
+      name: 'the provenance header carries the consumer-override marker in the first five lines',
+      run: async (ctx) => {
+        const root = consumer(ctx);
 
-  // A materialize IS the deliberate consumer copy, so the file has to pass the
-  // omega:guard shadow check (#452) without anybody hand-editing a marker in.
-  // That hook reads the first FIVE lines only, in any comment syntax.
-  await runIn(t, root, { _: ['customize', BASE_FOOTER] });
-  await runIn(t, root, { _: ['customize', 'assets/css/main.scss'] });
+        // A materialize IS the deliberate consumer copy, so the file has to pass the
+        // omega:guard shadow check (#452) without anybody hand-editing a marker in.
+        // That hook reads the first FIVE lines only, in any comment syntax.
+        await runIn(ctx, root, { _: ['customize', BASE_FOOTER] });
+        await runIn(ctx, root, { _: ['customize', 'assets/css/main.scss'] });
 
-  for (const rel of [path.join('_includes', 'frontend', 'sections', 'footer.html'), path.join('assets', 'css', 'main.scss')]) {
-    const head = fs.readFileSync(path.join(root, 'src', rel), 'utf8').split('\n').slice(0, 5).join('\n');
-    assert.match(head, /omega:consumer-override: materialized by omega customize /, `${rel} lost the marker the guard hook reads`);
-  }
-});
+        for (const rel of [path.join('_includes', 'frontend', 'sections', 'footer.html'), path.join('assets', 'css', 'main.scss')]) {
+          const head = fs.readFileSync(path.join(root, 'src', rel), 'utf8').split('\n').slice(0, 5).join('\n');
+          ctx.expect(head, `${rel} lost the marker the guard hook reads`).toMatch(/omega:consumer-override: materialized by omega customize /);
+        }
+      },
+    },
 
-// ─── The css contract: a listed sheet is one the compile chain HONORS ────────
+    // ─── The css contract: a listed sheet is one the compile chain HONORS ────────
 
-test('every css entry the map offers actually wins when materialized — proved by a real compile', async (t) => {
-  const root = consumer(t);
-  const entries = mapFor(root).filter((entry) => entry.kind === 'css');
+    {
+      name: 'every css entry the map offers actually wins when materialized — proved by a real compile',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        const entries = mapFor(root).filter((entry) => entry.kind === 'css');
 
-  assert.ok(entries.length, 'the lane is not empty');
+        ctx.expect(entries.length, 'the lane is not empty').toBeTruthy();
 
-  for (const entry of entries) {
-    await runIn(t, root, { _: ['customize', entry.path] });
-    fs.appendFileSync(path.join(root, 'src', entry.path), `\n.shadow-proof-${entry.path.replace(/\W/g, '-')} { color: red; }\n`);
-  }
+        for (const entry of entries) {
+          await runIn(ctx, root, { _: ['customize', entry.path] });
+          fs.appendFileSync(path.join(root, 'src', entry.path), `\n.shadow-proof-${entry.path.replace(/\W/g, '-')} { color: red; }\n`);
+        }
 
-  const css = await compileCss(t, root);
-  for (const entry of entries) {
-    assert.ok(css.includes(`.shadow-proof-${entry.path.replace(/\W/g, '-')}`), `${entry.path}: the consumer's copy reached the compiled output`);
-  }
-});
+        const css = await compileCss(ctx, root);
+        for (const entry of entries) {
+          ctx.expect(css.includes(`.shadow-proof-${entry.path.replace(/\W/g, '-')}`), `${entry.path}: the consumer's copy reached the compiled output`).toBeTruthy();
+        }
+      },
+    },
 
-test('unreachable partials are NOT listed — a consumer copy of one never loads', async (t) => {
-  const root = consumer(t);
-  const entries = mapFor(root).filter((entry) => entry.kind === 'css');
+    {
+      name: 'unreachable partials are NOT listed — a consumer copy of one never loads',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        const entries = mapFor(root).filter((entry) => entry.kind === 'css');
 
-  // The reason the lane is narrow: bare relative @use/@import inside a theme
-  // sheet resolves against the IMPORTING file before any loadPath, so a
-  // consumer copy of a partial is dead weight. Offering it would be a lie.
-  assert.ok(entries.every((entry) => !entry.path.split('/').some((segment) => segment.startsWith('_'))), 'no partials in the map');
-  // …and #624 narrows it to ONE: a page or layout sheet is never shadowed —
-  // every layer's loads — so materializing one would DUPLICATE its rules, not
-  // replace them. The map offers only what a consumer copy takes over.
-  assert.ok(entries.every((entry) => entry.path === 'assets/css/main.scss'), 'main.scss is the only sheet sass resolves by layer');
-  assert.equal(materializeOverride({ path: 'assets/css/base/_utilities.scss', consumerDir: path.join(root, 'src') }).status, 'unknown', 'and the verb refuses to write one');
+        // The reason the lane is narrow: bare relative @use/@import inside a theme
+        // sheet resolves against the IMPORTING file before any loadPath, so a
+        // consumer copy of a partial is dead weight. Offering it would be a lie.
+        ctx.expect(entries.every((entry) => !entry.path.split('/').some((segment) => segment.startsWith('_'))), 'no partials in the map').toBeTruthy();
+        // …and #624 narrows it to ONE: a page or layout sheet is never shadowed —
+        // every layer's loads — so materializing one would DUPLICATE its rules, not
+        // replace them. The map offers only what a consumer copy takes over.
+        ctx.expect(entries.every((entry) => entry.path === 'assets/css/main.scss'), 'main.scss is the only sheet sass resolves by layer').toBeTruthy();
+        ctx.expect(materializeOverride({ path: 'assets/css/base/_utilities.scss', consumerDir: path.join(root, 'src') }).status, 'and the verb refuses to write one').toBe('unknown');
 
-  const utilities = path.join(root, 'src', 'assets', 'css', 'base', '_utilities.scss');
-  fs.mkdirSync(path.dirname(utilities), { recursive: true });
-  fs.writeFileSync(utilities, '.hand-rolled-partial-shadow { color: red; }\n');
+        const utilities = path.join(root, 'src', 'assets', 'css', 'base', '_utilities.scss');
+        fs.mkdirSync(path.dirname(utilities), { recursive: true });
+        fs.writeFileSync(utilities, '.hand-rolled-partial-shadow { color: red; }\n');
 
-  assert.ok(!(await compileCss(t, root)).includes('.hand-rolled-partial-shadow'), 'a hand-placed partial shadow is dead — exactly what the map refuses to promise');
-});
+        ctx.expect(!(await compileCss(ctx, root)).includes('.hand-rolled-partial-shadow'), 'a hand-placed partial shadow is dead — exactly what the map refuses to promise').toBeTruthy();
+      },
+    },
 
-test('a section asset file says what section resolution actually does', async (t) => {
-  const root = consumer(t);
-  const scss = mapFor(root).find((entry) => entry.kind === 'section' && entry.path.endsWith('section.scss'));
+    {
+      name: 'a section asset file says what section resolution actually does',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        const scss = mapFor(root).find((entry) => entry.kind === 'section' && entry.path.endsWith('section.scss'));
 
-  const output = await runIn(t, root, { _: ['customize', scss.path] });
-  const written = fs.readFileSync(path.join(root, 'src', scss.path), 'utf8');
+        const output = await runIn(ctx, root, { _: ['customize', scss.path] });
+        const written = fs.readFileSync(path.join(root, 'src', scss.path), 'utf8');
 
-  assert.match(written, /Sections resolve per ENTRY/, 'the header warns that markup and assets travel together');
-  assert.match(output, /shadow the entry's section\.html too, or declare `inherit`/i, 'and so does the command');
-});
+        ctx.expect(written, 'the header warns that markup and assets travel together').toMatch(/Sections resolve per ENTRY/);
+        ctx.expect(output, 'and so does the command').toMatch(/shadow the entry's section\.html too, or declare `inherit`/i);
+      },
+    },
 
-test('materializing twice never overwrites — the second run says it exists and stops', async (t) => {
-  const root = consumer(t);
-  const target = path.join(root, 'src', BASE_FOOTER);
+    {
+      name: 'materializing twice never overwrites — the second run says it exists and stops',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        const target = path.join(root, 'src', BASE_FOOTER);
 
-  await runIn(t, root, { _: ['customize', BASE_FOOTER] });
-  fs.writeFileSync(target, '<footer>my edits</footer>');
-  const output = await runIn(t, root, { _: ['customize', BASE_FOOTER] });
+        await runIn(ctx, root, { _: ['customize', BASE_FOOTER] });
+        fs.writeFileSync(target, '<footer>my edits</footer>');
+        const output = await runIn(ctx, root, { _: ['customize', BASE_FOOTER] });
 
-  assert.equal(fs.readFileSync(target, 'utf8'), '<footer>my edits</footer>', 'the consumer\'s work survives');
-  assert.match(output, /Nothing to do — you already shadow _includes\/frontend\/sections\/footer\.html/);
-});
+        ctx.expect(fs.readFileSync(target, 'utf8'), 'the consumer\'s work survives').toBe('<footer>my edits</footer>');
+        ctx.expect(output).toMatch(/Nothing to do — you already shadow _includes\/frontend\/sections\/footer\.html/);
+      },
+    },
 
-test('materializeOverride reports an unknown path instead of writing one', (t) => {
-  const root = consumer(t);
-  const result = materializeOverride({ path: '_includes/nope/not-a-file.html', consumerDir: path.join(root, 'src') });
+    {
+      name: 'materializeOverride reports an unknown path instead of writing one',
+      run: (ctx) => {
+        const root = consumer(ctx);
+        const result = materializeOverride({ path: '_includes/nope/not-a-file.html', consumerDir: path.join(root, 'src') });
 
-  assert.equal(result.status, 'unknown');
-  assert.equal(fs.existsSync(path.join(root, 'src', '_includes', 'nope')), false, 'nothing is created for a miss');
-});
+        ctx.expect(result.status).toBe('unknown');
+        ctx.expect(fs.existsSync(path.join(root, 'src', '_includes', 'nope')), 'nothing is created for a miss').toBe(false);
+      },
+    },
 
-test('a page URL still routes to the page lane — the file lane never swallows it', async (t) => {
-  const root = consumer(t);
+    {
+      name: 'a page URL still routes to the page lane — the file lane never swallows it',
+      run: async (ctx) => {
+        const root = consumer(ctx);
 
-  const output = await runIn(t, root, { _: ['customize', '/pricing'] });
+        const output = await runIn(ctx, root, { _: ['customize', '/pricing'] });
 
-  assert.match(output, /(Materialized|Copied) src\/pages\//, 'the URL materialized a page, not a shadow file');
+        ctx.expect(output, 'the URL materialized a page, not a shadow file').toMatch(/(Materialized|Copied) src\/pages\//);
+      },
+    },
+  ],
 });

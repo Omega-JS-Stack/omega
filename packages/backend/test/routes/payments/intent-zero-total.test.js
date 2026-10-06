@@ -148,59 +148,59 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-code-really-does-cover-these-prices',
-      async run({ assert }) {
+      async run({ expect }) {
         // Pinned against the discount-codes SSOT, so a repriced code fails here
         // rather than quietly making every case below prove nothing
-        assert.equal(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].amount, 10, `${AMOUNT_CODE} should be $10 off`);
-        assert.equal(discountCodes.applyToAmount(CHEAP_ONE_TIME.prices.once, discountCodes.validate(AMOUNT_CODE)), 0, '$10 off $9.99 floors at $0');
-        assert.equal(discountCodes.applyToAmount(CHEAP_PLAN.prices.monthly, discountCodes.validate(AMOUNT_CODE)), 0, '$10 off $10.00 is exactly $0');
+        expect(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].amount, `${AMOUNT_CODE} should be $10 off`).toBe(10);
+        expect(discountCodes.applyToAmount(CHEAP_ONE_TIME.prices.once, discountCodes.validate(AMOUNT_CODE)), '$10 off $9.99 floors at $0').toBe(0);
+        expect(discountCodes.applyToAmount(CHEAP_PLAN.prices.monthly, discountCodes.validate(AMOUNT_CODE)), '$10 off $10.00 is exactly $0').toBe(0);
       },
     },
 
     {
       name: 'paypal-one-time-refuses-and-creates-no-order',
-      async run({ assert }) {
+      async run({ expect }) {
         const { calls, error } = await checkout(paypalIntent, { product: CHEAP_ONE_TIME });
 
-        assert.ok(error, 'A $0.00 v2 Order is refused, not sent');
-        assert.equal(error.code, 400, 'Coded 400, so the intent route answers the buyer instead of its neutral 500');
-        assert.match(error.message, /WELCOME10OFF/, 'The message names the code the buyer entered');
-        assert.match(error.message, /\$9\.99/, 'And the price it covered');
-        assert.match(error.message, /nothing for PayPal to charge/, 'And says why this payment method cannot be used');
-        assert.equal(calls.length, 0, 'PayPal was never called');
+        expect(error, 'A $0.00 v2 Order is refused, not sent').toBeTruthy();
+        expect(error.code, 'Coded 400, so the intent route answers the buyer instead of its neutral 500').toBe(400);
+        expect(error.message, 'The message names the code the buyer entered').toMatch(/WELCOME10OFF/);
+        expect(error.message, 'And the price it covered').toMatch(/\$9\.99/);
+        expect(error.message, 'And says why this payment method cannot be used').toMatch(/nothing for PayPal to charge/);
+        expect(calls.length, 'PayPal was never called').toBe(0);
       },
     },
 
     {
       name: 'paypal-subscription-refuses-before-the-plan-lookup',
-      async run({ assert }) {
+      async run({ expect }) {
         const { calls, error } = await checkout(paypalIntent, { product: CHEAP_PLAN });
 
-        assert.ok(error, 'A $0.00 setup fee is refused, not sent');
-        assert.equal(error.code, 400, 'Coded 400 like the one-time refusal');
-        assert.match(error.message, /WELCOME10OFF/, 'The message names the code');
-        assert.match(error.message, /\$10\.00/, 'And the period price it covered');
-        assert.equal(calls.length, 0, 'Not even the plan lookup ran — PayPal is untouched');
+        expect(error, 'A $0.00 setup fee is refused, not sent').toBeTruthy();
+        expect(error.code, 'Coded 400 like the one-time refusal').toBe(400);
+        expect(error.message, 'The message names the code').toMatch(/WELCOME10OFF/);
+        expect(error.message, 'And the period price it covered').toMatch(/\$10\.00/);
+        expect(calls.length, 'Not even the plan lookup ran — PayPal is untouched').toBe(0);
       },
     },
 
     {
       name: 'coinbase-refuses-and-creates-no-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         const { calls, error } = await checkout(coinbaseIntent, { product: CHEAP_ONE_TIME });
 
-        assert.ok(error, 'A $0.00 crypto charge is refused, not sent');
-        assert.equal(error.code, 400, 'Coded 400, the same refusal from the same helper');
-        assert.match(error.message, /WELCOME10OFF/, 'The message names the code');
-        assert.match(error.message, /\$9\.99/, 'And the price it covered');
-        assert.match(error.message, /nothing for Coinbase Commerce to charge/, 'And names the method that cannot take it');
-        assert.equal(calls.length, 0, 'Coinbase was never called');
+        expect(error, 'A $0.00 crypto charge is refused, not sent').toBeTruthy();
+        expect(error.code, 'Coded 400, the same refusal from the same helper').toBe(400);
+        expect(error.message, 'The message names the code').toMatch(/WELCOME10OFF/);
+        expect(error.message, 'And the price it covered').toMatch(/\$9\.99/);
+        expect(error.message, 'And names the method that cannot take it').toMatch(/nothing for Coinbase Commerce to charge/);
+        expect(calls.length, 'Coinbase was never called').toBe(0);
       },
     },
 
     {
       name: 'a-zero-checkout-on-every-provider-follows-its-descriptor',
-      async run({ assert }) {
+      async run({ expect }) {
         // The registry decides, never a provider name: a provider whose row
         // takes a $0 charge is handed one, and every other is refused before
         // its API is called, for each product type it sells
@@ -208,7 +208,7 @@ module.exports = defineCases({
 
         for (const descriptor of Object.values(registry.PAYMENT_PROVIDERS)) {
           if (descriptor.acceptsZeroCharge) {
-            assert.equal(discountCodes.chargeableAmount(CHEAP_ONE_TIME.prices.once, code, { provider: descriptor.id }), 0, `${descriptor.name} takes the $0 checkout`);
+            expect(discountCodes.chargeableAmount(CHEAP_ONE_TIME.prices.once, code, { provider: descriptor.id }), `${descriptor.name} takes the $0 checkout`).toBe(0);
             continue;
           }
 
@@ -218,9 +218,9 @@ module.exports = defineCases({
           for (const product of products) {
             const { calls, error } = await checkout(intent, { product });
 
-            assert.equal(error?.code, 400, `${descriptor.name} refuses a $0 ${product.type} as a 400, got ${error?.message}`);
-            assert.match(error.message, new RegExp(`nothing for ${descriptor.name} to charge`), 'naming the provider');
-            assert.equal(calls.length, 0, `${descriptor.name} was never called`);
+            expect(error?.code, `${descriptor.name} refuses a $0 ${product.type} as a 400, got ${error?.message}`).toBe(400);
+            expect(error.message, 'naming the provider').toMatch(new RegExp(`nothing for ${descriptor.name} to charge`));
+            expect(calls.length, `${descriptor.name} was never called`).toBe(0);
           }
         }
       },
@@ -228,46 +228,46 @@ module.exports = defineCases({
 
     {
       name: 'a-code-that-leaves-something-to-charge-still-sells',
-      async run({ assert }) {
+      async run({ expect }) {
         // The guard fires on ZERO, never on "discounted": a partial code is the
         // whole point of #758/#759 and must still reach both providers
         const partial = { valid: true, code: 'SAVE10', percent: 10, duration: 'once' };
 
         const order = await checkout(paypalIntent, { product: CHEAP_ONE_TIME, discount: partial });
-        assert.equal(order.error, null, `A 10% code still buys, got ${order.error?.message}`);
-        assert.equal(JSON.parse(order.calls[0].options.body).purchase_units[0].amount.value, '8.99', '10% off $9.99');
+        expect(order.error, `A 10% code still buys, got ${order.error?.message}`).toBe(null);
+        expect(JSON.parse(order.calls[0].options.body).purchase_units[0].amount.value, '10% off $9.99').toBe('8.99');
 
         const charge = await checkout(coinbaseIntent, { product: CHEAP_ONE_TIME, discount: partial });
-        assert.equal(charge.error, null, `And still buys in crypto, got ${charge.error?.message}`);
-        assert.equal(charge.calls[0].options.body.local_price.amount, '8.99', 'The same discounted charge');
+        expect(charge.error, `And still buys in crypto, got ${charge.error?.message}`).toBe(null);
+        expect(charge.calls[0].options.body.local_price.amount, 'The same discounted charge').toBe('8.99');
 
         const subscription = await checkout(paypalIntent, { product: CHEAP_PLAN, discount: partial });
-        assert.equal(subscription.error, null, `And a plan's first period still discounts, got ${subscription.error?.message}`);
+        expect(subscription.error, `And a plan's first period still discounts, got ${subscription.error?.message}`).toBe(null);
         const body = JSON.parse(subscription.calls.find(c => c.endpoint === '/v1/billing/subscriptions').options.body);
-        assert.equal(body.plan.payment_preferences.setup_fee.value, '9.00', '10% off $10.00, charged at approval');
+        expect(body.plan.payment_preferences.setup_fee.value, '10% off $10.00, charged at approval').toBe('9.00');
       },
     },
 
     {
       name: 'a-free-trial-charges-nothing-today-and-is-not-this-refusal',
-      async run({ assert }) {
+      async run({ expect }) {
         // A trial subscription really does charge $0 today, through the plan's
         // own TRIAL cycle rather than an amount we send — so the guard must not
         // read it as a fully discounted checkout (#759, #761)
         const { calls, error } = await checkout(paypalIntent, { product: TRIAL_PLAN, trial: true });
 
-        assert.equal(error, null, `A trial checkout is untouched, got ${error?.message}`);
+        expect(error, `A trial checkout is untouched, got ${error?.message}`).toBe(null);
 
         const body = JSON.parse(calls.find(c => c.endpoint === '/v1/billing/subscriptions').options.body);
 
-        assert.equal(body.plan_id, 'P-TEST-MONTHLY-TRIAL', 'The trial twin, which charges nothing today');
-        assert.equal(body.plan, undefined, 'And no setup fee to refuse');
+        expect(body.plan_id, 'The trial twin, which charges nothing today').toBe('P-TEST-MONTHLY-TRIAL');
+        expect(body.plan, 'And no setup fee to refuse').toBe(undefined);
       },
     },
 
     {
       name: 'a-priceless-product-keeps-its-own-refusal',
-      async run({ assert }) {
+      async run({ expect }) {
         // A product configured at no price is a CONFIG hole, not a discounted
         // checkout — every provider already refuses it in its own words, and
         // this guard must not take that sentence over
@@ -275,14 +275,14 @@ module.exports = defineCases({
         const freePlan = { ...CHEAP_PLAN, prices: { monthly: 0 } };
 
         const order = await checkout(paypalIntent, { product: free, discount: null });
-        assert.match(order.error.message, /No one-time price configured/, 'PayPal says what is actually wrong');
-        assert.equal(order.error.code, undefined, 'And it is a fault, not a buyer-facing 400');
+        expect(order.error.message, 'PayPal says what is actually wrong').toMatch(/No one-time price configured/);
+        expect(order.error.code, 'And it is a fault, not a buyer-facing 400').toBe(undefined);
 
         const charge = await checkout(coinbaseIntent, { product: free, discount: null });
-        assert.match(charge.error.message, /No one-time price configured/, 'Coinbase says the same');
+        expect(charge.error.message, 'Coinbase says the same').toMatch(/No one-time price configured/);
 
         const subscription = await checkout(paypalIntent, { product: freePlan, discount: null });
-        assert.match(subscription.error.message, /No price configured/, 'And the plan lookup keeps its own words');
+        expect(subscription.error.message, 'And the plan lookup keeps its own words').toMatch(/No price configured/);
       },
     },
   ],

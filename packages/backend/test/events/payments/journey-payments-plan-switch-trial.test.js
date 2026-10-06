@@ -39,7 +39,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-trialing-subscription',
-      async run({ accounts, firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, expect, state, config, skip }) {
         const paidProducts = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (paidProducts.length < 2) {
@@ -101,14 +101,14 @@ module.exports = defineCases({
         }, { merge: true });
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.trial.claimed, true, 'Should start mid-trial');
-        assert.equal(userDoc.subscription.trial.expires.timestampUNIX, trialEndUNIX, 'Should start with the original trial end');
+        expect(userDoc.subscription.trial.claimed, 'Should start mid-trial').toBe(true);
+        expect(userDoc.subscription.trial.expires.timestampUNIX, 'Should start with the original trial end').toBe(trialEndUNIX);
       },
     },
 
     {
       name: 'call-plan-endpoint-mid-trial',
-      async run({ assert, omega, state }) {
+      async run({ expect, omega, state }) {
         const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
@@ -127,13 +127,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(sent.code, 200, `A mid-trial switch is allowed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `A mid-trial switch is allowed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
       },
     },
 
     {
       name: 'trial-survives-the-switch-unchanged',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.product?.id === state.productB.id;
@@ -142,19 +142,19 @@ module.exports = defineCases({
         const userDoc = await firestore.get(`users/${state.uid}`);
         const subscription = userDoc.subscription;
 
-        assert.equal(subscription.product.id, state.productB.id, `Product should be ${state.productB.id}`);
-        assert.equal(subscription.status, 'active', 'Status should still be active');
+        expect(subscription.product.id, `Product should be ${state.productB.id}`).toBe(state.productB.id);
+        expect(subscription.status, 'Status should still be active').toBe('active');
 
         // The ruling, in two assertions: still claimed, same end date.
-        assert.equal(subscription.trial.claimed, true, 'A plan switch must never un-claim a trial');
-        assert.equal(subscription.trial.expires.timestampUNIX, state.trialEndUNIX, `Trial end should be the ORIGINAL ${state.trialEndUNIX}, got ${subscription.trial.expires.timestampUNIX}`);
+        expect(subscription.trial.claimed, 'A plan switch must never un-claim a trial').toBe(true);
+        expect(subscription.trial.expires.timestampUNIX, `Trial end should be the ORIGINAL ${state.trialEndUNIX}, got ${subscription.trial.expires.timestampUNIX}`).toBe(state.trialEndUNIX);
 
         // While a subscription is trialing the current period IS the trial
         // period, and the cancel route reads that equality to decide a
         // cancellation is immediate. A switch that left a 30-day period behind
         // would quietly turn the next trial cancellation into a scheduled one
         // and misreport the next billing date.
-        assert.equal(subscription.expires.timestampUNIX, state.trialEndUNIX, `A trialing subscription's period should END at the trial end (${state.trialEndUNIX}), got ${subscription.expires.timestampUNIX}`);
+        expect(subscription.expires.timestampUNIX, `A trialing subscription's period should END at the trial end (${state.trialEndUNIX}), got ${subscription.expires.timestampUNIX}`).toBe(state.trialEndUNIX);
       },
     },
   ],

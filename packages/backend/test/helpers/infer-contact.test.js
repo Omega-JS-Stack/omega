@@ -17,50 +17,50 @@ module.exports = defineCases({
 
     {
       name: 'capitalize-single-word',
-      async run({ assert }) {
-        assert.equal(capitalize('john'), 'John', 'Should capitalize first letter');
+      async run({ expect }) {
+        expect(capitalize('john'), 'Should capitalize first letter').toBe('John');
       },
     },
 
     {
       name: 'capitalize-multiple-words',
-      async run({ assert }) {
-        assert.equal(capitalize('john doe'), 'John Doe', 'Should capitalize each word');
+      async run({ expect }) {
+        expect(capitalize('john doe'), 'Should capitalize each word').toBe('John Doe');
       },
     },
 
     {
       name: 'capitalize-all-uppercase',
-      async run({ assert }) {
-        assert.equal(capitalize('JOHN'), 'John', 'Should lowercase after first letter');
+      async run({ expect }) {
+        expect(capitalize('JOHN'), 'Should lowercase after first letter').toBe('John');
       },
     },
 
     {
       name: 'capitalize-mixed-case',
-      async run({ assert }) {
-        assert.equal(capitalize('jOHN dOE'), 'John Doe', 'Should normalize mixed case');
+      async run({ expect }) {
+        expect(capitalize('jOHN dOE'), 'Should normalize mixed case').toBe('John Doe');
       },
     },
 
     {
       name: 'capitalize-empty-string',
-      async run({ assert }) {
-        assert.equal(capitalize(''), '', 'Empty string should return empty');
+      async run({ expect }) {
+        expect(capitalize(''), 'Empty string should return empty').toBe('');
       },
     },
 
     {
       name: 'capitalize-null',
-      async run({ assert }) {
-        assert.equal(capitalize(null), '', 'Null should return empty');
+      async run({ expect }) {
+        expect(capitalize(null), 'Null should return empty').toBe('');
       },
     },
 
     {
       name: 'capitalize-undefined',
-      async run({ assert }) {
-        assert.equal(capitalize(undefined), '', 'Undefined should return empty');
+      async run({ expect }) {
+        expect(capitalize(undefined), 'Undefined should return empty').toBe('');
       },
     },
 
@@ -68,7 +68,7 @@ module.exports = defineCases({
 
     {
       name: 'infer-contact-no-ai-returns-none',
-      async run({ assert }) {
+      async run({ expect }) {
         // Without OPENAI_API_KEY, should return empty result
         const originalKey = process.env.OPENAI_API_KEY;
         delete process.env.OPENAI_API_KEY;
@@ -76,11 +76,11 @@ module.exports = defineCases({
         try {
           const result = await inferContact('alice.wonderland@example.com');
 
-          assert.equal(result.firstName, '', 'No first name without AI');
-          assert.equal(result.lastName, '', 'No last name without AI');
-          assert.equal(result.company, '', 'No company without AI');
-          assert.equal(result.method, 'none', 'Method should be none');
-          assert.equal(result.confidence, 0, 'Confidence should be 0');
+          expect(result.firstName, 'No first name without AI').toBe('');
+          expect(result.lastName, 'No last name without AI').toBe('');
+          expect(result.company, 'No company without AI').toBe('');
+          expect(result.method, 'Method should be none').toBe('none');
+          expect(result.confidence, 'Confidence should be 0').toBe(0);
         } finally {
           if (originalKey) {
             process.env.OPENAI_API_KEY = originalKey;
@@ -96,7 +96,7 @@ module.exports = defineCases({
 
     {
       name: 'infer-contact-reads-the-bare-openai-key',
-      async run({ assert }) {
+      async run({ expect }) {
         const originalKey = process.env.OPENAI_API_KEY;
         process.env.OPENAI_API_KEY = 'openai-key-fixture';
 
@@ -117,9 +117,9 @@ module.exports = defineCases({
         try {
           const result = await inferContact('john.smith@acme.com', ctx);
 
-          assert.equal(handedKey, 'openai-key-fixture', 'OPENAI_API_KEY reaches the AI request');
-          assert.equal(result.method, 'ai', 'the AI path ran');
-          assert.equal(result.firstName, 'John', 'the inferred name comes back capitalized');
+          expect(handedKey, 'OPENAI_API_KEY reaches the AI request').toBe('openai-key-fixture');
+          expect(result.method, 'the AI path ran').toBe('ai');
+          expect(result.firstName, 'the inferred name comes back capitalized').toBe('John');
         } finally {
           if (originalKey) {
             process.env.OPENAI_API_KEY = originalKey;
@@ -137,7 +137,7 @@ module.exports = defineCases({
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set (skipping AI inference test)' : false,
       timeout: 30000,
 
-      async run({ assert, omega, skip }) {
+      async run({ expect, omega, skip }) {
         if (!process.env.OPENAI_API_KEY) {
           return skip('OPENAI_API_KEY not set');
         }
@@ -145,11 +145,11 @@ module.exports = defineCases({
         const ctx = new Context(omega);
         const result = await inferContact('john.smith@microsoft.com', ctx);
 
-        assert.ok(result, 'Should return a result');
-        assert.equal(result.method, 'ai', 'Should use AI method');
-        assert.hasProperty(result, 'firstName', 'Should have firstName');
-        assert.hasProperty(result, 'lastName', 'Should have lastName');
-        assert.ok(typeof result.confidence === 'number', 'Confidence should be a number');
+        expect(result, 'Should return a result').toBeTruthy();
+        expect(result.method, 'Should use AI method').toBe('ai');
+        expect(result, 'Should have firstName').toHaveProperty('firstName');
+        expect(result, 'Should have lastName').toHaveProperty('lastName');
+        expect(typeof result.confidence === 'number', 'Confidence should be a number').toBeTruthy();
       },
     },
   ],

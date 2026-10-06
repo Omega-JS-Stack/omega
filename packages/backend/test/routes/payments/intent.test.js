@@ -20,7 +20,7 @@ module.exports = defineCases({
     {
       name: 'rejects-unauthenticated',
       auth: 'none',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -32,13 +32,13 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-missing-provider',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -49,25 +49,25 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject missing provider');
+        expect(response, 'Should reject missing provider').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-product-id',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject missing productId');
+        expect(response, 'Should reject missing productId').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-frequency-for-subscription',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.type === 'subscription' && p.prices);
         if (!paidProduct) {
           skip('No paid subscription product configured in this brand');
@@ -78,14 +78,14 @@ module.exports = defineCases({
           productId: paidProduct.id,
         });
 
-        assert.isError(response, 400, 'Should reject missing frequency for subscription product');
+        expect(response, 'Should reject missing frequency for subscription product').toBeError(400);
       },
     },
 
     {
       name: 'rejects-active-paid-user',
       auth: 'premium-active',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -97,14 +97,14 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject user with active subscription');
+        expect(response, 'Should reject user with active subscription').toBeError(400);
       },
     },
 
     {
       name: 'rejects-suspended-user',
       auth: 'premium-suspended',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -116,14 +116,14 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject user with suspended subscription');
+        expect(response, 'Should reject user with suspended subscription').toBeError(400);
       },
     },
 
     {
       name: 'rejects-cancelling-user',
       auth: 'premium-cancelling',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -135,14 +135,14 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject user with cancelling subscription');
+        expect(response, 'Should reject user with cancelling subscription').toBeError(400);
       },
     },
 
     {
       name: 'allows-cancelled-user',
       auth: 'premium-expired',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -154,26 +154,26 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isSuccess(response, 'Should allow user with fully cancelled subscription');
+        expect(response, 'Should allow user with fully cancelled subscription').toBeSuccess();
       },
     },
 
     {
       name: 'rejects-invalid-product',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           productId: 'nonexistent-product',
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject invalid product');
+        expect(response, 'Should reject invalid product').toBeError(400);
       },
     },
 
     {
       name: 'rejects-unknown-simulate-value',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -186,13 +186,13 @@ module.exports = defineCases({
           simulate: 'explode',
         });
 
-        assert.isError(response, 400, 'simulate should be allow-listed');
+        expect(response, 'simulate should be allow-listed').toBeError(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -204,13 +204,13 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'rejects-a-product-type-the-provider-does-not-sell',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         // The provider gate reads the registry: Coinbase Commerce's row sells
         // no subscription, so the route refuses before any provider module runs
         const plan = config.payment.products.find(p => p.id !== 'basic' && (p.type || 'subscription') === 'subscription' && p.prices);
@@ -224,14 +224,14 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should refuse a subscription on a provider that sells none');
-        assert.match(`${response.error}`, /Coinbase Commerce cannot sell a subscription/, 'The refusal names the provider and the product type');
+        expect(response, 'Should refuse a subscription on a provider that sells none').toBeError(400);
+        expect(`${response.error}`, 'The refusal names the provider and the product type').toMatch(/Coinbase Commerce cannot sell a subscription/);
       },
     },
 
     {
       name: 'rejects-invalid-discount-code',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -244,13 +244,13 @@ module.exports = defineCases({
           discount: 'FAKECODE',
         });
 
-        assert.isError(response, 400, 'Should reject invalid discount code');
+        expect(response, 'Should reject invalid discount code').toBeError(400);
       },
     },
 
     {
       name: 'saves-discount-to-intent-doc',
-      async run({ http, assert, config, firestore, skip }) {
+      async run({ http, expect, config, firestore, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -264,14 +264,14 @@ module.exports = defineCases({
           discount: 'FLASH20',
         });
 
-        assert.isSuccess(response, 'Should succeed with valid discount');
+        expect(response, 'Should succeed with valid discount').toBeSuccess();
 
         // Verify discount was resolved and saved to intent doc
         const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
-        assert.ok(intentDoc.discount, 'Discount should be saved on intent');
-        assert.equal(intentDoc.discount.code, 'FLASH20', 'Discount code should match');
-        assert.equal(intentDoc.discount.percent, 20, 'Discount percent should be 20');
-        assert.equal(intentDoc.discount.duration, 'once', 'Discount duration should be once');
+        expect(intentDoc.discount, 'Discount should be saved on intent').toBeTruthy();
+        expect(intentDoc.discount.code, 'Discount code should match').toBe('FLASH20');
+        expect(intentDoc.discount.percent, 'Discount percent should be 20').toBe(20);
+        expect(intentDoc.discount.duration, 'Discount duration should be once').toBe('once');
       },
     },
 
@@ -286,7 +286,7 @@ module.exports = defineCases({
       // webhook arrives from the provider, so this is the only moment we hear from
       // the customer's own browser.
       name: 'saves-attribution-tracking-consent-and-supplemental-to-intent-doc',
-      async run({ http, assert, config, firestore, waitFor, skip }) {
+      async run({ http, expect, config, firestore, waitFor, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
@@ -333,15 +333,15 @@ module.exports = defineCases({
           supplemental: { referral: 'friend' },
         });
 
-        assert.isSuccess(response, 'Should succeed with attribution, trackingConsent and supplemental');
+        expect(response, 'Should succeed with attribution, trackingConsent and supplemental').toBeSuccess();
 
         const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
-        assert.deepEqual(intentDoc.attribution, attribution, 'Attribution should be stored verbatim on the intent');
-        assert.deepEqual(intentDoc.trackingConsent, trackingConsent, 'Tracking consent should be stored verbatim on the intent');
-        assert.equal(intentDoc.supplemental.referral, 'friend', 'Supplemental should be saved');
-        assert.equal(typeof intentDoc.request, 'object', 'The requester context should be captured on the intent');
-        assert.equal(Object.hasOwn(intentDoc.request, 'ip'), true, 'The client IP slot is always written — null when no header carries one');
-        assert.equal(Object.hasOwn(intentDoc.request, 'userAgent'), true, 'The user agent slot is always written');
+        expect(intentDoc.attribution, 'Attribution should be stored verbatim on the intent').toEqual(attribution);
+        expect(intentDoc.trackingConsent, 'Tracking consent should be stored verbatim on the intent').toEqual(trackingConsent);
+        expect(intentDoc.supplemental.referral, 'Supplemental should be saved').toBe('friend');
+        expect(typeof intentDoc.request, 'The requester context should be captured on the intent').toBe('object');
+        expect(Object.hasOwn(intentDoc.request, 'ip'), 'The client IP slot is always written — null when no header carries one').toBe(true);
+        expect(Object.hasOwn(intentDoc.request, 'userAgent'), 'The user agent slot is always written').toBe(true);
 
         // The auto-webhook folds the intent's checkout context onto the order.
         await waitFor(async () => {
@@ -350,15 +350,15 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const orderDoc = await firestore.get(`payments-orders/${response.data.orderId}`);
-        assert.deepEqual(orderDoc.attribution, attribution, 'The order fold copies attribution unchanged');
-        assert.deepEqual(orderDoc.trackingConsent, trackingConsent, 'The order fold copies trackingConsent unchanged');
-        assert.deepEqual(orderDoc.request, intentDoc.request, 'The order fold copies the captured request context — the conversion match data reads it from the order');
+        expect(orderDoc.attribution, 'The order fold copies attribution unchanged').toEqual(attribution);
+        expect(orderDoc.trackingConsent, 'The order fold copies trackingConsent unchanged').toEqual(trackingConsent);
+        expect(orderDoc.request, 'The order fold copies the captured request context — the conversion match data reads it from the order').toEqual(intentDoc.request);
       },
     },
 
     {
       name: 'succeeds-with-test-provider',
-      async run({ http, assert, config, firestore, accounts, waitFor, skip }) {
+      async run({ http, expect, config, firestore, accounts, waitFor, skip }) {
         const uid = accounts['journey-payments-intent'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
@@ -371,18 +371,18 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isSuccess(response, 'Should succeed with test provider');
-        assert.ok(response.data.id, 'Should return intent ID');
-        assert.ok(response.data.orderId, 'Should return orderId');
-        assert.match(response.data.orderId, /^\d{4}-\d{4}-\d{4}$/, 'orderId should be XXXX-XXXX-XXXX format');
-        assert.ok(response.data.url, 'Should return URL');
+        expect(response, 'Should succeed with test provider').toBeSuccess();
+        expect(response.data.id, 'Should return intent ID').toBeTruthy();
+        expect(response.data.orderId, 'Should return orderId').toBeTruthy();
+        expect(response.data.orderId, 'orderId should be XXXX-XXXX-XXXX format').toMatch(/^\d{4}-\d{4}-\d{4}$/);
+        expect(response.data.url, 'Should return URL').toBeTruthy();
 
         // Verify intent doc was saved (keyed by orderId)
         const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
-        assert.ok(intentDoc, 'Intent doc should exist');
-        assert.equal(intentDoc.intentId, response.data.id, 'Intent ID should match response');
-        assert.equal(intentDoc.provider, 'test', 'Provider should be test');
-        assert.equal(intentDoc.productId, paidProduct.id, 'Product should match');
+        expect(intentDoc, 'Intent doc should exist').toBeTruthy();
+        expect(intentDoc.intentId, 'Intent ID should match response').toBe(response.data.id);
+        expect(intentDoc.provider, 'Provider should be test').toBe('test');
+        expect(intentDoc.productId, 'Product should match').toBe(paidProduct.id);
 
         // Wait for auto-webhook to process and activate the subscription
         await waitFor(async () => {
@@ -394,7 +394,7 @@ module.exports = defineCases({
 
     {
       name: 'downgrades-trial-for-user-with-history',
-      async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
+      async run({ http, expect, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['journey-payments-intent-trial'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
@@ -414,11 +414,11 @@ module.exports = defineCases({
           });
 
           // Should succeed (not reject with 400) — trial silently downgraded
-          assert.isSuccess(response, 'Should not reject — trial silently downgraded');
+          expect(response, 'Should not reject — trial silently downgraded').toBeSuccess();
 
           // Verify intent saved with trial=false (keyed by orderId)
           const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
-          assert.equal(intentDoc.trial, false, 'Trial should be false (downgraded)');
+          expect(intentDoc.trial, 'Trial should be false (downgraded)').toBe(false);
 
           // Wait for auto-webhook to activate the subscription
           await waitFor(async () => {

@@ -23,11 +23,11 @@ module.exports = defineCases({
       name: 'update-short-and-long-flags-dispatch',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(Boolean(matchCommand(updateEntry, { '-u': true })), true, '`omega -u` resolves to the update command, like every sibling CLI');
-        assert.equal(Boolean(matchCommand(updateEntry, { '--update': true })), true, '`omega --update` resolves to the update command');
-        assert.equal(Boolean(matchCommand(updateEntry, { outdated: true })), false, '`omega outdated` is retired: a bare update installs');
-        assert.equal(Boolean(matchCommand(updateEntry, { out: true })), false, '`omega out` is retired with it');
+      async run({ expect }) {
+        expect(Boolean(matchCommand(updateEntry, { '-u': true })), '`omega -u` resolves to the update command, like every sibling CLI').toBe(true);
+        expect(Boolean(matchCommand(updateEntry, { '--update': true })), '`omega --update` resolves to the update command').toBe(true);
+        expect(Boolean(matchCommand(updateEntry, { outdated: true })), '`omega outdated` is retired: a bare update installs').toBe(false);
+        expect(Boolean(matchCommand(updateEntry, { out: true })), '`omega out` is retired with it').toBe(false);
       },
     },
   ],

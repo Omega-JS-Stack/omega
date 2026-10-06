@@ -15,12 +15,12 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup',
-      async run({ accounts, firestore, assert, state, config, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, skip, payments }) {
         const uid = accounts['journey-payments-intent-discount'].uid;
         const userDoc = await firestore.get(`users/${uid}`);
 
-        assert.ok(userDoc, 'User doc should exist');
-        assert.equal(userDoc.subscription?.product?.id, 'basic', 'Should start as basic');
+        expect(userDoc, 'User doc should exist').toBeTruthy();
+        expect(userDoc.subscription?.product?.id, 'Should start as basic').toBe('basic');
 
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices && p.type === 'subscription');
         if (!paidProduct) {
@@ -35,7 +35,7 @@ module.exports = defineCases({
 
     {
       name: 'create-intent-with-discount',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('journey-payments-intent-discount').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
@@ -43,8 +43,8 @@ module.exports = defineCases({
           discount: 'WELCOME15',
         });
 
-        assert.isSuccess(response, 'Intent with discount should succeed');
-        assert.ok(response.data.orderId, 'Should return orderId');
+        expect(response, 'Intent with discount should succeed').toBeSuccess();
+        expect(response.data.orderId, 'Should return orderId').toBeTruthy();
 
         state.orderId = response.data.orderId;
         state.eventId = response.data.id.replace('_test-cs-', '_test-evt-');
@@ -53,7 +53,7 @@ module.exports = defineCases({
 
     {
       name: 'subscription-activated-with-discount',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.product?.id === state.paidProductId;
@@ -61,30 +61,30 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
+        expect(userDoc.subscription.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
+        expect(userDoc.subscription.status, 'Status should be active').toBe('active');
       },
     },
 
     {
       name: 'order-has-discount',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.ok(orderDoc.discount, 'Order should have discount');
-        assert.equal(orderDoc.discount.code, 'WELCOME15', 'Discount code should be WELCOME15');
-        assert.equal(orderDoc.discount.percent, 15, 'Discount should be 15%');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.discount, 'Order should have discount').toBeTruthy();
+        expect(orderDoc.discount.code, 'Discount code should be WELCOME15').toBe('WELCOME15');
+        expect(orderDoc.discount.percent, 'Discount should be 15%').toBe(15);
       },
     },
 
     {
       name: 'webhook-transition-new-subscription',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
 
-        assert.ok(webhookDoc, 'Webhook doc should exist');
-        assert.equal(webhookDoc.transition, 'new-subscription', 'Transition should be new-subscription');
+        expect(webhookDoc, 'Webhook doc should exist').toBeTruthy();
+        expect(webhookDoc.transition, 'Transition should be new-subscription').toBe('new-subscription');
       },
     },
   ],

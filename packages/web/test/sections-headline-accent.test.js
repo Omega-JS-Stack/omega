@@ -9,9 +9,8 @@
  * the same <em> mechanism the siblings use. The pricing page's inline FAQ head
  * takes the same forward — pinned in pricing.test.js, where the page builds.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -49,28 +48,44 @@ const DROPPERS = [
   ['about/principles', 'items:\n  - title: "Ship it simple"\n    description: "The smallest thing wins."\n'],
 ];
 
-for (const [name, body] of DROPPERS) {
-  test(`#471: ${name} accepts headline_accent, warn-free`, async () => {
-    const { engine, warnings } = makeEngine();
-    const html = await engine.parseAndRender(
-      `{% section "${name}" %}\nheadline: "What builders"\nheadline_accent: "say"\n${body}{% endsection %}`,
-      {},
-    );
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-headline-accent',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const [name, body] of DROPPERS) {
+        cases.push({
+          name: `#471: ${name} accepts headline_accent, warn-free`,
+          run: async (ctx) => {
+            const { engine, warnings } = makeEngine();
+            const html = await engine.parseAndRender(
+              `{% section "${name}" %}\nheadline: "What builders"\nheadline_accent: "say"\n${body}{% endsection %}`,
+              {},
+            );
 
-    assert.ok(html.includes('What builders'), 'headline copy renders');
-    assert.ok(html.includes('<em>say</em>'), 'headline_accent rides the same <em> accent mechanism as the siblings');
-    assert.deepEqual(warnings, [], 'ported head copy no longer warns as unknown');
-  });
-}
+            ctx.expect(html.includes('What builders'), 'headline copy renders').toBeTruthy();
+            ctx.expect(html.includes('<em>say</em>'), 'headline_accent rides the same <em> accent mechanism as the siblings').toBeTruthy();
+            ctx.expect(warnings, 'ported head copy no longer warns as unknown').toEqual([]);
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#471: a band without accent copy renders exactly as it always did', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "about/principles" %}\nheadline: "What we stand for"\nitems:\n  - title: "Ship it simple"\n    description: "The smallest thing wins."\n{% endsection %}`,
-    {},
-  );
+    {
+      name: '#471: a band without accent copy renders exactly as it always did',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "about/principles" %}\nheadline: "What we stand for"\nitems:\n  - title: "Ship it simple"\n    description: "The smallest thing wins."\n{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('What we stand for'), 'the headline is the whole heading');
-  assert.ok(!html.includes('<em>'), 'no empty accent tail without accent copy');
-  assert.deepEqual(warnings, []);
+        ctx.expect(html.includes('What we stand for'), 'the headline is the whole heading').toBeTruthy();
+        ctx.expect(!html.includes('<em>'), 'no empty accent tail without accent copy').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
+  ],
 });

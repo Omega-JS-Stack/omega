@@ -85,7 +85,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-notice-is-silent-on-a-normal-run',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         const calls = withConsoleRecorder(() => {
@@ -99,13 +99,13 @@ module.exports = defineCases({
 
         const notices = [...calls.log, ...calls.debug].filter((args) => args[1] === NOTICE);
 
-        assert.equal(notices.length, 0, `the notice should be quiet by default, got ${notices.length}`);
+        expect(notices.length, `the notice should be quiet by default, got ${notices.length}`).toBe(0);
       },
     },
 
     {
       name: 'the-notice-is-there-with-omega-debug',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         const calls = withConsoleRecorder(() => {
@@ -120,14 +120,14 @@ module.exports = defineCases({
         // No latch: with the gate open you asked for every occurrence.
         const notices = calls.debug.filter((args) => args[1] === NOTICE);
 
-        assert.equal(notices.length, 2, `each construction should report under OMEGA_DEBUG, got ${notices.length}`);
-        assert.equal(calls.log.filter((args) => args[1] === NOTICE).length, 0, 'the notice must not ride the log level');
+        expect(notices.length, `each construction should report under OMEGA_DEBUG, got ${notices.length}`).toBe(2);
+        expect(calls.log.filter((args) => args[1] === NOTICE).length, 'the notice must not ride the log level').toBe(0);
       },
     },
 
     {
       name: 'the-quiet-construction-still-skips-analytics',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         let analytics;
@@ -140,7 +140,7 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(analytics.initialized, false, 'a missing analyticsId must still skip initialization');
+        expect(analytics.initialized, 'a missing analyticsId must still skip initialization').toBe(false);
       },
     },
   ],

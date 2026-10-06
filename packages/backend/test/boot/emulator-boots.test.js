@@ -8,7 +8,7 @@
  * `omega_api` function is wired, and the hosting rewrite routes to it.
  *
  * This is @omega.js/backend's equivalent of BXM's `boot/extension-loads` and UJM's site-boot
- * smoke. It is EXCLUDED from real-consumer runs (see runner.js discoverTests).
+ * smoke. It runs on the framework self-test only (devkit discovery.js skips framework boot/ elsewhere).
  */
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -20,19 +20,19 @@ module.exports = defineCases({
   tests: [
     {
       name: 'omega_api-health-responds-over-hosting-rewrite',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/health');
-        assert.isSuccess(response, 'omega_api /health should respond through the emulator hosting rewrite');
+        expect(response, 'omega_api /health should respond through the emulator hosting rewrite').toBeSuccess();
       },
     },
     {
       name: 'manager-booted-in-functions-runtime',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // /health is served by the omega_api function, which only exists if
         // omega.initialize() ran in the fixture's functions runtime. A success here
         // means the local @omega.js/backend (symlinked into the fixture) booted.
         const response = await http.get('omega/health');
-        assert.isSuccess(response, 'omega.initialize() should have wired omega_api in the fixture functions runtime');
+        expect(response, 'omega.initialize() should have wired omega_api in the fixture functions runtime').toBeSuccess();
       },
     },
   ],

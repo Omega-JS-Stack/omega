@@ -79,21 +79,17 @@ module.exports = defineCases({
   tests: [
     {
       name: 'ssot-helper-shim-is-same-function',
-      async run({ assert }) {
-        assert.equal(
-          helperShim.mergeLineBasedFiles,
-          mergeLineBasedFiles,
-          'setup-tests helper must re-export the canonical mergeLineBasedFiles (SSOT)'
-        );
-        assert.equal(helperShim.DEFAULT_SECTION_MARKER, DEFAULT_MARKER, 'marker alias matches');
-        assert.equal(helperShim.CUSTOM_SECTION_MARKER, CUSTOM_MARKER, 'marker alias matches');
-        assert.ok(helperShim.hasSectionMarkers(TEMPLATE), 'hasSectionMarkers detects markers');
+      async run({ expect }) {
+        expect(helperShim.mergeLineBasedFiles, 'setup-tests helper must re-export the canonical mergeLineBasedFiles (SSOT)').toBe(mergeLineBasedFiles);
+        expect(helperShim.DEFAULT_SECTION_MARKER, 'marker alias matches').toBe(DEFAULT_MARKER);
+        expect(helperShim.CUSTOM_SECTION_MARKER, 'marker alias matches').toBe(CUSTOM_MARKER);
+        expect(helperShim.hasSectionMarkers(TEMPLATE), 'hasSectionMarkers detects markers').toBeTruthy();
       },
     },
 
     {
       name: 'preserves-existing-values-by-key',
-      async run({ assert }) {
+      async run({ expect }) {
         const existing = [
           DEFAULT_MARKER,
           '# GitHub',
@@ -108,15 +104,15 @@ module.exports = defineCases({
         ].join('\n');
 
         const merged = mergeLineBasedFiles(existing, TEMPLATE, '.env');
-        assert.equal(keyValueInSection(merged, 'GH_TOKEN', 'default'), '"ghp_real"', 'GH_TOKEN value kept');
-        assert.equal(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), '"sk-real"', 'OPENAI value kept');
-        assert.equal(keyValueInSection(merged, 'PAYPAL_CLIENT_SECRET', 'default'), '"pp_real"', 'PAYPAL value kept');
+        expect(keyValueInSection(merged, 'GH_TOKEN', 'default'), 'GH_TOKEN value kept').toBe('"ghp_real"');
+        expect(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), 'OPENAI value kept').toBe('"sk-real"');
+        expect(keyValueInSection(merged, 'PAYPAL_CLIENT_SECRET', 'default'), 'PAYPAL value kept').toBe('"pp_real"');
       },
     },
 
     {
       name: 'keys-stay-under-correct-header-when-order-drifts',
-      async run({ assert }) {
+      async run({ expect }) {
         // Existing file has keys in a DIFFERENT order than the template. The old
         // positional merge would shift values under the wrong header here.
         const existing = [
@@ -132,21 +128,21 @@ module.exports = defineCases({
 
         const merged = mergeLineBasedFiles(existing, TEMPLATE, '.env');
 
-        assert.equal(headerAboveKey(merged, 'OPENAI_API_KEY'), '# AI', 'OPENAI under # AI');
-        assert.equal(headerAboveKey(merged, 'ANTHROPIC_API_KEY'), '# AI', 'ANTHROPIC under # AI');
-        assert.equal(headerAboveKey(merged, 'PAYPAL_CLIENT_SECRET'), '# Payment Providers', 'PAYPAL under # Payment Providers');
-        assert.equal(headerAboveKey(merged, 'STRIPE_SECRET_KEY'), '# Payment Providers', 'STRIPE under # Payment Providers');
-        assert.equal(headerAboveKey(merged, 'GH_TOKEN'), '# GitHub', 'GH_TOKEN under # GitHub');
+        expect(headerAboveKey(merged, 'OPENAI_API_KEY'), 'OPENAI under # AI').toBe('# AI');
+        expect(headerAboveKey(merged, 'ANTHROPIC_API_KEY'), 'ANTHROPIC under # AI').toBe('# AI');
+        expect(headerAboveKey(merged, 'PAYPAL_CLIENT_SECRET'), 'PAYPAL under # Payment Providers').toBe('# Payment Providers');
+        expect(headerAboveKey(merged, 'STRIPE_SECRET_KEY'), 'STRIPE under # Payment Providers').toBe('# Payment Providers');
+        expect(headerAboveKey(merged, 'GH_TOKEN'), 'GH_TOKEN under # GitHub').toBe('# GitHub');
 
         // Values still attached to the right keys.
-        assert.equal(keyValueInSection(merged, 'STRIPE_SECRET_KEY', 'default'), '"stripe_real"', 'STRIPE value intact');
-        assert.equal(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), '"openai_real"', 'OPENAI value intact');
+        expect(keyValueInSection(merged, 'STRIPE_SECRET_KEY', 'default'), 'STRIPE value intact').toBe('"stripe_real"');
+        expect(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), 'OPENAI value intact').toBe('"openai_real"');
       },
     },
 
     {
       name: 'promotes-custom-key-to-default-when-template-adopts-it',
-      async run({ assert }) {
+      async run({ expect }) {
         // User had APOLLO_API_KEY in Custom; framework adds it to the template.
         const tplWithApollo = TEMPLATE.replace('STRIPE_SECRET_KEY=""', 'STRIPE_SECRET_KEY=""\nAPOLLO_API_KEY=""');
         const existing = [
@@ -166,15 +162,15 @@ module.exports = defineCases({
 
         const merged = mergeLineBasedFiles(existing, tplWithApollo, '.env');
 
-        assert.equal(keyValueInSection(merged, 'APOLLO_API_KEY', 'default'), '"apollo_real"', 'APOLLO promoted to Default with value');
-        assert.equal(keyValueInSection(merged, 'APOLLO_API_KEY', 'custom'), undefined, 'APOLLO removed from Custom');
-        assert.equal(keyOccurrences(merged, 'APOLLO_API_KEY'), 1, 'APOLLO not duplicated');
+        expect(keyValueInSection(merged, 'APOLLO_API_KEY', 'default'), 'APOLLO promoted to Default with value').toBe('"apollo_real"');
+        expect(keyValueInSection(merged, 'APOLLO_API_KEY', 'custom'), 'APOLLO removed from Custom').toBe(undefined);
+        expect(keyOccurrences(merged, 'APOLLO_API_KEY'), 'APOLLO not duplicated').toBe(1);
       },
     },
 
     {
       name: 'migrates-unknown-default-key-to-custom',
-      async run({ assert }) {
+      async run({ expect }) {
         // User has a legacy key in Default that the template no longer defines.
         const existing = [
           DEFAULT_MARKER,
@@ -192,15 +188,15 @@ module.exports = defineCases({
 
         const merged = mergeLineBasedFiles(existing, TEMPLATE, '.env');
 
-        assert.equal(keyValueInSection(merged, 'GITHUB_TOKEN', 'custom'), '"legacy_real"', 'legacy key migrated to Custom with value');
-        assert.equal(keyValueInSection(merged, 'GITHUB_TOKEN', 'default'), undefined, 'legacy key gone from Default');
-        assert.equal(keyValueInSection(merged, 'GH_TOKEN', 'default'), '"gh_real"', 'GH_TOKEN kept in Default');
+        expect(keyValueInSection(merged, 'GITHUB_TOKEN', 'custom'), 'legacy key migrated to Custom with value').toBe('"legacy_real"');
+        expect(keyValueInSection(merged, 'GITHUB_TOKEN', 'default'), 'legacy key gone from Default').toBe(undefined);
+        expect(keyValueInSection(merged, 'GH_TOKEN', 'default'), 'GH_TOKEN kept in Default').toBe('"gh_real"');
       },
     },
 
     {
       name: 'preserves-custom-section-verbatim',
-      async run({ assert }) {
+      async run({ expect }) {
         const existing = [
           DEFAULT_MARKER,
           '# GitHub',
@@ -218,15 +214,15 @@ module.exports = defineCases({
         ].join('\n');
 
         const merged = mergeLineBasedFiles(existing, TEMPLATE, '.env');
-        assert.equal(keyValueInSection(merged, 'MY_CUSTOM_KEY', 'custom'), '"custom_real"', 'custom key preserved');
-        assert.equal(keyValueInSection(merged, 'OAUTH_ID', 'custom'), '"abc"', 'custom OAuth key preserved');
-        assert.ok(merged.includes('# OAuth2'), 'custom comment preserved');
+        expect(keyValueInSection(merged, 'MY_CUSTOM_KEY', 'custom'), 'custom key preserved').toBe('"custom_real"');
+        expect(keyValueInSection(merged, 'OAUTH_ID', 'custom'), 'custom OAuth key preserved').toBe('"abc"');
+        expect(merged.includes('# OAuth2'), 'custom comment preserved').toBeTruthy();
       },
     },
 
     {
       name: 'normalizes-raw-values-to-double-quoted',
-      async run({ assert }) {
+      async run({ expect }) {
         const existing = [
           DEFAULT_MARKER,
           '# GitHub',
@@ -241,14 +237,14 @@ module.exports = defineCases({
         ].join('\n');
 
         const merged = mergeLineBasedFiles(existing, TEMPLATE, '.env');
-        assert.equal(keyValueInSection(merged, 'GH_TOKEN', 'default'), '"raw-no-quotes"', 'raw value double-quoted');
-        assert.equal(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), '"single"', 'single-quoted canonicalized to double');
+        expect(keyValueInSection(merged, 'GH_TOKEN', 'default'), 'raw value double-quoted').toBe('"raw-no-quotes"');
+        expect(keyValueInSection(merged, 'OPENAI_API_KEY', 'default'), 'single-quoted canonicalized to double').toBe('"single"');
       },
     },
 
     {
       name: 'is-idempotent',
-      async run({ assert }) {
+      async run({ expect }) {
         const existing = [
           DEFAULT_MARKER,
           '# GitHub',
@@ -265,7 +261,7 @@ module.exports = defineCases({
 
         const once = mergeLineBasedFiles(existing, TEMPLATE, '.env');
         const twice = mergeLineBasedFiles(once, TEMPLATE, '.env');
-        assert.equal(once, twice, 're-running the merge produces identical output');
+        expect(once, 're-running the merge produces identical output').toBe(twice);
       },
     },
   ],

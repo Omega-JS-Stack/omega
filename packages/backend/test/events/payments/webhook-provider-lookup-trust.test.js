@@ -27,7 +27,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-provider-lookup-trust
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -114,13 +114,13 @@ module.exports = defineCases({
       async run() {
         const { store, logs } = await runSubscriptionUpdated(sdkThrowing(resourceMissing()));
 
-        assert.ok(!store.get(`users/${UID}`), 'no subscription state is written from an unverified payload');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'no order is written either');
-        assert.ok(!store.get(`payments-intents/${ORDER_ID}`), 'and no intent is closed out');
+        expect(!store.get(`users/${UID}`), 'no subscription state is written from an unverified payload').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'no order is written either').toBeTruthy();
+        expect(!store.get(`payments-intents/${ORDER_ID}`), 'and no intent is closed out').toBeTruthy();
 
         // Conversions are delivered from inside the same block that unifies the
         // resource and writes it, so an event that never unified never reported one
-        assert.ok(!logs.join('\n').includes('Unified subscription'), 'the resource is never transformed, so nothing downstream of it fires');
+        expect(!logs.join('\n').includes('Unified subscription'), 'the resource is never transformed, so nothing downstream of it fires').toBeTruthy();
       },
     },
 
@@ -131,11 +131,11 @@ module.exports = defineCases({
         const { store } = await runSubscriptionUpdated(sdkThrowing(resourceMissing()));
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'completed', 'no retry can conjure a resource the provider does not have — the event must not be redelivered forever');
-        assert.equal(event.refusal?.reason, 'resource-not-found', 'the stamp names what is wrong');
-        assert.equal(event.refusal?.resourceId, RESOURCE_ID, 'the stamp names the resource a human reconciles from');
-        assert.equal(event.transition, null, 'nothing happened to a subscription, so the trail must not say it did');
-        assert.ok(!event.retryCount, 'a terminal decision never burns the retry ladder');
+        expect(event.status, 'no retry can conjure a resource the provider does not have — the event must not be redelivered forever').toBe('completed');
+        expect(event.refusal?.reason, 'the stamp names what is wrong').toBe('resource-not-found');
+        expect(event.refusal?.resourceId, 'the stamp names the resource a human reconciles from').toBe(RESOURCE_ID);
+        expect(event.transition, 'nothing happened to a subscription, so the trail must not say it did').toBe(null);
+        expect(!event.retryCount, 'a terminal decision never burns the retry ladder').toBeTruthy();
       },
     },
 
@@ -146,9 +146,9 @@ module.exports = defineCases({
         const { logs } = await runSubscriptionUpdated(sdkThrowing(resourceMissing()));
         const output = logs.join('\n');
 
-        assert.match(output, /RESOURCE NOT FOUND/, 'the refusal is loud');
-        assert.match(output, /stripe/, 'the log names the provider that was asked');
-        assert.match(output, new RegExp(`subscription ${RESOURCE_ID}`), 'the log names the resource it does not have');
+        expect(output, 'the refusal is loud').toMatch(/RESOURCE NOT FOUND/);
+        expect(output, 'the log names the provider that was asked').toMatch(/stripe/);
+        expect(output, 'the log names the resource it does not have').toMatch(new RegExp(`subscription ${RESOURCE_ID}`));
       },
     },
 
@@ -159,13 +159,13 @@ module.exports = defineCases({
         const { store } = await runSubscriptionUpdated(sdkThrowing(unreachable()));
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'failed', 'the answer exists and could not be read — the retry sweep is the reconciliation path');
-        assert.equal(event.retryCount, 1, 'the attempt is counted toward the ladder');
-        assert.match(event.error, /could not be reached/, 'the recorded error says the provider was unreachable, not that the resource is gone');
-        assert.ok(!event.refusal, 'a deferral is not a refusal — nothing was decided');
+        expect(event.status, 'the answer exists and could not be read — the retry sweep is the reconciliation path').toBe('failed');
+        expect(event.retryCount, 'the attempt is counted toward the ladder').toBe(1);
+        expect(event.error, 'the recorded error says the provider was unreachable, not that the resource is gone').toMatch(/could not be reached/);
+        expect(!event.refusal, 'a deferral is not a refusal — nothing was decided').toBeTruthy();
 
-        assert.ok(!store.get(`users/${UID}`), 'no subscription state is written from an unverified payload');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'no order is written either');
+        expect(!store.get(`users/${UID}`), 'no subscription state is written from an unverified payload').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'no order is written either').toBeTruthy();
       },
     },
 
@@ -183,7 +183,7 @@ module.exports = defineCases({
 
         const { store } = await runSubscriptionUpdated(sdkReturning(canceled));
 
-        assert.equal(store.get(`users/${UID}`)?.subscription?.status, 'cancelled', 'the written state is the provider\'s, not the caller\'s');
+        expect(store.get(`users/${UID}`)?.subscription?.status, 'the written state is the provider\'s, not the caller\'s').toBe('cancelled');
       },
     },
 
@@ -195,11 +195,11 @@ module.exports = defineCases({
         const { store } = await runSubscriptionUpdated(sdkReturning(active));
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'completed', 'the happy path still completes');
-        assert.ok(!event.refusal, 'a resource the provider answered for is refused nothing');
-        assert.equal(store.get(`users/${UID}`)?.subscription?.status, 'active', 'the subscription lands on the user doc as before');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'the order is written as before');
-        assert.equal(store.get(`payments-intents/${ORDER_ID}`)?.status, 'completed', 'the intent is closed out as before');
+        expect(event.status, 'the happy path still completes').toBe('completed');
+        expect(!event.refusal, 'a resource the provider answered for is refused nothing').toBeTruthy();
+        expect(store.get(`users/${UID}`)?.subscription?.status, 'the subscription lands on the user doc as before').toBe('active');
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'the order is written as before').toBe(UID);
+        expect(store.get(`payments-intents/${ORDER_ID}`)?.status, 'the intent is closed out as before').toBe('completed');
       },
     },
   ],

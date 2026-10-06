@@ -73,48 +73,48 @@ module.exports = defineCases({
     {
       name: 'rejects-an-order-that-does-not-exist',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await refund(omega, purchaser(omega, OWNER), '_test-order-never-existed');
 
-        assert.equal(sent.code, 400, `An unknown order should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /order not found/i, 'The rejection should name the order');
+        expect(sent.code, `An unknown order should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The rejection should name the order').toMatch(/order not found/i);
       },
     },
 
     {
       name: 'rejects-an-order-owned-by-somebody-else',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-not-yours';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
         const sent = await refund(omega, purchaser(omega, '_test-refund-one-time-stranger'), orderId);
 
-        assert.equal(sent.code, 400, `Another user's order should be rejected, got ${sent.code}: ${sent.body}`);
+        expect(sent.code, `Another user's order should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
         // Not-found and not-yours read identically: an order id must not be a
         // probe for whether somebody else's purchase exists
-        assert.match(`${sent.body}`, /order not found/i, 'Somebody else\'s order must not be distinguishable from a missing one');
+        expect(`${sent.body}`, 'Somebody else\'s order must not be distinguishable from a missing one').toMatch(/order not found/i);
       },
     },
 
     {
       name: 'rejects-a-subscription-order',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-is-a-subscription';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, { type: 'subscription' }));
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A subscription order should be rejected here, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /one-time/i, 'The rejection should say the order is not a one-time purchase');
+        expect(sent.code, `A subscription order should be rejected here, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The rejection should say the order is not a one-time purchase').toMatch(/one-time/i);
       },
     },
 
     {
       name: 'rejects-an-already-refunded-order',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-already-refunded';
         const nowUNIX = Math.floor(Date.now() / 1000);
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
@@ -131,15 +131,15 @@ module.exports = defineCases({
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A refunded order should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded');
+        expect(sent.code, `A refunded order should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The rejection should say it was already refunded').toMatch(/already been refunded/i);
       },
     },
 
     {
       name: 'rejects-a-dashboard-refunded-order',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         // A refund issued from the provider dashboard arrives by webhook: it
         // flips unified.status to 'refunded' but writes NO requests.refund
         const orderId = '_test-order-one-time-dashboard-refunded';
@@ -153,15 +153,15 @@ module.exports = defineCases({
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A dashboard-refunded order should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded, not 500 out of the provider');
+        expect(sent.code, `A dashboard-refunded order should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The rejection should say it was already refunded, not 500 out of the provider').toMatch(/already been refunded/i);
       },
     },
 
     {
       name: 'rejects-a-purchase-that-never-completed',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         // An abandoned Stripe checkout session stays `open` on the order, with
         // its provider and resourceId intact — so every other refusal passes it
         // and the provider is asked to reverse a charge that never happened
@@ -176,15 +176,15 @@ module.exports = defineCases({
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `An incomplete purchase should be refused, not sent to the provider, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /has not completed/i, 'The rejection should say the purchase never completed');
+        expect(sent.code, `An incomplete purchase should be refused, not sent to the provider, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The rejection should say the purchase never completed').toMatch(/has not completed/i);
       },
     },
 
     {
       name: 'rejects-a-purchase-older-than-6-months',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-too-old';
         const oldUNIX = Math.floor(Date.now() / 1000) - (200 * 24 * 60 * 60);
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
@@ -193,15 +193,15 @@ module.exports = defineCases({
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `An old purchase should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /older than 6 months/i, 'The refund window applies to one-time purchases too');
+        expect(sent.code, `An old purchase should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The refund window applies to one-time purchases too').toMatch(/older than 6 months/i);
       },
     },
 
     {
       name: 'refuses-a-purchase-on-a-provider-that-cannot-refund',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         // The registry's `refundable: false` row is the refusal, before any
         // provider module is loaded
         const orderId = '_test-order-one-time-no-refund-api';
@@ -216,29 +216,29 @@ module.exports = defineCases({
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A provider with no refund API should be refused, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Coinbase Commerce purchases cannot be refunded/, 'The refusal names the provider');
+        expect(sent.code, `A provider with no refund API should be refused, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The refusal names the provider').toMatch(/Coinbase Commerce purchases cannot be refunded/);
       },
     },
 
     {
       name: 'reaches-the-provider-for-a-valid-one-time-order',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-valid';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
         const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A valid order should reach the provider lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown provider/i, 'A valid one-time order should get PAST every guard');
+        expect(sent.code, `A valid order should reach the provider lookup, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'A valid one-time order should get PAST every guard').toMatch(/Unknown provider/i);
       },
     },
 
     {
       name: 'still-requires-confirmation',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const orderId = '_test-order-one-time-unconfirmed';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
@@ -250,15 +250,15 @@ module.exports = defineCases({
           data: { confirmed: false, reason: 'Bought the wrong thing', feedback: null, orderId: orderId },
         });
 
-        assert.equal(sent.code, 400, `An unconfirmed refund should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /must be confirmed/i, 'The confirmation guard covers both paths');
+        expect(sent.code, `An unconfirmed refund should be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The confirmation guard covers both paths').toMatch(/must be confirmed/i);
       },
     },
 
     {
       name: 'without-an-order-id-it-is-still-the-subscription-path',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // No orderId: a Basic user is refused for having no paid subscription,
         // exactly as before the one-time branch existed
         const sent = await callHandler({
@@ -269,8 +269,8 @@ module.exports = defineCases({
           data: { confirmed: true, reason: 'Too expensive', feedback: null, orderId: null },
         });
 
-        assert.equal(sent.code, 400, `A basic user should still be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /no paid subscription/i, 'The subscription path must be untouched');
+        expect(sent.code, `A basic user should still be rejected, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The subscription path must be untouched').toMatch(/no paid subscription/i);
       },
     },
   ],

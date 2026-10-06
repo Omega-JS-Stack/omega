@@ -46,34 +46,34 @@ module.exports = defineCases({
   tests: [
     {
       name: 'records-the-order-that-failed',
-      async run({ assert }) {
+      async run({ expect }) {
         const logs = [];
 
         await handler(context(logs, []));
 
         const line = logs.find((entry) => entry.includes('one-time/purchase-failed'));
 
-        assert.ok(line, `The handler should log the transition, got: ${logs.join(' | ')}`);
-        assert.match(line, new RegExp(`orderId=${ORDER_ID}`), 'The line should name the order that failed');
+        expect(line, `The handler should log the transition, got: ${logs.join(' | ')}`).toBeTruthy();
+        expect(line, 'The line should name the order that failed').toMatch(new RegExp(`orderId=${ORDER_ID}`));
       },
     },
 
     {
       name: 'sends-the-failed-payment-email-the-subscription-twin-sends',
-      async run({ assert }) {
+      async run({ expect }) {
         const sent = [];
 
         await handler(context([], sent));
 
-        assert.equal(sent.length, 1, `A failed purchase owes the customer exactly one email, got ${sent.length}`);
+        expect(sent.length, `A failed purchase owes the customer exactly one email, got ${sent.length}`).toBe(1);
 
         const email = sent[0];
 
-        assert.equal(email.template, 'order', 'It rides the one order template, like every other transition');
-        assert.deepEqual(email.categories, ['order/payment-failed'], 'Filed under the same category the subscription failure is');
-        assert.equal(email.data.content.event, 'payment-failed', 'The order template renders the payment-failed variant off this event');
-        assert.match(email.subject, new RegExp(ORDER_ID), 'The subject should name the order that failed');
-        assert.equal(email.data.content.id, ORDER_ID, 'The order rides the payload, so the mail can quote what was being bought');
+        expect(email.template, 'It rides the one order template, like every other transition').toBe('order');
+        expect(email.categories, 'Filed under the same category the subscription failure is').toEqual(['order/payment-failed']);
+        expect(email.data.content.event, 'The order template renders the payment-failed variant off this event').toBe('payment-failed');
+        expect(email.subject, 'The subject should name the order that failed').toMatch(new RegExp(ORDER_ID));
+        expect(email.data.content.id, 'The order rides the payload, so the mail can quote what was being bought').toBe(ORDER_ID);
       },
     },
   ],

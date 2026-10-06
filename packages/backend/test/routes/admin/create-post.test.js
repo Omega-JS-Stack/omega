@@ -23,7 +23,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           url: 'test-post',
           description: 'Test description',
@@ -31,7 +31,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing title should return 400');
+        expect(response, 'Missing title should return 400').toBeError(400);
       },
     },
 
@@ -40,7 +40,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           description: 'Test description',
@@ -48,7 +48,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing URL should return 400');
+        expect(response, 'Missing URL should return 400').toBeError(400);
       },
     },
 
@@ -57,7 +57,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
@@ -65,7 +65,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing description should return 400');
+        expect(response, 'Missing description should return 400').toBeError(400);
       },
     },
 
@@ -74,7 +74,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
@@ -82,7 +82,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing headerImageURL should return 400');
+        expect(response, 'Missing headerImageURL should return 400').toBeError(400);
       },
     },
 
@@ -91,7 +91,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
@@ -99,7 +99,7 @@ module.exports = defineCases({
           headerImageURL: 'https://example.com/image.jpg',
         });
 
-        assert.isError(response, 400, 'Missing body should return 400');
+        expect(response, 'Missing body should return 400').toBeError(400);
       },
     },
 
@@ -111,16 +111,16 @@ module.exports = defineCases({
       timeout: 120000,
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE env var not set' : false,
 
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         if (!process.env.GH_TOKEN) {
-          assert.fail('GH_TOKEN env var not set');
+          expect.fail('GH_TOKEN env var not set');
           return;
         }
 
         const { sourceRepo } = require('../../helpers/_shared-config.js');
         const source = sourceRepo(config);
         if (!source) {
-          assert.fail('source repo not resolvable (set repo.owner + brand.id)');
+          expect.fail('source repo not resolvable (set repo.owner + brand.id)');
           return;
         }
 
@@ -145,9 +145,9 @@ module.exports = defineCases({
           postPath: 'guest',
         });
 
-        assert.isSuccess(response, 'Create post should succeed');
-        assert.hasProperty(response, 'data.id', 'Response should have post id');
-        assert.hasProperty(response, 'data.path', 'Response should have post file path');
+        expect(response, 'Create post should succeed').toBeSuccess();
+        expect(response, 'Response should have post id').toHaveProperty('data.id');
+        expect(response, 'Response should have post file path').toHaveProperty('data.path');
 
         // Store for cleanup
         state.postId = response.data.id;
@@ -161,7 +161,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE env var not set' : false,
 
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         if (!state.postPath) {
           return; // Previous test didn't run
         }
@@ -179,15 +179,9 @@ module.exports = defineCases({
         state.currentSha = fileData.sha;
 
         // The body should contain @post/ prefix instead of the original external URL
-        assert.ok(
-          content.includes('@post/'),
-          'Post body should contain @post/ prefix for downloaded images',
-        );
+        expect(content.includes('@post/'), 'Post body should contain @post/ prefix for downloaded images').toBeTruthy();
 
-        assert.ok(
-          !content.includes('picsum.photos/id/10'),
-          'Post body should NOT contain the original external inline image URL',
-        );
+        expect(!content.includes('picsum.photos/id/10'), 'Post body should NOT contain the original external inline image URL').toBeTruthy();
       },
     },
 
@@ -197,7 +191,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE env var not set' : false,
 
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         if (!state.postId) {
           return; // Previous test didn't run
         }
@@ -213,7 +207,7 @@ module.exports = defineCases({
         });
 
         const headerFile = dirData.find((f) => f.name === 'backend-test-create-post.jpg');
-        assert.ok(headerFile, 'Header image should be committed at expected slug');
+        expect(headerFile, 'Header image should be committed at expected slug').toBeTruthy();
 
         // Fetch the raw bytes and read dimensions
         const { data: blob } = await octokit.rest.git.getBlob({
@@ -228,13 +222,10 @@ module.exports = defineCases({
         // The source we requested was 5000x3000 (over the 4096 limit).
         // After resize, the long edge should be clamped to IMAGE_MAX_DIMENSION.
         const longEdge = Math.max(meta.width, meta.height);
-        assert.ok(
-          longEdge <= IMAGE_MAX_DIMENSION,
-          `Committed header image long edge (${meta.width}x${meta.height}) should be <= IMAGE_MAX_DIMENSION (${IMAGE_MAX_DIMENSION})`,
-        );
+        expect(longEdge <= IMAGE_MAX_DIMENSION, `Committed header image long edge (${meta.width}x${meta.height}) should be <= IMAGE_MAX_DIMENSION (${IMAGE_MAX_DIMENSION})`).toBeTruthy();
 
         // And the resize should actually have happened (source was 5000x3000 → expect width=4096)
-        assert.equal(meta.width, IMAGE_MAX_DIMENSION, 'Resized width should equal IMAGE_MAX_DIMENSION');
+        expect(meta.width, 'Resized width should equal IMAGE_MAX_DIMENSION').toBe(IMAGE_MAX_DIMENSION);
       },
     },
 
@@ -245,7 +236,7 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
@@ -254,7 +245,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 401, 'Create post should fail without authentication');
+        expect(response, 'Create post should fail without authentication').toBeError(401);
       },
     },
 
@@ -263,7 +254,7 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
@@ -272,7 +263,7 @@ module.exports = defineCases({
           body: 'Test content',
         });
 
-        assert.isError(response, 403, 'Create post should fail for non-admin user');
+        expect(response, 'Create post should fail for non-admin user').toBeError(403);
       },
     },
 

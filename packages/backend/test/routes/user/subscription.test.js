@@ -15,15 +15,15 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/subscription', {});
 
-        assert.isSuccess(response, 'Get subscription info should succeed for authenticated user');
-        assert.hasProperty(response, 'data.subscription', 'Response should contain subscription object');
-        assert.hasProperty(response, 'data.subscription.product.id', 'Subscription should have id');
-        assert.hasProperty(response, 'data.subscription.expires', 'Subscription should have expires');
-        assert.hasProperty(response, 'data.subscription.trial', 'Subscription should have trial info');
-        assert.hasProperty(response, 'data.subscription.payment', 'Subscription should have payment info');
+        expect(response, 'Get subscription info should succeed for authenticated user').toBeSuccess();
+        expect(response, 'Response should contain subscription object').toHaveProperty('data.subscription');
+        expect(response, 'Subscription should have id').toHaveProperty('data.subscription.product.id');
+        expect(response, 'Subscription should have expires').toHaveProperty('data.subscription.expires');
+        expect(response, 'Subscription should have trial info').toHaveProperty('data.subscription.trial');
+        expect(response, 'Subscription should have payment info').toHaveProperty('data.subscription.payment');
       },
     },
 
@@ -33,25 +33,22 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/subscription', {});
 
-        assert.isSuccess(response, 'Get subscription info should succeed');
+        expect(response, 'Get subscription info should succeed').toBeSuccess();
 
         const subscription = response.data.subscription;
 
         // Check expires structure
-        assert.hasProperty(response, 'data.subscription.expires.timestamp', 'expires should have timestamp');
-        assert.hasProperty(response, 'data.subscription.expires.timestampUNIX', 'expires should have timestampUNIX');
+        expect(response, 'expires should have timestamp').toHaveProperty('data.subscription.expires.timestamp');
+        expect(response, 'expires should have timestampUNIX').toHaveProperty('data.subscription.expires.timestampUNIX');
 
         // Check trial structure
-        assert.ok(
-          typeof subscription.trial.claimed === 'boolean',
-          'trial.claimed should be boolean'
-        );
+        expect(typeof subscription.trial.claimed === 'boolean', 'trial.claimed should be boolean').toBeTruthy();
 
         // Check payment structure
-        assert.hasProperty(response, 'data.subscription.payment', 'subscription should have payment');
+        expect(response, 'subscription should have payment').toHaveProperty('data.subscription.payment');
       },
     },
 
@@ -61,12 +58,12 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/subscription', {});
 
-        assert.isSuccess(response, 'Get subscription info should succeed for premium user');
-        assert.hasProperty(response, 'data.subscription.product.id', 'Premium user should have subscription id');
-        assert.hasProperty(response, 'data.subscription.payment', 'Premium user should have payment info');
+        expect(response, 'Get subscription info should succeed for premium user').toBeSuccess();
+        expect(response, 'Premium user should have subscription id').toHaveProperty('data.subscription.product.id');
+        expect(response, 'Premium user should have payment info').toHaveProperty('data.subscription.payment');
       },
     },
 
@@ -76,12 +73,12 @@ module.exports = defineCases({
       auth: 'premium-expired',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/subscription', {});
 
-        assert.isSuccess(response, 'Get subscription info should succeed for expired premium');
-        assert.hasProperty(response, 'data.subscription.product.id', 'Should still have subscription id');
-        assert.hasProperty(response, 'data.subscription.expires.timestampUNIX', 'Should have expires timestamp');
+        expect(response, 'Get subscription info should succeed for expired premium').toBeSuccess();
+        expect(response, 'Should still have subscription id').toHaveProperty('data.subscription.product.id');
+        expect(response, 'Should have expires timestamp').toHaveProperty('data.subscription.expires.timestampUNIX');
       },
     },
 
@@ -91,10 +88,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/subscription', {});
 
-        assert.isError(response, 401, 'Get subscription info should fail without authentication');
+        expect(response, 'Get subscription info should fail without authentication').toBeError(401);
       },
     },
   ],

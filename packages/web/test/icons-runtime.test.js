@@ -8,8 +8,7 @@
  * icon-renderer suite set: node has no DOM and web pulls in no jsdom), and
  * the transport seam is the real `fetch` global, stubbed per test.
  */
-const test = require('node:test');
-const assert = require('node:assert');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { createIconResolver, ICON_BASE } = require('../runtime/icons.js');
 const { createIconRenderer } = require('@omega.js/client/modules/icon-renderer.js');
@@ -77,93 +76,120 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const SVG = '<svg viewBox="0 0 512 512"><path d="M0 0h512v512H0z"/></svg>';
 
-test('#619: the resolver fetches one icon out of the site\'s own emitted set', () => {
-  return withFetch(() => ok(SVG), async (urls) => {
-    const svg = await createIconResolver({ development: false })('rocket', 'solid');
+module.exports = defineCases({
+  type: 'group',
+  description: 'icons-runtime',
+  tests: [
+    {
+      name: '#619: the resolver fetches one icon out of the site\'s own emitted set',
+      run: (ctx) => {
+        return withFetch(() => ok(SVG), async (urls) => {
+          const svg = await createIconResolver({ development: false })('rocket', 'solid');
 
-    assert.deepStrictEqual(urls, [`${ICON_BASE}/solid/rocket.svg`]);
-    assert.strictEqual(svg, SVG);
-  });
-});
+          ctx.expect(urls).toEqual([`${ICON_BASE}/solid/rocket.svg`]);
+          ctx.expect(svg).toBe(SVG);
+        });
+      },
+    },
 
-test('#619: flags ride the same URL shape, one namespace over', () => {
-  return withFetch(() => ok(SVG), async (urls) => {
-    await createIconResolver({ development: false })('us', 'flags');
+    {
+      name: '#619: flags ride the same URL shape, one namespace over',
+      run: (ctx) => {
+        return withFetch(() => ok(SVG), async (urls) => {
+          await createIconResolver({ development: false })('us', 'flags');
 
-    assert.deepStrictEqual(urls, [`${ICON_BASE}/flags/us.svg`]);
-  });
-});
+          ctx.expect(urls).toEqual([`${ICON_BASE}/flags/us.svg`]);
+        });
+      },
+    },
 
-test('#619: a missing icon is LOUD in development and silent in production', () => {
-  return withFetch(() => notFound, () => withConsoleError(async (lines) => {
-    const dev = await createIconResolver({ development: true })('not-a-real-glyph', 'solid');
-    assert.strictEqual(dev, null, 'a miss resolves to nothing — never a wrong-glyph fallback');
-    assert.strictEqual(lines.length, 1, 'exactly one line per miss');
-    assert.match(lines[0], /\[@omega\.js\/web:icons\]/, 'the one log tag');
-    assert.match(lines[0], /solid\/not-a-real-glyph/, 'the console names the icon');
+    {
+      name: '#619: a missing icon is LOUD in development and silent in production',
+      run: (ctx) => {
+        return withFetch(() => notFound, () => withConsoleError(async (lines) => {
+          const dev = await createIconResolver({ development: true })('not-a-real-glyph', 'solid');
+          ctx.expect(dev, 'a miss resolves to nothing — never a wrong-glyph fallback').toBe(null);
+          ctx.expect(lines.length, 'exactly one line per miss').toBe(1);
+          ctx.expect(lines[0], 'the one log tag').toMatch(/\[@omega\.js\/web:icons\]/);
+          ctx.expect(lines[0], 'the console names the icon').toMatch(/solid\/not-a-real-glyph/);
 
-    lines.length = 0;
-    const prod = await createIconResolver({ development: false })('not-a-real-glyph', 'solid');
-    assert.strictEqual(prod, null);
-    assert.deepStrictEqual(lines, [], 'production skips silently');
-  }));
-});
+          lines.length = 0;
+          const prod = await createIconResolver({ development: false })('not-a-real-glyph', 'solid');
+          ctx.expect(prod).toBe(null);
+          ctx.expect(lines, 'production skips silently').toEqual([]);
+        }));
+      },
+    },
 
-test('#619: the watcher upgrades an icon JS created after the build', () => {
-  return withFetch(() => ok(SVG), async (urls) => {
-    // Exactly what a page module does: build an <i> in JS and put it in the DOM.
-    const icon = makeIcon('fa-solid fa-bell fa-sm me-1');
+    {
+      name: '#619: the watcher upgrades an icon JS created after the build',
+      run: (ctx) => {
+        return withFetch(() => ok(SVG), async (urls) => {
+          // Exactly what a page module does: build an <i> in JS and put it in the DOM.
+          const icon = makeIcon('fa-solid fa-bell fa-sm me-1');
 
-    createIconWatcher({ development: false }).scan(makeRoot([icon]));
-    await settle();
+          createIconWatcher({ development: false }).scan(makeRoot([icon]));
+          await settle();
 
-    assert.deepStrictEqual(urls, [`${ICON_BASE}/solid/bell.svg`], 'only the icon actually asked for transfers');
-    assert.strictEqual(icon.dataset.omegaFa, 'solid/bell');
-    assert.match(icon.innerHTML, /<svg/, 'the glyph landed in the element');
-    assert.match(icon.innerHTML, /width="1em"/, '…through the shared root-attribute pass');
-  });
-});
+          ctx.expect(urls, 'only the icon actually asked for transfers').toEqual([`${ICON_BASE}/solid/bell.svg`]);
+          ctx.expect(icon.dataset.omegaFa).toBe('solid/bell');
+          ctx.expect(icon.innerHTML, 'the glyph landed in the element').toMatch(/<svg/);
+          ctx.expect(icon.innerHTML, '…through the shared root-attribute pass').toMatch(/width="1em"/);
+        });
+      },
+    },
 
-test('#619: the watcher upgrades a JS-created flag too', () => {
-  return withFetch(() => ok(SVG), async (urls) => {
-    const flag = makeIcon('omega-flag omega-flag-us');
+    {
+      name: '#619: the watcher upgrades a JS-created flag too',
+      run: (ctx) => {
+        return withFetch(() => ok(SVG), async (urls) => {
+          const flag = makeIcon('omega-flag omega-flag-us');
 
-    createIconWatcher({ development: false }).scan(makeRoot([flag]));
-    await settle();
+          createIconWatcher({ development: false }).scan(makeRoot([flag]));
+          await settle();
 
-    assert.deepStrictEqual(urls, [`${ICON_BASE}/flags/us.svg`]);
-    assert.strictEqual(flag.dataset.omegaFa, 'flags/us');
-    assert.match(flag.innerHTML, /<svg/);
-  });
-});
+          ctx.expect(urls).toEqual([`${ICON_BASE}/flags/us.svg`]);
+          ctx.expect(flag.dataset.omegaFa).toBe('flags/us');
+          ctx.expect(flag.innerHTML).toMatch(/<svg/);
+        });
+      },
+    },
 
-test('#619: a brand mark falls back to brands/, so fa-solid fa-github renders', () => {
-  const responder = (url) => (url.endsWith('/brands/github.svg') ? ok(SVG) : notFound);
+    {
+      name: '#619: a brand mark falls back to brands/, so fa-solid fa-github renders',
+      run: (ctx) => {
+        const responder = (url) => (url.endsWith('/brands/github.svg') ? ok(SVG) : notFound);
 
-  return withFetch(responder, async (urls) => {
-    const icon = makeIcon('fa-solid fa-github');
+        return withFetch(responder, async (urls) => {
+          const icon = makeIcon('fa-solid fa-github');
 
-    createIconWatcher({ development: false }).scan(makeRoot([icon]));
-    await settle();
+          createIconWatcher({ development: false }).scan(makeRoot([icon]));
+          await settle();
 
-    assert.deepStrictEqual(urls, [
-      `${ICON_BASE}/solid/github.svg`,
-      `${ICON_BASE}/brands/github.svg`,
-    ], 'the requested style first, then brands — icon-core\'s candidate order, the same one the build-time pass and desktop use');
-    assert.strictEqual(icon.dataset.omegaFa, 'solid/github');
-    assert.match(icon.innerHTML, /<svg/, 'the mark lands without the author knowing which side of the set it lives on');
-  });
-});
+          ctx.expect(urls, 'the requested style first, then brands — icon-core\'s candidate order, the same one the build-time pass and desktop use').toEqual([
+            `${ICON_BASE}/solid/github.svg`,
+            `${ICON_BASE}/brands/github.svg`,
+          ]);
+          ctx.expect(icon.dataset.omegaFa).toBe('solid/github');
+          ctx.expect(icon.innerHTML, 'the mark lands without the author knowing which side of the set it lives on').toMatch(/<svg/);
+        });
+      },
+    },
 
-test('#619: an icon the build already inlined costs zero fetches', () => {
-  return withFetch(() => ok(SVG), async (urls) => {
-    const inlined = makeIcon('fa-solid fa-rocket');
-    inlined.dataset.omegaFa = 'solid/rocket';
-    inlined.innerHTML = SVG;
+    {
+      name: '#619: an icon the build already inlined costs zero fetches',
+      run: (ctx) => {
+        return withFetch(() => ok(SVG), async (urls) => {
+          const inlined = makeIcon('fa-solid fa-rocket');
+          inlined.dataset.omegaFa = 'solid/rocket';
+          inlined.innerHTML = SVG;
 
-    createIconWatcher({ development: false }).scan(makeRoot([inlined]));
-    await settle();
+          createIconWatcher({ development: false }).scan(makeRoot([inlined]));
+          await settle();
 
-    assert.deepStrictEqual(urls, [], 'the build-time stamp is what makes the runtime free');
-  });
+          ctx.expect(urls, 'the build-time stamp is what makes the runtime free').toEqual([]);
+        });
+      },
+    },
+  ],
 });

@@ -90,7 +90,7 @@ module.exports = defineCases({
       name: 'the-service-account-file-travels-as-its-own-secret',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({
           owner: 'acme',
           brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n${REQUIRED_ENV}`,
@@ -104,17 +104,17 @@ module.exports = defineCases({
         try {
           const result = publish(targetDir, gh);
 
-          assert.ok(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'), 'the runner cannot authenticate without it');
-          assert.ok(result.published.includes('OMEGA_ADMIN_KEY'), 'the runtime keys ride too, so the workflow can write the .env');
-          assert.ok(result.published.includes('OMEGA_LICENSE_KEY'), 'and the license key, so the runner resolves a verdict instead of keyless (#320)');
+          expect(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'), 'the runner cannot authenticate without it').toBeTruthy();
+          expect(result.published.includes('OMEGA_ADMIN_KEY'), 'the runtime keys ride too, so the workflow can write the .env').toBeTruthy();
+          expect(result.published.includes('OMEGA_LICENSE_KEY'), 'and the license key, so the runner resolves a verdict instead of keyless (#320)').toBeTruthy();
 
           // The CONTENTS travel, never this laptop's path to the file, and
           // every value goes on stdin rather than argv.
           const sent = gh.find((call) => call.args.includes('OMEGA_SERVICE_ACCOUNT_JSON'));
-          assert.equal(sent.input, key, 'the key file is published verbatim');
-          assert.deepEqual(sent.args, ['secret', 'set', 'OMEGA_SERVICE_ACCOUNT_JSON', '--repo', 'acme/fixture-omega']);
-          assert.equal(gh.every((call) => call.file === 'gh'), true, 'one transport: the gh CLI');
-          assert.deepEqual(gh.slice(0, 2).map((call) => call.args), [['--version'], ['api', 'user']], 'an unusable gh fails before anything is sent');
+          expect(sent.input, 'the key file is published verbatim').toBe(key);
+          expect(sent.args).toEqual(['secret', 'set', 'OMEGA_SERVICE_ACCOUNT_JSON', '--repo', 'acme/fixture-omega']);
+          expect(gh.every((call) => call.file === 'gh'), 'one transport: the gh CLI').toBe(true);
+          expect(gh.slice(0, 2).map((call) => call.args), 'an unusable gh fails before anything is sent').toEqual([['--version'], ['api', 'user']]);
         } finally {
           jetpack.remove(root);
         }
@@ -125,7 +125,7 @@ module.exports = defineCases({
       name: 'the-composed-brand-env-plus-the-key-file-is-the-published-set',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({
           owner: 'acme',
           brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n',
@@ -138,9 +138,9 @@ module.exports = defineCases({
             ...serviceAccountSecret(targetDir),
           };
 
-          assert.equal(secrets.OMEGA_ADMIN_KEY, 'brand-admin', 'the brand-root .env supplies the target');
-          assert.equal(secrets.OMEGA_LICENSE_KEY, 'omg_live_brand');
-          assert.equal(secrets.OMEGA_SERVICE_ACCOUNT_JSON, '{"type":"service_account"}', 'the key FILE rides as one more secret');
+          expect(secrets.OMEGA_ADMIN_KEY, 'the brand-root .env supplies the target').toBe('brand-admin');
+          expect(secrets.OMEGA_LICENSE_KEY).toBe('omg_live_brand');
+          expect(secrets.OMEGA_SERVICE_ACCOUNT_JSON, 'the key FILE rides as one more secret').toBe('{"type":"service_account"}');
         } finally {
           jetpack.remove(root);
         }
@@ -151,17 +151,13 @@ module.exports = defineCases({
       name: 'a-standalone-target-root-key-is-the-first-stop-of-the-chain',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         jetpack.write(path.join(root, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account","project_id":"brand"}');
         jetpack.write(path.join(targetDir, 'service-account.json'), '{"type":"service_account","project_id":"target"}');
 
         try {
-          assert.deepEqual(
-            serviceAccountSecret(targetDir),
-            { OMEGA_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"target"}' },
-            'the target root owns its copy when it has one, the same chain the stage reads',
-          );
+          expect(serviceAccountSecret(targetDir), 'the target root owns its copy when it has one, the same chain the stage reads').toEqual({ OMEGA_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"target"}' });
         } finally {
           jetpack.remove(root);
         }
@@ -175,16 +171,16 @@ module.exports = defineCases({
       // A brand that has not minted one yet deploys from a runner that cannot
       // authenticate, and the MISSING secret is what says so. Publishing an
       // empty one would look like a credential and fail at `firebase deploy`.
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\n${REQUIRED_ENV}` });
 
         const gh = [];
         try {
-          assert.deepEqual(serviceAccountSecret(targetDir), {}, 'no file, no key');
+          expect(serviceAccountSecret(targetDir), 'no file, no key').toEqual({});
 
           const result = publish(targetDir, gh);
-          assert.equal(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'), false, 'nothing invents a credential');
-          assert.ok(result.published.includes('OMEGA_ADMIN_KEY'), 'the rest of the set still publishes');
+          expect(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'), 'nothing invents a credential').toBe(false);
+          expect(result.published.includes('OMEGA_ADMIN_KEY'), 'the rest of the set still publishes').toBeTruthy();
         } finally {
           jetpack.remove(root);
         }
@@ -197,7 +193,7 @@ module.exports = defineCases({
 
       // The same opt-out name web, desktop and the extension honor. On backend
       // the flag used to be accepted and ignored.
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({ owner: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         const ran = [];
 
@@ -209,8 +205,8 @@ module.exports = defineCases({
             steps: [{ name: 'push-secrets', run: () => ran.push('push-secrets') }],
           });
 
-          assert.deepEqual(skipped, { skipped: 'opt-out' });
-          assert.deepEqual(ran, [], 'no step runs, so a deploy needs no gh auth at all');
+          expect(skipped).toEqual({ skipped: 'opt-out' });
+          expect(ran, 'no step runs, so a deploy needs no gh auth at all').toEqual([]);
 
           const withSecrets = await deployPrecheck({
             projectDir: targetDir,
@@ -219,14 +215,14 @@ module.exports = defineCases({
             steps: [{ name: 'push-secrets', run: () => ran.push('push-secrets') }],
           });
 
-          assert.deepEqual(withSecrets, { ran: ['push-secrets'] }, 'and the default still publishes');
-          assert.deepEqual(ran, ['push-secrets']);
+          expect(withSecrets, 'and the default still publishes').toEqual({ ran: ['push-secrets'] });
+          expect(ran).toEqual(['push-secrets']);
 
           // The real list, so the bind itself is pinned and not just the runner.
-          assert.deepEqual(STEPS.map((step) => step.name), ['verify-deploy-roles', 'push-secrets']);
+          expect(STEPS.map((step) => step.name)).toEqual(['verify-deploy-roles', 'push-secrets']);
           // FATAL on all four frameworks (#891): the runner deploys with what
           // this step sends, so a refused or half publish stops the deploy.
-          assert.equal(STEPS.find((step) => step.name === 'push-secrets').fatal, true);
+          expect(STEPS.find((step) => step.name === 'push-secrets').fatal).toBe(true);
         } finally {
           jetpack.remove(root);
         }

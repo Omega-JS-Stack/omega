@@ -17,9 +17,8 @@
  * band at all (#514 — a tile with href IS the anchor), and a numbered process
  * band lost its numbers (#519 — band-level `numbered` counts the tiles).
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -50,137 +49,171 @@ function makeEngine() {
 
 const ITEMS = 'items:\n  - type: default\n    icon: fa-solid fa-bolt\n    title: "Fast by default"\n    description: "Static output, tuned assets."\n';
 
-test('#439: cta_button renders the closing CTA in the sibling button idiom, warn-free', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "marketing/bento" %}\n${ITEMS}cta_button:\n  text: "See every feature"\n  href: "/features"\n{% endsection %}`,
-    {},
-  );
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-bento',
+  tests: [
+    {
+      name: '#439: cta_button renders the closing CTA in the sibling button idiom, warn-free',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "marketing/bento" %}\n${ITEMS}cta_button:\n  text: "See every feature"\n  href: "/features"\n{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('<a href="/features" class="btn btn-adaptive btn-lg omega-hover-nudge">'), 'the shared closing-CTA button idiom');
-  assert.ok(html.includes('See every feature'), 'the button is named by its own copy');
-  assert.ok(html.includes('<span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i>'), 'the arrow nudge rides along');
-  assert.deepEqual(warnings, [], 'the ported CTA no longer warns as unknown');
-});
+        ctx.expect(html.includes('<a href="/features" class="btn btn-adaptive btn-lg omega-hover-nudge">'), 'the shared closing-CTA button idiom').toBeTruthy();
+        ctx.expect(html.includes('See every feature'), 'the button is named by its own copy').toBeTruthy();
+        ctx.expect(html.includes('<span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i>'), 'the arrow nudge rides along').toBeTruthy();
+        ctx.expect(warnings, 'the ported CTA no longer warns as unknown').toEqual([]);
+      },
+    },
 
-test('#439: cta_button honors the enabled gate, and absence renders no button at all', async () => {
-  const { engine, warnings } = makeEngine();
+    {
+      name: '#439: cta_button honors the enabled gate, and absence renders no button at all',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
 
-  const disabled = await engine.parseAndRender(
-    `{% section "marketing/bento" %}\n${ITEMS}cta_button:\n  enabled: false\n  text: "See every feature"\n  href: "/features"\n{% endsection %}`,
-    {},
-  );
-  assert.ok(!disabled.includes('See every feature'), 'enabled: false suppresses the CTA');
-  assert.ok(!disabled.includes('omega-hover-nudge'), 'no orphan button shell');
+        const disabled = await engine.parseAndRender(
+          `{% section "marketing/bento" %}\n${ITEMS}cta_button:\n  enabled: false\n  text: "See every feature"\n  href: "/features"\n{% endsection %}`,
+          {},
+        );
+        ctx.expect(!disabled.includes('See every feature'), 'enabled: false suppresses the CTA').toBeTruthy();
+        ctx.expect(!disabled.includes('omega-hover-nudge'), 'no orphan button shell').toBeTruthy();
 
-  const none = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
-  assert.ok(!none.includes('omega-hover-nudge'), 'no cta_button → no closing CTA');
-  assert.deepEqual(warnings, []);
-});
+        const none = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
+        ctx.expect(!none.includes('omega-hover-nudge'), 'no cta_button → no closing CTA').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('#439: superheadline takes BOTH shapes — the string unchanged, the object rendering its text alone', async () => {
-  const { engine, warnings } = makeEngine();
+    {
+      name: '#439: superheadline takes BOTH shapes — the string unchanged, the object rendering its text alone',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
 
-  const plain = await engine.parseAndRender(
-    `{% section "marketing/bento" %}\nsuperheadline: "Why ACME"\n${ITEMS}{% endsection %}`,
-    {},
-  );
-  assert.ok(plain.includes('<span class="omega-micro">Why ACME</span>'), 'the string form renders exactly as before');
+        const plain = await engine.parseAndRender(
+          `{% section "marketing/bento" %}\nsuperheadline: "Why ACME"\n${ITEMS}{% endsection %}`,
+          {},
+        );
+        ctx.expect(plain.includes('<span class="omega-micro">Why ACME</span>'), 'the string form renders exactly as before').toBeTruthy();
 
-  const object = await engine.parseAndRender(
-    `{% section "marketing/bento" %}\nsuperheadline:\n  icon: "rocket"\n  text: "Why ACME"\n${ITEMS}{% endsection %}`,
-    {},
-  );
-  // The superheadline is TEXT, always (Ian's 2026-08-22 ruling): an authored
-  // icon is ignored on the way in, never an error. TILE icons are untouched.
-  assert.ok(object.includes('<span class="omega-micro">Why ACME</span>'), 'the object form renders its label alone');
-  assert.ok(!object.includes('fa-rocket'), 'the authored eyebrow icon is dropped, not rendered');
-  assert.ok(object.includes('fa-bolt'), 'while the tile keeps its own feature icon');
-  assert.ok(!object.includes('[object Object]'), 'never the raw object');
-  assert.deepEqual(warnings, [], 'the object shape carries no type warning');
-});
+        const object = await engine.parseAndRender(
+          `{% section "marketing/bento" %}\nsuperheadline:\n  icon: "rocket"\n  text: "Why ACME"\n${ITEMS}{% endsection %}`,
+          {},
+        );
+        // The superheadline is TEXT, always (Ian's 2026-08-22 ruling): an authored
+        // icon is ignored on the way in, never an error. TILE icons are untouched.
+        ctx.expect(object.includes('<span class="omega-micro">Why ACME</span>'), 'the object form renders its label alone').toBeTruthy();
+        ctx.expect(!object.includes('fa-rocket'), 'the authored eyebrow icon is dropped, not rendered').toBeTruthy();
+        ctx.expect(object.includes('fa-bolt'), 'while the tile keeps its own feature icon').toBeTruthy();
+        ctx.expect(!object.includes('[object Object]'), 'never the raw object').toBeTruthy();
+        ctx.expect(warnings, 'the object shape carries no type warning').toEqual([]);
+      },
+    },
 
-test('#512: an absent subheadline renders NOTHING — no demo line inherited', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
+    {
+      name: '#512: an absent subheadline renders NOTHING — no demo line inherited',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
 
-  const head = html.slice(0, html.indexOf('omega-bento'));
-  assert.ok(!html.includes('A complete foundation'), 'the old demo default is gone from the band');
-  assert.ok(!/<p>/.test(head), 'no sub node in the head at all — absence is nothing, not a fallback');
-  assert.ok(head.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched');
-  assert.deepEqual(warnings, []);
-});
+        const head = html.slice(0, html.indexOf('omega-bento'));
+        ctx.expect(!html.includes('A complete foundation'), 'the old demo default is gone from the band').toBeTruthy();
+        ctx.expect(!/<p>/.test(head), 'no sub node in the head at all — absence is nothing, not a fallback').toBeTruthy();
+        ctx.expect(head.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('#512: an authored subheadline still renders its own line', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "marketing/bento" %}\nsubheadline: "Eight services, one team."\n${ITEMS}{% endsection %}`,
-    {},
-  );
+    {
+      name: '#512: an authored subheadline still renders its own line',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "marketing/bento" %}\nsubheadline: "Eight services, one team."\n${ITEMS}{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('<p>Eight services, one team.</p>'), 'the brand\'s own line lands in the head');
-});
+        ctx.expect(html.includes('<p>Eight services, one team.</p>'), 'the brand\'s own line lands in the head').toBeTruthy();
+      },
+    },
 
-test('#512: the demo line lives in the gallery variant now', async () => {
-  const pages = await buildWith(miniData, {}, 'bento-args-test');
-  const frame = pages.get('/test/sections/marketing/bento/frames/default-grid');
-  assert.ok(frame, 'the default-grid variant frame built');
+    {
+      name: '#512: the demo line lives in the gallery variant now',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'bento-args-test');
+        const frame = pages.get('/test/sections/marketing/bento/frames/default-grid');
+        ctx.expect(frame, 'the default-grid variant frame built').toBeTruthy();
 
-  assert.ok(frame.includes('A complete foundation that stays out of your way'), 'sample content, where sample content belongs');
-});
+        ctx.expect(frame.includes('A complete foundation that stays out of your way'), 'sample content, where sample content belongs').toBeTruthy();
+      },
+    },
 
-test('#514: a tile with href IS the anchor — one wrapping link, interactive states, no nested anchor', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/bento" %}\nitems:\n'
-    + '  - icon: fa-solid fa-bolt\n    title: "Solutions"\n    description: "What we build."\n    href: "/solutions"\n'
-    + '{% endsection %}',
-    {},
-  );
+    {
+      name: '#514: a tile with href IS the anchor — one wrapping link, interactive states, no nested anchor',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/bento" %}\nitems:\n'
+          + '  - icon: fa-solid fa-bolt\n    title: "Solutions"\n    description: "What we build."\n    href: "/solutions"\n'
+          + '{% endsection %}',
+          {},
+        );
 
-  assert.equal((html.match(/<a /g) || []).length, 1, 'exactly ONE anchor — the tile itself, nothing nested');
-  assert.ok(/<a href="\/solutions" class="omega-tile[^"]*\bomega-interactive\b[^"]*" data-omega-reveal>/.test(html),
-    'the tile wears the shared whole-surface click affordance');
-  assert.ok(!html.includes('<div class="omega-tile '), 'no div tile beside the anchor one');
-  assert.ok(html.includes('<span class="omega-tile__title">Solutions</span>'), 'the tile body is unchanged inside the link');
-  assert.ok(html.includes('<p class="omega-tile__desc">What we build.</p>'), 'description and all');
-  assert.deepEqual(warnings, [], 'href is a declared item key — no warning');
-});
+        ctx.expect((html.match(/<a /g) || []).length, 'exactly ONE anchor — the tile itself, nothing nested').toBe(1);
+        ctx.expect(/<a href="\/solutions" class="omega-tile[^"]*\bomega-interactive\b[^"]*" data-omega-reveal>/.test(html), 'the tile wears the shared whole-surface click affordance').toBeTruthy();
+        ctx.expect(!html.includes('<div class="omega-tile '), 'no div tile beside the anchor one').toBeTruthy();
+        ctx.expect(html.includes('<span class="omega-tile__title">Solutions</span>'), 'the tile body is unchanged inside the link').toBeTruthy();
+        ctx.expect(html.includes('<p class="omega-tile__desc">What we build.</p>'), 'description and all').toBeTruthy();
+        ctx.expect(warnings, 'href is a declared item key — no warning').toEqual([]);
+      },
+    },
 
-test('#514: no href — today\'s markup, no anchor, no interactive class', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
+    {
+      name: '#514: no href — today\'s markup, no anchor, no interactive class',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
 
-  assert.ok(html.includes('<div class="omega-tile '), 'the plain tile is the div it has always been');
-  assert.ok(!html.includes('<a '), 'no anchor anywhere — no cta_button, no linked tile');
-  assert.ok(!html.includes('omega-interactive'), 'and no click affordance on a tile that does not click');
-  assert.deepEqual(warnings, []);
-});
+        ctx.expect(html.includes('<div class="omega-tile '), 'the plain tile is the div it has always been').toBeTruthy();
+        ctx.expect(!html.includes('<a '), 'no anchor anywhere — no cta_button, no linked tile').toBeTruthy();
+        ctx.expect(!html.includes('omega-interactive'), 'and no click affordance on a tile that does not click').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('#519: numbered: true counts the tiles 1..N by position', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/bento" %}\nnumbered: true\nitems:\n'
-    + '  - title: "Discover"\n    description: "We listen first."\n'
-    + '  - title: "Design"\n    description: "Then we draw it."\n'
-    + '  - title: "Deliver"\n    description: "Then we ship it."\n'
-    + '{% endsection %}',
-    {},
-  );
+    {
+      name: '#519: numbered: true counts the tiles 1..N by position',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/bento" %}\nnumbered: true\nitems:\n'
+          + '  - title: "Discover"\n    description: "We listen first."\n'
+          + '  - title: "Design"\n    description: "Then we draw it."\n'
+          + '  - title: "Deliver"\n    description: "Then we ship it."\n'
+          + '{% endsection %}',
+          {},
+        );
 
-  const ordinals = [...html.matchAll(/<span class="omega-tile__ordinal">(\d+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(ordinals, ['1', '2', '3'], 'one ordinal per tile, in composition order');
+        const ordinals = [...html.matchAll(/<span class="omega-tile__ordinal">(\d+)<\/span>/g)].map((m) => m[1]);
+        ctx.expect(ordinals, 'one ordinal per tile, in composition order').toEqual(['1', '2', '3']);
 
-  const first = html.indexOf('Discover');
-  const second = html.indexOf('Design');
-  assert.ok(html.indexOf('>1<') < first && first < html.indexOf('>2<') && html.indexOf('>2<') < second,
-    'each number rides its own tile');
-  assert.deepEqual(warnings, [], 'numbered is a declared band arg');
-});
+        const first = html.indexOf('Discover');
+        const second = html.indexOf('Design');
+        ctx.expect(html.indexOf('>1<') < first && first < html.indexOf('>2<') && html.indexOf('>2<') < second, 'each number rides its own tile').toBeTruthy();
+        ctx.expect(warnings, 'numbered is a declared band arg').toEqual([]);
+      },
+    },
 
-test('#519: an unnumbered band renders no ordinals at all', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
+    {
+      name: '#519: an unnumbered band renders no ordinals at all',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender(`{% section "marketing/bento" %}\n${ITEMS}{% endsection %}`, {});
 
-  assert.ok(!html.includes('omega-tile__ordinal'), 'the default band is exactly what it was');
+        ctx.expect(!html.includes('omega-tile__ordinal'), 'the default band is exactly what it was').toBeTruthy();
+      },
+    },
+  ],
 });

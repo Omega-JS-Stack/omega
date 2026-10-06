@@ -22,8 +22,7 @@
  * the convention billing-actions.test.js sets — over a document built from the
  * ids `init()` wires its controls by.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -198,62 +197,74 @@ async function wireBilling({ analyticsBlocked }) {
   return { requests, opened, tracked, clickById };
 }
 
-test('#283: a blocked analytics global never stops a billing action', async () => {
-  // The repro: `gtag` is not a function that fails, it is a name that does not
-  // exist. The first line of trackBilling() throws a ReferenceError and takes
-  // the whole click handler with it.
-  const { requests, opened, clickById } = await wireBilling({ analyticsBlocked: true });
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-analytics-blocked',
+  tests: [
+    {
+      name: '#283: a blocked analytics global never stops a billing action',
+      run: async (ctx) => {
+        // The repro: `gtag` is not a function that fails, it is a name that does not
+        // exist. The first line of trackBilling() throws a ReferenceError and takes
+        // the whole click handler with it.
+        const { requests, opened, clickById } = await wireBilling({ analyticsBlocked: true });
 
-  // Undo cancellation counts BEFORE it calls the route, so the throw meant the
-  // customer's subscription was never actually resumed.
-  await clickById('uncancel-confirm-btn');
-  assert.deepStrictEqual(
-    requests.map((request) => request.route),
-    ['/omega/payments/uncancel'],
-    'the uncancel route is called with the analytics scripts blocked',
-  );
-  assert.strictEqual(requests[0].options.body.confirmed, true, 'and carries the confirmation the backend expects');
+        // Undo cancellation counts BEFORE it calls the route, so the throw meant the
+        // customer's subscription was never actually resumed.
+        await clickById('uncancel-confirm-btn');
+        ctx.expect(requests.map((request) => request.route), 'the uncancel route is called with the analytics scripts blocked').toEqual(['/omega/payments/uncancel']);
+        ctx.expect(requests[0].options.body.confirmed, 'and carries the confirmation the backend expects').toBe(true);
 
-  await clickById('manage-billing-btn');
-  assert.strictEqual(requests.at(-1).route, '/omega/payments/portal', 'the billing portal still opens');
-  assert.deepStrictEqual(opened, ['https://portal.example/session'], 'and the customer is taken to it');
+        await clickById('manage-billing-btn');
+        ctx.expect(requests.at(-1).route, 'the billing portal still opens').toBe('/omega/payments/portal');
+        ctx.expect(opened, 'and the customer is taken to it').toEqual(['https://portal.example/session']);
 
-  await clickById('upgrade-plan-btn');
-  assert.strictEqual(globalThis.window.location.href, '/pricing', 'the upgrade button still navigates');
+        await clickById('upgrade-plan-btn');
+        ctx.expect(globalThis.window.location.href, 'the upgrade button still navigates').toBe('/pricing');
 
-  // The plan switcher's own click only counts the intent, so the proof is that
-  // it raises nothing at all.
-  await assert.doesNotReject(() => clickById('change-plan-btn'), 'recording the change-plan intent throws nothing');
-});
+        // The plan switcher's own click only counts the intent, so the proof is that
+        // it raises nothing at all.
+        // Recording the change-plan intent throws nothing
+        await clickById('change-plan-btn');
+      },
+    },
 
-test('#328: with the scripts present, every provider the CATALOG maps is counted', async () => {
-  // The guard must not become a silent opt-out: an unblocked page still counts
-  // the billing action. WHO hears it is the catalog's call, and `user_billing_action`
-  // is a GA4-only action bucket by ruling — undoing a cancellation is account
-  // bookkeeping, not an ad signal.
-  const { tracked, clickById } = await wireBilling({ analyticsBlocked: false });
+    {
+      name: '#328: with the scripts present, every provider the CATALOG maps is counted',
+      run: async (ctx) => {
+        // The guard must not become a silent opt-out: an unblocked page still counts
+        // the billing action. WHO hears it is the catalog's call, and `user_billing_action`
+        // is a GA4-only action bucket by ruling — undoing a cancellation is account
+        // bookkeeping, not an ad signal.
+        const { tracked, clickById } = await wireBilling({ analyticsBlocked: false });
 
-  await clickById('uncancel-confirm-btn');
+        await clickById('uncancel-confirm-btn');
 
-  assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the mapped provider counted the action');
+        ctx.expect(tracked.map(([provider]) => provider), 'the mapped provider counted the action').toEqual(['gtag']);
 
-  const [gtagCall] = tracked;
-  assert.strictEqual(gtagCall[1], 'event', 'gtag is called as an event');
-  assert.strictEqual(gtagCall[2], 'user_billing_action', 'with the billing action name');
-  assert.strictEqual(gtagCall[3].action, 'uncancel_submit', 'and the action that happened');
-});
+        const [gtagCall] = tracked;
+        ctx.expect(gtagCall[1], 'gtag is called as an event').toBe('event');
+        ctx.expect(gtagCall[2], 'with the billing action name').toBe('user_billing_action');
+        ctx.expect(gtagCall[3].action, 'and the action that happened').toBe('uncancel_submit');
+      },
+    },
 
-test('#283: a half-blocked page counts what it can and still acts', async () => {
-  // Blockers are per-provider: one list blocks Meta and leaves Google alone.
-  // Each call has to stand on its own, which a single try/catch around all
-  // three would not do.
-  const { tracked, requests, clickById } = await wireBilling({ analyticsBlocked: false });
+    {
+      name: '#283: a half-blocked page counts what it can and still acts',
+      run: async (ctx) => {
+        // Blockers are per-provider: one list blocks Meta and leaves Google alone.
+        // Each call has to stand on its own, which a single try/catch around all
+        // three would not do.
+        const { tracked, requests, clickById } = await wireBilling({ analyticsBlocked: false });
 
-  delete globalThis.fbq;
-  globalThis.ttq = {};
+        delete globalThis.fbq;
+        globalThis.ttq = {};
 
-  await clickById('uncancel-confirm-btn');
+        await clickById('uncancel-confirm-btn');
 
-  assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the provider that loaded still counts');
-  assert.deepStrictEqual(requests.map((request) => request.route), ['/omega/payments/uncancel'], 'and the action ran');
+        ctx.expect(tracked.map(([provider]) => provider), 'the provider that loaded still counts').toEqual(['gtag']);
+        ctx.expect(requests.map((request) => request.route), 'and the action ran').toEqual(['/omega/payments/uncancel']);
+      },
+    },
+  ],
 });

@@ -10,11 +10,10 @@
  *
  * Run: npx omega test web:dev-env-watch
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { recordBrand } = require('@omega.js/config');
 
@@ -54,35 +53,47 @@ function brandFixture(t) {
   return { companyDir, brandRoot, targetDir };
 }
 
-test('the dev watcher lists every layer of the .env chain, overlays included', (t) => {
-  const { companyDir, brandRoot, targetDir } = brandFixture(t);
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-env-watch',
+  tests: [
+    {
+      name: 'the dev watcher lists every layer of the .env chain, overlays included',
+      run: (ctx) => {
+        const { companyDir, brandRoot, targetDir } = brandFixture(ctx);
 
-  const watcher = dev.watchEnvSources(targetDir, { environment: 'development' });
-  t.after(() => watcher.close());
+        const watcher = dev.watchEnvSources(targetDir, { environment: 'development' });
+        ctx.after(() => watcher.close());
 
-  assert.deepEqual(watcher.inputs.map((input) => input.path), [
-    path.join(companyDir, '.env'),
-    path.join(companyDir, '.env.development'),
-    path.join(brandRoot, '.env'),
-    path.join(brandRoot, '.env.development'),
-    path.join(targetDir, '.env'),
-    path.join(targetDir, '.env.development'),
-  ], 'company, brand and target — each layer with the overlay that wins over it, resolved through the chain');
+        ctx.expect(watcher.inputs.map((input) => input.path), 'company, brand and target — each layer with the overlay that wins over it, resolved through the chain').toEqual([
+          path.join(companyDir, '.env'),
+          path.join(companyDir, '.env.development'),
+          path.join(brandRoot, '.env'),
+          path.join(brandRoot, '.env.development'),
+          path.join(targetDir, '.env'),
+          path.join(targetDir, '.env.development'),
+        ]);
 
-  assert.deepEqual(watcher.inputs.map((input) => input.layer), [
-    'company', 'company', 'brand', 'brand', 'target', 'target',
-  ]);
-});
+        ctx.expect(watcher.inputs.map((input) => input.layer)).toEqual([
+          'company', 'company', 'brand', 'brand', 'target', 'target',
+        ]);
+      },
+    },
 
-test('a standalone target watches only its own .env layer', (t) => {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-env-solo-')));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: 'a standalone target watches only its own .env layer',
+      run: (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-env-solo-')));
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const watcher = dev.watchEnvSources(root, { environment: 'development' });
-  t.after(() => watcher.close());
+        const watcher = dev.watchEnvSources(root, { environment: 'development' });
+        ctx.after(() => watcher.close());
 
-  assert.deepEqual(watcher.inputs.map((input) => input.path), [
-    path.join(root, '.env'),
-    path.join(root, '.env.development'),
-  ], 'nothing above a standalone target — nothing extra to watch');
+        ctx.expect(watcher.inputs.map((input) => input.path), 'nothing above a standalone target — nothing extra to watch').toEqual([
+          path.join(root, '.env'),
+          path.join(root, '.env.development'),
+        ]);
+      },
+    },
+  ],
 });

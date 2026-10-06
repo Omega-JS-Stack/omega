@@ -5,7 +5,6 @@ const fs = require('fs');
 const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const powertools = require('node-powertools');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
@@ -153,10 +152,18 @@ class TestCommand extends BaseCommand {
     const self = this.main;
     const argv = self.argv;
 
-    // Tee THIS process to <targetRoot>/logs/test.log (#197) — the setup lines, the
-    // port summary and the emulator boot that the runner-child's dist/test.log
-    // never sees.
+    // Tee THIS process to <targetRoot>/logs/test.log: the setup lines, the port
+    // summary, the emulator boot, and the runner child, whose output flows
+    // through this process's streams.
     this.attachVerbLog('test');
+
+    // Under --reporter=json stdout carries the runner child's one document alone:
+    // every other line this verb writes (its own, the target checks', the
+    // emulator boot's) goes to stderr
+    if (argv.reporter === 'json') {
+      this.writeDocument = process.stdout.write.bind(process.stdout);
+      process.stdout.write = process.stderr.write.bind(process.stderr);
+    }
 
     // `--extended` CLI shorthand for the shared, unprefixed TEST_EXTENDED_MODE
     // env var (the same switch on every framework). Either the flag OR the
@@ -267,13 +274,17 @@ class TestCommand extends BaseCommand {
       emulatorPorts,
       isFrameworkSelfTest: isSelfTest, // gates the boot/ smoke layer (excluded for consumers)
       custom: isCustomProject(projectDir),
+      // The runner's own flags; `--lane` rides the lane's env instead
+      filter: argv.filter,
+      layer: argv.layer,
+      reporter: argv.reporter,
     };
 
     // A custom-server backend has no emulator to boot: the runner goes straight
     // to the discovered suites, and one that needs the emulator fails on its own
     if (testConfig.custom) {
       this.log(chalk.cyan('Custom-server backend: running the suites with no emulator'));
-      await this.runRunnerChild(this.buildTestCommand(testConfig), functionsDir);
+      process.exitCode = await this.runRunnerChild(this.buildTestCommand(testConfig), functionsDir);
       return;
     }
 
@@ -780,65 +791,45 @@ class TestCommand extends BaseCommand {
     this.log(chalk.gray(`  Auth: 127.0.0.1:${emulatorPorts.auth}`));
     this.log(chalk.gray(`  UI: http://127.0.0.1:${emulatorPorts.ui}`));
 
-    await this.runRunnerChild(testCommand, functionsDir);
+    process.exitCode = await this.runRunnerChild(testCommand, functionsDir);
   }
 
   /**
-   * Run the test-runner child, its output teed to logs/test.log
+   * Run the test-runner child, its output teed to logs/test.log.
+   * @param {string} testCommand - From buildTestCommand
+   * @param {string} functionsDir - The child's cwd
+   * @param {function} [onChild] - Receives the child once spawned
+   * @returns {Promise<number>} The child's exit code
    */
-  async runRunnerChild(testCommand, functionsDir) {
-    // Set up log file in the project's functions/ directory (alongside firebase-tools logs)
-    const logPath = this.getLogsPath('test.log');
-    const logStream = fs.createWriteStream(logPath, { flags: 'w' });
-    const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+  runRunnerChild(testCommand, functionsDir, onChild) {
+    // The child's lines flow through THIS process's streams, which the verb's
+    // one tee (attachVerbLog) holds
+    const child = spawnShell(testCommand, {
+      cwd: functionsDir,
+      env: { ...process.env, FORCE_COLOR: '1' },
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
 
-    this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
+    const writeOut = this.writeDocument || ((data) => process.stdout.write(data));
+    child.stdout.on('data', (data) => writeOut(data));
+    child.stderr.on('data', (data) => process.stderr.write(data));
+
+    if (onChild) {
+      onChild(child);
+    }
 
     // The runner's OWN exit code, kept: a no-match answers with a code of its
-    // own inside a brand-root fan-out (#814), and collapsing every non-zero to
-    // 1 here would hide it. powertools registers its close listener before it
-    // hands the child over, so this one has run by the time the catch does.
-    let childExit = 0;
-
-    try {
-      await powertools.execute(testCommand, {
-        log: false,
-        cwd: functionsDir,
-        config: {
-          stdio: ['inherit', 'pipe', 'pipe'],
-          env: { ...process.env, FORCE_COLOR: '1' },
-        },
-      }, (child) => {
-        // Tee stdout to both console and log file (strip ANSI codes for clean log)
-        child.stdout.on('data', (data) => {
-          process.stdout.write(data);
-          logStream.write(stripAnsi(data.toString()));
-        });
-
-        // Tee stderr to both console and log file (strip ANSI codes for clean log)
-        child.stderr.on('data', (data) => {
-          process.stderr.write(data);
-          logStream.write(stripAnsi(data.toString()));
-        });
-
-        // Clean up log stream when child exits
-        child.on('close', (code) => {
-          childExit = code ?? 1;
-          logStream.end();
-        });
-      });
-    } catch (error) {
-      process.exit(childExit || 1);
-    }
+    // own inside a brand-root fan-out, which collapsing to 1 would hide
+    return new Promise((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', (code) => resolve(code ?? 1));
+    });
   }
 
   /**
    * Run tests with Firebase emulator (starts emulator, runs tests, shuts down).
-   *
-   * Two real child processes are used so emulator output and test-runner output
-   * land in separate log files:
-   *   - `emulator.log` — `firebase emulators:start` stdout/stderr (managed by EmulatorCommand)
-   *   - `test.log`     — the test-runner subprocess stdout/stderr (managed here)
+   * The emulator's output lands in `emulator.log` (EmulatorCommand), the test
+   * runner child's in this verb's own `logs/test.log`.
    */
   async runEmulatorTests(testConfig, functionsDir) {
     if (refuseWhenToolsMissing(this.main.firebaseProjectPath, 'test', ['java', 'firebase'])) {
@@ -913,38 +904,10 @@ class TestCommand extends BaseCommand {
     this.log(chalk.gray(`  Auth: 127.0.0.1:${emulatorPorts.auth}`));
     this.log(chalk.gray(`  UI: http://127.0.0.1:${emulatorPorts.ui}`));
 
-    // Spawn the test runner as its own child so its stdout/stderr can be teed to test.log
-    const logPath = this.getLogsPath('test.log');
-    const logStream = fs.createWriteStream(logPath, { flags: 'w' });
-    const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
-
-    this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
-
     let testExitCode = 0;
 
     try {
-      testChild = spawnShell(testCommand, {
-        cwd: functionsDir,
-        env: { ...process.env, FORCE_COLOR: '1' },
-        stdio: ['inherit', 'pipe', 'pipe'],
-      });
-
-      testChild.stdout.on('data', (data) => {
-        process.stdout.write(data);
-        if (!logStream.destroyed) logStream.write(stripAnsi(data.toString()));
-      });
-
-      testChild.stderr.on('data', (data) => {
-        process.stderr.write(data);
-        if (!logStream.destroyed) logStream.write(stripAnsi(data.toString()));
-      });
-
-      testExitCode = await new Promise((resolve) => {
-        testChild.on('close', (code) => {
-          if (!logStream.destroyed) logStream.end();
-          resolve(code ?? 1);
-        });
-      });
+      testExitCode = await this.runRunnerChild(testCommand, functionsDir, (child) => { testChild = child; });
     } catch (error) {
       this.logError(`Test runner error: ${error.message || error}`);
       testExitCode = 1;

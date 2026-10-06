@@ -15,8 +15,8 @@
  * (test/lib/checkout-boot.js), so the assertion is the payload the intent route
  * would have received.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { bootCheckout, SUBSCRIPTION } = require('./lib/checkout-boot.js');
 
@@ -29,112 +29,124 @@ const ONE_TIME = { id: 'launch-kit', name: 'Starter Library', type: 'one-time', 
  */
 function intentPayload(requests) {
   const intent = requests.find((request) => request.url.includes('payments/intent') && request.options.method === 'POST');
-  assert.ok(intent, 'the checkout posted a payment intent');
+  expect(intent, 'the checkout posted a payment intent').toBeTruthy();
 
   return intent.options.body;
 }
 
-test('#668: a one-time checkout asks the intent route for `once`', async () => {
-  const { requests, form, pay } = await bootCheckout({
-    search: '?product=launch-kit',
-    product: ONE_TIME,
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-one-time-frequency',
+  tests: [
+    {
+      name: '#668: a one-time checkout asks the intent route for `once`',
+      run: async (ctx) => {
+        const { requests, form, pay } = await bootCheckout({
+          search: '?product=launch-kit',
+          product: ONE_TIME,
+        });
 
-  await pay();
+        await pay();
 
-  assert.strictEqual(
-    intentPayload(requests).frequency,
-    'once',
-    'the intent carries what a one-time buy actually bills on — the wrong word here is what stranded the confirmation page',
-  );
-  assert.strictEqual(form.data.frequency, 'once', 'and the form the page armed agrees with it');
-});
+        ctx.expect(intentPayload(requests).frequency, 'the intent carries what a one-time buy actually bills on — the wrong word here is what stranded the confirmation page').toBe('once');
+        ctx.expect(form.data.frequency, 'and the form the page armed agrees with it').toBe('once');
+      },
+    },
 
-test('#668: a cadence in the URL cannot make a one-time product recurring', async () => {
-  // The abandoned-cart reminder rebuilds the checkout URL from the cart doc, so
-  // a cart written before this fix links back with `frequency=annually` on a
-  // one-time product. The product decides, never the param.
-  const { requests, pay } = await bootCheckout({
-    search: '?product=launch-kit&frequency=annually',
-    product: ONE_TIME,
-  });
+    {
+      name: '#668: a cadence in the URL cannot make a one-time product recurring',
+      run: async (ctx) => {
+        // The abandoned-cart reminder rebuilds the checkout URL from the cart doc, so
+        // a cart written before this fix links back with `frequency=annually` on a
+        // one-time product. The product decides, never the param.
+        const { requests, pay } = await bootCheckout({
+          search: '?product=launch-kit&frequency=annually',
+          product: ONE_TIME,
+        });
 
-  await pay();
+        await pay();
 
-  assert.strictEqual(intentPayload(requests).frequency, 'once', 'a stale cadence param is ignored on a one-time product');
-});
+        ctx.expect(intentPayload(requests).frequency, 'a stale cadence param is ignored on a one-time product').toBe('once');
+      },
+    },
 
-test('#668: a subscription still runs on the cadence it was sent', async () => {
-  const { requests, form, pay, answerEligibility } = await bootCheckout({
-    search: '?product=premium&frequency=monthly',
-  });
+    {
+      name: '#668: a subscription still runs on the cadence it was sent',
+      run: async (ctx) => {
+        const { requests, form, pay, answerEligibility } = await bootCheckout({
+          search: '?product=premium&frequency=monthly',
+        });
 
-  await answerEligibility(false);
-  await pay();
+        await answerEligibility(false);
+        await pay();
 
-  assert.strictEqual(intentPayload(requests).frequency, 'monthly', 'the URL param still picks a plan\'s term');
-  assert.strictEqual(form.data.frequency, 'monthly', 'and seeds the cadence radios');
-});
+        ctx.expect(intentPayload(requests).frequency, 'the URL param still picks a plan\'s term').toBe('monthly');
+        ctx.expect(form.data.frequency, 'and seeds the cadence radios').toBe('monthly');
+      },
+    },
 
-test('#668: a subscription with no usable cadence param still falls back to the longest term', async () => {
-  // `weekly` is a real frequency the harness product does not sell, and `once`
-  // is not a cadence at all — both fall through to the longest term on offer.
-  for (const param of ['weekly', 'once', '']) {
-    const search = param ? `?product=premium&frequency=${param}` : '?product=premium';
-    const { requests, pay, answerEligibility } = await bootCheckout({ search });
+    {
+      name: '#668: a subscription with no usable cadence param still falls back to the longest term',
+      run: async (ctx) => {
+        // `weekly` is a real frequency the harness product does not sell, and `once`
+        // is not a cadence at all — both fall through to the longest term on offer.
+        for (const param of ['weekly', 'once', '']) {
+          const search = param ? `?product=premium&frequency=${param}` : '?product=premium';
+          const { requests, pay, answerEligibility } = await bootCheckout({ search });
 
-    await answerEligibility(false);
-    await pay();
+          await answerEligibility(false);
+          await pay();
 
-    assert.strictEqual(
-      intentPayload(requests).frequency,
-      'annually',
-      `a subscription sent "${param || 'nothing'}" bills on the longest term it sells`,
-    );
-  }
+          ctx.expect(intentPayload(requests).frequency, `a subscription sent "${param || 'nothing'}" bills on the longest term it sells`).toBe('annually');
+        }
 
-  assert.deepStrictEqual(
-    Object.keys(SUBSCRIPTION.prices),
-    ['monthly', 'annually'],
-    'the fallback above means annually only while the harness product sells it',
-  );
-});
+        ctx.expect(Object.keys(SUBSCRIPTION.prices), 'the fallback above means annually only while the harness product sells it').toEqual(['monthly', 'annually']);
+      },
+    },
 
-test('#668: the funnel reports what a one-time buy actually costs', async () => {
-  // `getBasePrice()` read `prices.amount || prices.monthly.amount` and never
-  // `prices.once`, so the playground's $49.99 product sent begin_checkout and
-  // add_payment_info a value of 0 — two funnel steps priced at nothing under a
-  // purchase that reports $49.99.
-  const { tracked, settle, pay } = await bootCheckout({
-    search: '?product=launch-kit',
-    product: ONE_TIME,
-  });
+    {
+      name: '#668: the funnel reports what a one-time buy actually costs',
+      run: async (ctx) => {
+        // `getBasePrice()` read `prices.amount || prices.monthly.amount` and never
+        // `prices.once`, so the playground's $49.99 product sent begin_checkout and
+        // add_payment_info a value of 0 — two funnel steps priced at nothing under a
+        // purchase that reports $49.99.
+        const { tracked, settle, pay } = await bootCheckout({
+          search: '?product=launch-kit',
+          product: ONE_TIME,
+        });
 
-  await settle();
-  await pay();
+        await settle();
+        await pay();
 
-  const named = (name) => tracked.find((fire) => fire.name === name);
+        const named = (name) => tracked.find((fire) => fire.name === name);
 
-  for (const name of ['begin_checkout', 'add_payment_info']) {
-    const fire = named(name);
-    assert.ok(fire, `${name} fired`);
-    assert.strictEqual(fire.params.value, 49.99, `${name} carries the price the card will be charged`);
-    assert.strictEqual(fire.params.items[0].price, 49.99, `${name}'s item is priced too`);
-    assert.strictEqual(fire.params.items[0].item_category, 'one-time', `${name} classifies the item by what it is`);
-    assert.strictEqual(fire.params.items[0].item_variant, 'once', `${name} names no cadence`);
-  }
-});
+        for (const name of ['begin_checkout', 'add_payment_info']) {
+          const fire = named(name);
+          ctx.expect(fire, `${name} fired`).toBeTruthy();
+          ctx.expect(fire.params.value, `${name} carries the price the card will be charged`).toBe(49.99);
+          ctx.expect(fire.params.items[0].price, `${name}'s item is priced too`).toBe(49.99);
+          ctx.expect(fire.params.items[0].item_category, `${name} classifies the item by what it is`).toBe('one-time');
+          ctx.expect(fire.params.items[0].item_variant, `${name} names no cadence`).toBe('once');
+        }
+      },
+    },
 
-test('#668: a subscription\'s funnel value still follows its cadence', async () => {
-  const { tracked, settle, answerEligibility } = await bootCheckout({
-    search: '?product=premium&frequency=monthly',
-  });
+    {
+      name: '#668: a subscription\'s funnel value still follows its cadence',
+      run: async (ctx) => {
+        const { tracked, settle, answerEligibility } = await bootCheckout({
+          search: '?product=premium&frequency=monthly',
+        });
 
-  await answerEligibility(false);
-  await settle();
+        await answerEligibility(false);
+        await settle();
 
-  const begin = tracked.find((fire) => fire.name === 'begin_checkout');
-  assert.ok(begin, 'begin_checkout fired');
-  assert.strictEqual(begin.params.value, 10, 'the monthly price, from the same catalog read');
-  assert.strictEqual(begin.params.items[0].item_variant, 'monthly', 'and the cadence it is billed on');
+        const begin = tracked.find((fire) => fire.name === 'begin_checkout');
+        ctx.expect(begin, 'begin_checkout fired').toBeTruthy();
+        ctx.expect(begin.params.value, 'the monthly price, from the same catalog read').toBe(10);
+        ctx.expect(begin.params.items[0].item_variant, 'and the cadence it is billed on').toBe('monthly');
+      },
+    },
+  ],
 });

@@ -9,8 +9,7 @@
  * jsdom), plus one real mini-site build proving the classy footer ships the
  * empty mount for the module to fill.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const {
   languageEntries,
@@ -71,114 +70,146 @@ const EN_ES_FR = [
   { hreflang: 'fr', href: 'https://example.com/fr/about' },
 ];
 
-// ─── The DOM read ────────────────────────────────────────────────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'language-switcher',
+  tests: [
+    // ─── The DOM read ────────────────────────────────────────────────────────────
 
-test('entries: x-default is dropped, repeated codes collapse, the page language is marked current', () => {
-  const entries = languageEntries(makeLinks([
-    ...EN_ES_FR,
-    { hreflang: 'ES', href: 'https://example.com/es/about' },
-    { hreflang: 'de', href: '' },
-  ]), 'es');
+    {
+      name: 'entries: x-default is dropped, repeated codes collapse, the page language is marked current',
+      run: (ctx) => {
+        const entries = languageEntries(makeLinks([
+          ...EN_ES_FR,
+          { hreflang: 'ES', href: 'https://example.com/es/about' },
+          { hreflang: 'de', href: '' },
+        ]), 'es');
 
-  assert.deepEqual(entries.map((entry) => entry.code), ['en', 'es', 'fr'], 'x-default, the duplicate and the href-less tag are all out');
-  assert.deepEqual(entries.map((entry) => entry.current), [false, true, false], 'documentElement.lang picks the current row');
-  assert.equal(entries[1].href, 'https://example.com/es/about', 'each row carries its alternate href verbatim');
-});
+        ctx.expect(entries.map((entry) => entry.code), 'x-default, the duplicate and the href-less tag are all out').toEqual(['en', 'es', 'fr']);
+        ctx.expect(entries.map((entry) => entry.current), 'documentElement.lang picks the current row').toEqual([false, true, false]);
+        ctx.expect(entries[1].href, 'each row carries its alternate href verbatim').toBe('https://example.com/es/about');
+      },
+    },
 
-test('labels: every language names itself; an unknown code falls back to its upper-cased code', () => {
-  assert.equal(languageLabel('en'), 'English');
-  assert.equal(languageLabel('es'), 'Español', 'a native name, not the English exonym');
-  assert.equal(languageLabel('qq'), 'QQ', 'no display name exists → the code labels the row');
-  assert.equal(languageLabel('not a code'), 'NOT A CODE', 'a malformed code never throws out of the render');
-});
+    {
+      name: 'labels: every language names itself; an unknown code falls back to its upper-cased code',
+      run: (ctx) => {
+        ctx.expect(languageLabel('en')).toBe('English');
+        ctx.expect(languageLabel('es'), 'a native name, not the English exonym').toBe('Español');
+        ctx.expect(languageLabel('qq'), 'no display name exists → the code labels the row').toBe('QQ');
+        ctx.expect(languageLabel('not a code'), 'a malformed code never throws out of the render').toBe('NOT A CODE');
+      },
+    },
 
-test('html: hrefs and labels are escaped — a query-string permalink stays valid markup', () => {
-  const html = switcherHtml(languageEntries(makeLinks([
-    { hreflang: 'en', href: 'https://example.com/search?a=1&b=2' },
-    { hreflang: 'es', href: 'https://example.com/es/search?a=1&b=2' },
-  ]), 'en'));
+    {
+      name: 'html: hrefs and labels are escaped — a query-string permalink stays valid markup',
+      run: (ctx) => {
+        const html = switcherHtml(languageEntries(makeLinks([
+          { hreflang: 'en', href: 'https://example.com/search?a=1&b=2' },
+          { hreflang: 'es', href: 'https://example.com/es/search?a=1&b=2' },
+        ]), 'en'));
 
-  assert.ok(html.includes('href="https://example.com/search?a=1&amp;b=2"'), 'the ampersand is escaped, not raw');
-  assert.ok(!html.includes('&b=2"'), 'no unescaped entity survives');
-  assert.match(html, /class="dropdown-item active"[^>]*aria-current="true"/, 'the current language is marked for sight and for screen readers');
-  assert.equal(html.match(/<li>/g).length, 2, 'one row per language');
-});
+        ctx.expect(html.includes('href="https://example.com/search?a=1&amp;b=2"'), 'the ampersand is escaped, not raw').toBeTruthy();
+        ctx.expect(!html.includes('&b=2"'), 'no unescaped entity survives').toBeTruthy();
+        ctx.expect(html, 'the current language is marked for sight and for screen readers').toMatch(/class="dropdown-item active"[^>]*aria-current="true"/);
+        ctx.expect(html.match(/<li>/g).length, 'one row per language').toBe(2);
+      },
+    },
 
-// ─── The flags (#129) ────────────────────────────────────────────────────────
+    // ─── The flags (#129) ────────────────────────────────────────────────────────
 
-test('html: every row carries its flag BEFORE the name, fetched by its own code', () => {
-  const html = switcherHtml(languageEntries(makeLinks(EN_ES_FR), 'en'));
+    {
+      name: 'html: every row carries its flag BEFORE the name, fetched by its own code',
+      run: (ctx) => {
+        const html = switcherHtml(languageEntries(makeLinks(EN_ES_FR), 'en'));
 
-  assert.equal(html.match(/<img class="omega-language-flag"/g).length, 3, 'one flag per language row');
-  assert.match(
-    html,
-    /<img class="omega-language-flag" data-omega-language-flag src="\/assets\/icons\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
-    'the flag precedes the label, from the emitted core set, at the row\'s own hreflang code',
-  );
-  assert.ok(!html.includes('alt="Español"'), 'the flag is decorative — the label beside it already names the language');
-});
+        ctx.expect(html.match(/<img class="omega-language-flag"/g).length, 'one flag per language row').toBe(3);
+        ctx.expect(html, 'the flag precedes the label, from the emitted core set, at the row\'s own hreflang code').toMatch(/<img class="omega-language-flag" data-omega-language-flag src="\/assets\/icons\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/);
+        ctx.expect(!html.includes('alt="Español"'), 'the flag is decorative — the label beside it already names the language').toBeTruthy();
+      },
+    },
 
-test('flags: a language the emitted set has no file for removes its own image', () => {
-  const [present, missing] = [makeFlag(), makeFlag()];
+    {
+      name: 'flags: a language the emitted set has no file for removes its own image',
+      run: (ctx) => {
+        const [present, missing] = [makeFlag(), makeFlag()];
 
-  assert.equal(wireFlagFallback(makeList([present, missing])), 2, 'every rendered flag is wired');
+        ctx.expect(wireFlagFallback(makeList([present, missing])), 'every rendered flag is wired').toBe(2);
 
-  missing.handlers.error();
+        missing.handlers.error();
 
-  assert.equal(missing.removed, true, 'a 404 leaves no broken-image glyph in the row');
-  assert.equal(present.removed, false, 'a flag that loads is untouched');
-});
+        ctx.expect(missing.removed, 'a 404 leaves no broken-image glyph in the row').toBe(true);
+        ctx.expect(present.removed, 'a flag that loads is untouched').toBe(false);
+      },
+    },
 
-// ─── The mount ───────────────────────────────────────────────────────────────
+    // ─── The mount ───────────────────────────────────────────────────────────────
 
-test('mount: a translated page renders one row per produced language and unhides the menu', () => {
-  const flag = makeFlag();
-  const doc = makeDocument({ lang: 'es', alternates: EN_ES_FR, flags: [flag] });
+    {
+      name: 'mount: a translated page renders one row per produced language and unhides the menu',
+      run: (ctx) => {
+        const flag = makeFlag();
+        const doc = makeDocument({ lang: 'es', alternates: EN_ES_FR, flags: [flag] });
 
-  assert.equal(mountLanguageSwitcher(doc), 3, 'en + es + fr — x-default is not a language');
-  assert.ok(doc.list.innerHTML.includes('src="/assets/icons/flags/lang/en.svg"'), 'each row ships its flag');
-  assert.ok(typeof flag.handlers.error === 'function', 'the mount wires the missing-flag fallback');
-  assert.equal(doc.mount.hidden, false, 'a real choice shows the control');
-  assert.ok(doc.list.innerHTML.includes('href="https://example.com/fr/about"'), 'each produced copy is reachable');
-  assert.ok(doc.list.innerHTML.includes('lang="es" dir="auto" hreflang="es" class="dropdown-item active"'), 'the current language row is the active one, bidi-isolated');
-});
+        ctx.expect(mountLanguageSwitcher(doc), 'en + es + fr — x-default is not a language').toBe(3);
+        ctx.expect(doc.list.innerHTML.includes('src="/assets/icons/flags/lang/en.svg"'), 'each row ships its flag').toBeTruthy();
+        ctx.expect(typeof flag.handlers.error === 'function', 'the mount wires the missing-flag fallback').toBeTruthy();
+        ctx.expect(doc.mount.hidden, 'a real choice shows the control').toBe(false);
+        ctx.expect(doc.list.innerHTML.includes('href="https://example.com/fr/about"'), 'each produced copy is reachable').toBeTruthy();
+        ctx.expect(doc.list.innerHTML.includes('lang="es" dir="auto" hreflang="es" class="dropdown-item active"'), 'the current language row is the active one, bidi-isolated').toBeTruthy();
+      },
+    },
 
-test('mount: a page with only its own language renders nothing and stays hidden', () => {
-  const doc = makeDocument({
-    lang: 'en',
-    alternates: [
-      { hreflang: 'x-default', href: 'https://example.com/legal' },
-      { hreflang: 'en', href: 'https://example.com/legal' },
-    ],
-  });
+    {
+      name: 'mount: a page with only its own language renders nothing and stays hidden',
+      run: (ctx) => {
+        const doc = makeDocument({
+          lang: 'en',
+          alternates: [
+            { hreflang: 'x-default', href: 'https://example.com/legal' },
+            { hreflang: 'en', href: 'https://example.com/legal' },
+          ],
+        });
 
-  assert.equal(mountLanguageSwitcher(doc), 0, 'one language is not a choice');
-  assert.equal(doc.mount.hidden, true, 'the control stays out of the footer');
-  assert.equal(doc.list.innerHTML, '', 'nothing rendered');
-});
+        ctx.expect(mountLanguageSwitcher(doc), 'one language is not a choice').toBe(0);
+        ctx.expect(doc.mount.hidden, 'the control stays out of the footer').toBe(true);
+        ctx.expect(doc.list.innerHTML, 'nothing rendered').toBe('');
+      },
+    },
 
-test('mount: a surface with no switcher markup is a no-op', () => {
-  const doc = makeDocument({ lang: 'en', alternates: EN_ES_FR, mount: false });
+    {
+      name: 'mount: a surface with no switcher markup is a no-op',
+      run: (ctx) => {
+        const doc = makeDocument({ lang: 'en', alternates: EN_ES_FR, mount: false });
 
-  assert.equal(mountLanguageSwitcher(doc), 0, 'no mount, no work — admin/app shells carry no footer');
-  assert.equal(doc.list.innerHTML, '', 'nothing rendered');
-});
+        ctx.expect(mountLanguageSwitcher(doc), 'no mount, no work — admin/app shells carry no footer').toBe(0);
+        ctx.expect(doc.list.innerHTML, 'nothing rendered').toBe('');
+      },
+    },
 
-// ─── The markup the module fills ─────────────────────────────────────────────
+    // ─── The markup the module fills ─────────────────────────────────────────────
 
-test('built classy footer ships the empty mount, hidden, with no build-time language rows', async () => {
-  const pages = await buildWith(miniData);
-  const html = pages.get('/blog');
+    {
+      name: 'built classy footer ships the empty mount, hidden, with no build-time language rows',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData);
+        const html = pages.get('/blog');
 
-  assert.match(html, /data-omega-language-switcher/, 'the footer carries the mount');
-  assert.match(html, /<div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>/, 'hidden until the DOM proves a second language exists');
-  assert.match(html, /<ul class="dropdown-menu" data-omega-language-list><\/ul>/, 'the list ships EMPTY — the client fills it from hreflang');
-  assert.ok(!html.includes('omega-language-dropdown-item'), 'the old build-time row (which named configured, not produced, languages) is gone');
-});
+        ctx.expect(html, 'the footer carries the mount').toMatch(/data-omega-language-switcher/);
+        ctx.expect(html, 'hidden until the DOM proves a second language exists').toMatch(/<div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>/);
+        ctx.expect(html, 'the list ships EMPTY — the client fills it from hreflang').toMatch(/<ul class="dropdown-menu" data-omega-language-list><\/ul>/);
+        ctx.expect(!html.includes('omega-language-dropdown-item'), 'the old build-time row (which named configured, not produced, languages) is gone').toBeTruthy();
+      },
+    },
 
-test('every theme gets the mount — the footer include is classy\'s, the base layer of every chain', async () => {
-  const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
-  const html = pages.get('/blog');
+    {
+      name: 'every theme gets the mount — the footer include is classy\'s, the base layer of every chain',
+      run: async (ctx) => {
+        const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
+        const html = pages.get('/blog');
 
-  assert.match(html, /<ul class="dropdown-menu" data-omega-language-list><\/ul>/, 'newsflash inherits the one shared footer, mount and all');
+        ctx.expect(html, 'newsflash inherits the one shared footer, mount and all').toMatch(/<ul class="dropdown-menu" data-omega-language-list><\/ul>/);
+      },
+    },
+  ],
 });

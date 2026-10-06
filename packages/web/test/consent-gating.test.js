@@ -22,8 +22,7 @@
  * (the shared-chunk guarantee a real split build gives) — and the REAL facade
  * behind it, because the catalog is what decides who hears a page view.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -162,181 +161,205 @@ async function boot({ timeZone, ids = IDS, storage = {} } = {}) {
 
 const ORIGINAL_TZ = process.env.TZ;
 
-test.after(() => {
-  process.env.TZ = ORIGINAL_TZ;
-  delete globalThis.window;
-  delete globalThis.document;
-
-  for (const name of PAGE_GLOBALS) {
-    delete globalThis[name];
-  }
-});
-
 const DENIED = { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' };
 const GRANTED = { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted' };
 
-test('opt-in region: nothing loads, and Consent Mode is denied by default', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'consent-gating',
+  cleanup: () => {
+    process.env.TZ = ORIGINAL_TZ;
+    delete globalThis.window;
+    delete globalThis.document;
 
-  assert.deepStrictEqual(gate.loaded(), [], 'no provider script is injected before a grant');
-  assert.deepStrictEqual(gate.consentCommands(), [['consent', 'default', DENIED]], 'the default is queued, denied');
+    for (const name of PAGE_GLOBALS) {
+      delete globalThis[name];
+    }
+  },
+  tests: [
+    {
+      name: 'opt-in region: nothing loads, and Consent Mode is denied by default',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  // Queued BEFORE anything else gtag-related, which is the whole point: gtag.js
-  // reads the head of dataLayer when it loads.
-  assert.strictEqual(gate.dataLayer()[0][1], 'default', 'the consent default is the first thing in dataLayer');
-});
+        ctx.expect(gate.loaded(), 'no provider script is injected before a grant').toEqual([]);
+        ctx.expect(gate.consentCommands(), 'the default is queued, denied').toEqual([['consent', 'default', DENIED]]);
 
-test('opt-in region: Accept injects the loaders and updates Consent Mode', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+        // Queued BEFORE anything else gtag-related, which is the whole point: gtag.js
+        // reads the head of dataLayer when it loads.
+        ctx.expect(gate.dataLayer()[0][1], 'the consent default is the first thing in dataLayer').toBe('default');
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: true, marketing: true });
+    {
+      name: 'opt-in region: Accept injects the loaders and updates Consent Mode',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(gate.loaded().sort(), ['google', 'meta', 'tiktok'], 'all three load, with no reload');
-  assert.deepStrictEqual(
-    gate.consentCommands(),
-    [['consent', 'default', DENIED], ['consent', 'update', GRANTED]],
-    'and the tag is told the flags flipped',
-  );
+        gate.setTrackingConsent({ analytics: true, marketing: true });
 
-  assert.ok(gate.injected.some((src) => src.includes(`id=${IDS.google}`)), 'gtag.js carries the configured id');
-  assert.ok(gate.injected.some((src) => src.includes(`sdkid=${IDS.tiktok}`)), 'the TikTok pixel carries its sdkid');
-  assert.ok(gate.dataLayer().some((entry) => entry[0] === 'config' && entry[1] === IDS.google), 'GA4 is configured');
-  assert.deepStrictEqual(gate.metaCalls()[0], ['init', IDS.meta], 'the Meta pixel is initialized');
-});
+        ctx.expect(gate.loaded().sort(), 'all three load, with no reload').toEqual(['google', 'meta', 'tiktok']);
+        ctx.expect(gate.consentCommands(), 'and the tag is told the flags flipped').toEqual([['consent', 'default', DENIED], ['consent', 'update', GRANTED]]);
 
-// ─── The page view (#409) ───
+        ctx.expect(gate.injected.some((src) => src.includes(`id=${IDS.google}`)), 'gtag.js carries the configured id').toBeTruthy();
+        ctx.expect(gate.injected.some((src) => src.includes(`sdkid=${IDS.tiktok}`)), 'the TikTok pixel carries its sdkid').toBeTruthy();
+        ctx.expect(gate.dataLayer().some((entry) => entry[0] === 'config' && entry[1] === IDS.google), 'GA4 is configured').toBeTruthy();
+        ctx.expect(gate.metaCalls()[0], 'the Meta pixel is initialized').toEqual(['init', IDS.meta]);
+      },
+    },
 
-test('the page view is the facade\'s fire, and the raw pixel calls are gone', async () => {
-  // The bypass this replaces: the loader fired `fbq('track', 'PageView')` and
-  // `ttq.page()` itself, which were the ONLY page-view signal Meta and TikTok
-  // got and the only two events on the page that walked past the catalog, the
-  // per-event consent gate and the dedupe ids
-  // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)).
-  const gate = await boot({ timeZone: 'America/New_York' });
+    // ─── The page view (#409) ───
 
-  assert.deepStrictEqual(
-    gate.metaCalls(),
-    [['init', IDS.meta], ['track', 'PageView', {}]],
-    'Meta hears its standard PageView through the transport, once, after the init',
-  );
+    {
+      name: 'the page view is the facade\'s fire, and the raw pixel calls are gone',
+      run: async (ctx) => {
+        // The bypass this replaces: the loader fired `fbq('track', 'PageView')` and
+        // `ttq.page()` itself, which were the ONLY page-view signal Meta and TikTok
+        // got and the only two events on the page that walked past the catalog, the
+        // per-event consent gate and the dedupe ids
+        // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)).
+        const gate = await boot({ timeZone: 'America/New_York' });
 
-  assert.deepStrictEqual(
-    gate.tiktokCalls(),
-    [['page']],
-    'TikTok keeps its own documented method — the catalog names it and the TRANSPORT calls it',
-  );
+        ctx.expect(gate.metaCalls(), 'Meta hears its standard PageView through the transport, once, after the init').toEqual([['init', IDS.meta], ['track', 'PageView', {}]]);
 
-  assert.deepStrictEqual(
-    gate.dataLayer().filter(([command]) => command === 'event'),
-    [],
-    'GA4 counts the page view off its own `config` command, so nothing fires it a second time',
-  );
-});
+        ctx.expect(gate.tiktokCalls(), 'TikTok keeps its own documented method — the catalog names it and the TRANSPORT calls it').toEqual([['page']]);
 
-test('a page view is counted once per pixel, however often consent is re-saved', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+        ctx.expect(gate.dataLayer().filter(([command]) => command === 'event'), 'GA4 counts the page view off its own `config` command, so nothing fires it a second time').toEqual([]);
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: true, marketing: true });
-  gate.setTrackingConsent({ analytics: true, marketing: true });
+    {
+      name: 'a page view is counted once per pixel, however often consent is re-saved',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(gate.metaCalls().filter(([command]) => command === 'track'), [['track', 'PageView', {}]]);
-  assert.deepStrictEqual(gate.tiktokCalls(), [['page']]);
-});
+        gate.setTrackingConsent({ analytics: true, marketing: true });
+        gate.setTrackingConsent({ analytics: true, marketing: true });
 
-test('the loader itself counts nothing — the raw calls cannot grow back', () => {
-  // TikTok's half looks the same ON THE WIRE as the retired `ttq.page()`, which
-  // is the point of the mapping — so the retirement gets its own pin. What may
-  // not come back is this file firing a pixel itself: the fire belongs to the
-  // facade, behind the catalog and the per-event consent gate.
-  const loader = fs.readFileSync(path.join(CORE_JS, 'core', 'analytics-loader.js'), 'utf8');
-  // Comment lines dropped: the retired calls are NAMED in that file's prose,
-  // which is documentation of what moved, not a call.
-  const code = loader.split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
+        ctx.expect(gate.metaCalls().filter(([command]) => command === 'track')).toEqual([['track', 'PageView', {}]]);
+        ctx.expect(gate.tiktokCalls()).toEqual([['page']]);
+      },
+    },
 
-  assert.ok(!/ttq\.page\(/.test(code), 'no raw ttq.page() at pixel init');
-  assert.ok(!/fbq\('track'/.test(code), 'no raw fbq track at pixel init');
-  assert.ok(code.includes('countPageView('), 'the page view goes through the facade');
-});
+    {
+      name: 'the loader itself counts nothing — the raw calls cannot grow back',
+      run: (ctx) => {
+        // TikTok's half looks the same ON THE WIRE as the retired `ttq.page()`, which
+        // is the point of the mapping — so the retirement gets its own pin. What may
+        // not come back is this file firing a pixel itself: the fire belongs to the
+        // facade, behind the catalog and the per-event consent gate.
+        const loader = fs.readFileSync(path.join(CORE_JS, 'core', 'analytics-loader.js'), 'utf8');
+        // Comment lines dropped: the retired calls are NAMED in that file's prose,
+        // which is documentation of what moved, not a call.
+        const code = loader.split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
 
-test('a denied marketing category counts no page view at all', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+        ctx.expect(!/ttq\.page\(/.test(code), 'no raw ttq.page() at pixel init').toBeTruthy();
+        ctx.expect(!/fbq\('track'/.test(code), 'no raw fbq track at pixel init').toBeTruthy();
+        ctx.expect(code.includes('countPageView('), 'the page view goes through the facade').toBeTruthy();
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: true, marketing: false });
+    {
+      name: 'a denied marketing category counts no page view at all',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(gate.loaded(), ['google'], 'no marketing pixel exists to count one');
-  assert.deepStrictEqual(gate.metaCalls(), [], 'and nothing is queued for one that never installed');
-  assert.deepStrictEqual(gate.tiktokCalls(), []);
-});
+        gate.setTrackingConsent({ analytics: true, marketing: false });
 
-test('a category is gated on its OWN provider — analytics alone loads GA4 alone', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+        ctx.expect(gate.loaded(), 'no marketing pixel exists to count one').toEqual(['google']);
+        ctx.expect(gate.metaCalls(), 'and nothing is queued for one that never installed').toEqual([]);
+        ctx.expect(gate.tiktokCalls()).toEqual([]);
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: true, marketing: false });
+    {
+      name: 'a category is gated on its OWN provider — analytics alone loads GA4 alone',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(gate.loaded(), ['google'], 'the marketing pair stays unloaded');
-  assert.deepStrictEqual(
-    gate.consentCommands().at(-1),
-    ['consent', 'update', { ...DENIED, analytics_storage: 'granted' }],
-    'the ad_* flags stay denied; only analytics_storage flips',
-  );
-});
+        gate.setTrackingConsent({ analytics: true, marketing: false });
 
-test('opt-out region: everything loads at boot and Consent Mode is granted', async () => {
-  const gate = await boot({ timeZone: 'America/New_York' });
+        ctx.expect(gate.loaded(), 'the marketing pair stays unloaded').toEqual(['google']);
+        ctx.expect(gate.consentCommands().at(-1), 'the ad_* flags stay denied; only analytics_storage flips').toEqual(['consent', 'update', { ...DENIED, analytics_storage: 'granted' }]);
+      },
+    },
 
-  assert.deepStrictEqual(gate.loaded().sort(), ['google', 'meta', 'tiktok'], 'no wait — the banner is informational here');
-  assert.deepStrictEqual(gate.consentCommands(), [['consent', 'default', GRANTED]]);
-});
+    {
+      name: 'opt-out region: everything loads at boot and Consent Mode is granted',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'America/New_York' });
 
-test('opt-out region: a Customize opt-out updates Consent Mode, and never loads more', async () => {
-  const gate = await boot({ timeZone: 'America/New_York' });
+        ctx.expect(gate.loaded().sort(), 'no wait — the banner is informational here').toEqual(['google', 'meta', 'tiktok']);
+        ctx.expect(gate.consentCommands()).toEqual([['consent', 'default', GRANTED]]);
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: false, marketing: false });
+    {
+      name: 'opt-out region: a Customize opt-out updates Consent Mode, and never loads more',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'America/New_York' });
 
-  // Revoking cannot unload a running script — there is no such thing — so the
-  // promise is the tag being TOLD, and nothing new arriving.
-  assert.deepStrictEqual(gate.loaded().sort(), ['google', 'meta', 'tiktok'], 'no second injection');
-  assert.deepStrictEqual(gate.consentCommands().at(-1), ['consent', 'update', DENIED], 'the tag is told to stop');
-});
+        gate.setTrackingConsent({ analytics: false, marketing: false });
 
-test('a stored decision is honored at boot, ahead of the region default', async () => {
-  const storage = {
-    trackingConsent: { analytics: false, marketing: false, region: 'opt-out', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
-  };
+        // Revoking cannot unload a running script — there is no such thing — so the
+        // promise is the tag being TOLD, and nothing new arriving.
+        ctx.expect(gate.loaded().sort(), 'no second injection').toEqual(['google', 'meta', 'tiktok']);
+        ctx.expect(gate.consentCommands().at(-1), 'the tag is told to stop').toEqual(['consent', 'update', DENIED]);
+      },
+    },
 
-  const gate = await boot({ timeZone: 'America/New_York', storage });
+    {
+      name: 'a stored decision is honored at boot, ahead of the region default',
+      run: async (ctx) => {
+        const storage = {
+          trackingConsent: { analytics: false, marketing: false, region: 'opt-out', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
+        };
 
-  assert.deepStrictEqual(gate.loaded(), [], 'a visitor who opted out stays opted out on every later page');
-  assert.deepStrictEqual(gate.consentCommands(), [['consent', 'default', DENIED]]);
-});
+        const gate = await boot({ timeZone: 'America/New_York', storage });
 
-test('a re-grant of a loaded category never injects twice', async () => {
-  const gate = await boot({ timeZone: 'Europe/Berlin' });
+        ctx.expect(gate.loaded(), 'a visitor who opted out stays opted out on every later page').toEqual([]);
+        ctx.expect(gate.consentCommands()).toEqual([['consent', 'default', DENIED]]);
+      },
+    },
 
-  gate.setTrackingConsent({ analytics: true, marketing: false });
-  gate.setTrackingConsent({ analytics: true, marketing: false });
-  gate.setTrackingConsent({ analytics: true, marketing: true });
+    {
+      name: 'a re-grant of a loaded category never injects twice',
+      run: async (ctx) => {
+        const gate = await boot({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(gate.loaded().sort(), ['google', 'meta', 'tiktok'], 'one script per provider, ever');
-});
+        gate.setTrackingConsent({ analytics: true, marketing: false });
+        gate.setTrackingConsent({ analytics: true, marketing: false });
+        gate.setTrackingConsent({ analytics: true, marketing: true });
 
-test('an unconfigured provider is never loaded, and no id means no queue at all', async () => {
-  const partial = await boot({ timeZone: 'America/New_York', ids: { google: IDS.google } });
-  assert.deepStrictEqual(partial.loaded(), ['google'], 'only the configured provider loads');
+        ctx.expect(gate.loaded().sort(), 'one script per provider, ever').toEqual(['google', 'meta', 'tiktok']);
+      },
+    },
 
-  const none = await boot({ timeZone: 'America/New_York', ids: {} });
-  assert.deepStrictEqual(none.loaded(), []);
-  assert.strictEqual(globalThis.window.dataLayer, undefined, 'nothing configured, nothing installed');
-});
+    {
+      name: 'an unconfigured provider is never loaded, and no id means no queue at all',
+      run: async (ctx) => {
+        const partial = await boot({ timeZone: 'America/New_York', ids: { google: IDS.google } });
+        ctx.expect(partial.loaded(), 'only the configured provider loads').toEqual(['google']);
 
-test('the chrome no longer ships a provider loader of its own', () => {
-  // The regression that made the old banner decorative. The stubs for an
-  // UNCONFIGURED provider stay (page code names the globals; #306 reads a stub
-  // as present) — what may not come back is a loader.
-  const foot = fs.readFileSync(path.join(CORE_DIR, '_includes', 'core', 'foot.html'), 'utf8');
+        const none = await boot({ timeZone: 'America/New_York', ids: {} });
+        ctx.expect(none.loaded()).toEqual([]);
+        ctx.expect(globalThis.window.dataLayer, 'nothing configured, nothing installed').toBe(undefined);
+      },
+    },
 
-  assert.ok(!foot.includes('googletagmanager.com/gtag/js'), 'no gtag.js tag in the chrome');
-  assert.ok(!foot.includes('connect.facebook.net'), 'no Meta pixel snippet in the chrome');
-  assert.ok(!foot.includes('analytics.tiktok.com'), 'no TikTok pixel snippet in the chrome');
-  assert.ok(!foot.includes('facebook.com/tr?id='), 'and no ungated <noscript> tracking pixel');
+    {
+      name: 'the chrome no longer ships a provider loader of its own',
+      run: (ctx) => {
+        // The regression that made the old banner decorative. The stubs for an
+        // UNCONFIGURED provider stay (page code names the globals; #306 reads a stub
+        // as present) — what may not come back is a loader.
+        const foot = fs.readFileSync(path.join(CORE_DIR, '_includes', 'core', 'foot.html'), 'utf8');
+
+        ctx.expect(!foot.includes('googletagmanager.com/gtag/js'), 'no gtag.js tag in the chrome').toBeTruthy();
+        ctx.expect(!foot.includes('connect.facebook.net'), 'no Meta pixel snippet in the chrome').toBeTruthy();
+        ctx.expect(!foot.includes('analytics.tiktok.com'), 'no TikTok pixel snippet in the chrome').toBeTruthy();
+        ctx.expect(!foot.includes('facebook.com/tr?id='), 'and no ungated <noscript> tracking pixel').toBeTruthy();
+      },
+    },
+  ],
 });

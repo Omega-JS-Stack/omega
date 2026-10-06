@@ -84,7 +84,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-deleted-account-fires-user-delete-with-the-uid-derived-dedupe-id',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const uid = testUid();
 
         try {
@@ -94,18 +94,18 @@ module.exports = defineCases({
             doc: { auth: { uid: uid, email: `${uid}@test.invalid` } },
           });
 
-          assert.equal(delivery.length, 1, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`);
-          assert.equal(delivery[0].startsWith('deliverConversion: user_delete →'), true, delivery[0]);
-          assert.equal(delivery[0].includes(`(event_id=user_delete.${uid})`), true, `the uid is what the deletion is about: ${delivery[0]}`);
+          expect(delivery.length, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`).toBe(1);
+          expect(delivery[0].startsWith('deliverConversion: user_delete →'), delivery[0]).toBe(true);
+          expect(delivery[0].includes(`(event_id=user_delete.${uid})`), `the uid is what the deletion is about: ${delivery[0]}`).toBe(true);
 
           // GA4 only — an account ending is nothing an ad platform maps.
           for (const provider of ['meta', 'tiktok']) {
-            assert.equal(delivery[0].includes(`${provider} skipped (no mapping)`), true, `${provider} has no mapping: ${delivery[0]}`);
+            expect(delivery[0].includes(`${provider} skipped (no mapping)`), `${provider} has no mapping: ${delivery[0]}`).toBe(true);
           }
 
           // An account with no snapshot at all is still counted.
-          assert.equal(delivery[0].includes('ga4 skipped (consent'), false, `an absent snapshot grants: ${delivery[0]}`);
-          assert.equal(await firestore.exists(`users/${uid}`), false, 'the handler still deletes the doc');
+          expect(delivery[0].includes('ga4 skipped (consent'), `an absent snapshot grants: ${delivery[0]}`).toBe(false);
+          expect(await firestore.exists(`users/${uid}`), 'the handler still deletes the doc').toBe(false);
         } finally {
           await firestore.delete(`users/${uid}`);
         }
@@ -114,7 +114,7 @@ module.exports = defineCases({
 
     {
       name: 'a-declined-snapshot-read-before-the-delete-blocks-the-fire',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const uid = testUid();
 
         try {
@@ -127,8 +127,8 @@ module.exports = defineCases({
             },
           });
 
-          assert.equal(delivery.length, 1, delivery.join(' | '));
-          assert.equal(delivery[0].includes('ga4 skipped (consent: analytics)'), true, `the snapshot the doc carried still gates the fire after the doc is gone: ${delivery[0]}`);
+          expect(delivery.length, delivery.join(' | ')).toBe(1);
+          expect(delivery[0].includes('ga4 skipped (consent: analytics)'), `the snapshot the doc carried still gates the fire after the doc is gone: ${delivery[0]}`).toBe(true);
         } finally {
           await firestore.delete(`users/${uid}`);
         }

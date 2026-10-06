@@ -4,7 +4,7 @@
  *
  * Run: npx omega test backend:mcp/utils
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -27,9 +27,9 @@ module.exports = defineCases({
           process.env.OMEGA_ADMIN_KEY = 'test-admin-key';
           const result = resolveAuthInfo('test-admin-key');
 
-          assert.equal(result.role, 'admin', 'Should be admin');
-          assert.equal(result.authType, 'adminKey', 'Should be adminKey type');
-          assert.equal(result.token, 'test-admin-key', 'Token should match');
+          expect(result.role, 'Should be admin').toBe('admin');
+          expect(result.authType, 'Should be adminKey type').toBe('adminKey');
+          expect(result.token, 'Token should match').toBe('test-admin-key');
         } finally {
           process.env.OMEGA_ADMIN_KEY = saved;
         }
@@ -42,8 +42,8 @@ module.exports = defineCases({
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('some-user-api-key');
 
-        assert.equal(result.role, 'user', 'Should be user');
-        assert.equal(result.authType, 'userToken', 'Should be userToken type');
+        expect(result.role, 'Should be user').toBe('user');
+        expect(result.authType, 'Should be userToken type').toBe('userToken');
       },
     },
 
@@ -53,9 +53,9 @@ module.exports = defineCases({
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('');
 
-        assert.equal(result.role, 'public', 'Should be public');
-        assert.equal(result.authType, 'none', 'Should be none type');
-        assert.equal(result.token, '', 'Token should be empty');
+        expect(result.role, 'Should be public').toBe('public');
+        expect(result.authType, 'Should be none type').toBe('none');
+        expect(result.token, 'Token should be empty').toBe('');
       },
     },
 
@@ -64,8 +64,8 @@ module.exports = defineCases({
       async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
 
-        assert.equal(resolveAuthInfo(null).role, 'public', 'null should be public');
-        assert.equal(resolveAuthInfo(undefined).role, 'public', 'undefined should be public');
+        expect(resolveAuthInfo(null).role, 'null should be public').toBe('public');
+        expect(resolveAuthInfo(undefined).role, 'undefined should be public').toBe('public');
       },
     },
 
@@ -79,7 +79,7 @@ module.exports = defineCases({
           delete process.env.OMEGA_ADMIN_KEY;
           const result = resolveAuthInfo('any-token');
 
-          assert.equal(result.role, 'user', 'Non-empty token with no config key should be user');
+          expect(result.role, 'Non-empty token with no config key should be user').toBe('user');
         } finally {
           process.env.OMEGA_ADMIN_KEY = saved;
         }
@@ -115,8 +115,8 @@ module.exports = defineCases({
           const { resolveAuthInfo } = require(utilsPath);
           const result = resolveAuthInfo('test-admin-key');
 
-          assert.equal(result.role, 'admin', 'Should still classify the admin key as admin');
-          assert.deepEqual(calls, [['test-admin-key', 'test-admin-key']], 'safeCompare receives the presented token and the admin key');
+          expect(result.role, 'Should still classify the admin key as admin').toBe('admin');
+          expect(calls, 'safeCompare receives the presented token and the admin key').toEqual([['test-admin-key', 'test-admin-key']]);
         } finally {
           process.env.OMEGA_ADMIN_KEY = saved;
           require.cache[safeComparePath] = savedSafeCompare;
@@ -142,7 +142,7 @@ module.exports = defineCases({
         ];
         const result = filterToolsByRole(tools, 'admin');
 
-        assert.equal(result.length, 3, 'Admin should see all 3');
+        expect(result.length, 'Admin should see all 3').toBe(3);
       },
     },
 
@@ -157,10 +157,10 @@ module.exports = defineCases({
         ];
         const result = filterToolsByRole(tools, 'user');
 
-        assert.equal(result.length, 2, 'User should see 2');
-        assert.ok(result.some((t) => t.name === 'b'), 'Should include user tool');
-        assert.ok(result.some((t) => t.name === 'c'), 'Should include public tool');
-        assert.ok(!result.some((t) => t.name === 'a'), 'Should exclude admin tool');
+        expect(result.length, 'User should see 2').toBe(2);
+        expect(result.some((t) => t.name === 'b'), 'Should include user tool').toBeTruthy();
+        expect(result.some((t) => t.name === 'c'), 'Should include public tool').toBeTruthy();
+        expect(!result.some((t) => t.name === 'a'), 'Should exclude admin tool').toBeTruthy();
       },
     },
 
@@ -175,8 +175,8 @@ module.exports = defineCases({
         ];
         const result = filterToolsByRole(tools, 'public');
 
-        assert.equal(result.length, 1, 'Public should see 1');
-        assert.equal(result[0].name, 'c', 'Should be the public tool');
+        expect(result.length, 'Public should see 1').toBe(1);
+        expect(result[0].name, 'Should be the public tool').toBe('c');
       },
     },
 
@@ -186,9 +186,9 @@ module.exports = defineCases({
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [{ name: 'no-role' }];
 
-        assert.equal(filterToolsByRole(tools, 'admin').length, 1, 'Admin should see role-less tool');
-        assert.equal(filterToolsByRole(tools, 'user').length, 0, 'User should not see role-less tool');
-        assert.equal(filterToolsByRole(tools, 'public').length, 0, 'Public should not see role-less tool');
+        expect(filterToolsByRole(tools, 'admin').length, 'Admin should see role-less tool').toBe(1);
+        expect(filterToolsByRole(tools, 'user').length, 'User should not see role-less tool').toBe(0);
+        expect(filterToolsByRole(tools, 'public').length, 'Public should not see role-less tool').toBe(0);
       },
     },
 
@@ -203,7 +203,7 @@ module.exports = defineCases({
         ];
         const result = filterToolsByRole(tools, 'garbage');
 
-        assert.equal(result.length, 1, 'Unknown role should see public only');
+        expect(result.length, 'Unknown role should see public only').toBe(1);
       },
     },
 
@@ -214,9 +214,9 @@ module.exports = defineCases({
       async run() {
         const { loadConsumerTools } = require('../../dist/mcp/utils.js');
 
-        assert.equal(loadConsumerTools(null).length, 0, 'null cwd');
-        assert.equal(loadConsumerTools('').length, 0, 'empty cwd');
-        assert.equal(loadConsumerTools(undefined).length, 0, 'undefined cwd');
+        expect(loadConsumerTools(null).length, 'null cwd').toBe(0);
+        expect(loadConsumerTools('').length, 'empty cwd').toBe(0);
+        expect(loadConsumerTools(undefined).length, 'undefined cwd').toBe(0);
       },
     },
 
@@ -226,7 +226,7 @@ module.exports = defineCases({
         const { loadConsumerTools } = require('../../dist/mcp/utils.js');
         const result = loadConsumerTools('/tmp/does-not-exist-12345');
 
-        assert.equal(result.length, 0, 'Should return empty array');
+        expect(result.length, 'Should return empty array').toBe(0);
       },
     },
 
@@ -240,11 +240,7 @@ module.exports = defineCases({
           { name: 'list_notes', description: 'List notes', method: 'GET', path: 'notes' },
         ];`);
 
-        assert.throws(
-          () => loadConsumerTools(cwd),
-          /Consumer tool "list_notes" path "notes" must be the HTTP path as served, starting with "\/"/,
-          'the path is taken as served, so a relative one is a load-time error',
-        );
+        expect(() => loadConsumerTools(cwd), 'the path is taken as served, so a relative one is a load-time error').toThrow(/Consumer tool "list_notes" path "notes" must be the HTTP path as served, starting with "\/"/);
       },
     },
 
@@ -258,8 +254,8 @@ module.exports = defineCases({
         const consumer = [{ name: 'tool_a', description: 'override', _consumer: true }];
 
         const map = buildToolMap(builtin, consumer);
-        assert.equal(map.get('tool_a').description, 'override', 'Consumer should override');
-        assert.equal(map.get('tool_a')._consumer, true, 'Should be marked as consumer');
+        expect(map.get('tool_a').description, 'Consumer should override').toBe('override');
+        expect(map.get('tool_a')._consumer, 'Should be marked as consumer').toBe(true);
       },
     },
 
@@ -271,10 +267,10 @@ module.exports = defineCases({
         const consumer = [{ name: 'c' }];
 
         const map = buildToolMap(builtin, consumer);
-        assert.equal(map.size, 3, 'Should have 3 tools total');
-        assert.ok(map.has('a'), 'Should have a');
-        assert.ok(map.has('b'), 'Should have b');
-        assert.ok(map.has('c'), 'Should have c');
+        expect(map.size, 'Should have 3 tools total').toBe(3);
+        expect(map.has('a'), 'Should have a').toBeTruthy();
+        expect(map.has('b'), 'Should have b').toBeTruthy();
+        expect(map.has('c'), 'Should have c').toBeTruthy();
       },
     },
 
@@ -286,7 +282,7 @@ module.exports = defineCases({
         const tools = require('../../dist/mcp/tools.js');
 
         const missing = tools.filter((t) => !t.role);
-        assert.equal(missing.length, 0, `All tools should have roles, missing: ${missing.map((t) => t.name).join(', ')}`);
+        expect(missing.length, `All tools should have roles, missing: ${missing.map((t) => t.name).join(', ')}`).toBe(0);
       },
     },
 
@@ -296,7 +292,7 @@ module.exports = defineCases({
         const tools = require('../../dist/mcp/tools.js');
 
         const stray = tools.filter((t) => !t.path.startsWith('/omega/'));
-        assert.equal(stray.length, 0, `Every built-in path is /omega/<route>, stray: ${stray.map((t) => `${t.name}=${t.path}`).join(', ')}`);
+        expect(stray.length, `Every built-in path is /omega/<route>, stray: ${stray.map((t) => `${t.name}=${t.path}`).join(', ')}`).toBe(0);
       },
     },
 
@@ -309,10 +305,10 @@ module.exports = defineCases({
         const user = tools.filter((t) => t.role === 'user');
         const pub = tools.filter((t) => t.role === 'public');
 
-        assert.equal(admin.length, 24, `Should have 24 admin tools, got ${admin.length}`);
-        assert.equal(user.length, 2, `Should have 2 user tools, got ${user.length}`);
-        assert.equal(pub.length, 2, `Should have 2 public tools, got ${pub.length}`);
-        assert.equal(admin.length + user.length + pub.length, tools.length, 'Every tool is in a known role bucket');
+        expect(admin.length, `Should have 24 admin tools, got ${admin.length}`).toBe(24);
+        expect(user.length, `Should have 2 user tools, got ${user.length}`).toBe(2);
+        expect(pub.length, `Should have 2 public tools, got ${pub.length}`).toBe(2);
+        expect(admin.length + user.length + pub.length, 'Every tool is in a known role bucket').toBe(tools.length);
       },
     },
   ],

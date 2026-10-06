@@ -66,18 +66,18 @@ function loadInitHooks(roots, { projectRoot, factoryArgs = {} }) {
 }
 
 /**
- * Load the hooks, then await each `setup` once, in root order.
+ * Load the hooks, await `setupContext` once, then await each `setup` once, in root order.
  * @param {Array<{dir: string, label: string}>} roots - Test dirs, in run order.
  * @param {string} projectRoot - Handed to every factory and every setup.
- * @param {{factoryArgs?: object, setupContext?: Function}} [options] - `setupContext({ hooks })` adds keys to each setup's ctx.
+ * @param {{factoryArgs?: object, setupContext?: Function}} [options] - `setupContext({ hooks })` runs whether or not any hook has a setup; its keys go to each setup's ctx.
  * @returns {Promise<Array<{file: string, label: string, hook: object}>>} The loaded hooks.
  */
 async function runInitSetups(roots, projectRoot, { factoryArgs, setupContext } = {}) {
   const hooks = loadInitHooks(roots, { projectRoot, factoryArgs });
+  const extra = setupContext ? await setupContext({ hooks }) : {};
 
   for (const { file, hook } of hooks) {
     if (typeof hook.setup !== 'function') continue;
-    const extra = setupContext ? await setupContext({ hooks }) : {};
     try {
       await hook.setup({ projectRoot, ...extra });
     } catch (e) {

@@ -45,57 +45,57 @@ module.exports = defineCases({
 
     {
       name: 'status-active',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'ACTIVE' });
-        assert.equal(result.status, 'active', 'PayPal ACTIVE → unified active');
+        expect(result.status, 'PayPal ACTIVE → unified active').toBe('active');
       },
     },
 
     {
       name: 'status-approved',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'APPROVED' });
-        assert.equal(result.status, 'active', 'PayPal APPROVED → unified active');
+        expect(result.status, 'PayPal APPROVED → unified active').toBe('active');
       },
     },
 
     {
       name: 'status-suspended',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'SUSPENDED' });
-        assert.equal(result.status, 'suspended', 'PayPal SUSPENDED → unified suspended');
+        expect(result.status, 'PayPal SUSPENDED → unified suspended').toBe('suspended');
       },
     },
 
     {
       name: 'status-cancelled',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'CANCELLED' });
-        assert.equal(result.status, 'cancelled', 'PayPal CANCELLED → unified cancelled');
+        expect(result.status, 'PayPal CANCELLED → unified cancelled').toBe('cancelled');
       },
     },
 
     {
       name: 'status-expired',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'EXPIRED' });
-        assert.equal(result.status, 'cancelled', 'PayPal EXPIRED → unified cancelled');
+        expect(result.status, 'PayPal EXPIRED → unified cancelled').toBe('cancelled');
       },
     },
 
     {
       name: 'status-approval-pending',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'APPROVAL_PENDING' });
-        assert.equal(result.status, 'cancelled', 'PayPal APPROVAL_PENDING → unified cancelled');
+        expect(result.status, 'PayPal APPROVAL_PENDING → unified cancelled').toBe('cancelled');
       },
     },
 
     {
       name: 'status-unknown-defaults-to-cancelled',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ status: 'SOME_FUTURE_STATUS' });
-        assert.equal(result.status, 'cancelled', 'Unknown status → cancelled');
+        expect(result.status, 'Unknown status → cancelled').toBe('cancelled');
       },
     },
 
@@ -103,53 +103,53 @@ module.exports = defineCases({
 
     {
       name: 'product-resolves-from-plan-product-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: { product_id: 'PROD-plus' },
         });
-        assert.equal(result.product.id, 'plus', 'Should resolve to plus');
-        assert.equal(result.product.name, 'Plus', 'Should have correct name');
+        expect(result.product.id, 'Should resolve to plus').toBe('plus');
+        expect(result.product.name, 'Should have correct name').toBe('Plus');
       },
     },
 
     {
       name: 'product-resolves-pro-from-plan-product-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: { product_id: 'PROD-pro' },
         });
-        assert.equal(result.product.id, 'pro', 'Should resolve to pro');
-        assert.equal(result.product.name, 'Pro', 'Should have correct name');
+        expect(result.product.id, 'Should resolve to pro').toBe('pro');
+        expect(result.product.name, 'Should have correct name').toBe('Pro');
       },
     },
 
     {
       name: 'product-falls-back-to-basic-on-unknown-product',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: { product_id: 'PROD-nonexistent' },
         });
-        assert.equal(result.product.id, 'basic', 'Unknown product → basic');
-        assert.equal(result.product.name, 'Basic', 'Unknown product → Basic name');
+        expect(result.product.id, 'Unknown product → basic').toBe('basic');
+        expect(result.product.name, 'Unknown product → Basic name').toBe('Basic');
       },
     },
 
     {
       name: 'product-falls-back-to-basic-on-missing-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.product.id, 'basic', 'No _plan → basic');
+        expect(result.product.id, 'No _plan → basic').toBe('basic');
       },
     },
 
     {
       name: 'product-falls-back-to-basic-without-config',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = PayPal.toUnifiedSubscription(
           { _plan: { product_id: 'PROD-plus' } },
           {},
         );
-        assert.equal(result.product.id, 'basic', 'No config → basic');
+        expect(result.product.id, 'No config → basic').toBe('basic');
       },
     },
 
@@ -157,7 +157,7 @@ module.exports = defineCases({
 
     {
       name: 'frequency-month-from-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -165,13 +165,13 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'monthly', 'MONTH → monthly');
+        expect(result.payment.frequency, 'MONTH → monthly').toBe('monthly');
       },
     },
 
     {
       name: 'frequency-year-from-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -179,13 +179,13 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'annually', 'YEAR → annually');
+        expect(result.payment.frequency, 'YEAR → annually').toBe('annually');
       },
     },
 
     {
       name: 'frequency-week-from-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -193,13 +193,13 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'weekly', 'WEEK → weekly');
+        expect(result.payment.frequency, 'WEEK → weekly').toBe('weekly');
       },
     },
 
     {
       name: 'frequency-day-from-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -207,21 +207,21 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'daily', 'DAY → daily');
+        expect(result.payment.frequency, 'DAY → daily').toBe('daily');
       },
     },
 
     {
       name: 'frequency-null-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.frequency, null, 'Missing plan → null');
+        expect(result.payment.frequency, 'Missing plan → null').toBe(null);
       },
     },
 
     {
       name: 'frequency-from-inline-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         // PayPal ?fields=plan returns plan inline
         const result = toUnifiedSubscription({
           plan: {
@@ -230,13 +230,13 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'annually', 'Inline plan year → annually');
+        expect(result.payment.frequency, 'Inline plan year → annually').toBe('annually');
       },
     },
 
     {
       name: 'frequency-prefers-plan-over-inline',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -249,7 +249,7 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.frequency, 'monthly', '_plan takes priority over inline plan');
+        expect(result.payment.frequency, '_plan takes priority over inline plan').toBe('monthly');
       },
     },
 
@@ -257,7 +257,7 @@ module.exports = defineCases({
 
     {
       name: 'trial-claimed-when-plan-has-trial-cycle',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           start_time: '2024-01-01T00:00:00Z',
           _plan: {
@@ -274,14 +274,14 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.trial.claimed, true, 'Plan with trial cycle → claimed');
-        assert.ok(result.trial.expires.timestampUNIX > 0, 'Trial expires should be set');
+        expect(result.trial.claimed, 'Plan with trial cycle → claimed').toBe(true);
+        expect(result.trial.expires.timestampUNIX > 0, 'Trial expires should be set').toBeTruthy();
       },
     },
 
     {
       name: 'trial-not-claimed-when-no-trial-cycle',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -292,21 +292,21 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.trial.claimed, false, 'No trial cycle → not claimed');
+        expect(result.trial.claimed, 'No trial cycle → not claimed').toBe(false);
       },
     },
 
     {
       name: 'trial-not-claimed-when-no-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.trial.claimed, false, 'No plan → not claimed');
+        expect(result.trial.claimed, 'No plan → not claimed').toBe(false);
       },
     },
 
     {
       name: 'trial-claimed-with-no-start-time-has-epoch-expiry',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             billing_cycles: [
@@ -318,14 +318,14 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.trial.claimed, true, 'Trial cycle exists → claimed');
-        assert.equal(result.trial.expires.timestampUNIX, 0, 'No start_time → epoch expiry');
+        expect(result.trial.claimed, 'Trial cycle exists → claimed').toBe(true);
+        expect(result.trial.expires.timestampUNIX, 'No start_time → epoch expiry').toBe(0);
       },
     },
 
     {
       name: 'trial-month-based-cycle',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           start_time: '2024-01-01T00:00:00Z',
           _plan: {
@@ -338,8 +338,8 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.trial.claimed, true, 'Monthly trial → claimed');
-        assert.ok(result.trial.expires.timestampUNIX > 0, 'Should have computed trial end');
+        expect(result.trial.claimed, 'Monthly trial → claimed').toBe(true);
+        expect(result.trial.expires.timestampUNIX > 0, 'Should have computed trial end').toBeTruthy();
       },
     },
 
@@ -347,35 +347,35 @@ module.exports = defineCases({
 
     {
       name: 'cancellation-when-status-cancelled',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           status: 'CANCELLED',
           status_update_time: '2024-06-15T12:00:00Z',
         });
-        assert.equal(result.cancellation.pending, false, 'Already cancelled → not pending');
-        assert.ok(result.cancellation.date.timestampUNIX > 0, 'Should have cancellation date');
+        expect(result.cancellation.pending, 'Already cancelled → not pending').toBe(false);
+        expect(result.cancellation.date.timestampUNIX > 0, 'Should have cancellation date').toBeTruthy();
       },
     },
 
     {
       name: 'cancellation-cancelled-no-update-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           status: 'CANCELLED',
         });
-        assert.equal(result.cancellation.pending, false, 'Already cancelled → not pending');
-        assert.equal(result.cancellation.date.timestampUNIX, 0, 'No update time → epoch');
+        expect(result.cancellation.pending, 'Already cancelled → not pending').toBe(false);
+        expect(result.cancellation.date.timestampUNIX, 'No update time → epoch').toBe(0);
       },
     },
 
     {
       name: 'cancellation-none-when-active',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           status: 'ACTIVE',
         });
-        assert.equal(result.cancellation.pending, false, 'Active → not pending');
-        assert.equal(result.cancellation.date.timestampUNIX, 0, 'No cancellation date');
+        expect(result.cancellation.pending, 'Active → not pending').toBe(false);
+        expect(result.cancellation.date.timestampUNIX, 'No cancellation date').toBe(0);
       },
     },
 
@@ -383,19 +383,19 @@ module.exports = defineCases({
 
     {
       name: 'expires-from-next-billing-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           billing_info: { next_billing_time: '2024-07-01T00:00:00Z' },
         });
-        assert.ok(result.expires.timestampUNIX > 0, 'Should have expiration');
+        expect(result.expires.timestampUNIX > 0, 'Should have expiration').toBeTruthy();
       },
     },
 
     {
       name: 'expires-defaults-to-epoch-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.expires.timestampUNIX, 0, 'Missing billing_info → epoch');
+        expect(result.expires.timestampUNIX, 'Missing billing_info → epoch').toBe(0);
       },
     },
 
@@ -403,25 +403,25 @@ module.exports = defineCases({
 
     {
       name: 'start-date-from-start-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ start_time: '2024-01-15T00:00:00Z' });
-        assert.ok(result.payment.startDate.timestampUNIX > 0, 'Should have start date from start_time');
+        expect(result.payment.startDate.timestampUNIX > 0, 'Should have start date from start_time').toBeTruthy();
       },
     },
 
     {
       name: 'start-date-from-create-time-fallback',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ create_time: '2024-01-10T00:00:00Z' });
-        assert.ok(result.payment.startDate.timestampUNIX > 0, 'Should have start date from create_time');
+        expect(result.payment.startDate.timestampUNIX > 0, 'Should have start date from create_time').toBeTruthy();
       },
     },
 
     {
       name: 'start-date-defaults-to-epoch-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.startDate.timestampUNIX, 0, 'Missing start_time → epoch');
+        expect(result.payment.startDate.timestampUNIX, 'Missing start_time → epoch').toBe(0);
       },
     },
 
@@ -429,59 +429,59 @@ module.exports = defineCases({
 
     {
       name: 'payment-provider-always-paypal',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.provider, 'paypal', 'Provider should always be paypal');
+        expect(result.payment.provider, 'Provider should always be paypal').toBe('paypal');
       },
     },
 
     {
       name: 'payment-resource-id-from-subscription-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ id: 'I-ABC123' });
-        assert.equal(result.payment.resourceId, 'I-ABC123', 'resourceId should be subscription ID');
+        expect(result.payment.resourceId, 'resourceId should be subscription ID').toBe('I-ABC123');
       },
     },
 
     {
       name: 'payment-resource-id-null-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.resourceId, null, 'Missing ID → null resourceId');
+        expect(result.payment.resourceId, 'Missing ID → null resourceId').toBe(null);
       },
     },
 
     {
       name: 'payment-order-id-from-custom-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ custom_id: 'uid:user-abc,orderId:1234-5678' });
-        assert.equal(result.payment.orderId, '1234-5678', 'orderId should come from custom_id');
+        expect(result.payment.orderId, 'orderId should come from custom_id').toBe('1234-5678');
       },
     },
 
     {
       name: 'payment-order-id-null-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.orderId, null, 'Missing custom_id → null orderId');
+        expect(result.payment.orderId, 'Missing custom_id → null orderId').toBe(null);
       },
     },
 
     {
       name: 'payment-event-metadata-passed-through',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({}, { eventName: 'BILLING.SUBSCRIPTION.ACTIVATED', eventId: 'WH-123' });
-        assert.equal(result.payment.updatedBy.event.name, 'BILLING.SUBSCRIPTION.ACTIVATED', 'Event name passed through');
-        assert.equal(result.payment.updatedBy.event.id, 'WH-123', 'Event ID passed through');
+        expect(result.payment.updatedBy.event.name, 'Event name passed through').toBe('BILLING.SUBSCRIPTION.ACTIVATED');
+        expect(result.payment.updatedBy.event.id, 'Event ID passed through').toBe('WH-123');
       },
     },
 
     {
       name: 'payment-event-metadata-null-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.updatedBy.event.name, null, 'Missing event name → null');
-        assert.equal(result.payment.updatedBy.event.id, null, 'Missing event ID → null');
+        expect(result.payment.updatedBy.event.name, 'Missing event name → null').toBe(null);
+        expect(result.payment.updatedBy.event.id, 'Missing event ID → null').toBe(null);
       },
     },
 
@@ -489,7 +489,7 @@ module.exports = defineCases({
 
     {
       name: 'price-resolves-from-config',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             product_id: 'PROD-plus',
@@ -498,13 +498,13 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.price, 9.99, 'Price should match config for plus/monthly');
+        expect(result.payment.price, 'Price should match config for plus/monthly').toBe(9.99);
       },
     },
 
     {
       name: 'price-resolves-annually',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: {
             product_id: 'PROD-pro',
@@ -513,17 +513,17 @@ module.exports = defineCases({
             ],
           },
         });
-        assert.equal(result.payment.price, 299.99, 'Price should match config for pro/annually');
+        expect(result.payment.price, 'Price should match config for pro/annually').toBe(299.99);
       },
     },
 
     {
       name: 'price-zero-when-product-unknown',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           _plan: { product_id: 'PROD-nonexistent' },
         });
-        assert.equal(result.payment.price, 0, 'Unknown product → price 0');
+        expect(result.payment.price, 'Unknown product → price 0').toBe(0);
       },
     },
 
@@ -531,29 +531,29 @@ module.exports = defineCases({
 
     {
       name: 'custom-id-parses-uid-and-order-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           custom_id: 'uid:user-123,orderId:ord-456',
         });
-        assert.equal(result.payment.orderId, 'ord-456', 'orderId from custom_id');
+        expect(result.payment.orderId, 'orderId from custom_id').toBe('ord-456');
       },
     },
 
     {
       name: 'custom-id-handles-colons-in-values',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           custom_id: 'uid:user:with:colons,orderId:ord-789',
         });
-        assert.equal(result.payment.orderId, 'ord-789', 'orderId parsed correctly');
+        expect(result.payment.orderId, 'orderId parsed correctly').toBe('ord-789');
       },
     },
 
     {
       name: 'custom-id-handles-empty-string',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({ custom_id: '' });
-        assert.equal(result.payment.orderId, null, 'Empty custom_id → null');
+        expect(result.payment.orderId, 'Empty custom_id → null').toBe(null);
       },
     },
 
@@ -561,7 +561,7 @@ module.exports = defineCases({
 
     {
       name: 'full-active-subscription-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-FULL-TEST',
           status: 'ACTIVE',
@@ -577,39 +577,39 @@ module.exports = defineCases({
         }, { eventName: 'BILLING.SUBSCRIPTION.ACTIVATED', eventId: 'WH-FULL' });
 
         // Verify all top-level keys exist
-        assert.ok(result.product, 'Should have product');
-        assert.ok(result.status, 'Should have status');
-        assert.ok(result.expires, 'Should have expires');
-        assert.ok(result.trial, 'Should have trial');
-        assert.ok(result.cancellation, 'Should have cancellation');
-        assert.ok(result.payment, 'Should have payment');
+        expect(result.product, 'Should have product').toBeTruthy();
+        expect(result.status, 'Should have status').toBeTruthy();
+        expect(result.expires, 'Should have expires').toBeTruthy();
+        expect(result.trial, 'Should have trial').toBeTruthy();
+        expect(result.cancellation, 'Should have cancellation').toBeTruthy();
+        expect(result.payment, 'Should have payment').toBeTruthy();
 
         // Verify values
-        assert.equal(result.product.id, 'pro', 'Product should be pro');
-        assert.equal(result.status, 'active', 'Status should be active');
-        assert.equal(result.trial.claimed, false, 'Trial should not be claimed');
-        assert.equal(result.cancellation.pending, false, 'Should not be pending cancellation');
-        assert.equal(result.payment.provider, 'paypal', 'Provider should be paypal');
-        assert.equal(result.payment.resourceId, 'I-FULL-TEST', 'Resource ID should match');
-        assert.equal(result.payment.frequency, 'monthly', 'Frequency should be monthly');
-        assert.equal(result.payment.orderId, 'ord-full', 'Order ID should match');
-        assert.equal(result.payment.updatedBy.event.name, 'BILLING.SUBSCRIPTION.ACTIVATED', 'Event name should match');
+        expect(result.product.id, 'Product should be pro').toBe('pro');
+        expect(result.status, 'Status should be active').toBe('active');
+        expect(result.trial.claimed, 'Trial should not be claimed').toBe(false);
+        expect(result.cancellation.pending, 'Should not be pending cancellation').toBe(false);
+        expect(result.payment.provider, 'Provider should be paypal').toBe('paypal');
+        expect(result.payment.resourceId, 'Resource ID should match').toBe('I-FULL-TEST');
+        expect(result.payment.frequency, 'Frequency should be monthly').toBe('monthly');
+        expect(result.payment.orderId, 'Order ID should match').toBe('ord-full');
+        expect(result.payment.updatedBy.event.name, 'Event name should match').toBe('BILLING.SUBSCRIPTION.ACTIVATED');
       },
     },
 
     {
       name: 'empty-subscription-gets-safe-defaults',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({});
 
-        assert.equal(result.product.id, 'basic', 'Empty → basic product');
-        assert.equal(result.status, 'cancelled', 'Empty → cancelled (no status field)');
-        assert.equal(result.trial.claimed, false, 'Empty → trial not claimed');
-        assert.equal(result.cancellation.pending, false, 'Empty → not pending');
-        assert.equal(result.payment.provider, 'paypal', 'Empty → still paypal');
-        assert.equal(result.payment.orderId, null, 'Empty → null orderId');
-        assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
-        assert.equal(result.payment.frequency, null, 'Empty → null frequency');
+        expect(result.product.id, 'Empty → basic product').toBe('basic');
+        expect(result.status, 'Empty → cancelled (no status field)').toBe('cancelled');
+        expect(result.trial.claimed, 'Empty → trial not claimed').toBe(false);
+        expect(result.cancellation.pending, 'Empty → not pending').toBe(false);
+        expect(result.payment.provider, 'Empty → still paypal').toBe('paypal');
+        expect(result.payment.orderId, 'Empty → null orderId').toBe(null);
+        expect(result.payment.resourceId, 'Empty → null resourceId').toBe(null);
+        expect(result.payment.frequency, 'Empty → null frequency').toBe(null);
       },
     },
 
@@ -617,7 +617,7 @@ module.exports = defineCases({
 
     {
       name: 'combo-active-with-trial',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-TRIAL-ACTIVE',
           status: 'ACTIVE',
@@ -638,16 +638,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'active', 'Active with trial → active');
-        assert.equal(result.trial.claimed, true, 'Trial should be claimed');
-        assert.equal(result.product.id, 'plus', 'Should resolve product');
-        assert.equal(result.payment.frequency, 'monthly', 'Regular cycle → monthly');
+        expect(result.status, 'Active with trial → active').toBe('active');
+        expect(result.trial.claimed, 'Trial should be claimed').toBe(true);
+        expect(result.product.id, 'Should resolve product').toBe('plus');
+        expect(result.payment.frequency, 'Regular cycle → monthly').toBe('monthly');
       },
     },
 
     {
       name: 'combo-suspended-subscription',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-SUSPENDED',
           status: 'SUSPENDED',
@@ -660,16 +660,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'suspended', 'SUSPENDED → suspended');
-        assert.equal(result.product.id, 'pro', 'Should resolve product');
-        assert.equal(result.payment.frequency, 'annually', 'Year → annually');
-        assert.equal(result.cancellation.pending, false, 'Not cancelled, just suspended');
+        expect(result.status, 'SUSPENDED → suspended').toBe('suspended');
+        expect(result.product.id, 'Should resolve product').toBe('pro');
+        expect(result.payment.frequency, 'Year → annually').toBe('annually');
+        expect(result.cancellation.pending, 'Not cancelled, just suspended').toBe(false);
       },
     },
 
     {
       name: 'combo-cancelled-with-update-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-CANCEL',
           status: 'CANCELLED',
@@ -683,16 +683,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'cancelled', 'CANCELLED → cancelled');
-        assert.equal(result.cancellation.pending, false, 'Already cancelled → not pending');
-        assert.ok(result.cancellation.date.timestampUNIX > 0, 'Should have cancellation date');
-        assert.equal(result.payment.orderId, 'ord-cancel', 'Order ID preserved');
+        expect(result.status, 'CANCELLED → cancelled').toBe('cancelled');
+        expect(result.cancellation.pending, 'Already cancelled → not pending').toBe(false);
+        expect(result.cancellation.date.timestampUNIX > 0, 'Should have cancellation date').toBeTruthy();
+        expect(result.payment.orderId, 'Order ID preserved').toBe('ord-cancel');
       },
     },
 
     {
       name: 'combo-cancelled-during-a-trial-keeps-no-access',
-      async run({ assert }) {
+      async run({ expect }) {
         // Cancelling a trial ends access NOW (Ian's ruling, 2026-08-15 — #267).
         // A trial can still carry a `last_payment`: a plan with a setup fee
         // charges one on day zero. Pricing the "remaining period" off that
@@ -714,19 +714,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.trial.claimed, true, 'the subscription is three days into a fourteen-day trial');
-        assert.equal(result.status, 'cancelled', 'a cancelled trial is cancelled NOW, setup fee or not');
-        assert.equal(result.cancellation.pending, false, 'there is no paid period to serve out');
-        assert.ok(
-          result.expires.timestampUNIX <= Math.floor(Date.now() / 1000),
-          'and no future expiry is handed out',
-        );
+        expect(result.trial.claimed, 'the subscription is three days into a fourteen-day trial').toBe(true);
+        expect(result.status, 'a cancelled trial is cancelled NOW, setup fee or not').toBe('cancelled');
+        expect(result.cancellation.pending, 'there is no paid period to serve out').toBe(false);
+        expect(result.expires.timestampUNIX <= Math.floor(Date.now() / 1000), 'and no future expiry is handed out').toBeTruthy();
       },
     },
 
     {
       name: 'combo-cancelled-after-the-trial-converted-serves-out-the-period',
-      async run({ assert }) {
+      async run({ expect }) {
         // The other half: once the trial has converted, the customer HAS paid
         // for the period they are in, and cancelling still runs to its end.
         const sixtyDaysAgo = new Date(Date.now() - (60 * 24 * 60 * 60 * 1000)).toISOString();
@@ -747,15 +744,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'active', 'a paid period still runs to its end');
-        assert.equal(result.cancellation.pending, true, 'so the cancellation is pending, not done');
-        assert.ok(result.expires.timestampUNIX > Math.floor(Date.now() / 1000), 'with the period end as the expiry');
+        expect(result.status, 'a paid period still runs to its end').toBe('active');
+        expect(result.cancellation.pending, 'so the cancellation is pending, not done').toBe(true);
+        expect(result.expires.timestampUNIX > Math.floor(Date.now() / 1000), 'with the period end as the expiry').toBeTruthy();
       },
     },
 
     {
       name: 'combo-expired-subscription',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-EXPIRED',
           status: 'EXPIRED',
@@ -767,8 +764,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'cancelled', 'EXPIRED → cancelled');
-        assert.equal(result.product.id, 'pro', 'Should still resolve product');
+        expect(result.status, 'EXPIRED → cancelled').toBe('cancelled');
+        expect(result.product.id, 'Should still resolve product').toBe('pro');
       },
     },
 
@@ -776,7 +773,7 @@ module.exports = defineCases({
 
     {
       name: 'shape-matches-stripe-output-keys',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription({
           id: 'I-SHAPE',
           status: 'ACTIVE',
@@ -793,34 +790,34 @@ module.exports = defineCases({
 
         // Top-level keys
         const topKeys = Object.keys(result).sort();
-        assert.deepEqual(topKeys, ['cancellation', 'expires', 'payment', 'product', 'status', 'trial'], 'Should have same top-level keys as Stripe unified');
+        expect(topKeys, 'Should have same top-level keys as Stripe unified').toEqual(['cancellation', 'expires', 'payment', 'product', 'status', 'trial']);
 
         // Product shape
-        assert.ok(result.product.id, 'product.id exists');
-        assert.ok(result.product.name, 'product.name exists');
+        expect(result.product.id, 'product.id exists').toBeTruthy();
+        expect(result.product.name, 'product.name exists').toBeTruthy();
 
         // Expires shape
-        assert.isType(result.expires.timestamp, 'string', 'expires.timestamp is string');
-        assert.isType(result.expires.timestampUNIX, 'number', 'expires.timestampUNIX is number');
+        expect(result.expires.timestamp, 'expires.timestamp is string').toBeTypeOf('string');
+        expect(result.expires.timestampUNIX, 'expires.timestampUNIX is number').toBeTypeOf('number');
 
         // Trial shape
-        assert.isType(result.trial.claimed, 'boolean', 'trial.claimed is boolean');
-        assert.ok(result.trial.expires, 'trial.expires exists');
+        expect(result.trial.claimed, 'trial.claimed is boolean').toBeTypeOf('boolean');
+        expect(result.trial.expires, 'trial.expires exists').toBeTruthy();
 
         // Cancellation shape
-        assert.isType(result.cancellation.pending, 'boolean', 'cancellation.pending is boolean');
-        assert.ok(result.cancellation.date, 'cancellation.date exists');
+        expect(result.cancellation.pending, 'cancellation.pending is boolean').toBeTypeOf('boolean');
+        expect(result.cancellation.date, 'cancellation.date exists').toBeTruthy();
 
         // Payment shape
-        assert.equal(result.payment.provider, 'paypal', 'payment.provider');
-        assert.ok('orderId' in result.payment, 'payment.orderId exists');
-        assert.ok('resourceId' in result.payment, 'payment.resourceId exists');
-        assert.ok('frequency' in result.payment, 'payment.frequency exists');
-        assert.ok('price' in result.payment, 'payment.price exists');
-        assert.ok(result.payment.startDate, 'payment.startDate exists');
-        assert.ok(result.payment.updatedBy, 'payment.updatedBy exists');
-        assert.ok(result.payment.updatedBy.event, 'payment.updatedBy.event exists');
-        assert.ok(result.payment.updatedBy.date, 'payment.updatedBy.date exists');
+        expect(result.payment.provider, 'payment.provider').toBe('paypal');
+        expect('orderId' in result.payment, 'payment.orderId exists').toBeTruthy();
+        expect('resourceId' in result.payment, 'payment.resourceId exists').toBeTruthy();
+        expect('frequency' in result.payment, 'payment.frequency exists').toBeTruthy();
+        expect('price' in result.payment, 'payment.price exists').toBeTruthy();
+        expect(result.payment.startDate, 'payment.startDate exists').toBeTruthy();
+        expect(result.payment.updatedBy, 'payment.updatedBy exists').toBeTruthy();
+        expect(result.payment.updatedBy.event, 'payment.updatedBy.event exists').toBeTruthy();
+        expect(result.payment.updatedBy.date, 'payment.updatedBy.date exists').toBeTruthy();
       },
     },
 
@@ -828,55 +825,55 @@ module.exports = defineCases({
 
     {
       name: 'fixture-active-produces-valid-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription(FIXTURE_ACTIVE);
 
-        assert.equal(result.status, 'active', 'ACTIVE fixture → active');
-        assert.equal(result.payment.provider, 'paypal', 'Provider is paypal');
-        assert.equal(result.payment.resourceId, 'I-MTPRX0B9LV4R', 'Resource ID from fixture');
-        assert.equal(result.payment.orderId, 'ord-sub-123', 'orderId from custom_id');
-        assert.isType(result.expires.timestamp, 'string', 'expires.timestamp is string');
-        assert.isType(result.expires.timestampUNIX, 'number', 'expires.timestampUNIX is number');
-        assert.equal(result.trial.claimed, false, 'No trial in fixture');
-        assert.equal(result.cancellation.pending, false, 'Not cancelled');
+        expect(result.status, 'ACTIVE fixture → active').toBe('active');
+        expect(result.payment.provider, 'Provider is paypal').toBe('paypal');
+        expect(result.payment.resourceId, 'Resource ID from fixture').toBe('I-MTPRX0B9LV4R');
+        expect(result.payment.orderId, 'orderId from custom_id').toBe('ord-sub-123');
+        expect(result.expires.timestamp, 'expires.timestamp is string').toBeTypeOf('string');
+        expect(result.expires.timestampUNIX, 'expires.timestampUNIX is number').toBeTypeOf('number');
+        expect(result.trial.claimed, 'No trial in fixture').toBe(false);
+        expect(result.cancellation.pending, 'Not cancelled').toBe(false);
       },
     },
 
     {
       name: 'fixture-cancelled-produces-valid-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription(FIXTURE_CANCELLED);
 
-        assert.equal(result.status, 'cancelled', 'CANCELLED fixture → cancelled');
-        assert.equal(result.payment.resourceId, 'I-MTPRX0B9LV4R', 'Resource ID from fixture');
-        assert.equal(result.payment.orderId, 'ord-sub-123', 'orderId from custom_id');
-        assert.equal(result.cancellation.pending, false, 'Already cancelled');
+        expect(result.status, 'CANCELLED fixture → cancelled').toBe('cancelled');
+        expect(result.payment.resourceId, 'Resource ID from fixture').toBe('I-MTPRX0B9LV4R');
+        expect(result.payment.orderId, 'orderId from custom_id').toBe('ord-sub-123');
+        expect(result.cancellation.pending, 'Already cancelled').toBe(false);
       },
     },
 
     {
       name: 'fixture-suspended-produces-valid-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedSubscription(FIXTURE_SUSPENDED);
 
-        assert.equal(result.status, 'suspended', 'SUSPENDED fixture → suspended');
-        assert.equal(result.payment.resourceId, 'I-MTPRX0B9LV4R', 'Resource ID from fixture');
-        assert.equal(result.cancellation.pending, false, 'Not cancelled, just suspended');
+        expect(result.status, 'SUSPENDED fixture → suspended').toBe('suspended');
+        expect(result.payment.resourceId, 'Resource ID from fixture').toBe('I-MTPRX0B9LV4R');
+        expect(result.cancellation.pending, 'Not cancelled, just suspended').toBe(false);
       },
     },
 
     {
       name: 'fixture-all-produce-valid-unified-keys',
-      async run({ assert }) {
+      async run({ expect }) {
         const fixtures = [FIXTURE_ACTIVE, FIXTURE_CANCELLED, FIXTURE_SUSPENDED];
         const expectedKeys = ['cancellation', 'expires', 'payment', 'product', 'status', 'trial'];
 
         for (let i = 0; i < fixtures.length; i++) {
           const result = toUnifiedSubscription(fixtures[i]);
           const keys = Object.keys(result).sort();
-          assert.deepEqual(keys, expectedKeys, `Fixture ${i} should have correct top-level keys`);
-          assert.isType(result.payment.updatedBy.date.timestamp, 'string', `Fixture ${i}: updatedBy.date.timestamp is string`);
-          assert.isType(result.payment.updatedBy.date.timestampUNIX, 'number', `Fixture ${i}: updatedBy.date.timestampUNIX is number`);
+          expect(keys, `Fixture ${i} should have correct top-level keys`).toEqual(expectedKeys);
+          expect(result.payment.updatedBy.date.timestamp, `Fixture ${i}: updatedBy.date.timestamp is string`).toBeTypeOf('string');
+          expect(result.payment.updatedBy.date.timestampUNIX, `Fixture ${i}: updatedBy.date.timestampUNIX is number`).toBeTypeOf('number');
         }
       },
     },

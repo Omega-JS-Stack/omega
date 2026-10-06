@@ -66,7 +66,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'debug-is-silent-by-default',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
@@ -75,14 +75,14 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls.debug.length, 0, 'a debug line must not reach console.debug by default');
-        assert.equal(calls.log.length, 0, 'a debug line must not fall through to console.log either');
+        expect(calls.debug.length, 'a debug line must not reach console.debug by default').toBe(0);
+        expect(calls.log.length, 'a debug line must not fall through to console.log either').toBe(0);
       },
     },
 
     {
       name: 'debug-writes-when-omega-debug-is-set',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
@@ -91,15 +91,15 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls.debug.length, 1, 'OMEGA_DEBUG should let the line through');
-        assert.equal(calls.debug[0][0].endsWith(`[@omega.js/backend:debug-gate] ${ctx.id}:`), true, calls.debug[0][0]);
-        assert.equal(calls.debug[0][1], 'a big payload', calls.debug[0][1]);
+        expect(calls.debug.length, 'OMEGA_DEBUG should let the line through').toBe(1);
+        expect(calls.debug[0][0].endsWith(`[@omega.js/backend:debug-gate] ${ctx.id}:`), calls.debug[0][0]).toBe(true);
+        expect(calls.debug[0][1], calls.debug[0][1]).toBe('a big payload');
       },
     },
 
     {
       name: 'every-other-level-is-untouched-by-the-gate',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
@@ -110,9 +110,9 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls.log.length, 1, 'ctx.log must still write with the debug gate closed');
-        assert.equal(calls.warn.length, 1, 'ctx.warn must still write with the debug gate closed');
-        assert.equal(calls.error.length, 1, 'ctx.error must still write with the debug gate closed');
+        expect(calls.log.length, 'ctx.log must still write with the debug gate closed').toBe(1);
+        expect(calls.warn.length, 'ctx.warn must still write with the debug gate closed').toBe(1);
+        expect(calls.error.length, 'ctx.error must still write with the debug gate closed').toBe(1);
       },
     },
   ],

@@ -66,35 +66,35 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-free-port-means-boot-our-own',
-      async run({ assert }) {
+      async run({ expect }) {
         const decision = decideEmulatorAdoption({
           portInUse: false,
           runningProjectId: null,
           expectedProjectId: OURS,
         });
 
-        assert.equal(decision.adopt, false);
-        assert.equal(decision.reason, 'no-emulator');
+        expect(decision.adopt).toBe(false);
+        expect(decision.reason).toBe('no-emulator');
       },
     },
 
     {
       name: 'our-own-emulator-is-adopted',
-      async run({ assert }) {
+      async run({ expect }) {
         const decision = decideEmulatorAdoption({
           portInUse: true,
           runningProjectId: OURS,
           expectedProjectId: OURS,
         });
 
-        assert.equal(decision.adopt, true);
-        assert.equal(decision.reason, 'project-match');
+        expect(decision.adopt).toBe(true);
+        expect(decision.reason).toBe('project-match');
       },
     },
 
     {
       name: 'another-brands-emulator-is-never-adopted',
-      async run({ assert }) {
+      async run({ expect }) {
         // The reported case: the omega playground's emulator on the classic
         // ports while the run belongs to a different project.
         const decision = decideEmulatorAdoption({
@@ -103,15 +103,15 @@ module.exports = defineCases({
           expectedProjectId: OURS,
         });
 
-        assert.equal(decision.adopt, false);
-        assert.equal(decision.reason, 'project-mismatch');
-        assert.equal(decision.runningProjectId, THEIRS, 'the decision names the incumbent so the log can too');
+        expect(decision.adopt).toBe(false);
+        expect(decision.reason).toBe('project-mismatch');
+        expect(decision.runningProjectId, 'the decision names the incumbent so the log can too').toBe(THEIRS);
       },
     },
 
     {
       name: 'our-own-live-ports-file-is-proof-on-its-own',
-      async run({ assert }) {
+      async run({ expect }) {
         // This project's .temp/ports.json is written by OUR emulator and only
         // survives while its writer is alive. It is the proof that holds when
         // the hub cannot answer for us — the hub sits on a fixed port, so a
@@ -123,14 +123,14 @@ module.exports = defineCases({
           expectedProjectId: OURS,
         });
 
-        assert.equal(decision.adopt, true);
-        assert.equal(decision.reason, 'ports-file');
+        expect(decision.adopt).toBe(true);
+        expect(decision.reason).toBe('ports-file');
       },
     },
 
     {
       name: 'an-unidentifiable-listener-is-never-adopted',
-      async run({ assert }) {
+      async run({ expect }) {
         // Identity unreadable (no hub answer, no metadata): something is on the
         // port but nothing proves it is ours. Booting our own on bumped ports
         // costs a boot; adopting a stranger costs the whole run.
@@ -140,14 +140,14 @@ module.exports = defineCases({
           expectedProjectId: OURS,
         });
 
-        assert.equal(decision.adopt, false);
-        assert.equal(decision.reason, 'unidentified');
+        expect(decision.adopt).toBe(false);
+        expect(decision.reason).toBe('unidentified');
       },
     },
 
     {
       name: 'a-run-with-no-project-id-of-its-own-cannot-claim-a-match',
-      async run({ assert }) {
+      async run({ expect }) {
         // Nothing to compare against is not evidence of ownership.
         const decision = decideEmulatorAdoption({
           portInUse: true,
@@ -155,8 +155,8 @@ module.exports = defineCases({
           expectedProjectId: null,
         });
 
-        assert.equal(decision.adopt, false);
-        assert.equal(decision.reason, 'unidentified');
+        expect(decision.adopt).toBe(false);
+        expect(decision.reason).toBe('unidentified');
       },
     },
 
@@ -164,7 +164,7 @@ module.exports = defineCases({
 
     {
       name: 'the-hub-locator-file-names-the-running-project',
-      async run({ assert }) {
+      async run({ expect }) {
         // The read used to ask the hub's GET /emulators for a `projectId` it
         // has never returned (the body is a map of emulator → listen info), so
         // it answered null for every emulator alive and the project-match
@@ -174,40 +174,40 @@ module.exports = defineCases({
         await withTmpDir(async (dir) => {
           jetpack.write(path.join(dir, `hub-${OURS}.json`), locator(HUB_PORT, process.pid));
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), OURS);
+          expect(readHubLocatorProjectId(HUB_PORT, dir)).toBe(OURS);
         });
       },
     },
 
     {
       name: 'a-locator-published-on-another-port-is-a-different-hub',
-      async run({ assert }) {
+      async run({ expect }) {
         // A bumped run's hub is a hub, just not the one on the port we probed.
         await withTmpDir(async (dir) => {
           jetpack.write(path.join(dir, `hub-${THEIRS}.json`), locator(4401, process.pid));
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), null);
+          expect(readHubLocatorProjectId(HUB_PORT, dir)).toBe(null);
         });
       },
     },
 
     {
       name: 'a-crashed-runs-leftover-locator-proves-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         // firebase-tools does not always clean the file up. A dead pid is the
         // tell: the file names a hub that is gone, so whatever holds the port
         // now is somebody else and stays unidentified.
         await withTmpDir(async (dir) => {
           jetpack.write(path.join(dir, `hub-${OURS}.json`), locator(HUB_PORT, deadPid()));
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), null);
+          expect(readHubLocatorProjectId(HUB_PORT, dir)).toBe(null);
         });
       },
     },
 
     {
       name: 'two-live-candidates-for-one-port-are-ambiguous',
-      async run({ assert }) {
+      async run({ expect }) {
         // A stale file whose pid got RECYCLED reads as live. With two live
         // claims on one port at most one is true and nothing says which —
         // answering "ours" there is exactly the adoption #258 is about.
@@ -215,38 +215,38 @@ module.exports = defineCases({
           jetpack.write(path.join(dir, `hub-${OURS}.json`), locator(HUB_PORT, process.pid));
           jetpack.write(path.join(dir, `hub-${THEIRS}.json`), locator(HUB_PORT, process.pid));
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), null);
+          expect(readHubLocatorProjectId(HUB_PORT, dir)).toBe(null);
         });
       },
     },
 
     {
       name: 'no-locator-or-an-unreadable-one-is-unproven-never-ours',
-      async run({ assert }) {
+      async run({ expect }) {
         // The safe fall-through: every unreadable case answers null, which the
         // decision reads as "unidentified" and boots on bumped ports.
         await withTmpDir(async (dir) => {
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), null, 'an empty tmp dir');
+          expect(readHubLocatorProjectId(HUB_PORT, dir), 'an empty tmp dir').toBe(null);
 
           jetpack.write(path.join(dir, `hub-${OURS}.json`), 'not json at all');
           jetpack.write(path.join(dir, `hub-${THEIRS}.json`), { version: '15.24.0' });
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), null, 'a malformed locator');
-          assert.equal(readHubLocatorProjectId(HUB_PORT, path.join(dir, 'nope')), null, 'a missing tmp dir');
+          expect(readHubLocatorProjectId(HUB_PORT, dir), 'a malformed locator').toBe(null);
+          expect(readHubLocatorProjectId(HUB_PORT, path.join(dir, 'nope')), 'a missing tmp dir').toBe(null);
         });
       },
     },
 
     {
       name: 'the-locator-file-name-is-the-project-id-verbatim',
-      async run({ assert }) {
+      async run({ expect }) {
         // Project ids carry dots and dashes; the name is everything between
         // `hub-` and `.json`, never a truncation at the first separator.
         await withTmpDir(async (dir) => {
           jetpack.write(path.join(dir, 'hub-my.brand-staging.json'), locator(HUB_PORT, process.pid));
           jetpack.write(path.join(dir, 'unrelated-tool.json'), locator(HUB_PORT, process.pid));
 
-          assert.equal(readHubLocatorProjectId(HUB_PORT, dir), 'my.brand-staging');
+          expect(readHubLocatorProjectId(HUB_PORT, dir)).toBe('my.brand-staging');
         });
       },
     },

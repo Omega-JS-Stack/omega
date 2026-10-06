@@ -4,10 +4,9 @@
  * the REAL Firebase project with whatever credentials the environment carries.
  * Nothing here is yours to fill in: leave it as shipped.
  */
-const assert = require('node:assert/strict');
 const net = require('node:net');
 const dns = require('node:dns');
-const { defineCases } = require('@omega.js/backend/test');
+const { defineCases, expect } = require('@omega.js/backend/test');
 
 // `--extended` and `--lane=` runs exist to reach real services, so the runner arms no trap there
 const STANDS_DOWN = process.env.TEST_EXTENDED_MODE || process.env.OMEGA_TEST_LANE
@@ -24,10 +23,7 @@ module.exports = defineCases({
       skip: STANDS_DOWN,
 
       run() {
-        assert.ok(
-          globalThis.__omegaConnectTrap?.installed,
-          'the connect trap is not armed: a plain run can reach the network',
-        );
+        expect(globalThis.__omegaConnectTrap?.installed, 'the connect trap is not armed: a plain run can reach the network').toBeTruthy();
       },
     },
 
@@ -36,11 +32,7 @@ module.exports = defineCases({
       skip: STANDS_DOWN,
 
       run() {
-        assert.throws(
-          () => new net.Socket().connect(443, 'firestore.googleapis.com'),
-          (e) => e.code === 'CONNECT_TRAP',
-          'a TCP connect went through: the live Firestore is one call away',
-        );
+        expect(() => new net.Socket().connect(443, 'firestore.googleapis.com'), 'a TCP connect went through: the live Firestore is one call away').toThrow((e) => e.code === 'CONNECT_TRAP');
       },
     },
 
@@ -49,11 +41,7 @@ module.exports = defineCases({
       skip: STANDS_DOWN,
 
       run() {
-        assert.throws(
-          () => dns.lookup('firestore.googleapis.com', () => {}),
-          (e) => e.code === 'CONNECT_TRAP',
-          'a DNS lookup went through',
-        );
+        expect(() => dns.lookup('firestore.googleapis.com', () => {}), 'a DNS lookup went through').toThrow((e) => e.code === 'CONNECT_TRAP');
       },
     },
   ],

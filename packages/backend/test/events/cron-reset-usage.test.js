@@ -17,7 +17,7 @@
  * collection walk and the document write, and both are recorded here rather
  * than performed — which is what makes the resulting patch assertable.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const resetUsage = require('../../dist/omega/events/cron/daily/reset-usage.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -76,16 +76,12 @@ module.exports = defineCases({
       async run() {
         const { writes } = await runCron();
 
-        assert.equal(writes.length, 1, 'one write per user, however many counters moved');
+        expect(writes.length, 'one write per user, however many counters moved').toBe(1);
 
         const written = writes[0].usage;
 
-        assert.equal(written.saves.daily, 0, 'the catalog feature reset');
-        assert.equal(
-          written['email-preferences'].daily,
-          0,
-          'and so did the framework gate the catalog never defines — the counter that used to grow forever',
-        );
+        expect(written.saves.daily, 'the catalog feature reset').toBe(0);
+        expect(written['email-preferences'].daily, 'and so did the framework gate the catalog never defines — the counter that used to grow forever').toBe(0);
       },
     },
 
@@ -97,8 +93,8 @@ module.exports = defineCases({
         const written = writes[0].usage;
         const isFirst = new Date().getDate() === 1;
 
-        assert.equal(written.saves.monthly, isFirst ? 0 : 40, 'the month resets on the 1st and only then');
-        assert.equal(written.saves.total, 900, 'the all-time counter never resets');
+        expect(written.saves.monthly, 'the month resets on the 1st and only then').toBe(isFirst ? 0 : 40);
+        expect(written.saves.total, 'the all-time counter never resets').toBe(900);
       },
     },
 
@@ -108,7 +104,7 @@ module.exports = defineCases({
       async run() {
         const { writes } = await runCron();
 
-        assert.deepEqual(writes[0].usage.overrides, { saves: 500 }, 'the granted credits survive the sweep');
+        expect(writes[0].usage.overrides, 'the granted credits survive the sweep').toEqual({ saves: 500 });
       },
     },
   ],

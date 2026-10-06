@@ -8,11 +8,10 @@
  * it) writes both the pages and `/service-worker.js`, so the two stamps come
  * out of the same process the way they do on a deploy.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { test, before, after } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { setEnvironment } = require('@omega.js/config/environment');
 const { buildSite } = require('../src/build.js');
@@ -63,37 +62,47 @@ function runWorker(scriptUrl) {
   return imported;
 }
 
-before(async () => {
-  setEnvironment('development');
-  await buildSite({
-    consumerDir: SITE,
-    siteData: JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8')),
-    outDir: OUT,
-    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-    skipPurge: true,
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'service-worker-stamp',
+  setup: async (ctx) => {
+    setEnvironment('development');
+    await buildSite({
+      consumerDir: SITE,
+      siteData: JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8')),
+      outDir: OUT,
+      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+      skipPurge: true,
+    });
 
-  const html = fs.readFileSync(path.join(OUT, 'index.html'), 'utf8');
-  const tag = html.match(/<script src="\/build\.js\?cb=([^"&]*)"><\/script>/);
-  assert.ok(tag, 'the rendered page loads /build.js with a ?cb= stamp');
-  pageStamp = tag[1];
+    const html = fs.readFileSync(path.join(OUT, 'index.html'), 'utf8');
+    const tag = html.match(/<script src="\/build\.js\?cb=([^"&]*)"><\/script>/);
+    ctx.expect(tag, 'the rendered page loads /build.js with a ?cb= stamp').toBeTruthy();
+    pageStamp = tag[1];
 
-  workerSource = fs.readFileSync(path.join(OUT, 'service-worker.js'), 'utf8');
-});
+    workerSource = fs.readFileSync(path.join(OUT, 'service-worker.js'), 'utf8');
+  },
+  cleanup: () => fs.rmSync(OUT, { recursive: true, force: true }),
+  tests: [
+    {
+      name: 'the page and the worker carry the same non-empty build stamp',
+      run: (ctx) => {
+        ctx.expect(pageStamp, 'the head stamp is the build timestamp').toMatch(/^\d+$/);
+        ctx.expect(workerSource.includes(pageStamp), 'the stamp is baked into the worker bundle at build time').toBeTruthy();
 
-after(() => fs.rmSync(OUT, { recursive: true, force: true }));
+        const buildImports = runWorker('https://example.com/service-worker.js').filter((url) => url.includes('build.js'));
+        ctx.expect(buildImports).toEqual([`/build.js?cb=${pageStamp}`]);
+      },
+    },
 
-test('the page and the worker carry the same non-empty build stamp', () => {
-  assert.match(pageStamp, /^\d+$/, 'the head stamp is the build timestamp');
-  assert.ok(workerSource.includes(pageStamp), 'the stamp is baked into the worker bundle at build time');
+    {
+      name: 'under a mount, the stamped import still carries the prefix',
+      run: (ctx) => {
+        const buildImports = runWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit')
+          .filter((url) => url.includes('build.js'));
 
-  const buildImports = runWorker('https://example.com/service-worker.js').filter((url) => url.includes('build.js'));
-  assert.deepEqual(buildImports, [`/build.js?cb=${pageStamp}`]);
-});
-
-test('under a mount, the stamped import still carries the prefix', () => {
-  const buildImports = runWorker('https://example.com/workkit/service-worker.js?omega-path-prefix=%2Fworkkit')
-    .filter((url) => url.includes('build.js'));
-
-  assert.deepEqual(buildImports, [`/workkit/build.js?cb=${pageStamp}`]);
+        ctx.expect(buildImports).toEqual([`/workkit/build.js?cb=${pageStamp}`]);
+      },
+    },
+  ],
 });

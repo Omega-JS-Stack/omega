@@ -22,14 +22,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'dist-command-loads-and-exposes-execute',
-      async run({ assert }) {
-        assert.equal(typeof UpdateCommand, 'function', 'dist/cli/commands/update.js exports the command class');
-        assert.equal(typeof UpdateCommand.prototype.execute, 'function', 'command class implements execute()');
+      async run({ expect }) {
+        expect(typeof UpdateCommand, 'dist/cli/commands/update.js exports the command class').toBe('function');
+        expect(typeof UpdateCommand.prototype.execute, 'command class implements execute()').toBe('function');
       },
     },
     {
       name: 'dry-run-reaches-runUpdate-and-a-bare-run-installs',
-      async run({ assert }) {
+      async run({ expect }) {
         const commandFile = path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'update.js');
 
         // The command destructures runUpdate at load, so the stub lands before a fresh require
@@ -45,32 +45,32 @@ module.exports = defineCases({
             devkitUpdate.runUpdate = original;
             delete require.cache[commandFile];
           }
-          assert.equal(seen.length, 1, 'the command called runUpdate once');
+          expect(seen.length, 'the command called runUpdate once').toBe(1);
           return seen[0];
         }
 
-        assert.equal((await run(['update', '--dry-run'])).dryRun, true);
-        assert.equal(Boolean((await run(['update'])).dryRun), false, 'a bare run is not a dry run');
+        expect((await run(['update', '--dry-run'])).dryRun).toBe(true);
+        expect(Boolean((await run(['update'])).dryRun), 'a bare run is not a dry run').toBe(false);
       },
     },
     {
       name: 'dispatcher-routes-update',
-      async run({ assert }) {
+      async run({ expect }) {
         const update = table.COMMANDS.find((command) => command.name === 'update');
-        assert.ok(update, 'the command table carries the update verb');
+        expect(update, 'the command table carries the update verb').toBeTruthy();
 
         for (const token of ['update', '-u', '--update']) {
-          assert.equal(table.matchCommand(update, { [token]: true }), true, `\`omega ${token}\` dispatches update`);
+          expect(table.matchCommand(update, { [token]: true }), `\`omega ${token}\` dispatches update`).toBe(true);
         }
       },
     },
     {
       name: 'core-semantics-hold-offline (quarantine + major hold, injected clock)',
-      async run({ assert }) {
+      async run({ expect }) {
         const NOW = Date.UTC(2026, 6, 21);
         const day = (daysAgo) => new Date(NOW - daysAgo * 24 * 60 * 60 * 1000).toISOString();
 
-        assert.equal(devkitUpdate.DEFAULT_MIN_AGE_DAYS, 7, 'quarantine default is 7 days');
+        expect(devkitUpdate.DEFAULT_MIN_AGE_DAYS, 'quarantine default is 7 days').toBe(7);
 
         const rows = [{
           name: 'fresh', group: 'prod', current: '1.0.0', installed: '1.0.0',
@@ -83,9 +83,9 @@ module.exports = defineCases({
         }];
 
         const selection = devkitUpdate.selectUpdates(rows, { minAge: 7, now: NOW });
-        assert.equal(selection.updates.length, 0, 'fresh release quarantined, major held');
-        assert.equal(selection.quarantined[0].name, 'fresh');
-        assert.equal(selection.majorsHeld[0].name, 'breaking');
+        expect(selection.updates.length, 'fresh release quarantined, major held').toBe(0);
+        expect(selection.quarantined[0].name).toBe('fresh');
+        expect(selection.majorsHeld[0].name).toBe('breaking');
       },
     },
   ],

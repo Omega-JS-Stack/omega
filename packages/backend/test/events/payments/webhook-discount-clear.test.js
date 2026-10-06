@@ -19,7 +19,7 @@
  * subscription that is already gone) without minting a persona and a payment
  * history per permutation.
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -85,17 +85,14 @@ module.exports = defineCases({
 
         const subscription = store.get(`users/${UID}`).subscription;
 
-        assert.equal(subscription.payment.resourceId, NEW_RESOURCE_ID, 'the new subscription is the one on the account');
-        assert.equal(subscription.discount.valid, false, 'the old claim is no longer a discount');
-        assert.equal(subscription.discount.code, null, 'nothing names a coupon that ended with the old subscription');
-        assert.equal(subscription.discount.percent, 0, 'and it is worth nothing');
-        assert.equal(subscription.discount.amount, 0, 'in either shape');
-        assert.equal(subscription.discount.duration, null);
-        assert.equal(
-          subscription.discount.source, null,
-          'source is the pitch gate: left at winback, this customer is never offered the save again',
-        );
-        assert.equal(subscription.discount.resourceId, null, 'and the stamp goes with it');
+        expect(subscription.payment.resourceId, 'the new subscription is the one on the account').toBe(NEW_RESOURCE_ID);
+        expect(subscription.discount.valid, 'the old claim is no longer a discount').toBe(false);
+        expect(subscription.discount.code, 'nothing names a coupon that ended with the old subscription').toBe(null);
+        expect(subscription.discount.percent, 'and it is worth nothing').toBe(0);
+        expect(subscription.discount.amount, 'in either shape').toBe(0);
+        expect(subscription.discount.duration).toBe(null);
+        expect(subscription.discount.source, 'source is the pitch gate: left at winback, this customer is never offered the save again').toBe(null);
+        expect(subscription.discount.resourceId, 'and the stamp goes with it').toBe(null);
       },
     },
 
@@ -109,10 +106,7 @@ module.exports = defineCases({
           seed: subscriberSeed(discount, OLD_RESOURCE_ID),
         });
 
-        assert.deepEqual(
-          store.get(`users/${UID}`).subscription.discount, discount,
-          'a renewal, a cancellation, any update to the SAME subscription leaves the saving exactly as claimed',
-        );
+        expect(store.get(`users/${UID}`).subscription.discount, 'a renewal, a cancellation, any update to the SAME subscription leaves the saving exactly as claimed').toEqual(discount);
       },
     },
 
@@ -137,10 +131,10 @@ module.exports = defineCases({
 
         const discount = store.get(`users/${UID}`).subscription.discount;
 
-        assert.equal(discount.valid, true, 'the discount survives');
-        assert.equal(discount.code, 'WINBACK50', 'unchanged');
-        assert.equal(discount.source, 'winback', 'source and all');
-        assert.equal(discount.resourceId, OLD_RESOURCE_ID, 'and it now names the subscription it is riding');
+        expect(discount.valid, 'the discount survives').toBe(true);
+        expect(discount.code, 'unchanged').toBe('WINBACK50');
+        expect(discount.source, 'source and all').toBe('winback');
+        expect(discount.resourceId, 'and it now names the subscription it is riding').toBe(OLD_RESOURCE_ID);
       },
     },
 
@@ -163,10 +157,7 @@ module.exports = defineCases({
           seed: subscriberSeed(discount, OLD_RESOURCE_ID),
         });
 
-        assert.deepEqual(
-          store.get(`users/${UID}`).subscription.discount, discount,
-          'only a real subscription resource may judge the stamp',
-        );
+        expect(store.get(`users/${UID}`).subscription.discount, 'only a real subscription resource may judge the stamp').toEqual(discount);
       },
     },
 
@@ -179,10 +170,7 @@ module.exports = defineCases({
           seed: subscriberSeed(null, OLD_RESOURCE_ID),
         });
 
-        assert.equal(
-          store.get(`users/${UID}`).subscription.discount, undefined,
-          'the pipeline never writes a discount node onto an account that has none',
-        );
+        expect(store.get(`users/${UID}`).subscription.discount, 'the pipeline never writes a discount node onto an account that has none').toBe(undefined);
       },
     },
   ],

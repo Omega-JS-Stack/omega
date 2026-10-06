@@ -1,6 +1,7 @@
 /**
  * Binds normalized case suites (run-case.js) to node:test. Every case is one
- * node:test `it`, and every `it` waits on its own case event, reported by id
+ * node:test test (an `it`, or a subtest of its file's `it` when the file loads
+ * lazily), and every one waits on its own case event, reported by id
  * from a SESSION: a host suite run through `runSuite`, or an app layer whose
  * driver runs the cases inside the app. The first case to begin starts its
  * session, so setup, state, stop-on-failure and cleanup follow `runSuite` exactly.
@@ -148,6 +149,19 @@ function hostSession(suite, { expect, defaultTimeout, extrasFrom }) {
   };
 }
 
+// One case's node:test body: it waits on the case's event and settles as the case did.
+function caseBody(caseDef, session, onEvent) {
+  return async (t) => {
+    const event = await session.wait(caseDef.id);
+    if (onEvent) onEvent(event, caseDef);
+    if (event.status === 'skip') {
+      t.skip(event.reason);
+      return;
+    }
+    if (event.status === 'fail') throw rebuildError(event.error);
+  };
+}
+
 /**
  * Register one suite with node:test: a `describe` holding one `it` per case.
  * @param {object} suite - A normalized suite.
@@ -159,18 +173,32 @@ function registerSuite(suite, { label, session, onEvent }) {
   describe(label, () => {
     // A host suite ends inside its describe: its cleanup has run before the next suite begins.
     if (session.end) after(() => session.end());
-    for (const caseDef of suite.cases) {
-      it(caseDef.name, async (t) => {
-        const event = await session.wait(caseDef.id);
-        if (onEvent) onEvent(event, caseDef);
-        if (event.status === 'skip') {
-          t.skip(event.reason);
-          return;
-        }
-        if (event.status === 'fail') throw rebuildError(event.error);
-      });
-    }
+    for (const caseDef of suite.cases) it(caseDef.name, caseBody(caseDef, session, onEvent));
   });
 }
 
-module.exports = { createCaseSession, hostSession, registerSuite };
+/**
+ * Register suite files that load only when the run reaches them: one `it` per
+ * file, whose body loads the file and runs each case as a subtest. The file's
+ * host session ends inside that body, so its cleanup has run before the next file loads.
+ * @param {Array<{rel: string}>} files - The discovered files, in run order.
+ * @param {Function} load - `load(file)` resolves `{ suite, session, onEvent }` from a host session, or null when the file has no case to run.
+ * @returns {void}
+ */
+function registerLazySuites(files, load) {
+  const { it } = require('node:test');
+  for (const file of files) {
+    it(file.rel, async (t) => {
+      const loaded = load(file);
+      if (!loaded) return;
+      const { suite, session, onEvent } = loaded;
+      try {
+        for (const caseDef of suite.cases) await t.test(caseDef.name, caseBody(caseDef, session, onEvent));
+      } finally {
+        await session.end();
+      }
+    });
+  }
+}
+
+module.exports = { createCaseSession, hostSession, registerSuite, registerLazySuites };

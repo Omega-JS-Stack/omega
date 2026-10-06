@@ -28,44 +28,44 @@ module.exports = defineCases({
 
     {
       name: 'supports-subscription-created',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('customer.subscription.created'), 'Should support customer.subscription.created');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('customer.subscription.created'), 'Should support customer.subscription.created').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-updated',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('customer.subscription.updated'), 'Should support customer.subscription.updated');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('customer.subscription.updated'), 'Should support customer.subscription.updated').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-deleted',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('customer.subscription.deleted'), 'Should support customer.subscription.deleted');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('customer.subscription.deleted'), 'Should support customer.subscription.deleted').toBeTruthy();
       },
     },
 
     {
       name: 'supports-invoice-payment-failed',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('invoice.payment_failed'), 'Should support invoice.payment_failed');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('invoice.payment_failed'), 'Should support invoice.payment_failed').toBeTruthy();
       },
     },
 
     {
       name: 'supports-checkout-session-completed',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('checkout.session.completed'), 'Should support checkout.session.completed');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('checkout.session.completed'), 'Should support checkout.session.completed').toBeTruthy();
       },
     },
 
     {
       name: 'rejects-unsupported-event',
-      async run({ assert }) {
-        assert.equal(stripeProvider.isSupported('charge.succeeded'), false, 'Should not support charge.succeeded');
-        assert.equal(stripeProvider.isSupported('customer.created'), false, 'Should not support customer.created');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('charge.succeeded'), 'Should not support charge.succeeded').toBe(false);
+        expect(stripeProvider.isSupported('customer.created'), 'Should not support customer.created').toBe(false);
       },
     },
 
@@ -73,36 +73,36 @@ module.exports = defineCases({
 
     {
       name: 'throws-on-empty-body',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook(null);
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
 
     {
       name: 'throws-on-missing-id',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook({ type: 'customer.subscription.updated', data: { object: {} } });
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
 
     {
       name: 'throws-on-missing-type',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook({ id: 'evt_123', data: { object: {} } });
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
@@ -111,65 +111,65 @@ module.exports = defineCases({
 
     {
       name: 'subscription-created-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_sub_created',
           type: 'customer.subscription.created',
           data: { object: { id: 'sub_123', metadata: { uid: 'user-abc' } } },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.resourceType, 'subscription', 'Resource type should be subscription');
-        assert.equal(result.resourceId, 'sub_123', 'Resource ID should be subscription ID');
-        assert.equal(result.uid, 'user-abc', 'UID should come from metadata');
-        assert.equal(result.eventId, 'evt_sub_created', 'Event ID should match');
-        assert.equal(result.eventType, 'customer.subscription.created', 'Event type should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.resourceType, 'Resource type should be subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should be subscription ID').toBe('sub_123');
+        expect(result.uid, 'UID should come from metadata').toBe('user-abc');
+        expect(result.eventId, 'Event ID should match').toBe('evt_sub_created');
+        expect(result.eventType, 'Event type should match').toBe('customer.subscription.created');
       },
     },
 
     {
       name: 'subscription-updated-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_sub_updated',
           type: 'customer.subscription.updated',
           data: { object: { id: 'sub_456', metadata: { uid: 'user-def' } } },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.resourceType, 'subscription', 'Resource type should be subscription');
-        assert.equal(result.resourceId, 'sub_456', 'Resource ID should match');
-        assert.equal(result.uid, 'user-def', 'UID should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.resourceType, 'Resource type should be subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should match').toBe('sub_456');
+        expect(result.uid, 'UID should match').toBe('user-def');
       },
     },
 
     {
       name: 'subscription-deleted-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_sub_deleted',
           type: 'customer.subscription.deleted',
           data: { object: { id: 'sub_789', metadata: { uid: 'user-ghi' } } },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.resourceType, 'subscription', 'Resource type should be subscription');
-        assert.equal(result.resourceId, 'sub_789', 'Resource ID should match');
-        assert.equal(result.uid, 'user-ghi', 'UID should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.resourceType, 'Resource type should be subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should match').toBe('sub_789');
+        expect(result.uid, 'UID should match').toBe('user-ghi');
       },
     },
 
     {
       name: 'subscription-event-null-uid-when-missing-metadata',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_no_uid',
           type: 'customer.subscription.created',
           data: { object: { id: 'sub_no_uid', metadata: {} } },
         });
 
-        assert.equal(result.uid, null, 'UID should be null when not in metadata');
-        assert.equal(result.category, 'subscription', 'Category should still be subscription');
+        expect(result.uid, 'UID should be null when not in metadata').toBe(null);
+        expect(result.category, 'Category should still be subscription').toBe('subscription');
       },
     },
 
@@ -177,7 +177,7 @@ module.exports = defineCases({
 
     {
       name: 'invoice-sub-failure-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_inv_sub_fail',
           type: 'invoice.payment_failed',
@@ -195,32 +195,32 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'Subscription invoice failure → subscription category');
-        assert.equal(result.resourceType, 'subscription', 'Should fetch the subscription, not the invoice');
-        assert.equal(result.resourceId, 'sub_target', 'Resource ID should be the subscription ID');
-        assert.equal(result.uid, 'user-sub-fail', 'UID should come from subscription metadata');
+        expect(result.category, 'Subscription invoice failure → subscription category').toBe('subscription');
+        expect(result.resourceType, 'Should fetch the subscription, not the invoice').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should be the subscription ID').toBe('sub_target');
+        expect(result.uid, 'UID should come from subscription metadata').toBe('user-sub-fail');
       },
     },
 
     {
       name: 'invoice-sub-failure-from-fixture',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_fixture_sub_fail',
           type: 'invoice.payment_failed',
           data: { object: FIXTURE_INVOICE_SUB },
         });
 
-        assert.equal(result.category, 'subscription', 'Fixture: should be subscription category');
-        assert.equal(result.resourceType, 'subscription', 'Fixture: should fetch subscription');
-        assert.equal(result.resourceId, 'sub_test_failed_sub', 'Fixture: resource ID from parent.subscription_details');
-        assert.equal(result.uid, 'test-uid-sub-fail', 'Fixture: UID from subscription metadata');
+        expect(result.category, 'Fixture: should be subscription category').toBe('subscription');
+        expect(result.resourceType, 'Fixture: should fetch subscription').toBe('subscription');
+        expect(result.resourceId, 'Fixture: resource ID from parent.subscription_details').toBe('sub_test_failed_sub');
+        expect(result.uid, 'Fixture: UID from subscription metadata').toBe('test-uid-sub-fail');
       },
     },
 
     {
       name: 'invoice-sub-failure-subscription-create-reason',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_inv_sub_create',
           type: 'invoice.payment_failed',
@@ -238,14 +238,14 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'subscription_create billing reason → subscription');
-        assert.equal(result.resourceId, 'sub_new', 'Should use subscription ID');
+        expect(result.category, 'subscription_create billing reason → subscription').toBe('subscription');
+        expect(result.resourceId, 'Should use subscription ID').toBe('sub_new');
       },
     },
 
     {
       name: 'invoice-sub-failure-legacy-subscription-field',
-      async run({ assert }) {
+      async run({ expect }) {
         // Older Stripe API versions use data.object.subscription instead of parent
         const result = parseWebhook({
           id: 'evt_inv_legacy',
@@ -260,10 +260,10 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'Legacy format → subscription');
-        assert.equal(result.resourceType, 'subscription', 'Should still fetch subscription');
-        assert.equal(result.resourceId, 'sub_legacy', 'Should use legacy subscription field');
-        assert.equal(result.uid, 'user-legacy', 'UID falls back to invoice metadata');
+        expect(result.category, 'Legacy format → subscription').toBe('subscription');
+        expect(result.resourceType, 'Should still fetch subscription').toBe('subscription');
+        expect(result.resourceId, 'Should use legacy subscription field').toBe('sub_legacy');
+        expect(result.uid, 'UID falls back to invoice metadata').toBe('user-legacy');
       },
     },
 
@@ -271,7 +271,7 @@ module.exports = defineCases({
 
     {
       name: 'invoice-onetime-failure-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_inv_manual_fail',
           type: 'invoice.payment_failed',
@@ -284,32 +284,32 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'Manual billing reason → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch the invoice');
-        assert.equal(result.resourceId, 'in_manual_fail', 'Resource ID should be invoice ID');
-        assert.equal(result.uid, 'user-manual', 'UID from invoice metadata');
+        expect(result.category, 'Manual billing reason → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch the invoice').toBe('invoice');
+        expect(result.resourceId, 'Resource ID should be invoice ID').toBe('in_manual_fail');
+        expect(result.uid, 'UID from invoice metadata').toBe('user-manual');
       },
     },
 
     {
       name: 'invoice-onetime-failure-from-fixture',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_fixture_manual',
           type: 'invoice.payment_failed',
           data: { object: FIXTURE_INVOICE_MANUAL },
         });
 
-        assert.equal(result.category, 'one-time', 'Fixture: manual billing → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Fixture: should fetch invoice');
-        assert.equal(result.resourceId, FIXTURE_INVOICE_MANUAL.id, 'Fixture: resource ID is invoice ID');
-        assert.equal(result.uid, null, 'Fixture: no uid in metadata (CLI-generated)');
+        expect(result.category, 'Fixture: manual billing → one-time').toBe('one-time');
+        expect(result.resourceType, 'Fixture: should fetch invoice').toBe('invoice');
+        expect(result.resourceId, 'Fixture: resource ID is invoice ID').toBe(FIXTURE_INVOICE_MANUAL.id);
+        expect(result.uid, 'Fixture: no uid in metadata (CLI-generated)').toBe(null);
       },
     },
 
     {
       name: 'invoice-failure-no-billing-reason-defaults-to-onetime',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_inv_no_reason',
           type: 'invoice.payment_failed',
@@ -321,8 +321,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'No billing reason → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch invoice');
+        expect(result.category, 'No billing reason → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch invoice').toBe('invoice');
       },
     },
 
@@ -330,7 +330,7 @@ module.exports = defineCases({
 
     {
       name: 'checkout-payment-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_cs_payment',
           type: 'checkout.session.completed',
@@ -343,26 +343,26 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'Payment mode → one-time');
-        assert.equal(result.resourceType, 'session', 'Should fetch session');
-        assert.equal(result.resourceId, 'cs_test_payment', 'Resource ID should be session ID');
-        assert.equal(result.uid, 'user-checkout', 'UID from session metadata');
+        expect(result.category, 'Payment mode → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch session').toBe('session');
+        expect(result.resourceId, 'Resource ID should be session ID').toBe('cs_test_payment');
+        expect(result.uid, 'UID from session metadata').toBe('user-checkout');
       },
     },
 
     {
       name: 'checkout-payment-from-fixture',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_fixture_checkout',
           type: 'checkout.session.completed',
           data: { object: FIXTURE_CHECKOUT_PAYMENT },
         });
 
-        assert.equal(result.category, 'one-time', 'Fixture: payment mode → one-time');
-        assert.equal(result.resourceType, 'session', 'Fixture: should fetch session');
-        assert.equal(result.resourceId, FIXTURE_CHECKOUT_PAYMENT.id, 'Fixture: resource ID is session ID');
-        assert.equal(result.uid, null, 'Fixture: no uid in metadata (CLI-generated)');
+        expect(result.category, 'Fixture: payment mode → one-time').toBe('one-time');
+        expect(result.resourceType, 'Fixture: should fetch session').toBe('session');
+        expect(result.resourceId, 'Fixture: resource ID is session ID').toBe(FIXTURE_CHECKOUT_PAYMENT.id);
+        expect(result.uid, 'Fixture: no uid in metadata (CLI-generated)').toBe(null);
       },
     },
 
@@ -370,7 +370,7 @@ module.exports = defineCases({
 
     {
       name: 'checkout-subscription-skipped',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_cs_sub',
           type: 'checkout.session.completed',
@@ -383,15 +383,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, null, 'Subscription checkout → null (skipped)');
-        assert.equal(result.resourceType, null, 'No resource type for skipped events');
-        assert.equal(result.resourceId, null, 'No resource ID for skipped events');
+        expect(result.category, 'Subscription checkout → null (skipped)').toBe(null);
+        expect(result.resourceType, 'No resource type for skipped events').toBe(null);
+        expect(result.resourceId, 'No resource ID for skipped events').toBe(null);
       },
     },
 
     {
       name: 'checkout-unknown-mode-skipped',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_cs_unknown',
           type: 'checkout.session.completed',
@@ -404,7 +404,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, null, 'Unknown checkout mode → null');
+        expect(result.category, 'Unknown checkout mode → null').toBe(null);
       },
     },
 
@@ -412,18 +412,18 @@ module.exports = defineCases({
 
     {
       name: 'unsupported-event-returns-null-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'evt_unsupported',
           type: 'charge.succeeded',
           data: { object: { id: 'ch_123' } },
         });
 
-        assert.equal(result.category, null, 'Unsupported event → null category');
-        assert.equal(result.resourceType, null, 'No resource type');
-        assert.equal(result.resourceId, null, 'No resource ID');
-        assert.equal(result.eventId, 'evt_unsupported', 'Should still return event ID');
-        assert.equal(result.eventType, 'charge.succeeded', 'Should still return event type');
+        expect(result.category, 'Unsupported event → null category').toBe(null);
+        expect(result.resourceType, 'No resource type').toBe(null);
+        expect(result.resourceId, 'No resource ID').toBe(null);
+        expect(result.eventId, 'Should still return event ID').toBe('evt_unsupported');
+        expect(result.eventType, 'Should still return event type').toBe('charge.succeeded');
       },
     },
 
@@ -431,7 +431,7 @@ module.exports = defineCases({
 
     {
       name: 'raw-contains-full-event',
-      async run({ assert }) {
+      async run({ expect }) {
         const event = {
           id: 'evt_raw',
           type: 'customer.subscription.updated',
@@ -440,8 +440,8 @@ module.exports = defineCases({
         };
 
         const result = parseWebhook(event);
-        assert.equal(result.raw, event, 'Raw should be the full event object');
-        assert.equal(result.raw.extra_field, 'preserved', 'Extra fields preserved in raw');
+        expect(result.raw, 'Raw should be the full event object').toBe(event);
+        expect(result.raw.extra_field, 'Extra fields preserved in raw').toBe('preserved');
       },
     },
   ],

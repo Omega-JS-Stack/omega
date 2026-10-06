@@ -83,7 +83,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'reads-the-credit-note-back-by-its-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = {
           [ENDPOINT]: { credit_note: { id: CREDIT_NOTE_ID, total: 999, currency_code: 'usd', reason_code: 'product_unsatisfactory' } },
@@ -93,17 +93,17 @@ module.exports = defineCases({
           return Chargebee.getRefundDetails(SUBSCRIPTION_RESOURCE, { raw: envelope({}) });
         });
 
-        assert.equal(calls.length, 1, 'The credit note is read once');
-        assert.equal(calls[0], ENDPOINT, 'By the id the payload names — an identifier, nothing more');
-        assert.equal(details.amount, '9.99', 'The amount is Chargebee\'s record of the credit note');
-        assert.equal(details.currency, 'USD', 'The currency comes off the same record');
-        assert.equal(details.reason, 'product_unsatisfactory', 'And so does the reason');
+        expect(calls.length, 'The credit note is read once').toBe(1);
+        expect(calls[0], 'By the id the payload names — an identifier, nothing more').toBe(ENDPOINT);
+        expect(details.amount, 'The amount is Chargebee\'s record of the credit note').toBe('9.99');
+        expect(details.currency, 'The currency comes off the same record').toBe('USD');
+        expect(details.reason, 'And so does the reason').toBe('product_unsatisfactory');
       },
     },
 
     {
       name: 'reads-the-transaction-back-when-there-is-no-credit-note',
-      async run({ assert }) {
+      async run({ expect }) {
         // A gateway refund issued without a credit note has a trusted record too.
         // Its id is the lookup KEY, exactly like the credit note's — the envelope's
         // own transaction amount is still never read
@@ -120,16 +120,16 @@ module.exports = defineCases({
           return Chargebee.getRefundDetails(SUBSCRIPTION_RESOURCE, { raw: raw, resourceType: 'subscription' });
         });
 
-        assert.equal(calls[0], TRANSACTION_ENDPOINT, 'The transaction is read back by the id the payload names');
-        assert.equal(details.amount, '9.99', 'The amount is Chargebee\'s record of the transaction');
-        assert.notEqual(details.amount, '999.99', 'Never the number the envelope carried');
-        assert.equal(details.currency, 'USD', 'The currency comes off the same record');
+        expect(calls[0], 'The transaction is read back by the id the payload names').toBe(TRANSACTION_ENDPOINT);
+        expect(details.amount, 'The amount is Chargebee\'s record of the transaction').toBe('9.99');
+        expect(details.amount, 'Never the number the envelope carried').not.toBe('999.99');
+        expect(details.currency, 'The currency comes off the same record').toBe('USD');
       },
     },
 
     {
       name: 'a-transaction-that-settled-another-subscription-is-refused',
-      async run({ assert }) {
+      async run({ expect }) {
         // The fallback's id is the caller's, so it is linked back like every other
         // refund lookup ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)).
         const raw = envelope({ transaction: { id: TRANSACTION_ID, amount: 99999, currency_code: 'USD' } });
@@ -149,15 +149,15 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A record about another order must not answer for this one');
-        assert.equal(threw.refundNotLinked, true, 'It is a linkage refusal, not a lookup failure');
-        assert.equal(threw.linkedTo, 'cb_sub_someone_else', 'And it names what the transaction really settled');
+        expect(threw, 'A record about another order must not answer for this one').toBeTruthy();
+        expect(threw.refundNotLinked, 'It is a linkage refusal, not a lookup failure').toBe(true);
+        expect(threw.linkedTo, 'And it names what the transaction really settled').toBe('cb_sub_someone_else');
       },
     },
 
     {
       name: 'an-event-naming-neither-record-reports-no-amount',
-      async run({ assert }) {
+      async run({ expect }) {
         const warnings = [];
         const calls = [];
         const raw = envelope({});
@@ -168,15 +168,15 @@ module.exports = defineCases({
           return Chargebee.getRefundDetails(SUBSCRIPTION_RESOURCE, { raw: raw, ctx: { warn: (m) => warnings.push(m) } });
         });
 
-        assert.equal(calls.length, 0, 'There is nothing to ask Chargebee about');
-        assert.equal(details.amount, null, 'The refund is recorded with no amount rather than with the payload\'s');
-        assert.equal(warnings.length, 1, 'And the gap is said out loud');
+        expect(calls.length, 'There is nothing to ask Chargebee about').toBe(0);
+        expect(details.amount, 'The refund is recorded with no amount rather than with the payload\'s').toBe(null);
+        expect(warnings.length, 'And the gap is said out loud').toBe(1);
       },
     },
 
     {
       name: 'a-failed-credit-note-lookup-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // An amount that cannot be verified is not written at all ([#506]).
         let threw = null;
 
@@ -188,10 +188,10 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed lookup must throw');
-        assert.equal(threw.notFound, true, 'A credit note Chargebee does not have is a terminal miss, classified by the same seam');
-        assert.equal(threw.resourceType, 'credit_note', 'The failure names the lookup that missed');
-        assert.equal(threw.resourceId, CREDIT_NOTE_ID, 'And the id it missed on');
+        expect(threw, 'A failed lookup must throw').toBeTruthy();
+        expect(threw.notFound, 'A credit note Chargebee does not have is a terminal miss, classified by the same seam').toBe(true);
+        expect(threw.resourceType, 'The failure names the lookup that missed').toBe('credit_note');
+        expect(threw.resourceId, 'And the id it missed on').toBe(CREDIT_NOTE_ID);
       },
     },
   ],

@@ -10,11 +10,10 @@
  * end to end through a real watcher; this one is the static contract, over a
  * stub Eleventy config.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { configureOmega } = require('../src/index.js');
 const { registerTemplateWatchTargets } = require('../src/commands/dev.js');
@@ -175,93 +174,110 @@ function registeredForms(fixture) {
   return config.watched;
 }
 
-test('the recorded union covers every target the hand list registered', (t) => {
-  const fixture = app(t);
-  const forms = registeredForms(fixture);
-  const registered = new Set(forms.map((entry) => entry.target));
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-watch-targets',
+  tests: [
+    {
+      name: 'the recorded union covers every target the hand list registered',
+      run: (ctx) => {
+        const fixture = app(ctx);
+        const forms = registeredForms(fixture);
+        const registered = new Set(forms.map((entry) => entry.target));
 
-  // COVERAGE, not membership: a watch target is recursive, so containment
-  // pruning (#200 Lane B) drops a recorded dir whose recorded ancestor already
-  // watches it — `_sections/toy-section` rides `_sections`, the whole defaults
-  // tree rides its root. What may never happen is a hand-list dir no target
-  // covers.
-  for (const target of legacyWatchTargets(fixture)) {
-    assert.ok([...registered].some((form) => path.isAbsolute(form) && covers(form, target)),
-      `${target} is watched by no registered target — the derivation may only ever add coverage`);
-  }
-});
+        // COVERAGE, not membership: a watch target is recursive, so containment
+        // pruning (#200 Lane B) drops a recorded dir whose recorded ancestor already
+        // watches it — `_sections/toy-section` rides `_sections`, the whole defaults
+        // tree rides its root. What may never happen is a hand-list dir no target
+        // covers.
+        for (const target of legacyWatchTargets(fixture)) {
+          ctx.expect([...registered].some((form) => path.isAbsolute(form) && covers(form, target)), `${target} is watched by no registered target — the derivation may only ever add coverage`).toBeTruthy();
+        }
+      },
+    },
 
-test('a target whose ancestor is already registered is pruned away', (t) => {
-  const fixture = app(t);
-  const registered = registeredForms(fixture).map((entry) => entry.target).filter((form) => path.isAbsolute(form));
+    {
+      name: 'a target whose ancestor is already registered is pruned away',
+      run: (ctx) => {
+        const fixture = app(ctx);
+        const registered = registeredForms(fixture).map((entry) => entry.target).filter((form) => path.isAbsolute(form));
 
-  const entryDir = path.join(fixture.consumerDir, '_sections', 'toy-section');
-  assert.ok(registered.includes(path.join(fixture.consumerDir, '_sections')), 'the sections root is the target');
-  assert.ok(!registered.includes(entryDir), 'one recursive watcher already covers every entry folder under it');
+        const entryDir = path.join(fixture.consumerDir, '_sections', 'toy-section');
+        ctx.expect(registered.includes(path.join(fixture.consumerDir, '_sections')), 'the sections root is the target').toBeTruthy();
+        ctx.expect(!registered.includes(entryDir), 'one recursive watcher already covers every entry folder under it').toBeTruthy();
 
-  for (const form of registered) {
-    assert.ok(!registered.some((other) => other !== form && covers(other, form)),
-      `${form} sits under another registered target — one dir, one watcher`);
-  }
-});
+        for (const form of registered) {
+          ctx.expect(!registered.some((other) => other !== form && covers(other, form)), `${form} sits under another registered target — one dir, one watcher`).toBeTruthy();
+        }
+      },
+    },
 
-test('the consumer scan dirs stay OFF the reset lane', (t) => {
-  const fixture = app(t);
-  const registered = new Set(registeredForms(fixture).map((entry) => entry.target));
+    {
+      name: 'the consumer scan dirs stay OFF the reset lane',
+      run: (ctx) => {
+        const fixture = app(ctx);
+        const registered = new Set(registeredForms(fixture).map((entry) => entry.target));
 
-  // The Lane B pin (#200): pages/ and the collection dirs are where a brand's
-  // content lives. A reset target on either would rebuild the whole Eleventy
-  // config on every page edit — the incremental contract (dev-watch.test.js)
-  // dies the moment one appears here.
-  for (const dir of ['pages', '_posts', '_team', '_updates']) {
-    const target = path.join(fixture.consumerDir, dir);
-    assert.ok(![...registered].some((form) => path.isAbsolute(form) && covers(form, target)),
-      `${target} resets the config — the content lanes are rescan captures, never resets`);
-  }
-});
+        // The Lane B pin (#200): pages/ and the collection dirs are where a brand's
+        // content lives. A reset target on either would rebuild the whole Eleventy
+        // config on every page edit — the incremental contract (dev-watch.test.js)
+        // dies the moment one appears here.
+        for (const dir of ['pages', '_posts', '_team', '_updates']) {
+          const target = path.join(fixture.consumerDir, dir);
+          ctx.expect(![...registered].some((form) => path.isAbsolute(form) && covers(form, target)), `${target} resets the config — the content lanes are rescan captures, never resets`).toBeTruthy();
+        }
+      },
+    },
 
-test('every derived target resets the config', (t) => {
-  const fixture = app(t);
+    {
+      name: 'every derived target resets the config',
+      run: (ctx) => {
+        const fixture = app(ctx);
 
-  for (const entry of registeredForms(fixture)) {
-    assert.deepEqual(entry.options, { resetConfig: true }, `${entry.target} must force a config reset`);
-  }
-});
+        for (const entry of registeredForms(fixture)) {
+          ctx.expect(entry.options, `${entry.target} must force a config reset`).toEqual({ resetConfig: true });
+        }
+      },
+    },
 
-test('a config build that throws still registers what it read', (t) => {
-  const fixture = app(t);
-  const config = stubConfig();
-  registerTemplateWatchTargets(config);
+    {
+      name: 'a config build that throws still registers what it read',
+      run: (ctx) => {
+        const fixture = app(ctx);
+        const config = stubConfig();
+        registerTemplateWatchTargets(config);
 
-  // A real config-time failure, part way through the build: an unknown
-  // collection name in dev.limitCollections. Everything read before it — the
-  // layers, the sections, the defaults tree — is already recorded.
-  assert.throws(
-    () => configure(config, fixture, { ...SITE_DATA, dev: { limitCollections: { bogus: 5 } } }),
-    /limitCollections/,
-  );
+        // A real config-time failure, part way through the build: an unknown
+        // collection name in dev.limitCollections. Everything read before it — the
+        // layers, the sections, the defaults tree — is already recorded.
+        ctx.expect(() => configure(config, fixture, { ...SITE_DATA, dev: { limitCollections: { bogus: 5 } } })).toThrow(/limitCollections/);
 
-  const registered = config.watched.map((entry) => entry.target);
-  assert.ok(registered.includes(path.join(fixture.consumerDir, '_layouts')),
-    'the scope closes in a finally — a broken config must still watch the dirs where its fix will land, or the fix needs a restart to be seen');
-});
+        const registered = config.watched.map((entry) => entry.target);
+        ctx.expect(registered.includes(path.join(fixture.consumerDir, '_layouts')), 'the scope closes in a finally — a broken config must still watch the dirs where its fix will land, or the fix needs a restart to be seen').toBeTruthy();
+      },
+    },
 
-test('in-cwd targets register both path forms, out-of-cwd targets absolute only', (t) => {
-  const fixture = app(t);
-  const forms = registeredForms(fixture);
-  const registered = new Set(forms.map((entry) => entry.target));
+    {
+      name: 'in-cwd targets register both path forms, out-of-cwd targets absolute only',
+      run: (ctx) => {
+        const fixture = app(ctx);
+        const forms = registeredForms(fixture);
+        const registered = new Set(forms.map((entry) => entry.target));
 
-  const inCwd = path.join(fixture.consumerDir, '_layouts');
-  assert.ok(registered.has(inCwd), 'the absolute form carries the reset today');
-  // Not dead insurance, measured (#344): registering the absolute form ALONE
-  // starved the packaged-layer reset in 5 of 8 interleaved A/B runs, against
-  // 0 of 8 with both. The duplicate event is the cost of an FSEvents stream
-  // arrangement that actually delivers.
-  assert.ok(registered.has(path.relative(process.cwd(), inCwd)), 'the relative form is the insurance form');
+        const inCwd = path.join(fixture.consumerDir, '_layouts');
+        ctx.expect(registered.has(inCwd), 'the absolute form carries the reset today').toBeTruthy();
+        // Not dead insurance, measured (#344): registering the absolute form ALONE
+        // starved the packaged-layer reset in 5 of 8 interleaved A/B runs, against
+        // 0 of 8 with both. The duplicate event is the cost of an FSEvents stream
+        // arrangement that actually delivers.
+        ctx.expect(registered.has(path.relative(process.cwd(), inCwd)), 'the relative form is the insurance form').toBeTruthy();
 
-  const outOfCwd = path.join(fs.realpathSync(fixture.coreDir), '_layouts');
-  assert.ok(registered.has(outOfCwd), 'a packaged layer registers its resolved absolute path');
-  for (const form of registered) {
-    assert.ok(!form.startsWith('..'), `${form} escapes cwd — an escaping relative target re-roots Eleventy's watcher and kills every reset (#134)`);
-  }
+        const outOfCwd = path.join(fs.realpathSync(fixture.coreDir), '_layouts');
+        ctx.expect(registered.has(outOfCwd), 'a packaged layer registers its resolved absolute path').toBeTruthy();
+        for (const form of registered) {
+          ctx.expect(!form.startsWith('..'), `${form} escapes cwd — an escaping relative target re-roots Eleventy's watcher and kills every reset (#134)`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

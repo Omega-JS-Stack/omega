@@ -26,12 +26,12 @@ module.exports = defineCases({
       name: 'repo-keys-absent-from-schemas',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         for (const [name, factory] of Object.entries(SCHEMAS)) {
           const keys = Object.keys(factory());
 
           if (keys.includes('githubUser') || keys.includes('githubRepo')) {
-            assert.fail(`${name} still accepts a caller-supplied repo target (keys: ${keys.join(',')})`);
+            expect.fail(`${name} still accepts a caller-supplied repo target (keys: ${keys.join(',')})`);
           }
         }
       },
@@ -42,7 +42,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Sending the retired keys must not change the outcome: the request is
         // resolved against brand config exactly as if they were never sent. A
         // unique URL is never-created, so both calls fetch-404 before any push.
@@ -64,11 +64,11 @@ module.exports = defineCases({
         // must make no difference. Asserting a fixed status would couple this
         // to GH_TOKEN and the network.
         if (withKeys.status !== withoutKeys.status) {
-          assert.fail(`Caller-supplied repo changed the outcome: with=${withKeys.status} (${withKeys.error}) vs without=${withoutKeys.status} (${withoutKeys.error})`);
+          expect.fail(`Caller-supplied repo changed the outcome: with=${withKeys.status} (${withKeys.error}) vs without=${withoutKeys.status} (${withoutKeys.error})`);
         }
 
         if (withKeys.success) {
-          assert.fail('Expected the never-created post to fail resolution, not succeed');
+          expect.fail('Expected the never-created post to fail resolution, not succeed');
         }
       },
     },

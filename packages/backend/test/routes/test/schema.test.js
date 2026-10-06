@@ -16,28 +16,28 @@ module.exports = defineCases({
     // ===================
     {
       name: 'default-values-applied',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided', // Must provide required field
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // Check all defaults are applied
-        assert.equal(settings.stringField, 'default-string', 'String default');
-        assert.equal(settings.numberField, 42, 'Number default');
-        assert.equal(settings.booleanField, false, 'Boolean default');
-        assert.deepEqual(settings.arrayField, ['a', 'b', 'c'], 'Array default');
+        expect(settings.stringField, 'String default').toBe('default-string');
+        expect(settings.numberField, 'Number default').toBe(42);
+        expect(settings.booleanField, 'Boolean default').toBe(false);
+        expect(settings.arrayField, 'Array default').toEqual(['a', 'b', 'c']);
         // Note: Object defaults may include schema metadata due to powertools.defaults() behavior
-        assert.equal(settings.objectField.key, 'value', 'Object default key');
+        expect(settings.objectField.key, 'Object default key').toBe('value');
       },
     },
 
     {
       name: 'user-values-override-defaults',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           stringField: 'custom-string',
@@ -47,15 +47,15 @@ module.exports = defineCases({
           objectField: { custom: 'data' },
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.stringField, 'custom-string', 'String overridden');
-        assert.equal(settings.numberField, 100, 'Number overridden');
-        assert.equal(settings.booleanField, true, 'Boolean overridden');
-        assert.deepEqual(settings.arrayField, ['x', 'y'], 'Array overridden');
-        assert.equal(settings.objectField.custom, 'data', 'Object overridden');
+        expect(settings.stringField, 'String overridden').toBe('custom-string');
+        expect(settings.numberField, 'Number overridden').toBe(100);
+        expect(settings.booleanField, 'Boolean overridden').toBe(true);
+        expect(settings.arrayField, 'Array overridden').toEqual(['x', 'y']);
+        expect(settings.objectField.custom, 'Object overridden').toBe('data');
       },
     },
 
@@ -64,65 +64,65 @@ module.exports = defineCases({
     // ===================
     {
       name: 'required-field-missing-fails',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           // NOT providing requiredField
         });
 
-        assert.isError(response, 400, 'Should fail with 400 for missing required field');
+        expect(response, 'Should fail with 400 for missing required field').toBeError(400);
       },
     },
 
     {
       name: 'required-field-provided-succeeds',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'i-am-required',
         });
 
-        assert.isSuccess(response, 'Should succeed when required field provided');
-        assert.equal(response.data.settings.requiredField, 'i-am-required', 'Required field value');
+        expect(response, 'Should succeed when required field provided').toBeSuccess();
+        expect(response.data.settings.requiredField, 'Required field value').toBe('i-am-required');
       },
     },
 
     {
       name: 'conditional-required-basic-user',
       auth: 'basic',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Basic user - conditionalRequired should NOT be required
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           // NOT providing conditionalRequired
         });
 
-        assert.isSuccess(response, 'Basic user should succeed without conditionalRequired');
+        expect(response, 'Basic user should succeed without conditionalRequired').toBeSuccess();
       },
     },
 
     {
       name: 'conditional-required-premium-user',
       auth: 'premium-active',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Premium user - conditionalRequired SHOULD be required
         const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           // NOT providing conditionalRequired
         });
 
-        assert.isError(response, 400, 'Premium user should fail without conditionalRequired');
+        expect(response, 'Premium user should fail without conditionalRequired').toBeError(400);
       },
     },
 
     {
       name: 'conditional-required-premium-provided',
       auth: 'premium-active',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'also-provided',
         });
 
-        assert.isSuccess(response, 'Premium user should succeed with conditionalRequired');
+        expect(response, 'Premium user should succeed with conditionalRequired').toBeSuccess();
       },
     },
 
@@ -131,50 +131,50 @@ module.exports = defineCases({
     // ===================
     {
       name: 'function-default-executed',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // functionDefault should be a generated string
-        assert.match(settings.functionDefault, /^generated-\d+$/, 'Function default should be generated');
+        expect(settings.functionDefault, 'Function default should be generated').toMatch(/^generated-\d+$/);
       },
     },
 
     {
       name: 'user-based-default-authenticated',
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // userBasedDefault should be the user's UID
-        assert.equal(settings.userBasedDefault, accounts.basic.uid, 'User-based default should be UID');
+        expect(settings.userBasedDefault, 'User-based default should be UID').toBe(accounts.basic.uid);
       },
     },
 
     {
       name: 'user-based-default-unauthenticated',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // userBasedDefault should be 'anonymous' for unauthenticated users
-        assert.equal(settings.userBasedDefault, 'anonymous', 'User-based default should be anonymous');
+        expect(settings.userBasedDefault, 'User-based default should be anonymous').toBe('anonymous');
       },
     },
 
@@ -183,18 +183,18 @@ module.exports = defineCases({
     // ===================
     {
       name: 'forced-value-overrides-user-input',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           forcedValue: 'user-tried-to-set-this',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // forcedValue should always be the schema's value, not user input
-        assert.equal(settings.forcedValue, 'always-this-value', 'Forced value should override user input');
+        expect(settings.forcedValue, 'Forced value should override user input').toBe('always-this-value');
       },
     },
 
@@ -203,83 +203,83 @@ module.exports = defineCases({
     // ===================
     {
       name: 'min-number-enforced',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           minNumber: -5, // Below min of 1
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // Should be clamped to min
-        assert.equal(settings.minNumber, 1, 'Number should be clamped to min');
+        expect(settings.minNumber, 'Number should be clamped to min').toBe(1);
       },
     },
 
     {
       name: 'max-number-enforced',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxNumber: 500, // Above max of 100
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // Should be clamped to max
-        assert.equal(settings.maxNumber, 100, 'Number should be clamped to max');
+        expect(settings.maxNumber, 'Number should be clamped to max').toBe(100);
       },
     },
 
     {
       name: 'clamped-number-within-range',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 75, // Within range 10-100
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.clampedNumber, 75, 'Number within range should be unchanged');
+        expect(settings.clampedNumber, 'Number within range should be unchanged').toBe(75);
       },
     },
 
     {
       name: 'clamped-number-below-range',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 5, // Below min of 10
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.clampedNumber, 10, 'Number should be clamped to min');
+        expect(settings.clampedNumber, 'Number should be clamped to min').toBe(10);
       },
     },
 
     {
       name: 'clamped-number-above-range',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 200, // Above max of 100
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.clampedNumber, 100, 'Number should be clamped to max');
+        expect(settings.clampedNumber, 'Number should be clamped to max').toBe(100);
       },
     },
 
@@ -288,18 +288,18 @@ module.exports = defineCases({
     // ===================
     {
       name: 'max-length-string-truncated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxLengthString: 'this-is-way-too-long-for-the-limit', // max is 10
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.maxLengthString.length, 10, 'String should be truncated to max length');
-        assert.equal(settings.maxLengthString, 'this-is-wa', 'String should be truncated correctly');
+        expect(settings.maxLengthString.length, 'String should be truncated to max length').toBe(10);
+        expect(settings.maxLengthString, 'String should be truncated correctly').toBe('this-is-wa');
       },
     },
 
@@ -308,18 +308,18 @@ module.exports = defineCases({
     // ===================
     {
       name: 'max-length-array-truncated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxLengthArray: ['a', 'b', 'c', 'd', 'e'], // max is 3
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.maxLengthArray.length, 3, 'Array should be truncated to max length');
-        assert.deepEqual(settings.maxLengthArray, ['a', 'b', 'c'], 'Array should be truncated correctly');
+        expect(settings.maxLengthArray.length, 'Array should be truncated to max length').toBe(3);
+        expect(settings.maxLengthArray, 'Array should be truncated correctly').toEqual(['a', 'b', 'c']);
       },
     },
 
@@ -329,35 +329,35 @@ module.exports = defineCases({
     {
       name: 'plan-based-limit-basic-user',
       auth: 'basic',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           planBasedLimit: 500, // Basic max is 100
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.planBasedLimit, 100, 'Basic user should be clamped to 100');
+        expect(settings.planBasedLimit, 'Basic user should be clamped to 100').toBe(100);
       },
     },
 
     {
       name: 'plan-based-limit-premium-user',
       auth: 'premium-active',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'provided', // Required for premium
           planBasedLimit: 500, // Premium max is 1000
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.planBasedLimit, 500, 'Premium user should allow 500');
+        expect(settings.planBasedLimit, 'Premium user should allow 500').toBe(500);
       },
     },
 
@@ -366,35 +366,35 @@ module.exports = defineCases({
     // ===================
     {
       name: 'multi-type-accepts-string',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           multiType: 'hello',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.multiType, 'hello', 'Should accept string');
-        assert.isType(settings.multiType, 'string', 'Should be string type');
+        expect(settings.multiType, 'Should accept string').toBe('hello');
+        expect(settings.multiType, 'Should be string type').toBeTypeOf('string');
       },
     },
 
     {
       name: 'multi-type-accepts-number',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           multiType: 123,
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.multiType, 123, 'Should accept number');
-        assert.isType(settings.multiType, 'number', 'Should be number type');
+        expect(settings.multiType, 'Should accept number').toBe(123);
+        expect(settings.multiType, 'Should be number type').toBeTypeOf('number');
       },
     },
 
@@ -403,17 +403,17 @@ module.exports = defineCases({
     // ===================
     {
       name: 'any-type-accepts-anything',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           anyType: { complex: { nested: ['data', 123, true] } },
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.deepEqual(settings.anyType, { complex: { nested: ['data', 123, true] } }, 'Should accept any type');
+        expect(settings.anyType, 'Should accept any type').toEqual({ complex: { nested: ['data', 123, true] } });
       },
     },
 
@@ -422,17 +422,17 @@ module.exports = defineCases({
     // ===================
     {
       name: 'clean-regex-removes-characters',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           cleanedString: 'hello@world!123#test',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.cleanedString, 'helloworld123test', 'Non-alphanumeric should be removed');
+        expect(settings.cleanedString, 'Non-alphanumeric should be removed').toBe('helloworld123test');
       },
     },
 
@@ -441,17 +441,17 @@ module.exports = defineCases({
     // ===================
     {
       name: 'clean-function-transforms-value',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           cleanedFunction: '  HELLO WORLD  ',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.cleanedFunction, 'hello world', 'Should be lowercased and trimmed');
+        expect(settings.cleanedFunction, 'Should be lowercased and trimmed').toBe('hello world');
       },
     },
 
@@ -460,23 +460,23 @@ module.exports = defineCases({
     // ===================
     {
       name: 'nested-defaults-applied',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.hasProperty(settings, 'nested.level1', 'Nested property should exist');
-        assert.equal(settings.nested.level1, 'nested-default', 'Nested default should be applied');
+        expect(settings, 'Nested property should exist').toHaveProperty('nested.level1');
+        expect(settings.nested.level1, 'Nested default should be applied').toBe('nested-default');
       },
     },
 
     {
       name: 'nested-values-overridden',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           nested: {
@@ -484,11 +484,11 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
-        assert.equal(settings.nested.level1, 'custom-nested', 'Nested value should be overridden');
+        expect(settings.nested.level1, 'Nested value should be overridden').toBe('custom-nested');
       },
     },
 
@@ -498,17 +498,17 @@ module.exports = defineCases({
     {
       name: 'unauthenticated-request',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
-        assert.isSuccess(response, 'Unauthenticated request should succeed');
+        expect(response, 'Unauthenticated request should succeed').toBeSuccess();
 
         const { user } = response.data;
 
-        assert.equal(user.authenticated, false, 'Should be unauthenticated');
-        assert.equal(user.subscription, 'basic', 'Should default to basic subscription');
+        expect(user.authenticated, 'Should be unauthenticated').toBe(false);
+        expect(user.subscription, 'Should default to basic subscription').toBe('basic');
       },
     },
 
@@ -518,38 +518,38 @@ module.exports = defineCases({
     {
       name: 'premium-only-field-basic-user',
       auth: 'basic',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           premiumOnlyField: 'trying-to-use-premium-feature',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // Basic user should NOT have access to premiumOnlyField
-        assert.ok(!('premiumOnlyField' in settings), 'Basic user should not have premiumOnlyField');
+        expect(!('premiumOnlyField' in settings), 'Basic user should not have premiumOnlyField').toBeTruthy();
       },
     },
 
     {
       name: 'premium-only-field-premium-user',
       auth: 'premium-active',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'provided',
           premiumOnlyField: 'using-premium-feature',
         });
 
-        assert.isSuccess(response, 'Request should succeed');
+        expect(response, 'Request should succeed').toBeSuccess();
 
         const { settings } = response.data;
 
         // Premium user SHOULD have access to premiumOnlyField
-        assert.ok('premiumOnlyField' in settings, 'Premium user should have premiumOnlyField');
-        assert.equal(settings.premiumOnlyField, 'using-premium-feature', 'Premium user can set value');
+        expect('premiumOnlyField' in settings, 'Premium user should have premiumOnlyField').toBeTruthy();
+        expect(settings.premiumOnlyField, 'Premium user can set value').toBe('using-premium-feature');
       },
     },
   ],

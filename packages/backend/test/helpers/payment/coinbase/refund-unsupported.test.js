@@ -50,37 +50,37 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-crypto-order-is-refused-by-the-shared-predicate',
-      async run({ assert }) {
+      async run({ expect }) {
         const refusal = oneTimeRefundRefusal(order('coinbase'));
 
-        assert.ok(refusal, 'A crypto purchase is not refundable');
-        assert.equal(refusal.reason, 'provider-cannot-refund', 'The refusal names WHY, machine-readably');
-        assert.match(refusal.message, /Coinbase Commerce purchases cannot be refunded/, 'And says so, naming the provider off its descriptor');
+        expect(refusal, 'A crypto purchase is not refundable').toBeTruthy();
+        expect(refusal.reason, 'The refusal names WHY, machine-readably').toBe('provider-cannot-refund');
+        expect(refusal.message, 'And says so, naming the provider off its descriptor').toMatch(/Coinbase Commerce purchases cannot be refunded/);
       },
     },
 
     {
       name: 'the-account-page-therefore-offers-no-button',
-      async run({ assert }) {
+      async run({ expect }) {
         // GET /user/orders answers `refundable: !oneTimeRefundRefusal(order)`,
         // so this one predicate is what keeps the button and the route agreeing
-        assert.equal(!oneTimeRefundRefusal(order('coinbase')), false, 'refundable === false for a crypto order');
+        expect(!oneTimeRefundRefusal(order('coinbase')), 'refundable === false for a crypto order').toBe(false);
       },
     },
 
     {
       name: 'the-refusal-comes-from-the-provider-not-the-order-state',
-      async run({ assert }) {
+      async run({ expect }) {
         // The very same order on a provider that CAN refund passes every guard
-        assert.equal(oneTimeRefundRefusal(order('stripe')), null, 'A card purchase is still refundable');
-        assert.equal(oneTimeRefundRefusal(order('paypal')), null);
-        assert.equal(oneTimeRefundRefusal(order('chargebee')), null);
+        expect(oneTimeRefundRefusal(order('stripe')), 'A card purchase is still refundable').toBe(null);
+        expect(oneTimeRefundRefusal(order('paypal'))).toBe(null);
+        expect(oneTimeRefundRefusal(order('chargebee'))).toBe(null);
       },
     },
 
     {
       name: 'a-crypto-order-that-names-its-provider-only-in-unified-is-refused-too',
-      async run({ assert }) {
+      async run({ expect }) {
         // The predicate reads the same fallback chain the route does
         const refusal = oneTimeRefundRefusal(order(undefined, {
           provider: null,
@@ -91,38 +91,34 @@ module.exports = defineCases({
           },
         }));
 
-        assert.ok(refusal, 'The order is still a crypto order');
-        assert.equal(refusal.reason, 'provider-cannot-refund');
+        expect(refusal, 'The order is still a crypto order').toBeTruthy();
+        expect(refusal.reason).toBe('provider-cannot-refund');
       },
     },
 
     {
       name: 'the-earlier-refusals-still-win',
-      async run({ assert }) {
+      async run({ expect }) {
         // Order matters: an already-refunded or never-completed crypto purchase
         // must keep saying the more specific thing about itself
-        assert.equal(
-          oneTimeRefundRefusal(order('coinbase', { type: 'subscription' })).reason, 'not-one-time',
-        );
-        assert.equal(
-          oneTimeRefundRefusal(order('coinbase', {
+        expect(oneTimeRefundRefusal(order('coinbase', { type: 'subscription' })).reason).toBe('not-one-time');
+        expect(oneTimeRefundRefusal(order('coinbase', {
             unified: { product: { id: 'launch-kit' }, status: 'pending', payment: { provider: 'coinbase' } },
-          })).reason, 'not-completed',
-        );
+          })).reason).toBe('not-completed');
       },
     },
 
     {
       name: 'the-provider-module-exists-so-the-route-never-says-unknown-provider',
-      async run({ assert }) {
-        assert.equal(typeof refundProvider.processRefund, 'function', 'The subscription half is exported');
-        assert.equal(typeof refundProvider.processOneTimeRefund, 'function', 'And the one-time half');
+      async run({ expect }) {
+        expect(typeof refundProvider.processRefund, 'The subscription half is exported').toBe('function');
+        expect(typeof refundProvider.processOneTimeRefund, 'And the one-time half').toBe('function');
       },
     },
 
     {
       name: 'and-both-halves-refuse-rather-than-report-a-refund-that-never-happened',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const fn of ['processRefund', 'processOneTimeRefund']) {
           let threw = false;
 
@@ -130,10 +126,10 @@ module.exports = defineCases({
             await refundProvider[fn]({ resourceId: 'ch_x', uid: 'u1', order: order('coinbase'), ctx: { log() {} } });
           } catch (e) {
             threw = true;
-            assert.match(e.message, /no refund API/i, `${fn}() says what is missing`);
+            expect(e.message, `${fn}() says what is missing`).toMatch(/no refund API/i);
           }
 
-          assert.ok(threw, `${fn}() must throw`);
+          expect(threw, `${fn}() must throw`).toBeTruthy();
         }
       },
     },

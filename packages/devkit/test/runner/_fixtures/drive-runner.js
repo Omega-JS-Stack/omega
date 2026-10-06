@@ -64,6 +64,10 @@ const SCENARIOS = {
   layer: () => ({ framework: 'desktop', fixture: 'runner-layers', drivers: { main: appDriver(() => ({ status: 'pass', durationMs: 1 })) }, options: { layer: arg } }),
   lanes: () => ({ framework: 'node', fixture: 'runner-lanes', drivers: {}, lanes: ['live'], options: arg ? { lane: arg } : {} }),
   'default-layer': () => ({ framework: 'desktop', fixture: 'runner-default', drivers: {} }),
+  'extended-lines': () => ({ framework: 'node', fixture: 'runner-lanes', drivers: {}, extendedModeLines: ['fixture extended detail'], options: { extended: true } }),
+  'one-row': () => ({ framework: 'node', fixture: arg, drivers: {} }),
+  'one-row-filter': () => ({ framework: 'node', fixture: 'lazy-load', drivers: {}, options: { filter: arg, reporter: 'pretty' } }),
+  'several-rows': () => ({ framework: 'desktop', fixture: 'eager-load', drivers: {} }),
 };
 
 async function main() {
@@ -80,6 +84,7 @@ async function main() {
     packageName: `fixture-${scenario.fixture}`,
     frameworkAliases: [],
     ...(scenario.lanes ? { lanes: scenario.lanes } : {}),
+    ...(scenario.extendedModeLines ? { extendedModeLines: scenario.extendedModeLines } : {}),
   });
 
   let result = null;

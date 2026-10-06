@@ -10,7 +10,7 @@
  *
  * Run: npx omega test backend:cli/machine-tools
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -92,9 +92,9 @@ module.exports = defineCases({
         try {
           const run = await withoutMachineTools(() => new TestCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).runEmulatorTests({}, dir));
 
-          assert.ok(run.output.includes(line), `the refusal is the list's one line: ${run.output}`);
-          assert.strictEqual(run.code, 1, 'a refused lane fails the process');
-          assert.doesNotMatch(run.output, /Starting Firebase emulator/, 'the refusal comes before the emulator boot');
+          expect(run.output.includes(line), `the refusal is the list's one line: ${run.output}`).toBeTruthy();
+          expect(run.code, 'a refused lane fails the process').toBe(1);
+          expect(run.output, 'the refusal comes before the emulator boot').not.toMatch(/Starting Firebase emulator/);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -110,16 +110,16 @@ module.exports = defineCases({
 
         try {
           for (const check of ['java-installed', 'firebase-cli']) {
-            assert.ok(FIREBASE_ONLY_SETUP_CHECKS.includes(check), `${check} is in the Firebase-only set`);
+            expect(FIREBASE_ONLY_SETUP_CHECKS.includes(check), `${check} is in the Firebase-only set`).toBeTruthy();
           }
 
           const kept = setupCheckNames(custom);
-          assert.strictEqual(kept.includes('JavaInstalledTest'), false, 'a custom backend has no emulator to need Java');
-          assert.strictEqual(kept.includes('FirebaseCliTest'), false, 'a custom backend never calls the Firebase CLI');
+          expect(kept.includes('JavaInstalledTest'), 'a custom backend has no emulator to need Java').toBe(false);
+          expect(kept.includes('FirebaseCliTest'), 'a custom backend never calls the Firebase CLI').toBe(false);
 
           const full = setupCheckNames(firebase);
-          assert.strictEqual(full.includes('JavaInstalledTest'), true);
-          assert.strictEqual(full.includes('FirebaseCliTest'), true);
+          expect(full.includes('JavaInstalledTest')).toBe(true);
+          expect(full.includes('FirebaseCliTest')).toBe(true);
         } finally {
           for (const dir of [custom, firebase]) fs.rmSync(dir, { recursive: true, force: true });
         }

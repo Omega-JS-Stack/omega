@@ -54,30 +54,30 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-trial-checkout-takes-the-trial-twin',
-      async run({ assert }) {
-        assert.equal(await resolveAgainst(BOTH_TWINS, true), 'P-TRIAL', 'The plan carrying the free cycle');
+      async run({ expect }) {
+        expect(await resolveAgainst(BOTH_TWINS, true), 'The plan carrying the free cycle').toBe('P-TRIAL');
       },
     },
 
     {
       name: 'a-skip-trial-checkout-takes-the-no-trial-twin',
-      async run({ assert }) {
+      async run({ expect }) {
         // The trial twin is first in the list and matches interval + amount, so
         // this is exactly the pick the old matcher got wrong
-        assert.equal(await resolveAgainst(BOTH_TWINS, false), 'P-NO-TRIAL', 'The plan with no free cycle to skip');
+        expect(await resolveAgainst(BOTH_TWINS, false), 'The plan with no free cycle to skip').toBe('P-NO-TRIAL');
       },
     },
 
     {
       name: 'a-product-without-trial-days-still-resolves-its-one-plan',
-      async run({ assert }) {
-        assert.equal(await resolveAgainst([plan('P-ONLY', 0)], false), 'P-ONLY', 'One plan, unchanged');
+      async run({ expect }) {
+        expect(await resolveAgainst([plan('P-ONLY', 0)], false), 'One plan, unchanged').toBe('P-ONLY');
       },
     },
 
     {
       name: 'a-missing-twin-throws-and-names-it',
-      async run({ assert }) {
+      async run({ expect }) {
         // A trial product the manager has not re-walked has only the trial twin.
         // Falling back to it would hand a returning buyer a free period they
         // were refused, so the lookup refuses instead and the fix is a manage run.
@@ -89,19 +89,19 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'No twin, no plan id');
-        assert.match(threw.message, /No active PayPal plan/, 'The existing plan-lookup refusal');
-        assert.match(threw.message, /without a trial/, 'Naming the twin that is missing');
+        expect(threw, 'No twin, no plan id').toBeTruthy();
+        expect(threw.message, 'The existing plan-lookup refusal').toMatch(/No active PayPal plan/);
+        expect(threw.message, 'Naming the twin that is missing').toMatch(/without a trial/);
       },
     },
 
     {
       name: 'a-trial-twin-of-the-wrong-length-is-not-the-trial-twin',
-      async run({ assert }) {
+      async run({ expect }) {
         // The manager matches a trial cycle by presence, so any TRIAL cycle
         // answers a trial checkout — what must never answer it is a plan with
         // none at all
-        assert.equal(await resolveAgainst([plan('P-TRIAL-30', 30), plan('P-NO-TRIAL', 0)], true), 'P-TRIAL-30', 'Presence is the match, not the day count');
+        expect(await resolveAgainst([plan('P-TRIAL-30', 30), plan('P-NO-TRIAL', 0)], true), 'Presence is the match, not the day count').toBe('P-TRIAL-30');
       },
     },
   ],

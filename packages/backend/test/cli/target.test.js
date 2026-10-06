@@ -97,85 +97,85 @@ module.exports = defineCases({
   tests: [
     {
       name: 'every-subcommand-defaults-to-the-emulator',
-      async run({ assert }) {
-        assert.equal(resolveTarget({}).emulator, true, 'no flags should default to the emulator');
-        assert.equal(resolveTarget({}).label, 'emulator', 'no flags should be labelled emulator');
+      async run({ expect }) {
+        expect(resolveTarget({}).emulator, 'no flags should default to the emulator').toBe(true);
+        expect(resolveTarget({}).label, 'no flags should be labelled emulator').toBe('emulator');
       },
     },
 
     {
       name: 'production-flag-is-the-only-way-to-the-live-stack',
-      async run({ assert }) {
-        assert.equal(resolveTarget({ production: true }).emulator, false, '--production should hit live');
-        assert.equal(resolveTarget({ production: true }).label, 'production', '--production should be labelled production');
+      async run({ expect }) {
+        expect(resolveTarget({ production: true }).emulator, '--production should hit live').toBe(false);
+        expect(resolveTarget({ production: true }).label, '--production should be labelled production').toBe('production');
       },
     },
 
     {
       name: 'emulator-flag-names-the-default-and-consults-nothing',
-      async run({ assert }) {
-        assert.equal(resolveTarget({ emulator: true }).emulator, true, '--emulator lands where the default already goes');
-        assert.equal(resolveTarget({ emulator: true, production: true }).emulator, false, '--production wins; --emulator is not consulted');
+      async run({ expect }) {
+        expect(resolveTarget({ emulator: true }).emulator, '--emulator lands where the default already goes').toBe(true);
+        expect(resolveTarget({ emulator: true, production: true }).emulator, '--production wins; --emulator is not consulted').toBe(false);
       },
     },
 
     {
       name: 'firestore-set-asks-for-the-emulator-with-no-flag',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(FIRESTORE_PATH, ['firestore:set', 'users/_test-target', '{"a":1}'], {});
 
-        assert.equal(run.emulator, true, 'firestore:set should have initialized against the emulator');
-        assert.equal(run.writes.length, 1, 'The document should have been written');
-        assert.equal(run.output.includes('emulator'), true, `The output should name the stack it hit: ${run.output}`);
+        expect(run.emulator, 'firestore:set should have initialized against the emulator').toBe(true);
+        expect(run.writes.length, 'The document should have been written').toBe(1);
+        expect(run.output.includes('emulator'), `The output should name the stack it hit: ${run.output}`).toBe(true);
       },
     },
 
     {
       name: 'firestore-set-with-production-asks-for-the-live-stack',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(FIRESTORE_PATH, ['firestore:set', 'users/_test-target', '{"a":1}'], { production: true });
 
-        assert.equal(run.emulator, false, 'firestore:set --production should have initialized against live');
-        assert.equal(run.output.includes('production'), true, `The output should name the stack it hit: ${run.output}`);
+        expect(run.emulator, 'firestore:set --production should have initialized against live').toBe(false);
+        expect(run.output.includes('production'), `The output should name the stack it hit: ${run.output}`).toBe(true);
       },
     },
 
     {
       name: 'auth-set-claims-asks-for-the-emulator-with-no-flag',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(AUTH_PATH, ['auth:set-claims', '_test-uid', '{"admin":true}'], {});
 
-        assert.equal(run.emulator, true, 'auth:set-claims should have initialized against the emulator');
-        assert.equal(run.writes.length, 1, 'The claims should have been set');
-        assert.equal(run.output.includes('emulator'), true, `The output should name the stack it hit: ${run.output}`);
+        expect(run.emulator, 'auth:set-claims should have initialized against the emulator').toBe(true);
+        expect(run.writes.length, 'The claims should have been set').toBe(1);
+        expect(run.output.includes('emulator'), `The output should name the stack it hit: ${run.output}`).toBe(true);
       },
     },
 
     {
       name: 'auth-set-claims-with-production-asks-for-the-live-stack',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(AUTH_PATH, ['auth:set-claims', '_test-uid', '{"admin":true}'], { production: true });
 
-        assert.equal(run.emulator, false, 'auth:set-claims --production should have initialized against live');
-        assert.equal(run.output.includes('production'), true, `The output should name the stack it hit: ${run.output}`);
+        expect(run.emulator, 'auth:set-claims --production should have initialized against live').toBe(false);
+        expect(run.output.includes('production'), `The output should name the stack it hit: ${run.output}`).toBe(true);
       },
     },
 
     {
       name: 'a-read-subcommand-follows-the-same-emulator-default',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(AUTH_PATH, ['auth:get', '_test-uid'], {});
 
-        assert.equal(run.emulator, true, 'auth:get should default to the emulator like everything else');
+        expect(run.emulator, 'auth:get should default to the emulator like everything else').toBe(true);
       },
     },
 
     {
       name: 'a-read-subcommand-reaches-live-with-production',
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await runSubcommand(AUTH_PATH, ['auth:get', '_test-uid'], { production: true });
 
-        assert.equal(run.emulator, false, 'auth:get --production should hit live');
+        expect(run.emulator, 'auth:get --production should hit live').toBe(false);
       },
     },
   ],

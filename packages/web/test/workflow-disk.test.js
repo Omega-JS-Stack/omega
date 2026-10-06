@@ -15,11 +15,10 @@
  * --quiet` (index vs HEAD), and `omega deploy --direct` inits a FRESH repo in
  * dist — so the depth is free to drop.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test, before, after } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { scaffoldDefaults } = require('../src/scaffold.js');
 
@@ -27,53 +26,68 @@ const quiet = { log() {}, warn() {}, error() {} };
 
 let dir;
 let workflow;
-before(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-workflow-'));
-  fs.writeFileSync(path.join(dir, '.env'), 'GH_TOKEN=ghp\n');
-  scaffoldDefaults({ outputDir: dir, logger: quiet });
-  workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
-});
 
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'workflow-disk',
+  setup: () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-workflow-'));
+    fs.writeFileSync(path.join(dir, '.env'), 'GH_TOKEN=ghp\n');
+    scaffoldDefaults({ outputDir: dir, logger: quiet });
+    workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
+  },
+  cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
+  tests: [
+    {
+      name: '#568: the checkout is shallow — nothing in the build reads history',
+      run: (ctx) => {
+        ctx.expect(workflow.includes('fetch-depth: 1'), 'depth 1, the biggest lever (~4 GB on somiibo)').toBeTruthy();
+        ctx.expect(!workflow.includes('fetch-depth: 0'), 'no full-history checkout anywhere').toBeTruthy();
+      },
+    },
 
-test('#568: the checkout is shallow — nothing in the build reads history', () => {
-  assert.ok(workflow.includes('fetch-depth: 1'), 'depth 1, the biggest lever (~4 GB on somiibo)');
-  assert.ok(!workflow.includes('fetch-depth: 0'), 'no full-history checkout anywhere');
-});
+    // #883: the third-party action is gone, CI runs the framework's OWN
+    // `deploy --direct`, which is where the orphan push, the CNAME, the .nojekyll
+    // and the Pages call live. One implementation, so the branch cannot start
+    // growing again in one lane and not the other.
+    {
+      name: '#568/#883: the gh-pages push is the framework verb, one orphan commit',
+      run: (ctx) => {
+        ctx.expect(!workflow.includes('peaceiris'), 'no third-party deploy action publishes this site any more').toBeTruthy();
+        ctx.expect(workflow.includes('node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" deploy --direct'), 'the framework verb does the build and the push, run by path (#877)').toBeTruthy();
+        ctx.expect(/name: Build and deploy to gh-pages[\s\S]{0,200}GH_TOKEN: \$\{\{ secrets\.GH_TOKEN \}\}/.test(workflow), 'with the brand cross-repo token in the step env: the website repo is not the repo this workflow lives in').toBeTruthy();
 
-// #883: the third-party action is gone, CI runs the framework's OWN
-// `deploy --direct`, which is where the orphan push, the CNAME, the .nojekyll
-// and the Pages call live. One implementation, so the branch cannot start
-// growing again in one lane and not the other.
-test('#568/#883: the gh-pages push is the framework verb, one orphan commit', () => {
-  assert.ok(!workflow.includes('peaceiris'), 'no third-party deploy action publishes this site any more');
-  assert.ok(workflow.includes('node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" deploy --direct'), 'the framework verb does the build and the push, run by path (#877)');
-  assert.ok(/name: Build and deploy to gh-pages[\s\S]{0,200}GH_TOKEN: \$\{\{ secrets\.GH_TOKEN \}\}/.test(workflow),
-    'with the brand cross-repo token in the step env: the website repo is not the repo this workflow lives in');
+        const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'deploy.js'), 'utf8');
+        ctx.expect(source, 'and the verb force-pushes the freshly inited repo in dist: one commit, forever').toMatch(/'push', '-q', '-f', plan\.pushUrl, plan\.branch/);
+      },
+    },
 
-  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'deploy.js'), 'utf8');
-  assert.match(source, /'push', '-q', '-f', plan\.pushUrl, plan\.branch/, 'and the verb force-pushes the freshly inited repo in dist: one commit, forever');
-});
+    {
+      name: '#568: disk is reported before the build AND after it, even when the build dies',
+      run: (ctx) => {
+        const before_ = workflow.indexOf('df -h /');
+        const after_ = workflow.indexOf('df -h /', before_ + 1);
+        ctx.expect(before_ > -1 && after_ > -1, 'two df readings').toBeTruthy();
 
-test('#568: disk is reported before the build AND after it, even when the build dies', () => {
-  const before_ = workflow.indexOf('df -h /');
-  const after_ = workflow.indexOf('df -h /', before_ + 1);
-  assert.ok(before_ > -1 && after_ > -1, 'two df readings');
+        const buildStep = workflow.indexOf('name: Build');
+        ctx.expect(before_ < buildStep, 'one before the build').toBeTruthy();
+        ctx.expect(after_ > buildStep, 'one after it').toBeTruthy();
 
-  const buildStep = workflow.indexOf('name: Build');
-  assert.ok(before_ < buildStep, 'one before the build');
-  assert.ok(after_ > buildStep, 'one after it');
+        // The after-step is the one that matters: it has to run when the build
+        // itself is what ran out of room.
+        ctx.expect(/if: always\(\)[\s\S]{0,200}df -h \//.test(workflow.slice(buildStep)), 'the after reading runs with if: always()').toBeTruthy();
+      },
+    },
 
-  // The after-step is the one that matters: it has to run when the build
-  // itself is what ran out of room.
-  assert.ok(/if: always\(\)[\s\S]{0,200}df -h \//.test(workflow.slice(buildStep)),
-    'the after reading runs with if: always()');
-});
+    {
+      name: '#568: no file-listing step can truncate the job log',
+      run: (ctx) => {
+        // Comments are allowed to NAME the retired command; steps are not.
+        const steps = workflow.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
 
-test('#568: no file-listing step can truncate the job log', () => {
-  // Comments are allowed to NAME the retired command; steps are not.
-  const steps = workflow.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
-
-  assert.ok(!/ls -R/.test(steps), 'no ls -R sweep (45k lines of node_modules) in any step');
-  assert.ok(steps.includes('git ls-files'), 'the listing is the tracked-file list instead');
+        ctx.expect(!/ls -R/.test(steps), 'no ls -R sweep (45k lines of node_modules) in any step').toBeTruthy();
+        ctx.expect(steps.includes('git ls-files'), 'the listing is the tracked-file list instead').toBeTruthy();
+      },
+    },
+  ],
 });

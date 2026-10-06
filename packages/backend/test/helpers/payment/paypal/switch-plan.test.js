@@ -68,24 +68,24 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-trialing-switcher-carries-the-trial-onto-a-trial-products-trial-twin',
-      async run({ assert }) {
-        assert.equal(await switchTo(TRIAL_PRODUCT, TRIALING), 'P-PREMIUM-TRIAL', 'The trial rides over');
+      async run({ expect }) {
+        expect(await switchTo(TRIAL_PRODUCT, TRIALING), 'The trial rides over').toBe('P-PREMIUM-TRIAL');
       },
     },
 
     {
       name: 'a-paying-switcher-lands-on-the-no-trial-twin',
-      async run({ assert }) {
-        assert.equal(await switchTo(TRIAL_PRODUCT, PAYING), 'P-PREMIUM', 'No free cycle for a paying customer');
+      async run({ expect }) {
+        expect(await switchTo(TRIAL_PRODUCT, PAYING), 'No free cycle for a paying customer').toBe('P-PREMIUM');
       },
     },
 
     {
       name: 'a-trialing-switcher-onto-a-trial-less-product-takes-its-one-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         // No manage run will ever mint a trial twin for a product with no trial
         // days, so asking for one would 500 every such switch
-        assert.equal(await switchTo(PLAIN_PRODUCT, TRIALING), 'P-PROOF', 'The trial ends; the switch still works');
+        expect(await switchTo(PLAIN_PRODUCT, TRIALING), 'The trial ends; the switch still works').toBe('P-PROOF');
       },
     },
   ],

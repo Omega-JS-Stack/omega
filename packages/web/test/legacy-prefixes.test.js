@@ -12,10 +12,9 @@
  * lane's `ultimate-jekyll-manager.json` reader) is history, not API: only the
  * prefixed identifiers below are banned.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const PKG = path.resolve(__dirname, '..');
 const KIT = path.resolve(PKG, '..', 'template-kit', 'src');
@@ -53,21 +52,30 @@ function walk(dir) {
   return files;
 }
 
-test('#44: no retired legacy prefix survives on a shipped surface', () => {
-  const sightings = [];
+module.exports = defineCases({
+  type: 'group',
+  description: 'legacy-prefixes',
+  tests: [
+    {
+      name: '#44: no retired legacy prefix survives on a shipped surface',
+      run: (ctx) => {
+        const sightings = [];
 
-  for (const surface of SURFACES) {
-    const dir = path.isAbsolute(surface) ? surface : path.join(PKG, surface);
-    for (const file of walk(dir)) {
-      if (file === EXEMPT) continue;
-      const text = fs.readFileSync(file, 'utf8');
-      for (const [pattern, replacement] of RETIRED) {
-        if (!pattern.test(text)) continue;
-        const line = text.split('\n').findIndex((each) => pattern.test(each)) + 1;
-        sightings.push(`${path.relative(PKG, file)}:${line} — ${pattern} (use ${replacement})`);
-      }
-    }
-  }
+        for (const surface of SURFACES) {
+          const dir = path.isAbsolute(surface) ? surface : path.join(PKG, surface);
+          for (const file of walk(dir)) {
+            if (file === EXEMPT) continue;
+            const text = fs.readFileSync(file, 'utf8');
+            for (const [pattern, replacement] of RETIRED) {
+              if (!pattern.test(text)) continue;
+              const line = text.split('\n').findIndex((each) => pattern.test(each)) + 1;
+              sightings.push(`${path.relative(PKG, file)}:${line} — ${pattern} (use ${replacement})`);
+            }
+          }
+        }
 
-  assert.deepStrictEqual(sightings, [], `retired prefixes are back:\n${sightings.join('\n')}`);
+        ctx.expect(sightings, `retired prefixes are back:\n${sightings.join('\n')}`).toEqual([]);
+      },
+    },
+  ],
 });

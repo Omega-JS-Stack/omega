@@ -25,12 +25,12 @@ module.exports = defineCases({
   tests: [
     {
       name: 'emulator-and-serve-hand-their-child-the-mkcert-root',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const file of ['emulator.js', 'serve.js']) {
           const source = fs.readFileSync(path.join(COMMANDS, file), 'utf8');
 
-          assert.equal(source.includes('NODE_EXTRA_CA_CERTS'), true, `${file} hands its child the trust variable`);
-          assert.equal(source.includes('mkcertCaRootPem'), true, `${file} resolves the root through devkit's one lookup`);
+          expect(source.includes('NODE_EXTRA_CA_CERTS'), `${file} hands its child the trust variable`).toBe(true);
+          expect(source.includes('mkcertCaRootPem'), `${file} resolves the root through devkit's one lookup`).toBe(true);
         }
       },
     },

@@ -18,14 +18,11 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Get active sessions should succeed for authenticated user');
-        assert.ok(
-          typeof response.data === 'object',
-          'Response data should be an object'
-        );
+        expect(response, 'Get active sessions should succeed for authenticated user').toBeSuccess();
+        expect(typeof response.data === 'object', 'Response data should be an object').toBeTruthy();
       },
     },
 
@@ -35,16 +32,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // With no id specified, should query sessions/app
         const response = await http.get('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Get active sessions should succeed');
+        expect(response, 'Get active sessions should succeed').toBeSuccess();
         // Response is an object (may be empty if no sessions)
-        assert.ok(
-          response.data !== undefined,
-          'Response should have data'
-        );
+        expect(response.data !== undefined, 'Response should have data').toBeTruthy();
       },
     },
 
@@ -54,16 +48,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/sessions', {
           id: 'custom-session-type',
         });
 
-        assert.isSuccess(response, 'Get active sessions with custom id should succeed');
-        assert.ok(
-          typeof response.data === 'object',
-          'Response data should be an object'
-        );
+        expect(response, 'Get active sessions with custom id should succeed').toBeSuccess();
+        expect(typeof response.data === 'object', 'Response data should be an object').toBeTruthy();
       },
     },
 
@@ -73,17 +64,14 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Query a session type that definitely doesn't exist
         const response = await http.get('omega/user/sessions', {
           id: 'nonexistent-session-type-12345',
         });
 
-        assert.isSuccess(response, 'Get sessions for empty type should succeed');
-        assert.ok(
-          Object.keys(response.data).length === 0,
-          'Empty session type should return empty object'
-        );
+        expect(response, 'Get sessions for empty type should succeed').toBeSuccess();
+        expect(Object.keys(response.data).length === 0, 'Empty session type should return empty object').toBeTruthy();
       },
     },
 
@@ -93,10 +81,10 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 15000,
 
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.get('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Get active sessions should succeed');
+        expect(response, 'Get active sessions should succeed').toBeSuccess();
 
         // The boot seed writes these into the Realtime Database from OUTSIDE the
         // functions runtime, so this is also the proof it wrote the namespace
@@ -104,15 +92,12 @@ module.exports = defineCases({
         const sessions = response.data || {};
         const ids = Object.keys(sessions).filter((id) => id.startsWith('_test-session-premium-active-'));
 
-        assert.ok(
-          ids.length >= 2,
-          `The Premium persona is seeded as signed in on several devices, so its sessions must come back (got ${Object.keys(sessions).length} session(s))`
-        );
+        expect(ids.length >= 2, `The Premium persona is seeded as signed in on several devices, so its sessions must come back (got ${Object.keys(sessions).length} session(s))`).toBeTruthy();
 
         for (const id of ids) {
-          assert.equal(sessions[id].uid, accounts['premium-active'].uid, `Session ${id} should belong to the persona`);
-          assert.ok(sessions[id].platform, `Session ${id} should name its platform`);
-          assert.ok(sessions[id].timestampUNIX > 0, `Session ${id} should record its last check-in`);
+          expect(sessions[id].uid, `Session ${id} should belong to the persona`).toBe(accounts['premium-active'].uid);
+          expect(sessions[id].platform, `Session ${id} should name its platform`).toBeTruthy();
+          expect(sessions[id].timestampUNIX > 0, `Session ${id} should record its last check-in`).toBeTruthy();
         }
       },
     },
@@ -123,10 +108,10 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Get active sessions should succeed for admin');
+        expect(response, 'Get active sessions should succeed for admin').toBeSuccess();
       },
     },
 
@@ -136,10 +121,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user/sessions', {});
 
-        assert.isError(response, 401, 'Get active sessions should fail without authentication');
+        expect(response, 'Get active sessions should fail without authentication').toBeError(401);
       },
     },
 
@@ -151,20 +136,14 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000, // Longer timeout due to session cleanup
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.delete('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Sign out all sessions should succeed for authenticated user');
-        assert.hasProperty(response, 'data.sessions', 'Response should contain sessions count');
-        assert.hasProperty(response, 'data.message', 'Response should contain message');
-        assert.ok(
-          typeof response.data.sessions === 'number',
-          'sessions should be a number'
-        );
-        assert.ok(
-          response.data.sessions >= 0,
-          'sessions count should be non-negative'
-        );
+        expect(response, 'Sign out all sessions should succeed for authenticated user').toBeSuccess();
+        expect(response, 'Response should contain sessions count').toHaveProperty('data.sessions');
+        expect(response, 'Response should contain message').toHaveProperty('data.message');
+        expect(typeof response.data.sessions === 'number', 'sessions should be a number').toBeTruthy();
+        expect(response.data.sessions >= 0, 'sessions count should be non-negative').toBeTruthy();
       },
     },
 
@@ -174,13 +153,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.delete('omega/user/sessions', {
           id: 'custom-session-type',
         });
 
-        assert.isSuccess(response, 'Sign out with custom session id should succeed');
-        assert.hasProperty(response, 'data.sessions', 'Response should contain sessions count');
+        expect(response, 'Sign out with custom session id should succeed').toBeSuccess();
+        expect(response, 'Response should contain sessions count').toHaveProperty('data.sessions');
       },
     },
 
@@ -191,11 +170,11 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.delete('omega/user/sessions', {});
 
-        assert.isSuccess(response, 'Sign out all sessions should succeed for premium user');
-        assert.hasProperty(response, 'data.sessions', 'Response should contain sessions count');
+        expect(response, 'Sign out all sessions should succeed for premium user').toBeSuccess();
+        expect(response, 'Response should contain sessions count').toHaveProperty('data.sessions');
       },
     },
 
@@ -205,13 +184,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Call twice in a row - both should succeed
         const response1 = await http.delete('omega/user/sessions', {});
         const response2 = await http.delete('omega/user/sessions', {});
 
-        assert.isSuccess(response1, 'First sign out should succeed');
-        assert.isSuccess(response2, 'Second sign out should succeed (idempotent)');
+        expect(response1, 'First sign out should succeed').toBeSuccess();
+        expect(response2, 'Second sign out should succeed (idempotent)').toBeSuccess();
       },
     },
 
@@ -221,10 +200,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.delete('omega/user/sessions', {});
 
-        assert.isError(response, 401, 'Sign out all sessions should fail without authentication');
+        expect(response, 'Sign out all sessions should fail without authentication').toBeError(401);
       },
     },
   ],

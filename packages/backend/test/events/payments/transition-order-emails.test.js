@@ -24,7 +24,7 @@
  *
  * Run: npx omega test framework:events/payments/transition-order-emails
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const newSubscription = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
 const purchaseCompleted = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
 const checkoutDeclined = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/subscription/checkout-declined.js');
@@ -97,15 +97,15 @@ module.exports = defineCases({
         const [record] = await waitForCaptured(omega, 1);
         const brandName = omega.config.brand.name;
 
-        assert.deepEqual(record.to, [USER_DOC.auth.email], 'the receipt goes to the subscriber');
-        assert.equal(record.template, 'order', 'on the order template');
-        assert.match(record.subject, /Premium order #_test-order-subscription/, `the subject names the plan and the order, got: ${record.subject}`);
+        expect(record.to, 'the receipt goes to the subscriber').toEqual([USER_DOC.auth.email]);
+        expect(record.template, 'on the order template').toBe('order');
+        expect(record.subject, `the subject names the plan and the order, got: ${record.subject}`).toMatch(/Premium order #_test-order-subscription/);
 
         // The one thing a receipt exists to state (#668), and the line that tells a
         // subscription apart from a one-time buy.
-        assert.match(record.summary, new RegExp(`${brandName} Premium`), `the summary names the product, got: ${record.summary}`);
-        assert.match(record.summary, /Billed monthly/, `and how it bills, got: ${record.summary}`);
-        assert.match(record.summary, /Total paid today \$4\.99/, `and what was charged, got: ${record.summary}`);
+        expect(record.summary, `the summary names the product, got: ${record.summary}`).toMatch(new RegExp(`${brandName} Premium`));
+        expect(record.summary, `and how it bills, got: ${record.summary}`).toMatch(/Billed monthly/);
+        expect(record.summary, `and what was charged, got: ${record.summary}`).toMatch(/Total paid today \$4\.99/);
 
         capture.clearCaptured(omega);
       },
@@ -140,15 +140,15 @@ module.exports = defineCases({
         const [record] = await waitForCaptured(omega, 1);
         const brandName = omega.config.brand.name;
 
-        assert.deepEqual(record.to, [USER_DOC.auth.email], 'the receipt goes to the buyer');
-        assert.equal(record.template, 'order');
-        assert.match(record.subject, /100 Credits order #_test-order-one-time/, `the subject names the product, got: ${record.subject}`);
+        expect(record.to, 'the receipt goes to the buyer').toEqual([USER_DOC.auth.email]);
+        expect(record.template).toBe('order');
+        expect(record.subject, `the subject names the product, got: ${record.subject}`).toMatch(/100 Credits order #_test-order-one-time/);
 
         // The #668 shape: the row used to be labelled with the order id the header
         // already prints, so the product appeared nowhere in the email.
-        assert.match(record.summary, new RegExp(`${brandName} 100 Credits`), `the summary names the product, got: ${record.summary}`);
-        assert.match(record.summary, /One-time purchase/, `and says it is not a subscription, got: ${record.summary}`);
-        assert.match(record.summary, /Total paid today \$9\.99/, `and what was charged, got: ${record.summary}`);
+        expect(record.summary, `the summary names the product, got: ${record.summary}`).toMatch(new RegExp(`${brandName} 100 Credits`));
+        expect(record.summary, `and says it is not a subscription, got: ${record.summary}`).toMatch(/One-time purchase/);
+        expect(record.summary, `and what was charged, got: ${record.summary}`).toMatch(/Total paid today \$9\.99/);
 
         capture.clearCaptured(omega);
       },
@@ -178,7 +178,7 @@ module.exports = defineCases({
         // inside, which waitForCaptured() measures at well under this.
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        assert.deepEqual(capture.readCaptured(omega), [], 'a log-only transition emails nobody');
+        expect(capture.readCaptured(omega), 'a log-only transition emails nobody').toEqual([]);
       },
     },
   ],

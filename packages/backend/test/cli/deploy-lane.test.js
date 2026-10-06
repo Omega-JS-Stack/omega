@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:cli/deploy-lane
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -188,11 +188,11 @@ module.exports = defineCases({
           // the dry run below sends nothing either way.
           const run = await runDeploy(dir, { 'dry-run': true, secrets: false });
 
-          assert.match(run.output, /DRY RUN/, 'a dry run prints the plan it would send');
-          assert.match(run.output, /actions\/workflows\/deploy\.yml\/dispatches/, 'the plan names the backend workflow');
-          assert.match(run.output, /Fixture-Org\/fixture-omega/, 'it dispatches on the brand repo the config names');
-          assert.deepStrictEqual(run.shell, [], 'a dispatch runs no firebase command of its own');
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist')), false, 'nothing is staged here: the runner stages from its own checkout');
+          expect(run.output, 'a dry run prints the plan it would send').toMatch(/DRY RUN/);
+          expect(run.output, 'the plan names the backend workflow').toMatch(/actions\/workflows\/deploy\.yml\/dispatches/);
+          expect(run.output, 'it dispatches on the brand repo the config names').toMatch(/Fixture-Org\/fixture-omega/);
+          expect(run.shell, 'a dispatch runs no firebase command of its own').toEqual([]);
+          expect(fs.existsSync(path.join(dir, 'dist')), 'nothing is staged here: the runner stages from its own checkout').toBe(false);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -207,8 +207,8 @@ module.exports = defineCases({
         try {
           const run = await runDeploy(dir, { 'dry-run': true, secrets: false });
 
-          assert.match(run.output, /actions\/workflows\/backend-deploy\.yml\/dispatches/, 'the composed name (#265) is what the brand root carries');
-          assert.strictEqual(fs.existsSync(path.join(root, '.github', 'workflows', 'backend-deploy.yml')), true, 'the verb composes it on the way past, so the dispatch can never name a file that is not there');
+          expect(run.output, 'the composed name (#265) is what the brand root carries').toMatch(/actions\/workflows\/backend-deploy\.yml\/dispatches/);
+          expect(fs.existsSync(path.join(root, '.github', 'workflows', 'backend-deploy.yml')), 'the verb composes it on the way past, so the dispatch can never name a file that is not there').toBe(true);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -235,11 +235,7 @@ module.exports = defineCases({
 
         try {
           process.env.CI = 'true';
-          await assert.rejects(
-            () => new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker(),
-            (error) => /gcloud: command not found/.test(error.message) && /403/.test(error.message),
-            'CI fails with what broke and what it costs',
-          );
+          await expect((() => new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker())(), 'CI fails with what broke and what it costs').rejects.toThrow((error) => /gcloud: command not found/.test(error.message) && /403/.test(error.message));
 
           lines.length = 0;
           delete process.env.CI;
@@ -247,7 +243,7 @@ module.exports = defineCases({
           await new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker();
           const onALaptop = lines.join('\n');
 
-          assert.strictEqual(onALaptop, '', 'a laptop stays as quiet as it was');
+          expect(onALaptop, 'a laptop stays as quiet as it was').toBe('');
         } finally {
           console.log = originalLog;
           powertools.execute = originalExecute;
@@ -268,9 +264,9 @@ module.exports = defineCases({
         try {
           const run = await runDeploy(dir, { direct: true, 'dry-run': true });
 
-          assert.match(run.output, /DRY RUN, would run: firebase deploy/, 'the plan names the command');
-          assert.deepStrictEqual(run.shell, [], 'and nothing shells out');
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist')), false, 'nothing is staged for a dry run');
+          expect(run.output, 'the plan names the command').toMatch(/DRY RUN, would run: firebase deploy/);
+          expect(run.shell, 'and nothing shells out').toEqual([]);
+          expect(fs.existsSync(path.join(dir, 'dist')), 'nothing is staged for a dry run').toBe(false);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -285,8 +281,8 @@ module.exports = defineCases({
         try {
           const run = await runDeploy(dir, { direct: true });
 
-          assert.ok(run.shell.some((command) => command.startsWith('firebase deploy')), `--direct runs the deploy itself (ran: ${run.shell.join(', ')})`);
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'index.js')), true, 'and stages the upload first');
+          expect(run.shell.some((command) => command.startsWith('firebase deploy')), `--direct runs the deploy itself (ran: ${run.shell.join(', ')})`).toBeTruthy();
+          expect(fs.existsSync(path.join(dir, 'dist', 'index.js')), 'and stages the upload first').toBe(true);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -307,12 +303,8 @@ module.exports = defineCases({
           // and nothing else about this lane reaches a shell.
           const run = await runDeploy(dir, { direct: true, 'dry-run': true });
 
-          assert.strictEqual(
-            fs.existsSync(path.join(dir, '.github', 'workflows', 'deploy.yml')),
-            true,
-            'the scaffold composed this target\'s workflow on the way past',
-          );
-          assert.deepStrictEqual(run.shell, [], 'and the lane still sends nothing');
+          expect(fs.existsSync(path.join(dir, '.github', 'workflows', 'deploy.yml')), 'the scaffold composed this target\'s workflow on the way past').toBe(true);
+          expect(run.shell, 'and the lane still sends nothing').toEqual([]);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -329,31 +321,28 @@ module.exports = defineCases({
         try {
           const green = await runFollowedDeploy(dir, async () => ({ run: {}, conclusion: 'success' }));
 
-          assert.strictEqual(green.error, null, green.error && green.error.message);
+          expect(green.error, green.error && green.error.message).toBe(null);
 
           // The dispatch address is devkit's ONE helper's (#847): the repo the
           // brand's config names, and the per-target workflow the scaffold
           // composed at the brand root (#265).
-          assert.strictEqual(green.sent.length, 1);
-          assert.deepStrictEqual(
-            { owner: green.sent[0].owner, repo: green.sent[0].repo, workflow: green.sent[0].workflow },
-            { owner: 'Fixture-Org', repo: 'fixture-omega', workflow: 'backend-deploy.yml' },
-          );
+          expect(green.sent.length).toBe(1);
+          expect({ owner: green.sent[0].owner, repo: green.sent[0].repo, workflow: green.sent[0].workflow }).toEqual({ owner: 'Fixture-Org', repo: 'fixture-omega', workflow: 'backend-deploy.yml' });
 
-          assert.strictEqual(green.followed.length, 1, 'the run is followed, not just dispatched');
-          assert.strictEqual(green.followed[0].owner, 'Fixture-Org');
-          assert.strictEqual(green.followed[0].repo, 'fixture-omega');
-          assert.strictEqual(green.followed[0].workflow, 'backend-deploy.yml', 'the composed name the dispatch itself used');
-          assert.strictEqual(green.followed[0].token, 'tok');
-          assert.ok(green.followed[0].since instanceof Date, 'the instant read before the dispatch');
-          assert.strictEqual(fs.existsSync(path.join(dir, 'logs', 'deploy.log')), true, 'the whole verb tees logs/deploy.log');
+          expect(green.followed.length, 'the run is followed, not just dispatched').toBe(1);
+          expect(green.followed[0].owner).toBe('Fixture-Org');
+          expect(green.followed[0].repo).toBe('fixture-omega');
+          expect(green.followed[0].workflow, 'the composed name the dispatch itself used').toBe('backend-deploy.yml');
+          expect(green.followed[0].token).toBe('tok');
+          expect(green.followed[0].since instanceof Date, 'the instant read before the dispatch').toBeTruthy();
+          expect(fs.existsSync(path.join(dir, 'logs', 'deploy.log')), 'the whole verb tees logs/deploy.log').toBe(true);
 
           const red = await runFollowedDeploy(dir, async () => {
             throw new Error('backend-deploy.yml concluded failure: https://github.com/Fixture-Org/fixture-omega/actions/runs/7');
           });
 
-          assert.match(red.error && red.error.message, /concluded failure/, 'a red run is the verb failing');
-          assert.match(red.error.message, /actions\/runs\/7/, 'with the run to look at');
+          expect(red.error && red.error.message, 'a red run is the verb failing').toMatch(/concluded failure/);
+          expect(red.error.message, 'with the run to look at').toMatch(/actions\/runs\/7/);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -375,19 +364,16 @@ module.exports = defineCases({
             { snapshot: 'abc1234567890' },
           );
 
-          assert.strictEqual(run.error, null, run.error && run.error.message);
-          assert.strictEqual(run.sent.length, 1);
-          assert.strictEqual(run.sent[0].snapshot, 'abc1234567890');
+          expect(run.error, run.error && run.error.message).toBe(null);
+          expect(run.sent.length).toBe(1);
+          expect(run.sent[0].snapshot).toBe('abc1234567890');
 
           // And the sha the executor answers with is what the run is BOTH
           // labelled with and held to (#902): the dispatch line names it, and
           // the follower refuses a run whose head is anything else.
-          assert.ok(
-            run.lines.join('\n').includes('Dispatched backend-deploy.yml (snapshot lane, ref main @ abc1234)'),
-            `the dispatch line names the snapshot sha (printed: ${run.lines.join('\n')})`,
-          );
-          assert.strictEqual(run.followed.length, 1);
-          assert.strictEqual(run.followed[0].headSha, 'abc1234567890');
+          expect(run.lines.join('\n').includes('Dispatched backend-deploy.yml (snapshot lane, ref main @ abc1234)'), `the dispatch line names the snapshot sha (printed: ${run.lines.join('\n')})`).toBeTruthy();
+          expect(run.followed.length).toBe(1);
+          expect(run.followed[0].headSha).toBe('abc1234567890');
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
@@ -404,15 +390,12 @@ module.exports = defineCases({
           // dispatch (which would push secrets) nor `--direct` may ship a target
           // carrying a number the brand never released.
           for (const argv of [{ 'dry-run': true, secrets: false }, { direct: true, 'dry-run': true }]) {
-            await assert.rejects(
-              () => runDeploy(dir, argv),
-              (error) => {
-                assert.strictEqual(error.refusal, true, 'a refusal prints its message alone');
-                assert.match(error.message, /targets\/backend is 0\.0\.0 but the brand is 0\.0\.3/, 'names the target and both numbers');
-                assert.match(error.message, /omega bump/, 'and the fix');
+            await expect((() => runDeploy(dir, argv))()).rejects.toThrow((error) => {
+                expect(error.refusal, 'a refusal prints its message alone').toBe(true);
+                expect(error.message, 'names the target and both numbers').toMatch(/targets\/backend is 0\.0\.0 but the brand is 0\.0\.3/);
+                expect(error.message, 'and the fix').toMatch(/omega bump/);
                 return true;
-              },
-            );
+              });
           }
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
@@ -436,12 +419,12 @@ module.exports = defineCases({
             const run = await runDeploy(dir, argv);
             const printed = run.output.split('\n').filter((line) => line.trim());
 
-            assert.match(run.output, /Skipping the backend deploy/, `the skip names itself (argv: ${JSON.stringify(argv)})`);
-            assert.match(run.output, /cloud\.shared is true/, 'and the key that decided it');
-            assert.strictEqual(printed.length, 1, `and nothing else is printed (printed: ${run.output})`);
-            assert.deepStrictEqual(run.shell, [], 'no firebase, no gcloud, no shell at all');
-            assert.strictEqual(fs.existsSync(path.join(dir, 'dist')), false, 'nothing is staged for a deploy that will not happen');
-            assert.strictEqual(process.exitCode, undefined, 'a skip is not a refusal: the verb exits 0');
+            expect(run.output, `the skip names itself (argv: ${JSON.stringify(argv)})`).toMatch(/Skipping the backend deploy/);
+            expect(run.output, 'and the key that decided it').toMatch(/cloud\.shared is true/);
+            expect(printed.length, `and nothing else is printed (printed: ${run.output})`).toBe(1);
+            expect(run.shell, 'no firebase, no gcloud, no shell at all').toEqual([]);
+            expect(fs.existsSync(path.join(dir, 'dist')), 'nothing is staged for a deploy that will not happen').toBe(false);
+            expect(process.exitCode, 'a skip is not a refusal: the verb exits 0').toBe(undefined);
           }
         } finally {
           process.exitCode = originalExitCode;
@@ -461,14 +444,11 @@ module.exports = defineCases({
         try {
           const run = await runFollowedDeploy(dir, async () => ({ run: {}, conclusion: 'success' }));
 
-          assert.strictEqual(run.error, null, run.error && run.error.message);
-          assert.strictEqual(run.prechecked.length, 0, 'no secrets are published for a deploy that will not happen');
-          assert.strictEqual(run.sent.length, 0, 'no workflow is dispatched');
-          assert.strictEqual(run.followed.length, 0, 'and no run is followed');
-          assert.ok(
-            run.lines.join('\n').includes('Skipping the backend deploy'),
-            `the skip line is what the lane printed (printed: ${run.lines.join('\n')})`,
-          );
+          expect(run.error, run.error && run.error.message).toBe(null);
+          expect(run.prechecked.length, 'no secrets are published for a deploy that will not happen').toBe(0);
+          expect(run.sent.length, 'no workflow is dispatched').toBe(0);
+          expect(run.followed.length, 'and no run is followed').toBe(0);
+          expect(run.lines.join('\n').includes('Skipping the backend deploy'), `the skip line is what the lane printed (printed: ${run.lines.join('\n')})`).toBeTruthy();
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }

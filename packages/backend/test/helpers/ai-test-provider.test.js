@@ -45,20 +45,20 @@ module.exports = defineCases({
 
     {
       name: 'no-instance-provider-runs-when-the-one-input-names-testing',
-      async run({ assert }) {
+      async run({ expect }) {
         const refusal = await attemptUnder('testing');
 
-        assert.equal(refusal, null, `OMEGA_ENVIRONMENT=testing allows the provider, got: ${refusal && refusal.message}`);
+        expect(refusal, `OMEGA_ENVIRONMENT=testing allows the provider, got: ${refusal && refusal.message}`).toBe(null);
       },
     },
 
     {
       name: 'no-instance-provider-refuses-development-off-the-emulator',
-      async run({ assert }) {
+      async run({ expect }) {
         const refusal = await attemptUnder('development');
 
-        assert.ok(refusal, 'development with no FUNCTIONS_EMULATOR refuses the provider');
-        assert.match(refusal.message, /AI test provider is only available in development or testing environments/, `the refusal is the environment gate, got: ${refusal.message}`);
+        expect(refusal, 'development with no FUNCTIONS_EMULATOR refuses the provider').toBeTruthy();
+        expect(refusal.message, `the refusal is the environment gate, got: ${refusal.message}`).toMatch(/AI test provider is only available in development or testing environments/);
       },
     },
 
@@ -66,27 +66,27 @@ module.exports = defineCases({
 
     {
       name: 'parse-script-orders-steps-and-strips-directives',
-      async run({ assert }) {
+      async run({ expect }) {
         const { steps, cleanText } = parseScript(
           'Check my order [[tool:check_order {"orderNumber":"1"}]] please [[reply:{"message":"done"}]]',
         );
 
-        assert.equal(steps.length, 2, 'two steps');
-        assert.equal(steps[0].type, 'tools', 'first step is a tool call');
-        assert.equal(steps[0].calls[0].name, 'check_order', 'tool name parsed');
-        assert.deepEqual(steps[0].calls[0].arguments, { orderNumber: '1' }, 'tool args parsed');
-        assert.equal(steps[1].type, 'reply', 'second step is the reply');
-        assert.equal(cleanText, 'Check my order  please', 'directives stripped from echo text');
+        expect(steps.length, 'two steps').toBe(2);
+        expect(steps[0].type, 'first step is a tool call').toBe('tools');
+        expect(steps[0].calls[0].name, 'tool name parsed').toBe('check_order');
+        expect(steps[0].calls[0].arguments, 'tool args parsed').toEqual({ orderNumber: '1' });
+        expect(steps[1].type, 'second step is the reply').toBe('reply');
+        expect(cleanText, 'directives stripped from echo text').toBe('Check my order  please');
       },
     },
 
     {
       name: 'parse-script-delay-attaches-to-next-step',
-      async run({ assert }) {
+      async run({ expect }) {
         const { steps } = parseScript('[[delay:50]][[tool:slow_tool]]');
 
-        assert.equal(steps.length, 1, 'one step');
-        assert.equal(steps[0].delay, 50, 'delay attached to the tool step');
+        expect(steps.length, 'one step').toBe(1);
+        expect(steps[0].delay, 'delay attached to the tool step').toBe(50);
       },
     },
 
@@ -94,7 +94,7 @@ module.exports = defineCases({
 
     {
       name: 'echo-reply-without-directives',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const result = await provider.request({
           messages: [
@@ -103,24 +103,24 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(result.content, 'Echo: hello there', 'echoes the user message');
-        assert.equal(result.stopReason, 'end', 'final turn');
-        assert.deepEqual(result.toolCalls, [], 'no tool calls');
-        assert.equal(result.tokens.total.count > 0, true, 'tokens accounted');
+        expect(result.content, 'echoes the user message').toBe('Echo: hello there');
+        expect(result.stopReason, 'final turn').toBe('end');
+        expect(result.toolCalls, 'no tool calls').toEqual([]);
+        expect(result.tokens.total.count > 0, 'tokens accounted').toBe(true);
       },
     },
 
     {
       name: 'echo-reply-json-mode-wraps-message',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const result = await provider.request({
           response: 'json',
           messages: [{ role: 'user', content: 'hi' }],
         });
 
-        assert.equal(typeof result.content, 'object', 'parsed object');
-        assert.equal(result.content.message, 'Echo: hi', 'wrapped message');
+        expect(typeof result.content, 'parsed object').toBe('object');
+        expect(result.content.message, 'wrapped message').toBe('Echo: hi');
       },
     },
 
@@ -128,7 +128,7 @@ module.exports = defineCases({
 
     {
       name: 'scripted-json-reply',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const result = await provider.request({
           response: 'json',
@@ -137,9 +137,9 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(result.content.message, 'Hi!', 'scripted message');
-        assert.equal(result.content.actions[0].label, 'More', 'scripted actions');
-        assert.equal(result.stopReason, 'end', 'final turn');
+        expect(result.content.message, 'scripted message').toBe('Hi!');
+        expect(result.content.actions[0].label, 'scripted actions').toBe('More');
+        expect(result.stopReason, 'final turn').toBe('end');
       },
     },
 
@@ -147,7 +147,7 @@ module.exports = defineCases({
 
     {
       name: 'tool-then-reply-sequence-across-turns',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const script = 'check it [[tool:check_order {"orderNumber":"42"}]] [[reply:{"message":"Order 42 shipped"}]]';
 
@@ -160,10 +160,10 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(first.stopReason, 'tool_use', 'first turn requests the tool');
-        assert.equal(first.toolCalls.length, 1, 'one call');
-        assert.equal(first.toolCalls[0].name, 'check_order', 'tool name');
-        assert.deepEqual(first.toolCalls[0].arguments, { orderNumber: '42' }, 'tool args');
+        expect(first.stopReason, 'first turn requests the tool').toBe('tool_use');
+        expect(first.toolCalls.length, 'one call').toBe(1);
+        expect(first.toolCalls[0].name, 'tool name').toBe('check_order');
+        expect(first.toolCalls[0].arguments, 'tool args').toEqual({ orderNumber: '42' });
 
         // Turn 2: caller appended the ctx turn + tool result — provider
         // moves to the next step (the reply)
@@ -177,14 +177,14 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(second.stopReason, 'end', 'second turn is final');
-        assert.equal(second.content.message, 'Order 42 shipped', 'scripted final reply');
+        expect(second.stopReason, 'second turn is final').toBe('end');
+        expect(second.content.message, 'scripted final reply').toBe('Order 42 shipped');
       },
     },
 
     {
       name: 'parallel-tools-directive-emits-multiple-calls',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const result = await provider.request({
           messages: [
@@ -192,11 +192,11 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(result.stopReason, 'tool_use', 'tool turn');
-        assert.equal(result.toolCalls.length, 2, 'two parallel calls');
-        assert.equal(result.toolCalls[0].name, 'a', 'first call');
-        assert.equal(result.toolCalls[1].name, 'b', 'second call');
-        assert.deepEqual(result.toolCalls[1].arguments, { y: 2 }, 'second args');
+        expect(result.stopReason, 'tool turn').toBe('tool_use');
+        expect(result.toolCalls.length, 'two parallel calls').toBe(2);
+        expect(result.toolCalls[0].name, 'first call').toBe('a');
+        expect(result.toolCalls[1].name, 'second call').toBe('b');
+        expect(result.toolCalls[1].arguments, 'second args').toEqual({ y: 2 });
       },
     },
 
@@ -204,7 +204,7 @@ module.exports = defineCases({
 
     {
       name: 'scripted-error-throws',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         let threw = false;
 
@@ -214,10 +214,10 @@ module.exports = defineCases({
           });
         } catch (e) {
           threw = true;
-          assert.equal(e.message, 'boom', 'scripted error message');
+          expect(e.message, 'scripted error message').toBe('boom');
         }
 
-        assert.equal(threw, true, 'throws the scripted error');
+        expect(threw, 'throws the scripted error').toBe(true);
       },
     },
 
@@ -225,7 +225,7 @@ module.exports = defineCases({
 
     {
       name: 'exhausted-script-falls-back-to-echo',
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = makeProvider();
         const script = 'hi [[tool:t1]]';
 
@@ -237,8 +237,8 @@ module.exports = defineCases({
           ],
         });
 
-        assert.equal(second.stopReason, 'end', 'falls back to a final turn');
-        assert.equal(String(second.content).startsWith('Echo:'), true, 'echo fallback');
+        expect(second.stopReason, 'falls back to a final turn').toBe('end');
+        expect(String(second.content).startsWith('Echo:'), 'echo fallback').toBe(true);
       },
     },
 
@@ -246,7 +246,7 @@ module.exports = defineCases({
 
     {
       name: 'reply-directive-from-path-based-message-settings',
-      async run({ assert }) {
+      async run({ expect }) {
         // Routes idiomatically pass message: { path, settings } — the real
         // providers render the template, so directives arrive via settings values
         const provider = makeProvider();
@@ -261,8 +261,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(typeof result.content, 'object', 'parsed object');
-        assert.equal(result.content.answer, '4', 'directive extracted from settings values');
+        expect(typeof result.content, 'parsed object').toBe('object');
+        expect(result.content.answer, 'directive extracted from settings values').toBe('4');
       },
     },
   ],

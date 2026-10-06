@@ -13,11 +13,10 @@
  * something to say (feed items, or the aside photo), and a letter with
  * neither runs full width with no aside markup at all.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, buildWith, miniData, BARE } = require('./lib/build.js');
 
@@ -39,111 +38,135 @@ function makeConsumer(sidecar) {
   return { tmp, consumerDir };
 }
 
-test('#456: letter: false kills the band — the gallery gate, on the letter', async () => {
-  const { tmp, consumerDir } = makeConsumer({ letter: false });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-off');
-    const html = pages.get('/about');
-    assert.ok(html, 'the about page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'about-letter',
+  tests: [
+    {
+      name: '#456: letter: false kills the band — the gallery gate, on the letter',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({ letter: false });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-off');
+          const html = pages.get('/about');
+          ctx.expect(html, 'the about page built').toBeTruthy();
 
-    assert.ok(!html.includes('omega-fragment'), 'the ops feed is gone');
-    assert.ok(!html.includes('omega-statement'), 'and so are the mission/vision statements');
-    assert.ok(!html.includes('All systems go'), 'no status chip survives the opt-out');
-    // The rest of the composition is untouched — the gate kills one band.
-    assert.ok(html.includes('omega-timeline'), 'the journey still renders');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('#456: a brand\'s own feed items and status chip replace the placeholder copy', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    letter: {
-      feed_items: [
-        { icon: 'code-branch', text: 'The <strong>2.0</strong> rewrite landed' },
-        { icon: 'user-plus', text: 'Priya joined the support desk' },
-      ],
-      feed_status: 'Shipping daily',
+          ctx.expect(!html.includes('omega-fragment'), 'the ops feed is gone').toBeTruthy();
+          ctx.expect(!html.includes('omega-statement'), 'and so are the mission/vision statements').toBeTruthy();
+          ctx.expect(!html.includes('All systems go'), 'no status chip survives the opt-out').toBeTruthy();
+          // The rest of the composition is untouched — the gate kills one band.
+          ctx.expect(html.includes('omega-timeline'), 'the journey still renders').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
     },
-  });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-feed');
-    const html = pages.get('/about');
-    assert.ok(html, 'the about page built');
 
-    assert.ok(html.includes('The <strong>2.0</strong> rewrite landed'), 'the brand item renders, markup and all');
-    assert.ok(html.includes('Priya joined the support desk'), 'every supplied item renders');
-    assert.ok(html.includes('Shipping daily'), 'the brand names its own status chip');
-    assert.equal((html.match(/omega-fragment__msg"/g) || []).length, 2, 'exactly the supplied items — the demo feed is REPLACED, not appended to');
-    assert.ok(!html.includes('shipped to production'), 'no fabricated release claim survives');
-    assert.ok(!html.includes('All systems go'), 'nor the default chip');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+    {
+      name: '#456: a brand\'s own feed items and status chip replace the placeholder copy',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          letter: {
+            feed_items: [
+              { icon: 'code-branch', text: 'The <strong>2.0</strong> rewrite landed' },
+              { icon: 'user-plus', text: 'Priya joined the support desk' },
+            ],
+            feed_status: 'Shipping daily',
+          },
+        });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-feed');
+          const html = pages.get('/about');
+          ctx.expect(html, 'the about page built').toBeTruthy();
 
-test('#520: an emptied feed renders NO aside at all — no frame, no chip, no label', async () => {
-  const { tmp, consumerDir } = makeConsumer({ letter: { feed_items: [] } });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-nofeed');
-    const html = pages.get('/about');
-    assert.ok(html, 'the about page built');
-
-    // The letter's own aside — the timeline band further down owns the other
-    // `omega-duo__aside omega-section-head` on this page.
-    assert.ok(!html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column is gone, not emptied');
-    assert.ok(!html.includes('omega-fragment'), 'no empty frame');
-    assert.ok(!html.includes('omega-fragment-chip'), 'no chip holding a bare dot');
-    assert.ok(!html.includes('Why we exist'), 'and no orphan aside label');
-    // The letter itself is the whole point of the band — it stays.
-    assert.ok(html.includes('omega-statement'), 'the mission/vision statements still render');
-    assert.ok(html.includes('Our mission'), 'with their own labels');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('#520: an emptied feed with an aside PHOTO keeps the aside — the picture is content', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    letter: {
-      feed_items: [],
-      image: '/assets/images/core/placeholder/photo-3.jpg',
-      image_alt: 'Placeholder artwork in soft green tones',
+          ctx.expect(html.includes('The <strong>2.0</strong> rewrite landed'), 'the brand item renders, markup and all').toBeTruthy();
+          ctx.expect(html.includes('Priya joined the support desk'), 'every supplied item renders').toBeTruthy();
+          ctx.expect(html.includes('Shipping daily'), 'the brand names its own status chip').toBeTruthy();
+          ctx.expect((html.match(/omega-fragment__msg"/g) || []).length, 'exactly the supplied items — the demo feed is REPLACED, not appended to').toBe(2);
+          ctx.expect(!html.includes('shipped to production'), 'no fabricated release claim survives').toBeTruthy();
+          ctx.expect(!html.includes('All systems go'), 'nor the default chip').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
     },
-  });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-photo-nofeed');
-    const html = pages.get('/about');
-    assert.ok(html, 'the about page built');
 
-    assert.ok(html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column survives for the photo');
-    assert.ok(html.includes('omega-aside-photo'), 'the photo hangs where it always did');
-    assert.ok(!html.includes('omega-fragment'), 'while the feed frame stays gone');
-    assert.ok(!html.includes('All systems go'), 'chip and all');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+    {
+      name: '#520: an emptied feed renders NO aside at all — no frame, no chip, no label',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({ letter: { feed_items: [] } });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-nofeed');
+          const html = pages.get('/about');
+          ctx.expect(html, 'the about page built').toBeTruthy();
 
-test('#520: the gallery shows the feedless form — the letter, full width', async () => {
-  const pages = await buildWith(miniData, {}, 'about-letter-frames');
-  const frame = pages.get('/test/sections/about/letter/frames/no-feed-the-full-width-letter');
-  assert.ok(frame, 'the feedless variant frame built');
+          // The letter's own aside — the timeline band further down owns the other
+          // `omega-duo__aside omega-section-head` on this page.
+          ctx.expect(!html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column is gone, not emptied').toBeTruthy();
+          ctx.expect(!html.includes('omega-fragment'), 'no empty frame').toBeTruthy();
+          ctx.expect(!html.includes('omega-fragment-chip'), 'no chip holding a bare dot').toBeTruthy();
+          ctx.expect(!html.includes('Why we exist'), 'and no orphan aside label').toBeTruthy();
+          // The letter itself is the whole point of the band — it stays.
+          ctx.expect(html.includes('omega-statement'), 'the mission/vision statements still render').toBeTruthy();
+          ctx.expect(html.includes('Our mission'), 'with their own labels').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-  assert.ok(!frame.includes('omega-duo'), 'no aside column, so no duo grid either');
-  assert.ok(!frame.includes('omega-fragment'), 'and nothing left of the feed');
-  assert.ok(frame.includes('omega-statement'), 'the statements are the whole band now');
-});
+    {
+      name: '#520: an emptied feed with an aside PHOTO keeps the aside — the picture is content',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          letter: {
+            feed_items: [],
+            image: '/assets/images/core/placeholder/photo-3.jpg',
+            image_alt: 'Placeholder artwork in soft green tones',
+          },
+        });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-photo-nofeed');
+          const html = pages.get('/about');
+          ctx.expect(html, 'the about page built').toBeTruthy();
 
-test('#456: no letter data — the packaged about page renders the placeholder feed, unchanged', async () => {
-  const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'about-letter-default');
-  const html = pages.get('/about');
-  assert.ok(html, 'the packaged about page built');
+          ctx.expect(html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column survives for the photo').toBeTruthy();
+          ctx.expect(html.includes('omega-aside-photo'), 'the photo hangs where it always did').toBeTruthy();
+          ctx.expect(!html.includes('omega-fragment'), 'while the feed frame stays gone').toBeTruthy();
+          ctx.expect(!html.includes('All systems go'), 'chip and all').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-  assert.ok(html.includes('This week at BareCo'), 'the feed label still liquifies against the brand');
-  assert.ok(html.includes('<strong>v2.4</strong> shipped to production'), 'the placeholder feed is byte-identical');
-  assert.ok(html.includes('Two new faces on support'), 'item two, unchanged');
-  assert.ok(html.includes('"Best tool we\'ve adopted this year"'), 'item three, unchanged');
-  assert.ok(html.includes('All systems go'), 'and the status chip');
-  assert.equal((html.match(/omega-fragment__msg"/g) || []).length, 3, 'three feed messages, as before');
+    {
+      name: '#520: the gallery shows the feedless form — the letter, full width',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'about-letter-frames');
+        const frame = pages.get('/test/sections/about/letter/frames/no-feed-the-full-width-letter');
+        ctx.expect(frame, 'the feedless variant frame built').toBeTruthy();
+
+        ctx.expect(!frame.includes('omega-duo'), 'no aside column, so no duo grid either').toBeTruthy();
+        ctx.expect(!frame.includes('omega-fragment'), 'and nothing left of the feed').toBeTruthy();
+        ctx.expect(frame.includes('omega-statement'), 'the statements are the whole band now').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#456: no letter data — the packaged about page renders the placeholder feed, unchanged',
+      run: async (ctx) => {
+        const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'about-letter-default');
+        const html = pages.get('/about');
+        ctx.expect(html, 'the packaged about page built').toBeTruthy();
+
+        ctx.expect(html.includes('This week at BareCo'), 'the feed label still liquifies against the brand').toBeTruthy();
+        ctx.expect(html.includes('<strong>v2.4</strong> shipped to production'), 'the placeholder feed is byte-identical').toBeTruthy();
+        ctx.expect(html.includes('Two new faces on support'), 'item two, unchanged').toBeTruthy();
+        ctx.expect(html.includes('"Best tool we\'ve adopted this year"'), 'item three, unchanged').toBeTruthy();
+        ctx.expect(html.includes('All systems go'), 'and the status chip').toBeTruthy();
+        ctx.expect((html.match(/omega-fragment__msg"/g) || []).length, 'three feed messages, as before').toBe(3);
+      },
+    },
+  ],
 });

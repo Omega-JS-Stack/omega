@@ -24,26 +24,26 @@ module.exports = defineCases({
 
     {
       name: 'identical-strings-match',
-      async run({ assert }) {
-        assert.equal(safeCompare('sk_live_abc123', 'sk_live_abc123'), true);
-        assert.equal(safeCompare('a', 'a'), true);
+      async run({ expect }) {
+        expect(safeCompare('sk_live_abc123', 'sk_live_abc123')).toBe(true);
+        expect(safeCompare('a', 'a')).toBe(true);
       },
     },
 
     {
       name: 'different-strings-do-not-match',
-      async run({ assert }) {
-        assert.equal(safeCompare('sk_live_abc123', 'sk_live_abc124'), false);
-        assert.equal(safeCompare('a', 'b'), false);
+      async run({ expect }) {
+        expect(safeCompare('sk_live_abc123', 'sk_live_abc124')).toBe(false);
+        expect(safeCompare('a', 'b')).toBe(false);
       },
     },
 
     {
       name: 'comparison-is-case-and-whitespace-sensitive',
-      async run({ assert }) {
-        assert.equal(safeCompare('Secret', 'secret'), false);
-        assert.equal(safeCompare('secret ', 'secret'), false);
-        assert.equal(safeCompare('\nsecret', 'secret'), false);
+      async run({ expect }) {
+        expect(safeCompare('Secret', 'secret')).toBe(false);
+        expect(safeCompare('secret ', 'secret')).toBe(false);
+        expect(safeCompare('\nsecret', 'secret')).toBe(false);
       },
     },
 
@@ -51,19 +51,19 @@ module.exports = defineCases({
 
     {
       name: 'different-lengths-return-false-without-throwing',
-      async run({ assert }) {
+      async run({ expect }) {
         // A raw timingSafeEqual on these buffers would throw.
-        assert.equal(safeCompare('short', 'a-much-longer-secret-value'), false);
-        assert.equal(safeCompare('a-much-longer-secret-value', 'short'), false);
-        assert.equal(safeCompare('prefix', 'prefix-and-more'), false);
+        expect(safeCompare('short', 'a-much-longer-secret-value')).toBe(false);
+        expect(safeCompare('a-much-longer-secret-value', 'short')).toBe(false);
+        expect(safeCompare('prefix', 'prefix-and-more')).toBe(false);
       },
     },
 
     {
       name: 'a-matching-prefix-is-still-false',
-      async run({ assert }) {
-        assert.equal(safeCompare('sk_live_', 'sk_live_abc123'), false);
-        assert.equal(safeCompare('sk_live_abc123', 'sk_live_'), false);
+      async run({ expect }) {
+        expect(safeCompare('sk_live_', 'sk_live_abc123')).toBe(false);
+        expect(safeCompare('sk_live_abc123', 'sk_live_')).toBe(false);
       },
     },
 
@@ -71,33 +71,33 @@ module.exports = defineCases({
 
     {
       name: 'empty-strings-never-match-even-each-other',
-      async run({ assert }) {
-        assert.equal(safeCompare('', ''), false);
-        assert.equal(safeCompare('', 'secret'), false);
-        assert.equal(safeCompare('secret', ''), false);
+      async run({ expect }) {
+        expect(safeCompare('', '')).toBe(false);
+        expect(safeCompare('', 'secret')).toBe(false);
+        expect(safeCompare('secret', '')).toBe(false);
       },
     },
 
     {
       name: 'undefined-and-null-never-match',
-      async run({ assert }) {
-        assert.equal(safeCompare(undefined, undefined), false);
-        assert.equal(safeCompare(null, null), false);
-        assert.equal(safeCompare(undefined, 'secret'), false);
-        assert.equal(safeCompare('secret', undefined), false);
-        assert.equal(safeCompare(null, 'secret'), false);
+      async run({ expect }) {
+        expect(safeCompare(undefined, undefined)).toBe(false);
+        expect(safeCompare(null, null)).toBe(false);
+        expect(safeCompare(undefined, 'secret')).toBe(false);
+        expect(safeCompare('secret', undefined)).toBe(false);
+        expect(safeCompare(null, 'secret')).toBe(false);
       },
     },
 
     {
       name: 'non-string-inputs-never-match',
-      async run({ assert }) {
-        assert.equal(safeCompare(123, 123), false);
-        assert.equal(safeCompare('123', 123), false);
-        assert.equal(safeCompare(true, true), false);
-        assert.equal(safeCompare({}, {}), false);
-        assert.equal(safeCompare(['a'], ['a']), false);
-        assert.equal(safeCompare(Buffer.from('secret'), 'secret'), false);
+      async run({ expect }) {
+        expect(safeCompare(123, 123)).toBe(false);
+        expect(safeCompare('123', 123)).toBe(false);
+        expect(safeCompare(true, true)).toBe(false);
+        expect(safeCompare({}, {})).toBe(false);
+        expect(safeCompare(['a'], ['a'])).toBe(false);
+        expect(safeCompare(Buffer.from('secret'), 'secret')).toBe(false);
       },
     },
 
@@ -105,9 +105,9 @@ module.exports = defineCases({
 
     {
       name: 'unicode-secrets-compare-correctly',
-      async run({ assert }) {
-        assert.equal(safeCompare('sécret-🔑', 'sécret-🔑'), true);
-        assert.equal(safeCompare('sécret-🔑', 'secret-🔑'), false);
+      async run({ expect }) {
+        expect(safeCompare('sécret-🔑', 'sécret-🔑')).toBe(true);
+        expect(safeCompare('sécret-🔑', 'secret-🔑')).toBe(false);
       },
     },
   ],

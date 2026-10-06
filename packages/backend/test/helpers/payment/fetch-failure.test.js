@@ -15,7 +15,7 @@
  *
  * Run: npx omega test backend:helpers/payment/fetch-failure
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
@@ -45,7 +45,7 @@ async function throwsFrom(fn) {
     return e;
   }
 
-  assert.fail('A failed lookup must throw — there is nothing to fall back to');
+  expect.fail('A failed lookup must throw — there is nothing to fall back to');
 }
 
 module.exports = defineCases({
@@ -64,10 +64,10 @@ module.exports = defineCases({
           throw notThere;
         }, () => Chargebee.fetchResource('subscription', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, true, 'Chargebee answering 404 means the resource is gone');
-        assert.equal(error.provider, 'chargebee', 'the failure names the provider that was asked');
-        assert.equal(error.resourceId, RESOURCE_ID, 'and the resource it was asked about');
-        assert.match(error.message, /chargebee does not have subscription/, 'the message says the provider does not have it');
+        expect(error.notFound, 'Chargebee answering 404 means the resource is gone').toBe(true);
+        expect(error.provider, 'the failure names the provider that was asked').toBe('chargebee');
+        expect(error.resourceId, 'and the resource it was asked about').toBe(RESOURCE_ID);
+        expect(error.message, 'the message says the provider does not have it').toMatch(/chargebee does not have subscription/);
       },
     },
 
@@ -78,8 +78,8 @@ module.exports = defineCases({
           throw new Error('fetch failed');
         }, () => Chargebee.fetchResource('subscription', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, false, 'an unreachable API is not a provider saying the resource is gone');
-        assert.match(error.message, /could not be reached/, 'the message says the lookup never got an answer');
+        expect(error.notFound, 'an unreachable API is not a provider saying the resource is gone').toBe(false);
+        expect(error.message, 'the message says the lookup never got an answer').toMatch(/could not be reached/);
       },
     },
 
@@ -96,10 +96,10 @@ module.exports = defineCases({
           throw notThere;
         }, () => Coinbase.fetchResource('charge', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, true, 'Coinbase answering 404 means the charge is gone');
-        assert.equal(error.provider, 'coinbase', 'the failure names the provider that was asked');
-        assert.equal(error.resourceId, RESOURCE_ID, 'and the resource it was asked about');
-        assert.match(error.message, /coinbase does not have charge/, 'the message says the provider does not have it');
+        expect(error.notFound, 'Coinbase answering 404 means the charge is gone').toBe(true);
+        expect(error.provider, 'the failure names the provider that was asked').toBe('coinbase');
+        expect(error.resourceId, 'and the resource it was asked about').toBe(RESOURCE_ID);
+        expect(error.message, 'the message says the provider does not have it').toMatch(/coinbase does not have charge/);
       },
     },
 
@@ -110,8 +110,8 @@ module.exports = defineCases({
           throw new Error('fetch failed');
         }, () => Coinbase.fetchResource('charge', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, false, 'an unreachable API is not a provider saying the charge is gone');
-        assert.match(error.message, /could not be reached/, 'the message says the lookup never got an answer');
+        expect(error.notFound, 'an unreachable API is not a provider saying the charge is gone').toBe(false);
+        expect(error.message, 'the message says the lookup never got an answer').toMatch(/could not be reached/);
       },
     },
 
@@ -123,8 +123,8 @@ module.exports = defineCases({
           throw new Error('PayPal API 404: The specified resource does not exist.');
         }, () => PayPal.fetchResource('subscription', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, true, 'PayPal answering 404 means the resource is gone');
-        assert.equal(error.provider, 'paypal', 'the failure names the provider that was asked');
+        expect(error.notFound, 'PayPal answering 404 means the resource is gone').toBe(true);
+        expect(error.provider, 'the failure names the provider that was asked').toBe('paypal');
       },
     },
 
@@ -138,8 +138,8 @@ module.exports = defineCases({
           throw new Error('PayPal API 503: Service unavailable');
         }, () => PayPal.fetchResource('order', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, false, 'a 503 is transient');
-        assert.match(error.message, /NOT captured/, 'the consequence of the failed capture rides on the failure');
+        expect(error.notFound, 'a 503 is transient').toBe(false);
+        expect(error.message, 'the consequence of the failed capture rides on the failure').toMatch(/NOT captured/);
       },
     },
 
@@ -161,8 +161,8 @@ module.exports = defineCases({
         const error = await throwsFrom(() => withTransport(Stripe, 'init', () => sdk,
           () => Stripe.fetchResource('subscription', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, true, 'Stripe resource_missing means the resource is gone');
-        assert.equal(error.cause, missing, 'the provider\'s own error rides along for the logs');
+        expect(error.notFound, 'Stripe resource_missing means the resource is gone').toBe(true);
+        expect(error.cause, 'the provider\'s own error rides along for the logs').toBe(missing);
       },
     },
 
@@ -180,7 +180,7 @@ module.exports = defineCases({
         const error = await throwsFrom(() => withTransport(Stripe, 'init', () => sdk,
           () => Stripe.fetchResource('subscription', RESOURCE_ID, {})));
 
-        assert.equal(error.notFound, false, 'an outage is not a provider saying the resource is gone');
+        expect(error.notFound, 'an outage is not a provider saying the resource is gone').toBe(false);
       },
     },
 
@@ -194,8 +194,8 @@ module.exports = defineCases({
           throw new Error('PayPal API 404: The specified resource does not exist.');
         }, () => PayPal.getRefundDetails({ id: 'SALE-1' }, { refundId: RESOURCE_ID, eventType: 'PAYMENT.SALE.REFUNDED' })));
 
-        assert.match(error.message, /getRefundDetails\(refund\//, 'the refund lookup names getRefundDetails, not fetchResource');
-        assert.equal(error.notFound, true, 'and still classifies — a 404 refund is gone');
+        expect(error.message, 'the refund lookup names getRefundDetails, not fetchResource').toMatch(/getRefundDetails\(refund\//);
+        expect(error.notFound, 'and still classifies — a 404 refund is gone').toBe(true);
       },
     },
 
@@ -207,8 +207,8 @@ module.exports = defineCases({
         // which would acknowledge the event and drop it forever.
         const error = await throwsFrom(() => Chargebee.fetchResource('unknown-type', RESOURCE_ID, {}));
 
-        assert.equal(error.notFound, false, 'nothing was asked, so nothing was answered');
-        assert.match(error.message, /Unknown resource type/, 'the original error still surfaces');
+        expect(error.notFound, 'nothing was asked, so nothing was answered').toBe(false);
+        expect(error.message, 'the original error still surfaces').toMatch(/Unknown resource type/);
       },
     },
   ],

@@ -18,8 +18,7 @@
  * esbuild with the client stubbed, over a hand-rolled document that is only
  * what the section builds with.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -140,100 +139,126 @@ async function build({ search = '?product=premium' } = {}) {
   };
 }
 
-test('#234: the checkout section is scoped to the checkout page', async () => {
-  const { section, setPath } = await build();
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-dev-section',
+  tests: [
+    {
+      name: '#234: the checkout section is scoped to the checkout page',
+      run: async (ctx) => {
+        const { section, setPath } = await build();
 
-  assert.strictEqual(section.title, 'Checkout', 'it supplies the heading the palette renders it under');
-  assert.strictEqual(section.appliesTo(), true, 'on the checkout page it applies');
+        ctx.expect(section.title, 'it supplies the heading the palette renders it under').toBe('Checkout');
+        ctx.expect(section.appliesTo(), 'on the checkout page it applies').toBe(true);
 
-  setPath('/pricing');
-  assert.strictEqual(section.appliesTo(), false, 'anywhere else it does not');
-});
+        setPath('/pricing');
+        ctx.expect(section.appliesTo(), 'anywhere else it does not').toBe(false);
+      },
+    },
 
-test('#234: the section carries every control the gear dropdown offered', async () => {
-  const { select } = await build();
+    {
+      name: '#234: the section carries every control the gear dropdown offered',
+      run: async (ctx) => {
+        const { select } = await build();
 
-  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProvider', '_dev_recaptcha']) {
-    assert.ok(select(param), `the ported control for "${param}" is present`);
-  }
+        for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProvider', '_dev_recaptcha']) {
+          ctx.expect(select(param), `the ported control for "${param}" is present`).toBeTruthy();
+        }
 
-  // The product list is the brand's own, not a hardcoded one.
-  const products = select('product').children.map((option) => option.value);
-  assert.deepStrictEqual(products, ['premium', 'lifetime'], 'products come from the payment config');
+        // The product list is the brand's own, not a hardcoded one.
+        const products = select('product').children.map((option) => option.value);
+        ctx.expect(products, 'products come from the payment config').toEqual(['premium', 'lifetime']);
 
-  // The provider override is the reason this section exists as more than the
-  // decline toggle — state.js resolves a card payment through exactly this.
-  const providers = select('_dev_cardProvider').children.map((option) => option.value);
-  assert.deepStrictEqual(providers, ['', 'test', 'stripe', 'chargebee'], 'auto plus every provider state.js can force');
-});
+        // The provider override is the reason this section exists as more than the
+        // decline toggle — state.js resolves a card payment through exactly this.
+        const providers = select('_dev_cardProvider').children.map((option) => option.value);
+        ctx.expect(providers, 'auto plus every provider state.js can force').toEqual(['', 'test', 'stripe', 'chargebee']);
+      },
+    },
 
-test('#234: the provider override applies by navigating with the param set', async () => {
-  const { select, button, navigations } = await build();
+    {
+      name: '#234: the provider override applies by navigating with the param set',
+      run: async (ctx) => {
+        const { select, button, navigations } = await build();
 
-  select('_dev_cardProvider').value = 'chargebee';
-  await button('Apply & reload').click();
+        select('_dev_cardProvider').value = 'chargebee';
+        await button('Apply & reload').click();
 
-  assert.strictEqual(navigations.length, 1, 'applying navigates once');
+        ctx.expect(navigations.length, 'applying navigates once').toBe(1);
 
-  const applied = new URLSearchParams(navigations[0]);
-  assert.strictEqual(
-    applied.get('_dev_cardProvider'),
-    'chargebee',
-    'the override rides the URL — that is the only place modules/state.js reads it',
-  );
-  assert.strictEqual(applied.get('product'), 'premium', 'and the product the page is on is carried over');
-});
+        const applied = new URLSearchParams(navigations[0]);
+        ctx.expect(applied.get('_dev_cardProvider'), 'the override rides the URL — that is the only place modules/state.js reads it').toBe('chargebee');
+        ctx.expect(applied.get('product'), 'and the product the page is on is carried over').toBe('premium');
+      },
+    },
 
-test('#234: the controls open showing what the page actually used', async () => {
-  const { select } = await build({ search: '?product=lifetime&frequency=monthly&_dev_cardProvider=stripe' });
+    {
+      name: '#234: the controls open showing what the page actually used',
+      run: async (ctx) => {
+        const { select } = await build({ search: '?product=lifetime&frequency=monthly&_dev_cardProvider=stripe' });
 
-  assert.strictEqual(select('product').value, 'lifetime', 'the product from the URL');
-  assert.strictEqual(select('frequency').value, 'monthly', 'the frequency from the URL');
-  assert.strictEqual(select('_dev_cardProvider').value, 'stripe', 'the forced provider from the URL');
-  assert.strictEqual(select('_dev_trialEligible').value, '', 'an unset param shows its default option');
-});
+        ctx.expect(select('product').value, 'the product from the URL').toBe('lifetime');
+        ctx.expect(select('frequency').value, 'the frequency from the URL').toBe('monthly');
+        ctx.expect(select('_dev_cardProvider').value, 'the forced provider from the URL').toBe('stripe');
+        ctx.expect(select('_dev_trialEligible').value, 'an unset param shows its default option').toBe('');
+      },
+    },
 
-test('#226: the decline toggle rides with the section, and applies as `_dev_decline`', async () => {
-  const { checkbox, button, navigations } = await build();
+    {
+      name: '#226: the decline toggle rides with the section, and applies as `_dev_decline`',
+      run: async (ctx) => {
+        const { checkbox, button, navigations } = await build();
 
-  const decline = checkbox('omega-devbar-decline');
-  assert.ok(decline, 'the toggle is part of the checkout section now, not a palette built-in');
-  assert.strictEqual(decline.checked, false, 'nothing is armed until you ask for it');
+        const decline = checkbox('omega-devbar-decline');
+        ctx.expect(decline, 'the toggle is part of the checkout section now, not a palette built-in').toBeTruthy();
+        ctx.expect(decline.checked, 'nothing is armed until you ask for it').toBe(false);
 
-  decline.checked = true;
-  await button('Apply & reload').click();
+        decline.checked = true;
+        await button('Apply & reload').click();
 
-  const applied = new URLSearchParams(navigations[0]);
-  assert.strictEqual(applied.get('_dev_decline'), 'true', 'the arm rides the URL, like every other checkout control');
-  assert.strictEqual(applied.get('product'), 'premium', 'and the rest of the panel applies alongside it');
-});
+        const applied = new URLSearchParams(navigations[0]);
+        ctx.expect(applied.get('_dev_decline'), 'the arm rides the URL, like every other checkout control').toBe('true');
+        ctx.expect(applied.get('product'), 'and the rest of the panel applies alongside it').toBe('premium');
+      },
+    },
 
-test('#226: the toggle opens showing the arm the page is actually running with', async () => {
-  const { checkbox } = await build({ search: '?product=premium&_dev_decline=true' });
+    {
+      name: '#226: the toggle opens showing the arm the page is actually running with',
+      run: async (ctx) => {
+        const { checkbox } = await build({ search: '?product=premium&_dev_decline=true' });
 
-  assert.strictEqual(checkbox('omega-devbar-decline').checked, true, 'the param the intent POST reads shows as armed');
-});
+        ctx.expect(checkbox('omega-devbar-decline').checked, 'the param the intent POST reads shows as armed').toBe(true);
+      },
+    },
 
-test('#226: an unarmed toggle applies no param at all', async () => {
-  // The arm persists until it is applied away, so an unchecked box has to
-  // REMOVE the param — never write `_dev_decline=false`, which the intent POST
-  // would read as an arm anyway.
-  const { checkbox, button, navigations } = await build({ search: '?product=premium&_dev_decline=true' });
+    {
+      name: '#226: an unarmed toggle applies no param at all',
+      run: async (ctx) => {
+        // The arm persists until it is applied away, so an unchecked box has to
+        // REMOVE the param — never write `_dev_decline=false`, which the intent POST
+        // would read as an arm anyway.
+        const { checkbox, button, navigations } = await build({ search: '?product=premium&_dev_decline=true' });
 
-  checkbox('omega-devbar-decline').checked = false;
-  await button('Apply & reload').click();
+        checkbox('omega-devbar-decline').checked = false;
+        await button('Apply & reload').click();
 
-  const applied = new URLSearchParams(navigations[0]);
-  assert.strictEqual(applied.has('_dev_decline'), false, 'unchecking disarms by dropping the param');
-});
+        const applied = new URLSearchParams(navigations[0]);
+        ctx.expect(applied.has('_dev_decline'), 'unchecking disarms by dropping the param').toBe(false);
+      },
+    },
 
-test('#234: an unset control is left out of the applied URL entirely', async () => {
-  const { button, navigations } = await build({ search: '?product=premium' });
+    {
+      name: '#234: an unset control is left out of the applied URL entirely',
+      run: async (ctx) => {
+        const { button, navigations } = await build({ search: '?product=premium' });
 
-  await button('Apply & reload').click();
+        await button('Apply & reload').click();
 
-  const applied = new URLSearchParams(navigations[0]);
-  assert.strictEqual(applied.has('_dev_cardProvider'), false, 'auto means no param, not an empty one');
-  assert.strictEqual(applied.has('_dev_trialEligible'), false, 'and the API answer is left alone');
-  assert.strictEqual(applied.get('frequency'), 'annually', 'the frequency select has no empty option — it always applies');
+        const applied = new URLSearchParams(navigations[0]);
+        ctx.expect(applied.has('_dev_cardProvider'), 'auto means no param, not an empty one').toBe(false);
+        ctx.expect(applied.has('_dev_trialEligible'), 'and the API answer is left alone').toBe(false);
+        ctx.expect(applied.get('frequency'), 'the frequency select has no empty option — it always applies').toBe('annually');
+      },
+    },
+  ],
 });

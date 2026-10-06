@@ -123,18 +123,17 @@ class Omega extends EventEmitter {
    * Boot the backend. Synchronous; returns the instance.
    * @param {object} [options] - projectType, resourceZone, sentry, reportErrorsInDev,
    *   firebaseConfig, serviceAccountPath, checkNodeVersion, uniqueAppName, cwd, projectPackageDirectory,
-   *   logSavePath, express.bodyParser, identity, useFirebaseLogger, ctx
+   *   logSavePath, express.bodyParser, identity, useFirebaseLogger, ctx, runnerHost
    * @returns {Omega} the instance.
    */
   initialize(options = {}) {
-    // The test runner sets OMEGA_TEST_RUNNER before loading the framework: it has
-    // already initialized firebase-admin and is no Functions runtime, so the
-    // Firebase init, the function wiring, the custom server and Sentry stay off
-    const isTestRunner = !!process.env.OMEGA_TEST_RUNNER;
-
+    // A runner host (the test runner) has already initialized firebase-admin and is
+    // no Functions runtime: the Firebase init, the function wiring, the custom
+    // server and Sentry stay off
+    options.runnerHost = typeof options.runnerHost === 'undefined' ? false : options.runnerHost;
     options.identity = typeof options.identity === 'undefined' ? true : options.identity;
     options.resourceZone = typeof options.resourceZone === 'undefined' ? 'us-central1' : options.resourceZone;
-    options.sentry = typeof options.sentry === 'undefined' ? !isTestRunner : options.sentry;
+    options.sentry = typeof options.sentry === 'undefined' ? !options.runnerHost : options.sentry;
     options.reportErrorsInDev = typeof options.reportErrorsInDev === 'undefined' ? false : options.reportErrorsInDev;
     options.useFirebaseLogger = typeof options.useFirebaseLogger === 'undefined' ? true : options.useFirebaseLogger;
     options.serviceAccountPath = typeof options.serviceAccountPath === 'undefined' ? 'service-account.json' : options.serviceAccountPath;
@@ -312,7 +311,7 @@ class Omega extends EventEmitter {
       });
     }
 
-    if (!isTestRunner) {
+    if (!options.runnerHost) {
       this.#initializeFirebase(options);
 
       if (options.projectType === 'firebase') {

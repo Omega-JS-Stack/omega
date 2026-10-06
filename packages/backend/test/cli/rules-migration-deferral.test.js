@@ -114,7 +114,7 @@ module.exports = defineCases({
       name: 'setup-leaves-a-legacy-exact-tree-byte-identical',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-defer-', LEGACY_SOURCE, BRAND_RULES_FILE);
         const before = snapshot(targetPath);
 
@@ -122,10 +122,10 @@ module.exports = defineCases({
         const file = await runCheck(FirestoreRulesFileTest, targetPath);
         const after = snapshot(targetPath);
 
-        assert.equal(inJson.result, 'warn', 'the firebase.json check must DEFER, not fail into a fix');
-        assert.equal(file.result, 'warn', 'the rules-source check must DEFER, not fail into a fix');
-        assert.equal(after.rules, before.rules, `${BRAND_RULES_FILE} must be byte-identical after setup`);
-        assert.equal(after.firebaseJSON, before.firebaseJSON, 'firebase.json must be byte-identical after setup');
+        expect(inJson.result, 'the firebase.json check must DEFER, not fail into a fix').toBe('warn');
+        expect(file.result, 'the rules-source check must DEFER, not fail into a fix').toBe('warn');
+        expect(after.rules, `${BRAND_RULES_FILE} must be byte-identical after setup`).toBe(before.rules);
+        expect(after.firebaseJSON, 'firebase.json must be byte-identical after setup').toBe(before.firebaseJSON);
 
         jetpack.remove(targetPath);
       },
@@ -135,7 +135,7 @@ module.exports = defineCases({
       name: 'the-deferral-is-named-in-the-output-with-the-migration-pointer',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-defer-notice-', LEGACY_SOURCE, BRAND_RULES_FILE);
 
         const inJson = await runCheck(FirestoreRulesInJsonTest, targetPath);
@@ -144,10 +144,10 @@ module.exports = defineCases({
         const jsonNotice = inJson.warning.join('\n');
         const fileNotice = file.warning.join('\n');
 
-        assert.match(jsonNotice, /defer/i, 'the firebase.json deferral must say it deferred');
-        assert.match(jsonNotice, /live posture|allow create, update/i, 'the deferral must name what migrating would change');
-        assert.ok(jsonNotice.includes(RULES_MIGRATION_COMMAND), `the deferral must point at ${RULES_MIGRATION_COMMAND}`);
-        assert.ok(fileNotice.includes(RULES_MIGRATION_COMMAND), `the rules-source deferral must point at ${RULES_MIGRATION_COMMAND}`);
+        expect(jsonNotice, 'the firebase.json deferral must say it deferred').toMatch(/defer/i);
+        expect(jsonNotice, 'the deferral must name what migrating would change').toMatch(/live posture|allow create, update/i);
+        expect(jsonNotice.includes(RULES_MIGRATION_COMMAND), `the deferral must point at ${RULES_MIGRATION_COMMAND}`).toBeTruthy();
+        expect(fileNotice.includes(RULES_MIGRATION_COMMAND), `the rules-source deferral must point at ${RULES_MIGRATION_COMMAND}`).toBeTruthy();
 
         jetpack.remove(targetPath);
       },
@@ -157,7 +157,7 @@ module.exports = defineCases({
       name: 'a-tree-already-on-the-compiled-artifact-still-migrates-and-compiles',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Deferral hangs on the firebase.json TARGET, not on the source's era:
         // a brand already deploying dist/firestore.rules has taken the model,
         // so setup keeps healing its source exactly as before.
@@ -165,9 +165,9 @@ module.exports = defineCases({
 
         const file = await runCheck(FirestoreRulesFileTest, targetPath);
 
-        assert.equal(file.result, false, 'an unmigrated source under the compiled target still fails into its fix');
-        assert.equal(jetpack.read(path.join(targetPath, BRAND_RULES_FILE)).includes('OMEGA Rules (v1.0.0)'), false, 'the marker block is migrated out');
-        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'file', 'the compiled artifact is written');
+        expect(file.result, 'an unmigrated source under the compiled target still fails into its fix').toBe(false);
+        expect(jetpack.read(path.join(targetPath, BRAND_RULES_FILE)).includes('OMEGA Rules (v1.0.0)'), 'the marker block is migrated out').toBe(false);
+        expect(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'the compiled artifact is written').toBe('file');
 
         jetpack.remove(targetPath);
       },
@@ -177,7 +177,7 @@ module.exports = defineCases({
       name: 'a-fresh-tree-is-untouched-by-the-deferral',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // No rules file and no firestore target — nothing has been deferred,
         // so the seed + retarget path must still run for a new brand.
         const targetPath = jetpack.tmpDir({ prefix: 'omega-rules-fresh-' }).path();
@@ -186,10 +186,10 @@ module.exports = defineCases({
         const inJson = await runCheck(FirestoreRulesInJsonTest, targetPath);
         const file = await runCheck(FirestoreRulesFileTest, targetPath);
 
-        assert.equal(inJson.result, false, 'a fresh tree fails the check and takes the fix');
-        assert.equal(file.result, false, 'a fresh tree fails the check and takes the fix');
-        assert.equal(jetpack.read(path.join(targetPath, 'firebase.json'), 'json').firestore.rules, COMPILED_RULES_FILE, 'firebase.json is pointed at the compiled artifact');
-        assert.equal(jetpack.read(path.join(targetPath, BRAND_RULES_FILE)), jetpack.read(BRAND_RULES_SEED), 'the brand source is seeded');
+        expect(inJson.result, 'a fresh tree fails the check and takes the fix').toBe(false);
+        expect(file.result, 'a fresh tree fails the check and takes the fix').toBe(false);
+        expect(jetpack.read(path.join(targetPath, 'firebase.json'), 'json').firestore.rules, 'firebase.json is pointed at the compiled artifact').toBe(COMPILED_RULES_FILE);
+        expect(jetpack.read(path.join(targetPath, BRAND_RULES_FILE)), 'the brand source is seeded').toBe(jetpack.read(BRAND_RULES_SEED));
 
         jetpack.remove(targetPath);
       },
@@ -199,7 +199,7 @@ module.exports = defineCases({
       name: 'the-migration-verb-does-what-setup-refused-to',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-verb-', LEGACY_SOURCE, BRAND_RULES_FILE);
 
         const command = new MigrateRulesCommand({ firebaseProjectPath: targetPath, argv: {}, options: {} });
@@ -207,10 +207,10 @@ module.exports = defineCases({
 
         const source = jetpack.read(path.join(targetPath, BRAND_RULES_FILE));
 
-        assert.equal(source.includes('OMEGA Rules (v1.0.0)'), false, 'the marker block is migrated out of the brand source');
-        assert.match(source, /match \/leaderboards\/\{id\}/, "the brand's own rules survive the migration");
-        assert.equal(jetpack.read(path.join(targetPath, 'firebase.json'), 'json').firestore.rules, COMPILED_RULES_FILE, 'firebase.json is repointed at the compiled artifact');
-        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'file', 'the compiled artifact is written');
+        expect(source.includes('OMEGA Rules (v1.0.0)'), 'the marker block is migrated out of the brand source').toBe(false);
+        expect(source, "the brand's own rules survive the migration").toMatch(/match \/leaderboards\/\{id\}/);
+        expect(jetpack.read(path.join(targetPath, 'firebase.json'), 'json').firestore.rules, 'firebase.json is repointed at the compiled artifact').toBe(COMPILED_RULES_FILE);
+        expect(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'the compiled artifact is written').toBe('file');
 
         jetpack.remove(targetPath);
       },
@@ -220,7 +220,7 @@ module.exports = defineCases({
       name: 'the-migration-verb-is-idempotent',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-verb-twice-', LEGACY_SOURCE, BRAND_RULES_FILE);
         const command = new MigrateRulesCommand({ firebaseProjectPath: targetPath, argv: {}, options: {} });
 
@@ -230,8 +230,8 @@ module.exports = defineCases({
         await command.execute();
         const second = snapshot(targetPath);
 
-        assert.equal(second.rules, first.rules, 'a second run leaves the brand source alone');
-        assert.equal(second.firebaseJSON, first.firebaseJSON, 'a second run leaves firebase.json alone');
+        expect(second.rules, 'a second run leaves the brand source alone').toBe(first.rules);
+        expect(second.firebaseJSON, 'a second run leaves firebase.json alone').toBe(first.firebaseJSON);
 
         jetpack.remove(targetPath);
       },
@@ -241,7 +241,7 @@ module.exports = defineCases({
       name: 'the-compiler-points-a-deferred-tree-at-the-migration-verb',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The build's stale-target warning used to say `npx omega setup` — the
         // one command that will no longer do it.
         const targetPath = seedTarget('omega-rules-warn-', jetpack.read(BRAND_RULES_SEED), BRAND_RULES_FILE);
@@ -249,8 +249,8 @@ module.exports = defineCases({
 
         compileFirestoreRules({ projectDir: targetPath, onWarn: (message) => warnings.push(message) });
 
-        assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
-        assert.ok(warnings[0].includes(RULES_MIGRATION_COMMAND), `the warning must point at ${RULES_MIGRATION_COMMAND}, not at setup`);
+        expect(warnings.length, `expected one warning, got ${warnings.length}`).toBe(1);
+        expect(warnings[0].includes(RULES_MIGRATION_COMMAND), `the warning must point at ${RULES_MIGRATION_COMMAND}, not at setup`).toBeTruthy();
 
         jetpack.remove(targetPath);
       },

@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refused-intent
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -83,8 +83,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runRefusalWhoseStampFails();
 
-        assert.ok(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'the refused event must not reach a doc named by the caller, not even to fail it');
-        assert.ok(!store.get(`payments-intents/${OWNER_ORDER_ID}`), 'nor the real owner\'s intent — a refusal acts on nobody');
+        expect(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'the refused event must not reach a doc named by the caller, not even to fail it').toBeTruthy();
+        expect(!store.get(`payments-intents/${OWNER_ORDER_ID}`), 'nor the real owner\'s intent — a refusal acts on nobody').toBeTruthy();
       },
     },
 
@@ -94,9 +94,9 @@ module.exports = defineCases({
       async run() {
         const { store } = await runRefusalWhoseStampFails();
 
-        assert.ok(!store.get(`users/${FORGED_UID}`), 'no subscription for the forged uid');
-        assert.ok(!store.get(`users/${OWNER_UID}`), 'and none for the owner');
-        assert.ok(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'no order behind it');
+        expect(!store.get(`users/${FORGED_UID}`), 'no subscription for the forged uid').toBeTruthy();
+        expect(!store.get(`users/${OWNER_UID}`), 'and none for the owner').toBeTruthy();
+        expect(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'no order behind it').toBeTruthy();
       },
     },
 
@@ -107,9 +107,9 @@ module.exports = defineCases({
         const { store } = await runRefusalWhoseStampFails();
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'failed', 'the decision was made but never recorded — the retry sweep is what re-lands it');
-        assert.ok(!event.refusal, 'the stamp is exactly the write that did not land');
-        assert.equal(event.retryCount, 1, 'and the attempt is counted like any other failed pass');
+        expect(event.status, 'the decision was made but never recorded — the retry sweep is what re-lands it').toBe('failed');
+        expect(!event.refusal, 'the stamp is exactly the write that did not land').toBeTruthy();
+        expect(event.retryCount, 'and the attempt is counted like any other failed pass').toBe(1);
       },
     },
 
@@ -133,9 +133,9 @@ module.exports = defineCases({
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'completed', 'a refusal that records itself is terminal and acknowledged');
-        assert.equal(event.refusal?.reason, 'uid-mismatch', 'and carries its reason');
-        assert.ok(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'still nothing under the order the payload named');
+        expect(event.status, 'a refusal that records itself is terminal and acknowledged').toBe('completed');
+        expect(event.refusal?.reason, 'and carries its reason').toBe('uid-mismatch');
+        expect(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'still nothing under the order the payload named').toBeTruthy();
       },
     },
   ],

@@ -1,0 +1,12 @@
+{
+  "description": "case-145-helper",
+  "fileLacks": ["node:test", "\\bassert\\b", "@omega\\.js/devkit"],
+  "fileHas": [
+    "const { defineCases, expect } = require('@omega.js/web/test');",
+    "function check(x) { expect(x).toBeTruthy(); }"
+  ],
+  "fileCount": { "require(": 1 },
+  "tests": [
+    { "name": "helper and case", "has": ["check(a)", "ctx.expect(a).toBe(b)"], "runLacks": ["(?<!\\.)\\bexpect\\("] }
+  ]
+}

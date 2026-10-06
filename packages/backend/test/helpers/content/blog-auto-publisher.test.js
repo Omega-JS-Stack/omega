@@ -25,40 +25,40 @@ module.exports = defineCases({
     // ============================
     {
       name: 'isURL-detects-http-url',
-      async run({ assert }) {
-        assert.equal(isURL('https://example.com/page'), true);
-        assert.equal(isURL('http://example.com'), true);
+      async run({ expect }) {
+        expect(isURL('https://example.com/page')).toBe(true);
+        expect(isURL('http://example.com')).toBe(true);
       },
     },
 
     {
       name: 'isURL-rejects-non-urls',
-      async run({ assert }) {
-        assert.equal(isURL('$brand'), false);
-        assert.equal(isURL('Write about AI'), false);
-        assert.equal(isURL('$feed:https://example.com/feed'), false);
+      async run({ expect }) {
+        expect(isURL('$brand')).toBe(false);
+        expect(isURL('Write about AI')).toBe(false);
+        expect(isURL('$feed:https://example.com/feed')).toBe(false);
       },
     },
 
     {
       name: 'isURL-rejects-colon-prefixed-text-and-non-http-schemes',
-      async run({ assert }) {
+      async run({ expect }) {
         // "AI:" parses as a URL scheme via new URL() — these are text seeds,
         // not URLs, and must NOT be fetched (the fetch fails and the seed is
         // silently lost)
-        assert.equal(isURL('AI: the future of work'), false);
-        assert.equal(isURL('Growth: 10 tactics for creators'), false);
-        assert.equal(isURL('mailto:someone@example.com'), false);
-        assert.equal(isURL('ftp://example.com/file'), false);
+        expect(isURL('AI: the future of work')).toBe(false);
+        expect(isURL('Growth: 10 tactics for creators')).toBe(false);
+        expect(isURL('mailto:someone@example.com')).toBe(false);
+        expect(isURL('ftp://example.com/file')).toBe(false);
       },
     },
 
     {
       name: 'isURL-rejects-empty-and-null',
-      async run({ assert }) {
-        assert.equal(isURL(''), false);
-        assert.equal(isURL(null), false);
-        assert.equal(isURL(undefined), false);
+      async run({ expect }) {
+        expect(isURL('')).toBe(false);
+        expect(isURL(null)).toBe(false);
+        expect(isURL(undefined)).toBe(false);
       },
     },
 
@@ -67,40 +67,40 @@ module.exports = defineCases({
     // ============================
     {
       name: 'feed-prefix-detected-correctly',
-      async run({ assert }) {
+      async run({ expect }) {
         const source = '$feed:https://techcrunch.com/feed/';
-        assert.equal(source.startsWith('$feed:'), true, '$feed: prefix detected');
+        expect(source.startsWith('$feed:'), '$feed: prefix detected').toBe(true);
 
         const feedUrl = source.slice('$feed:'.length);
-        assert.equal(feedUrl, 'https://techcrunch.com/feed/', 'URL extracted after prefix');
+        expect(feedUrl, 'URL extracted after prefix').toBe('https://techcrunch.com/feed/');
       },
     },
 
     {
       name: 'feed-prefix-not-confused-with-brand',
-      async run({ assert }) {
-        assert.equal('$brand'.startsWith('$feed:'), false);
+      async run({ expect }) {
+        expect('$brand'.startsWith('$feed:')).toBe(false);
       },
     },
 
     {
       name: 'feed-prefix-not-confused-with-parent',
-      async run({ assert }) {
-        assert.equal('$parent'.startsWith('$feed:'), false);
+      async run({ expect }) {
+        expect('$parent'.startsWith('$feed:')).toBe(false);
       },
     },
 
     {
       name: 'feed-prefix-not-confused-with-plain-url',
-      async run({ assert }) {
-        assert.equal('https://example.com'.startsWith('$feed:'), false);
+      async run({ expect }) {
+        expect('https://example.com'.startsWith('$feed:')).toBe(false);
       },
     },
 
     {
       name: 'feed-prefix-not-confused-with-text',
-      async run({ assert }) {
-        assert.equal('Write about technology'.startsWith('$feed:'), false);
+      async run({ expect }) {
+        expect('Write about technology'.startsWith('$feed:')).toBe(false);
       },
     },
 
@@ -109,53 +109,53 @@ module.exports = defineCases({
     // ============================
     {
       name: 'contentSourceHash-is-deterministic',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash1 = contentSourceHash('$feed:https://example.com/feed', 'item-123');
         const hash2 = contentSourceHash('$feed:https://example.com/feed', 'item-123');
-        assert.equal(hash1, hash2, 'same input produces same hash');
+        expect(hash1, 'same input produces same hash').toBe(hash2);
       },
     },
 
     {
       name: 'contentSourceHash-different-for-different-items',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash1 = contentSourceHash('$feed:https://example.com/feed', 'item-1');
         const hash2 = contentSourceHash('$feed:https://example.com/feed', 'item-2');
-        assert.notEqual(hash1, hash2, 'different items produce different hashes');
+        expect(hash1, 'different items produce different hashes').not.toBe(hash2);
       },
     },
 
     {
       name: 'contentSourceHash-different-for-different-origins',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash1 = contentSourceHash('$feed:https://example.com/feed-a', 'item-1');
         const hash2 = contentSourceHash('$feed:https://example.com/feed-b', 'item-1');
-        assert.notEqual(hash1, hash2, 'same item ID with different origins produces different hash');
+        expect(hash1, 'same item ID with different origins produces different hash').not.toBe(hash2);
       },
     },
 
     {
       name: 'contentSourceHash-different-for-different-source-types',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash1 = contentSourceHash('$parent', 'source-1');
         const hash2 = contentSourceHash('$feed:https://example.com/feed', 'source-1');
-        assert.notEqual(hash1, hash2, '$parent and $feed with same URL produce different hash');
+        expect(hash1, '$parent and $feed with same URL produce different hash').not.toBe(hash2);
       },
     },
 
     {
       name: 'contentSourceHash-is-20-chars',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash = contentSourceHash('$feed:https://example.com/feed', 'item-123');
-        assert.equal(hash.length, 20, 'hash is 20 hex chars');
+        expect(hash.length, 'hash is 20 hex chars').toBe(20);
       },
     },
 
     {
       name: 'contentSourceHash-is-hex-only',
-      async run({ assert }) {
+      async run({ expect }) {
         const hash = contentSourceHash('$feed:https://example.com/feed', 'item-123');
-        assert.ok(/^[0-9a-f]+$/.test(hash), 'hash contains only hex characters');
+        expect(/^[0-9a-f]+$/.test(hash), 'hash contains only hex characters').toBeTruthy();
       },
     },
 
@@ -164,9 +164,9 @@ module.exports = defineCases({
     // ============================
     {
       name: 'trackContentSource-writes-correct-schema',
-      async run({ assert, admin }) {
+      async run({ expect, admin }) {
         if (!admin) {
-          return assert.ok(true, 'skipped: no emulator');
+          return expect(true, 'skipped: no emulator').toBeTruthy();
         }
 
         const { trackContentSource } = require(resolverPath);
@@ -187,33 +187,33 @@ module.exports = defineCases({
         });
 
         const doc = await admin.firestore().doc(`content-sources/${docId}`).get();
-        assert.ok(doc.exists, 'tracking doc created');
+        expect(doc.exists, 'tracking doc created').toBeTruthy();
 
         const data = doc.data();
-        assert.equal(data.url, url);
-        assert.equal(data.origin, origin);
-        assert.equal(data.feedUrl, 'https://test-feed.com/rss');
-        assert.equal(data.itemId, 'test-item-1');
-        assert.equal(data.itemTitle, 'Test Article');
-        assert.equal(data.usedBy, 'blog');
-        assert.equal(data.brandId, 'test-brand');
-        assert.equal(data.postUrl, 'https://test-brand.com/blog/test-article');
-        assert.equal(data.postSlug, 'test-article');
-        assert.ok(data.metadata, 'has metadata object');
-        assert.ok(data.metadata.created, 'has metadata.created');
-        assert.ok(data.metadata.updated, 'has metadata.updated');
-        assert.equal(typeof data.metadata.created.timestamp, 'string', 'created.timestamp is ISO string');
-        assert.equal(typeof data.metadata.created.timestampUNIX, 'number', 'created.timestampUNIX is number');
-        assert.equal(typeof data.metadata.updated.timestamp, 'string', 'updated.timestamp is ISO string');
-        assert.equal(typeof data.metadata.updated.timestampUNIX, 'number', 'updated.timestampUNIX is number');
+        expect(data.url).toBe(url);
+        expect(data.origin).toBe(origin);
+        expect(data.feedUrl).toBe('https://test-feed.com/rss');
+        expect(data.itemId).toBe('test-item-1');
+        expect(data.itemTitle).toBe('Test Article');
+        expect(data.usedBy).toBe('blog');
+        expect(data.brandId).toBe('test-brand');
+        expect(data.postUrl).toBe('https://test-brand.com/blog/test-article');
+        expect(data.postSlug).toBe('test-article');
+        expect(data.metadata, 'has metadata object').toBeTruthy();
+        expect(data.metadata.created, 'has metadata.created').toBeTruthy();
+        expect(data.metadata.updated, 'has metadata.updated').toBeTruthy();
+        expect(typeof data.metadata.created.timestamp, 'created.timestamp is ISO string').toBe('string');
+        expect(typeof data.metadata.created.timestampUNIX, 'created.timestampUNIX is number').toBe('number');
+        expect(typeof data.metadata.updated.timestamp, 'updated.timestamp is ISO string').toBe('string');
+        expect(typeof data.metadata.updated.timestampUNIX, 'updated.timestampUNIX is number').toBe('number');
       },
     },
 
     {
       name: 'trackContentSource-tracks-newsletter-usage',
-      async run({ assert, admin }) {
+      async run({ expect, admin }) {
         if (!admin) {
-          return assert.ok(true, 'skipped: no emulator');
+          return expect(true, 'skipped: no emulator').toBeTruthy();
         }
 
         const { trackContentSource } = require(resolverPath);
@@ -231,19 +231,19 @@ module.exports = defineCases({
         });
 
         const doc = await admin.firestore().doc(`content-sources/${docId}`).get();
-        assert.ok(doc.exists, 'tracking doc created for newsletter');
+        expect(doc.exists, 'tracking doc created for newsletter').toBeTruthy();
 
         const data = doc.data();
-        assert.equal(data.usedBy, 'newsletter', 'usedBy is newsletter');
-        assert.equal(data.origin, '$parent', 'origin is $parent');
+        expect(data.usedBy, 'usedBy is newsletter').toBe('newsletter');
+        expect(data.origin, 'origin is $parent').toBe('$parent');
       },
     },
 
     {
       name: 'getProcessedItemIds-returns-tracked-ids',
-      async run({ assert, admin }) {
+      async run({ expect, admin }) {
         if (!admin) {
-          return assert.ok(true, 'skipped: no emulator');
+          return expect(true, 'skipped: no emulator').toBeTruthy();
         }
 
         const { getProcessedItemIds, trackContentSource } = require(resolverPath);
@@ -271,17 +271,17 @@ module.exports = defineCases({
         });
 
         const ids = await getProcessedItemIds(admin, feedUrl);
-        assert.ok(ids.has('proc-1'), 'first item tracked');
-        assert.ok(ids.has('proc-2'), 'second item tracked');
-        assert.ok(!ids.has('proc-3'), 'untracked item not present');
+        expect(ids.has('proc-1'), 'first item tracked').toBeTruthy();
+        expect(ids.has('proc-2'), 'second item tracked').toBeTruthy();
+        expect(!ids.has('proc-3'), 'untracked item not present').toBeTruthy();
       },
     },
 
     {
       name: 'getProcessedItemIds-scoped-to-feed-url',
-      async run({ assert, admin }) {
+      async run({ expect, admin }) {
         if (!admin) {
-          return assert.ok(true, 'skipped: no emulator');
+          return expect(true, 'skipped: no emulator').toBeTruthy();
         }
 
         const { getProcessedItemIds, trackContentSource } = require(resolverPath);
@@ -299,16 +299,16 @@ module.exports = defineCases({
 
         // Query feed B — should NOT see feed A's items
         const ids = await getProcessedItemIds(admin, 'https://feed-b.com/rss');
-        assert.ok(!ids.has('scoped-1'), 'feed A item not visible in feed B query');
+        expect(!ids.has('scoped-1'), 'feed A item not visible in feed B query').toBeTruthy();
       },
     },
 
     {
       name: 'getProcessedItemIds-returns-empty-set-without-admin',
-      async run({ assert }) {
+      async run({ expect }) {
         const { getProcessedItemIds } = require(resolverPath);
         const ids = await getProcessedItemIds(null, 'https://example.com/feed');
-        assert.equal(ids.size, 0, 'returns empty Set when admin is null');
+        expect(ids.size, 'returns empty Set when admin is null').toBe(0);
       },
     },
 
@@ -317,7 +317,7 @@ module.exports = defineCases({
     // ============================
     {
       name: 'resolveSources-brand-pick-resolves-seed',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { resolveSources } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -327,15 +327,15 @@ module.exports = defineCases({
           ctx,
         });
 
-        assert.equal(resolved.length, 1, 'one source resolved');
-        assert.equal(resolved[0].type, 'brand', 'type is brand');
-        assert.equal(resolved[0].trackingData, null, 'no trackingData for $brand');
+        expect(resolved.length, 'one source resolved').toBe(1);
+        expect(resolved[0].type, 'type is brand').toBe('brand');
+        expect(resolved[0].trackingData, 'no trackingData for $brand').toBe(null);
       },
     },
 
     {
       name: 'resolveSources-text-pick-resolves-content',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { resolveSources } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -345,17 +345,17 @@ module.exports = defineCases({
           ctx,
         });
 
-        assert.equal(resolved.length, 1, 'one source resolved');
-        assert.equal(resolved[0].type, 'text', 'type is text');
-        assert.equal(resolved[0].content, 'Write about blockchain technology', 'content is the text seed');
-        assert.equal(resolved[0].trackingData, null, 'no trackingData for text');
+        expect(resolved.length, 'one source resolved').toBe(1);
+        expect(resolved[0].type, 'type is text').toBe('text');
+        expect(resolved[0].content, 'content is the text seed').toBe('Write about blockchain technology');
+        expect(resolved[0].trackingData, 'no trackingData for text').toBe(null);
       },
     },
 
     {
       name: 'resolvePick-feed-failure-never-falls-back-to-brand',
       timeout: 30000,
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -367,14 +367,14 @@ module.exports = defineCases({
         });
 
         const result = await resolvePick(state, '$feed:https://nonexistent-feed.invalid/feed.xml');
-        assert.equal(result, null, 'feed failure returns null — never falls back to $brand');
+        expect(result, 'feed failure returns null — never falls back to $brand').toBe(null);
       },
     },
 
     {
       name: 'resolvePick-feed-falls-back-to-other-feeds-then-parent',
       timeout: 30000,
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -390,16 +390,16 @@ module.exports = defineCases({
         });
 
         const result = await resolvePick(state, '$feed:https://nonexistent-a.invalid/feed.xml');
-        assert.equal(result, null, 'chain exhausts feeds then parent, returns null');
-        assert.ok(state.feedCache.has('https://nonexistent-a.invalid/feed.xml'), 'first feed was tried');
-        assert.ok(state.feedCache.has('https://nonexistent-b.invalid/feed.xml'), 'second feed was tried as fallback');
-        assert.ok(Array.isArray(state.parentPool), 'parent pool was attempted after feeds');
+        expect(result, 'chain exhausts feeds then parent, returns null').toBe(null);
+        expect(state.feedCache.has('https://nonexistent-a.invalid/feed.xml'), 'first feed was tried').toBeTruthy();
+        expect(state.feedCache.has('https://nonexistent-b.invalid/feed.xml'), 'second feed was tried as fallback').toBeTruthy();
+        expect(Array.isArray(state.parentPool), 'parent pool was attempted after feeds').toBeTruthy();
       },
     },
 
     {
       name: 'resolvePick-parent-only-falls-back-to-parent',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -411,26 +411,26 @@ module.exports = defineCases({
         });
 
         const result = await resolvePick(state, '$parent');
-        assert.equal(result, null, 'parent failure returns null — never falls to feeds or $brand');
-        assert.equal(state.feedCache.size, 0, 'no feed was touched by the parent chain');
+        expect(result, 'parent failure returns null — never falls to feeds or $brand').toBe(null);
+        expect(state.feedCache.size, 'no feed was touched by the parent chain').toBe(0);
       },
     },
 
     {
       name: 'resolveSources-empty-pool-returns-empty',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { resolveSources } = require(resolverPath);
         const ctx = new Context(omega);
 
         const resolved = await resolveSources({ sources: [], count: 3, ctx });
-        assert.equal(resolved.length, 0, 'empty pool resolves nothing');
+        expect(resolved.length, 'empty pool resolves nothing').toBe(0);
       },
     },
 
     {
       name: 'resolveSources-dead-feed-only-pool-returns-empty',
       timeout: 30000,
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { resolveSources } = require(resolverPath);
         const ctx = new Context(omega);
 
@@ -440,7 +440,7 @@ module.exports = defineCases({
           ctx,
         });
 
-        assert.equal(resolved.length, 0, 'dead-feed-only pool resolves nothing (no $brand invented)');
+        expect(resolved.length, 'dead-feed-only pool resolves nothing (no $brand invented)').toBe(0);
       },
     },
 
@@ -449,7 +449,7 @@ module.exports = defineCases({
     // ============================
     {
       name: 'source-type-detection-covers-all-types',
-      async run({ assert }) {
+      async run({ expect }) {
         const sources = [
           '$brand',
           '$parent',
@@ -459,24 +459,24 @@ module.exports = defineCases({
         ];
 
         // $brand
-        assert.equal(sources[0], '$brand');
-        assert.equal(sources[0].startsWith('$feed:'), false);
+        expect(sources[0]).toBe('$brand');
+        expect(sources[0].startsWith('$feed:')).toBe(false);
 
         // $parent
-        assert.equal(sources[1], '$parent');
-        assert.equal(sources[1].startsWith('$feed:'), false);
+        expect(sources[1]).toBe('$parent');
+        expect(sources[1].startsWith('$feed:')).toBe(false);
 
         // $feed:
-        assert.equal(sources[2].startsWith('$feed:'), true);
+        expect(sources[2].startsWith('$feed:')).toBe(true);
 
         // URL
-        try { new URL(sources[3]); assert.ok(true, 'URL is valid'); } catch (e) { assert.fail('URL should be valid'); }
+        try { new URL(sources[3]); expect(true, 'URL is valid').toBeTruthy(); } catch (e) { expect.fail('URL should be valid'); }
 
         // text (not $brand, not $parent, not $feed:, not URL)
-        assert.ok(!sources[4].startsWith('$feed:'), 'text is not feed');
-        assert.ok(sources[4] !== '$brand', 'text is not $brand');
-        assert.ok(sources[4] !== '$parent', 'text is not $parent');
-        try { new URL(sources[4]); assert.fail('text should not be URL'); } catch (e) { assert.ok(true, 'text is not URL'); }
+        expect(!sources[4].startsWith('$feed:'), 'text is not feed').toBeTruthy();
+        expect(sources[4] !== '$brand', 'text is not $brand').toBeTruthy();
+        expect(sources[4] !== '$parent', 'text is not $parent').toBeTruthy();
+        try { new URL(sources[4]); expect.fail('text should not be URL'); } catch (e) { expect(true, 'text is not URL').toBeTruthy(); }
       },
     },
   ],

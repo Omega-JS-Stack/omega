@@ -23,7 +23,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const uid = accounts['journey-payments-refund-webhook'].uid;
 
         // Resolve a paid product with a monthly price. If the brand has none configured,
@@ -42,7 +42,7 @@ module.exports = defineCases({
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
-        assert.isSuccess(response, 'Intent should succeed');
+        expect(response, 'Intent should succeed').toBeSuccess();
         state.orderId = response.data.orderId;
 
         // Wait for subscription to activate
@@ -53,8 +53,8 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc.subscription?.product?.id, paidProduct.id, `Should be ${paidProduct.id}`);
-        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
+        expect(userDoc.subscription?.product?.id, `Should be ${paidProduct.id}`).toBe(paidProduct.id);
+        expect(userDoc.subscription?.status, 'Should be active').toBe('active');
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
       },
@@ -62,7 +62,7 @@ module.exports = defineCases({
 
     {
       name: 'send-pending-cancel-webhook',
-      async run({ http, assert, state, config, payments }) {
+      async run({ http, expect, state, config, payments }) {
         const futureDate = new Date();
         futureDate.setMonth(futureDate.getMonth() + 1);
 
@@ -90,30 +90,30 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Cancel webhook should be accepted');
+        expect(response, 'Cancel webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'cancellation-pending-confirmed',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.cancelEventId}`);
           return doc?.status === 'completed';
         }, 15000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.cancelEventId}`);
-        assert.equal(webhookDoc.transition, 'cancellation-requested', 'Should detect cancellation-requested');
+        expect(webhookDoc.transition, 'Should detect cancellation-requested').toBe('cancellation-requested');
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.cancellation.pending, true, 'Cancellation should be pending');
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Cancellation should be pending').toBe(true);
       },
     },
 
     {
       name: 'send-charge-refunded-webhook',
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         // Simulate a charge.refunded event (Stripe-shaped, used by test provider)
         // This carries refund amount data that getRefundDetails() extracts
         state.refundEventId = `_test-evt-journey-refund-charge-${Date.now()}`;
@@ -145,13 +145,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Refund webhook should be accepted');
+        expect(response, 'Refund webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'payment-refunded-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Wait for the refund webhook to be processed
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.refundEventId}`);
@@ -161,30 +161,30 @@ module.exports = defineCases({
         const webhookDoc = await firestore.get(`payments-webhooks/${state.refundEventId}`);
 
         // Core assertion: refund events trigger payment-refunded, not subscription-cancelled
-        assert.equal(webhookDoc.status, 'completed', 'Webhook should complete successfully');
-        assert.equal(webhookDoc.transition, 'payment-refunded', 'Transition should be payment-refunded (not subscription-cancelled)');
-        assert.equal(webhookDoc.owner, state.uid, 'Owner should match');
-        assert.equal(webhookDoc.orderId, state.orderId, 'Order ID should match');
+        expect(webhookDoc.status, 'Webhook should complete successfully').toBe('completed');
+        expect(webhookDoc.transition, 'Transition should be payment-refunded (not subscription-cancelled)').toBe('payment-refunded');
+        expect(webhookDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(webhookDoc.orderId, 'Order ID should match').toBe(state.orderId);
       },
     },
 
     {
       name: 'order-doc-updated',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.type, 'Type should be subscription').toBe('subscription');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
 
         // The order was last updated by the refund webhook event
-        assert.equal(orderDoc.metadata?.updatedBy?.event?.name, 'charge.refunded', 'Last event should be charge.refunded');
+        expect(orderDoc.metadata?.updatedBy?.event?.name, 'Last event should be charge.refunded').toBe('charge.refunded');
       },
     },
 
     {
       name: 'reprocessed-refund-fires-once',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Reprocess the SAME refund event: put the completed doc back to pending,
         // exactly as the route's retry path does. Refund detection reads the event
         // type alone, so without an idempotency guard the second pass re-dispatches
@@ -213,12 +213,12 @@ module.exports = defineCases({
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.refundEventId}`);
 
-        assert.equal(webhookDoc.transition, null, 'A reprocessed refund must dispatch nothing — one refund, one email');
-        assert.equal(webhookDoc.orderId, state.orderId, 'The reprocess should still resolve the same order');
+        expect(webhookDoc.transition, 'A reprocessed refund must dispatch nothing — one refund, one email').toBe(null);
+        expect(webhookDoc.orderId, 'The reprocess should still resolve the same order').toBe(state.orderId);
 
         // The pass ran in full (it was not skipped as stale) — the order carries its write
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
-        assert.equal(orderDoc.metadata?.updatedBy?.event?.id, state.refundEventId, 'The order should record the reprocessed event');
+        expect(orderDoc.metadata?.updatedBy?.event?.id, 'The order should record the reprocessed event').toBe(state.refundEventId);
       },
     },
   ],

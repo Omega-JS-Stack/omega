@@ -17,7 +17,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const testData = {
           testField: 'database-test-value',
           timestamp: new Date().toISOString(),
@@ -32,7 +32,7 @@ module.exports = defineCases({
           document: testData,
         });
 
-        assert.isSuccess(writeResponse, 'Setup: Database write should succeed');
+        expect(writeResponse, 'Setup: Database write should succeed').toBeSuccess();
       },
     },
 
@@ -42,24 +42,16 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 
-        assert.isSuccess(readResponse, 'Database read should succeed with admin auth');
-        assert.hasProperty(readResponse, 'data.testField', 'Response should contain test data');
-        assert.equal(
-          readResponse.data.testField,
-          'database-test-value',
-          'Read data should match written data'
-        );
-        assert.hasProperty(readResponse, 'data.nested.field1', 'Response should contain nested data');
-        assert.equal(
-          readResponse.data.nested.field2,
-          123,
-          'Nested field should match written data'
-        );
+        expect(readResponse, 'Database read should succeed with admin auth').toBeSuccess();
+        expect(readResponse, 'Response should contain test data').toHaveProperty('data.testField');
+        expect(readResponse.data.testField, 'Read data should match written data').toBe('database-test-value');
+        expect(readResponse, 'Response should contain nested data').toHaveProperty('data.nested.field1');
+        expect(readResponse.data.nested.field2, 'Nested field should match written data').toBe(123);
       },
     },
 
@@ -69,20 +61,17 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/database', {
           path: '_test/nonexistent-path-12345',
         });
 
-        assert.isSuccess(readResponse, 'Reading non-existent path should succeed');
+        expect(readResponse, 'Reading non-existent path should succeed').toBeSuccess();
         const data = readResponse.data;
         const isEmpty = data === null
           || data === undefined
           || (typeof data === 'object' && Object.keys(data).length === 0);
-        assert.ok(
-          isEmpty,
-          `Non-existent path should return null, undefined, or empty object, got: ${JSON.stringify(data)}`
-        );
+        expect(isEmpty, `Non-existent path should return null, undefined, or empty object, got: ${JSON.stringify(data)}`).toBeTruthy();
       },
     },
 
@@ -92,10 +81,10 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/database', {});
 
-        assert.isError(readResponse, 400, 'Missing path should return 400');
+        expect(readResponse, 'Missing path should return 400').toBeError(400);
       },
     },
 
@@ -105,12 +94,12 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 
-        assert.isError(readResponse, 401, 'Database read should fail without authentication');
+        expect(readResponse, 'Database read should fail without authentication').toBeError(401);
       },
     },
 
@@ -120,12 +109,12 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 
-        assert.isError(readResponse, 403, 'Database read should fail for non-admin user');
+        expect(readResponse, 'Database read should fail for non-admin user').toBeError(403);
       },
     },
 

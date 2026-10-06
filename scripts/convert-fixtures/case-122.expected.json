@@ -1,0 +1,21 @@
+{
+  "description": "case-122 backend suite",
+  "fileLacks": ["\\bassert\\b"],
+  "fileHas": [
+    "const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');",
+    "description: 'case-122 backend suite', auth: 'none',",
+    "name: 'admin case', auth: 'admin',"
+  ],
+  "tests": [
+    { "name": "admin case", "params": "{ expect, http }", "keys": ["auth"], "has": [
+      "expect(r, 'm').toBeSuccess()",
+      "expect(r).toBeError(401)",
+      "expect(o).toHaveProperty('a.b')",
+      "expect(o, 'm').toHaveProperty('a.b', 1)",
+      "expect(v).toBeTypeOf('array')",
+      "expect(a).toContain(1)",
+      "expect(v, 'm').toBeGreaterThanOrEqual(1); expect(v, 'm').toBeLessThanOrEqual(3)",
+      "expect.fail('m')"
+    ], "runLacks": ["\\bassert\\b", "\\bctx\\b"] }
+  ]
+}

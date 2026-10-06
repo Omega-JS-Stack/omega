@@ -15,8 +15,7 @@
  * the convention checkout-decline.test.js set. The assertion is the payload the
  * intent route would have received.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -100,46 +99,67 @@ async function createIntent({ cookie = '', attribution = STORED_ATTRIBUTION } = 
   return { payload: requests.at(-1).options.body, storage: storage };
 }
 
-test('platform cookies: every present cookie rides the intent attribution', async () => {
-  const { payload } = await createIntent({
-    cookie: '_ga=GA1.1.123; _fbc=fb.1.1754006400000.FB-CLICK; _fbp=fb.1.1754006400000.987654321; _ttp=TTP-COOKIE; session=abc',
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-attribution-cookies',
+  tests: [
+    {
+      name: 'platform cookies: every present cookie rides the intent attribution',
+      run: async (ctx) => {
+        const { payload } = await createIntent({
+          cookie: '_ga=GA1.1.123; _fbc=fb.1.1754006400000.FB-CLICK; _fbp=fb.1.1754006400000.987654321; _ttp=TTP-COOKIE; session=abc',
+        });
 
-  assert.deepStrictEqual(payload.attribution.cookies, {
-    fbc: 'fb.1.1754006400000.FB-CLICK',
-    fbp: 'fb.1.1754006400000.987654321',
-    ttp: 'TTP-COOKIE',
-  });
+        ctx.expect(payload.attribution.cookies).toEqual({
+          fbc: 'fb.1.1754006400000.FB-CLICK',
+          fbp: 'fb.1.1754006400000.987654321',
+          ttp: 'TTP-COOKIE',
+        });
 
-  assert.deepStrictEqual(payload.attribution.first, STORED_ATTRIBUTION.first, 'the captured touches ride unchanged');
-  assert.deepStrictEqual(payload.attribution.last, STORED_ATTRIBUTION.last);
-});
+        ctx.expect(payload.attribution.first, 'the captured touches ride unchanged').toEqual(STORED_ATTRIBUTION.first);
+        ctx.expect(payload.attribution.last).toEqual(STORED_ATTRIBUTION.last);
+      },
+    },
 
-test('platform cookies: only the cookies that exist are sent', async () => {
-  // A visitor who has the Meta pixel's browser id but never clicked a Meta ad,
-  // and no TikTok pixel at all. The server constructs `fbc` from the captured
-  // fbclid — the client only ever sends real cookies.
-  const { payload } = await createIntent({ cookie: '_fbp=fb.1.1754006400000.987654321' });
+    {
+      name: 'platform cookies: only the cookies that exist are sent',
+      run: async (ctx) => {
+        // A visitor who has the Meta pixel's browser id but never clicked a Meta ad,
+        // and no TikTok pixel at all. The server constructs `fbc` from the captured
+        // fbclid — the client only ever sends real cookies.
+        const { payload } = await createIntent({ cookie: '_fbp=fb.1.1754006400000.987654321' });
 
-  assert.deepStrictEqual(payload.attribution.cookies, { fbp: 'fb.1.1754006400000.987654321' });
-});
+        ctx.expect(payload.attribution.cookies).toEqual({ fbp: 'fb.1.1754006400000.987654321' });
+      },
+    },
 
-test('platform cookies: an empty jar sends no cookies key at all', async () => {
-  const { payload } = await createIntent({ cookie: '' });
+    {
+      name: 'platform cookies: an empty jar sends no cookies key at all',
+      run: async (ctx) => {
+        const { payload } = await createIntent({ cookie: '' });
 
-  assert.strictEqual(Object.hasOwn(payload.attribution, 'cookies'), false, 'no husk when the pixels wrote nothing');
-  assert.deepStrictEqual(payload.attribution, STORED_ATTRIBUTION, 'the stored attribution rides exactly as captured');
-});
+        ctx.expect(Object.hasOwn(payload.attribution, 'cookies'), 'no husk when the pixels wrote nothing').toBe(false);
+        ctx.expect(payload.attribution, 'the stored attribution rides exactly as captured').toEqual(STORED_ATTRIBUTION);
+      },
+    },
 
-test('platform cookies: the read is fresh and never persisted', async () => {
-  const { payload, storage } = await createIntent({ cookie: '_fbc=fb.1.1754006400000.FB-CLICK' });
+    {
+      name: 'platform cookies: the read is fresh and never persisted',
+      run: async (ctx) => {
+        const { payload, storage } = await createIntent({ cookie: '_fbc=fb.1.1754006400000.FB-CLICK' });
 
-  assert.strictEqual(payload.attribution.cookies.fbc, 'fb.1.1754006400000.FB-CLICK');
-  assert.strictEqual(Object.hasOwn(storage.attribution, 'cookies'), false, 'a stale cookie in storage would match the wrong click on the next checkout');
-});
+        ctx.expect(payload.attribution.cookies.fbc).toBe('fb.1.1754006400000.FB-CLICK');
+        ctx.expect(Object.hasOwn(storage.attribution, 'cookies'), 'a stale cookie in storage would match the wrong click on the next checkout').toBe(false);
+      },
+    },
 
-test('platform cookies: a checkout with no stored attribution still sends what the jar holds', async () => {
-  const { payload } = await createIntent({ cookie: '_ttp=TTP-COOKIE', attribution: {} });
+    {
+      name: 'platform cookies: a checkout with no stored attribution still sends what the jar holds',
+      run: async (ctx) => {
+        const { payload } = await createIntent({ cookie: '_ttp=TTP-COOKIE', attribution: {} });
 
-  assert.deepStrictEqual(payload.attribution, { cookies: { ttp: 'TTP-COOKIE' } });
+        ctx.expect(payload.attribution).toEqual({ cookies: { ttp: 'TTP-COOKIE' } });
+      },
+    },
+  ],
 });

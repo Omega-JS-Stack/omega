@@ -23,7 +23,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'declined-checkout-accepted',
-      async run({ accounts, firestore, assert, state, config, http, skip }) {
+      async run({ accounts, firestore, expect, state, config, http, skip }) {
         const uid = accounts['journey-payments-one-time'].uid;
 
         // Resolve first one-time product from config. If none configured, skip the
@@ -47,14 +47,14 @@ module.exports = defineCases({
           simulate: 'decline',
         });
 
-        assert.isSuccess(response, 'Intent should succeed — the checkout starts, the payment is what fails');
+        expect(response, 'Intent should succeed — the checkout starts, the payment is what fails').toBeSuccess();
         state.orderId = response.data.orderId;
       },
     },
 
     {
       name: 'purchase-failed-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
             .where('orderId', '==', state.orderId)
@@ -71,56 +71,52 @@ module.exports = defineCases({
 
         const webhookDoc = snapshot.docs[0].data();
 
-        assert.equal(webhookDoc.status, 'completed', 'Failed-invoice webhook should process cleanly');
-        assert.equal(webhookDoc.event.type, 'invoice.payment_failed', 'A declined one-time checkout fires the failed invoice');
-        assert.equal(webhookDoc.event.category, 'one-time', 'Category should be one-time');
-        assert.equal(webhookDoc.event.resourceType, 'invoice', 'Resource type should be invoice');
-        assert.equal(webhookDoc.transition, 'purchase-failed', 'Transition should be purchase-failed');
+        expect(webhookDoc.status, 'Failed-invoice webhook should process cleanly').toBe('completed');
+        expect(webhookDoc.event.type, 'A declined one-time checkout fires the failed invoice').toBe('invoice.payment_failed');
+        expect(webhookDoc.event.category, 'Category should be one-time').toBe('one-time');
+        expect(webhookDoc.event.resourceType, 'Resource type should be invoice').toBe('invoice');
+        expect(webhookDoc.transition, 'Transition should be purchase-failed').toBe('purchase-failed');
       },
     },
 
     {
       name: 'order-doc-records-the-failed-purchase',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.type, 'one-time', 'Type should be one-time');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
-        assert.equal(orderDoc.productId, state.productId, 'Order should name the attempted product');
-        assert.notEqual(orderDoc.unified.status, 'completed', 'The purchase must not read as completed');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.type, 'Type should be one-time').toBe('one-time');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(orderDoc.provider, 'Provider should be test').toBe('test');
+        expect(orderDoc.productId, 'Order should name the attempted product').toBe(state.productId);
+        expect(orderDoc.unified.status, 'The purchase must not read as completed').not.toBe('completed');
       },
     },
 
     {
       name: 'intent-doc-reflects-webhook-outcome',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
 
-        assert.ok(intentDoc, 'Intent doc should exist');
-        assert.equal(intentDoc.type, 'one-time', 'Type should be one-time');
+        expect(intentDoc, 'Intent doc should exist').toBeTruthy();
+        expect(intentDoc.type, 'Type should be one-time').toBe('one-time');
 
         // 'completed' means the PIPELINE completed, not that the payment succeeded —
         // the intent sync is outcome-blind today ([#212]).
-        assert.equal(intentDoc.status, 'completed', 'Intent status tracks webhook processing, not payment outcome');
-        assert.equal(intentDoc.simulate, undefined, 'simulate is request-only — never persisted');
+        expect(intentDoc.status, 'Intent status tracks webhook processing, not payment outcome').toBe('completed');
+        expect(intentDoc.simulate, 'simulate is request-only — never persisted').toBe(undefined);
       },
     },
 
     {
       name: 'user-untouched',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.deepEqual(
-          userDoc.subscription,
-          state.subscriptionBefore,
-          'A one-time decline must leave subscription state exactly as it was',
-        );
+        expect(userDoc.subscription, 'A one-time decline must leave subscription state exactly as it was').toEqual(state.subscriptionBefore);
 
         const resolved = new User(userDoc);
-        assert.equal(resolved.active, false, 'The account keeps its (free) access level');
+        expect(resolved.active, 'The account keeps its (free) access level').toBe(false);
       },
     },
   ],

@@ -63,9 +63,9 @@ module.exports = defineCases({
       name: 'processFeedSource-selects-unprocessed-item',
       timeout: 15000,
 
-      async run({ assert, admin, state }) {
+      async run({ expect, admin, state }) {
         if (!admin) {
-          return assert.ok(true, 'skipped: no emulator');
+          return expect(true, 'skipped: no emulator').toBeTruthy();
         }
 
         // Pre-track one item so the pipeline has to skip it
@@ -84,8 +84,8 @@ module.exports = defineCases({
 
         // Verify the tracked item is in the set
         const processed = await getProcessedItemIds(admin, testFeedUrl);
-        assert.ok(processed.has('already-tracked'), 'pre-tracked item should be in processed set');
-        assert.ok(!processed.has('new-item'), 'new item should NOT be in processed set');
+        expect(processed.has('already-tracked'), 'pre-tracked item should be in processed set').toBeTruthy();
+        expect(!processed.has('new-item'), 'new item should NOT be in processed set').toBeTruthy();
 
         state.testFeedUrl = testFeedUrl;
       },
@@ -95,9 +95,9 @@ module.exports = defineCases({
       name: 'processFeedSource-filters-tracked-from-parsed-items',
       timeout: 10000,
 
-      async run({ assert, admin, state }) {
+      async run({ expect, admin, state }) {
         if (!admin || !state.testFeedUrl) {
-          return assert.ok(true, 'skipped');
+          return expect(true, 'skipped').toBeTruthy();
         }
 
         // Simulate what processFeedSource does: parse → filter → select
@@ -110,8 +110,8 @@ module.exports = defineCases({
         const processed = await getProcessedItemIds(admin, state.testFeedUrl);
         const unprocessed = feedItems.filter((item) => !processed.has(item.id) && !processed.has(item.url));
 
-        assert.equal(unprocessed.length, 2, 'should have 2 unprocessed items');
-        assert.equal(unprocessed[0].id, 'new-item-1', 'first unprocessed is newest');
+        expect(unprocessed.length, 'should have 2 unprocessed items').toBe(2);
+        expect(unprocessed[0].id, 'first unprocessed is newest').toBe('new-item-1');
       },
     },
 
@@ -119,9 +119,9 @@ module.exports = defineCases({
       name: 'processFeedSource-tracks-after-processing',
       timeout: 15000,
 
-      async run({ assert, admin, state }) {
+      async run({ expect, admin, state }) {
         if (!admin || !state.testFeedUrl) {
-          return assert.ok(true, 'skipped');
+          return expect(true, 'skipped').toBeTruthy();
         }
 
         // Track the "newly processed" item
@@ -139,9 +139,9 @@ module.exports = defineCases({
 
         // Now only new-item-2 should be unprocessed
         const processed = await getProcessedItemIds(admin, state.testFeedUrl);
-        assert.ok(processed.has('already-tracked'), 'original tracked item still present');
-        assert.ok(processed.has('new-item-1'), 'newly tracked item present');
-        assert.ok(!processed.has('new-item-2'), 'remaining item still unprocessed');
+        expect(processed.has('already-tracked'), 'original tracked item still present').toBeTruthy();
+        expect(processed.has('new-item-1'), 'newly tracked item present').toBeTruthy();
+        expect(!processed.has('new-item-2'), 'remaining item still unprocessed').toBeTruthy();
 
         // Verify the dedup count
         const feedItems = [
@@ -150,8 +150,8 @@ module.exports = defineCases({
           { id: 'new-item-2', title: 'New 2', url: 'https://integration-test.example.com/new-2' },
         ];
         const unprocessed = feedItems.filter((item) => !processed.has(item.id) && !processed.has(item.url));
-        assert.equal(unprocessed.length, 1, 'only 1 item remains after second tracking');
-        assert.equal(unprocessed[0].id, 'new-item-2', 'remaining item is new-item-2');
+        expect(unprocessed.length, 'only 1 item remains after second tracking').toBe(1);
+        expect(unprocessed[0].id, 'remaining item is new-item-2').toBe('new-item-2');
       },
     },
 
@@ -163,9 +163,9 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         const feed = REAL_FEEDS[0];
-        assert.ok(feed, 'test feed config exists');
+        expect(feed, 'test feed config exists').toBeTruthy();
 
         const text = await fetch(feed.url, {
           timeout: 15000,
@@ -174,17 +174,17 @@ module.exports = defineCases({
           headers: { 'User-Agent': USER_AGENT },
         });
 
-        assert.ok(text, 'feed text fetched');
-        assert.ok(text.length > 100, `feed text has content (${text.length} chars)`);
+        expect(text, 'feed text fetched').toBeTruthy();
+        expect(text.length > 100, `feed text has content (${text.length} chars)`).toBeTruthy();
 
         const result = parseFeed(text);
-        assert.ok(result.items.length > 0, `parsed ${result.items.length} items from ${feed.name}`);
+        expect(result.items.length > 0, `parsed ${result.items.length} items from ${feed.name}`).toBeTruthy();
 
         // Verify item shape
         const item = result.items[0];
-        assert.ok(item.title, `first item has title: "${item.title.slice(0, 60)}..."`);
-        assert.ok(item.url, `first item has URL: ${item.url}`);
-        assert.ok(item.id, 'first item has id');
+        expect(item.title, `first item has title: "${item.title.slice(0, 60)}..."`).toBeTruthy();
+        expect(item.url, `first item has URL: ${item.url}`).toBeTruthy();
+        expect(item.id, 'first item has id').toBeTruthy();
 
         // Save artifacts
         saveArtifact(`feed-${feed.name.toLowerCase().replace(/\s+/g, '-')}-raw.xml`, text);
@@ -201,7 +201,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert }) {
+      async run({ expect }) {
         const feed = REAL_FEEDS[1];
 
         const text = await fetch(feed.url, {
@@ -211,14 +211,14 @@ module.exports = defineCases({
           headers: { 'User-Agent': USER_AGENT },
         });
 
-        assert.ok(text, 'feed text fetched');
+        expect(text, 'feed text fetched').toBeTruthy();
 
         const result = parseFeed(text);
-        assert.ok(result.items.length > 0, `parsed ${result.items.length} items from ${feed.name}`);
+        expect(result.items.length > 0, `parsed ${result.items.length} items from ${feed.name}`).toBeTruthy();
 
         const item = result.items[0];
-        assert.ok(item.title, `first item has title: "${item.title.slice(0, 60)}..."`);
-        assert.ok(item.url, `first item has URL: ${item.url}`);
+        expect(item.title, `first item has title: "${item.title.slice(0, 60)}..."`).toBeTruthy();
+        expect(item.url, `first item has URL: ${item.url}`).toBeTruthy();
 
         // Save artifacts
         saveArtifact(`feed-${feed.name.toLowerCase().replace(/\s+/g, '-')}-raw.xml`, text);
@@ -234,27 +234,27 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         if (!state.realFeedItems?.length) {
-          return assert.ok(true, 'skipped: no feed items from previous test');
+          return expect(true, 'skipped: no feed items from previous test').toBeTruthy();
         }
 
         // Pick the first item with a URL
         const item = state.realFeedItems.find((i) => i.url);
-        assert.ok(item, 'have an item with a URL to extract');
+        expect(item, 'have an item with a URL to extract').toBeTruthy();
 
         const content = await extractArticleContent(item.url);
 
         // Content extraction is best-effort — some sites block scrapers.
-        assert.equal(typeof content, 'string', 'extractArticleContent returns a string');
+        expect(typeof content, 'extractArticleContent returns a string').toBe('string');
 
         if (content.length > 0) {
-          assert.ok(content.length >= 50, `extracted ${content.length} chars of article content`);
-          assert.ok(content.length <= 1024 * 14, 'content within 14KB limit');
-          assert.ok(!content.includes('<script'), 'no script tags in extracted content');
-          assert.ok(!content.includes('<style'), 'no style tags in extracted content');
+          expect(content.length >= 50, `extracted ${content.length} chars of article content`).toBeTruthy();
+          expect(content.length <= 1024 * 14, 'content within 14KB limit').toBeTruthy();
+          expect(!content.includes('<script'), 'no script tags in extracted content').toBeTruthy();
+          expect(!content.includes('<style'), 'no style tags in extracted content').toBeTruthy();
         } else {
-          assert.ok(true, `content extraction returned empty for ${item.url} (site may block scraping)`);
+          expect(true, `content extraction returned empty for ${item.url} (site may block scraping)`).toBeTruthy();
         }
 
         // Save artifacts
@@ -279,9 +279,9 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert, admin, state }) {
+      async run({ expect, admin, state }) {
         if (!admin || !state.realFeedItems?.length) {
-          return assert.ok(true, 'skipped: no emulator or feed items');
+          return expect(true, 'skipped: no emulator or feed items').toBeTruthy();
         }
 
         const realFeedUrl = REAL_FEEDS[0].url;
@@ -302,25 +302,19 @@ module.exports = defineCases({
 
         // Run 2: verify it's now in the processed set
         const processed = await getProcessedItemIds(admin, realFeedUrl);
-        assert.ok(
-          processed.has(firstItem.id) || processed.has(firstItem.url),
-          'tracked real feed item is in processed set',
-        );
+        expect(processed.has(firstItem.id) || processed.has(firstItem.url), 'tracked real feed item is in processed set').toBeTruthy();
 
         // Simulate selection: filter out processed items
         const unprocessed = state.realFeedItems.filter(
           (item) => !processed.has(item.id) && !processed.has(item.url),
         );
 
-        assert.ok(
-          unprocessed.length < state.realFeedItems.length,
-          `dedup removed tracked item (${unprocessed.length} remain of ${state.realFeedItems.length})`,
-        );
+        expect(unprocessed.length < state.realFeedItems.length, `dedup removed tracked item (${unprocessed.length} remain of ${state.realFeedItems.length})`).toBeTruthy();
 
         const trackedInUnprocessed = unprocessed.find(
           (item) => item.id === firstItem.id || item.url === firstItem.url,
         );
-        assert.ok(!trackedInUnprocessed, 'tracked item correctly excluded from unprocessed list');
+        expect(!trackedInUnprocessed, 'tracked item correctly excluded from unprocessed list').toBeTruthy();
       },
     },
 
@@ -329,9 +323,9 @@ module.exports = defineCases({
       timeout: 5000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert, admin, state }) {
+      async run({ expect, admin, state }) {
         if (!admin || !state.realFeedItems?.length) {
-          return assert.ok(true, 'skipped');
+          return expect(true, 'skipped').toBeTruthy();
         }
 
         const realFeedUrl = REAL_FEEDS[0].url;
@@ -341,12 +335,12 @@ module.exports = defineCases({
         const expectedDocId = contentSourceHash(`$feed:${realFeedUrl}`, firstItem.url || firstItem.id);
         const doc = await admin.firestore().doc(`content-sources/${expectedDocId}`).get();
 
-        assert.ok(doc.exists, 'tracking doc exists at expected hash-based ID');
+        expect(doc.exists, 'tracking doc exists at expected hash-based ID').toBeTruthy();
 
         const data = doc.data();
-        assert.equal(data.feedUrl, realFeedUrl, 'stored feedUrl matches');
-        assert.equal(data.brandId, 'integration-test', 'stored brandId matches');
-        assert.ok(data.itemTitle, 'stored itemTitle is not empty');
+        expect(data.feedUrl, 'stored feedUrl matches').toBe(realFeedUrl);
+        expect(data.brandId, 'stored brandId matches').toBe('integration-test');
+        expect(data.itemTitle, 'stored itemTitle is not empty').toBeTruthy();
       },
     },
 
@@ -358,7 +352,7 @@ module.exports = defineCases({
       timeout: 60000,
       skip: !EXTENDED ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ assert }) {
+      async run({ expect }) {
         const results = [];
 
         for (const feed of REAL_FEEDS) {
@@ -383,10 +377,7 @@ module.exports = defineCases({
 
         // At least 5 of 7 feeds should parse successfully
         const successful = results.filter((r) => r.items > 0);
-        assert.ok(
-          successful.length >= 5,
-          `at least 5 of ${REAL_FEEDS.length} real feeds parsed successfully: ${JSON.stringify(results)}`,
-        );
+        expect(successful.length >= 5, `at least 5 of ${REAL_FEEDS.length} real feeds parsed successfully: ${JSON.stringify(results)}`).toBeTruthy();
 
         // Save summary
         saveArtifact('summary.json', {
@@ -397,7 +388,7 @@ module.exports = defineCases({
 
         // Log results for visibility
         for (const r of results) {
-          assert.ok(true, `${r.name} (${r.format}): ${r.items} items${r.error ? ` [ERROR: ${r.error}]` : ''}`);
+          expect(true, `${r.name} (${r.format}): ${r.items} items${r.error ? ` [ERROR: ${r.error}]` : ''}`).toBeTruthy();
         }
       },
     },

@@ -69,44 +69,44 @@ module.exports = defineCases({
     {
       name: 'a-transient-failure-on-a-suspended-subscription-writes-nothing',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const uid = '_test-cancel-transient-suspended';
         const user = subscriber(omega, { uid, status: 'suspended', provider: 'stripe' });
 
-        assert.equal(await firestore.exists(`users/${uid}`), false, 'the case starts with no user doc to overwrite');
+        expect(await firestore.exists(`users/${uid}`), 'the case starts with no user doc to overwrite').toBe(false);
 
         const sent = await cancelWithoutStripeKey(omega, user);
 
-        assert.equal(sent.code, 500, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(await firestore.exists(`users/${uid}`), false, 'A transient failure must never write a cancelled subscription');
+        expect(sent.code, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(500);
+        expect(await firestore.exists(`users/${uid}`), 'A transient failure must never write a cancelled subscription').toBe(false);
       },
     },
 
     {
       name: 'a-transient-failure-on-an-active-subscription-writes-nothing',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const uid = '_test-cancel-transient-active';
         const user = subscriber(omega, { uid, status: 'active', provider: 'stripe' });
 
         const sent = await cancelWithoutStripeKey(omega, user);
 
-        assert.equal(sent.code, 500, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(await firestore.exists(`users/${uid}`), false, 'A transient failure must never write a cancelled subscription');
+        expect(sent.code, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(500);
+        expect(await firestore.exists(`users/${uid}`), 'A transient failure must never write a cancelled subscription').toBe(false);
       },
     },
 
     {
       name: 'the-failure-response-carries-no-sdk-detail',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = subscriber(omega, { uid: '_test-cancel-neutral-message', status: 'active', provider: 'stripe' });
 
         const sent = await cancelWithoutStripeKey(omega, user);
 
-        assert.equal(sent.code, 500, `Expected the provider failure, got ${sent.code}`);
-        assert.ok(!/STRIPE_SECRET_KEY/.test(`${sent.body}`), `The SDK detail must stay in the logs, got: ${sent.body}`);
-        assert.match(`${sent.body}`, /could not cancel your subscription/i, 'The client should get the neutral message');
+        expect(sent.code, `Expected the provider failure, got ${sent.code}`).toBe(500);
+        expect(!/STRIPE_SECRET_KEY/.test(`${sent.body}`), `The SDK detail must stay in the logs, got: ${sent.body}`).toBeTruthy();
+        expect(`${sent.body}`, 'The client should get the neutral message').toMatch(/could not cancel your subscription/i);
       },
     },
 
@@ -115,7 +115,7 @@ module.exports = defineCases({
     {
       name: 'classifies-a-stripe-missing-resource-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // The SDK's own error class, generated from the payload Stripe returns
         // for a subscription that does not exist.
         const error = Stripe.errors.StripeInvalidRequestError.generate({
@@ -125,30 +125,30 @@ module.exports = defineCases({
           message: "No such subscription: 'sub_test_provider_error'",
         });
 
-        assert.equal(isAlreadyGone(error), true, 'Stripe resource_missing means the subscription is gone');
+        expect(isAlreadyGone(error), 'Stripe resource_missing means the subscription is gone').toBe(true);
       },
     },
 
     {
       name: 'classifies-a-chargebee-404-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // The shape libraries/payment/providers/chargebee.js throws
         const error = new Error('Chargebee API 404: Sorry, we couldn\'t find that resource');
         error.statusCode = 404;
 
-        assert.equal(isAlreadyGone(error), true, 'A Chargebee 404 means the subscription is gone');
+        expect(isAlreadyGone(error), 'A Chargebee 404 means the subscription is gone').toBe(true);
       },
     },
 
     {
       name: 'classifies-a-paypal-404-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // The shape libraries/payment/providers/paypal.js throws — status in the message only
         const error = new Error('PayPal API 404: The specified resource does not exist.');
 
-        assert.equal(isAlreadyGone(error), true, 'A PayPal 404 means the subscription is gone');
+        expect(isAlreadyGone(error), 'A PayPal 404 means the subscription is gone').toBe(true);
       },
     },
 
@@ -157,70 +157,70 @@ module.exports = defineCases({
     {
       name: 'does-not-classify-a-stripe-outage-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const error = Stripe.errors.StripeAPIError.generate({
           type: 'api_error',
           statusCode: 503,
           message: 'Stripe is temporarily unavailable',
         });
 
-        assert.equal(isAlreadyGone(error), false, 'A Stripe outage is transient, not gone');
+        expect(isAlreadyGone(error), 'A Stripe outage is transient, not gone').toBe(false);
       },
     },
 
     {
       name: 'does-not-classify-a-stripe-auth-failure-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const error = Stripe.errors.StripeAuthenticationError.generate({
           type: 'invalid_request_error',
           statusCode: 401,
           message: 'Invalid API Key provided',
         });
 
-        assert.equal(isAlreadyGone(error), false, 'A rotated key is transient, not gone');
+        expect(isAlreadyGone(error), 'A rotated key is transient, not gone').toBe(false);
       },
     },
 
     {
       name: 'does-not-classify-a-paypal-422-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // PayPal answers 422 for an already-cancelled subscription too, but the
         // client surfaces no issue code — so it stays in the transient bucket
         // rather than becoming a guess that writes.
         const error = new Error('PayPal API 422: The requested action could not be performed, semantically incorrect, or failed business validation.');
 
-        assert.equal(isAlreadyGone(error), false, 'An unreadable PayPal 422 must not force a cancellation');
+        expect(isAlreadyGone(error), 'An unreadable PayPal 422 must not force a cancellation').toBe(false);
       },
     },
 
     {
       name: 'does-not-classify-a-paypal-outage-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const error = new Error('PayPal API 503: Service Unavailable');
 
-        assert.equal(isAlreadyGone(error), false, 'A PayPal outage is transient, not gone');
+        expect(isAlreadyGone(error), 'A PayPal outage is transient, not gone').toBe(false);
       },
     },
 
     {
       name: 'does-not-classify-a-configuration-error-as-gone',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const error = new Error('STRIPE_SECRET_KEY environment variable is required');
 
-        assert.equal(isAlreadyGone(error), false, 'A misconfiguration is not a missing subscription');
+        expect(isAlreadyGone(error), 'A misconfiguration is not a missing subscription').toBe(false);
       },
     },
 
     {
       name: 'does-not-classify-an-unknown-error-as-gone',
       auth: 'none',
-      async run({ assert }) {
-        assert.equal(isAlreadyGone(new Error('socket hang up')), false, 'An unrecognized error must never be the one that writes');
-        assert.equal(isAlreadyGone(undefined), false, 'A missing error must never be the one that writes');
+      async run({ expect }) {
+        expect(isAlreadyGone(new Error('socket hang up')), 'An unrecognized error must never be the one that writes').toBe(false);
+        expect(isAlreadyGone(undefined), 'A missing error must never be the one that writes').toBe(false);
       },
     },
   ],

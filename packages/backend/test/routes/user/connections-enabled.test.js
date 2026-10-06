@@ -159,11 +159,11 @@ function tokenizeInput() {
 }
 
 /** A refusal is a 400 naming the config key that turns the provider on. */
-function assertRefused(assert, response) {
+function assertRefused(expect, response) {
   const message = typeof response.message === 'string' ? response.message : JSON.stringify(response.message);
 
-  assert.equal(response.options.code, 400, `the refusal is a 400: ${message}`);
-  assert.equal(message.includes(`connections.${PROVIDER_ID}.enabled`), true, `the message names the key that turns it on: ${message}`);
+  expect(response.options.code, `the refusal is a 400: ${message}`).toBe(400);
+  expect(message.includes(`connections.${PROVIDER_ID}.enabled`), `the message names the key that turns it on: ${message}`).toBe(true);
 
   return message;
 }
@@ -207,7 +207,7 @@ module.exports = defineCases({
     {
       name: 'authorize-refuses-an-off-provider-and-returns-no-url',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, responses, redirects } = lane(false);
 
         await getRoute({
@@ -218,32 +218,32 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assertRefused(assert, response);
-        assert.equal(response.message?.url, undefined, 'no authorization URL comes back');
-        assert.equal(redirects.length, 0, 'and nobody is redirected to one');
-        assert.deepEqual(stepsRun(), [], 'the authorize step never ran');
+        assertRefused(expect, response);
+        expect(response.message?.url, 'no authorization URL comes back').toBe(undefined);
+        expect(redirects.length, 'and nobody is redirected to one').toBe(0);
+        expect(stepsRun(), 'the authorize step never ran').toEqual([]);
       },
     },
 
     {
       name: 'tokenize-refuses-an-off-provider-before-any-exchange',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { docs, data } = tokenizeInput();
         const { ctx, writes, responses } = lane(false, docs);
 
         await postRoute({ ctx, user: userFor(false), data });
 
-        assertRefused(assert, answered(responses));
-        assert.deepEqual(stepsRun(), [], 'no token exchange was attempted');
-        assert.equal(writes.some((write) => write.path.startsWith('users/')), false, 'and no connection was recorded');
+        assertRefused(expect, answered(responses));
+        expect(stepsRun(), 'no token exchange was attempted').toEqual([]);
+        expect(writes.some((write) => write.path.startsWith('users/')), 'and no connection was recorded').toBe(false);
       },
     },
 
     {
       name: 'refresh-refuses-an-off-provider-and-calls-no-refresh',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane(false, { [`users/${USER_UID}`]: { connections: storedConnections() } });
 
         await postRoute({
@@ -252,27 +252,27 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
-        assertRefused(assert, answered(responses));
-        assert.deepEqual(stepsRun(), [], 'no refresh call reached the provider');
-        assert.equal(writes.some((write) => write.verb === 'set' && write.path === `users/${USER_UID}`), false, 'and no token was stored');
+        assertRefused(expect, answered(responses));
+        expect(stepsRun(), 'no refresh call reached the provider').toEqual([]);
+        expect(writes.some((write) => write.verb === 'set' && write.path === `users/${USER_UID}`), 'and no token was stored').toBe(false);
       },
     },
 
     {
       name: 'the-three-refused-actions-answer-one-and-the-same-error',
 
-      async run({ assert }) {
-        const [authorize, tokenize, refresh] = (await refusedResponses()).map((response) => assertRefused(assert, response));
+      async run({ expect }) {
+        const [authorize, tokenize, refresh] = (await refusedResponses()).map((response) => assertRefused(expect, response));
 
-        assert.equal(tokenize, authorize, 'tokenize answers the same message as authorize');
-        assert.equal(refresh, authorize, 'and so does refresh');
+        expect(tokenize, 'tokenize answers the same message as authorize').toBe(authorize);
+        expect(refresh, 'and so does refresh').toBe(authorize);
       },
     },
 
     {
       name: 'status-still-answers-for-an-off-provider',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, responses } = lane(false);
 
         await getRoute({
@@ -283,15 +283,15 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `status is not refused: ${JSON.stringify(response.message)}`);
-        assert.equal(response.message.status, 'connected', 'and it reads the stored record');
+        expect(response.options.code, `status is not refused: ${JSON.stringify(response.message)}`).toBe(undefined);
+        expect(response.message.status, 'and it reads the stored record').toBe('connected');
       },
     },
 
     {
       name: 'delete-still-removes-an-off-providers-connection',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane(false);
 
         await deleteRoute({
@@ -302,22 +302,22 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `delete is not refused: ${JSON.stringify(response.message)}`);
-        assert.equal(response.message.success, true, 'the disconnect succeeds');
+        expect(response.options.code, `delete is not refused: ${JSON.stringify(response.message)}`).toBe(undefined);
+        expect(response.message.success, 'the disconnect succeeds').toBe(true);
 
         const deleted = writes.find((write) => write.path === `users/${USER_UID}`);
         const removed = deleted && (deleted.payload.connections?.[PROVIDER_ID]?.[IDENTITY_ID]
           ?? deleted.payload[`connections.${PROVIDER_ID}.${IDENTITY_ID}`]);
 
-        assert.ok(deleted, 'the record is deleted');
-        assert.equal(removed?.methodName, 'FieldValue.delete', `and it is the one account's record that went: ${JSON.stringify(deleted?.payload)}`);
+        expect(deleted, 'the record is deleted').toBeTruthy();
+        expect(removed?.methodName, `and it is the one account's record that went: ${JSON.stringify(deleted?.payload)}`).toBe('FieldValue.delete');
       },
     },
 
     {
       name: 'authorize-tokenize-and-refresh-run-when-the-provider-is-on',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const authorizeLane = lane(true);
 
         await getRoute({
@@ -328,8 +328,8 @@ module.exports = defineCases({
 
         const authorized = answered(authorizeLane.responses);
 
-        assert.equal(authorized.options.code, undefined, `authorize is not refused: ${JSON.stringify(authorized.message)}`);
-        assert.equal(authorized.message.url, 'https://provider.test/a?state=x', "the provider's authorization URL comes back");
+        expect(authorized.options.code, `authorize is not refused: ${JSON.stringify(authorized.message)}`).toBe(undefined);
+        expect(authorized.message.url, "the provider's authorization URL comes back").toBe('https://provider.test/a?state=x');
 
         const { docs, data } = tokenizeInput();
         const tokenizeLane = lane(true, docs);
@@ -338,8 +338,8 @@ module.exports = defineCases({
 
         const tokenized = answered(tokenizeLane.responses);
 
-        assert.equal(tokenized.options.code, undefined, `tokenize is not refused: ${JSON.stringify(tokenized.message)}`);
-        assert.equal(stepsRun().includes('exchange'), true, 'and the exchange ran');
+        expect(tokenized.options.code, `tokenize is not refused: ${JSON.stringify(tokenized.message)}`).toBe(undefined);
+        expect(stepsRun().includes('exchange'), 'and the exchange ran').toBe(true);
 
         const refreshLane = lane(true, { [`users/${USER_UID}`]: { connections: storedConnections() } });
 
@@ -351,8 +351,8 @@ module.exports = defineCases({
 
         const refreshed = answered(refreshLane.responses);
 
-        assert.equal(refreshed.options.code, undefined, `refresh is not refused: ${JSON.stringify(refreshed.message)}`);
-        assert.deepEqual(stepsRun(), ['refresh'], 'and the refresh reached the provider once');
+        expect(refreshed.options.code, `refresh is not refused: ${JSON.stringify(refreshed.message)}`).toBe(undefined);
+        expect(stepsRun(), 'and the refresh reached the provider once').toEqual(['refresh']);
       },
     },
   ],

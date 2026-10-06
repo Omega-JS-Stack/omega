@@ -25,98 +25,98 @@ module.exports = defineCases({
 
     {
       name: 'supports-subscription-created',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_created'), 'Should support subscription_created');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_created'), 'Should support subscription_created').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-cancelled',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_cancelled'), 'Should support subscription_cancelled');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_cancelled'), 'Should support subscription_cancelled').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-activated',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_activated'), 'Should support subscription_activated');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_activated'), 'Should support subscription_activated').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-changed',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_changed'), 'Should support subscription_changed');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_changed'), 'Should support subscription_changed').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-renewed',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_renewed'), 'Should support subscription_renewed');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_renewed'), 'Should support subscription_renewed').toBeTruthy();
       },
     },
 
     {
       name: 'supports-subscription-reactivated',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_reactivated'), 'Should support subscription_reactivated');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_reactivated'), 'Should support subscription_reactivated').toBeTruthy();
       },
     },
 
     {
       name: 'supports-cancellation-scheduled',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_cancellation_scheduled'), 'Should support subscription_cancellation_scheduled');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_cancellation_scheduled'), 'Should support subscription_cancellation_scheduled').toBeTruthy();
       },
     },
 
     {
       name: 'supports-cancellation-removed',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('subscription_scheduled_cancellation_removed'), 'Should support scheduled_cancellation_removed');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('subscription_scheduled_cancellation_removed'), 'Should support scheduled_cancellation_removed').toBeTruthy();
       },
     },
 
     {
       name: 'supports-payment-failed',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('payment_failed'), 'Should support payment_failed');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('payment_failed'), 'Should support payment_failed').toBeTruthy();
       },
     },
 
     {
       name: 'supports-payment-succeeded',
-      async run({ assert }) {
+      async run({ expect }) {
         // The paid signal for a one-time purchase. Without it subscribed, a
         // Chargebee one-time sale reached the pipeline as `invoice_generated`
         // alone — an event that says nothing about payment
         // ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)).
-        assert.ok(chargebeeProvider.isSupported('payment_succeeded'), 'Should support payment_succeeded');
+        expect(chargebeeProvider.isSupported('payment_succeeded'), 'Should support payment_succeeded').toBeTruthy();
       },
     },
 
     {
       name: 'supports-payment-refunded',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('payment_refunded'), 'Should support payment_refunded');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('payment_refunded'), 'Should support payment_refunded').toBeTruthy();
       },
     },
 
     {
       name: 'supports-invoice-generated',
-      async run({ assert }) {
-        assert.ok(chargebeeProvider.isSupported('invoice_generated'), 'Should support invoice_generated');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('invoice_generated'), 'Should support invoice_generated').toBeTruthy();
       },
     },
 
     {
       name: 'rejects-unsupported-event',
-      async run({ assert }) {
-        assert.equal(chargebeeProvider.isSupported('customer_created'), false, 'Should not support customer_created');
-        assert.equal(chargebeeProvider.isSupported('coupon_created'), false, 'Should not support coupon_created');
-        assert.equal(chargebeeProvider.isSupported('subscription_deleted'), false, 'Should not support subscription_deleted');
+      async run({ expect }) {
+        expect(chargebeeProvider.isSupported('customer_created'), 'Should not support customer_created').toBe(false);
+        expect(chargebeeProvider.isSupported('coupon_created'), 'Should not support coupon_created').toBe(false);
+        expect(chargebeeProvider.isSupported('subscription_deleted'), 'Should not support subscription_deleted').toBe(false);
       },
     },
 
@@ -124,36 +124,36 @@ module.exports = defineCases({
 
     {
       name: 'throws-on-empty-body',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook(null);
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
 
     {
       name: 'throws-on-missing-id',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook({ event_type: 'subscription_created', content: {} });
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
 
     {
       name: 'throws-on-missing-event-type',
-      async run({ assert }) {
+      async run({ expect }) {
         try {
           parseWebhook({ id: 'ev_123', content: {} });
-          assert.fail('Should have thrown');
+          expect.fail('Should have thrown');
         } catch (e) {
-          assert.match(e.message, /Invalid/, 'Should mention invalid payload');
+          expect(e.message, 'Should mention invalid payload').toMatch(/Invalid/);
         }
       },
     },
@@ -162,7 +162,7 @@ module.exports = defineCases({
 
     {
       name: 'subscription-created-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_sub_created',
           event_type: 'subscription_created',
@@ -175,18 +175,18 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.resourceType, 'subscription', 'Resource type should be subscription');
-        assert.equal(result.resourceId, 'sub_123', 'Resource ID should be subscription ID');
-        assert.equal(result.uid, 'user-abc', 'UID should come from meta_data');
-        assert.equal(result.eventId, 'ev_sub_created', 'Event ID should match');
-        assert.equal(result.eventType, 'subscription_created', 'Event type should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.resourceType, 'Resource type should be subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should be subscription ID').toBe('sub_123');
+        expect(result.uid, 'UID should come from meta_data').toBe('user-abc');
+        expect(result.eventId, 'Event ID should match').toBe('ev_sub_created');
+        expect(result.eventType, 'Event type should match').toBe('subscription_created');
       },
     },
 
     {
       name: 'subscription-cancelled-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_sub_cancelled',
           event_type: 'subscription_cancelled',
@@ -198,15 +198,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.resourceId, 'sub_456', 'Resource ID should match');
-        assert.equal(result.uid, 'user-def', 'UID should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should match').toBe('sub_456');
+        expect(result.uid, 'UID should match').toBe('user-def');
       },
     },
 
     {
       name: 'subscription-cancellation-scheduled-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_cancel_scheduled',
           event_type: 'subscription_cancellation_scheduled',
@@ -219,14 +219,14 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'Category should be subscription');
-        assert.equal(result.uid, 'user-ghi', 'UID should match');
+        expect(result.category, 'Category should be subscription').toBe('subscription');
+        expect(result.uid, 'UID should match').toBe('user-ghi');
       },
     },
 
     {
       name: 'subscription-event-uid-from-legacy-cf',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_legacy_uid',
           event_type: 'subscription_renewed',
@@ -238,13 +238,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.uid, 'legacy-user-123', 'UID should fall back to cf_uid');
+        expect(result.uid, 'UID should fall back to cf_uid').toBe('legacy-user-123');
       },
     },
 
     {
       name: 'subscription-event-null-uid-when-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_no_uid',
           event_type: 'subscription_created',
@@ -253,8 +253,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.uid, null, 'UID should be null when not available');
-        assert.equal(result.category, 'subscription', 'Category should still be subscription');
+        expect(result.uid, 'UID should be null when not available').toBe(null);
+        expect(result.category, 'Category should still be subscription').toBe('subscription');
       },
     },
 
@@ -262,7 +262,7 @@ module.exports = defineCases({
 
     {
       name: 'payment-failed-subscription-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_pay_fail',
           event_type: 'payment_failed',
@@ -275,16 +275,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'With subscription → subscription category');
-        assert.equal(result.resourceType, 'subscription', 'Should fetch subscription');
-        assert.equal(result.resourceId, 'sub_fail', 'Resource ID should be subscription ID');
-        assert.equal(result.uid, 'user-fail', 'UID from subscription');
+        expect(result.category, 'With subscription → subscription category').toBe('subscription');
+        expect(result.resourceType, 'Should fetch subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should be subscription ID').toBe('sub_fail');
+        expect(result.uid, 'UID from subscription').toBe('user-fail');
       },
     },
 
     {
       name: 'payment-failed-one-time-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_pay_fail_onetime',
           event_type: 'payment_failed',
@@ -294,9 +294,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'No subscription → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch invoice');
-        assert.equal(result.resourceId, 'inv_onetime_fail', 'Resource ID should be invoice ID');
+        expect(result.category, 'No subscription → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch invoice').toBe('invoice');
+        expect(result.resourceId, 'Resource ID should be invoice ID').toBe('inv_onetime_fail');
       },
     },
 
@@ -304,7 +304,7 @@ module.exports = defineCases({
 
     {
       name: 'payment-succeeded-one-time-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_pay_ok_onetime',
           event_type: 'payment_succeeded',
@@ -314,16 +314,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'No subscription → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch invoice');
-        assert.equal(result.resourceId, 'inv_onetime_paid', 'Resource ID should be invoice ID');
-        assert.equal(result.uid, 'user-onetime-paid', 'UID from customer');
+        expect(result.category, 'No subscription → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch invoice').toBe('invoice');
+        expect(result.resourceId, 'Resource ID should be invoice ID').toBe('inv_onetime_paid');
+        expect(result.uid, 'UID from customer').toBe('user-onetime-paid');
       },
     },
 
     {
       name: 'payment-succeeded-with-subscription-skipped',
-      async run({ assert }) {
+      async run({ expect }) {
         // A renewal's charge. `subscription_renewed` already carries that revenue,
         // so storing this one too would book the renewal twice — the same
         // double-count the Stripe provider documents for `invoice.paid`
@@ -337,7 +337,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, null, 'With a subscription → null (subscription_renewed owns it)');
+        expect(result.category, 'With a subscription → null (subscription_renewed owns it)').toBe(null);
       },
     },
 
@@ -345,7 +345,7 @@ module.exports = defineCases({
 
     {
       name: 'payment-refunded-subscription-category',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_refund',
           event_type: 'payment_refunded',
@@ -357,15 +357,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'subscription', 'With subscription → subscription');
-        assert.equal(result.resourceId, 'sub_refund', 'Resource ID should be subscription');
-        assert.equal(result.uid, 'user-refund', 'UID from subscription');
+        expect(result.category, 'With subscription → subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID should be subscription').toBe('sub_refund');
+        expect(result.uid, 'UID from subscription').toBe('user-refund');
       },
     },
 
     {
       name: 'payment-refunded-no-subscription-is-one-time',
-      async run({ assert }) {
+      async run({ expect }) {
         // A refund with an invoice and no subscription is the refund of a one-time
         // purchase — the same invoice the one-time payment_failed branch names.
         // Dropping it meant that refund never entered the pipeline at all
@@ -380,16 +380,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'No subscription → one-time refund');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch the invoice');
-        assert.equal(result.resourceId, 'inv_onetime_refund', 'Resource ID should be the invoice ID');
-        assert.equal(result.uid, 'user-onetime-refund', 'UID from customer');
+        expect(result.category, 'No subscription → one-time refund').toBe('one-time');
+        expect(result.resourceType, 'Should fetch the invoice').toBe('invoice');
+        expect(result.resourceId, 'Resource ID should be the invoice ID').toBe('inv_onetime_refund');
+        expect(result.uid, 'UID from customer').toBe('user-onetime-refund');
       },
     },
 
     {
       name: 'payment-refunded-with-neither-subscription-nor-invoice-skipped',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_refund_no_sub',
           event_type: 'payment_refunded',
@@ -398,7 +398,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, null, 'Nothing to resolve the purchase from → null (skipped)');
+        expect(result.category, 'Nothing to resolve the purchase from → null (skipped)').toBe(null);
       },
     },
 
@@ -406,7 +406,7 @@ module.exports = defineCases({
 
     {
       name: 'invoice-generated-non-recurring-one-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_inv_gen',
           event_type: 'invoice_generated',
@@ -416,15 +416,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, 'one-time', 'Non-recurring invoice → one-time');
-        assert.equal(result.resourceType, 'invoice', 'Should fetch invoice');
-        assert.equal(result.resourceId, 'inv_onetime_001', 'Resource ID should be invoice ID');
+        expect(result.category, 'Non-recurring invoice → one-time').toBe('one-time');
+        expect(result.resourceType, 'Should fetch invoice').toBe('invoice');
+        expect(result.resourceId, 'Resource ID should be invoice ID').toBe('inv_onetime_001');
       },
     },
 
     {
       name: 'invoice-generated-recurring-skipped',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook({
           id: 'ev_inv_recurring',
           event_type: 'invoice_generated',
@@ -433,7 +433,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.category, null, 'Recurring invoice → null (skipped)');
+        expect(result.category, 'Recurring invoice → null (skipped)').toBe(null);
       },
     },
 
@@ -441,29 +441,29 @@ module.exports = defineCases({
 
     {
       name: 'fixture-subscription-created',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook(FIXTURE_SUB_CREATED);
 
-        assert.equal(result.eventId, FIXTURE_SUB_CREATED.id, 'Event ID matches fixture');
-        assert.equal(result.eventType, 'subscription_created', 'Event type matches');
-        assert.equal(result.category, 'subscription', 'Category is subscription');
-        assert.equal(result.resourceType, 'subscription', 'Resource type is subscription');
-        assert.equal(result.resourceId, 'cb_sub_active_001', 'Resource ID from content.subscription.id');
-        assert.equal(result.uid, 'test-uid-001', 'UID from meta_data');
+        expect(result.eventId, 'Event ID matches fixture').toBe(FIXTURE_SUB_CREATED.id);
+        expect(result.eventType, 'Event type matches').toBe('subscription_created');
+        expect(result.category, 'Category is subscription').toBe('subscription');
+        expect(result.resourceType, 'Resource type is subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID from content.subscription.id').toBe('cb_sub_active_001');
+        expect(result.uid, 'UID from meta_data').toBe('test-uid-001');
       },
     },
 
     {
       name: 'fixture-payment-failed',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = parseWebhook(FIXTURE_PAYMENT_FAILED);
 
-        assert.equal(result.eventId, FIXTURE_PAYMENT_FAILED.id, 'Event ID matches fixture');
-        assert.equal(result.eventType, 'payment_failed', 'Event type matches');
-        assert.equal(result.category, 'subscription', 'Category is subscription (has subscription)');
-        assert.equal(result.resourceType, 'subscription', 'Resource type is subscription');
-        assert.equal(result.resourceId, 'cb_sub_active_001', 'Resource ID from content.subscription.id');
-        assert.equal(result.uid, 'test-uid-001', 'UID from subscription meta_data');
+        expect(result.eventId, 'Event ID matches fixture').toBe(FIXTURE_PAYMENT_FAILED.id);
+        expect(result.eventType, 'Event type matches').toBe('payment_failed');
+        expect(result.category, 'Category is subscription (has subscription)').toBe('subscription');
+        expect(result.resourceType, 'Resource type is subscription').toBe('subscription');
+        expect(result.resourceId, 'Resource ID from content.subscription.id').toBe('cb_sub_active_001');
+        expect(result.uid, 'UID from subscription meta_data').toBe('test-uid-001');
       },
     },
 
@@ -471,7 +471,7 @@ module.exports = defineCases({
 
     {
       name: 'raw-contains-full-event',
-      async run({ assert }) {
+      async run({ expect }) {
         const event = {
           id: 'ev_raw',
           event_type: 'subscription_changed',
@@ -482,8 +482,8 @@ module.exports = defineCases({
         };
 
         const result = parseWebhook(event);
-        assert.equal(result.raw, event, 'Raw should be the full event object');
-        assert.equal(result.raw.extra_field, 'preserved', 'Extra fields preserved in raw');
+        expect(result.raw, 'Raw should be the full event object').toBe(event);
+        expect(result.raw.extra_field, 'Extra fields preserved in raw').toBe('preserved');
       },
     },
   ],

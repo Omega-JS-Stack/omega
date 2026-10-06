@@ -22,7 +22,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-hosted-page-uid-trust
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -145,10 +145,10 @@ module.exports = defineCases({
         const calls = [];
         const { store } = await runHostedPageEvent({ payloadUid: FORGED_UID, payloadOrderId: FORGED_ORDER_ID, calls });
 
-        assert.ok(calls.includes(HOSTED_PAGES), 'the second source is consulted exactly when the claim needs checking');
-        assert.ok(!store.get(`users/${FORGED_UID}`), 'the uid the caller chose never receives a subscription it did not buy');
-        assert.ok(!store.get(`users/${OWNER_UID}`), 'and the refusal acts on nobody, not even the real owner');
-        assert.ok(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'no order behind it either');
+        expect(calls.includes(HOSTED_PAGES), 'the second source is consulted exactly when the claim needs checking').toBeTruthy();
+        expect(!store.get(`users/${FORGED_UID}`), 'the uid the caller chose never receives a subscription it did not buy').toBeTruthy();
+        expect(!store.get(`users/${OWNER_UID}`), 'and the refusal acts on nobody, not even the real owner').toBeTruthy();
+        expect(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'no order behind it either').toBeTruthy();
       },
     },
 
@@ -159,12 +159,12 @@ module.exports = defineCases({
         const { store, logs } = await runHostedPageEvent({ payloadUid: FORGED_UID, payloadOrderId: FORGED_ORDER_ID });
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'completed', 'no retry can make the payload agree — the event must not be redelivered forever');
-        assert.equal(event.refusal?.reason, 'uid-mismatch', 'it is the same refusal a mismatched record earns');
-        assert.equal(event.refusal?.payloadUid, FORGED_UID, 'the stamp names the uid the payload claimed');
-        assert.equal(event.refusal?.providerUid, OWNER_UID, 'and the uid Chargebee\'s hosted page carries');
-        assert.equal(event.refusal?.source, 'hosted-page', 'and which of Chargebee\'s records answered');
-        assert.match(logs.join('\n'), /UID MISMATCH/, 'the refusal is loud');
+        expect(event.status, 'no retry can make the payload agree — the event must not be redelivered forever').toBe('completed');
+        expect(event.refusal?.reason, 'it is the same refusal a mismatched record earns').toBe('uid-mismatch');
+        expect(event.refusal?.payloadUid, 'the stamp names the uid the payload claimed').toBe(FORGED_UID);
+        expect(event.refusal?.providerUid, 'and the uid Chargebee\'s hosted page carries').toBe(OWNER_UID);
+        expect(event.refusal?.source, 'and which of Chargebee\'s records answered').toBe('hosted-page');
+        expect(logs.join('\n'), 'the refusal is loud').toMatch(/UID MISMATCH/);
       },
     },
 
@@ -177,9 +177,9 @@ module.exports = defineCases({
         // hosted-page checkout older than 25 pages.
         const { store, logs } = await runHostedPageEvent({ payloadUid: FORGED_UID, payloadOrderId: FORGED_ORDER_ID, inWindow: false });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a miss is not a mismatch');
-        assert.equal(store.get(`users/${FORGED_UID}`)?.subscription?.status, 'active', 'the payload steers, as it did before');
-        assert.match(logs.join('\n'), /UID FALLBACK/, 'and the write that was never cross-checked is named out loud');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a miss is not a mismatch').toBeTruthy();
+        expect(store.get(`users/${FORGED_UID}`)?.subscription?.status, 'the payload steers, as it did before').toBe('active');
+        expect(logs.join('\n'), 'and the write that was never cross-checked is named out loud').toMatch(/UID FALLBACK/);
       },
     },
 
@@ -189,9 +189,9 @@ module.exports = defineCases({
       async run() {
         const { store } = await runHostedPageEvent({ payloadUid: OWNER_UID, payloadOrderId: OWNER_ORDER_ID });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a claim the second source confirms is refused nothing');
-        assert.equal(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'active', 'the subscription lands on the owner\'s doc');
-        assert.equal(store.get(`payments-orders/${OWNER_ORDER_ID}`)?.owner, OWNER_UID, 'and the order the hosted page names is written with it');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a claim the second source confirms is refused nothing').toBeTruthy();
+        expect(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'the subscription lands on the owner\'s doc').toBe('active');
+        expect(store.get(`payments-orders/${OWNER_ORDER_ID}`)?.owner, 'and the order the hosted page names is written with it').toBe(OWNER_UID);
       },
     },
 
@@ -203,9 +203,9 @@ module.exports = defineCases({
         const { store } = await runHostedPageEvent({ payloadUid: null, payloadOrderId: null });
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.ok(!event.refusal, 'a payload that claims nothing contradicts nothing');
-        assert.equal(event.owner, OWNER_UID, 'the resolved uid is persisted on the event doc');
-        assert.equal(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'active', 'and the subscription lands on it');
+        expect(!event.refusal, 'a payload that claims nothing contradicts nothing').toBeTruthy();
+        expect(event.owner, 'the resolved uid is persisted on the event doc').toBe(OWNER_UID);
+        expect(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'and the subscription lands on it').toBe('active');
       },
     },
   ],

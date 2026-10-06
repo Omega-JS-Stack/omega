@@ -94,13 +94,13 @@ module.exports = defineCases({
 
     {
       name: 'reference-schema-full-input',
-      async run({ assert }) {
+      async run({ expect }) {
         const { data } = validate(referenceSchema({ user: basicUser }), FULL_INPUT);
 
-        assert.match(data.functionDefault, /^generated-\d+$/);
+        expect(data.functionDefault).toMatch(/^generated-\d+$/);
         delete data.functionDefault;
 
-        assert.deepEqual(data, {
+        expect(data).toEqual({
           stringField: 'custom', numberField: 77, booleanField: false, arrayField: ['x', 'y'],
           objectField: { custom: 1 }, requiredField: 'provided', conditionalRequired: '', userBasedDefault: 'basic-uid',
           forcedValue: 'always-this-value', minNumber: 1, maxNumber: 100, clampedNumber: 100, maxLengthString: 'way-too-lo',
@@ -112,18 +112,18 @@ module.exports = defineCases({
 
     {
       name: 'reference-schema-empty-and-defaults-only-input',
-      async run({ assert }) {
+      async run({ expect }) {
         const empty = validate(referenceSchema({ user: basicUser }), {});
-        assert.deepEqual(empty, { error: 'Required key {requiredField} is missing in settings' });
+        expect(empty).toEqual({ error: 'Required key {requiredField} is missing in settings' });
 
         const { data } = validate(referenceSchema({ user: basicUser }), { requiredField: 'x' });
         delete data.functionDefault;
-        assert.deepEqual(data, DEFAULTS);
+        expect(data).toEqual(DEFAULTS);
 
         // Object defaults are clones: a request never mutates the declaration's
         const declaration = referenceSchema({ user: basicUser });
         validate(declaration, { requiredField: 'x' }).data.objectField.mutated = true;
-        assert.deepEqual(validate(declaration, { requiredField: 'x' }).data.objectField, { key: 'value' });
+        expect(validate(declaration, { requiredField: 'x' }).data.objectField).toEqual({ key: 'value' });
       },
     },
 
@@ -131,107 +131,107 @@ module.exports = defineCases({
 
     {
       name: 'defaults-coerce-and-never-reject',
-      async run({ assert }) {
-        assert.equal(one({ type: 'number', default: 5 }, '42'), 42);
-        assert.equal(one({ type: 'number', default: 5 }, 'abc'), 1, 'an unparseable number coerces, never refuses');
-        assert.equal(one({ type: 'number' }), 0);
-        assert.equal(one({ type: 'string', default: null }), '', 'a single type coerces its default too');
-        assert.equal(one({ type: 'string', default: 'd' }, true), 'true');
-        assert.equal(one({ type: 'boolean', default: true }, 'false'), false);
-        assert.deepEqual(one({ type: 'array', default: [] }, 'a, b,,c'), ['a', 'b', 'c']);
-        assert.equal(one({ type: 'object', default: {} }, 'x'), undefined, 'a non-object is dropped');
-        assert.deepEqual(one({ type: 'object', default: {} }, [1, 2]), [1, 2], 'an array is an object (typeof)');
-        assert.equal(one({ type: 'object', default: null }), null);
-        assert.deepEqual(one({ type: 'any', default: null }, { complex: [1] }), { complex: [1] });
-        assert.equal(one({ type: 'number', default: 7 }, NaN), 7, 'a non-finite number takes the default');
-        assert.equal(one({ type: 'number', default: 7 }, 'Infinity'), 7);
-        assert.equal(one({ type: 'string', default: () => 'computed' }), 'computed', 'a function default runs');
+      async run({ expect }) {
+        expect(one({ type: 'number', default: 5 }, '42')).toBe(42);
+        expect(one({ type: 'number', default: 5 }, 'abc'), 'an unparseable number coerces, never refuses').toBe(1);
+        expect(one({ type: 'number' })).toBe(0);
+        expect(one({ type: 'string', default: null }), 'a single type coerces its default too').toBe('');
+        expect(one({ type: 'string', default: 'd' }, true)).toBe('true');
+        expect(one({ type: 'boolean', default: true }, 'false')).toBe(false);
+        expect(one({ type: 'array', default: [] }, 'a, b,,c')).toEqual(['a', 'b', 'c']);
+        expect(one({ type: 'object', default: {} }, 'x'), 'a non-object is dropped').toBe(undefined);
+        expect(one({ type: 'object', default: {} }, [1, 2]), 'an array is an object (typeof)').toEqual([1, 2]);
+        expect(one({ type: 'object', default: null })).toBe(null);
+        expect(one({ type: 'any', default: null }, { complex: [1] })).toEqual({ complex: [1] });
+        expect(one({ type: 'number', default: 7 }, NaN), 'a non-finite number takes the default').toBe(7);
+        expect(one({ type: 'number', default: 7 }, 'Infinity')).toBe(7);
+        expect(one({ type: 'string', default: () => 'computed' }), 'a function default runs').toBe('computed');
       },
     },
 
     {
       name: 'a-type-list-keeps-a-match-and-otherwise-takes-the-default',
-      async run({ assert }) {
+      async run({ expect }) {
         const field = { type: ['string', 'number'], default: 'fallback' };
 
-        assert.equal(one(field, 'kept'), 'kept');
-        assert.equal(one(field, 7), 7);
-        assert.equal(one(field, true), 'fallback', 'no coercion across a list');
-        assert.equal(one(field, NaN), 'fallback');
-        assert.equal(one({ type: ['string', 'number'] }), undefined);
+        expect(one(field, 'kept')).toBe('kept');
+        expect(one(field, 7)).toBe(7);
+        expect(one(field, true), 'no coercion across a list').toBe('fallback');
+        expect(one(field, NaN)).toBe('fallback');
+        expect(one({ type: ['string', 'number'] })).toBe(undefined);
       },
     },
 
     {
       name: 'bounds-clamp-numbers-and-truncate-strings-and-arrays',
-      async run({ assert }) {
-        assert.equal(one({ type: 'number', default: 50, min: 10, max: 100 }, 5), 10);
-        assert.equal(one({ type: 'number', default: 50, min: 10, max: 100 }, 200), 100);
-        assert.equal(one({ type: 'number', default: 5 }, -10), -10, 'no declared min, no floor');
-        assert.equal(one({ type: 'number', default: 5, max: 0 }, 3), 0, 'a declared 0 is a real bound');
-        assert.equal(one({ type: 'string', default: '', max: 3 }, 'abcdef'), 'abc');
-        assert.deepEqual(one({ type: 'array', default: [], max: 2 }, [1, 2, 3]), [1, 2]);
+      async run({ expect }) {
+        expect(one({ type: 'number', default: 50, min: 10, max: 100 }, 5)).toBe(10);
+        expect(one({ type: 'number', default: 50, min: 10, max: 100 }, 200)).toBe(100);
+        expect(one({ type: 'number', default: 5 }, -10), 'no declared min, no floor').toBe(-10);
+        expect(one({ type: 'number', default: 5, max: 0 }, 3), 'a declared 0 is a real bound').toBe(0);
+        expect(one({ type: 'string', default: '', max: 3 }, 'abcdef')).toBe('abc');
+        expect(one({ type: 'array', default: [], max: 2 }, [1, 2, 3])).toEqual([1, 2]);
       },
     },
 
     {
       name: 'min-refuses-short-strings-and-arrays-sent-or-defaulted',
-      async run({ assert }) {
-        assert.equal(one({ type: 'string', default: '', min: 1 }), 'refused: Invalid settings {v}: must be at least 1 character');
-        assert.equal(one({ type: 'string', default: '', min: 2 }, 'a'), 'refused: Invalid settings {v}: must be at least 2 characters');
-        assert.equal(one({ type: 'array', default: [], min: 2 }, ['solo']), 'refused: Invalid settings {v}: must have at least 2 items');
-        assert.equal(one({ type: 'string', default: '', min: 1 }, 'ok'), 'ok');
+      async run({ expect }) {
+        expect(one({ type: 'string', default: '', min: 1 })).toBe('refused: Invalid settings {v}: must be at least 1 character');
+        expect(one({ type: 'string', default: '', min: 2 }, 'a')).toBe('refused: Invalid settings {v}: must be at least 2 characters');
+        expect(one({ type: 'array', default: [], min: 2 }, ['solo'])).toBe('refused: Invalid settings {v}: must have at least 2 items');
+        expect(one({ type: 'string', default: '', min: 1 }, 'ok')).toBe('ok');
       },
     },
 
     {
       name: 'enum-and-pattern-judge-only-sent-values',
-      async run({ assert }) {
+      async run({ expect }) {
         const mode = { type: 'string', enum: ['quick', 'full'], default: 'quick' };
 
-        assert.equal(one(mode, 'full'), 'full');
-        assert.equal(one(mode), 'quick');
-        assert.equal(one(mode, 'banana'), 'refused: Invalid settings {v}: must be one of [quick, full]');
-        assert.equal(one({ type: 'string', enum: ['a'], default: null }), '', 'an absent field is never judged');
+        expect(one(mode, 'full')).toBe('full');
+        expect(one(mode)).toBe('quick');
+        expect(one(mode, 'banana')).toBe('refused: Invalid settings {v}: must be one of [quick, full]');
+        expect(one({ type: 'string', enum: ['a'], default: null }), 'an absent field is never judged').toBe('');
 
         const zip = { type: 'string', pattern: /^\d{5}$/g };
-        assert.equal(one(zip, '12345'), '12345');
-        assert.equal(one(zip, '12345'), '12345', 'a global flag keeps no state between requests');
-        assert.equal(one(zip, 'abc'), 'refused: Invalid settings {v}: must match /^\\d{5}$/g');
+        expect(one(zip, '12345')).toBe('12345');
+        expect(one(zip, '12345'), 'a global flag keeps no state between requests').toBe('12345');
+        expect(one(zip, 'abc')).toBe('refused: Invalid settings {v}: must match /^\\d{5}$/g');
       },
     },
 
     {
       name: 'required-reads-the-raw-input-and-never-pairs-with-default',
-      async run({ assert }) {
+      async run({ expect }) {
         const field = { type: 'string', required: true };
 
-        assert.equal(one(field), 'refused: Required key {v} is missing in settings');
-        assert.equal(one(field, ''), 'refused: Required key {v} is missing in settings', "'' counts as missing");
-        assert.equal(one(field, null), '', 'null passes, then coerces');
-        assert.equal(one({ type: 'boolean', required: true }, false), false);
+        expect(one(field)).toBe('refused: Required key {v} is missing in settings');
+        expect(one(field, ''), "'' counts as missing").toBe('refused: Required key {v} is missing in settings');
+        expect(one(field, null), 'null passes, then coerces').toBe('');
+        expect(one({ type: 'boolean', required: true }, false)).toBe(false);
 
         // The footgun: a required field's default could never apply, so it throws by name
         const footgun = thrownBy(() => validate({ action: { type: 'string', required: true, default: 'x' } }, {}));
-        assert.match(footgun.message, /Invalid schema at "action": `required` never pairs with `default`/);
+        expect(footgun.message).toMatch(/Invalid schema at "action": `required` never pairs with `default`/);
 
         const computed = thrownBy(() => validate({ a: { type: 'string', required: () => true } }, {}));
-        assert.match(computed.message, /`required` is a boolean/);
+        expect(computed.message).toMatch(/`required` is a boolean/);
       },
     },
 
     {
       name: 'a-forced-value-wins-over-input-and-default',
-      async run({ assert }) {
-        assert.equal(one({ type: 'number', value: 0 }, 99), 0);
-        assert.equal(one({ type: 'string', default: 'd', value: 'forced' }), 'forced');
-        assert.equal(one({ type: 'number', max: 10, value: 42 }, 999), 42, 'value applies after bounds');
+      async run({ expect }) {
+        expect(one({ type: 'number', value: 0 }, 99)).toBe(0);
+        expect(one({ type: 'string', default: 'd', value: 'forced' })).toBe('forced');
+        expect(one({ type: 'number', max: 10, value: 42 }, 999), 'value applies after bounds').toBe(42);
       },
     },
 
     {
       name: 'nested-fields-and-array-items-carry-their-own-limits',
-      async run({ assert }) {
+      async run({ expect }) {
         const declaration = {
           address: { type: 'object', default: {}, fields: {
             city: { type: 'string', default: '', max: 3 },
@@ -241,49 +241,49 @@ module.exports = defineCases({
           rows: { type: 'array', default: [], of: { type: 'object', fields: { n: { type: 'number', min: 1 } } } },
         };
 
-        assert.deepEqual(validate(declaration, {
+        expect(validate(declaration, {
           address: { city: 'Springfield', zip: 90210, evil: 1 },
           tags: ['abc', 7, 'z'],
           rows: [{ n: -3, evil: 1 }, 'garbage'],
-        }).data, {
+        }).data).toEqual({
           address: { city: 'Spr', zip: '90210' },
           tags: ['ab', '7'],
           rows: [{ n: 1 }, { n: 1 }],
         });
 
-        assert.equal(validate(declaration, {}).error, 'Required key {address.zip} is missing in settings');
-        assert.equal(validate(declaration, { address: 'garbage' }).error, 'Required key {address.zip} is missing in settings');
-        assert.equal(validate({ tags: { type: 'array', of: { type: 'string', min: 2 } } }, { tags: ['ok', 'x'] }).error, 'Invalid settings {tags.1}: must be at least 2 characters');
+        expect(validate(declaration, {}).error).toBe('Required key {address.zip} is missing in settings');
+        expect(validate(declaration, { address: 'garbage' }).error).toBe('Required key {address.zip} is missing in settings');
+        expect(validate({ tags: { type: 'array', of: { type: 'string', min: 2 } } }, { tags: ['ok', 'x'] }).error).toBe('Invalid settings {tags.1}: must be at least 2 characters');
       },
     },
 
     {
       name: 'path-ids-come-from-the-request-path-alone',
-      async run({ assert }) {
-        assert.deepEqual(pathParams('/items/abc', 'items'), ['abc']);
-        assert.deepEqual(pathParams('/omega/items/abc/7', 'items'), ['abc', '7']);
-        assert.deepEqual(pathParams('/abc', 'items'), ['abc'], 'a function called at its own root: every segment is an id');
-        assert.deepEqual(pathParams('/omega/test/schema', 'test/schema'), []);
+      async run({ expect }) {
+        expect(pathParams('/items/abc', 'items')).toEqual(['abc']);
+        expect(pathParams('/omega/items/abc/7', 'items')).toEqual(['abc', '7']);
+        expect(pathParams('/abc', 'items'), 'a function called at its own root: every segment is an id').toEqual(['abc']);
+        expect(pathParams('/omega/test/schema', 'test/schema')).toEqual([]);
 
         const declaration = { id: { type: 'string', path: true, required: true }, page: { type: 'string', path: true } };
 
-        assert.deepEqual(validate(declaration, { id: 'sent-in-body' }, { pathParams: ['abc', '2'] }).data, { id: 'abc', page: '2' });
-        assert.equal(validate(declaration, { id: 'sent-in-body' }).error, 'Required key {id} is missing in settings', 'the caller cannot set a path id');
+        expect(validate(declaration, { id: 'sent-in-body' }, { pathParams: ['abc', '2'] }).data).toEqual({ id: 'abc', page: '2' });
+        expect(validate(declaration, { id: 'sent-in-body' }).error, 'the caller cannot set a path id').toBe('Required key {id} is missing in settings');
 
         const nested = thrownBy(() => validate({ o: { type: 'object', fields: { id: { type: 'string', path: true } } } }, {}));
-        assert.match(nested.message, /Invalid schema at "o\.id": `path` is `true` on a top-level field/);
+        expect(nested.message).toMatch(/Invalid schema at "o\.id": `path` is `true` on a top-level field/);
       },
     },
 
     {
       name: 'a-malformed-declaration-throws-naming-the-field',
-      async run({ assert }) {
-        assert.match(thrownBy(() => validate({ a: { type: 'string', defualt: 'x' } }, {})).message, /"a": unknown key\(s\) defualt/);
-        assert.match(thrownBy(() => validate({ a: { type: 'text' } }, {})).message, /"a": `type` must be one of/);
-        assert.match(thrownBy(() => validate({ a: { default: 1 } }, {})).message, /"a": `type` must be one of/);
-        assert.match(thrownBy(() => validate({ a: { type: 'string', of: { type: 'string' } } }, {})).message, /`of` belongs to `type: 'array'`/);
-        assert.match(thrownBy(() => validate({ a: { type: 'array', fields: {} } }, {})).message, /`fields` belongs to `type: 'object'`/);
-        assert.match(thrownBy(() => validate({ a: 'string' }, {})).message, /"a": a field is a plain object/);
+      async run({ expect }) {
+        expect(thrownBy(() => validate({ a: { type: 'string', defualt: 'x' } }, {})).message).toMatch(/"a": unknown key\(s\) defualt/);
+        expect(thrownBy(() => validate({ a: { type: 'text' } }, {})).message).toMatch(/"a": `type` must be one of/);
+        expect(thrownBy(() => validate({ a: { default: 1 } }, {})).message).toMatch(/"a": `type` must be one of/);
+        expect(thrownBy(() => validate({ a: { type: 'string', of: { type: 'string' } } }, {})).message).toMatch(/`of` belongs to `type: 'array'`/);
+        expect(thrownBy(() => validate({ a: { type: 'array', fields: {} } }, {})).message).toMatch(/`fields` belongs to `type: 'object'`/);
+        expect(thrownBy(() => validate({ a: 'string' }, {})).message).toMatch(/"a": a field is a plain object/);
       },
     },
 
@@ -291,26 +291,26 @@ module.exports = defineCases({
 
     {
       name: 'the-method-file-wins-over-index-and-index-is-the-fallback',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = schemaDir({
           'thing/post.js': NAME_SCHEMA.replace('%LABEL%', 'from-post'),
           'thing/index.js': NAME_SCHEMA.replace('%LABEL%', 'from-index'),
         });
 
-        assert.equal(new Settings(makeCtx({ method: 'POST' })).resolve({ dir, schema: 'thing' }).name, 'from-post');
-        assert.equal(new Settings(makeCtx({ method: 'DELETE' })).resolve({ dir, schema: 'thing' }).name, 'from-index');
-        assert.equal(new Settings(makeCtx({ method: 'GET' })).resolve({ dir, schema: 'thing.js' }).name, 'from-index', 'a .js suffix is tolerated');
+        expect(new Settings(makeCtx({ method: 'POST' })).resolve({ dir, schema: 'thing' }).name).toBe('from-post');
+        expect(new Settings(makeCtx({ method: 'DELETE' })).resolve({ dir, schema: 'thing' }).name).toBe('from-index');
+        expect(new Settings(makeCtx({ method: 'GET' })).resolve({ dir, schema: 'thing.js' }).name, 'a .js suffix is tolerated').toBe('from-index');
       },
     },
 
     {
       name: 'neither-file-present-is-an-honest-500-naming-both-paths',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = schemaDir({ 'other/index.js': NAME_SCHEMA.replace('%LABEL%', 'x') });
         const thrown = thrownBy(() => new Settings(makeCtx({ method: 'PATCH' })).resolve({ dir, schema: 'thing' }));
 
-        assert.equal(thrown.code, 500);
-        assert.match(thrown.message, /No schema for PATCH request: expected thing\/patch\.js or thing\/index\.js/);
+        expect(thrown.code).toBe(500);
+        expect(thrown.message).toMatch(/No schema for PATCH request: expected thing\/patch\.js or thing\/index\.js/);
       },
     },
 
@@ -319,38 +319,38 @@ module.exports = defineCases({
       // require fails (MODULE_NOT_FOUND too, and its "Require stack:" names the
       // schema file), surfaces its own error, never the index fallback
       name: 'a-broken-schema-file-surfaces-its-own-error',
-      async run({ assert }) {
+      async run({ expect }) {
         const index = NAME_SCHEMA.replace('%LABEL%', 'from-index');
         const throwing = schemaDir({ 'thing/post.js': 'throw new Error("the schema itself is broken");', 'thing/index.js': index });
         const innerRequire = schemaDir({ 'thing/post.js': 'require("a-package-that-does-not-exist");', 'thing/index.js': index });
         const brokenIndex = schemaDir({ 'thing/index.js': 'require("another-package-that-does-not-exist");' });
 
-        assert.equal(thrownBy(() => new Settings(makeCtx()).resolve({ dir: throwing, schema: 'thing' })).message, 'the schema itself is broken');
+        expect(thrownBy(() => new Settings(makeCtx()).resolve({ dir: throwing, schema: 'thing' })).message).toBe('the schema itself is broken');
 
         const inner = thrownBy(() => new Settings(makeCtx()).resolve({ dir: innerRequire, schema: 'thing' }));
-        assert.equal(inner.code, 'MODULE_NOT_FOUND');
-        assert.match(inner.message, /a-package-that-does-not-exist/);
+        expect(inner.code).toBe('MODULE_NOT_FOUND');
+        expect(inner.message).toMatch(/a-package-that-does-not-exist/);
 
         const broken = thrownBy(() => new Settings(makeCtx()).resolve({ dir: brokenIndex, schema: 'thing' }));
-        assert.match(broken.message, /another-package-that-does-not-exist/);
+        expect(broken.message).toMatch(/another-package-that-does-not-exist/);
       },
     },
 
     {
       name: 'a-schema-that-returns-no-declaration-is-a-500-and-a-refusal-a-400',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = schemaDir({
           'none/post.js': 'module.exports = () => null;',
           'strict/post.js': 'module.exports = () => ({ email: { type: \'string\', required: true } });',
         });
 
         const none = thrownBy(() => new Settings(makeCtx()).resolve({ dir, schema: 'none' }));
-        assert.equal(none.code, 500);
-        assert.equal(none.message, 'Invalid schema none: the schema function must return a plain field declaration');
+        expect(none.code).toBe(500);
+        expect(none.message).toBe('Invalid schema none: the schema function must return a plain field declaration');
 
         const refused = thrownBy(() => new Settings(makeCtx()).resolve({ dir, schema: 'strict' }));
-        assert.equal(refused.code, 400);
-        assert.equal(refused.message, 'Required key {email} is missing in settings');
+        expect(refused.code).toBe(400);
+        expect(refused.message).toBe('Required key {email} is missing in settings');
       },
     },
 
@@ -358,7 +358,7 @@ module.exports = defineCases({
 
     {
       name: 'the-schema-receives-the-raw-parts-by-name-and-the-declaration-is-kept',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = schemaDir({
           'echo/post.js': `module.exports = (context) => {
             global.__omegaSchemaContext = context;
@@ -372,33 +372,33 @@ module.exports = defineCases({
         const context = global.__omegaSchemaContext;
         delete global.__omegaSchemaContext;
 
-        assert.deepEqual(Object.keys(context).sort(), ['body', 'geolocation', 'headers', 'method', 'path', 'query', 'user']);
-        assert.equal(context.user, premiumUser, 'the User instance itself');
-        assert.equal(context.user.plan, 'pro', 'getters, never raw');
-        assert.deepEqual([context.body, context.query, context.path, context.method, context.headers, context.geolocation], [request.body, request.query, '/echo', 'POST', request.headers, request.geolocation]);
-        assert.equal(settings.declaration.html.sanitize, false, 'the sanitize pass reads the declaration');
+        expect(Object.keys(context).sort()).toEqual(['body', 'geolocation', 'headers', 'method', 'path', 'query', 'user']);
+        expect(context.user, 'the User instance itself').toBe(premiumUser);
+        expect(context.user.plan, 'getters, never raw').toBe('pro');
+        expect([context.body, context.query, context.path, context.method, context.headers, context.geolocation]).toEqual([request.body, request.query, '/echo', 'POST', request.headers, request.geolocation]);
+        expect(settings.declaration.html.sanitize, 'the sanitize pass reads the declaration').toBe(false);
       },
     },
 
     {
       name: 'split-on-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const input = { requiredField: 'x', planBasedLimit: 500, premiumOnlyField: 'mine' };
 
         const basic = validate(referenceSchema({ user: basicUser }), input).data;
-        assert.equal(basic.planBasedLimit, 100);
-        assert.equal('premiumOnlyField' in basic, false);
+        expect(basic.planBasedLimit).toBe(100);
+        expect('premiumOnlyField' in basic).toBe(false);
 
         const premium = validate(referenceSchema({ user: premiumUser }), { ...input, conditionalRequired: 'yes' }).data;
-        assert.equal(premium.planBasedLimit, 500, 'premium max 1000');
-        assert.equal(premium.premiumOnlyField, 'mine');
-        assert.equal(validate(referenceSchema({ user: premiumUser }), input).error, 'Required key {conditionalRequired} is missing in settings');
+        expect(premium.planBasedLimit, 'premium max 1000').toBe(500);
+        expect(premium.premiumOnlyField).toBe('mine');
+        expect(validate(referenceSchema({ user: premiumUser }), input).error).toBe('Required key {conditionalRequired} is missing in settings');
       },
     },
 
     {
       name: 'split-on-query-path-method-and-header',
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = schemaDir({
           'items/index.js': `module.exports = ({ query, path, method, headers }) => {
             const fields = {
@@ -425,11 +425,11 @@ module.exports = defineCases({
         };
         const tags = ['a', 'b', 'c'];
 
-        assert.deepEqual(run({ body: { tags, total: 9 } }), { id: 'abc', tags: ['a', 'b'], total: 0, note: '', mode: 'quick' });
-        assert.deepEqual(run({ body: { tags }, query: { bulk: 'true' } }).tags, tags, 'query split');
-        assert.equal(run({ path: '/items/admin', body: { total: 9 } }).total, 9, 'path split');
-        assert.equal(run({ method: 'PUT', body: {} }), 'Required key {note} is missing in settings', 'method split');
-        assert.equal(run({ headers: { 'x-mode': 'full' }, body: { mode: 'quick' } }), 'Invalid settings {mode}: must be one of [full]', 'header split');
+        expect(run({ body: { tags, total: 9 } })).toEqual({ id: 'abc', tags: ['a', 'b'], total: 0, note: '', mode: 'quick' });
+        expect(run({ body: { tags }, query: { bulk: 'true' } }).tags, 'query split').toEqual(tags);
+        expect(run({ path: '/items/admin', body: { total: 9 } }).total, 'path split').toBe(9);
+        expect(run({ method: 'PUT', body: {} }), 'method split').toBe('Required key {note} is missing in settings');
+        expect(run({ headers: { 'x-mode': 'full' }, body: { mode: 'quick' } }), 'header split').toBe('Invalid settings {mode}: must be one of [full]');
       },
     },
   ],

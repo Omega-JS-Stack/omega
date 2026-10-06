@@ -13,10 +13,10 @@
  *  5. the SHAPE (#322): a chip-sized pill above the row's title, never a
  *     full-width row of its own
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildSite, BARE } = require('./lib/build.js');
 const { SAMPLE_SETS, generateSampleSet, resolveAnchor } = require('../src/sample-content.js');
@@ -44,7 +44,7 @@ function postHeader(html) {
     const block = html.slice(open, close);
     if (block.includes('<h1')) return block;
   }
-  throw new assert.AssertionError({ message: 'the post page renders no <header> carrying the headline' });
+  expect.fail('the post page renders no <header> carrying the headline');
 }
 
 /**
@@ -63,7 +63,7 @@ function badgedRow(html, open, end) {
     const block = html.slice(match.index, close);
     if (block.includes(BADGE)) return block;
   }
-  throw new assert.AssertionError({ message: `no ${open} row carries the badge` });
+  expect.fail(`no ${open} row carries the badge`);
 }
 
 /**
@@ -75,187 +75,217 @@ function badgedRow(html, open, end) {
  */
 function assertChipComposed(html, label) {
   const found = [...html.matchAll(new RegExp(`class="([^"]*\\b${BADGE}\\b[^"]*)"`, 'g'))];
-  assert.ok(found.length, `${label} renders at least one badge`);
+  expect(found.length, `${label} renders at least one badge`).toBeTruthy();
   for (const [, classes] of found) {
-    assert.ok(classes.split(/\s+/).includes('omega-chip'), `${label}: the badge composes the chip ("${classes}")`);
+    expect(classes.split(/\s+/).includes('omega-chip'), `${label}: the badge composes the chip ("${classes}")`).toBeTruthy();
   }
 }
 
-test('every generated sample document carries the generated marker', () => {
-  const anchorMs = resolveAnchor('2026-07-18');
+module.exports = defineCases({
+  type: 'group',
+  description: 'sample-generated-badge',
+  tests: [
+    {
+      name: 'every generated sample document carries the generated marker',
+      run: (ctx) => {
+        const anchorMs = resolveAnchor('2026-07-18');
 
-  for (const set of SAMPLE_SETS) {
-    const files = generateSampleSet(PATHS.defaults, set, anchorMs);
-    assert.ok(files.length, `${set.collectionDir} generates documents`);
+        for (const set of SAMPLE_SETS) {
+          const files = generateSampleSet(PATHS.defaults, set, anchorMs);
+          ctx.expect(files.length, `${set.collectionDir} generates documents`).toBeTruthy();
 
-    for (const file of files) {
-      const frontmatter = file.content.slice(0, file.content.indexOf('\n---', 4));
-      assert.match(frontmatter, /^generated: true$/m, `${set.collectionDir}/${file.name} is marked generated`);
-    }
-  }
-});
+          for (const file of files) {
+            const frontmatter = file.content.slice(0, file.content.indexOf('\n---', 4));
+            ctx.expect(frontmatter, `${set.collectionDir}/${file.name} is marked generated`).toMatch(/^generated: true$/m);
+          }
+        }
+      },
+    },
 
-test('the marker rides the generator, not the corpus files', () => {
-  // A corpus file carrying it by hand would be a marker the NEXT authored
-  // sample forgets. Nothing under defaults/sample-* declares it.
-  for (const set of SAMPLE_SETS) {
-    const dir = path.join(PATHS.defaults, set.samplesDir);
-    for (const name of fs.readdirSync(dir).filter((file) => file.endsWith('.md'))) {
-      const source = fs.readFileSync(path.join(dir, name), 'utf8');
-      assert.doesNotMatch(source, /^generated:/m, `defaults/${set.samplesDir}/${name} does not hand-declare the marker`);
-    }
-  }
-});
+    {
+      name: 'the marker rides the generator, not the corpus files',
+      run: (ctx) => {
+        // A corpus file carrying it by hand would be a marker the NEXT authored
+        // sample forgets. Nothing under defaults/sample-* declares it.
+        for (const set of SAMPLE_SETS) {
+          const dir = path.join(PATHS.defaults, set.samplesDir);
+          for (const name of fs.readdirSync(dir).filter((file) => file.endsWith('.md'))) {
+            const source = fs.readFileSync(path.join(dir, name), 'utf8');
+            ctx.expect(source, `defaults/${set.samplesDir}/${name} does not hand-declare the marker`).not.toMatch(/^generated:/m);
+          }
+        }
+      },
+    },
 
-test('a development build badges the sample post page and every listing row', async () => {
-  const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'generated-badge-dev');
+    {
+      name: 'a development build badges the sample post page and every listing row',
+      run: async (ctx) => {
+        const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'generated-badge-dev');
 
-  // The post page
-  const post = pages.get('/blog/welcome-to-the-blog');
-  assert.ok(post, 'the sample post renders');
-  assert.match(postHeader(post), new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`), 'the post headline wears the badge, and the pill reads TEST');
+        // The post page
+        const post = pages.get('/blog/welcome-to-the-blog');
+        ctx.expect(post, 'the sample post renders').toBeTruthy();
+        ctx.expect(postHeader(post), 'the post headline wears the badge, and the pill reads TEST').toMatch(new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`));
 
-  // The listing: the featured lead AND the grid cards are separate markup, so
-  // both are pinned — the featured slot is the one row that does not go
-  // through post-card.html.
-  const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
-  const blog = pages.get(blogUrl);
-  const badges = blog.split(BADGE).length - 1;
-  assert.ok(badges >= 2, `every listing row is badged (found ${badges})`);
+        // The listing: the featured lead AND the grid cards are separate markup, so
+        // both are pinned — the featured slot is the one row that does not go
+        // through post-card.html.
+        const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
+        const blog = pages.get(blogUrl);
+        const badges = blog.split(BADGE).length - 1;
+        ctx.expect(badges >= 2, `every listing row is badged (found ${badges})`).toBeTruthy();
 
-  // A taxonomy page renders through the same shared card.
-  const categoryUrl = [...pages.keys()].find((url) => url.startsWith('/blog/categories/') && url !== '/blog/categories');
-  assert.ok(pages.get(categoryUrl).includes(BADGE), 'category listing rows are badged too');
+        // A taxonomy page renders through the same shared card.
+        const categoryUrl = [...pages.keys()].find((url) => url.startsWith('/blog/categories/') && url !== '/blog/categories');
+        ctx.expect(pages.get(categoryUrl).includes(BADGE), 'category listing rows are badged too').toBeTruthy();
 
-  // The badge is styled off the status tokens, never a raw hex.
-  const sheet = fs.readFileSync(path.join(__dirname, '..', 'core', 'css', 'core', '_generated-badge.scss'), 'utf8');
-  assert.match(sheet, /var\(--omega-warn\)/, 'the pill reads from the warn token');
-  // Declarations only — a `#208` issue reference in a comment is not a color.
-  const declarations = sheet.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
-  assert.doesNotMatch(declarations, /#[0-9a-fA-F]{3,8}\b/, 'no raw hex in the badge declarations — status tokens only');
-});
+        // The badge is styled off the status tokens, never a raw hex.
+        const sheet = fs.readFileSync(path.join(__dirname, '..', 'core', 'css', 'core', '_generated-badge.scss'), 'utf8');
+        ctx.expect(sheet, 'the pill reads from the warn token').toMatch(/var\(--omega-warn\)/);
+        // Declarations only — a `#208` issue reference in a comment is not a color.
+        const declarations = sheet.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+        ctx.expect(declarations, 'no raw hex in the badge declarations — status tokens only').not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+      },
+    },
 
-test('#322: the badge is a chip-sized pill ABOVE the row title, never a full-width row', async () => {
-  // Ian's QA: on a playground blog card the pill spanned the whole card under
-  // the title. `.omega-post-card__body` is a flex COLUMN, so a badge dropped in
-  // as a plain item stretches across the cross axis and eats a row — and it sat
-  // under the title besides. The fix is structural, so it is pinned twice:
-  // the sheet may never let a flex parent stretch it, and the row markup puts
-  // it above the title.
-  const sheet = fs.readFileSync(SHEET, 'utf8');
-  const rule = sheet.match(/\.omega-generated-badge \{[^}]*\}/);
-  assert.ok(rule, 'the badge rule still lives in core');
-  assert.match(rule[0], /align-self: flex-start/, 'a flex column can never stretch the pill into a row');
-  assert.doesNotMatch(rule[0], /font-size:|padding:|border-radius:/, 'sizing is the chip\'s — never a second copy that drifts');
+    {
+      name: '#322: the badge is a chip-sized pill ABOVE the row title, never a full-width row',
+      run: async (ctx) => {
+        // Ian's QA: on a playground blog card the pill spanned the whole card under
+        // the title. `.omega-post-card__body` is a flex COLUMN, so a badge dropped in
+        // as a plain item stretches across the cross axis and eats a row — and it sat
+        // under the title besides. The fix is structural, so it is pinned twice:
+        // the sheet may never let a flex parent stretch it, and the row markup puts
+        // it above the title.
+        const sheet = fs.readFileSync(SHEET, 'utf8');
+        const rule = sheet.match(/\.omega-generated-badge \{[^}]*\}/);
+        ctx.expect(rule, 'the badge rule still lives in core').toBeTruthy();
+        ctx.expect(rule[0], 'a flex column can never stretch the pill into a row').toMatch(/align-self: flex-start/);
+        ctx.expect(rule[0], 'sizing is the chip\'s — never a second copy that drifts').not.toMatch(/font-size:|padding:|border-radius:/);
 
-  const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'generated-badge-shape');
+        const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'generated-badge-shape');
 
-  // The shared card (blog grid, category and tag pages all render it).
-  const categoryUrl = [...pages.keys()].find((url) => url.startsWith('/blog/categories/') && url !== '/blog/categories');
-  const card = badgedRow(pages.get(categoryUrl), /<article class="omega-post-card"/g, '</article>');
-  assert.ok(card.indexOf(BADGE) < card.indexOf('omega-post-card__title'), 'the card wears the pill ABOVE its title');
-  assertChipComposed(card, 'the post card');
+        // The shared card (blog grid, category and tag pages all render it).
+        const categoryUrl = [...pages.keys()].find((url) => url.startsWith('/blog/categories/') && url !== '/blog/categories');
+        const card = badgedRow(pages.get(categoryUrl), /<article class="omega-post-card"/g, '</article>');
+        ctx.expect(card.indexOf(BADGE) < card.indexOf('omega-post-card__title'), 'the card wears the pill ABOVE its title').toBeTruthy();
+        assertChipComposed(card, 'the post card');
 
-  // The featured lead is its own markup and gets the same treatment.
-  const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
-  const blog = pages.get(blogUrl);
-  const featured = badgedRow(blog, /<article class="omega-featured-post/g, '</article>');
-  assert.ok(featured.indexOf(BADGE) < featured.indexOf('omega-featured-post__title'), 'the featured lead wears it above its title too');
-  assertChipComposed(blog, 'the blog listing');
-});
+        // The featured lead is its own markup and gets the same treatment.
+        const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
+        const blog = pages.get(blogUrl);
+        const featured = badgedRow(blog, /<article class="omega-featured-post/g, '</article>');
+        ctx.expect(featured.indexOf(BADGE) < featured.indexOf('omega-featured-post__title'), 'the featured lead wears it above its title too').toBeTruthy();
+        assertChipComposed(blog, 'the blog listing');
+      },
+    },
 
-test('the newsflash fork renders the badge too — post page, lead splash, story rows', async () => {
-  // The theme that forks blog/index.html + blog/post.html and renders rows
-  // through its own story-card component: a real render, not just the static
-  // sweep below, because this is the fork that shipped unbadged.
-  const pages = await buildSite(BARE, { ...bareData, theme: { id: 'newsflash' } }, {
-    environment: 'development',
-    activeTheme: 'newsflash',
-  }, 'generated-badge-newsflash');
+    {
+      name: 'the newsflash fork renders the badge too — post page, lead splash, story rows',
+      run: async (ctx) => {
+        // The theme that forks blog/index.html + blog/post.html and renders rows
+        // through its own story-card component: a real render, not just the static
+        // sweep below, because this is the fork that shipped unbadged.
+        const pages = await buildSite(BARE, { ...bareData, theme: { id: 'newsflash' } }, {
+          environment: 'development',
+          activeTheme: 'newsflash',
+        }, 'generated-badge-newsflash');
 
-  const post = pages.get('/blog/welcome-to-the-blog');
-  assert.ok(post, 'the sample post renders under newsflash');
-  assert.match(postHeader(post), new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`), 'the newsflash post headline wears the badge');
+        const post = pages.get('/blog/welcome-to-the-blog');
+        ctx.expect(post, 'the sample post renders under newsflash').toBeTruthy();
+        ctx.expect(postHeader(post), 'the newsflash post headline wears the badge').toMatch(new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`));
 
-  const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
-  const blog = pages.get(blogUrl);
-  const badges = blog.split(BADGE).length - 1;
-  assert.ok(badges >= 2, `the lead splash and the story rows are badged (found ${badges})`);
+        const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
+        const blog = pages.get(blogUrl);
+        const badges = blog.split(BADGE).length - 1;
+        ctx.expect(badges >= 2, `the lead splash and the story rows are badged (found ${badges})`).toBeTruthy();
 
-  // #322: the same chip shape and above-the-title placement as the base rows —
-  // this theme's story tile is a separate component, so it is pinned separately.
-  assertChipComposed(blog, 'the newsflash listing');
-  const story = badgedRow(blog, /<a href="[^"]*" class="newsflash-story-card"/g, '</a>');
-  assert.ok(story.indexOf(BADGE) < story.indexOf('<h3'), 'the newsflash story row wears the pill above its headline');
-});
+        // #322: the same chip shape and above-the-title placement as the base rows —
+        // this theme's story tile is a separate component, so it is pinned separately.
+        assertChipComposed(blog, 'the newsflash listing');
+        const story = badgedRow(blog, /<a href="[^"]*" class="newsflash-story-card"/g, '</a>');
+        ctx.expect(story.indexOf(BADGE) < story.indexOf('<h3'), 'the newsflash story row wears the pill above its headline').toBeTruthy();
+      },
+    },
 
-test('every packaged theme that forks the blog markup carries the badge conditional', () => {
-  // Core owns the badge's STYLE; the MARKUP is per-theme, so a skin that forks
-  // blog/index.html, blog/post.html or the row unit can drop the warning
-  // silently. This static sweep is what actually stops that — a future
-  // packaged skin fails here the moment it ships unbadged templates.
-  const themesDir = path.join(__dirname, '..', 'themes');
-  const swept = [];
+    {
+      name: 'every packaged theme that forks the blog markup carries the badge conditional',
+      run: (ctx) => {
+        // Core owns the badge's STYLE; the MARKUP is per-theme, so a skin that forks
+        // blog/index.html, blog/post.html or the row unit can drop the warning
+        // silently. This static sweep is what actually stops that — a future
+        // packaged skin fails here the moment it ships unbadged templates.
+        const themesDir = path.join(__dirname, '..', 'themes');
+        const swept = [];
 
-  for (const theme of fs.readdirSync(themesDir).filter((name) => !name.startsWith('_'))) {
-    const forked = [
-      path.join(themesDir, theme, '_layouts', 'frontend', 'pages', 'blog', 'post.html'),
-      path.join(themesDir, theme, '_layouts', 'frontend', 'pages', 'blog', 'index.html'),
-      // The row unit, whatever this theme calls it (base: a post-card
-      // include; newsflash: a story-card component).
-      ...['_includes', '_components'].flatMap((dir) => {
-        const root = path.join(themesDir, theme, dir);
-        if (!fs.existsSync(root)) return [];
-        return fs.readdirSync(root, { recursive: true, withFileTypes: true })
-          .filter((entry) => entry.isFile() && /(post|story)-card/.test(path.join(entry.parentPath, entry.name)) && entry.name.endsWith('.html'))
-          .map((entry) => path.join(entry.parentPath, entry.name));
-      }),
-    ].filter((file) => fs.existsSync(file));
+        for (const theme of fs.readdirSync(themesDir).filter((name) => !name.startsWith('_'))) {
+          const forked = [
+            path.join(themesDir, theme, '_layouts', 'frontend', 'pages', 'blog', 'post.html'),
+            path.join(themesDir, theme, '_layouts', 'frontend', 'pages', 'blog', 'index.html'),
+            // The row unit, whatever this theme calls it (base: a post-card
+            // include; newsflash: a story-card component).
+            ...['_includes', '_components'].flatMap((dir) => {
+              const root = path.join(themesDir, theme, dir);
+              if (!fs.existsSync(root)) return [];
+              return fs.readdirSync(root, { recursive: true, withFileTypes: true })
+                .filter((entry) => entry.isFile() && /(post|story)-card/.test(path.join(entry.parentPath, entry.name)) && entry.name.endsWith('.html'))
+                .map((entry) => path.join(entry.parentPath, entry.name));
+            }),
+          ].filter((file) => fs.existsSync(file));
 
-    for (const file of forked) {
-      const relative = path.relative(themesDir, file);
-      assert.match(fs.readFileSync(file, 'utf8'), /generated/, `themes/${relative} renders no generated-content badge — a forked blog template must carry it`);
-      swept.push(relative);
-    }
-  }
+          for (const file of forked) {
+            const relative = path.relative(themesDir, file);
+            ctx.expect(fs.readFileSync(file, 'utf8'), `themes/${relative} renders no generated-content badge — a forked blog template must carry it`).toMatch(/generated/);
+            swept.push(relative);
+          }
+        }
 
-  // The sweep must never silently pass on nothing found.
-  assert.ok(swept.some((file) => file.startsWith('base/')), 'the base theme is swept');
-  assert.ok(swept.some((file) => file.startsWith('newsflash/')), 'the newsflash theme is swept');
-  assert.ok(swept.length >= 5, `every forked blog template is swept (${swept.length}: ${swept.join(', ')})`);
-});
+        // The sweep must never silently pass on nothing found.
+        ctx.expect(swept.some((file) => file.startsWith('base/')), 'the base theme is swept').toBeTruthy();
+        ctx.expect(swept.some((file) => file.startsWith('newsflash/')), 'the newsflash theme is swept').toBeTruthy();
+        ctx.expect(swept.length >= 5, `every forked blog template is swept (${swept.length}: ${swept.join(', ')})`).toBeTruthy();
+      },
+    },
 
-test('a production build ships neither the samples nor the badge', async () => {
-  const pages = await buildSite(BARE, bareData, { environment: 'production' }, 'generated-badge-prod');
+    {
+      name: 'a production build ships neither the samples nor the badge',
+      run: async (ctx) => {
+        const pages = await buildSite(BARE, bareData, { environment: 'production' }, 'generated-badge-prod');
 
-  assert.strictEqual(pages.get('/blog/welcome-to-the-blog'), undefined, 'samples never inject into production');
+        ctx.expect(pages.get('/blog/welcome-to-the-blog'), 'samples never inject into production').toBe(undefined);
 
-  for (const [url, html] of pages) {
-    assert.ok(!html.includes(BADGE), `${url} carries no generated badge`);
-  }
-});
+        for (const [url, html] of pages) {
+          ctx.expect(!html.includes(BADGE), `${url} carries no generated badge`).toBeTruthy();
+        }
+      },
+    },
 
-test('the rolling anchor keeps the corpus recent, never stale or future-dated', () => {
-  // The anchor defaults to TODAY (the harness pins it via OMEGA_SAMPLE_ANCHOR
-  // so fixture builds stay stable — cleared here to read the real default).
-  const pinned = process.env.OMEGA_SAMPLE_ANCHOR;
-  delete process.env.OMEGA_SAMPLE_ANCHOR;
-  try {
-    const now = new Date();
-    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    assert.strictEqual(resolveAnchor(), today, 'no anchor, no env pin → today');
+    {
+      name: 'the rolling anchor keeps the corpus recent, never stale or future-dated',
+      run: (ctx) => {
+        // The anchor defaults to TODAY (the harness pins it via OMEGA_SAMPLE_ANCHOR
+        // so fixture builds stay stable — cleared here to read the real default).
+        const pinned = process.env.OMEGA_SAMPLE_ANCHOR;
+        delete process.env.OMEGA_SAMPLE_ANCHOR;
+        try {
+          const now = new Date();
+          const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+          ctx.expect(resolveAnchor(), 'no anchor, no env pin → today').toBe(today);
 
-    const postsSet = SAMPLE_SETS.find((set) => set.collectionDir === '_posts');
-    const days = generateSampleSet(PATHS.defaults, postsSet, resolveAnchor())
-      .map((file) => Date.parse(`${file.name.slice(0, 10)}T00:00:00Z`))
-      .sort((a, b) => a - b);
+          const postsSet = SAMPLE_SETS.find((set) => set.collectionDir === '_posts');
+          const days = generateSampleSet(PATHS.defaults, postsSet, resolveAnchor())
+            .map((file) => Date.parse(`${file.name.slice(0, 10)}T00:00:00Z`))
+            .sort((a, b) => a - b);
 
-    const newest = days[days.length - 1];
-    const oldest = days[0];
-    assert.ok(newest <= today, 'nothing is dated in the future');
-    assert.ok((today - newest) / DAY_MS <= 14, `the newest sample is recent (${(today - newest) / DAY_MS} days old)`);
-    assert.ok((today - oldest) / DAY_MS <= 240, 'even the oldest sample is within the last months, not years');
-  } finally {
-    if (pinned !== undefined) process.env.OMEGA_SAMPLE_ANCHOR = pinned;
-  }
+          const newest = days[days.length - 1];
+          const oldest = days[0];
+          ctx.expect(newest <= today, 'nothing is dated in the future').toBeTruthy();
+          ctx.expect((today - newest) / DAY_MS <= 14, `the newest sample is recent (${(today - newest) / DAY_MS} days old)`).toBeTruthy();
+          ctx.expect((today - oldest) / DAY_MS <= 240, 'even the oldest sample is within the last months, not years').toBeTruthy();
+        } finally {
+          if (pinned !== undefined) process.env.OMEGA_SAMPLE_ANCHOR = pinned;
+        }
+      },
+    },
+  ],
 });

@@ -34,34 +34,32 @@ module.exports = defineCases({
   tests: [
     {
       name: 'fresh-app-gets-the-framework-pin',
-      async run({ assert }) {
+      async run({ expect }) {
         const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
         const written = runScaffoldPackageJson({ name: 'pin-test-app' });
 
-        assert.equal(written.engines.node, frameworkMajor,
-          `engines.node must be the framework's pinned runtime (${frameworkMajor}), independent of the node running the scaffold (${process.versions.node})`);
+        expect(written.engines.node, `engines.node must be the framework's pinned runtime (${frameworkMajor}), independent of the node running the scaffold (${process.versions.node})`).toBe(frameworkMajor);
       },
     },
 
     {
       name: 'existing-engines-survive-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         const written = runScaffoldPackageJson({ name: 'pin-test-app', engines: { node: '20' } });
 
-        assert.equal(written.engines.node, '20', 'a consumer-authored engines.node is never overwritten');
+        expect(written.engines.node, 'a consumer-authored engines.node is never overwritten').toBe('20');
       },
     },
 
     {
       name: 'nvmrc-lockstep-fix-writes-the-same-major',
-      async run({ assert }) {
+      async run({ expect }) {
         // The nvmrc target check heals .nvmrc to `v<engines.node>/*` — with
         // engines stamped from the framework pin, both files must agree
         const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
         const written = runScaffoldPackageJson({ name: 'pin-test-app' });
 
-        assert.equal(`v${written.engines.node}/*`, `v${frameworkMajor}/*`,
-          '.nvmrc heal target (v<engines>/*) matches the framework pin');
+        expect(`v${written.engines.node}/*`, '.nvmrc heal target (v<engines>/*) matches the framework pin').toBe(`v${frameworkMajor}/*`);
       },
     },
   ],

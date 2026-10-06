@@ -38,46 +38,30 @@ module.exports = defineCases({
   tests: [
     {
       name: 'fills-an-empty-location-from-the-request-geolocation',
-      async run({ assert }) {
+      async run({ expect }) {
         // A doc resolved from the account schema carries the location leaves as nulls
-        assert.deepEqual(
-          locationFromGeolocation(GEOLOCATION, { country: null, region: null, city: null }),
-          { country: 'US', region: 'CA', city: 'San Francisco' },
-          'country/region/city come from the request geolocation',
-        );
+        expect(locationFromGeolocation(GEOLOCATION, { country: null, region: null, city: null }), 'country/region/city come from the request geolocation').toEqual({ country: 'US', region: 'CA', city: 'San Francisco' });
       },
     },
 
     {
       name: 'never-overwrites-a-location-the-user-set',
-      async run({ assert }) {
-        assert.deepEqual(
-          locationFromGeolocation(GEOLOCATION, { country: 'FR', region: 'IDF', city: 'Paris' }),
-          {},
-          'a self-reported location is left entirely alone',
-        );
+      async run({ expect }) {
+        expect(locationFromGeolocation(GEOLOCATION, { country: 'FR', region: 'IDF', city: 'Paris' }), 'a self-reported location is left entirely alone').toEqual({});
       },
     },
 
     {
       name: 'fills-only-the-fields-the-user-left-empty',
-      async run({ assert }) {
-        assert.deepEqual(
-          locationFromGeolocation(GEOLOCATION, { country: null, region: null, city: 'Oakland' }),
-          { country: 'US', region: 'CA' },
-          'the fill is per-field — the city the user set survives',
-        );
+      async run({ expect }) {
+        expect(locationFromGeolocation(GEOLOCATION, { country: null, region: null, city: 'Oakland' }), 'the fill is per-field — the city the user set survives').toEqual({ country: 'US', region: 'CA' });
       },
     },
 
     {
       name: 'writes-nothing-when-the-request-carries-no-geolocation',
-      async run({ assert }) {
-        assert.deepEqual(
-          locationFromGeolocation({ ip: '203.0.113.7', country: null, region: null, city: null }, {}),
-          {},
-          'no geolocation means no personal.location key in the write',
-        );
+      async run({ expect }) {
+        expect(locationFromGeolocation({ ip: '203.0.113.7', country: null, region: null, city: null }, {}), 'no geolocation means no personal.location key in the write').toEqual({});
       },
     },
   ],

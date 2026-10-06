@@ -22,10 +22,10 @@ module.exports = defineCases({
     {
       name: 'returns-the-labelled-personas-in-declaration-order',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/test/roster');
 
-        assert.isSuccess(response, 'The roster is readable without signing in');
+        expect(response, 'The roster is readable without signing in').toBeSuccess();
 
         // The framework's labeled personas must appear in declaration order,
         // as a SUBSEQUENCE: a consumer's test/_init.js may append its own
@@ -39,10 +39,10 @@ module.exports = defineCases({
         let cursor = 0;
         for (const localpart of frameworkLocalparts) {
           const at = served.indexOf(localpart, cursor);
-          assert.ok(at >= 0, `${localpart} must be offered, after the framework personas before it`);
+          expect(at >= 0, `${localpart} must be offered, after the framework personas before it`).toBeTruthy();
           cursor = at + 1;
         }
-        assert.ok(served.length >= frameworkLocalparts.length, 'Every framework palette persona is offered');
+        expect(served.length >= frameworkLocalparts.length, 'Every framework palette persona is offered').toBeTruthy();
       },
     },
 
@@ -51,14 +51,14 @@ module.exports = defineCases({
     {
       name: 'machinery-stays-off-the-palette-roster',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/test/roster');
         const localparts = response.data.personas.map((persona) => persona.localpart);
 
-        assert.ok(localparts.includes('_test.referrer'), 'A human-facing persona is offered');
+        expect(localparts.includes('_test.referrer'), 'A human-facing persona is offered').toBeTruthy();
 
         for (const localpart of ['_test.delete', '_test.signup-merge', '_test.allow_consent-granted', '_test.desktop-auth-e2e']) {
-          assert.ok(!localparts.includes(localpart), `${localpart} is machinery, so the roster must not offer it`);
+          expect(!localparts.includes(localpart), `${localpart} is machinery, so the roster must not offer it`).toBeTruthy();
         }
       },
     },
@@ -72,7 +72,7 @@ module.exports = defineCases({
     {
       name: 'project-personas-reach-the-roster',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectAccounts = {
           'shop-owner': { id: 'shop-owner', uid: '_test-shop-owner', email: '_test.shop-owner@{domain}', palette: 'Shop Owner', properties: {} },
           'bulk-importer': { id: 'bulk-importer', uid: '_test-bulk-importer', email: '_test.bulk-importer@{domain}', properties: {} },
@@ -81,22 +81,11 @@ module.exports = defineCases({
         const roster = getRoster(projectAccounts, { testing: true });
         const localparts = roster.map((persona) => persona.localpart);
 
-        assert.deepEqual(
-          roster[roster.length - 1],
-          { localpart: '_test.shop-owner', label: 'Shop Owner' },
-          'A project persona carrying a palette label is offered, after the framework\'s own — declaration order, framework first',
-        );
-        assert.ok(
-          !localparts.includes('_test.bulk-importer'),
-          'A project persona with no label is machinery like any other, and stays off the palette roster',
-        );
-        assert.ok(localparts.includes('_test.referrer'), 'The framework\'s own personas are still every one of them');
+        expect(roster[roster.length - 1], 'A project persona carrying a palette label is offered, after the framework\'s own — declaration order, framework first').toEqual({ localpart: '_test.shop-owner', label: 'Shop Owner' });
+        expect(!localparts.includes('_test.bulk-importer'), 'A project persona with no label is machinery like any other, and stays off the palette roster').toBeTruthy();
+        expect(localparts.includes('_test.referrer'), 'The framework\'s own personas are still every one of them').toBeTruthy();
 
-        assert.deepEqual(
-          getRoster(undefined, { testing: true }),
-          getRoster({}, { testing: true }),
-          'A project that declares no personas of its own gets the framework roster, unchanged',
-        );
+        expect(getRoster(undefined, { testing: true }), 'A project that declares no personas of its own gets the framework roster, unchanged').toEqual(getRoster({}, { testing: true }));
       },
     },
 
@@ -106,23 +95,19 @@ module.exports = defineCases({
     {
       name: 'a-testing-backend-offers-the-machinery-when-asked',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/test/roster', { machinery: true });
 
-        assert.isSuccess(response, 'The machinery roster is readable without signing in');
+        expect(response, 'The machinery roster is readable without signing in').toBeSuccess();
 
         const personas = response.data.personas;
         const localparts = personas.map((persona) => persona.localpart);
 
         for (const localpart of ['_test.desktop-auth-e2e', '_test.extension-auth-e2e', '_test.auth-token-e2e', '_test.flows-signin']) {
-          assert.ok(localparts.includes(localpart), `${localpart} is a sign-in lane's own persona, so a testing roster offers it`);
+          expect(localparts.includes(localpart), `${localpart} is a sign-in lane's own persona, so a testing roster offers it`).toBeTruthy();
         }
-        assert.deepEqual(
-          personas.find((persona) => persona.localpart === '_test.desktop-auth-e2e'),
-          { localpart: '_test.desktop-auth-e2e', label: null },
-          'Machinery carries no palette label',
-        );
-        assert.ok(localparts.includes('_test.referrer'), 'The human-facing personas are still offered beside it');
+        expect(personas.find((persona) => persona.localpart === '_test.desktop-auth-e2e'), 'Machinery carries no palette label').toEqual({ localpart: '_test.desktop-auth-e2e', label: null });
+        expect(localparts.includes('_test.referrer'), 'The human-facing personas are still offered beside it').toBeTruthy();
       },
     },
 
@@ -131,7 +116,7 @@ module.exports = defineCases({
     {
       name: 'the-machinery-switch-is-testing-only',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectAccounts = {
           'bulk-importer': { id: 'bulk-importer', uid: '_test-bulk-importer', email: '_test.bulk-importer@{domain}', properties: {} },
         };
@@ -142,25 +127,13 @@ module.exports = defineCases({
 
         // Every sign-in lane's own persona: offered here, and never to the palette
         for (const localpart of ['_test.desktop-auth-e2e', '_test.extension-auth-e2e', '_test.auth-token-e2e', '_test.flows-signin']) {
-          assert.ok(localparts.includes(localpart), `A testing backend offers ${localpart}`);
-          assert.ok(!palette.some((persona) => persona.localpart === localpart), `${localpart} is machinery, so the palette never offers it`);
+          expect(localparts.includes(localpart), `A testing backend offers ${localpart}`).toBeTruthy();
+          expect(!palette.some((persona) => persona.localpart === localpart), `${localpart} is machinery, so the palette never offers it`).toBeTruthy();
         }
-        assert.deepEqual(
-          testing[testing.length - 1],
-          { localpart: '_test.bulk-importer', label: null },
-          'A project machinery persona joins last, unlabeled',
-        );
-        assert.deepEqual(
-          testing.filter((persona) => persona.label),
-          palette,
-          'The labeled personas are the palette roster, in its order',
-        );
+        expect(testing[testing.length - 1], 'A project machinery persona joins last, unlabeled').toEqual({ localpart: '_test.bulk-importer', label: null });
+        expect(testing.filter((persona) => persona.label), 'The labeled personas are the palette roster, in its order').toEqual(palette);
 
-        assert.deepEqual(
-          getRoster(projectAccounts, { machinery: true, testing: false }),
-          palette,
-          'A backend not running as testing ignores the switch and offers the palette alone',
-        );
+        expect(getRoster(projectAccounts, { machinery: true, testing: false }), 'A backend not running as testing ignores the switch and offers the palette alone').toEqual(palette);
 
         // The caller always says whether the backend is testing, never a silent default
         let thrown = null;
@@ -169,7 +142,7 @@ module.exports = defineCases({
         } catch (error) {
           thrown = error;
         }
-        assert.match(String(thrown?.message), /options\.testing/, 'A roster asked without `testing` fails loudly');
+        expect(String(thrown?.message), 'A roster asked without `testing` fails loudly').toMatch(/options\.testing/);
       },
     },
   ],

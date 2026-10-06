@@ -17,8 +17,7 @@
  * analytics-blocked.test.js sets: who hears an event is the catalog's call, so
  * stubbing it would prove nothing about a page that must reach GA4.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -134,74 +133,73 @@ async function land(href) {
   return { tracked, navigations, reported, $pageUrl };
 }
 
-test('#408: a dead link counts one page_not_found, carrying the path asked for', async () => {
-  const { tracked, navigations, $pageUrl } = await land('https://brand.test/blog/moved-post?ref=newsletter');
+module.exports = defineCases({
+  type: 'group',
+  description: 'page-not-found',
+  tests: [
+    {
+      name: '#408: a dead link counts one page_not_found, carrying the path asked for',
+      run: async (ctx) => {
+        const { tracked, navigations, $pageUrl } = await land('https://brand.test/blog/moved-post?ref=newsletter');
 
-  assert.deepStrictEqual(
-    tracked,
-    [['gtag', 'event', 'page_not_found', { path: '/blog/moved-post' }]],
-    'the miss reaches GA4 once, under the canonical name, with the missed path',
-  );
-  assert.deepStrictEqual(navigations, [], 'a path with no trailing slash is not rewritten');
-  assert.strictEqual($pageUrl.innerText, 'https://brand.test/blog/moved-post?ref=newsletter', 'and the visitor is shown what they asked for');
-});
+        ctx.expect(tracked, 'the miss reaches GA4 once, under the canonical name, with the missed path').toEqual([['gtag', 'event', 'page_not_found', { path: '/blog/moved-post' }]]);
+        ctx.expect(navigations, 'a path with no trailing slash is not rewritten').toEqual([]);
+        ctx.expect($pageUrl.innerText, 'and the visitor is shown what they asked for').toBe('https://brand.test/blog/moved-post?ref=newsletter');
+      },
+    },
 
-test('#408: the trailing-slash fixer counts the path asked for, exactly once', async () => {
-  // The fixer REWRITES the url it then reloads (`url.pathname` loses its
-  // slash), so the path in the payload is what says which side of the fixer the
-  // count happened on: `/blog/moved-post/` is the visitor's own path, and
-  // `/blog/moved-post` would mean the count read the corrected url instead.
-  // That value is the assertion, not the call order — the reload is deferred
-  // through setTimeout, so ANY synchronous fire precedes it and a sequence
-  // assertion could never fail. The reload must also not turn one miss into two.
-  const { tracked, navigations } = await land('https://brand.test/blog/moved-post/');
+    {
+      name: '#408: the trailing-slash fixer counts the path asked for, exactly once',
+      run: async (ctx) => {
+        // The fixer REWRITES the url it then reloads (`url.pathname` loses its
+        // slash), so the path in the payload is what says which side of the fixer the
+        // count happened on: `/blog/moved-post/` is the visitor's own path, and
+        // `/blog/moved-post` would mean the count read the corrected url instead.
+        // That value is the assertion, not the call order — the reload is deferred
+        // through setTimeout, so ANY synchronous fire precedes it and a sequence
+        // assertion could never fail. The reload must also not turn one miss into two.
+        const { tracked, navigations } = await land('https://brand.test/blog/moved-post/');
 
-  await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
-  assert.deepStrictEqual(
-    tracked,
-    [['gtag', 'event', 'page_not_found', { path: '/blog/moved-post/' }]],
-    'the path the visitor asked for is the one counted, slash and all',
-  );
-  assert.deepStrictEqual(
-    navigations,
-    ['https://brand.test/blog/moved-post?404Fixer=trailing-slash'],
-    'and the fixer still runs',
-  );
-});
+        ctx.expect(tracked, 'the path the visitor asked for is the one counted, slash and all').toEqual([['gtag', 'event', 'page_not_found', { path: '/blog/moved-post/' }]]);
+        ctx.expect(navigations, 'and the fixer still runs').toEqual(['https://brand.test/blog/moved-post?404Fixer=trailing-slash']);
+      },
+    },
 
-test('#408: only the 404 page module counts a miss — a normal page cannot', async () => {
-  // `page_not_found` belongs to the one page that IS the miss. A shared module
-  // firing it (main.js, a core module, a lib, a THEME entry — themes ship
-  // first-party js that every page of that skin loads) would count every page
-  // view on the site as a dead link, which is the failure this census catches.
-  const offenders = [];
+    {
+      name: '#408: only the 404 page module counts a miss — a normal page cannot',
+      run: async (ctx) => {
+        // `page_not_found` belongs to the one page that IS the miss. A shared module
+        // firing it (main.js, a core module, a lib, a THEME entry — themes ship
+        // first-party js that every page of that skin loads) would count every page
+        // view on the site as a dead link, which is the failure this census catches.
+        const offenders = [];
 
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+        const walk = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
 
-      if (entry.isDirectory()) {
-        if (SCAN_EXCLUDES.includes(full)) {
-          continue;
-        }
-        walk(full);
-        continue;
-      }
-      if (!/\.m?js$/.test(entry.name)) {
-        continue;
-      }
-      if (fs.readFileSync(full, 'utf8').includes('page_not_found')) {
-        offenders.push(path.relative(PKG, full));
-      }
-    }
-  };
+            if (entry.isDirectory()) {
+              if (SCAN_EXCLUDES.includes(full)) {
+                continue;
+              }
+              walk(full);
+              continue;
+            }
+            if (!/\.m?js$/.test(entry.name)) {
+              continue;
+            }
+            if (fs.readFileSync(full, 'utf8').includes('page_not_found')) {
+              offenders.push(path.relative(PKG, full));
+            }
+          }
+        };
 
-  SCAN_ROOTS.forEach(walk);
+        SCAN_ROOTS.forEach(walk);
 
-  assert.deepStrictEqual(
-    offenders,
-    [path.join('core', 'js', 'pages', '404', 'index.js')],
-    'page_not_found belongs to the 404 page module alone — a shared module firing it counts every page view as a dead link',
-  );
+        ctx.expect(offenders, 'page_not_found belongs to the 404 page module alone — a shared module firing it counts every page view as a dead link').toEqual([path.join('core', 'js', 'pages', '404', 'index.js')]);
+      },
+    },
+  ],
 });

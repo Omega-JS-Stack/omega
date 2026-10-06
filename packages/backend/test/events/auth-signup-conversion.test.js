@@ -92,16 +92,16 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-new-account-writes-its-doc-and-delivers-nothing',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const user = newUserRecord('password');
 
         try {
           const { delivery } = await runHandler({ omega: omega, user: user });
 
-          assert.deepEqual(delivery, [], `the trigger must fire no conversion — the post-auth request owns it: ${delivery.join(' | ')}`);
+          expect(delivery, `the trigger must fire no conversion — the post-auth request owns it: ${delivery.join(' | ')}`).toEqual([]);
 
           // And the account it is about actually landed.
-          assert.equal(await firestore.exists(`users/${user.uid}`), true, 'the handler still writes the user doc');
+          expect(await firestore.exists(`users/${user.uid}`), 'the handler still writes the user doc').toBe(true);
         } finally {
           await firestore.delete(`users/${user.uid}`);
         }
@@ -110,13 +110,13 @@ module.exports = defineCases({
 
     {
       name: 'a-provider-signup-delivers-nothing-either',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const user = newUserRecord('google.com');
 
         try {
           const { delivery } = await runHandler({ omega: omega, user: user });
 
-          assert.deepEqual(delivery, [], `no signup path fires from the trigger: ${delivery.join(' | ')}`);
+          expect(delivery, `no signup path fires from the trigger: ${delivery.join(' | ')}`).toEqual([]);
         } finally {
           await firestore.delete(`users/${user.uid}`);
         }
@@ -125,16 +125,16 @@ module.exports = defineCases({
 
     {
       name: 'an-existing-account-fires-nothing',
-      async run({ assert, omega, accounts, firestore }) {
+      async run({ expect, omega, accounts, firestore }) {
         // A provider link or a re-fired trigger is not a registration. The
         // handler returns at its "already exists" branch, before any work.
         const existing = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
-        assert.equal(await firestore.exists(`users/${existing.uid}`), true, 'precondition: the persona already has a doc');
+        expect(await firestore.exists(`users/${existing.uid}`), 'precondition: the persona already has a doc').toBe(true);
 
         const { delivery } = await runHandler({ omega: omega, user: existing });
 
-        assert.deepEqual(delivery, [], `an existing account must fire no conversion: ${delivery.join(' | ')}`);
+        expect(delivery, `an existing account must fire no conversion: ${delivery.join(' | ')}`).toEqual([]);
       },
     },
   ],

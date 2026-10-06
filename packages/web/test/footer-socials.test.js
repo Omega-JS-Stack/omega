@@ -5,8 +5,7 @@
  * profile link with the platform's FA brand icon, and an entry with nothing
  * to point at prints nothing.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { buildWith, miniData } = require('./lib/build.js');
 
 const ROW = /<div class="omega-footer__social"[^>]*>([\s\S]*?)<\/div>/;
@@ -16,39 +15,54 @@ function socialsRow(html) {
   return match ? match[1] : null;
 }
 
-test('no socials configured → no row, not one empty link', async () => {
-  const pages = await buildWith(miniData, {}, 'footer-socials-none');
-  const home = pages.get('/');
+module.exports = defineCases({
+  type: 'group',
+  description: 'footer-socials',
+  tests: [
+    {
+      name: 'no socials configured → no row, not one empty link',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'footer-socials-none');
+        const home = pages.get('/');
 
-  assert.strictEqual(socialsRow(home), null, 'the whole row stays out of the markup');
-  assert.ok(!home.includes('omega-footer__social-link'), 'no social link anywhere');
-  assert.ok(!/fa-(?:twitter|facebook|instagram|linkedin|github)\b/.test(home), 'no default platform icons');
-});
+        ctx.expect(socialsRow(home), 'the whole row stays out of the markup').toBe(null);
+        ctx.expect(!home.includes('omega-footer__social-link'), 'no social link anywhere').toBeTruthy();
+        ctx.expect(!/fa-(?:twitter|facebook|instagram|linkedin|github)\b/.test(home), 'no default platform icons').toBeTruthy();
+      },
+    },
 
-test('one declared handle → exactly that link, with the platform brand icon', async () => {
-  const pages = await buildWith({ ...miniData, socials: { twitter: 'minico' } }, {}, 'footer-socials-one');
-  const row = socialsRow(pages.get('/'));
+    {
+      name: 'one declared handle → exactly that link, with the platform brand icon',
+      run: async (ctx) => {
+        const pages = await buildWith({ ...miniData, socials: { twitter: 'minico' } }, {}, 'footer-socials-one');
+        const row = socialsRow(pages.get('/'));
 
-  assert.ok(row, 'a declared social brings the row');
-  const links = row.match(/<a\s/g) || [];
-  assert.strictEqual(links.length, 1, `exactly one link: ${row}`);
-  assert.ok(row.includes('href="https://twitter.com/minico"'), `the profile URL: ${row}`);
-  assert.ok(/data-omega-fa="brands\/twitter"><svg/.test(row), `the FA brand icon inlined: ${row}`);
-  assert.ok(!/facebook|instagram|linkedin|github/.test(row), 'nothing the brand never declared');
-});
+        ctx.expect(row, 'a declared social brings the row').toBeTruthy();
+        const links = row.match(/<a\s/g) || [];
+        ctx.expect(links.length, `exactly one link: ${row}`).toBe(1);
+        ctx.expect(row.includes('href="https://twitter.com/minico"'), `the profile URL: ${row}`).toBeTruthy();
+        ctx.expect(/data-omega-fa="brands\/twitter"><svg/.test(row), `the FA brand icon inlined: ${row}`).toBeTruthy();
+        ctx.expect(!/facebook|instagram|linkedin|github/.test(row), 'nothing the brand never declared').toBeTruthy();
+      },
+    },
 
-test('an entry with nothing to point at prints nothing', async () => {
-  // A blank placeholder handle, and a platform whose profile URL the handle
-  // can never derive — omega_social resolves neither, so neither renders.
-  const pages = await buildWith(
-    { ...miniData, socials: { twitter: 'minico', facebook: '', patreon: { redirect: 'https://patreon.com/minico' } } },
-    {},
-    'footer-socials-blank',
-  );
-  const row = socialsRow(pages.get('/'));
+    {
+      name: 'an entry with nothing to point at prints nothing',
+      run: async (ctx) => {
+        // A blank placeholder handle, and a platform whose profile URL the handle
+        // can never derive — omega_social resolves neither, so neither renders.
+        const pages = await buildWith(
+          { ...miniData, socials: { twitter: 'minico', facebook: '', patreon: { redirect: 'https://patreon.com/minico' } } },
+          {},
+          'footer-socials-blank',
+        );
+        const row = socialsRow(pages.get('/'));
 
-  const links = row.match(/<a\s/g) || [];
-  assert.strictEqual(links.length, 1, `only the entry that resolves: ${row}`);
-  assert.ok(row.includes('href="https://twitter.com/minico"'), `the resolvable one: ${row}`);
-  assert.ok(!row.includes('href=""'), 'never an empty href');
+        const links = row.match(/<a\s/g) || [];
+        ctx.expect(links.length, `only the entry that resolves: ${row}`).toBe(1);
+        ctx.expect(row.includes('href="https://twitter.com/minico"'), `the resolvable one: ${row}`).toBeTruthy();
+        ctx.expect(!row.includes('href=""'), 'never an empty href').toBeTruthy();
+      },
+    },
+  ],
 });

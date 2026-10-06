@@ -26,8 +26,7 @@
  * themselves are `@show` bindings on those flags, which the last case reads out
  * of the shipped layout.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -155,162 +154,198 @@ async function openCheckout(product, { providers = ALL_PROVIDERS, capabilities =
   };
 }
 
-test('#786: a code that covers the whole one-time price takes PayPal and crypto away', async () => {
-  const page = await openCheckout(CHEAP_ONE_TIME);
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-zero-total',
+  tests: [
+    {
+      name: '#786: a code that covers the whole one-time price takes PayPal and crypto away',
+      run: async (ctx) => {
+        const page = await openCheckout(CHEAP_ONE_TIME);
 
-  const before = page.bindings();
-  assert.strictEqual(before.checkout.paymentMethods.paypal, true, 'both are offered at list price');
-  assert.strictEqual(before.checkout.paymentMethods.crypto, true, 'including crypto on a one-time buy');
+        const before = page.bindings();
+        ctx.expect(before.checkout.paymentMethods.paypal, 'both are offered at list price').toBe(true);
+        ctx.expect(before.checkout.paymentMethods.crypto, 'including crypto on a one-time buy').toBe(true);
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  assert.strictEqual(bound.order.total, '$0.00', '$10 off $9.99 leaves nothing to charge');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, false, 'PayPal cannot take a $0.00 order');
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, false, 'nor Coinbase Commerce a $0.00 charge');
-  assert.strictEqual(bound.checkout.paymentMethods.card, true, 'card checkout is untouched — Stripe takes a real coupon');
-  assert.strictEqual(bound.checkout.discount.hasDiscount, true, 'and the receipt still shows the code that did it');
-});
+        ctx.expect(bound.order.total, '$10 off $9.99 leaves nothing to charge').toBe('$0.00');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'PayPal cannot take a $0.00 order').toBe(false);
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'nor Coinbase Commerce a $0.00 charge').toBe(false);
+        ctx.expect(bound.checkout.paymentMethods.card, 'card checkout is untouched — Stripe takes a real coupon').toBe(true);
+        ctx.expect(bound.checkout.discount.hasDiscount, 'and the receipt still shows the code that did it').toBe(true);
+      },
+    },
 
-test('#786: removing the code brings both buttons straight back', async () => {
-  const page = await openCheckout(CHEAP_ONE_TIME);
+    {
+      name: '#786: removing the code brings both buttons straight back',
+      run: async (ctx) => {
+        const page = await openCheckout(CHEAP_ONE_TIME);
 
-  await page.apply('welcome10off', FULL_PRICE_CODE);
+        await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  // The page rebuilds its bindings on every discount change, so a rejected code
-  // (which clears the applied one) is the same lane a cleared field takes
-  const bound = await page.apply('nope', { valid: false });
+        // The page rebuilds its bindings on every discount change, so a rejected code
+        // (which clears the applied one) is the same lane a cleared field takes
+        const bound = await page.apply('nope', { valid: false });
 
-  assert.strictEqual(bound.checkout.discount.hasDiscount, false, 'the code is gone');
-  assert.strictEqual(bound.order.total, '$9.99', 'so the full price is due again');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'PayPal is back');
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'and so is crypto');
-});
+        ctx.expect(bound.checkout.discount.hasDiscount, 'the code is gone').toBe(false);
+        ctx.expect(bound.order.total, 'so the full price is due again').toBe('$9.99');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'PayPal is back').toBe(true);
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'and so is crypto').toBe(true);
+      },
+    },
 
-test('#786: a code that only discounts leaves every button alone', async () => {
-  const page = await openCheckout(CHEAP_ONE_TIME);
+    {
+      name: '#786: a code that only discounts leaves every button alone',
+      run: async (ctx) => {
+        const page = await openCheckout(CHEAP_ONE_TIME);
 
-  const bound = await page.apply('save10', PARTIAL_CODE);
+        const bound = await page.apply('save10', PARTIAL_CODE);
 
-  assert.strictEqual(bound.order.total, '$8.99', 'there is still something to charge');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'so PayPal stays');
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'and crypto with it');
-});
+        ctx.expect(bound.order.total, 'there is still something to charge').toBe('$8.99');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'so PayPal stays').toBe(true);
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'and crypto with it').toBe(true);
+      },
+    },
 
-test('#786: a fully discounted plan hides PayPal too', async () => {
-  // A subscription's zero total is the setup-fee half of the same bug (#759):
-  // the discounted first period rides the create call as a $0.00 setup fee.
-  const page = await openCheckout(CHEAP_PLAN);
+    {
+      name: '#786: a fully discounted plan hides PayPal too',
+      run: async (ctx) => {
+        // A subscription's zero total is the setup-fee half of the same bug (#759):
+        // the discounted first period rides the create call as a $0.00 setup fee.
+        const page = await openCheckout(CHEAP_PLAN);
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  assert.strictEqual(bound.order.total, '$0.00', '$10 off a $10.00 month');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, false, 'PayPal has no first period to charge');
-  assert.strictEqual(bound.checkout.paymentMethods.card, true, 'the card button still sells it');
-});
+        ctx.expect(bound.order.total, '$10 off a $10.00 month').toBe('$0.00');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'PayPal has no first period to charge').toBe(false);
+        ctx.expect(bound.checkout.paymentMethods.card, 'the card button still sells it').toBe(true);
+      },
+    },
 
-test('#786: a free trial charges $0.00 today and keeps its buttons', async () => {
-  // A trial charges nothing today through PayPal's OWN plan cycle, not through
-  // an amount we send (#761) — so the trial's $0.00 total must never be read as
-  // a fully discounted checkout. The eligibility is the SERVER's answer, and
-  // the page only quotes a trial once it has one (#637), so it is set here.
-  const page = await openCheckout(TRIAL_PLAN, { trialEligible: true });
+    {
+      name: '#786: a free trial charges $0.00 today and keeps its buttons',
+      run: async (ctx) => {
+        // A trial charges nothing today through PayPal's OWN plan cycle, not through
+        // an amount we send (#761) — so the trial's $0.00 total must never be read as
+        // a fully discounted checkout. The eligibility is the SERVER's answer, and
+        // the page only quotes a trial once it has one (#637), so it is set here.
+        const page = await openCheckout(TRIAL_PLAN, { trialEligible: true });
 
-  const bound = page.bindings();
+        const bound = page.bindings();
 
-  assert.strictEqual(bound.order.trial.show, true, 'the page really is quoting the trial');
-  assert.strictEqual(bound.order.total, '$0.00', 'and nothing at all is due today');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'PayPal takes a trial subscription — the plan cycle charges the $0.00, not us');
-});
+        ctx.expect(bound.order.trial.show, 'the page really is quoting the trial').toBe(true);
+        ctx.expect(bound.order.total, 'and nothing at all is due today').toBe('$0.00');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'PayPal takes a trial subscription — the plan cycle charges the $0.00, not us').toBe(true);
+      },
+    },
 
-test('#786: a full-covering code on a TRIAL checkout still keeps both buttons', async () => {
-  // The two ends have to agree: the backend skips the zero-charge guard
-  // outright while a trial is being taken (`takingTrial` in
-  // intent/providers/paypal.js), because the code comes off the first PAID
-  // period, not today. A page that hid the button here would refuse a checkout
-  // the backend would have accepted.
-  const page = await openCheckout(TRIAL_PLAN, { trialEligible: true });
+    {
+      name: '#786: a full-covering code on a TRIAL checkout still keeps both buttons',
+      run: async (ctx) => {
+        // The two ends have to agree: the backend skips the zero-charge guard
+        // outright while a trial is being taken (`takingTrial` in
+        // intent/providers/paypal.js), because the code comes off the first PAID
+        // period, not today. A page that hid the button here would refuse a checkout
+        // the backend would have accepted.
+        const page = await openCheckout(TRIAL_PLAN, { trialEligible: true });
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  assert.strictEqual(bound.checkout.discount.hasDiscount, true, 'the code really is applied');
-  assert.strictEqual(bound.order.total, '$0.00', 'and today is still free, as it was without it');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'so PayPal stays — the backend accepts this exact checkout');
-  assert.strictEqual(bound.checkout.discount.error, false, 'and nothing is refused on the discount line');
-});
+        ctx.expect(bound.checkout.discount.hasDiscount, 'the code really is applied').toBe(true);
+        ctx.expect(bound.order.total, 'and today is still free, as it was without it').toBe('$0.00');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'so PayPal stays — the backend accepts this exact checkout').toBe(true);
+        ctx.expect(bound.checkout.discount.error, 'and nothing is refused on the discount line').toBe(false);
+      },
+    },
 
-test('#759: the discount note no longer claims PayPal cannot take a code', async () => {
-  const page = await openCheckout(CHEAP_PLAN);
+    {
+      name: '#759: the discount note no longer claims PayPal cannot take a code',
+      run: async (ctx) => {
+        const page = await openCheckout(CHEAP_PLAN);
 
-  const bound = await page.apply('save10', PARTIAL_CODE);
+        const bound = await page.apply('save10', PARTIAL_CODE);
 
-  assert.match(bound.order.termsText, /Discount code applies to first payment only\./, 'the half that is still true is still said');
-  assert.doesNotMatch(bound.order.termsText, /PayPal/, 'a PayPal subscription takes the code as a discounted first period (#759)');
-});
+        ctx.expect(bound.order.termsText, 'the half that is still true is still said').toMatch(/Discount code applies to first payment only\./);
+        ctx.expect(bound.order.termsText, 'a PayPal subscription takes the code as a discounted first period (#759)').not.toMatch(/PayPal/);
+      },
+    },
 
-test('#786: a PayPal-only brand says why the grid emptied, and takes it back', async () => {
-  // The page's only "no payment methods" sentence is an init-time read of the
-  // provider CONFIG, so a brand selling through PayPal and crypto alone showed
-  // an empty button grid and nothing else. The message goes where the remedy
-  // is — the discount field's own error line, beside the code that has to come
-  // back off.
-  const page = await openCheckout(CHEAP_ONE_TIME, { providers: { paypal: { clientId: 'paypal-client-id' }, coinbase: { enabled: true } } });
+    {
+      name: '#786: a PayPal-only brand says why the grid emptied, and takes it back',
+      run: async (ctx) => {
+        // The page's only "no payment methods" sentence is an init-time read of the
+        // provider CONFIG, so a brand selling through PayPal and crypto alone showed
+        // an empty button grid and nothing else. The message goes where the remedy
+        // is — the discount field's own error line, beside the code that has to come
+        // back off.
+        const page = await openCheckout(CHEAP_ONE_TIME, { providers: { paypal: { clientId: 'paypal-client-id' }, coinbase: { enabled: true } } });
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
-  const methods = bound.checkout.paymentMethods;
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const methods = bound.checkout.paymentMethods;
 
-  assert.ok(!Object.values(methods).some(Boolean), `every method is gone: ${JSON.stringify(methods)}`);
-  assert.strictEqual(bound.checkout.discount.error, true, 'so the page says so');
-  assert.strictEqual(bound.checkout.discount.success, false, 'and never as a success the buyer cannot act on');
-  assert.match(bound.checkout.discount.errorMessage, /WELCOME10OFF/, 'the message names the code that did it');
-  assert.match(bound.checkout.discount.errorMessage, /Remove the code/, 'and tells the buyer how to get the buttons back');
-  assert.strictEqual(bound.checkout.error.show, false, 'the page-level error stays down — it would hide the discount field with the rest of the checkout');
+        ctx.expect(!Object.values(methods).some(Boolean), `every method is gone: ${JSON.stringify(methods)}`).toBeTruthy();
+        ctx.expect(bound.checkout.discount.error, 'so the page says so').toBe(true);
+        ctx.expect(bound.checkout.discount.success, 'and never as a success the buyer cannot act on').toBe(false);
+        ctx.expect(bound.checkout.discount.errorMessage, 'the message names the code that did it').toMatch(/WELCOME10OFF/);
+        ctx.expect(bound.checkout.discount.errorMessage, 'and tells the buyer how to get the buttons back').toMatch(/Remove the code/);
+        ctx.expect(bound.checkout.error.show, 'the page-level error stays down — it would hide the discount field with the rest of the checkout').toBe(false);
 
-  const cleared = await page.apply('nope', { valid: false });
+        const cleared = await page.apply('nope', { valid: false });
 
-  assert.strictEqual(cleared.checkout.paymentMethods.paypal, true, 'removing the code brings the button back');
-  assert.strictEqual(cleared.checkout.discount.errorMessage, 'Invalid discount code', 'and the blocked message is gone with it');
-});
+        ctx.expect(cleared.checkout.paymentMethods.paypal, 'removing the code brings the button back').toBe(true);
+        ctx.expect(cleared.checkout.discount.errorMessage, 'and the blocked message is gone with it').toBe('Invalid discount code');
+      },
+    },
 
-test('#786: a card brand with a full code keeps a way to pay, and no refusal', async () => {
-  // The message is for an EMPTY grid only: a brand with a card provider still
-  // sells this checkout, and Stripe decides what a $0.00 total means there.
-  const page = await openCheckout(CHEAP_ONE_TIME);
+    {
+      name: '#786: a card brand with a full code keeps a way to pay, and no refusal',
+      run: async (ctx) => {
+        // The message is for an EMPTY grid only: a brand with a card provider still
+        // sells this checkout, and Stripe decides what a $0.00 total means there.
+        const page = await openCheckout(CHEAP_ONE_TIME);
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  assert.strictEqual(bound.checkout.paymentMethods.card, true, 'card checkout is still offered');
-  assert.strictEqual(bound.checkout.discount.error, false, 'so nothing is refused');
-  assert.strictEqual(bound.checkout.discount.success, true, 'and the applied code still reads as applied');
-});
+        ctx.expect(bound.checkout.paymentMethods.card, 'card checkout is still offered').toBe(true);
+        ctx.expect(bound.checkout.discount.error, 'so nothing is refused').toBe(false);
+        ctx.expect(bound.checkout.discount.success, 'and the applied code still reads as applied').toBe(true);
+      },
+    },
 
-test('#849: the $0 hide-set is the capability table, never a provider name', async () => {
-  // Flip the table and the same $0 checkout keeps both buttons: nothing in the
-  // page knows PayPal or Coinbase by name, only what their rows say
-  const acceptsZero = Object.fromEntries(Object.entries(CAPABILITIES).map(([id, row]) => [id, { ...row, acceptsZeroCharge: true }]));
-  const page = await openCheckout(CHEAP_ONE_TIME, { capabilities: acceptsZero });
+    {
+      name: '#849: the $0 hide-set is the capability table, never a provider name',
+      run: async (ctx) => {
+        // Flip the table and the same $0 checkout keeps both buttons: nothing in the
+        // page knows PayPal or Coinbase by name, only what their rows say
+        const acceptsZero = Object.fromEntries(Object.entries(CAPABILITIES).map(([id, row]) => [id, { ...row, acceptsZeroCharge: true }]));
+        const page = await openCheckout(CHEAP_ONE_TIME, { capabilities: acceptsZero });
 
-  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+        const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
 
-  assert.strictEqual(bound.order.total, '$0.00', 'the code still covers the price');
-  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'a row that takes $0 keeps PayPal');
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'and crypto');
+        ctx.expect(bound.order.total, 'the code still covers the price').toBe('$0.00');
+        ctx.expect(bound.checkout.paymentMethods.paypal, 'a row that takes $0 keeps PayPal').toBe(true);
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'and crypto').toBe(true);
 
-  // And a card provider whose row refuses $0 loses the card button the same way
-  const cardRefuses = { ...CAPABILITIES, stripe: { ...CAPABILITIES.stripe, acceptsZeroCharge: false } };
-  const strict = await openCheckout(CHEAP_ONE_TIME, { capabilities: cardRefuses });
+        // And a card provider whose row refuses $0 loses the card button the same way
+        const cardRefuses = { ...CAPABILITIES, stripe: { ...CAPABILITIES.stripe, acceptsZeroCharge: false } };
+        const strict = await openCheckout(CHEAP_ONE_TIME, { capabilities: cardRefuses });
 
-  assert.strictEqual((await strict.apply('welcome10off', FULL_PRICE_CODE)).checkout.paymentMethods.card, false, 'the card button follows its row');
-});
+        ctx.expect((await strict.apply('welcome10off', FULL_PRICE_CODE)).checkout.paymentMethods.card, 'the card button follows its row').toBe(false);
+      },
+    },
 
-test('#786: the buttons this flag governs are the ones the layout binds to it', async () => {
-  // The flags above are only real because the shipped buttons are `@show`
-  // bindings on exactly these paths — the seam between this state and the DOM.
-  const layout = fs.readFileSync(CHECKOUT_LAYOUT, 'utf8');
+    {
+      name: '#786: the buttons this flag governs are the ones the layout binds to it',
+      run: async (ctx) => {
+        // The flags above are only real because the shipped buttons are `@show`
+        // bindings on exactly these paths — the seam between this state and the DOM.
+        const layout = fs.readFileSync(CHECKOUT_LAYOUT, 'utf8');
 
-  for (const method of ['paypal', 'crypto']) {
-    assert.ok(
-      layout.includes(`data-omega-bind="@show checkout.paymentMethods.${method}"`),
-      `the ${method} button shows only while checkout.paymentMethods.${method} is true`,
-    );
-  }
+        for (const method of ['paypal', 'crypto']) {
+          ctx.expect(layout.includes(`data-omega-bind="@show checkout.paymentMethods.${method}"`), `the ${method} button shows only while checkout.paymentMethods.${method} is true`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

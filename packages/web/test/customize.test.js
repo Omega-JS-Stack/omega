@@ -18,10 +18,9 @@
  * the parked nondeterminism family), and meta-file ordering. Everything
  * else is byte-strict.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // The lane NAMES the environment
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
@@ -99,175 +98,186 @@ function normalize(url, text) {
   return out;
 }
 
-test('cp220: resolver lanes — composition where the theme wraps one, shell elsewhere, theme-honest', () => {
-  const empty = path.join(PKG, '.omega', 'customize-empty');
-  fs.rmSync(empty, { recursive: true, force: true });
-  fs.mkdirSync(empty, { recursive: true });
+module.exports = defineCases({
+  type: 'group',
+  description: 'customize',
+  tests: [
+    {
+      name: 'cp220: resolver lanes — composition where the theme wraps one, shell elsewhere, theme-honest',
+      run: (ctx) => {
+        const empty = path.join(PKG, '.omega', 'customize-empty');
+        fs.rmSync(empty, { recursive: true, force: true });
+        fs.mkdirSync(empty, { recursive: true });
 
-  const home = resolveCustomization({ url: '/', consumerDir: empty, siteData: miniData });
-  assert.strictEqual(home.status, 'ok');
-  assert.strictEqual(home.lane, 'composition');
-  assert.ok(home.inner.includes('{% section "marketing/hero", data: resolved.hero %}'), 'inner is the one-liner composition');
-  assert.ok(home.inner.includes('{% iftruthy resolved.testimonials.items %}'), 'guards ride along verbatim');
-  assert.ok(!home.inner.includes('Sarah Johnson'), 'NO copy inlined — the words stay in the theme');
-  assert.ok(home.target.endsWith(path.join('pages', 'index.html')), 'composition lane lands .html (never markdown-processed)');
+        const home = resolveCustomization({ url: '/', consumerDir: empty, siteData: miniData });
+        ctx.expect(home.status).toBe('ok');
+        ctx.expect(home.lane).toBe('composition');
+        ctx.expect(home.inner.includes('{% section "marketing/hero", data: resolved.hero %}'), 'inner is the one-liner composition').toBeTruthy();
+        ctx.expect(home.inner.includes('{% iftruthy resolved.testimonials.items %}'), 'guards ride along verbatim').toBeTruthy();
+        ctx.expect(!home.inner.includes('Sarah Johnson'), 'NO copy inlined — the words stay in the theme').toBeTruthy();
+        ctx.expect(home.target.endsWith(path.join('pages', 'index.html')), 'composition lane lands .html (never markdown-processed)').toBeTruthy();
 
-  assert.strictEqual(resolveCustomization({ url: '/pricing', consumerDir: empty, siteData: miniData }).lane, 'shell');
-  assert.strictEqual(resolveCustomization({ url: 'pricing.html', consumerDir: empty, siteData: miniData }).url, '/pricing', 'inputs normalize');
+        ctx.expect(resolveCustomization({ url: '/pricing', consumerDir: empty, siteData: miniData }).lane).toBe('shell');
+        ctx.expect(resolveCustomization({ url: 'pricing.html', consumerDir: empty, siteData: miniData }).url, 'inputs normalize').toBe('/pricing');
 
-  // Under newsflash, its own (not-pure) home layout shadows the classy wrap —
-  // the lane is honest about what the ACTIVE theme would materialize.
-  assert.strictEqual(resolveCustomization({ url: '/', consumerDir: empty, siteData: nfData }).lane, 'shell');
+        // Under newsflash, its own (not-pure) home layout shadows the classy wrap —
+        // the lane is honest about what the ACTIVE theme would materialize.
+        ctx.expect(resolveCustomization({ url: '/', consumerDir: empty, siteData: nfData }).lane).toBe('shell');
 
-  const unknown = resolveCustomization({ url: '/nope', consumerDir: empty, siteData: miniData });
-  assert.strictEqual(unknown.status, 'unknown');
-  assert.ok(unknown.known.includes('/pricing'), 'unknown carries the known list for suggestions');
+        const unknown = resolveCustomization({ url: '/nope', consumerDir: empty, siteData: miniData });
+        ctx.expect(unknown.status).toBe('unknown');
+        ctx.expect(unknown.known.includes('/pricing'), 'unknown carries the known list for suggestions').toBeTruthy();
 
-  const list = listCustomizable({ consumerDir: empty, siteData: miniData });
-  assert.ok(list.length >= 60, `every static default URL lists (${list.length})`);
-  assert.strictEqual(list.find((entry) => entry.url === '/').lane, 'composition');
-  assert.strictEqual(list.find((entry) => entry.url === '/about').lane, 'composition');
-  assert.ok(list.every((entry) => !entry.url.includes('{')), 'generator permalinks never list');
-});
+        const list = listCustomizable({ consumerDir: empty, siteData: miniData });
+        ctx.expect(list.length >= 60, `every static default URL lists (${list.length})`).toBeTruthy();
+        ctx.expect(list.find((entry) => entry.url === '/').lane).toBe('composition');
+        ctx.expect(list.find((entry) => entry.url === '/about').lane).toBe('composition');
+        ctx.expect(list.every((entry) => !entry.url.includes('{')), 'generator permalinks never list').toBeTruthy();
+      },
+    },
 
-test('#458: a PAGINATING default page materializes — addressed by its logical URL, permalink byte-identical, default suppressed', async () => {
-  const consumer = path.join(PKG, '.omega', 'customize-paginating');
-  fs.rmSync(consumer, { recursive: true, force: true });
-  fs.mkdirSync(consumer, { recursive: true });
+    {
+      name: '#458: a PAGINATING default page materializes — addressed by its logical URL, permalink byte-identical, default suppressed',
+      run: async (ctx) => {
+        const consumer = path.join(PKG, '.omega', 'customize-paginating');
+        fs.rmSync(consumer, { recursive: true, force: true });
+        fs.mkdirSync(consumer, { recursive: true });
 
-  // The blog hub's permalink is a pagination TEMPLATE, so no URL can equal it
-  // — the index skipped it and `omega customize /blog` reported "unknown".
-  const plan = resolveCustomization({ url: '/blog', consumerDir: consumer, siteData: miniData });
-  assert.strictEqual(plan.status, 'ok', 'the blog hub is addressable by the URL its page 1 serves');
-  assert.strictEqual(plan.lane, 'shell');
-  assert.ok(plan.target.endsWith(path.join('pages', 'blog.md')), `lands at the default's own path: ${plan.target}`);
+        // The blog hub's permalink is a pagination TEMPLATE, so no URL can equal it
+        // — the index skipped it and `omega customize /blog` reported "unknown".
+        const plan = resolveCustomization({ url: '/blog', consumerDir: consumer, siteData: miniData });
+        ctx.expect(plan.status, 'the blog hub is addressable by the URL its page 1 serves').toBe('ok');
+        ctx.expect(plan.lane).toBe('shell');
+        ctx.expect(plan.target.endsWith(path.join('pages', 'blog.md')), `lands at the default's own path: ${plan.target}`).toBeTruthy();
 
-  const before = await buildConsumer(consumer, 'customize-blog-a');
-  assert.ok(before.has('/blog'), 'the packaged default ships the hub before customizing');
+        const before = await buildConsumer(consumer, 'customize-blog-a');
+        ctx.expect(before.has('/blog'), 'the packaged default ships the hub before customizing').toBeTruthy();
 
-  // (a) materialized with the permalink copied BYTE-IDENTICAL — the only
-  // thing the build-time suppression lane keys on (consumer-scan.js).
-  const created = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
-  assert.strictEqual(created.status, 'created');
-  const written = fs.readFileSync(created.target, 'utf8');
-  const permalinkLine = (raw) => (raw.match(/^permalink:.*$/m) || [])[0];
-  assert.strictEqual(
-    permalinkLine(written),
-    'permalink: "/blog{% if pagination.pageNumber > 0 %}/page/{{ pagination.pageNumber | plus: 1 }}{% endif %}.html"',
-  );
-  assert.strictEqual(permalinkLine(written), permalinkLine(created.defaultPage.raw), 'byte-identical to the packaged default');
-  assert.ok(written.includes('# Verbatim copy'), 'shell explains itself in frontmatter comments');
+        // (a) materialized with the permalink copied BYTE-IDENTICAL — the only
+        // thing the build-time suppression lane keys on (consumer-scan.js).
+        const created = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
+        ctx.expect(created.status).toBe('created');
+        const written = fs.readFileSync(created.target, 'utf8');
+        const permalinkLine = (raw) => (raw.match(/^permalink:.*$/m) || [])[0];
+        ctx.expect(permalinkLine(written)).toBe('permalink: "/blog{% if pagination.pageNumber > 0 %}/page/{{ pagination.pageNumber | plus: 1 }}{% endif %}.html"');
+        ctx.expect(permalinkLine(written), 'byte-identical to the packaged default').toBe(permalinkLine(created.defaultPage.raw));
+        ctx.expect(written.includes('# Verbatim copy'), 'shell explains itself in frontmatter comments').toBeTruthy();
 
-  // (b) the build suppresses the default: the same page set, one /blog.
-  const after = await buildConsumer(consumer, 'customize-blog-b');
-  assert.deepStrictEqual([...after.keys()].sort(), [...before.keys()].sort(), 'same page set — no duplicate hub');
-  for (const [url, content] of before) {
-    assert.strictEqual(normalize(url, after.get(url)), normalize(url, content), `${url} unchanged by materializing the hub`);
-  }
+        // (b) the build suppresses the default: the same page set, one /blog.
+        const after = await buildConsumer(consumer, 'customize-blog-b');
+        ctx.expect([...after.keys()].sort(), 'same page set — no duplicate hub').toEqual([...before.keys()].sort());
+        for (const [url, content] of before) {
+          ctx.expect(normalize(url, after.get(url)), `${url} unchanged by materializing the hub`).toBe(normalize(url, content));
+        }
 
-  // Idempotent, like every other lane.
-  const again = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
-  assert.ok(again.status === 'owned' || again.status === 'exists', `no-op on rerun (${again.status})`);
-  assert.strictEqual(fs.readFileSync(created.target, 'utf8'), written, 'rerun never rewrites the file');
+        // Idempotent, like every other lane.
+        const again = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
+        ctx.expect(again.status === 'owned' || again.status === 'exists', `no-op on rerun (${again.status})`).toBeTruthy();
+        ctx.expect(fs.readFileSync(created.target, 'utf8'), 'rerun never rewrites the file').toBe(written);
 
-  // (c) non-paginating customize is untouched, and no Liquid ever LISTS as a URL.
-  const empty = path.join(PKG, '.omega', 'customize-paginating-empty');
-  fs.rmSync(empty, { recursive: true, force: true });
-  fs.mkdirSync(empty, { recursive: true });
-  const pricing = resolveCustomization({ url: '/pricing', consumerDir: empty, siteData: miniData });
-  assert.strictEqual(pricing.lane, 'shell');
-  assert.ok(pricing.target.endsWith(path.join('pages', 'pricing.md')));
-  assert.strictEqual(resolveCustomization({ url: '/', consumerDir: empty, siteData: miniData }).lane, 'composition');
+        // (c) non-paginating customize is untouched, and no Liquid ever LISTS as a URL.
+        const empty = path.join(PKG, '.omega', 'customize-paginating-empty');
+        fs.rmSync(empty, { recursive: true, force: true });
+        fs.mkdirSync(empty, { recursive: true });
+        const pricing = resolveCustomization({ url: '/pricing', consumerDir: empty, siteData: miniData });
+        ctx.expect(pricing.lane).toBe('shell');
+        ctx.expect(pricing.target.endsWith(path.join('pages', 'pricing.md'))).toBeTruthy();
+        ctx.expect(resolveCustomization({ url: '/', consumerDir: empty, siteData: miniData }).lane).toBe('composition');
 
-  const list = listCustomizable({ consumerDir: empty, siteData: miniData });
-  assert.ok(list.every((entry) => !entry.url.includes('{')), 'a pagination template never lists as a URL');
-  assert.deepStrictEqual(
-    list.filter((entry) => /^\/blog(\/|$)/.test(entry.url)).map((entry) => entry.url).sort(),
-    ['/blog', '/blog/categories', '/blog/categories/category', '/blog/index.json', '/blog/tags', '/blog/tags/tag'],
-    'every blog default is addressable, generators included',
-  );
-});
+        const list = listCustomizable({ consumerDir: empty, siteData: miniData });
+        ctx.expect(list.every((entry) => !entry.url.includes('{')), 'a pagination template never lists as a URL').toBeTruthy();
+        ctx.expect(list.filter((entry) => /^\/blog(\/|$)/.test(entry.url)).map((entry) => entry.url).sort(), 'every blog default is addressable, generators included').toEqual(['/blog', '/blog/categories', '/blog/categories/category', '/blog/index.json', '/blog/tags', '/blog/tags/tag']);
+      },
+    },
 
-test('cp220: the {% composition %} guard — a body REPLACES the composition, and `append` is gone (#607)', async () => {
-  const consumer = path.join(PKG, '.omega', 'customize-replace');
-  fs.rmSync(consumer, { recursive: true, force: true });
-  fs.mkdirSync(path.join(consumer, 'pages'), { recursive: true });
+    {
+      name: 'cp220: the {% composition %} guard — a body REPLACES the composition, and `append` is gone (#607)',
+      run: async (ctx) => {
+        const consumer = path.join(PKG, '.omega', 'customize-replace');
+        fs.rmSync(consumer, { recursive: true, force: true });
+        fs.mkdirSync(path.join(consumer, 'pages'), { recursive: true });
 
-  // Default (Ian 2026-07-19): a body REPLACES the composition — no flag
-  fs.writeFileSync(
-    path.join(consumer, 'pages', 'index.md'),
-    '---\nlayout: blueprint/index\npermalink: /\n---\n\n## My replacement home\n',
-  );
-  const replaced = (await buildConsumer(consumer, 'customize-replace')).get('/');
-  assert.ok(replaced.includes('My replacement home'), 'the page body renders');
-  assert.ok(replaced.includes('<h2'), 'markdown content formats (parity branch)');
-  assert.ok(!replaced.includes('omega-hero'), 'the default composition is REPLACED by default');
+        // Default (Ian 2026-07-19): a body REPLACES the composition — no flag
+        fs.writeFileSync(
+          path.join(consumer, 'pages', 'index.md'),
+          '---\nlayout: blueprint/index\npermalink: /\n---\n\n## My replacement home\n',
+        );
+        const replaced = (await buildConsumer(consumer, 'customize-replace')).get('/');
+        ctx.expect(replaced.includes('My replacement home'), 'the page body renders').toBeTruthy();
+        ctx.expect(replaced.includes('<h2'), 'markdown content formats (parity branch)').toBeTruthy();
+        ctx.expect(!replaced.includes('omega-hero'), 'the default composition is REPLACED by default').toBeTruthy();
 
-  // The legacy UJM add-below flag is DELETED (#607, Ian 2026-08-26): it is an
-  // unknown frontmatter key now, stripped with the content-key warning, and
-  // the body replaces the composition like any other body. A page that wants
-  // the default bands writes them — `omega customize <url>` materializes them.
-  fs.writeFileSync(
-    path.join(consumer, 'pages', 'index.md'),
-    '---\nlayout: blueprint/index\npermalink: /\nappend: true\n---\n\n## My appended prose\n',
-  );
-  const appended = (await buildConsumer(consumer, 'customize-append')).get('/');
-  assert.ok(!appended.includes('omega-hero'), '`append: true` no longer keeps the default composition');
-  assert.ok(appended.includes('My appended prose'), 'the body still renders — it replaced the composition');
-});
+        // The legacy UJM add-below flag is DELETED (#607, Ian 2026-08-26): it is an
+        // unknown frontmatter key now, stripped with the content-key warning, and
+        // the body replaces the composition like any other body. A page that wants
+        // the default bands writes them — `omega customize <url>` materializes them.
+        fs.writeFileSync(
+          path.join(consumer, 'pages', 'index.md'),
+          '---\nlayout: blueprint/index\npermalink: /\nappend: true\n---\n\n## My appended prose\n',
+        );
+        const appended = (await buildConsumer(consumer, 'customize-append')).get('/');
+        ctx.expect(!appended.includes('omega-hero'), '`append: true` no longer keeps the default composition').toBeTruthy();
+        ctx.expect(appended.includes('My appended prose'), 'the body still renders — it replaced the composition').toBeTruthy();
+      },
+    },
 
-test('cp220: materialize-then-build identity, then divergence — args land, bands drop, words keep flowing', async () => {
-  fs.rmSync(SCRATCH, { recursive: true, force: true });
-  fs.mkdirSync(SCRATCH, { recursive: true });
+    {
+      name: 'cp220: materialize-then-build identity, then divergence — args land, bands drop, words keep flowing',
+      run: async (ctx) => {
+        fs.rmSync(SCRATCH, { recursive: true, force: true });
+        fs.mkdirSync(SCRATCH, { recursive: true });
 
-  // A: the bare consumer — full default site
-  const before = await buildConsumer(SCRATCH, 'customize-a');
+        // A: the bare consumer — full default site
+        const before = await buildConsumer(SCRATCH, 'customize-a');
 
-  // Materialize both lanes
-  const home = materialize({ url: '/', consumerDir: SCRATCH, siteData: miniData });
-  assert.strictEqual(home.status, 'created');
-  assert.strictEqual(home.lane, 'composition');
-  const homeFile = fs.readFileSync(home.target, 'utf8');
-  assert.ok(!homeFile.includes('Sarah Johnson'), 'materialized file carries no theme copy');
-  assert.ok(!homeFile.includes('composition: true'), 'no flag needed — a body replaces the composition by default');
+        // Materialize both lanes
+        const home = materialize({ url: '/', consumerDir: SCRATCH, siteData: miniData });
+        ctx.expect(home.status).toBe('created');
+        ctx.expect(home.lane).toBe('composition');
+        const homeFile = fs.readFileSync(home.target, 'utf8');
+        ctx.expect(!homeFile.includes('Sarah Johnson'), 'materialized file carries no theme copy').toBeTruthy();
+        ctx.expect(!homeFile.includes('composition: true'), 'no flag needed — a body replaces the composition by default').toBeTruthy();
 
-  const pricing = materialize({ url: '/pricing', consumerDir: SCRATCH, siteData: miniData });
-  assert.strictEqual(pricing.status, 'created');
-  assert.strictEqual(pricing.lane, 'shell');
-  const pricingFile = fs.readFileSync(pricing.target, 'utf8');
-  assert.ok(pricingFile.includes('layout: blueprint/pricing'), 'shell keeps the thin default verbatim');
-  assert.ok(pricingFile.includes('# Verbatim copy'), 'shell explains itself in frontmatter comments');
+        const pricing = materialize({ url: '/pricing', consumerDir: SCRATCH, siteData: miniData });
+        ctx.expect(pricing.status).toBe('created');
+        ctx.expect(pricing.lane).toBe('shell');
+        const pricingFile = fs.readFileSync(pricing.target, 'utf8');
+        ctx.expect(pricingFile.includes('layout: blueprint/pricing'), 'shell keeps the thin default verbatim').toBeTruthy();
+        ctx.expect(pricingFile.includes('# Verbatim copy'), 'shell explains itself in frontmatter comments').toBeTruthy();
 
-  // Idempotent: the URL is now consumer-owned — nothing overwrites
-  const again = materialize({ url: '/', consumerDir: SCRATCH, siteData: miniData });
-  assert.ok(again.status === 'owned' || again.status === 'exists', `no-op on rerun (${again.status})`);
-  assert.strictEqual(fs.readFileSync(home.target, 'utf8'), homeFile, 'rerun never rewrites the file');
+        // Idempotent: the URL is now consumer-owned — nothing overwrites
+        const again = materialize({ url: '/', consumerDir: SCRATCH, siteData: miniData });
+        ctx.expect(again.status === 'owned' || again.status === 'exists', `no-op on rerun (${again.status})`).toBeTruthy();
+        ctx.expect(fs.readFileSync(home.target, 'utf8'), 'rerun never rewrites the file').toBe(homeFile);
 
-  // B: materialized but untouched — the SAME site
-  const after = await buildConsumer(SCRATCH, 'customize-b');
-  assert.deepStrictEqual([...after.keys()].sort(), [...before.keys()].sort(), 'same page set');
-  for (const [url, content] of before) {
-    assert.strictEqual(normalize(url, after.get(url)), normalize(url, content), `${url} unchanged by materializing`);
-  }
-  assert.ok(after.get('/').includes('omega-hero'), 'the composition renders from the page body now');
-  assert.ok(after.get('/').includes('Sarah Johnson'), 'theme words flow through resolved.* — never inlined');
+        // B: materialized but untouched — the SAME site
+        const after = await buildConsumer(SCRATCH, 'customize-b');
+        ctx.expect([...after.keys()].sort(), 'same page set').toEqual([...before.keys()].sort());
+        for (const [url, content] of before) {
+          ctx.expect(normalize(url, after.get(url)), `${url} unchanged by materializing`).toBe(normalize(url, content));
+        }
+        ctx.expect(after.get('/').includes('omega-hero'), 'the composition renders from the page body now').toBeTruthy();
+        ctx.expect(after.get('/').includes('Sarah Johnson'), 'theme words flow through resolved.* — never inlined').toBeTruthy();
 
-  // Diverge the new-world way (frontmatter is meta-only): an arg override on
-  // the section CALL (args beat data in the section merge chain) + one band
-  // deleted from the body.
-  const diverged = homeFile
-    .replace('{% section "marketing/cta", data: resolved.cta %}', '{% section "marketing/cta", data: resolved.cta, headline: "MiniCo custom close" %}')
-    .replace('{% section "marketing/stats", items: resolved.stats %}\n', '');
-  assert.notStrictEqual(diverged, homeFile);
-  fs.writeFileSync(home.target, diverged);
+        // Diverge the new-world way (frontmatter is meta-only): an arg override on
+        // the section CALL (args beat data in the section merge chain) + one band
+        // deleted from the body.
+        const diverged = homeFile
+          .replace('{% section "marketing/cta", data: resolved.cta %}', '{% section "marketing/cta", data: resolved.cta, headline: "MiniCo custom close" %}')
+          .replace('{% section "marketing/stats", items: resolved.stats %}\n', '');
+        ctx.expect(diverged).not.toBe(homeFile);
+        fs.writeFileSync(home.target, diverged);
 
-  const custom = await buildConsumer(SCRATCH, 'customize-c');
-  const customHome = custom.get('/');
-  assert.ok(customHome.includes('MiniCo custom close'), 'the call-site arg override lands');
-  assert.ok(!customHome.includes('omega-stats'), 'the deleted one-liner drops exactly that band');
-  assert.ok(customHome.includes('Sarah Johnson'), 'untouched bands keep their theme words');
-  for (const [url, content] of after) {
-    if (url === '/') continue;
-    assert.strictEqual(normalize(url, custom.get(url)), normalize(url, content), `${url} untouched by the home divergence`);
-  }
+        const custom = await buildConsumer(SCRATCH, 'customize-c');
+        const customHome = custom.get('/');
+        ctx.expect(customHome.includes('MiniCo custom close'), 'the call-site arg override lands').toBeTruthy();
+        ctx.expect(!customHome.includes('omega-stats'), 'the deleted one-liner drops exactly that band').toBeTruthy();
+        ctx.expect(customHome.includes('Sarah Johnson'), 'untouched bands keep their theme words').toBeTruthy();
+        for (const [url, content] of after) {
+          if (url === '/') continue;
+          ctx.expect(normalize(url, custom.get(url)), `${url} untouched by the home divergence`).toBe(normalize(url, content));
+        }
+      },
+    },
+  ],
 });

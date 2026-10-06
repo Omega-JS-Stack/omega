@@ -105,83 +105,83 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-percent-code-renders-a-percent-line',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME15'));
 
-        assert.ok(computed, 'The transition should have composed the email');
-        assert.equal(computed.promoCode, 'WELCOME15', 'The line names the code');
-        assert.equal(computed.promoPercent, 15, 'A percent code quotes its percent');
-        assert.equal(computed.promoSavings, '7.50', 'It saved 15% of the price');
-        assert.equal(computed.totalToday, '42.49', 'The total is what was actually charged');
-        assert.equal(computed.firstChargeAmount, '42.49', 'The first charge matches');
-        assert.equal('promoAmount' in computed, false, 'A percent code quotes no dollar amount');
+        expect(computed, 'The transition should have composed the email').toBeTruthy();
+        expect(computed.promoCode, 'The line names the code').toBe('WELCOME15');
+        expect(computed.promoPercent, 'A percent code quotes its percent').toBe(15);
+        expect(computed.promoSavings, 'It saved 15% of the price').toBe('7.50');
+        expect(computed.totalToday, 'The total is what was actually charged').toBe('42.49');
+        expect(computed.firstChargeAmount, 'The first charge matches').toBe('42.49');
+        expect('promoAmount' in computed, 'A percent code quotes no dollar amount').toBe(false);
       },
     },
 
     {
       name: 'an-amount-code-renders-a-money-line-and-the-discounted-total',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME10OFF'));
 
-        assert.equal(computed.promoCode, 'WELCOME10OFF', 'The line names the code');
-        assert.equal(computed.promoAmount, '10.00', 'A flat-dollar code quotes its dollars');
-        assert.equal(computed.promoSavings, '10.00', 'It saved the full $10');
-        assert.equal(computed.totalToday, '39.99', 'The receipt must not quote the list price');
-        assert.equal('promoPercent' in computed, false, 'An amount code quotes no percentage');
+        expect(computed.promoCode, 'The line names the code').toBe('WELCOME10OFF');
+        expect(computed.promoAmount, 'A flat-dollar code quotes its dollars').toBe('10.00');
+        expect(computed.promoSavings, 'It saved the full $10').toBe('10.00');
+        expect(computed.totalToday, 'The receipt must not quote the list price').toBe('39.99');
+        expect('promoPercent' in computed, 'An amount code quotes no percentage').toBe(false);
       },
     },
 
     {
       name: 'a-discount-with-neither-shape-renders-no-promo-line-and-does-not-throw',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // An order written before the amount field existed. The handler is
         // dispatched fire-and-forget, so a throw here costs the email silently.
         const { computed, captured } = await runSubscription(omega, LEGACY_SHAPELESS_DISCOUNT);
 
-        assert.ok(computed, 'The email should still be composed');
-        assert.equal('promoCode' in computed, false, 'A shapeless discount renders no promo line');
-        assert.equal('promoPercent' in computed, false, 'Nothing to quote as a percentage');
-        assert.equal('promoAmount' in computed, false, 'Nothing to quote as an amount');
-        assert.equal(computed.totalToday, '49.99', 'With no usable discount the full price stands');
-        assert.deepEqual(captured.errors, [], 'The transition should log no error');
+        expect(computed, 'The email should still be composed').toBeTruthy();
+        expect('promoCode' in computed, 'A shapeless discount renders no promo line').toBe(false);
+        expect('promoPercent' in computed, 'Nothing to quote as a percentage').toBe(false);
+        expect('promoAmount' in computed, 'Nothing to quote as an amount').toBe(false);
+        expect(computed.totalToday, 'With no usable discount the full price stands').toBe('49.99');
+        expect(captured.errors, 'The transition should log no error').toEqual([]);
       },
     },
 
     {
       name: 'a-trial-still-charges-nothing-today',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME10OFF'), { isTrial: true });
 
-        assert.equal(computed.totalToday, '0.00', 'A trial charges nothing today');
-        assert.equal(computed.firstChargeAmount, '39.99', 'The first real charge is still the discounted one');
+        expect(computed.totalToday, 'A trial charges nothing today').toBe('0.00');
+        expect(computed.firstChargeAmount, 'The first real charge is still the discounted one').toBe('39.99');
       },
     },
 
     {
       name: 'the-one-time-transition-behaves-the-same-for-every-shape',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const percent = await runOneTime(omega, discountCodes.validate('FLASH20'));
-        assert.equal(percent.computed.promoPercent, 20, 'A percent code quotes its percent');
-        assert.equal(percent.computed.totalToday, '39.99', '20% off 49.99 is 39.99');
+        expect(percent.computed.promoPercent, 'A percent code quotes its percent').toBe(20);
+        expect(percent.computed.totalToday, '20% off 49.99 is 39.99').toBe('39.99');
 
         const amount = await runOneTime(omega, discountCodes.validate('WELCOME10OFF'));
-        assert.equal(amount.computed.promoAmount, '10.00', 'A flat-dollar code quotes its dollars');
-        assert.equal(amount.computed.totalToday, '39.99', '$10 off 49.99 is 39.99');
+        expect(amount.computed.promoAmount, 'A flat-dollar code quotes its dollars').toBe('10.00');
+        expect(amount.computed.totalToday, '$10 off 49.99 is 39.99').toBe('39.99');
 
         const shapeless = await runOneTime(omega, LEGACY_SHAPELESS_DISCOUNT);
-        assert.equal('promoCode' in shapeless.computed, false, 'A shapeless discount renders no promo line');
-        assert.equal(shapeless.computed.totalToday, '49.99', 'The full price stands');
-        assert.deepEqual(shapeless.captured.errors, [], 'The transition should log no error');
+        expect('promoCode' in shapeless.computed, 'A shapeless discount renders no promo line').toBe(false);
+        expect(shapeless.computed.totalToday, 'The full price stands').toBe('49.99');
+        expect(shapeless.captured.errors, 'The transition should log no error').toEqual([]);
       },
     },
 
     {
       name: 'no-discount-at-all-is-unchanged',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { computed } = await runSubscription(omega, null);
 
-        assert.equal('promoCode' in computed, false, 'No code, no promo line');
-        assert.equal(computed.totalToday, '49.99', 'The customer pays the list price');
+        expect('promoCode' in computed, 'No code, no promo line').toBe(false);
+        expect(computed.totalToday, 'The customer pays the list price').toBe('49.99');
       },
     },
   ],

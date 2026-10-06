@@ -11,7 +11,7 @@
  *
  * Plain-node unit test (no emulator, no network).
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const crypto = require('crypto');
 
 const { buildUnsubscribeUrl } = require('../../dist/omega/libraries/email/prepare.js');
@@ -55,11 +55,11 @@ module.exports = defineCases({
 
       run() {
         withKey(undefined, () => {
-          assert.throws(() => buildUnsubscribeUrl(LINK), (error) => {
-            assert.strictEqual(error.name, 'MissingEnvKeyError');
-            assert.match(error.message, /UNSUBSCRIBE_HMAC_KEY/);
+          expect(() => buildUnsubscribeUrl(LINK)).toThrow((error) => {
+            expect(error.name).toBe('MissingEnvKeyError');
+            expect(error.message).toMatch(/UNSUBSCRIBE_HMAC_KEY/);
             // Not node's crypto TypeError — the point of the guard
-            assert.strictEqual(error instanceof TypeError, false);
+            expect(error instanceof TypeError).toBe(false);
             return true;
           });
         });
@@ -71,7 +71,7 @@ module.exports = defineCases({
 
       run() {
         withKey('', () => {
-          assert.throws(() => buildUnsubscribeUrl(LINK), /UNSUBSCRIBE_HMAC_KEY/);
+          expect(() => buildUnsubscribeUrl(LINK)).toThrow(/UNSUBSCRIBE_HMAC_KEY/);
         });
       },
     },
@@ -83,8 +83,8 @@ module.exports = defineCases({
         const url = withKey('unit-test-key', () => buildUnsubscribeUrl(LINK));
 
         const expected = crypto.createHmac('sha256', 'unit-test-key').update('customer@example.com').digest('hex');
-        assert.ok(url.startsWith('https://brand.dev/portal/email-preferences?'));
-        assert.ok(url.endsWith(`&sig=${expected}`));
+        expect(url.startsWith('https://brand.dev/portal/email-preferences?')).toBeTruthy();
+        expect(url.endsWith(`&sig=${expected}`)).toBeTruthy();
       },
     },
   ],

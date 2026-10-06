@@ -1,146 +1,296 @@
 /**
- * `omega test` consumer-suite invocation (#114) — the default target must be a
- * glob node expands itself: a bare `test/` directory positional is treated as
- * a module to load on Node >= 22 (web's engines floor) and errors even when a
- * valid suite exists. Both invocations run FOR REAL against a staged app.
- * Run: node --test test/commands-test.test.js
+ * `omega test` on a web target: one runner run holding the smoke suite and the
+ * project suites, after one production build. Each run is the real verb
+ * (`dist/cli-run.js test`) in a staged temp target, as its own process.
  */
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawnSync } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const { parseTestScope, noMatchExitCode, NO_MATCH_EXIT_CODE, FANOUT_ENV } = require('@omega.js/devkit/test/scope');
-const { projectTestArgs, frameworkTestRuns, selectedTestFiles } = require('../src/commands/test.js');
+// Every staged target's config load records its brand: keep that off the real ~/.omega
+require('@omega.js/devkit/test/temp-home');
 
-const stageTarget = () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-test-'));
-  const passing = `const { test } = require('node:test');\ntest('passes', () => {});\n`;
-  fs.mkdirSync(path.join(dir, 'test', 'nested'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'test', 'top.test.js'), passing);
-  fs.writeFileSync(path.join(dir, 'test', 'nested', 'deep.test.js'), passing);
-  return dir;
+const WEB = path.resolve(__dirname, '..');
+const CLI_RUN = path.join(WEB, 'dist', 'cli-run.js');
+const VERB_TIMEOUT = 240000;
+const NODE_MAJOR = Number(process.versions.node.split('.')[0]);
+
+const SMOKE = [
+  'the build wrote pages',
+  '404.html renders through the theme root layout',
+  "the manifest's js.main bundle exists",
+  'every internal link resolves',
+  'the built output audits clean',
+];
+const HOME_CASE = 'the home page was built';
+
+const BASE_FILES = {
+  'config/omega.json5': `{
+  brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com', description: 'A fixture brand.' },
+  targets: { web: { type: 'web' } },
+}`,
+  'package.json': JSON.stringify({ name: 'fixture-website', private: true, dependencies: { '@omega.js/web': '*' } }),
 };
 
-// Strip the parent runner's NODE_TEST_* context vars — with them present the
-// nested `node --test` behaves as the runner's IPC child and reports nothing.
-const childEnv = () => Object.fromEntries(
-  Object.entries(process.env).filter(([key]) => !key.startsWith('NODE_TEST')),
-);
+const staged = [];
 
-const runSuite = (dir, target) => spawnSync(`node --test ${target}`, {
-  cwd: dir, shell: true, encoding: 'utf8', env: childEnv(),
+// A project suite, through the door a brand's suite uses; its case records the environment it saw.
+function homeSuite() {
+  return `const fs = require('node:fs');
+const path = require('node:path');
+const { defineCases } = require(${JSON.stringify(require.resolve('@omega.js/web/test'))});
+
+const ROOT = path.join(__dirname, '..', '..');
+
+module.exports = defineCases({
+  type: 'group',
+  description: 'home',
+  tests: [
+    {
+      name: ${JSON.stringify(HOME_CASE)},
+      run(ctx) {
+        fs.appendFileSync(path.join(ROOT, 'env-seen.txt'), \`\${process.env.OMEGA_ENVIRONMENT}\\n\`);
+        ctx.expect(fs.existsSync(path.join(ROOT, 'dist', 'index.html'))).toBe(true);
+      },
+    },
+  ],
 });
+`;
+}
 
-test('the default target discovers top-level and nested tests via node\'s own glob', () => {
-  const dir = stageTarget();
-  const result = runSuite(dir, projectTestArgs([]));
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout, /pass 2/);
-  fs.rmSync(dir, { recursive: true, force: true });
-});
-
-test('the old bare test/ positional fails on this Node — the defect stays pinned', () => {
-  const dir = stageTarget();
-  const result = runSuite(dir, 'test/');
-  assert.notEqual(result.status, 0, 'bare test/ unexpectedly worked — revisit #114');
-  fs.rmSync(dir, { recursive: true, force: true });
-});
-
-test('the project lane runs test/_init.js setup once, before the suite that needs its fixture', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-init-'));
-  fs.mkdirSync(path.join(dir, 'test', 'build'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'test', '_init.js'), `module.exports = ({ projectRoot }) => ({
-  async setup() { require('fs').appendFileSync(require('path').join(projectRoot, 'seeded.log'), 'seeded\\n'); },
-});\n`);
-  fs.writeFileSync(path.join(dir, 'test', 'build', 'seeded.test.js'), `const { test } = require('node:test');
-const assert = require('node:assert/strict');
-test('the fixture is there', () => {
-  assert.equal(require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'seeded.log'), 'utf8'), 'seeded\\n');
-});\n`);
-
-  // A clean child process: the lane spawns its own `node --test`, which this runner's context vars would hijack.
-  const lane = `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'commands', 'test.js'))}).runProjectSuite({ root: ${JSON.stringify(dir)}, filters: [] }).catch((error) => { console.error(error.message); process.exit(1); })`;
-  const result = spawnSync(process.execPath, ['-e', lane], { cwd: dir, encoding: 'utf8', env: childEnv() });
-
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout, /pass 1/);
-  fs.rmSync(dir, { recursive: true, force: true });
-});
-
-test('a project filter still maps to test/<path>* patterns', () => {
-  assert.equal(projectTestArgs(['pages.js']), 'test/pages*');
-  assert.equal(projectTestArgs(['a', 'b']), 'test/a* test/b*');
-});
-
-test('#344: `omega test web:` runs the watcher lane too, serially, and never in parallel', () => {
-  // The framework suite is TWO phases here for the same reason the package's
-  // own `npm test` is: a watcher suite left in the parallel glob starves.
-  // `omega test web:` losing test/watch/ would silently stop running them.
-  assert.deepEqual(frameworkTestRuns([]), [
-    { flags: '', target: 'test/*.test.js' },
-    { flags: '--test-concurrency=1 ', target: 'test/watch/*.test.js' },
-  ]);
-
-  // A filter reaches both dirs — a non-matching glob is a no-op run, so
-  // `web:dev-watch` resolves in test/watch/ and `web:pricing` in test/.
-  assert.deepEqual(frameworkTestRuns(['dev-watch']), [
-    { flags: '', target: 'test/dev-watch*.test.js' },
-    { flags: '--test-concurrency=1 ', target: 'test/watch/dev-watch*.test.js' },
-  ]);
-});
-
-const stageFramework = () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-framework-'));
-  const passing = `const { test } = require('node:test');\ntest('passes', () => {});\n`;
-  fs.mkdirSync(path.join(dir, 'test', 'watch'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'test', 'pricing.test.js'), passing);
-  fs.writeFileSync(path.join(dir, 'test', 'watch', 'dev-watch.test.js'), passing);
+// A temp web target: the base files plus `extra`, removed by the suite cleanup.
+function stage(extra = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-test-verb-'));
+  staged.push(dir);
+  for (const [relative, contents] of Object.entries({ ...BASE_FILES, ...extra })) {
+    fs.mkdirSync(path.dirname(path.join(dir, relative)), { recursive: true });
+    fs.writeFileSync(path.join(dir, relative), contents);
+  }
   return dir;
-};
+}
 
-test('#814: a project filter resolves to the files it selects, so a typo is knowable', () => {
-  const dir = stageTarget();
-  const roots = { frameworkRoot: dir, projectRoot: dir };
-  const scopeFor = (target) => parseTestScope([target], { frameworkAliases: ['web'] });
+// The parent's node:test context would hijack the child, and the tee is skipped under CI.
+function childEnv(extra = {}) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('NODE_TEST')));
+  for (const key of ['TEST_EXTENDED_MODE', 'OMEGA_TEST_FANOUT', 'OMEGA_ENVIRONMENT', 'ENVIRONMENT', 'CI', 'GITHUB_ACTIONS']) delete env[key];
+  return { ...env, ...extra };
+}
 
-  assert.deepEqual(selectedTestFiles(scopeFor('top'), roots), ['test/top.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('project:nested/deep'), roots), ['test/nested/deep.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('topp'), roots), []);
+const stripAnsi = (text) => text.replace(/\x1b\[[0-9;]*m/g, '');
 
-  // A bare run names no file: the whole suite is the selection, never a typo.
-  assert.ok(selectedTestFiles(scopeFor('project:'), roots).length >= 2);
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+}
 
-  fs.rmSync(dir, { recursive: true, force: true });
+function runVerb(dir, args, env = {}) {
+  const result = spawnSync(process.execPath, [CLI_RUN, 'test', ...args], {
+    cwd: dir,
+    env: childEnv(env),
+    encoding: 'utf8',
+    timeout: VERB_TIMEOUT,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const stdout = stripAnsi(result.stdout || '');
+  const output = `${stdout}${stripAnsi(result.stderr || '')}`;
+  return { status: result.status, stdout, output, json: parseJson(stdout) };
+}
+
+function readText(file) {
+  return fs.existsSync(file) ? stripAnsi(fs.readFileSync(file, 'utf8')) : null;
+}
+
+const byName = (json, name) => json.tests.find((t) => t.name === name);
+const resultsBlocks = (text) => (text.match(/^\s*Results\s*$/gm) || []).length;
+
+module.exports = defineCases({
+  type: 'group',
+  description: 'commands-test',
+  timeout: VERB_TIMEOUT * 2,
+
+  // One green target, run once per reporter; the pretty run goes last so its log stays.
+  setup(ctx) {
+    const dir = stage({ 'test/build/home.test.js': homeSuite() });
+    const json = runVerb(dir, ['--reporter=json']);
+    const pretty = runVerb(dir, []);
+    ctx.state.green = {
+      dir,
+      json,
+      pretty,
+      log: readText(path.join(dir, 'logs', 'test.log')),
+      envSeen: readText(path.join(dir, 'env-seen.txt')),
+    };
+  },
+
+  cleanup() {
+    for (const dir of staged.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  },
+
+  tests: [
+    {
+      name: 'case-135 a green target builds, then reports the five smoke cases and the project case in one Results block',
+      run(ctx) {
+        const { dir, pretty, log } = ctx.state.green;
+        ctx.expect(pretty.status, pretty.output).toBe(0);
+        ctx.expect(fs.existsSync(path.join(dir, 'dist', 'index.html')), 'the build ran').toBe(true);
+        for (const name of [...SMOKE, HOME_CASE]) ctx.expect(pretty.stdout, pretty.output).toContain(name);
+        ctx.expect(resultsBlocks(pretty.output), pretty.output).toBe(1);
+        ctx.expect(pretty.output).toMatch(/^\s*6 passing\s*$/m);
+
+        ctx.expect(log, 'logs/test.log exists').not.toBeNull();
+        ctx.expect(resultsBlocks(log), log).toBe(1);
+        ctx.expect(log).toMatch(/^\s*6 passing\s*$/m);
+      },
+    },
+    {
+      name: 'case-136 a dead internal link fails the link case by name while the other cases still report',
+      run(ctx) {
+        const dir = stage({
+          'test/build/home.test.js': homeSuite(),
+          'src/pages/dead-link.html': `---
+layout: frontend/core/base
+permalink: /dead-link
+meta:
+  title: Dead link
+  description: A page that links to a page the build never wrote.
+---
+<p><a href="/no-such-page">Nowhere</a></p>
+`,
+        });
+        const run = runVerb(dir, ['--reporter=json']);
+        ctx.expect(run.json, run.output).not.toBeNull();
+
+        const link = byName(run.json, 'every internal link resolves');
+        ctx.expect(link, JSON.stringify(run.json.tests)).toHaveProperty('status', 'fail');
+        ctx.expect(link.error.message).toContain('/no-such-page');
+        for (const name of [...SMOKE.filter((n) => n !== link.name), HOME_CASE]) {
+          ctx.expect(byName(run.json, name), name).toHaveProperty('status', 'pass');
+        }
+        ctx.expect(run.status).toBe(1);
+      },
+    },
+    {
+      name: 'case-137 a project suite reads OMEGA_ENVIRONMENT as testing',
+      run(ctx) {
+        const { envSeen, pretty } = ctx.state.green;
+        ctx.expect(envSeen, pretty.output).not.toBeNull();
+        // One line per run: the json run, then the pretty one.
+        ctx.expect(envSeen.trim().split('\n')).toEqual(['testing', 'testing']);
+      },
+    },
+    {
+      name: 'case-138 framework:<suite> runs that framework suite with no build, and a bare run runs no framework suite',
+      skip: NODE_MAJOR < 23 && 'a framework: run from a target needs Node 23',
+      run(ctx) {
+        const dir = stage();
+        const run = runVerb(dir, ['framework:scaffold-em-dash', '--reporter=json']);
+        ctx.expect(run.json, run.output).not.toBeNull();
+        ctx.expect(run.json.tests.map((t) => t.name)).toEqual(['no scaffold file carries an em dash']);
+        ctx.expect(run.json.tests[0]).toHaveProperty('source', 'framework');
+        ctx.expect(run.json.tests[0].file.endsWith(path.join('test', 'scaffold-em-dash.test.js')), run.json.tests[0].file).toBe(true);
+        ctx.expect(fs.existsSync(path.join(dir, 'dist')), 'no build ran').toBe(false);
+        ctx.expect(run.status).toBe(0);
+
+        const { json } = ctx.state.green;
+        ctx.expect(json.json, json.output).not.toBeNull();
+        ctx.expect(json.json.tests.filter((t) => t.source === 'framework').map((t) => t.name)).toEqual([]);
+      },
+    },
+    {
+      name: 'case-139 a path target that matches no file ends before the build with the no-match message and code',
+      run(ctx) {
+        const dir = stage();
+        const alone = runVerb(dir, ['no-such-suite-anywhere']);
+        ctx.expect(alone.output).toContain('No test file matches "no-such-suite-anywhere"');
+        ctx.expect(alone.status, alone.output).toBe(1);
+        ctx.expect(fs.existsSync(path.join(dir, 'dist')), 'no build ran').toBe(false);
+
+        // Inside a brand-root fan-out the same miss answers with the no-match code.
+        const fanned = runVerb(dir, ['no-such-suite-anywhere'], { OMEGA_TEST_FANOUT: '1' });
+        ctx.expect(fanned.status, fanned.output).toBe(3);
+      },
+    },
+    {
+      name: 'case-140 --reporter=json writes one JSON document on stdout holding the smoke cases',
+      run(ctx) {
+        const { json } = ctx.state.green;
+        ctx.expect(json.json, `stdout is not one JSON document:\n${json.stdout}`).not.toBeNull();
+        const names = json.json.tests.map((t) => t.name);
+        for (const name of SMOKE) ctx.expect(names, name).toContain(name);
+        ctx.expect(json.status, json.output).toBe(0);
+      },
+    },
+    {
+      name: 'case-141 a path target naming one project suite builds, then runs only that suite',
+      run(ctx) {
+        const dir = stage({
+          'test/build/home.test.js': homeSuite(),
+          'test/pages/other.test.js': `const { defineCases } = require(${JSON.stringify(require.resolve('@omega.js/web/test'))});
+
+module.exports = defineCases({
+  type: 'group',
+  description: 'other',
+  tests: [{ name: 'the other suite runs', run: (ctx) => ctx.expect(1).toBe(1) }],
 });
+`,
+        });
+        const run = runVerb(dir, ['build/home', '--reporter=json']);
+        ctx.expect(run.json, run.output).not.toBeNull();
+        ctx.expect(run.json.tests.map((t) => t.name)).toEqual([HOME_CASE]);
+        ctx.expect(byName(run.json, HOME_CASE)).toHaveProperty('status', 'pass');
+        ctx.expect(fs.existsSync(path.join(dir, 'dist', 'index.html')), 'the build ran').toBe(true);
+        ctx.expect(run.status).toBe(0);
+      },
+    },
+    {
+      name: 'case-142 a project _init.js that throws runs no case, names the file, and exits 1',
+      run(ctx) {
+        const dir = stage({
+          'test/_init.js': "throw new Error('the init hook exploded');\n",
+          'test/build/home.test.js': homeSuite(),
+        });
+        const run = runVerb(dir, ['--reporter=json']);
+        ctx.expect(run.output).toContain(path.join('test', '_init.js'));
+        ctx.expect(fs.existsSync(path.join(dir, 'env-seen.txt')), 'the project case never ran').toBe(false);
+        ctx.expect(run.json, run.output).not.toBeNull();
+        const ran = run.json.tests.filter((t) => [...SMOKE, HOME_CASE].includes(t.name) && t.status !== 'skip');
+        ctx.expect(ran.map((t) => `${t.name}: ${t.status}`), 'no case ran').toEqual([]);
+        ctx.expect(run.status, run.output).toBe(1);
+      },
+    },
+    {
+      name: 'case-150 a target whose build fails exits 1 without the early-exit line',
+      run(ctx) {
+        const dir = stage({
+          'config/omega.json5': `{
+  brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com', description: 'A fixture brand.' },
+  notAConfigKey: true,
+  targets: { web: { type: 'web' } },
+}`,
+        });
+        const run = runVerb(dir, []);
+        ctx.expect(run.output).toContain('notAConfigKey');
+        ctx.expect(run.output).not.toContain('ended before its report');
+        ctx.expect(run.status, run.output).toBe(1);
+      },
+    },
+    {
+      name: 'case-143 the self-test runner config isolates files, serializes watch/, and has one framework root at the web package',
+      run(ctx) {
+        const { runnerConfig } = require('../src/commands/test.js');
+        const config = runnerConfig({ projectRoot: WEB, selfTest: true });
 
-test('#814: a framework filter is selected across BOTH phases, not one at a time', () => {
-  // `web:dev-watch` misses test/*.test.js and hits test/watch/*.test.js. Each
-  // phase alone reads as a no-match; the union is what the run actually gets.
-  const frameworkRoot = stageFramework();
-  const roots = { frameworkRoot, projectRoot: stageTarget() };
-  const scopeFor = (target) => parseTestScope([target], { frameworkAliases: ['web'] });
-
-  assert.deepEqual(selectedTestFiles(scopeFor('web:dev-watch'), roots), ['test/watch/dev-watch.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('web:pricing'), roots), ['test/pricing.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('web:nope'), roots), []);
-
-  // full: reaching ONE of the two sources is still a real selection.
-  assert.deepEqual(selectedTestFiles(scopeFor('full:pricing'), roots), ['test/pricing.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('full:top'), roots), ['test/top.test.js']);
-  assert.deepEqual(selectedTestFiles(scopeFor('full:nope'), roots), []);
-
-  fs.rmSync(roots.frameworkRoot, { recursive: true, force: true });
-  fs.rmSync(roots.projectRoot, { recursive: true, force: true });
-});
-
-test('#814: a no-match exits 1 alone and with its own code inside a brand-root fan-out', () => {
-  // `omega test` at a brand root forwards ONE target to every target, so a
-  // target that does not carry it is a no-op there rather than a failure.
-  assert.equal(FANOUT_ENV, 'OMEGA_TEST_FANOUT');
-  assert.equal(NO_MATCH_EXIT_CODE, 3);
-  assert.equal(noMatchExitCode({}), 1);
-  assert.equal(noMatchExitCode({ OMEGA_TEST_FANOUT: '1' }), 3);
+        ctx.expect(config).toHaveProperty('isolation', 'process');
+        ctx.expect(config.serial).toEqual(['watch']);
+        ctx.expect(Number.isInteger(config.concurrency) && config.concurrency >= 1, `concurrency ${config.concurrency}`).toBe(true);
+        ctx.expect(config).toHaveProperty('defaultTimeout', 120000);
+        ctx.expect(config.roots).toEqual([{ source: 'framework', dir: path.join(WEB, 'test'), cwd: WEB }]);
+      },
+    },
+  ],
 });

@@ -35,8 +35,7 @@
  * guarded transport, so what the page globals receive is what a live pixel
  * would (the convention analytics-blocked.test.js sets).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -151,159 +150,169 @@ async function trackOnce(state) {
   return page;
 }
 
-test('#386/#656: the purchase pixel fires to all three, GA4 included', async (t) => {
-  t.after(clearPage);
+module.exports = defineCases({
+  type: 'group',
+  description: 'confirmation-purchase-pixel',
+  tests: [
+    {
+      name: '#386/#656: the purchase pixel fires to all three, GA4 included',
+      run: async (ctx) => {
+        ctx.after(clearPage);
 
-  const { tracked } = await trackOnce(purchaseState());
+        const { tracked } = await trackOnce(purchaseState());
 
-  assert.deepStrictEqual(
-    tracked.map(([provider]) => provider),
-    ['gtag', 'fbq', 'ttq'],
-    'Meta and TikTok get the retargeting signal, and GA4 gets the browser attribution it deduplicates against the webhook on transaction_id (#656)',
-  );
+        ctx.expect(tracked.map(([provider]) => provider), 'Meta and TikTok get the retargeting signal, and GA4 gets the browser attribution it deduplicates against the webhook on transaction_id (#656)').toEqual(['gtag', 'fbq', 'ttq']);
 
-  const [google, meta, tiktok] = tracked;
-  assert.strictEqual(google[1], 'event');
-  assert.strictEqual(google[2], 'purchase');
-  assert.strictEqual(google[3].transaction_id, 'ORD-1', 'the id the webhook sends too — GA4 collapses the two halves on it');
-  assert.strictEqual(google[3].value, 19, 'and the browser half carries the real amount');
-  assert.strictEqual(meta[1], 'track', 'Purchase is one of Meta\'s standard events');
-  assert.strictEqual(meta[2], 'Purchase');
-  assert.strictEqual(tiktok[1], 'Purchase', 'TikTok retired CompletePayment for its own Purchase (#652)');
-});
+        const [google, meta, tiktok] = tracked;
+        ctx.expect(google[1]).toBe('event');
+        ctx.expect(google[2]).toBe('purchase');
+        ctx.expect(google[3].transaction_id, 'the id the webhook sends too — GA4 collapses the two halves on it').toBe('ORD-1');
+        ctx.expect(google[3].value, 'and the browser half carries the real amount').toBe(19);
+        ctx.expect(meta[1], 'Purchase is one of Meta\'s standard events').toBe('track');
+        ctx.expect(meta[2]).toBe('Purchase');
+        ctx.expect(tiktok[1], 'TikTok retired CompletePayment for its own Purchase (#652)').toBe('Purchase');
+      },
+    },
 
-test('#386: both halves name the same dedupe id, derived from the order', async (t) => {
-  t.after(clearPage);
+    {
+      name: '#386: both halves name the same dedupe id, derived from the order',
+      run: async (ctx) => {
+        ctx.after(clearPage);
 
-  const { tracked } = await trackOnce(purchaseState());
+        const { tracked } = await trackOnce(purchaseState());
 
-  const [, meta, tiktok] = tracked;
+        const [, meta, tiktok] = tracked;
 
-  // The backend keys the two browser-twinned events on the ORDER
-  // (payments-webhooks/analytics.js resolveEventId) — the only id a browser holds.
-  assert.deepStrictEqual(meta.at(-1), { eventID: 'purchase.ORD-1' }, 'Meta deduplicates on (event_name, event_id)');
-  assert.deepStrictEqual(tiktok.at(-1), { event_id: 'purchase.ORD-1' }, 'and TikTok on event_id');
-});
+        // The backend keys the two browser-twinned events on the ORDER
+        // (payments-webhooks/analytics.js resolveEventId) — the only id a browser holds.
+        ctx.expect(meta.at(-1), 'Meta deduplicates on (event_name, event_id)').toEqual({ eventID: 'purchase.ORD-1' });
+        ctx.expect(tiktok.at(-1), 'and TikTok on event_id').toEqual({ event_id: 'purchase.ORD-1' });
+      },
+    },
 
-test('#654: a trial checkout fires trial_start with value 0 — never a purchase', async (t) => {
-  t.after(clearPage);
+    {
+      name: '#654: a trial checkout fires trial_start with value 0 — never a purchase',
+      run: async (ctx) => {
+        ctx.after(clearPage);
 
-  const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
+        const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
 
-  assert.deepStrictEqual(
-    tracked.map(([provider]) => provider),
-    ['fbq', 'ttq'],
-    'the ad platforms only: GA4\'s trial_start is a custom event with no dedupe, and the webhook owns it',
-  );
+        ctx.expect(tracked.map(([provider]) => provider), 'the ad platforms only: GA4\'s trial_start is a custom event with no dedupe, and the webhook owns it').toEqual(['fbq', 'ttq']);
 
-  const [meta, tiktok] = tracked;
+        const [meta, tiktok] = tracked;
 
-  assert.strictEqual(meta[2], 'StartTrial', 'Meta\'s own event for the start of a free trial');
-  assert.strictEqual(meta[3].value, 0, 'a trial charges nothing, whatever amount the confirmation URL carried');
-  assert.strictEqual(meta[3].currency, 'USD');
-  assert.deepStrictEqual(meta.at(-1), { eventID: 'trial_start.ORD-1' }, 'and the id the webhook now derives the same way');
+        ctx.expect(meta[2], 'Meta\'s own event for the start of a free trial').toBe('StartTrial');
+        ctx.expect(meta[3].value, 'a trial charges nothing, whatever amount the confirmation URL carried').toBe(0);
+        ctx.expect(meta[3].currency).toBe('USD');
+        ctx.expect(meta.at(-1), 'and the id the webhook now derives the same way').toEqual({ eventID: 'trial_start.ORD-1' });
 
-  assert.strictEqual(tiktok[1], 'StartTrial');
-  assert.strictEqual(tiktok[2].value, 0);
-  assert.deepStrictEqual(tiktok.at(-1), { event_id: 'trial_start.ORD-1' });
-});
+        ctx.expect(tiktok[1]).toBe('StartTrial');
+        ctx.expect(tiktok[2].value).toBe(0);
+        ctx.expect(tiktok.at(-1)).toEqual({ event_id: 'trial_start.ORD-1' });
+      },
+    },
 
-test('#654: a trial never sends a Purchase to any platform', async (t) => {
-  t.after(clearPage);
+    {
+      name: '#654: a trial never sends a Purchase to any platform',
+      run: async (ctx) => {
+        ctx.after(clearPage);
 
-  // The state's `amount: 19` is DEFENSIVE, not what a live trial arrives with:
-  // the intent route already puts `amount=0` on a trial's confirmation URL. The
-  // fixture proves the pixel's own guard, not the URL's.
-  const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
+        // The state's `amount: 19` is DEFENSIVE, not what a live trial arrives with:
+        // the intent route already puts `amount=0` on a trial's confirmation URL. The
+        // fixture proves the pixel's own guard, not the URL's.
+        const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
 
-  const names = JSON.stringify(tracked);
+        const names = JSON.stringify(tracked);
 
-  assert.strictEqual(names.includes('Purchase'), false, `a $0 trial must book no purchase anywhere: ${names}`);
-  assert.strictEqual(names.includes('19'), false, 'nor the plan price nobody was charged');
-});
+        ctx.expect(names.includes('Purchase'), `a $0 trial must book no purchase anywhere: ${names}`).toBe(false);
+        ctx.expect(names.includes('19'), 'nor the plan price nobody was charged').toBe(false);
+      },
+    },
 
-test('#386: a one-time buy is not a subscription (the frequency-string bug)', async (t) => {
-  t.after(clearPage);
+    {
+      name: '#386: a one-time buy is not a subscription (the frequency-string bug)',
+      run: async (ctx) => {
+        ctx.after(clearPage);
 
-  // Checkout sends `frequency=once` for a one-time purchase, so the old
-  // `state.frequency ? 'subscription' : 'one-time'` called every one of them a
-  // subscription — the same truthiness bug the receipt copy carried (#282).
-  const { tracked } = await trackOnce(purchaseState({ frequency: 'once' }));
+        // Checkout sends `frequency=once` for a one-time purchase, so the old
+        // `state.frequency ? 'subscription' : 'one-time'` called every one of them a
+        // subscription — the same truthiness bug the receipt copy carried (#282).
+        const { tracked } = await trackOnce(purchaseState({ frequency: 'once' }));
 
-  const [, meta] = tracked;
-  assert.strictEqual(meta[3].content_type, 'product', 'the item still rides as a product');
+        const [, meta] = tracked;
+        ctx.expect(meta[3].content_type, 'the item still rides as a product').toBe('product');
 
-  const { tracked: subscription } = await trackOnce(purchaseState({ frequency: 'monthly' }));
-  assert.ok(subscription.length, 'a subscription purchase still fires');
-});
+        const { tracked: subscription } = await trackOnce(purchaseState({ frequency: 'monthly' }));
+        ctx.expect(subscription.length, 'a subscription purchase still fires').toBeTruthy();
+      },
+    },
 
-test('#386: the classifier reads the product, never the frequency string', async () => {
-  await bundleOnce();
+    {
+      name: '#386: the classifier reads the product, never the frequency string',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  const { buildItems } = require(BUNDLE);
+        const { buildItems } = require(BUNDLE);
 
-  assert.strictEqual(
-    buildItems(purchaseState({ frequency: 'once' }))[0].item_category,
-    'one-time',
-    'frequency=once is a one-time purchase',
-  );
-  assert.strictEqual(
-    buildItems(purchaseState({ frequency: 'monthly' }))[0].item_category,
-    'subscription',
-    'a real billing cadence is a subscription',
-  );
-  assert.strictEqual(
-    buildItems(purchaseState({ frequency: '' }))[0].item_category,
-    'one-time',
-    'and no frequency at all is not a subscription either',
-  );
-});
+        ctx.expect(buildItems(purchaseState({ frequency: 'once' }))[0].item_category, 'frequency=once is a one-time purchase').toBe('one-time');
+        ctx.expect(buildItems(purchaseState({ frequency: 'monthly' }))[0].item_category, 'a real billing cadence is a subscription').toBe('subscription');
+        ctx.expect(buildItems(purchaseState({ frequency: '' }))[0].item_category, 'and no frequency at all is not a subscription either').toBe('one-time');
+      },
+    },
 
-test('#668: a one-time purchase reports itself as one to every platform', async () => {
-  await bundleOnce();
+    {
+      name: '#668: a one-time purchase reports itself as one to every platform',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  const { buildItems } = require(BUNDLE);
+        const { buildItems } = require(BUNDLE);
 
-  // The live buy (order 5434-3892-3088) reached this file as
-  // `frequency=annually` — checkout resolved a cadence for a product that has
-  // none — so the browser purchase told GA4, Meta and TikTok that a $49.99
-  // one-time buy was a subscription. The redirect now carries what was bought
-  // outright, so even that URL is classified by the TYPE and the cadence beside
-  // it decides nothing.
-  const [stale] = buildItems(purchaseState({
-    productId: 'launch-kit',
-    productName: 'Starter Library',
-    amount: 49.99,
-    type: 'one-time',
-    frequency: 'annually',
-  }));
+        // The live buy (order 5434-3892-3088) reached this file as
+        // `frequency=annually` — checkout resolved a cadence for a product that has
+        // none — so the browser purchase told GA4, Meta and TikTok that a $49.99
+        // one-time buy was a subscription. The redirect now carries what was bought
+        // outright, so even that URL is classified by the TYPE and the cadence beside
+        // it decides nothing.
+        const [stale] = buildItems(purchaseState({
+          productId: 'launch-kit',
+          productName: 'Starter Library',
+          amount: 49.99,
+          type: 'one-time',
+          frequency: 'annually',
+        }));
 
-  assert.strictEqual(stale.item_category, 'one-time', 'the conversion is categorized by what was bought, not by the cadence beside it');
-  assert.strictEqual(stale.item_variant, 'once', 'and a stale link never reports a cadence on a one-time buy');
-  assert.strictEqual(stale.price, 49.99, 'at the price the card was charged');
+        ctx.expect(stale.item_category, 'the conversion is categorized by what was bought, not by the cadence beside it').toBe('one-time');
+        ctx.expect(stale.item_variant, 'and a stale link never reports a cadence on a one-time buy').toBe('once');
+        ctx.expect(stale.price, 'at the price the card was charged').toBe(49.99);
 
-  // And checkout now sends the word a one-time buy actually bills on, so a
-  // freshly minted link names no cadence the buyer will never be billed on.
-  const [item] = buildItems(purchaseState({
-    productId: 'launch-kit',
-    productName: 'Starter Library',
-    amount: 49.99,
-    type: 'one-time',
-    frequency: 'once',
-  }));
+        // And checkout now sends the word a one-time buy actually bills on, so a
+        // freshly minted link names no cadence the buyer will never be billed on.
+        const [item] = buildItems(purchaseState({
+          productId: 'launch-kit',
+          productName: 'Starter Library',
+          amount: 49.99,
+          type: 'one-time',
+          frequency: 'once',
+        }));
 
-  assert.strictEqual(item.item_category, 'one-time', 'still a one-time purchase');
-  assert.strictEqual(item.item_variant, 'once', 'and its variant is the one-time word, not a cadence');
-});
+        ctx.expect(item.item_category, 'still a one-time purchase').toBe('one-time');
+        ctx.expect(item.item_variant, 'and its variant is the one-time word, not a cadence').toBe('once');
+      },
+    },
 
-test('#386: the page really calls the tracker — the commented-out state is gone', () => {
-  const source = fs.readFileSync(path.join(CONFIRMATION, 'index.js'), 'utf8');
+    {
+      name: '#386: the page really calls the tracker — the commented-out state is gone',
+      run: (ctx) => {
+        const source = fs.readFileSync(path.join(CONFIRMATION, 'index.js'), 'utf8');
 
-  // Comments blanked, line structure intact: a call that only exists inside a
-  // comment is exactly the bug this pins.
-  const code = source
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/.*$/gm, (match, before) => before + ' '.repeat(match.length - before.length));
+        // Comments blanked, line structure intact: a call that only exists inside a
+        // comment is exactly the bug this pins.
+        const code = source
+          .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+          .replace(/(^|[^:])\/\/.*$/gm, (match, before) => before + ' '.repeat(match.length - before.length));
 
-  assert.match(code, /trackPurchaseIfNeeded\(state\)/, 'the confirmation page calls the purchase tracker in live code');
+        ctx.expect(code, 'the confirmation page calls the purchase tracker in live code').toMatch(/trackPurchaseIfNeeded\(state\)/);
+      },
+    },
+  ],
 });

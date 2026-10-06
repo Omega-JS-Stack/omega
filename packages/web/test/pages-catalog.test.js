@@ -9,11 +9,10 @@
  * page-only: there is no site-wide catalog default, and `search` in
  * omega.json5 means the provider section and nothing else.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -44,67 +43,79 @@ const PAGE = (permalink, title, extra = []) => [
   '<section><h2>Body</h2></section>',
 ];
 
-test('#858: `catalog.include: false` drops the page from pages.json, and only from there', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    'listed.html': PAGE('/listed', 'Listed'),
-    'unlisted.html': PAGE('/unlisted', 'Unlisted', ['catalog:', '  include: false']),
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'pages-catalog',
+  tests: [
+    {
+      name: '#858: `catalog.include: false` drops the page from pages.json, and only from there',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          'listed.html': PAGE('/listed', 'Listed'),
+          'unlisted.html': PAGE('/unlisted', 'Unlisted', ['catalog:', '  include: false']),
+        });
 
-  try {
-    const built = await buildSite(consumerDir, bareData, {}, 'catalog-include');
-    const urls = JSON.parse(built.get('/pages.json')).map((entry) => entry.url);
+        try {
+          const built = await buildSite(consumerDir, bareData, {}, 'catalog-include');
+          const urls = JSON.parse(built.get('/pages.json')).map((entry) => entry.url);
 
-    assert.ok(urls.includes(`${bareData.url}/listed`), 'an ordinary page is a catalog entry');
-    assert.ok(!urls.includes(`${bareData.url}/unlisted`), 'catalog.include: false takes it out');
+          ctx.expect(urls.includes(`${bareData.url}/listed`), 'an ordinary page is a catalog entry').toBeTruthy();
+          ctx.expect(!urls.includes(`${bareData.url}/unlisted`), 'catalog.include: false takes it out').toBeTruthy();
 
-    // It is a SEARCH-BOX opt-out, never an index posture: the page still ships
-    // indexable and still sits in the sitemap.
-    assert.ok(built.get('/unlisted').includes('<meta name="robots" content="index'), 'still indexable');
-    assert.ok(built.get('/sitemap.xml').includes(`<loc>${bareData.url}/unlisted</loc>`), 'still in the sitemap');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('#858: `catalog.category` sets the entry\'s category', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    'guide.html': PAGE('/guide', 'Guide', ['catalog:', '  category: "Docs"']),
-  });
-
-  try {
-    const built = await buildSite(consumerDir, bareData, {}, 'catalog-category');
-    const entry = JSON.parse(built.get('/pages.json')).find((item) => item.url === `${bareData.url}/guide`);
-
-    assert.ok(entry, 'the page is a catalog entry');
-    assert.equal(entry.category, 'Docs');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-// No dual-read (#858): the old spelling is not quietly honoured. `search` is
-// not on the frontmatter allow-list, and it IS a config section, so a page
-// still writing it FAILS the build the way any bare config section does.
-test('#858: a page still writing the old `search:` keys fails the frontmatter guard', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    'legacy.html': PAGE('/legacy', 'Legacy', ['search:', '  include: false']),
-  });
-
-  try {
-    await assert.rejects(
-      () => buildSite(consumerDir, bareData, {}, 'catalog-legacy'),
-      (error) => {
-        // Eleventy wraps a preprocessor throw, so the engine's message is down
-        // the originalError/cause chain.
-        const parts = [];
-        for (let node = error; node; node = node.originalError || node.cause) parts.push(node.message);
-        const message = parts.join(' | ');
-        assert.match(message, /legacy\.html/, 'the error names the file');
-        assert.match(message, /`search`/, 'the error names the retired key');
-        return true;
+          // It is a SEARCH-BOX opt-out, never an index posture: the page still ships
+          // indexable and still sits in the sitemap.
+          ctx.expect(built.get('/unlisted').includes('<meta name="robots" content="index'), 'still indexable').toBeTruthy();
+          ctx.expect(built.get('/sitemap.xml').includes(`<loc>${bareData.url}/unlisted</loc>`), 'still in the sitemap').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
       },
-    );
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+    },
+
+    {
+      name: '#858: `catalog.category` sets the entry\'s category',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          'guide.html': PAGE('/guide', 'Guide', ['catalog:', '  category: "Docs"']),
+        });
+
+        try {
+          const built = await buildSite(consumerDir, bareData, {}, 'catalog-category');
+          const entry = JSON.parse(built.get('/pages.json')).find((item) => item.url === `${bareData.url}/guide`);
+
+          ctx.expect(entry, 'the page is a catalog entry').toBeTruthy();
+          ctx.expect(entry.category).toBe('Docs');
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // No dual-read (#858): the old spelling is not quietly honoured. `search` is
+    // not on the frontmatter allow-list, and it IS a config section, so a page
+    // still writing it FAILS the build the way any bare config section does.
+    {
+      name: '#858: a page still writing the old `search:` keys fails the frontmatter guard',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          'legacy.html': PAGE('/legacy', 'Legacy', ['search:', '  include: false']),
+        });
+
+        try {
+          await ctx.expect((() => buildSite(consumerDir, bareData, {}, 'catalog-legacy'))()).rejects.toThrow((error) => {
+              // Eleventy wraps a preprocessor throw, so the engine's message is down
+              // the originalError/cause chain.
+              const parts = [];
+              for (let node = error; node; node = node.originalError || node.cause) parts.push(node.message);
+              const message = parts.join(' | ');
+              ctx.expect(message, 'the error names the file').toMatch(/legacy\.html/);
+              ctx.expect(message, 'the error names the retired key').toMatch(/`search`/);
+              return true;
+            });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

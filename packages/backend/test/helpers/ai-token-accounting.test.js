@@ -47,42 +47,42 @@ module.exports = defineCases({
 
     {
       name: 'build-tokens-computes-counts-and-prices-for-one-call',
-      async run({ assert }) {
+      async run({ expect }) {
         const tokens = buildTokens(1000, 500, { input: 2, output: 10 });
 
-        assert.equal(tokens.input.count, 1000, 'input count');
-        assert.equal(tokens.output.count, 500, 'output count');
-        assert.equal(tokens.total.count, 1500, 'total count');
-        assert.equal(tokens.input.price, 0.002, 'input price per 1M');
-        assert.equal(tokens.output.price, 0.005, 'output price per 1M');
-        assert.equal(tokens.total.price, 0.007, 'total price');
+        expect(tokens.input.count, 'input count').toBe(1000);
+        expect(tokens.output.count, 'output count').toBe(500);
+        expect(tokens.total.count, 'total count').toBe(1500);
+        expect(tokens.input.price, 'input price per 1M').toBe(0.002);
+        expect(tokens.output.price, 'output price per 1M').toBe(0.005);
+        expect(tokens.total.price, 'total price').toBe(0.007);
       },
     },
 
     {
       name: 'build-tokens-treats-missing-usage-as-zero',
-      async run({ assert }) {
+      async run({ expect }) {
         const tokens = buildTokens(undefined, undefined, { input: 2, output: 10 });
 
-        assert.deepEqual(tokens, emptyTokens(), 'missing usage → zeroed report');
+        expect(tokens, 'missing usage → zeroed report').toEqual(emptyTokens());
       },
     },
 
     {
       name: 'add-tokens-accumulates-calls-into-a-running-counter',
-      async run({ assert }) {
+      async run({ expect }) {
         const running = emptyTokens();
         const modelConfig = { input: 10, output: 100 };
 
         addTokens(running, buildTokens(100000, 50000, modelConfig));
         addTokens(running, buildTokens(300000, 150000, modelConfig));
 
-        assert.equal(running.input.count, 400000, 'input counts summed');
-        assert.equal(running.output.count, 200000, 'output counts summed');
-        assert.equal(running.total.count, 600000, 'total count summed');
-        assert.equal(running.input.price, 4, 'input prices summed');
-        assert.equal(running.output.price, 20, 'output prices summed');
-        assert.equal(running.total.price, 24, 'total price summed');
+        expect(running.input.count, 'input counts summed').toBe(400000);
+        expect(running.output.count, 'output counts summed').toBe(200000);
+        expect(running.total.count, 'total count summed').toBe(600000);
+        expect(running.input.price, 'input prices summed').toBe(4);
+        expect(running.output.price, 'output prices summed').toBe(20);
+        expect(running.total.price, 'total price summed').toBe(24);
       },
     },
 
@@ -90,29 +90,25 @@ module.exports = defineCases({
 
     {
       name: 'sequential-calls-each-report-only-their-own-usage',
-      async run({ assert }) {
+      async run({ expect }) {
         const ai = makeAI();
 
         const first = await ai.request(SHORT_CALL);
         const second = await ai.request(SHORT_CALL);
 
-        assert.deepEqual(second.tokens, first.tokens, 'identical calls report identical usage');
-        assert.equal(
-          ai.tokens.total.count,
-          first.tokens.total.count + second.tokens.total.count,
-          'instance counter is the sum of both calls',
-        );
+        expect(second.tokens, 'identical calls report identical usage').toEqual(first.tokens);
+        expect(ai.tokens.total.count, 'instance counter is the sum of both calls').toBe(first.tokens.total.count + second.tokens.total.count);
       },
     },
 
     {
       name: 'parallel-calls-report-their-own-usage-not-the-running-total',
-      async run({ assert }) {
+      async run({ expect }) {
         // Reference: what each call reports with nothing else in flight
         const shortAlone = (await makeAI().request(SHORT_CALL)).tokens;
         const longAlone = (await makeAI().request(LONG_CALL)).tokens;
 
-        assert.equal(longAlone.input.count > shortAlone.input.count, true, 'the two calls have distinct usage');
+        expect(longAlone.input.count > shortAlone.input.count, 'the two calls have distinct usage').toBe(true);
 
         // Same AI instance, both in flight, resolving out of order (the long
         // call is delayed, so the short call finishes first)
@@ -122,20 +118,16 @@ module.exports = defineCases({
           ai.request(SHORT_CALL),
         ]);
 
-        assert.deepEqual(short.tokens, shortAlone, 'short caller reads its own response usage');
-        assert.deepEqual(long.tokens, longAlone, 'long caller reads its own response usage');
-        assert.notEqual(short.tokens, long.tokens, 'callers do not share one tokens object');
-        assert.equal(
-          ai.tokens.total.count,
-          shortAlone.total.count + longAlone.total.count,
-          'instance counter still totals every call',
-        );
+        expect(short.tokens, 'short caller reads its own response usage').toEqual(shortAlone);
+        expect(long.tokens, 'long caller reads its own response usage').toEqual(longAlone);
+        expect(short.tokens, 'callers do not share one tokens object').not.toBe(long.tokens);
+        expect(ai.tokens.total.count, 'instance counter still totals every call').toBe(shortAlone.total.count + longAlone.total.count);
       },
     },
 
     {
       name: 'parallel-calls-do-not-mutate-an-earlier-callers-report',
-      async run({ assert }) {
+      async run({ expect }) {
         const ai = makeAI();
 
         const first = await ai.request(SHORT_CALL);
@@ -143,7 +135,7 @@ module.exports = defineCases({
 
         await ai.request(LONG_CALL);
 
-        assert.deepEqual(first.tokens, snapshot, 'a later call cannot change an earlier report');
+        expect(first.tokens, 'a later call cannot change an earlier report').toEqual(snapshot);
       },
     },
   ],

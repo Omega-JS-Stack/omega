@@ -19,8 +19,7 @@
  * card ids and the form markup the base theme's connection-card include
  * renders.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -278,26 +277,38 @@ async function bootConnections() {
   };
 }
 
-test('#797: the Connect button stays disabled while the browser is leaving for the provider', async () => {
-  const { $form, $connect, location, submit } = await bootConnections();
+module.exports = defineCases({
+  type: 'group',
+  description: 'connections-connect-state',
+  tests: [
+    {
+      name: '#797: the Connect button stays disabled while the browser is leaving for the provider',
+      run: async (ctx) => {
+        const { $form, $connect, location, submit } = await bootConnections();
 
-  assert.strictEqual($form.getAttribute('data-form-state'), 'ready', 'the card starts with a clickable Connect');
+        ctx.expect($form.getAttribute('data-form-state'), 'the card starts with a clickable Connect').toBe('ready');
 
-  await submit();
+        await submit();
 
-  assert.strictEqual(location.href, AUTHORIZE_URL, 'the click sent the visitor to the provider');
-  assert.strictEqual($form.getAttribute('data-form-state'), 'submitting', 'and the form is still submitting, because the page is on its way out');
-  assert.strictEqual($connect.disabled, true, 'so the button cannot be clicked a second time');
-  assert.ok($connect.innerHTML.includes('Connecting...'), `and it still says what is happening: ${$connect.innerHTML}`);
-});
+        ctx.expect(location.href, 'the click sent the visitor to the provider').toBe(AUTHORIZE_URL);
+        ctx.expect($form.getAttribute('data-form-state'), 'and the form is still submitting, because the page is on its way out').toBe('submitting');
+        ctx.expect($connect.disabled, 'so the button cannot be clicked a second time').toBe(true);
+        ctx.expect($connect.innerHTML.includes('Connecting...'), `and it still says what is happening: ${$connect.innerHTML}`).toBeTruthy();
+      },
+    },
 
-test('#797: the back button lands on a usable form', async () => {
-  const { $form, $connect, submit, restore } = await bootConnections();
+    {
+      name: '#797: the back button lands on a usable form',
+      run: async (ctx) => {
+        const { $form, $connect, submit, restore } = await bootConnections();
 
-  await submit();
-  await restore();
+        await submit();
+        await restore();
 
-  assert.strictEqual($form.getAttribute('data-form-state'), 'ready', 'a page restored from the back-forward cache resets the form FormManager left submitting');
-  assert.strictEqual($connect.disabled, false, 'the button is clickable again');
-  assert.ok($connect.innerHTML.includes('>Connect<'), `and it says Connect again: ${$connect.innerHTML}`);
+        ctx.expect($form.getAttribute('data-form-state'), 'a page restored from the back-forward cache resets the form FormManager left submitting').toBe('ready');
+        ctx.expect($connect.disabled, 'the button is clickable again').toBe(false);
+        ctx.expect($connect.innerHTML.includes('>Connect<'), `and it says Connect again: ${$connect.innerHTML}`).toBeTruthy();
+      },
+    },
+  ],
 });

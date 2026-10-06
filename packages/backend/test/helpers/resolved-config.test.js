@@ -50,10 +50,10 @@ module.exports = defineCases({
       name: 'the-source-repo-derives-from-the-one-repo-block',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const config = composeBrandConfig({});
 
-        assert.deepEqual(resolvedConfigValues(config).github, {
+        expect(resolvedConfigValues(config).github).toEqual({
           owner: 'Acme-Org',
           name: 'acme-omega',
           slug: 'Acme-Org/acme-omega',
@@ -65,10 +65,10 @@ module.exports = defineCases({
       name: 'no-repo-block-is-null-never-half-an-address',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // #883: a brand that declares no owner has no content repo, and the CMS
         // routes answer "GitHub repo not configured" off exactly this value.
-        assert.equal(resolvedConfigValues(composeBrandConfig({}, null)).github, null);
+        expect(resolvedConfigValues(composeBrandConfig({}, null)).github).toBe(null);
       },
     },
 
@@ -76,14 +76,13 @@ module.exports = defineCases({
       name: 'the-exposed-value-is-config-packages-own-derivation',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The whole point of #290: ONE implementation, in @omega.js/config. If
         // this ever diverges, a second copy of the rule has grown here.
         for (const repo of [undefined, { provider: 'github', owner: 'Other-Org' }]) {
           const config = composeBrandConfig({}, repo);
 
-          assert.deepEqual(resolvedConfigValues(config).github, sourceRepo(config),
-            `resolved.github must equal @omega.js/config's sourceRepo() (repo: ${JSON.stringify(repo)})`);
+          expect(resolvedConfigValues(config).github, `resolved.github must equal @omega.js/config's sourceRepo() (repo: ${JSON.stringify(repo)})`).toEqual(sourceRepo(config));
         }
       },
     },
@@ -92,10 +91,10 @@ module.exports = defineCases({
       name: 'booted-manager-publishes-the-group',
       auth: 'none',
 
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The surface consumer code reads: `omega.config.resolved.github.slug`
         // on the config object every route/hook/cron already receives.
-        assert.deepEqual(omega.config.resolved.github, sourceRepo(omega.config), 'the booted value must be the config package derivation');
+        expect(omega.config.resolved.github, 'the booted value must be the config package derivation').toEqual(sourceRepo(omega.config));
       },
     },
   ],

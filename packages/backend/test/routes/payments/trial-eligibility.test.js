@@ -12,27 +12,27 @@ module.exports = defineCases({
   tests: [
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/payments/trial-eligibility');
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'eligible-when-no-orders',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Basic user with no subscription history should be eligible
         const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
-        assert.isSuccess(response, 'Should succeed for authenticated user');
-        assert.equal(response.data.eligible, true, 'Should be eligible with no order history');
+        expect(response, 'Should succeed for authenticated user').toBeSuccess();
+        expect(response.data.eligible, 'Should be eligible with no order history').toBe(true);
       },
     },
 
     {
       name: 'ineligible-when-has-subscription-history',
-      async run({ http, assert, accounts, firestore }) {
+      async run({ http, expect, accounts, firestore }) {
         const uid = accounts['basic'].uid;
         const orderDocPath = `payments-orders/_test-trial-eligibility-${uid}`;
 
@@ -42,8 +42,8 @@ module.exports = defineCases({
         try {
           const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
-          assert.isSuccess(response, 'Should succeed for authenticated user');
-          assert.equal(response.data.eligible, false, 'Should be ineligible with subscription history');
+          expect(response, 'Should succeed for authenticated user').toBeSuccess();
+          expect(response.data.eligible, 'Should be ineligible with subscription history').toBe(false);
         } finally {
           await firestore.delete(orderDocPath);
         }
@@ -52,7 +52,7 @@ module.exports = defineCases({
 
     {
       name: 'eligible-when-only-non-subscription-orders',
-      async run({ http, assert, accounts, firestore }) {
+      async run({ http, expect, accounts, firestore }) {
         const uid = accounts['basic'].uid;
         const orderDocPath = `payments-orders/_test-trial-eligibility-onetime-${uid}`;
 
@@ -62,8 +62,8 @@ module.exports = defineCases({
         try {
           const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
-          assert.isSuccess(response, 'Should succeed for authenticated user');
-          assert.equal(response.data.eligible, true, 'Should be eligible — only non-subscription orders');
+          expect(response, 'Should succeed for authenticated user').toBeSuccess();
+          expect(response.data.eligible, 'Should be eligible — only non-subscription orders').toBe(true);
         } finally {
           await firestore.delete(orderDocPath);
         }

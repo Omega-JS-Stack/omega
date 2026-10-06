@@ -6,11 +6,10 @@
  * engine's (template-kit's markdownify filter) — so the same prose is the same
  * punctuation wherever it renders.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -41,33 +40,45 @@ function makeConsumer() {
   return { tmp, consumerDir };
 }
 
-test('#547: a .md body renders straight punctuation as smart (Kramdown parity)', async () => {
-  const { tmp, consumerDir } = makeConsumer();
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'typographer-md');
-    const html = pages.get('/prose');
-    assert.ok(html, 'the prose page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'markdown-typographer',
+  tests: [
+    {
+      name: '#547: a .md body renders straight punctuation as smart (Kramdown parity)',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer();
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'typographer-md');
+          const html = pages.get('/prose');
+          ctx.expect(html, 'the prose page built').toBeTruthy();
 
-    assert.ok(html.includes('It’s the brand’s'), 'apostrophes curl');
-    assert.ok(html.includes('“flagship”'), 'double quotes curl');
-    assert.ok(html.includes('plan – the one'), '-- becomes an en dash');
-    assert.ok(html.includes('asks about…'), '... becomes an ellipsis');
-    assert.ok(!html.includes("It's the brand's"), 'no straight apostrophes survive in the body');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+          ctx.expect(html.includes('It’s the brand’s'), 'apostrophes curl').toBeTruthy();
+          ctx.expect(html.includes('“flagship”'), 'double quotes curl').toBeTruthy();
+          ctx.expect(html.includes('plan – the one'), '-- becomes an en dash').toBeTruthy();
+          ctx.expect(html.includes('asks about…'), '... becomes an ellipsis').toBeTruthy();
+          ctx.expect(!html.includes("It's the brand's"), 'no straight apostrophes survive in the body').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('#547: the markdownify filter smartens the same way (one markdown contract)', async () => {
-  const { tmp, consumerDir } = makeConsumer();
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'typographer-filter');
-    const html = pages.get('/filtered');
-    assert.ok(html, 'the filtered page built');
+    {
+      name: '#547: the markdownify filter smartens the same way (one markdown contract)',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer();
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'typographer-filter');
+          const html = pages.get('/filtered');
+          ctx.expect(html, 'the filtered page built').toBeTruthy();
 
-    assert.ok(html.includes('It’s here'), 'the engine markdown instance curls apostrophes');
-    assert.ok(html.includes('He said “hi”'), 'the engine markdown instance curls quotes');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+          ctx.expect(html.includes('It’s here'), 'the engine markdown instance curls apostrophes').toBeTruthy();
+          ctx.expect(html.includes('He said “hi”'), 'the engine markdown instance curls quotes').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

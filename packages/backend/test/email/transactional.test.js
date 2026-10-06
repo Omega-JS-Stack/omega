@@ -19,14 +19,14 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Empty To',
           to: [],
           copy: false,
         });
 
-        assert.isError(response, 400, 'Empty to array should return 400');
+        expect(response, 'Empty to array should return 400').toBeError(400);
       },
     },
 
@@ -35,14 +35,14 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Bad Object',
           to: [{ name: 'No Email' }],
           copy: false,
         });
 
-        assert.isError(response, 400, 'Object without email should return 400');
+        expect(response, 'Object without email should return 400').toBeError(400);
       },
     },
 
@@ -51,7 +51,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Default Template',
           to: [{ email: `_test-receiver@${config.domain}` }],
@@ -66,9 +66,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should succeed with default template');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.ok(response.data.options.content?.[0]?.value?.includes('<html'), 'Should have rendered HTML content (MJML pipeline)');
+        expect(response, 'Should succeed with default template').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.content?.[0]?.value?.includes('<html'), 'Should have rendered HTML content (MJML pipeline)').toBeTruthy();
       },
     },
 
@@ -77,14 +77,14 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Bad UID',
           to: 'nonexistent_uid_12345',
           copy: false,
         });
 
-        assert.isError(response, 400, 'Nonexistent UID should return 400');
+        expect(response, 'Nonexistent UID should return 400').toBeError(400);
       },
     },
 
@@ -95,7 +95,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,
@@ -109,8 +109,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should use subject from data.email.subject');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should use subject from data.email.subject').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -121,7 +121,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - String Email',
           to: `_test-receiver@${config.domain}`,
@@ -136,8 +136,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email to string address');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email to string address').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -146,7 +146,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - UID Recipient',
           to: accounts.admin.uid,
@@ -161,8 +161,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email to UID');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email to UID').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -171,7 +171,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, accounts, config }) {
+      async run({ http, expect, accounts, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Mixed Recipients',
           to: [
@@ -190,8 +190,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email to mixed recipients');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email to mixed recipients').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -200,7 +200,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Object Recipient',
           to: { email: `_test-receiver@${config.domain}`, name: 'Named Recipient' },
@@ -215,8 +215,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email to object recipient');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email to object recipient').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -225,7 +225,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - CC/BCC',
           to: `_test-receiver@${config.domain}`,
@@ -242,8 +242,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with cc and bcc');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email with cc and bcc').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -254,7 +254,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const email = `_test-dedup@${config.domain}`;
 
         const response = await http.post('omega/admin/email', {
@@ -271,9 +271,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send despite duplicate to');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.equal(response.data.options.to.length, 1, 'Duplicate should be removed from to');
+        expect(response, 'Should send despite duplicate to').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.to.length, 'Duplicate should be removed from to').toBe(1);
       },
     },
 
@@ -282,7 +282,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const email = `_test-dedup-cc@${config.domain}`;
 
         const response = await http.post('omega/admin/email', {
@@ -300,9 +300,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send despite duplicate in cc');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.equal(response.data.options.cc.length, 0, 'Email in to should be removed from cc');
+        expect(response, 'Should send despite duplicate in cc').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.cc.length, 'Email in to should be removed from cc').toBe(0);
       },
     },
 
@@ -311,7 +311,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Case Dedup',
           to: [`_TEST-DEDUP@${config.domain}`, `_test-dedup@${config.domain}`],
@@ -326,9 +326,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send despite case-different duplicates');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.equal(response.data.options.to.length, 1, 'Case-insensitive duplicate should be removed');
+        expect(response, 'Should send despite case-different duplicates').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.to.length, 'Case-insensitive duplicate should be removed').toBe(1);
       },
     },
 
@@ -339,7 +339,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - No Copy',
           to: `_test-receiver@${config.domain}`,
@@ -354,10 +354,10 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email without carbon copies');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.equal(response.data.options.cc.length, 0, 'cc should be empty with copy:false');
-        assert.equal(response.data.options.bcc.length, 0, 'bcc should be empty with copy:false');
+        expect(response, 'Should send email without carbon copies').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.cc.length, 'cc should be empty with copy:false').toBe(0);
+        expect(response.data.options.bcc.length, 'bcc should be empty with copy:false').toBe(0);
       },
     },
 
@@ -366,7 +366,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - HTML Override',
           to: `_test-receiver@${config.domain}`,
@@ -374,9 +374,9 @@ module.exports = defineCases({
           copy: false,
         });
 
-        assert.isSuccess(response, 'Should send email with HTML override');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.ok(response.data.options.content?.[0]?.value?.includes('raw HTML content'), 'HTML override should be in content');
+        expect(response, 'Should send email with HTML override').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.content?.[0]?.value?.includes('raw HTML content'), 'HTML override should be in content').toBeTruthy();
       },
     },
 
@@ -385,7 +385,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - SVG to PNG',
           to: `_test-receiver@${config.domain}`,
@@ -400,12 +400,12 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send email').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
 
         // The rendered HTML should not contain any SVG image URLs
         const html = response.data.options.content?.[0]?.value || '';
-        assert.ok(!html.includes('-x.svg'), 'Rendered HTML should not contain SVG image URLs (sanitized to PNG)');
+        expect(!html.includes('-x.svg'), 'Rendered HTML should not contain SVG image URLs (sanitized to PNG)').toBeTruthy();
       },
     },
 
@@ -416,7 +416,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Sender Orders',
           to: `_test-receiver@${config.domain}`,
@@ -432,12 +432,12 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with orders sender');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.ok(response.data.options.from.email.startsWith('orders@'), 'From email should start with orders@');
-        assert.ok(response.data.options.from.name.includes('Orders'), 'From name should include Orders');
-        assert.ok(response.data.options.asm, 'Should have ASM group');
-        assert.ok(response.data.options.replyTo.startsWith('orders@'), 'replyTo should match from address');
+        expect(response, 'Should send email with orders sender').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.from.email.startsWith('orders@'), 'From email should start with orders@').toBeTruthy();
+        expect(response.data.options.from.name.includes('Orders'), 'From name should include Orders').toBeTruthy();
+        expect(response.data.options.asm, 'Should have ASM group').toBeTruthy();
+        expect(response.data.options.replyTo.startsWith('orders@'), 'replyTo should match from address').toBeTruthy();
       },
     },
 
@@ -446,7 +446,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Sender Security',
           to: `_test-receiver@${config.domain}`,
@@ -462,11 +462,11 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with security sender');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.ok(response.data.options.from.email.startsWith('security@'), 'From email should start with security@');
-        assert.ok(response.data.options.asm, 'Should have ASM group');
-        assert.ok(response.data.options.headers['List-Unsubscribe'], 'Should have List-Unsubscribe header');
+        expect(response, 'Should send email with security sender').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.from.email.startsWith('security@'), 'From email should start with security@').toBeTruthy();
+        expect(response.data.options.asm, 'Should have ASM group').toBeTruthy();
+        expect(response.data.options.headers['List-Unsubscribe'], 'Should have List-Unsubscribe header').toBeTruthy();
       },
     },
 
@@ -475,7 +475,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const customFrom = { email: `custom@${config.domain}`, name: 'Custom Sender' };
 
         const response = await http.post('omega/admin/email', {
@@ -494,10 +494,10 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with explicit from');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.equal(response.data.options.from.email, customFrom.email, 'Explicit from should override sender');
-        assert.equal(response.data.options.from.name, customFrom.name, 'Explicit from name should override sender');
+        expect(response, 'Should send email with explicit from').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.from.email, 'Explicit from should override sender').toBe(customFrom.email);
+        expect(response.data.options.from.name, 'Explicit from name should override sender').toBe(customFrom.name);
       },
     },
 
@@ -506,7 +506,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Unknown Sender',
           to: `_test-receiver@${config.domain}`,
@@ -522,10 +522,10 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with default from');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
-        assert.ok(response.data.options.from.email, 'Should have a from email (brand default)');
-        assert.ok(response.data.options.asm, 'Should have default ASM group');
+        expect(response, 'Should send email with default from').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
+        expect(response.data.options.from.email, 'Should have a from email (brand default)').toBeTruthy();
+        expect(response.data.options.asm, 'Should have default ASM group').toBeTruthy();
       },
     },
 
@@ -534,7 +534,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         // Use a time 1 hour from now (well within the 71h limit)
         const sendAtDate = new Date(Date.now() + (60 * 60 * 1000)).toISOString();
 
@@ -553,9 +553,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send email with ISO sendAt');
-        assert.equal(response.data.status, 'sent', 'Status should be sent (within 71h)');
-        assert.isType(response.data.options.sendAt, 'number', 'sendAt should be normalized to unix timestamp');
+        expect(response, 'Should send email with ISO sendAt').toBeSuccess();
+        expect(response.data.status, 'Status should be sent (within 71h)').toBe('sent');
+        expect(response.data.options.sendAt, 'sendAt should be normalized to unix timestamp').toBeTypeOf('number');
       },
     },
   ],

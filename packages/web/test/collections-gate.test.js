@@ -24,11 +24,10 @@
  * template (one page per taxonomy term) gets no such exemption: its page 0 is
  * one arbitrary term.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { configureOmega } = require('../src/index.js');
 
@@ -107,89 +106,101 @@ const EXCLUDES = /^eleventyExcludeFromCollections:\s*true\s*$/m;
 const PAGINATES = /^pagination:/m;
 const ALIAS = /^\s+alias:/m;
 
-test('every paginated default spells eleventyExcludeFromCollections in its own frontmatter', () => {
-  // defaults/ is the WHOLE set of templates the render gate covers (the engine
-  // registers default pages and the showcase; themes ship layouts and
-  // sections, never page templates).
-  const paginated = templateFiles(DEFAULTS)
-    .map((file) => ({ rel: path.relative(DEFAULTS, file).split(path.sep).join('/'), frontmatter: frontmatterOf(fs.readFileSync(file, 'utf8')) }))
-    .filter((entry) => entry.frontmatter && PAGINATES.test(entry.frontmatter));
+module.exports = defineCases({
+  type: 'group',
+  description: 'collections-gate',
+  tests: [
+    {
+      name: 'every paginated default spells eleventyExcludeFromCollections in its own frontmatter',
+      run: (ctx) => {
+        // defaults/ is the WHOLE set of templates the render gate covers (the engine
+        // registers default pages and the showcase; themes ship layouts and
+        // sections, never page templates).
+        const paginated = templateFiles(DEFAULTS)
+          .map((file) => ({ rel: path.relative(DEFAULTS, file).split(path.sep).join('/'), frontmatter: frontmatterOf(fs.readFileSync(file, 'utf8')) }))
+          .filter((entry) => entry.frontmatter && PAGINATES.test(entry.frontmatter));
 
-  const offenders = paginated.filter((entry) => !LISTING_DEFAULTS.includes(entry.rel) && !EXCLUDES.test(entry.frontmatter));
-  assert.deepEqual(offenders.map((entry) => entry.rel), [],
-    'Eleventy reads eleventyExcludeFromCollections off RAW frontmatter when it expands pagination, '
-    + 'so the render gate\'s computed value never reaches a paginated template — every one of them must '
-    + 'carry the literal `eleventyExcludeFromCollections: true`, or its generated pages land in the '
-    + 'collections a suppressed page must stay out of');
-});
+        const offenders = paginated.filter((entry) => !LISTING_DEFAULTS.includes(entry.rel) && !EXCLUDES.test(entry.frontmatter));
+        ctx.expect(offenders.map((entry) => entry.rel), 'Eleventy reads eleventyExcludeFromCollections off RAW frontmatter when it expands pagination, '
+          + 'so the render gate\'s computed value never reaches a paginated template — every one of them must '
+          + 'carry the literal `eleventyExcludeFromCollections: true`, or its generated pages land in the '
+          + 'collections a suppressed page must stay out of').toEqual([]);
+      },
+    },
 
-test('#564: the canonical listing is the ONE exemption, and it is not an alias generator', () => {
-  const listings = LISTING_DEFAULTS.map((rel) => ({ rel, frontmatter: frontmatterOf(fs.readFileSync(path.join(DEFAULTS, rel), 'utf8')) }));
+    {
+      name: '#564: the canonical listing is the ONE exemption, and it is not an alias generator',
+      run: (ctx) => {
+        const listings = LISTING_DEFAULTS.map((rel) => ({ rel, frontmatter: frontmatterOf(fs.readFileSync(path.join(DEFAULTS, rel), 'utf8')) }));
 
-  for (const entry of listings) {
-    assert.ok(PAGINATES.test(entry.frontmatter), `${entry.rel} paginates`);
-    assert.ok(!ALIAS.test(entry.frontmatter),
-      `${entry.rel} must paginate a LISTING, not one page per term — an alias generator's page 0 is one arbitrary term, `
-      + 'and putting that in the sitemap while its siblings stay out is exactly the disagreement #564 reports');
-    assert.ok(!EXCLUDES.test(entry.frontmatter),
-      `${entry.rel} must NOT exclude itself from collections: its page 1 is the canonical listing URL, and a page `
-      + 'cannot be in sitemap.xml if it is not in the walk sitemap.xml reads (#564)');
-  }
-});
+        for (const entry of listings) {
+          ctx.expect(PAGINATES.test(entry.frontmatter), `${entry.rel} paginates`).toBeTruthy();
+          ctx.expect(!ALIAS.test(entry.frontmatter), `${entry.rel} must paginate a LISTING, not one page per term — an alias generator's page 0 is one arbitrary term, `
+            + 'and putting that in the sitemap while its siblings stay out is exactly the disagreement #564 reports').toBeTruthy();
+          ctx.expect(!EXCLUDES.test(entry.frontmatter), `${entry.rel} must NOT exclude itself from collections: its page 1 is the canonical listing URL, and a page `
+            + 'cannot be in sitemap.xml if it is not in the walk sitemap.xml reads (#564)').toBeTruthy();
+        }
+      },
+    },
 
-test('every synthesized collection page spells it too', (t) => {
-  // The dynamic pages (#207) are built as source strings, so the same
-  // invariant is a property of the GENERATOR: a listing or category page that
-  // lost the key would paginate its way into the sitemap and the page index.
-  const synthesized = templates(t, {
-    ...SITE_DATA,
-    collections: { docs: { field: 'doc.category' }, recipes: { field: 'recipe.cuisine', size: 3 } },
-  }).filter((entry) => entry.virtual.startsWith('omega-dynamic/'));
+    {
+      name: 'every synthesized collection page spells it too',
+      run: (ctx) => {
+        // The dynamic pages (#207) are built as source strings, so the same
+        // invariant is a property of the GENERATOR: a listing or category page that
+        // lost the key would paginate its way into the sitemap and the page index.
+        const synthesized = templates(ctx, {
+          ...SITE_DATA,
+          collections: { docs: { field: 'doc.category' }, recipes: { field: 'recipe.cuisine', size: 3 } },
+        }).filter((entry) => entry.virtual.startsWith('omega-dynamic/'));
 
-  assert.deepEqual(synthesized.map((entry) => entry.virtual), [
-    'omega-dynamic/docs/index.html',
-    'omega-dynamic/docs/categories.html',
-    'omega-dynamic/recipes/index.html',
-    'omega-dynamic/recipes/categories.html',
-  ], 'every declared collection generates its listing and its category pages');
+        ctx.expect(synthesized.map((entry) => entry.virtual), 'every declared collection generates its listing and its category pages').toEqual([
+          'omega-dynamic/docs/index.html',
+          'omega-dynamic/docs/categories.html',
+          'omega-dynamic/recipes/index.html',
+          'omega-dynamic/recipes/categories.html',
+        ]);
 
-  for (const entry of synthesized) {
-    const frontmatter = frontmatterOf(entry.raw);
-    assert.ok(PAGINATES.test(frontmatter), `${entry.virtual} paginates`);
+        for (const entry of synthesized) {
+          const frontmatter = frontmatterOf(entry.raw);
+          ctx.expect(PAGINATES.test(frontmatter), `${entry.virtual} paginates`).toBeTruthy();
 
-    // The listing carries the blog listing's own exemption (#564); the
-    // category generator is an alias generator and keeps the key.
-    if (entry.virtual.endsWith('/index.html')) {
-      assert.ok(!EXCLUDES.test(frontmatter),
-        `${entry.virtual} is the collection's canonical listing — excluding it from collections is what kept `
-        + '/blog and /docs out of sitemap.xml (#564)');
-      continue;
-    }
+          // The listing carries the blog listing's own exemption (#564); the
+          // category generator is an alias generator and keeps the key.
+          if (entry.virtual.endsWith('/index.html')) {
+            ctx.expect(!EXCLUDES.test(frontmatter), `${entry.virtual} is the collection's canonical listing — excluding it from collections is what kept `
+              + '/blog and /docs out of sitemap.xml (#564)').toBeTruthy();
+            continue;
+          }
 
-    assert.ok(EXCLUDES.test(frontmatter),
-      `${entry.virtual} must carry the literal \`eleventyExcludeFromCollections: true\` — Eleventy reads it off `
-      + 'RAW frontmatter when it expands pagination, so a computed value never reaches a paginated template');
-  }
-});
+          ctx.expect(EXCLUDES.test(frontmatter), `${entry.virtual} must carry the literal \`eleventyExcludeFromCollections: true\` — Eleventy reads it off `
+            + 'RAW frontmatter when it expands pagination, so a computed value never reaches a paginated template').toBeTruthy();
+        }
+      },
+    },
 
-test('an open gate passes the template\'s own eleventyExcludeFromCollections through verbatim', (t) => {
-  const gate = gates(t).get('omega-defaults/about.md');
-  assert.ok(gate, 'the about default page is registered');
+    {
+      name: 'an open gate passes the template\'s own eleventyExcludeFromCollections through verbatim',
+      run: (ctx) => {
+        const gate = gates(ctx).get('omega-defaults/about.md');
+        ctx.expect(gate, 'the about default page is registered').toBeTruthy();
 
-  assert.equal(excludeGate(gate)({ eleventyExcludeFromCollections: undefined }), undefined,
-    'a page that never sets the key must not come out of the gate holding a value');
-  assert.deepEqual(excludeGate(gate)({ eleventyExcludeFromCollections: ['posts'] }), ['posts'],
-    'Eleventy also takes a list of collections to skip — narrowing the answer to a boolean rewrites it');
-});
+        ctx.expect(excludeGate(gate)({ eleventyExcludeFromCollections: undefined }), 'a page that never sets the key must not come out of the gate holding a value').toBe(undefined);
+        ctx.expect(excludeGate(gate)({ eleventyExcludeFromCollections: ['posts'] }), 'Eleventy also takes a list of collections to skip — narrowing the answer to a boolean rewrites it').toEqual(['posts']);
+      },
+    },
 
-test('a shut gate keeps the page out of every collection', (t) => {
-  // The bare fixture's own pages/index.html claims `/` — the framework index
-  // default steps aside.
-  const gate = gates(t).get('omega-defaults/index.md');
-  assert.ok(gate, 'a suppressed default is still REGISTERED — the gate is a render-time answer');
+    {
+      name: 'a shut gate keeps the page out of every collection',
+      run: (ctx) => {
+        // The bare fixture's own pages/index.html claims `/` — the framework index
+        // default steps aside.
+        const gate = gates(ctx).get('omega-defaults/index.md');
+        ctx.expect(gate, 'a suppressed default is still REGISTERED — the gate is a render-time answer').toBeTruthy();
 
-  assert.equal(excludeGate(gate)({ eleventyExcludeFromCollections: ['posts'] }), true,
-    'a page that writes no file belongs in no collection, whatever its frontmatter asked for');
-  assert.equal(gate.eleventyComputed.permalink({ eleventyExcludeFromCollections: undefined }), false,
-    'and it writes no file');
+        ctx.expect(excludeGate(gate)({ eleventyExcludeFromCollections: ['posts'] }), 'a page that writes no file belongs in no collection, whatever its frontmatter asked for').toBe(true);
+        ctx.expect(gate.eleventyComputed.permalink({ eleventyExcludeFromCollections: undefined }), 'and it writes no file').toBe(false);
+      },
+    },
+  ],
 });

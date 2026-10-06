@@ -22,11 +22,11 @@ module.exports = defineCases({
       name: 'no-setup-entry-in-the-table',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const tokens = COMMANDS.flatMap(tokensOf);
 
-        assert.equal(tokens.includes('setup'), false, 'nothing dispatches `omega setup`');
-        assert.equal(buildHelpText().includes('setup'), false, 'nothing lists it either');
+        expect(tokens.includes('setup'), 'nothing dispatches `omega setup`').toBe(false);
+        expect(buildHelpText().includes('setup'), 'nothing lists it either').toBe(false);
       },
     },
 
@@ -34,9 +34,9 @@ module.exports = defineCases({
       name: 'no-command-claims-the-default-slot',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(COMMANDS.some((command) => command.default), false, 'setup was the only default — nothing inherits the slot');
-        assert.equal(defaultCommand(), undefined, 'defaultCommand() answers "none" instead of throwing');
+      async run({ expect }) {
+        expect(COMMANDS.some((command) => command.default), 'setup was the only default — nothing inherits the slot').toBe(false);
+        expect(defaultCommand(), 'defaultCommand() answers "none" instead of throwing').toBe(undefined);
       },
     },
 
@@ -44,7 +44,7 @@ module.exports = defineCases({
       name: 'a-bare-invocation-resolves-to-help',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const help = COMMANDS.find((command) => command.name === 'help');
         const lines = [];
         const original = console.log;
@@ -56,8 +56,8 @@ module.exports = defineCases({
           console.log = original;
         }
 
-        assert.match(lines.join('\n'), /^Usage: omega <command>/, 'the fallback prints the listing');
-        assert.equal(matchCommand(help, {}), false, 'help still only matches when it is named');
+        expect(lines.join('\n'), 'the fallback prints the listing').toMatch(/^Usage: omega <command>/);
+        expect(matchCommand(help, {}), 'help still only matches when it is named').toBe(false);
       },
     },
   ],

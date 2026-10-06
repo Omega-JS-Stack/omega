@@ -17,8 +17,7 @@
  * reproducible here at all. The assertion is the discount UI state the bindings
  * would have rendered.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -134,137 +133,169 @@ async function applyCode(code, answer, product = PRODUCT, { trialEligible = fals
   };
 }
 
-test('discount: a code the server accepts is applied, not rejected', async () => {
-  const { ui, state } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20 });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-discount',
+  tests: [
+    {
+      name: 'discount: a code the server accepts is applied, not rejected',
+      run: async (ctx) => {
+        const { ui, state } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20 });
 
-  assert.strictEqual(ui.success, true, 'a server answer of valid=true must reach the success state');
-  assert.strictEqual(ui.error, false, 'and must never render the invalid message');
-  assert.strictEqual(ui.message, 'Discount applied: 20% off', 'the percent comes off the parsed body');
-  assert.strictEqual(state.discountCode, 'SAVE20', 'the applied code is what the intent call sends');
-  assert.strictEqual(state.discountPercent, 20, 'and the percent is what the receipt rows price against');
-});
+        ctx.expect(ui.success, 'a server answer of valid=true must reach the success state').toBe(true);
+        ctx.expect(ui.error, 'and must never render the invalid message').toBe(false);
+        ctx.expect(ui.message, 'the percent comes off the parsed body').toBe('Discount applied: 20% off');
+        ctx.expect(state.discountCode, 'the applied code is what the intent call sends').toBe('SAVE20');
+        ctx.expect(state.discountPercent, 'and the percent is what the receipt rows price against').toBe(20);
+      },
+    },
 
-test('discount: the validate call asks wonderful-fetch to parse the body', async () => {
-  const { calls } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20 });
+    {
+      name: 'discount: the validate call asks wonderful-fetch to parse the body',
+      run: async (ctx) => {
+        const { calls } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20 });
 
-  assert.strictEqual(calls.length, 1, 'one validation request per apply');
-  assert.strictEqual(calls[0].url, 'https://api.test/omega/payments/discount', 'the discount route');
-  assert.deepStrictEqual(calls[0].options.query, { code: 'SAVE20' }, 'the code is normalized before it is sent');
-  assert.strictEqual(
-    calls[0].options.response,
-    'json',
-    'without this wonderful-fetch returns the raw Response and .valid is undefined forever',
-  );
-});
+        ctx.expect(calls.length, 'one validation request per apply').toBe(1);
+        ctx.expect(calls[0].url, 'the discount route').toBe('https://api.test/omega/payments/discount');
+        ctx.expect(calls[0].options.query, 'the code is normalized before it is sent').toEqual({ code: 'SAVE20' });
+        ctx.expect(calls[0].options.response, 'without this wonderful-fetch returns the raw Response and .valid is undefined forever').toBe('json');
+      },
+    },
 
-test('discount: a percent code prices the receipt against the percent', async () => {
-  // The shape that always worked, pinned beside the amount shape below: the
-  // two must stay computed the same way.
-  const { bindings } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20, duration: 'once' });
+    {
+      name: 'discount: a percent code prices the receipt against the percent',
+      run: async (ctx) => {
+        // The shape that always worked, pinned beside the amount shape below: the
+        // two must stay computed the same way.
+        const { bindings } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20, duration: 'once' });
 
-  assert.strictEqual(bindings.checkout.discount.hasDiscount, true, 'the receipt shows a discount row');
-  assert.strictEqual(bindings.checkout.discount.label, '20%', 'labelled by the percent it takes off');
-  assert.strictEqual(bindings.checkout.discount.amount, '20.00', '20% of $100');
-  assert.strictEqual(bindings.order.total, '$80.00', 'and the total is what the card will be charged');
-});
+        ctx.expect(bindings.checkout.discount.hasDiscount, 'the receipt shows a discount row').toBe(true);
+        ctx.expect(bindings.checkout.discount.label, 'labelled by the percent it takes off').toBe('20%');
+        ctx.expect(bindings.checkout.discount.amount, '20% of $100').toBe('20.00');
+        ctx.expect(bindings.order.total, 'and the total is what the card will be charged').toBe('$80.00');
+      },
+    },
 
-test('discount: an amount code is money off, not an undefined percent', async () => {
-  // The backend also issues FLAT codes — `{ amount: 10, duration: 'once' }`,
-  // no `percent` key at all (the seeded WELCOME10OFF). The client read
-  // `result.percent`, so the message said "undefined% off" and the summary
-  // reported no discount at all — while the backend went on to charge one.
-  const { ui, state, bindings } = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
+    {
+      name: 'discount: an amount code is money off, not an undefined percent',
+      run: async (ctx) => {
+        // The backend also issues FLAT codes — `{ amount: 10, duration: 'once' }`,
+        // no `percent` key at all (the seeded WELCOME10OFF). The client read
+        // `result.percent`, so the message said "undefined% off" and the summary
+        // reported no discount at all — while the backend went on to charge one.
+        const { ui, state, bindings } = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
 
-  assert.strictEqual(ui.success, true, 'a valid flat code is applied');
-  assert.strictEqual(ui.message, 'Discount applied: $10.00 off', 'and says what it takes off, in the page\'s money format');
-  assert.strictEqual(state.discountAmount, 10, 'the amount is what the receipt prices against');
-  assert.strictEqual(state.discountPercent, 0, 'there is no percent in this shape');
+        ctx.expect(ui.success, 'a valid flat code is applied').toBe(true);
+        ctx.expect(ui.message, 'and says what it takes off, in the page\'s money format').toBe('Discount applied: $10.00 off');
+        ctx.expect(state.discountAmount, 'the amount is what the receipt prices against').toBe(10);
+        ctx.expect(state.discountPercent, 'there is no percent in this shape').toBe(0);
 
-  assert.strictEqual(bindings.checkout.discount.hasDiscount, true, 'the receipt shows the discount the backend WILL charge');
-  assert.strictEqual(bindings.checkout.discount.amount, '10.00', '$10 off the first charge');
-  assert.strictEqual(bindings.checkout.discount.label, 'WELCOME10OFF', 'labelled by the code — "$10.00" beside "-$10.00" says it twice');
-  assert.strictEqual(bindings.order.total, '$90.00', '$100 less $10 due today');
-  assert.match(bindings.order.termsText, /first payment only/, 'and the first-payment-only note still rides along');
+        ctx.expect(bindings.checkout.discount.hasDiscount, 'the receipt shows the discount the backend WILL charge').toBe(true);
+        ctx.expect(bindings.checkout.discount.amount, '$10 off the first charge').toBe('10.00');
+        ctx.expect(bindings.checkout.discount.label, 'labelled by the code — "$10.00" beside "-$10.00" says it twice').toBe('WELCOME10OFF');
+        ctx.expect(bindings.order.total, '$100 less $10 due today').toBe('$90.00');
+        ctx.expect(bindings.order.termsText, 'and the first-payment-only note still rides along').toMatch(/first payment only/);
 
-  assert.ok(!JSON.stringify(bindings).includes('undefined'), 'no binding renders the word undefined');
-});
+        ctx.expect(!JSON.stringify(bindings).includes('undefined'), 'no binding renders the word undefined').toBeTruthy();
+      },
+    },
 
-test('discount: a once code discounts today and leaves the renewal at list price (#254)', async () => {
-  // The receipt used to reduce the recurring row too, so a $100 plan with a
-  // 15% code advertised a $85 renewal the backend charges $100 for. The
-  // server's own `duration` is what decides it now, in BOTH code shapes.
-  const percent = await applyCode('welcome15', { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' });
+    {
+      name: 'discount: a once code discounts today and leaves the renewal at list price (#254)',
+      run: async (ctx) => {
+        // The receipt used to reduce the recurring row too, so a $100 plan with a
+        // 15% code advertised a $85 renewal the backend charges $100 for. The
+        // server's own `duration` is what decides it now, in BOTH code shapes.
+        const percent = await applyCode('welcome15', { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' });
 
-  assert.strictEqual(percent.state.discountDuration, 'once', 'the server\'s duration reaches the state');
-  assert.strictEqual(percent.bindings.order.total, '$85.00', 'the discount comes off today');
-  assert.match(percent.bindings.order.termsText, /renew on .* for \$100\.00/, 'the terms line quotes the list-price renewal we will actually charge');
+        ctx.expect(percent.state.discountDuration, 'the server\'s duration reaches the state').toBe('once');
+        ctx.expect(percent.bindings.order.total, 'the discount comes off today').toBe('$85.00');
+        ctx.expect(percent.bindings.order.termsText, 'the terms line quotes the list-price renewal we will actually charge').toMatch(/renew on .* for \$100\.00/);
 
-  const amount = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
+        const amount = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
 
-  assert.strictEqual(amount.bindings.order.total, '$90.00', 'the flat shape comes off today the same way');
-  assert.match(amount.bindings.order.termsText, /renew on .* for \$100\.00/, 'and its terms line leaves the renewal at list price too');
-});
+        ctx.expect(amount.bindings.order.total, 'the flat shape comes off today the same way').toBe('$90.00');
+        ctx.expect(amount.bindings.order.termsText, 'and its terms line leaves the renewal at list price too').toMatch(/renew on .* for \$100\.00/);
+      },
+    },
 
-test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)', async () => {
-  // The trial terms line names the charge that lands when the trial ends, and
-  // that charge IS the first invoice — the one the `once` coupon is attached to
-  // (intent/providers/stripe.js sends `discounts: [{ coupon }]` alongside
-  // `trial_period_days`). Quoting list price there promised a bigger first
-  // charge than the card will actually see, which is the #254 mistake pointing
-  // the other way.
-  const { bindings } = await applyCode(
-    'welcome15',
-    { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' },
-    TRIAL_PRODUCT,
-    { trialEligible: true },
-  );
+    {
+      name: 'discount: a trial + a once code quotes the DISCOUNTED first charge (#254)',
+      run: async (ctx) => {
+        // The trial terms line names the charge that lands when the trial ends, and
+        // that charge IS the first invoice — the one the `once` coupon is attached to
+        // (intent/providers/stripe.js sends `discounts: [{ coupon }]` alongside
+        // `trial_period_days`). Quoting list price there promised a bigger first
+        // charge than the card will actually see, which is the #254 mistake pointing
+        // the other way.
+        const { bindings } = await applyCode(
+          'welcome15',
+          { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' },
+          TRIAL_PRODUCT,
+          { trialEligible: true },
+        );
 
-  assert.strictEqual(bindings.order.total, '$0.00', 'nothing is due today — it is a free trial');
-  assert.match(bindings.order.termsText, /charged \$85\.00/, 'the first charge after the trial carries the discount');
-  assert.match(bindings.order.termsText, /renews at \$100\.00/, 'and every renewal after it is list price');
-});
+        ctx.expect(bindings.order.total, 'nothing is due today — it is a free trial').toBe('$0.00');
+        ctx.expect(bindings.order.termsText, 'the first charge after the trial carries the discount').toMatch(/charged \$85\.00/);
+        ctx.expect(bindings.order.termsText, 'and every renewal after it is list price').toMatch(/renews at \$100\.00/);
+      },
+    },
 
-test('discount: a trial with no code quotes list price, unchanged (#254)', async () => {
-  const { bindings } = await applyCode('nope', { valid: false }, TRIAL_PRODUCT, { trialEligible: true });
+    {
+      name: 'discount: a trial with no code quotes list price, unchanged (#254)',
+      run: async (ctx) => {
+        const { bindings } = await applyCode('nope', { valid: false }, TRIAL_PRODUCT, { trialEligible: true });
 
-  assert.strictEqual(bindings.checkout.discount.hasDiscount, false, 'no discount was applied');
-  assert.match(bindings.order.termsText, /charged \$100\.00/, 'so the first charge is the list price');
-  assert.ok(!/renews at/.test(bindings.order.termsText), 'and there is no second price to explain');
-});
+        ctx.expect(bindings.checkout.discount.hasDiscount, 'no discount was applied').toBe(false);
+        ctx.expect(bindings.order.termsText, 'so the first charge is the list price').toMatch(/charged \$100\.00/);
+        ctx.expect(!/renews at/.test(bindings.order.termsText), 'and there is no second price to explain').toBeTruthy();
+      },
+    },
 
-test('trial: the length is the catalog\'s number, never a framework constant (#273)', async () => {
-  // A trial is CATALOG data, so every sentence that names its length reads the
-  // product — the message AND the renewal date the terms line computes. Pinned
-  // with a 3-day plan precisely because 3 is not the constant the fallbacks
-  // used to reach for.
-  const short = { ...PRODUCT, trial: { days: 3 } };
-  const { bindings } = await applyCode('nope', { valid: false }, short, { trialEligible: true });
+    {
+      name: 'trial: the length is the catalog\'s number, never a framework constant (#273)',
+      run: async (ctx) => {
+        // A trial is CATALOG data, so every sentence that names its length reads the
+        // product — the message AND the renewal date the terms line computes. Pinned
+        // with a 3-day plan precisely because 3 is not the constant the fallbacks
+        // used to reach for.
+        const short = { ...PRODUCT, trial: { days: 3 } };
+        const { bindings } = await applyCode('nope', { valid: false }, short, { trialEligible: true });
 
-  assert.strictEqual(bindings.order.trial.message, 'Start your 3-day free trial today!', 'the message states the real length');
+        ctx.expect(bindings.order.trial.message, 'the message states the real length').toBe('Start your 3-day free trial today!');
 
-  const renewal = new Date();
-  renewal.setDate(renewal.getDate() + 3);
-  const formatted = renewal.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  assert.ok(bindings.order.termsText.includes(formatted), 'and the first charge lands 3 days out, not 7');
-});
+        const renewal = new Date();
+        renewal.setDate(renewal.getDate() + 3);
+        const formatted = renewal.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        ctx.expect(bindings.order.termsText.includes(formatted), 'and the first charge lands 3 days out, not 7').toBeTruthy();
+      },
+    },
 
-test('discount: a code the server rejects still lands the error message', async () => {
-  const { ui, state, bindings } = await applyCode('nope', { valid: false });
+    {
+      name: 'discount: a code the server rejects still lands the error message',
+      run: async (ctx) => {
+        const { ui, state, bindings } = await applyCode('nope', { valid: false });
 
-  assert.strictEqual(ui.error, true, 'an invalid code is still an error');
-  assert.strictEqual(ui.success, false, 'and never a success');
-  assert.strictEqual(ui.message, 'Invalid discount code', 'with the message the bindings show');
-  assert.strictEqual(state.discountCode, null, 'nothing is carried into the intent call');
-  assert.strictEqual(state.discountPercent, 0, 'and the receipt keeps full price');
-  assert.strictEqual(state.discountAmount, 0, 'in either shape');
-  assert.strictEqual(bindings.checkout.discount.hasDiscount, false, 'so the receipt shows no discount row');
-  assert.strictEqual(bindings.order.total, '$100.00', 'and charges full price');
-});
+        ctx.expect(ui.error, 'an invalid code is still an error').toBe(true);
+        ctx.expect(ui.success, 'and never a success').toBe(false);
+        ctx.expect(ui.message, 'with the message the bindings show').toBe('Invalid discount code');
+        ctx.expect(state.discountCode, 'nothing is carried into the intent call').toBe(null);
+        ctx.expect(state.discountPercent, 'and the receipt keeps full price').toBe(0);
+        ctx.expect(state.discountAmount, 'in either shape').toBe(0);
+        ctx.expect(bindings.checkout.discount.hasDiscount, 'so the receipt shows no discount row').toBe(false);
+        ctx.expect(bindings.order.total, 'and charges full price').toBe('$100.00');
+      },
+    },
 
-test('discount: an empty code asks for one instead of calling the server', async () => {
-  const { ui, calls } = await applyCode('   ', { valid: true, code: 'X', percent: 5 });
+    {
+      name: 'discount: an empty code asks for one instead of calling the server',
+      run: async (ctx) => {
+        const { ui, calls } = await applyCode('   ', { valid: true, code: 'X', percent: 5 });
 
-  assert.strictEqual(calls.length, 0, 'an empty field is answered locally');
-  assert.strictEqual(ui.error, true, 'and reads as an error');
-  assert.strictEqual(ui.message, 'Please enter a discount code', 'with the prompt, not the rejection');
+        ctx.expect(calls.length, 'an empty field is answered locally').toBe(0);
+        ctx.expect(ui.error, 'and reads as an error').toBe(true);
+        ctx.expect(ui.message, 'with the prompt, not the rejection').toBe('Please enter a discount code');
+      },
+    },
+  ],
 });

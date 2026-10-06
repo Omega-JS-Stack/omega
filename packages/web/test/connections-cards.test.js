@@ -29,8 +29,7 @@
  * card ids come from the rendered Liquid, so the two halves meet where the page
  * makes them meet.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -811,170 +810,205 @@ function themeFiles(dir) {
   });
 }
 
-test('#793: the framework ships a card for every packaged provider, in the config defaults', () => {
-  const expected = ['google', 'discord', 'spotify', 'twitch', 'kick'];
+module.exports = defineCases({
+  type: 'group',
+  description: 'connections-cards',
+  tests: [
+    {
+      name: '#793: the framework ships a card for every packaged provider, in the config defaults',
+      run: (ctx) => {
+        const expected = ['google', 'discord', 'spotify', 'twitch', 'kick'];
 
-  assert.deepEqual(Object.keys(PACKAGED).sort(), [...expected].sort(), 'the five providers @omega.js/backend ships a module for');
+        ctx.expect(Object.keys(PACKAGED).sort(), 'the five providers @omega.js/backend ships a module for').toEqual([...expected].sort());
 
-  for (const provider of expected) {
-    const entry = PACKAGED[provider];
+        for (const provider of expected) {
+          const entry = PACKAGED[provider];
 
-    assert.ok(entry.name, `${provider} has the name its card says`);
-    assert.ok(entry.description, `${provider} has the line under it`);
-    assert.ok(!entry.logo.includes('/') && !entry.logo.includes(':'), `${provider}'s logo is a mark NAME, never a CDN url: ${entry.logo}`);
-    assert.ok(fs.existsSync(path.join(MARKS_DIR, `${entry.logo}.svg`)), `and the mark SHIPS in this package: ${entry.logo}.svg`);
-  }
-});
-
-test('#792: a brand that only ENABLES a packaged provider gets a drawn card', async () => {
-  const html = await renderConnections({ google: { ...PACKAGED.google, enabled: true } });
-
-  assert.deepEqual(cardIds(html), ['google'], 'the config is the whole list');
-  assert.ok(html.includes('>Google<'), "the name comes from the framework's defaults");
-  assert.ok(html.includes('<svg'), 'and the logo is the packaged mark, inlined by omega_logo');
-  assert.ok(!html.includes('<img'), 'never an <img> for a mark name');
-  assert.ok(!html.includes('cdn.itwcreativeworks.com'), 'and nothing points at the CDN files that 404');
-  assert.ok(html.includes(markSignature('google')), "the mark drawn is the one the logo names");
-});
-
-test("#792: a brand's own logo wins over the packaged one, and a URL still renders an img", async () => {
-  const overridden = await renderConnections({ google: { ...PACKAGED.google, enabled: true, logo: 'github' } });
-
-  assert.ok(overridden.includes(markSignature('github')), "the brand's mark is what is drawn");
-  assert.ok(!overridden.includes(markSignature('google')), 'and the packaged one is not');
-
-  const url = await renderConnections({ google: { ...PACKAGED.google, enabled: true, logo: 'https://cdn.test/google.svg' } });
-
-  assert.ok(url.includes('<img'), 'a full URL is still an <img>');
-  assert.ok(url.includes('https://cdn.test/google.svg'), 'pointing at what the brand named');
-});
-
-test('#792: no connections: frontmatter row survives anywhere in the theme', () => {
-  const offenders = themeFiles(THEMES_DIR).filter((file) => {
-    const source = fs.readFileSync(file, 'utf8');
-
-    if (!source.startsWith('---')) {
-      return false;
-    }
-
-    const frontmatter = yaml.load(source.split('---')[1]) || {};
-
-    return Object.prototype.hasOwnProperty.call(frontmatter, 'connections');
-  });
-
-  assert.deepEqual(offenders, [], `the config is the only card list: ${offenders.join(', ')}`);
-  assert.ok(!ACCOUNT_LAYOUT.includes('cdn.itwcreativeworks.com/assets/general/images/brands/color/kick.svg'), 'and the CDN logos that 404 are gone with them');
-  assert.ok(ACCOUNT_LAYOUT.includes('{% include frontend/sections/account-connections.html %}'), 'the layout renders the shared connections include');
-});
-
-test('#771: an enabled provider with a card is shown; one without gets the unsupported card', async () => {
-  const { elements, appended } = await runSection();
-
-  assert.ok(!elements['connection-google'].classes.has('d-none'), 'a packaged provider the brand enabled is shown');
-  assert.ok(!elements['connection-house-sso'].classes.has('d-none'), "and a brand's own, with no allowlist to be on");
-
-  assert.equal(appended.length, 1, 'exactly one provider had no card to show');
-
-  const warning = appended[0];
-
-  assert.equal(warning.id, 'connection-no-card-unconfigured', 'the unsupported card names the provider it stands for');
-  assert.ok(warning.innerHTML.includes('Unsupported connection'), 'it says the connection is unsupported');
-  assert.ok(warning.innerHTML.includes('"name"') && warning.innerHTML.includes('"logo"'), `it says what the config entry is missing: ${warning.innerHTML}`);
-  assert.ok(!/Ultimate Jekyll Manager/i.test(warning.innerHTML), 'and never tells anyone to update a framework that does not exist');
-});
-
-test('#771: a disabled provider is hidden, and a page with nothing enabled says so', async () => {
-  const { elements, appended } = await runSection({
-    connectionsConfig: {
-      google: { ...PACKAGED.google, enabled: false },
-      twitch: { ...PACKAGED.twitch, enabled: false },
+          ctx.expect(entry.name, `${provider} has the name its card says`).toBeTruthy();
+          ctx.expect(entry.description, `${provider} has the line under it`).toBeTruthy();
+          ctx.expect(!entry.logo.includes('/') && !entry.logo.includes(':'), `${provider}'s logo is a mark NAME, never a CDN url: ${entry.logo}`).toBeTruthy();
+          ctx.expect(fs.existsSync(path.join(MARKS_DIR, `${entry.logo}.svg`)), `and the mark SHIPS in this package: ${entry.logo}.svg`).toBeTruthy();
+        }
+      },
     },
-  });
 
-  assert.ok(elements['connection-google'].classes.has('d-none'), 'a disabled provider stays hidden');
-  assert.ok(elements['connection-twitch'].classes.has('d-none'), 'even when its card exists');
-  assert.equal(appended.length, 0, 'and a disabled provider never draws a warning');
-  assert.ok(!elements['connections-empty'].classes.has('d-none'), 'the empty message is shown instead');
-});
+    {
+      name: '#792: a brand that only ENABLES a packaged provider gets a drawn card',
+      run: async (ctx) => {
+        const html = await renderConnections({ google: { ...PACKAGED.google, enabled: true } });
 
-test('#771: a config key that is not a legal provider name never shows a live card', async () => {
-  const { elements, appended } = await runSection({ connectionsConfig: CONNECTIONS_CONFIG_BAD_KEY });
+        ctx.expect(cardIds(html), 'the config is the whole list').toEqual(['google']);
+        ctx.expect(html.includes('>Google<'), "the name comes from the framework's defaults").toBeTruthy();
+        ctx.expect(html.includes('<svg'), 'and the logo is the packaged mark, inlined by omega_logo').toBeTruthy();
+        ctx.expect(!html.includes('<img'), 'never an <img> for a mark name').toBeTruthy();
+        ctx.expect(!html.includes('cdn.itwcreativeworks.com'), 'and nothing points at the CDN files that 404').toBeTruthy();
+        ctx.expect(html.includes(markSignature('google')), "the mark drawn is the one the logo names").toBeTruthy();
+      },
+    },
 
-  // The card may EXIST (the key carries name + logo), but it is never shown:
-  // no authorize call could succeed for a name the backend's loader refuses
-  assert.ok(elements['connection-HouseSSO'].classes.has('d-none'), 'the card stays hidden');
-  assert.equal(appended.length, 1, 'and the warning card is drawn instead');
+    {
+      name: "#792: a brand's own logo wins over the packaged one, and a URL still renders an img",
+      run: async (ctx) => {
+        const overridden = await renderConnections({ google: { ...PACKAGED.google, enabled: true, logo: 'github' } });
 
-  const warning = appended[0];
+        ctx.expect(overridden.includes(markSignature('github')), "the brand's mark is what is drawn").toBeTruthy();
+        ctx.expect(!overridden.includes(markSignature('google')), 'and the packaged one is not').toBeTruthy();
 
-  assert.ok(/lowercase/i.test(warning.innerHTML), `the warning says what a provider id may be: ${warning.innerHTML}`);
-  assert.ok(/dash/i.test(warning.innerHTML), 'naming the allowed characters');
-  assert.ok(!/"name"/.test(warning.innerHTML), 'and never blames the fields, which this entry has');
-});
+        const url = await renderConnections({ google: { ...PACKAGED.google, enabled: true, logo: 'https://cdn.test/google.svg' } });
 
-test('#793: the section drives from the config alone — no allowlist, no second description list', async () => {
-  assert.ok(!/supportedProviders/.test(CONNECTIONS_SOURCE), 'the hardcoded provider allowlist is gone');
-  assert.ok(!/defaultDescriptions/.test(CONNECTIONS_SOURCE), 'and the descriptions map naming providers this lane cannot connect');
-  assert.ok(/Object\.keys\(availableProviders\)/.test(CONNECTIONS_SOURCE), 'the config keys are the list');
-  assert.ok(!/Ultimate Jekyll Manager/i.test(CONNECTIONS_SOURCE), 'and the dead advice with it');
+        ctx.expect(url.includes('<img'), 'a full URL is still an <img>').toBeTruthy();
+        ctx.expect(url.includes('https://cdn.test/google.svg'), 'pointing at what the brand named').toBeTruthy();
+      },
+    },
 
-  // The description a card shows comes from the config entry, which is where
-  // the framework's own default for a packaged provider lives now
-  const { elements } = await runSection();
+    {
+      name: '#792: no connections: frontmatter row survives anywhere in the theme',
+      run: (ctx) => {
+        const offenders = themeFiles(THEMES_DIR).filter((file) => {
+          const source = fs.readFileSync(file, 'utf8');
 
-  assert.equal(
-    elements['google-connection-description'].textContent,
-    PACKAGED.google.description,
-    "the packaged description is what the card says when the brand wrote none",
-  );
-});
+          if (!source.startsWith('---')) {
+            return false;
+          }
 
-test('#1061: two linked accounts at max 2 draw two cards, each with its own Disconnect, and no Connect', async () => {
-  const document = await runAccountSection({
-    connectionsConfig: { google: { ...PACKAGED.google, enabled: true, max: 2 } },
-    account: accountWith(linkedAccount('sub-alpha', 'Alpha Channel'), linkedAccount('sub-beta', 'Beta Channel')),
-  });
+          const frontmatter = yaml.load(source.split('---')[1]) || {};
 
-  const alpha = accountCard(document, 'Alpha Channel');
-  const beta = accountCard(document, 'Beta Channel');
+          return Object.prototype.hasOwnProperty.call(frontmatter, 'connections');
+        });
 
-  assert.ok(alpha, 'the first account has a shown card with a Disconnect');
-  assert.ok(beta, 'and so does the second');
-  assert.notEqual(alpha, beta, 'one card per account');
+        ctx.expect(offenders, `the config is the only card list: ${offenders.join(', ')}`).toEqual([]);
+        ctx.expect(!ACCOUNT_LAYOUT.includes('cdn.itwcreativeworks.com/assets/general/images/brands/color/kick.svg'), 'and the CDN logos that 404 are gone with them').toBeTruthy();
+        ctx.expect(ACCOUNT_LAYOUT.includes('{% include frontend/sections/account-connections.html %}'), 'the layout renders the shared connections include').toBeTruthy();
+      },
+    },
 
-  for (const card of [alpha, beta]) {
-    assert.ok(visibleText(card).includes('Google'), `each card names the provider: ${visibleText(card)}`);
-    assert.equal(shownControls(card, 'Disconnect').length, 1, 'and carries exactly one Disconnect, its own');
-  }
+    {
+      name: '#771: an enabled provider with a card is shown; one without gets the unsupported card',
+      run: async (ctx) => {
+        const { elements, appended } = await runSection();
 
-  const list = document.getElementById('connections-list');
+        ctx.expect(!elements['connection-google'].classes.has('d-none'), 'a packaged provider the brand enabled is shown').toBeTruthy();
+        ctx.expect(!elements['connection-house-sso'].classes.has('d-none'), "and a brand's own, with no allowlist to be on").toBeTruthy();
 
-  assert.equal(shownControls(list, 'Connect').length, 0, 'at max, no Connect control shows');
-});
+        ctx.expect(appended.length, 'exactly one provider had no card to show').toBe(1);
 
-test('#1061: under max, the Connect control shows beside the linked account', async () => {
-  const document = await runAccountSection({
-    connectionsConfig: { google: { ...PACKAGED.google, enabled: true, max: 2 } },
-    account: accountWith(linkedAccount('sub-alpha', 'Alpha Channel')),
-  });
+        const warning = appended[0];
 
-  const alpha = accountCard(document, 'Alpha Channel');
-  const list = document.getElementById('connections-list');
+        ctx.expect(warning.id, 'the unsupported card names the provider it stands for').toBe('connection-no-card-unconfigured');
+        ctx.expect(warning.innerHTML.includes('Unsupported connection'), 'it says the connection is unsupported').toBeTruthy();
+        ctx.expect(warning.innerHTML.includes('"name"') && warning.innerHTML.includes('"logo"'), `it says what the config entry is missing: ${warning.innerHTML}`).toBeTruthy();
+        ctx.expect(!/Ultimate Jekyll Manager/i.test(warning.innerHTML), 'and never tells anyone to update a framework that does not exist').toBeTruthy();
+      },
+    },
 
-  assert.ok(alpha, 'the linked account has a shown card with a Disconnect');
-  assert.equal(shownControls(list, 'Connect').length, 1, 'one account of two allowed: the Connect control shows');
-});
+    {
+      name: '#771: a disabled provider is hidden, and a page with nothing enabled says so',
+      run: async (ctx) => {
+        const { elements, appended } = await runSection({
+          connectionsConfig: {
+            google: { ...PACKAGED.google, enabled: false },
+            twitch: { ...PACKAGED.twitch, enabled: false },
+          },
+        });
 
-test('#1061: a record still in the old one-level shape draws no card and keeps Connect', async () => {
-  // Until the users migration runs, the record sits at `connections.google`
-  // itself: its keys are not accounts, so nothing is drawn for them
-  const document = await runAccountSection({
-    connectionsConfig: { google: { ...PACKAGED.google, enabled: true } },
-    account: new User({ connections: { google: linkedAccount('sub-alpha', 'Alpha Channel') } }, { uid: 'u1' }),
-  });
+        ctx.expect(elements['connection-google'].classes.has('d-none'), 'a disabled provider stays hidden').toBeTruthy();
+        ctx.expect(elements['connection-twitch'].classes.has('d-none'), 'even when its card exists').toBeTruthy();
+        ctx.expect(appended.length, 'and a disabled provider never draws a warning').toBe(0);
+        ctx.expect(!elements['connections-empty'].classes.has('d-none'), 'the empty message is shown instead').toBeTruthy();
+      },
+    },
 
-  const list = document.getElementById('connections-list');
+    {
+      name: '#771: a config key that is not a legal provider name never shows a live card',
+      run: async (ctx) => {
+        const { elements, appended } = await runSection({ connectionsConfig: CONNECTIONS_CONFIG_BAD_KEY });
 
-  assert.equal(shownControls(list, 'Disconnect').length, 0, 'no account card is drawn');
-  assert.equal(shownControls(list, 'Connect').length, 1, 'and the Connect control shows');
+        // The card may EXIST (the key carries name + logo), but it is never shown:
+        // no authorize call could succeed for a name the backend's loader refuses
+        ctx.expect(elements['connection-HouseSSO'].classes.has('d-none'), 'the card stays hidden').toBeTruthy();
+        ctx.expect(appended.length, 'and the warning card is drawn instead').toBe(1);
+
+        const warning = appended[0];
+
+        ctx.expect(/lowercase/i.test(warning.innerHTML), `the warning says what a provider id may be: ${warning.innerHTML}`).toBeTruthy();
+        ctx.expect(/dash/i.test(warning.innerHTML), 'naming the allowed characters').toBeTruthy();
+        ctx.expect(!/"name"/.test(warning.innerHTML), 'and never blames the fields, which this entry has').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#793: the section drives from the config alone — no allowlist, no second description list',
+      run: async (ctx) => {
+        ctx.expect(!/supportedProviders/.test(CONNECTIONS_SOURCE), 'the hardcoded provider allowlist is gone').toBeTruthy();
+        ctx.expect(!/defaultDescriptions/.test(CONNECTIONS_SOURCE), 'and the descriptions map naming providers this lane cannot connect').toBeTruthy();
+        ctx.expect(/Object\.keys\(availableProviders\)/.test(CONNECTIONS_SOURCE), 'the config keys are the list').toBeTruthy();
+        ctx.expect(!/Ultimate Jekyll Manager/i.test(CONNECTIONS_SOURCE), 'and the dead advice with it').toBeTruthy();
+
+        // The description a card shows comes from the config entry, which is where
+        // the framework's own default for a packaged provider lives now
+        const { elements } = await runSection();
+
+        ctx.expect(elements['google-connection-description'].textContent, "the packaged description is what the card says when the brand wrote none").toBe(PACKAGED.google.description);
+      },
+    },
+
+    {
+      name: '#1061: two linked accounts at max 2 draw two cards, each with its own Disconnect, and no Connect',
+      run: async (ctx) => {
+        const document = await runAccountSection({
+          connectionsConfig: { google: { ...PACKAGED.google, enabled: true, max: 2 } },
+          account: accountWith(linkedAccount('sub-alpha', 'Alpha Channel'), linkedAccount('sub-beta', 'Beta Channel')),
+        });
+
+        const alpha = accountCard(document, 'Alpha Channel');
+        const beta = accountCard(document, 'Beta Channel');
+
+        ctx.expect(alpha, 'the first account has a shown card with a Disconnect').toBeTruthy();
+        ctx.expect(beta, 'and so does the second').toBeTruthy();
+        ctx.expect(alpha, 'one card per account').not.toBe(beta);
+
+        for (const card of [alpha, beta]) {
+          ctx.expect(visibleText(card).includes('Google'), `each card names the provider: ${visibleText(card)}`).toBeTruthy();
+          ctx.expect(shownControls(card, 'Disconnect').length, 'and carries exactly one Disconnect, its own').toBe(1);
+        }
+
+        const list = document.getElementById('connections-list');
+
+        ctx.expect(shownControls(list, 'Connect').length, 'at max, no Connect control shows').toBe(0);
+      },
+    },
+
+    {
+      name: '#1061: under max, the Connect control shows beside the linked account',
+      run: async (ctx) => {
+        const document = await runAccountSection({
+          connectionsConfig: { google: { ...PACKAGED.google, enabled: true, max: 2 } },
+          account: accountWith(linkedAccount('sub-alpha', 'Alpha Channel')),
+        });
+
+        const alpha = accountCard(document, 'Alpha Channel');
+        const list = document.getElementById('connections-list');
+
+        ctx.expect(alpha, 'the linked account has a shown card with a Disconnect').toBeTruthy();
+        ctx.expect(shownControls(list, 'Connect').length, 'one account of two allowed: the Connect control shows').toBe(1);
+      },
+    },
+
+    {
+      name: '#1061: a record still in the old one-level shape draws no card and keeps Connect',
+      run: async (ctx) => {
+        // Until the users migration runs, the record sits at `connections.google`
+        // itself: its keys are not accounts, so nothing is drawn for them
+        const document = await runAccountSection({
+          connectionsConfig: { google: { ...PACKAGED.google, enabled: true } },
+          account: new User({ connections: { google: linkedAccount('sub-alpha', 'Alpha Channel') } }, { uid: 'u1' }),
+        });
+
+        const list = document.getElementById('connections-list');
+
+        ctx.expect(shownControls(list, 'Disconnect').length, 'no account card is drawn').toBe(0);
+        ctx.expect(shownControls(list, 'Connect').length, 'and the Connect control shows').toBe(1);
+      },
+    },
+  ],
 });

@@ -16,20 +16,20 @@ module.exports = defineCases({
   tests: [
     {
       name: 'ready-timeout-defaults-high-enough-to-absorb-a-slow-port-sweep',
-      async run({ assert }) {
-        assert.equal(EmulatorCommand.resolveReadyTimeout(undefined), 180000, 'no override reads the default');
-        assert.equal(EmulatorCommand.resolveReadyTimeout(''), 180000, 'an empty override reads the default');
+      async run({ expect }) {
+        expect(EmulatorCommand.resolveReadyTimeout(undefined), 'no override reads the default').toBe(180000);
+        expect(EmulatorCommand.resolveReadyTimeout(''), 'an empty override reads the default').toBe(180000);
       },
     },
     {
       name: 'ready-timeout-env-override-is-respected-in-ms',
-      async run({ assert }) {
-        assert.equal(EmulatorCommand.resolveReadyTimeout('240000'), 240000, 'a numeric override wins');
+      async run({ expect }) {
+        expect(EmulatorCommand.resolveReadyTimeout('240000'), 'a numeric override wins').toBe(240000);
       },
     },
     {
       name: 'a-junk-override-fails-loudly-instead-of-racing-an-unknown-deadline',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const junk of ['soon', '-5', '0', 'NaN']) {
           let threw = null;
           try {
@@ -37,8 +37,8 @@ module.exports = defineCases({
           } catch (error) {
             threw = error;
           }
-          assert.ok(threw, `"${junk}" must throw instead of racing an unknown deadline`);
-          assert.match(threw.message, /OMEGA_EMULATOR_READY_TIMEOUT/, 'the error names the knob');
+          expect(threw, `"${junk}" must throw instead of racing an unknown deadline`).toBeTruthy();
+          expect(threw.message, 'the error names the knob').toMatch(/OMEGA_EMULATOR_READY_TIMEOUT/);
         }
       },
     },

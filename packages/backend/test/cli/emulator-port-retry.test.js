@@ -173,7 +173,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-port-taken-mid-bind-is-bumped-and-the-boot-retried-once',
-      async run({ assert }) {
+      async run({ expect }) {
         const { projectDir, cleanup } = makeProject();
         const { command } = bootCommand(projectDir);
         const restoreEnv = capturePortEnv();
@@ -189,12 +189,12 @@ module.exports = defineCases({
         try {
           const { emulatorPorts, bumped } = await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
 
-          assert.equal(attempts.length, 2, 'the first boot died on the bind and exactly one retry followed');
-          assert.equal(attempts[1], attempts[0] + 1, 'the retry allocated auth off the port it could not bind');
-          assert.equal(emulatorPorts.auth, attempts[1], 'the stack that came up is the bumped one');
-          assert.ok(bumped.includes('auth'), 'the moved name is reported as bumped');
-          assert.equal(publishedPorts(projectDir).auth, attempts[1], 'the ports file siblings read carries the bumped port');
-          assert.equal(publishedPorts(projectDir).functions, emulatorPorts.functions, 'every other name kept its allocation');
+          expect(attempts.length, 'the first boot died on the bind and exactly one retry followed').toBe(2);
+          expect(attempts[1], 'the retry allocated auth off the port it could not bind').toBe(attempts[0] + 1);
+          expect(emulatorPorts.auth, 'the stack that came up is the bumped one').toBe(attempts[1]);
+          expect(bumped.includes('auth'), 'the moved name is reported as bumped').toBeTruthy();
+          expect(publishedPorts(projectDir).auth, 'the ports file siblings read carries the bumped port').toBe(attempts[1]);
+          expect(publishedPorts(projectDir).functions, 'every other name kept its allocation').toBe(emulatorPorts.functions);
         } finally {
           if (child) child.emit('close', 0, null);
           restoreEnv();
@@ -205,7 +205,7 @@ module.exports = defineCases({
 
     {
       name: 'a-bind-failure-on-a-port-this-run-never-asked-for-is-not-retried',
-      async run({ assert }) {
+      async run({ expect }) {
         // The retry is for the race this run can do something about: a port of
         // its OWN allocation. A failure naming anything else (a redis this
         // machine runs, a port some other tool logged) is not a bump the
@@ -228,9 +228,9 @@ module.exports = defineCases({
         }
 
         try {
-          assert.equal(attempts.length, 1, 'a port outside the allocation is not a bump, so nothing is retried');
-          assert.equal(failure?.addressInUsePort, undefined, 'the failure carries no port tag');
-          assert.match(failure.message, /exited before ready/, 'the boot fails the way it always did');
+          expect(attempts.length, 'a port outside the allocation is not a bump, so nothing is retried').toBe(1);
+          expect(failure?.addressInUsePort, 'the failure carries no port tag').toBe(undefined);
+          expect(failure.message, 'the boot fails the way it always did').toMatch(/exited before ready/);
         } finally {
           restoreEnv();
           cleanup();
@@ -240,7 +240,7 @@ module.exports = defineCases({
 
     {
       name: 'a-late-close-from-the-failed-attempt-leaves-the-retrys-artifacts-alone',
-      async run({ assert }) {
+      async run({ expect }) {
         // The first child can outlive shutdown's SIGTERM/SIGKILL races and
         // close LATER, by which time the retry has published its own map into
         // the same two files. Both attempts stamp this same process, so only
@@ -260,13 +260,13 @@ module.exports = defineCases({
         try {
           const { emulatorPorts } = await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
 
-          assert.equal(publishedPorts(projectDir).auth, emulatorPorts.auth, 'the retry published its map');
+          expect(publishedPorts(projectDir).auth, 'the retry published its map').toBe(emulatorPorts.auth);
 
           // The dead first attempt finally reports in.
           children[0].emit('close', 1, null);
 
-          assert.equal(publishedPorts(projectDir).auth, emulatorPorts.auth, "the late close leaves the live stack's ports file published");
-          assert.ok(jetpack.exists(resolvedConfig), 'and leaves the config the live stack is running on');
+          expect(publishedPorts(projectDir).auth, "the late close leaves the live stack's ports file published").toBe(emulatorPorts.auth);
+          expect(jetpack.exists(resolvedConfig), 'and leaves the config the live stack is running on').toBeTruthy();
         } finally {
           children.forEach((child) => child.emit('close', 0, null));
           restoreEnv();
@@ -277,7 +277,7 @@ module.exports = defineCases({
 
     {
       name: 'a-second-bind-failure-names-the-port-and-its-holder',
-      async run({ assert }) {
+      async run({ expect }) {
         // Twice on the same wall is not a race any more: something is sitting
         // on that port. The report says which, and who has it, and never
         // signals them.
@@ -305,11 +305,11 @@ module.exports = defineCases({
         }
 
         try {
-          assert.ok(failure, 'a boot that cannot bind its ports twice fails loudly');
-          assert.equal(attempts.length, 2, 'ONE retry, never a loop');
-          assert.deepEqual(asked, [attempts[1]], 'the holder is looked up for the port the retry could not bind');
-          assert.match(failure.message, new RegExp(`port ${attempts[1]} \\(auth\\)`), 'the report names the port and the emulator that wanted it');
-          assert.match(failure.message, /held by pid 4242: java -jar cloud-firestore-emulator/, 'and the process holding it');
+          expect(failure, 'a boot that cannot bind its ports twice fails loudly').toBeTruthy();
+          expect(attempts.length, 'ONE retry, never a loop').toBe(2);
+          expect(asked, 'the holder is looked up for the port the retry could not bind').toEqual([attempts[1]]);
+          expect(failure.message, 'the report names the port and the emulator that wanted it').toMatch(new RegExp(`port ${attempts[1]} \\(auth\\)`));
+          expect(failure.message, 'and the process holding it').toMatch(/held by pid 4242: java -jar cloud-firestore-emulator/);
         } finally {
           restoreEnv();
           cleanup();
@@ -319,7 +319,7 @@ module.exports = defineCases({
 
     {
       name: 'the-stale-reap-probes-its-ports-only-after-the-pid-is-gone',
-      async run({ assert }) {
+      async run({ expect }) {
         // A signal is not an exit: kill() returns while the kernel is still
         // unwinding the process, so a probe in that same tick is a verdict
         // about a shutdown that has not happened. The numbers go first, then
@@ -380,12 +380,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), seams);
 
-          assert.deepEqual(
-            events,
-            ['signal:SIGTERM', 'signal:SIGKILL', 'unwinding', 'gone', `probe:${port}`, `probe:${port}`],
-            'the reap waits out the process, THEN polls the port until it reads free',
-          );
-          assert.ok(!lines.join('\n').includes('still closing'), 'a port that came back free on the second ask is not reported as held');
+          expect(events, 'the reap waits out the process, THEN polls the port until it reads free').toEqual(['signal:SIGTERM', 'signal:SIGKILL', 'unwinding', 'gone', `probe:${port}`, `probe:${port}`]);
+          expect(!lines.join('\n').includes('still closing'), 'a port that came back free on the second ask is not reported as held').toBeTruthy();
         } finally {
           jetpack.remove(projectDir);
         }

@@ -15,8 +15,7 @@
  * fallback: it loads every matched element straight away, which is the shortest
  * honest route into `loadSrcset`.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -120,68 +119,92 @@ async function rewriteSrcset(value) {
   return element.srcset;
 }
 
-test('runtime lazy-loader: a data-URI candidate survives the rewrite whole (#367)', async () => {
-  const dataUri = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+module.exports = defineCases({
+  type: 'group',
+  description: 'lazy-loading-srcset',
+  tests: [
+    {
+      name: 'runtime lazy-loader: a data-URI candidate survives the rewrite whole (#367)',
+      run: async (ctx) => {
+        const dataUri = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-  const srcset = await rewriteSrcset(`${dataUri} 1x, /assets/images/hero.png 2x`);
+        const srcset = await rewriteSrcset(`${dataUri} 1x, /assets/images/hero.png 2x`);
 
-  assert.ok(srcset.startsWith(dataUri), `the base64 payload arrives in one piece: ${srcset}`);
-  assert.equal(srcset.split(', ').length, 2, 'two candidates — the comma inside the payload is not a boundary');
-  assert.ok(srcset.endsWith(`https://brand.test/assets/images/hero.png?cb=${BUILD_TIME} 2x`), `the second candidate is intact: ${srcset}`);
-});
+        ctx.expect(srcset.startsWith(dataUri), `the base64 payload arrives in one piece: ${srcset}`).toBeTruthy();
+        ctx.expect(srcset.split(', ').length, 'two candidates — the comma inside the payload is not a boundary').toBe(2);
+        ctx.expect(srcset.endsWith(`https://brand.test/assets/images/hero.png?cb=${BUILD_TIME} 2x`), `the second candidate is intact: ${srcset}`).toBeTruthy();
+      },
+    },
 
-test('runtime lazy-loader: a comma in a candidate’s query is not a boundary either (#367)', async () => {
-  const srcset = await rewriteSrcset('/assets/images/hero.png?w=100,200 1x');
+    {
+      name: 'runtime lazy-loader: a comma in a candidate’s query is not a boundary either (#367)',
+      run: async (ctx) => {
+        const srcset = await rewriteSrcset('/assets/images/hero.png?w=100,200 1x');
 
-  assert.equal(srcset, `https://brand.test/assets/images/hero.png?w=100%2C200&cb=${BUILD_TIME} 1x`);
-});
+        ctx.expect(srcset).toBe(`https://brand.test/assets/images/hero.png?w=100%2C200&cb=${BUILD_TIME} 1x`);
+      },
+    },
 
-// #368 — the runtime cache-buster had no locality guard, so the payload the
-// #367 splitter now keeps whole was corrupted one step later by a `?cb=`
-// appended to it. It skips exactly what the build-time pass skips.
-test('runtime lazy-loader: a data: URI is never cache-busted — byte-identical through the rewrite (#368)', async () => {
-  const dataUri = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    // #368 — the runtime cache-buster had no locality guard, so the payload the
+    // #367 splitter now keeps whole was corrupted one step later by a `?cb=`
+    // appended to it. It skips exactly what the build-time pass skips.
+    {
+      name: 'runtime lazy-loader: a data: URI is never cache-busted — byte-identical through the rewrite (#368)',
+      run: async (ctx) => {
+        const dataUri = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-  const srcset = await rewriteSrcset(`${dataUri} 1x, /assets/images/hero.png 2x`);
+        const srcset = await rewriteSrcset(`${dataUri} 1x, /assets/images/hero.png 2x`);
 
-  assert.equal(srcset, `${dataUri} 1x, https://brand.test/assets/images/hero.png?cb=${BUILD_TIME} 2x`);
-});
+        ctx.expect(srcset).toBe(`${dataUri} 1x, https://brand.test/assets/images/hero.png?cb=${BUILD_TIME} 2x`);
+      },
+    },
 
-test('runtime lazy-loader: blob: and external candidates are left alone too (#368)', async () => {
-  const blob = 'blob:https://brand.test/2c8f0e1a-0c1b-4f2e-9a6d-3b7c8d9e0f11';
+    {
+      name: 'runtime lazy-loader: blob: and external candidates are left alone too (#368)',
+      run: async (ctx) => {
+        const blob = 'blob:https://brand.test/2c8f0e1a-0c1b-4f2e-9a6d-3b7c8d9e0f11';
 
-  const srcset = await rewriteSrcset(`${blob} 1x, https://cdn.example.com/hero.png 2x, //cdn.example.com/wide.png 3x`);
+        const srcset = await rewriteSrcset(`${blob} 1x, https://cdn.example.com/hero.png 2x, //cdn.example.com/wide.png 3x`);
 
-  assert.equal(srcset, `${blob} 1x, https://cdn.example.com/hero.png 2x, //cdn.example.com/wide.png 3x`);
-});
+        ctx.expect(srcset).toBe(`${blob} 1x, https://cdn.example.com/hero.png 2x, //cdn.example.com/wide.png 3x`);
+      },
+    },
 
-test('runtime lazy-loader: an ordinary ladder rewrites exactly as it always did', async () => {
-  const srcset = await rewriteSrcset('/assets/images/shot-320px.webp 320w, /assets/images/shot-1024px.webp 1024w');
+    {
+      name: 'runtime lazy-loader: an ordinary ladder rewrites exactly as it always did',
+      run: async (ctx) => {
+        const srcset = await rewriteSrcset('/assets/images/shot-320px.webp 320w, /assets/images/shot-1024px.webp 1024w');
 
-  assert.equal(srcset, [
-    `https://brand.test/assets/images/shot-320px.webp?cb=${BUILD_TIME} 320w`,
-    `https://brand.test/assets/images/shot-1024px.webp?cb=${BUILD_TIME} 1024w`,
-  ].join(', '));
-});
+        ctx.expect(srcset).toBe([
+          `https://brand.test/assets/images/shot-320px.webp?cb=${BUILD_TIME} 320w`,
+          `https://brand.test/assets/images/shot-1024px.webp?cb=${BUILD_TIME} 1024w`,
+        ].join(', '));
+      },
+    },
 
-// The two grammar files are format TWINS (each says so at the top): one lane is
-// CJS build-time, the other ESM browser code, and they must agree on what a
-// candidate is or the passes and the runtime cut markup differently.
-test('the browser grammar twin and the build-time original parse identically', () => {
-  const { mapSrcset: buildTime } = require('../src/srcset.js');
-  const { mapSrcset: runtime } = require('../core/js/libs/srcset.js');
+    // The two grammar files are format TWINS (each says so at the top): one lane is
+    // CJS build-time, the other ESM browser code, and they must agree on what a
+    // candidate is or the passes and the runtime cut markup differently.
+    {
+      name: 'the browser grammar twin and the build-time original parse identically',
+      run: (ctx) => {
+        const { mapSrcset: buildTime } = require('../src/srcset.js');
+        const { mapSrcset: runtime } = require('../core/js/libs/srcset.js');
 
-  const cases = [
-    'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7 1x, /b.png 2x',
-    '/a.png?w=100,200 1x, /b.png 2x',
-    '/a.png 320w, /b.png 1024w',
-    '/a.png,/b.png',
-    '  /a.png   ,,  /b.png 2x  ',
-    '/a.png calc(100vw - (2 * 1rem)), /b.png 2x',
-    '',
-  ];
+        const cases = [
+          'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7 1x, /b.png 2x',
+          '/a.png?w=100,200 1x, /b.png 2x',
+          '/a.png 320w, /b.png 1024w',
+          '/a.png,/b.png',
+          '  /a.png   ,,  /b.png 2x  ',
+          '/a.png calc(100vw - (2 * 1rem)), /b.png 2x',
+          '',
+        ];
 
-  for (const value of cases) {
-    assert.equal(runtime(value, (url) => `${url}#x`), buildTime(value, (url) => `${url}#x`), `same parse: ${value}`);
-  }
+        for (const value of cases) {
+          ctx.expect(runtime(value, (url) => `${url}#x`), `same parse: ${value}`).toBe(buildTime(value, (url) => `${url}#x`));
+        }
+      },
+    },
+  ],
 });

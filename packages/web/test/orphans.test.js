@@ -15,10 +15,9 @@
  * of bug (a name that exists but not on the consuming element) is out of
  * reach here.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { PKG } = require('./lib/build.js');
@@ -101,49 +100,56 @@ const declarations = (css) => [...css.matchAll(/[^{}]+\{([^{}]*)\}/g)]
 // author saying an undefined name is fine here, so it never orphans.
 const BARE_USE = /var\(\s*(--[\w-]+)\s*\)/g;
 
-test('#188: the sweep reaches core css, every theme, and vendored bootstrap', () => {
-  const units = compileUnits();
+module.exports = defineCases({
+  type: 'group',
+  description: 'orphans',
+  tests: [
+    {
+      name: '#188: the sweep reaches core css, every theme, and vendored bootstrap',
+      run: (ctx) => {
+        const units = compileUnits();
 
-  assert.ok(units.includes(path.join(CSS_DIR, 'tokens', '_index.scss')), 'the core token sheet is in the surface');
-  assert.ok(units.includes(path.join(THEMES_DIR, 'bootstrap', '_theme.scss')),
-    'vendored bootstrap compiles, so its tokens count as defined');
-  for (const theme of ['base', 'classy', 'newsflash', 'neobrutalism']) {
-    assert.ok(units.includes(path.join(THEMES_DIR, theme, '_theme.scss')), `the derivation still reaches themes/${theme}`);
-  }
-});
+        ctx.expect(units.includes(path.join(CSS_DIR, 'tokens', '_index.scss')), 'the core token sheet is in the surface').toBeTruthy();
+        ctx.expect(units.includes(path.join(THEMES_DIR, 'bootstrap', '_theme.scss')), 'vendored bootstrap compiles, so its tokens count as defined').toBeTruthy();
+        for (const theme of ['base', 'classy', 'newsflash', 'neobrutalism']) {
+          ctx.expect(units.includes(path.join(THEMES_DIR, theme, '_theme.scss')), `the derivation still reaches themes/${theme}`).toBeTruthy();
+        }
+      },
+    },
 
-test('#188: every custom property a compiled sheet consumes is defined somewhere', () => {
-  const defined = new Set();
-  const uses = [];
+    {
+      name: '#188: every custom property a compiled sheet consumes is defined somewhere',
+      run: (ctx) => {
+        const defined = new Set();
+        const uses = [];
 
-  for (const unit of compileUnits()) {
-    const name = path.relative(PKG, unit);
-    const css = compileUnit(unit);
+        for (const unit of compileUnits()) {
+          const name = path.relative(PKG, unit);
+          const css = compileUnit(unit);
 
-    for (const decl of declarations(css)) {
-      // Definition collection is declaration-position only: a sweep over raw
-      // css also matches selector text, where a BEM modifier ahead of a
-      // pseudo-class (`.omega-interactive--lift:hover`) reads as `--lift:`
-      // and would silently absorb a real orphan of the same name.
-      const definition = decl.match(/^(--[\w-]+)\s*:/);
-      if (definition) defined.add(definition[1]);
-      for (const match of decl.matchAll(BARE_USE)) uses.push({ property: match[1], sheet: name, decl });
-    }
-  }
+          for (const decl of declarations(css)) {
+            // Definition collection is declaration-position only: a sweep over raw
+            // css also matches selector text, where a BEM modifier ahead of a
+            // pseudo-class (`.omega-interactive--lift:hover`) reads as `--lift:`
+            // and would silently absorb a real orphan of the same name.
+            const definition = decl.match(/^(--[\w-]+)\s*:/);
+            if (definition) defined.add(definition[1]);
+            for (const match of decl.matchAll(BARE_USE)) uses.push({ property: match[1], sheet: name, decl });
+          }
+        }
 
-  // A regex that quietly stopped matching would pass this test vacuously, so
-  // the sweep proves it saw the vocabulary before it judges it.
-  assert.ok(defined.has('--bs-body-bg'), 'the definition sweep sees vendored bootstrap tokens');
-  assert.ok(uses.some((use) => use.property === '--omega-accent'), 'the use sweep sees bare var() consumers');
+        // A regex that quietly stopped matching would pass this test vacuously, so
+        // the sweep proves it saw the vocabulary before it judges it.
+        ctx.expect(defined.has('--bs-body-bg'), 'the definition sweep sees vendored bootstrap tokens').toBeTruthy();
+        ctx.expect(uses.some((use) => use.property === '--omega-accent'), 'the use sweep sees bare var() consumers').toBeTruthy();
 
-  // Deduped: the same declaration repeated across a sheet's rules is one fix,
-  // so it reads as one line.
-  const orphans = uses
-    .filter((use) => !defined.has(use.property) && !ALLOWLIST.has(use.property))
-    .map((use) => `${use.sheet}: \`${use.decl}\` consumes ${use.property}, which nothing defines`);
-  assert.deepEqual(
-    [...new Set(orphans)].sort(),
-    [],
-    'a var() with no definition computes to transparent; define the property, or give the use a fallback',
-  );
+        // Deduped: the same declaration repeated across a sheet's rules is one fix,
+        // so it reads as one line.
+        const orphans = uses
+          .filter((use) => !defined.has(use.property) && !ALLOWLIST.has(use.property))
+          .map((use) => `${use.sheet}: \`${use.decl}\` consumes ${use.property}, which nothing defines`);
+        ctx.expect([...new Set(orphans)].sort(), 'a var() with no definition computes to transparent; define the property, or give the use a fallback').toEqual([]);
+      },
+    },
+  ],
 });

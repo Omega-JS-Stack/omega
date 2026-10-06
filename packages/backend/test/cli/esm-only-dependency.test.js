@@ -52,16 +52,16 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-commonjs-function-requires-an-esm-only-package',
-      async run({ assert }) {
+      async run({ expect }) {
         const entry = stageFunctionsTree();
         try {
           const loaded = require(entry);
 
-          assert.equal(loaded.marker, NODE_MARKER);
+          expect(loaded.marker).toBe(NODE_MARKER);
           // Unbundled, `import.meta.url` is the dependency's own file, and the
           // require it opens from it works.
-          assert.ok(loaded.fileUrl.startsWith('file://'), `import.meta.url answered a file URL, got ${loaded.fileUrl}`);
-          assert.equal(loaded.viaRequire, true);
+          expect(loaded.fileUrl.startsWith('file://'), `import.meta.url answered a file URL, got ${loaded.fileUrl}`).toBeTruthy();
+          expect(loaded.viaRequire).toBe(true);
         } finally {
           delete require.cache[entry];
           jetpack.remove(path.dirname(entry));

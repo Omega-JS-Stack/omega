@@ -24,7 +24,7 @@
  * with SendGrid's field_definitions call stubbed in the require cache (the same
  * idiom as helpers/webhook-forward.test.js).
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const {
   FIELDS,
   fieldsForProvider,
@@ -101,7 +101,7 @@ async function withSendgrid(run) {
     filename: FETCH_PATH,
     loaded: true,
     exports: async (url) => {
-      assert.strictEqual(url, FIELD_DEFINITIONS_URL, `buildFields only reads field definitions, got ${url}`);
+      expect(url, `buildFields only reads field definitions, got ${url}`).toBe(FIELD_DEFINITIONS_URL);
 
       return fieldDefinitions();
     },
@@ -157,16 +157,8 @@ module.exports = defineCases({
 
         const unprovisioned = synced.filter((name) => !provisioned.includes(name));
 
-        assert.deepStrictEqual(
-          unprovisioned,
-          SENDGRID_RESERVED,
-          `Only SendGrid's reserved name columns may sit outside the custom-field catalog, got ${unprovisioned.join(', ')}`,
-        );
-        assert.strictEqual(
-          synced.length,
-          Object.keys(FIELDS).length,
-          `The doc populates the whole catalog, got ${synced.length} of ${Object.keys(FIELDS).length}`,
-        );
+        expect(unprovisioned, `Only SendGrid's reserved name columns may sit outside the custom-field catalog, got ${unprovisioned.join(', ')}`).toEqual(SENDGRID_RESERVED);
+        expect(synced.length, `The doc populates the whole catalog, got ${synced.length} of ${Object.keys(FIELDS).length}`).toBe(Object.keys(FIELDS).length);
       },
     },
 
@@ -178,12 +170,12 @@ module.exports = defineCases({
         const values = resolveFieldValues(USER_DOC, CONFIG);
 
         for (const name of SENDGRID_RESERVED) {
-          assert.ok(!provisioned.includes(name), `${name} is not provisioned as a SendGrid custom field`);
-          assert.ok(name in values, `${name} still resolves — Beehiiv provisions it, and addContact reads it`);
+          expect(!provisioned.includes(name), `${name} is not provisioned as a SendGrid custom field`).toBeTruthy();
+          expect(name in values, `${name} still resolves — Beehiiv provisions it, and addContact reads it`).toBeTruthy();
         }
 
-        assert.strictEqual(values.user_personal_name_first, 'Ada');
-        assert.strictEqual(values.user_personal_name_last, 'Lovelace');
+        expect(values.user_personal_name_first).toBe('Ada');
+        expect(values.user_personal_name_last).toBe('Lovelace');
       },
     },
 
@@ -193,9 +185,9 @@ module.exports = defineCases({
       run() {
         const beehiiv = fieldsForProvider('beehiiv');
 
-        assert.ok(!beehiiv.includes('user_personal_country'), 'Beehiiv skips country');
-        assert.ok(!beehiiv.includes('user_attribution_utm_source'), 'Beehiiv skips utm_source');
-        assert.ok(beehiiv.includes('user_personal_name_first'), 'Beehiiv still needs the name fields');
+        expect(!beehiiv.includes('user_personal_country'), 'Beehiiv skips country').toBeTruthy();
+        expect(!beehiiv.includes('user_attribution_utm_source'), 'Beehiiv skips utm_source').toBeTruthy();
+        expect(beehiiv.includes('user_personal_name_first'), 'Beehiiv still needs the name fields').toBeTruthy();
       },
     },
 
@@ -209,22 +201,14 @@ module.exports = defineCases({
           const fields = await sendgrid.buildFields(USER_DOC);
 
           for (const name of SENDGRID_RESERVED) {
-            assert.ok(!(name in idByName), `${name} has no SendGrid custom field to write to`);
+            expect(!(name in idByName), `${name} has no SendGrid custom field to write to`).toBeTruthy();
           }
 
           const writtenNames = Object.keys(fields).map((id) => definitions.find((field) => field.id === id).name);
 
-          assert.deepStrictEqual(
-            writtenNames.filter((name) => SENDGRID_RESERVED.includes(name)),
-            [],
-            `A catalog-skipped field must never be written, got ${writtenNames.join(', ')}`,
-          );
-          assert.deepStrictEqual(
-            writtenNames.sort(),
-            Object.keys(resolveFieldValues(USER_DOC, CONFIG)).filter((name) => name in idByName).sort(),
-            'Every field the catalog provisions for SendGrid is written',
-          );
-          assert.deepStrictEqual(warns, [], `No unmapped-field warn may fire, got: ${warns.join(' | ')}`);
+          expect(writtenNames.filter((name) => SENDGRID_RESERVED.includes(name)), `A catalog-skipped field must never be written, got ${writtenNames.join(', ')}`).toEqual([]);
+          expect(writtenNames.sort(), 'Every field the catalog provisions for SendGrid is written').toEqual(Object.keys(resolveFieldValues(USER_DOC, CONFIG)).filter((name) => name in idByName).sort());
+          expect(warns, `No unmapped-field warn may fire, got: ${warns.join(' | ')}`).toEqual([]);
         });
       },
     },
@@ -238,20 +222,13 @@ module.exports = defineCases({
           const displays = fields.map((field) => field.name);
 
           for (const name of ['user_personal_country', 'user_attribution_utm_source']) {
-            assert.ok(
-              !displays.includes(FIELDS[name].display),
-              `${name} is skipped for Beehiiv and must never be written, got ${displays.join(', ')}`,
-            );
+            expect(!displays.includes(FIELDS[name].display), `${name} is skipped for Beehiiv and must never be written, got ${displays.join(', ')}`).toBeTruthy();
           }
 
-          assert.deepStrictEqual(
-            displays.sort(),
-            fieldsForProvider('beehiiv')
+          expect(displays.sort(), 'Every field the catalog provisions for Beehiiv is written').toEqual(fieldsForProvider('beehiiv')
               .filter((name) => name in resolveFieldValues(USER_DOC, CONFIG))
               .map((name) => FIELDS[name].display)
-              .sort(),
-            'Every field the catalog provisions for Beehiiv is written',
-          );
+              .sort());
         });
       },
     },

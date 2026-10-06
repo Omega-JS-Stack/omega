@@ -25,8 +25,7 @@
  * the convention billing-actions.test.js sets — and through the REAL catalog,
  * adapters and transport, which is what decides who hears an event.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -212,185 +211,194 @@ async function wireRefund({ analyticsBlocked }) {
   return { requests, tracked, form, submit };
 }
 
-test('#306: a blocked analytics global never stops the refund', async () => {
-  // The repro: `gtag` is not a function that fails, it is a name that does not
-  // exist. trackRefund() runs first, so the throw meant the customer's refund
-  // request was never sent at all.
-  const { requests, form, submit } = await wireRefund({ analyticsBlocked: true });
+module.exports = defineCases({
+  type: 'group',
+  description: 'analytics-blocked',
+  tests: [
+    {
+      name: '#306: a blocked analytics global never stops the refund',
+      run: async (ctx) => {
+        // The repro: `gtag` is not a function that fails, it is a name that does not
+        // exist. trackRefund() runs first, so the throw meant the customer's refund
+        // request was never sent at all.
+        const { requests, form, submit } = await wireRefund({ analyticsBlocked: true });
 
-  await assert.doesNotReject(submit, 'the submit handler survives the blocked scripts');
+        // The submit handler survives the blocked scripts
+        await submit();
 
-  assert.deepStrictEqual(
-    requests.map((request) => request.route),
-    ['/omega/payments/refund'],
-    'the refund route is called with the analytics scripts blocked',
-  );
-  assert.strictEqual(requests[0].options.body.confirmed, true, 'and carries the confirmation the backend expects');
-  assert.strictEqual(requests[0].options.body.reason, 'Too expensive', 'with the reason the customer picked');
-  assert.strictEqual(form.successes.length, 1, 'and the customer is told it went through');
-});
+        ctx.expect(requests.map((request) => request.route), 'the refund route is called with the analytics scripts blocked').toEqual(['/omega/payments/refund']);
+        ctx.expect(requests[0].options.body.confirmed, 'and carries the confirmation the backend expects').toBe(true);
+        ctx.expect(requests[0].options.body.reason, 'with the reason the customer picked').toBe('Too expensive');
+        ctx.expect(form.successes.length, 'and the customer is told it went through').toBe(1);
+      },
+    },
 
-test('#328: with the scripts present, every provider the CATALOG maps is counted', async () => {
-  // The guard must not become a silent opt-out: an unblocked page still counts
-  // the refund action. WHO hears it is the catalog's call, and `user_refund_request`
-  // is a GA4-only action bucket by ruling — an ad platform has nothing to do
-  // with a support click, and the pre-catalog site's `RefundAction` /
-  // `ViewContent` pair was noise in two ad accounts.
-  const { tracked, submit } = await wireRefund({ analyticsBlocked: false });
+    {
+      name: '#328: with the scripts present, every provider the CATALOG maps is counted',
+      run: async (ctx) => {
+        // The guard must not become a silent opt-out: an unblocked page still counts
+        // the refund action. WHO hears it is the catalog's call, and `user_refund_request`
+        // is a GA4-only action bucket by ruling — an ad platform has nothing to do
+        // with a support click, and the pre-catalog site's `RefundAction` /
+        // `ViewContent` pair was noise in two ad accounts.
+        const { tracked, submit } = await wireRefund({ analyticsBlocked: false });
 
-  await submit();
+        await submit();
 
-  assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the mapped provider counted the refund');
-  assert.deepStrictEqual(tracked[0], ['gtag', 'event', 'user_refund_request', { action: 'submit' }], 'gtag is called exactly as before');
-});
+        ctx.expect(tracked.map(([provider]) => provider), 'the mapped provider counted the refund').toEqual(['gtag']);
+        ctx.expect(tracked[0], 'gtag is called exactly as before').toEqual(['gtag', 'event', 'user_refund_request', { action: 'submit' }]);
+      },
+    },
 
-test('#306: a half-blocked page counts what it can and still refunds', async () => {
-  // Blockers are per-provider: one list blocks Meta and leaves Google alone.
-  // Each provider is checked on its own inside the transport, which a single
-  // try/catch around all three would not do.
-  const { tracked, requests, submit } = await wireRefund({ analyticsBlocked: false });
+    {
+      name: '#306: a half-blocked page counts what it can and still refunds',
+      run: async (ctx) => {
+        // Blockers are per-provider: one list blocks Meta and leaves Google alone.
+        // Each provider is checked on its own inside the transport, which a single
+        // try/catch around all three would not do.
+        const { tracked, requests, submit } = await wireRefund({ analyticsBlocked: false });
 
-  delete globalThis.fbq;
-  globalThis.ttq = {};
+        delete globalThis.fbq;
+        globalThis.ttq = {};
 
-  await submit();
+        await submit();
 
-  assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the provider that loaded still counts');
-  assert.deepStrictEqual(requests.map((request) => request.route), ['/omega/payments/refund'], 'and the refund went through');
-});
+        ctx.expect(tracked.map(([provider]) => provider), 'the provider that loaded still counts').toEqual(['gtag']);
+        ctx.expect(requests.map((request) => request.route), 'and the refund went through').toEqual(['/omega/payments/refund']);
+      },
+    },
 
-test('#328: no call site names a provider — the guarded wrappers are gone', () => {
-  // The wrappers were the #306 fix: one guarded pass-through per provider. They
-  // are retired, because a call site that knows a provider's name is a call
-  // site that can drift from the catalog (a `track` where the platform defines
-  // no such event, a payload in the wrong dialect). The ONE canonical call is
-  // the replacement, and this is what keeps a new page from reaching past it.
-  const RETIRED = /\btrack(Google|Meta|TikTok)\b|\bidentifyTikTok\b/;
+    {
+      name: '#328: no call site names a provider — the guarded wrappers are gone',
+      run: (ctx) => {
+        // The wrappers were the #306 fix: one guarded pass-through per provider. They
+        // are retired, because a call site that knows a provider's name is a call
+        // site that can drift from the catalog (a `track` where the platform defines
+        // no such event, a payload in the wrong dialect). The ONE canonical call is
+        // the replacement, and this is what keeps a new page from reaching past it.
+        const RETIRED = /\btrack(Google|Meta|TikTok)\b|\bidentifyTikTok\b/;
 
-  const offenders = [];
+        const offenders = [];
 
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+        const walk = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
 
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!/\.m?js$/.test(entry.name)) {
-        continue;
-      }
+            if (entry.isDirectory()) {
+              walk(full);
+              continue;
+            }
+            if (!/\.m?js$/.test(entry.name)) {
+              continue;
+            }
 
-      // Comments blanked, line structure intact: a retired name MENTIONED in
-      // prose (the facade's own header says what it replaced) is documentation,
-      // not a call.
-      codeOnly(fs.readFileSync(full, 'utf8')).split('\n').forEach((line, index) => {
-        if (RETIRED.test(line)) {
-          offenders.push(`${path.relative(PKG, full)}:${index + 1}: ${line.trim()}`);
-        }
-      });
-    }
-  };
+            // Comments blanked, line structure intact: a retired name MENTIONED in
+            // prose (the facade's own header says what it replaced) is documentation,
+            // not a call.
+            codeOnly(fs.readFileSync(full, 'utf8')).split('\n').forEach((line, index) => {
+              if (RETIRED.test(line)) {
+                offenders.push(`${path.relative(PKG, full)}:${index + 1}: ${line.trim()}`);
+              }
+            });
+          }
+        };
 
-  walk(CORE_JS);
-  walk(THEMES_DIR);
+        walk(CORE_JS);
+        walk(THEMES_DIR);
 
-  assert.deepStrictEqual(
-    offenders,
-    [],
-    `fire the canonical event instead — event('<catalog name>', params) from __main_assets__/js/libs/analytics.js (#328):\n${offenders.join('\n')}`,
-  );
-});
+        ctx.expect(offenders, `fire the canonical event instead — event('<catalog name>', params) from __main_assets__/js/libs/analytics.js (#328):\n${offenders.join('\n')}`).toEqual([]);
+      },
+    },
 
-test('#306: no file in core/js or the theme layer calls a provider global bare', async () => {
-  // Static by design: one guarded helper is only the SSOT while nothing walks
-  // around it, and the shape regrows one new page module at a time.
-  const BARE_CALL = /\bgtag\(|\bfbq\(|\bttq\./;
+    {
+      name: '#306: no file in core/js or the theme layer calls a provider global bare',
+      run: async (ctx) => {
+        // Static by design: one guarded helper is only the SSOT while nothing walks
+        // around it, and the shape regrows one new page module at a time.
+        const BARE_CALL = /\bgtag\(|\bfbq\(|\bttq\./;
 
-  // The two files that may name the globals, each for a reason that is not a
-  // bare call: libs/analytics.js is the page's own host of the facade, and the
-  // IDENTITY calls it makes (gtag set, fbq init, ttq identify) are settings
-  // rather than events, so they have no catalog entry to ride — each one is
-  // `typeof`-guarded there. analytics-loader.js is the file that DEFINES the
-  // globals (#383): it installs each provider's queue on `window` and calls it
-  // through `window.`, which cannot throw a ReferenceError the way a bare name
-  // can. (dev.js is no longer on this list: its interceptors retired with the
-  // rewire — the facade logs the whole walk itself.)
-  const ALLOWED = new Set([
-    path.join(CORE_JS, 'libs', 'analytics.js'),
-    path.join(CORE_JS, 'core', 'analytics-loader.js'),
-  ]);
+        // The two files that may name the globals, each for a reason that is not a
+        // bare call: libs/analytics.js is the page's own host of the facade, and the
+        // IDENTITY calls it makes (gtag set, fbq init, ttq identify) are settings
+        // rather than events, so they have no catalog entry to ride — each one is
+        // `typeof`-guarded there. analytics-loader.js is the file that DEFINES the
+        // globals (#383): it installs each provider's queue on `window` and calls it
+        // through `window.`, which cannot throw a ReferenceError the way a bare name
+        // can. (dev.js is no longer on this list: its interceptors retired with the
+        // rewire — the facade logs the whole walk itself.)
+        const ALLOWED = new Set([
+          path.join(CORE_JS, 'libs', 'analytics.js'),
+          path.join(CORE_JS, 'core', 'analytics-loader.js'),
+        ]);
 
-  const offenders = [];
+        const offenders = [];
 
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+        const walk = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
 
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!/\.m?js$/.test(entry.name) || ALLOWED.has(full)) {
-        continue;
-      }
+            if (entry.isDirectory()) {
+              walk(full);
+              continue;
+            }
+            if (!/\.m?js$/.test(entry.name) || ALLOWED.has(full)) {
+              continue;
+            }
 
-      const lines = fs.readFileSync(full, 'utf8').split('\n');
+            const lines = fs.readFileSync(full, 'utf8').split('\n');
 
-      lines.forEach((line, index) => {
-        if (BARE_CALL.test(line)) {
-          offenders.push(`${path.relative(path.join(__dirname, '..'), full)}:${index + 1}: ${line.trim()}`);
-        }
-      });
-    }
-  };
+            lines.forEach((line, index) => {
+              if (BARE_CALL.test(line)) {
+                offenders.push(`${path.relative(path.join(__dirname, '..'), full)}:${index + 1}: ${line.trim()}`);
+              }
+            });
+          }
+        };
 
-  // Theme section behaviors are call sites too — the newsletter band proved it
-  // (a blocked provider turned a successful subscribe into an error alert).
-  walk(CORE_JS);
-  walk(THEMES_DIR);
+        // Theme section behaviors are call sites too — the newsletter band proved it
+        // (a blocked provider turned a successful subscribe into an error alert).
+        walk(CORE_JS);
+        walk(THEMES_DIR);
 
-  assert.deepStrictEqual(
-    offenders,
-    [],
-    `fire the canonical event instead — event('<catalog name>', params) from __main_assets__/js/libs/analytics.js — so a blocked provider cannot take the action with it (#306):\n${offenders.join('\n')}`,
-  );
-});
+        ctx.expect(offenders, `fire the canonical event instead — event('<catalog name>', params) from __main_assets__/js/libs/analytics.js — so a blocked provider cannot take the action with it (#306):\n${offenders.join('\n')}`).toEqual([]);
+      },
+    },
 
-test('#606: no TEMPLATE names a provider global either — no stubs, no inline pixels', () => {
-  // foot.html used to define empty `gtag`/`fbq`/`ttq` for an unconfigured
-  // provider. The guarded transport already reads a missing global as a silent
-  // skip, so the stubs only made a pixel that never loaded look present — and
-  // an inline snippet in the chrome is what made the old cookie banner
-  // decorative (#383). The template surfaces stay clear of all three names.
-  const NAMES = /\bgtag\b|\bfbq\b|\bttq\b/;
-  const TEMPLATE_EXT = /\.(html|md|liquid|json|json5|xml|txt)$/;
-  const offenders = [];
+    {
+      name: '#606: no TEMPLATE names a provider global either — no stubs, no inline pixels',
+      run: (ctx) => {
+        // foot.html used to define empty `gtag`/`fbq`/`ttq` for an unconfigured
+        // provider. The guarded transport already reads a missing global as a silent
+        // skip, so the stubs only made a pixel that never loaded look present — and
+        // an inline snippet in the chrome is what made the old cookie banner
+        // decorative (#383). The template surfaces stay clear of all three names.
+        const NAMES = /\bgtag\b|\bfbq\b|\bttq\b/;
+        const TEMPLATE_EXT = /\.(html|md|liquid|json|json5|xml|txt)$/;
+        const offenders = [];
 
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name === 'bootstrap') continue;
-        walk(full);
-        continue;
-      }
-      if (!TEMPLATE_EXT.test(entry.name)) continue;
+        const walk = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              if (entry.name === 'node_modules' || entry.name === 'bootstrap') continue;
+              walk(full);
+              continue;
+            }
+            if (!TEMPLATE_EXT.test(entry.name)) continue;
 
-      // Comments BLANKED, line structure intact (the codeOnly idiom above,
-      // for template comment syntax): a name explained in an HTML or Liquid
-      // comment is documentation, not a snippet.
-      templateCodeOnly(fs.readFileSync(full, 'utf8')).split('\n').forEach((line, index) => {
-        if (NAMES.test(line)) offenders.push(`${path.relative(PKG, full)}:${index + 1}: ${line.trim()}`);
-      });
-    }
-  };
+            // Comments BLANKED, line structure intact (the codeOnly idiom above,
+            // for template comment syntax): a name explained in an HTML or Liquid
+            // comment is documentation, not a snippet.
+            templateCodeOnly(fs.readFileSync(full, 'utf8')).split('\n').forEach((line, index) => {
+              if (NAMES.test(line)) offenders.push(`${path.relative(PKG, full)}:${index + 1}: ${line.trim()}`);
+            });
+          }
+        };
 
-  for (const surface of ['core', 'defaults', 'themes', 'scaffold']) walk(path.join(PKG, surface));
+        for (const surface of ['core', 'defaults', 'themes', 'scaffold']) walk(path.join(PKG, surface));
 
-  assert.deepStrictEqual(
-    offenders,
-    [],
-    `a provider global has no home in a template (#606) — the loader installs it after consent, and the transport guards every call:\n${offenders.join('\n')}`,
-  );
+        ctx.expect(offenders, `a provider global has no home in a template (#606) — the loader installs it after consent, and the transport guards every call:\n${offenders.join('\n')}`).toEqual([]);
+      },
+    },
+  ],
 });

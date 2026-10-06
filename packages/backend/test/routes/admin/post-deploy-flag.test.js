@@ -46,33 +46,33 @@ module.exports = defineCases({
   tests: [
     {
       name: 'create: deploy defaults true when absent',
-      async run({ assert }) {
+      async run({ expect }) {
         const settings = resolve(createSchema(), { ...CREATE_INPUT });
-        assert.equal(settings.deploy, true, `deploy should default true, got ${settings.deploy}`);
+        expect(settings.deploy, `deploy should default true, got ${settings.deploy}`).toBe(true);
       },
     },
 
     {
       name: 'create: deploy false survives to the route',
-      async run({ assert }) {
+      async run({ expect }) {
         const settings = resolve(createSchema(), { ...CREATE_INPUT, deploy: false });
-        assert.equal(settings.deploy, false, `deploy: false should survive validation, got ${settings.deploy}`);
+        expect(settings.deploy, `deploy: false should survive validation, got ${settings.deploy}`).toBe(false);
       },
     },
 
     {
       name: 'edit: deploy defaults true when absent',
-      async run({ assert }) {
+      async run({ expect }) {
         const settings = resolve(editSchema(), { ...EDIT_INPUT });
-        assert.equal(settings.deploy, true, `deploy should default true, got ${settings.deploy}`);
+        expect(settings.deploy, `deploy should default true, got ${settings.deploy}`).toBe(true);
       },
     },
 
     {
       name: 'edit: deploy false survives to the route',
-      async run({ assert }) {
+      async run({ expect }) {
         const settings = resolve(editSchema(), { ...EDIT_INPUT, deploy: false });
-        assert.equal(settings.deploy, false, `deploy: false should survive validation, got ${settings.deploy}`);
+        expect(settings.deploy, `deploy: false should survive validation, got ${settings.deploy}`).toBe(false);
       },
     },
 
@@ -82,7 +82,7 @@ module.exports = defineCases({
     // name-taking form of the same rule.
     {
       name: 'dispatch: the composed workflow is <target>-build.yml, named by devkit',
-      async run({ assert }) {
+      async run({ expect }) {
         const dispatchDeploy = require('../../../dist/omega/routes/admin/post/dispatch-deploy.js');
 
         const requests = [];
@@ -110,12 +110,9 @@ module.exports = defineCases({
             githubRepo: 'acme-omega',
           });
 
-          assert.equal(settings.deployDispatched, true, `the dispatch should have been sent: ${said.join(' | ')}`);
-          assert.equal(requests.length, 1, 'exactly one dispatch');
-          assert.ok(
-            requests[0].endsWith('/repos/acme/acme-omega/actions/workflows/admin-build.yml/dispatches'),
-            `the second web target dispatches its OWN workflow, got ${requests[0]}`,
-          );
+          expect(settings.deployDispatched, `the dispatch should have been sent: ${said.join(' | ')}`).toBe(true);
+          expect(requests.length, 'exactly one dispatch').toBe(1);
+          expect(requests[0].endsWith('/repos/acme/acme-omega/actions/workflows/admin-build.yml/dispatches'), `the second web target dispatches its OWN workflow, got ${requests[0]}`).toBeTruthy();
         } finally {
           globalThis.fetch = savedFetch;
           if (savedToken === undefined) delete process.env.GH_TOKEN;

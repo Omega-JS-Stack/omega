@@ -71,7 +71,7 @@ module.exports = defineCases({
       name: 'the-emulator-lane-stages-development-unless-a-caller-names-one',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { projectDir, cleanup } = makeProject();
 
         try {
@@ -80,19 +80,19 @@ module.exports = defineCases({
 
           await untilStaged(() => command.startEmulators());
 
-          assert.deepEqual(staged, [
+          expect(staged, 'a plain emulator boot stages development — the stage never asks the shell').toEqual([
             { call: 'ensureStaged', environment: 'development' },
             { call: 'startStageWatch', environment: 'development' },
-          ], 'a plain emulator boot stages development — the stage never asks the shell');
+          ]);
 
           // `omega test`'s auto-start passes its own: the pin is a DEFAULT, not a lock
           staged.length = 0;
           await untilStaged(() => command.startEmulators({ environment: 'testing' }));
 
-          assert.deepEqual(staged, [
+          expect(staged, "an explicit environment still wins (`omega test` names testing)").toEqual([
             { call: 'ensureStaged', environment: 'testing' },
             { call: 'startStageWatch', environment: 'testing' },
-          ], "an explicit environment still wins (`omega test` names testing)");
+          ]);
         } finally {
           cleanup();
         }
@@ -103,7 +103,7 @@ module.exports = defineCases({
       name: 'the-serve-lane-stages-development',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { projectDir, cleanup } = makeProject();
 
         try {
@@ -114,10 +114,10 @@ module.exports = defineCases({
 
           await untilStaged(() => command.execute());
 
-          assert.deepEqual(staged, [
+          expect(staged, 'serve is the same local lane as the emulator — same overlay').toEqual([
             { call: 'ensureStaged', environment: 'development' },
             { call: 'startStageWatch', environment: 'development' },
-          ], 'serve is the same local lane as the emulator — same overlay');
+          ]);
         } finally {
           cleanup();
         }
@@ -128,7 +128,7 @@ module.exports = defineCases({
       name: 'the-mcp-lane-stages-development-and-reads-the-same-overlay',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { projectDir, cleanup } = makeProject();
         const config = require('../../dist/vendor/config/index.js');
         const realLoadEnv = config.loadEnv;
@@ -145,10 +145,10 @@ module.exports = defineCases({
 
           await untilStaged(() => command.execute());
 
-          assert.deepEqual(staged, [
+          expect(staged, 'the mcp lane stages development and reads the env it just staged').toEqual([
             { call: 'ensureStaged', environment: 'development' },
             { call: 'loadEnv', environment: 'development' },
-          ], 'the mcp lane stages development and reads the env it just staged');
+          ]);
         } finally {
           config.loadEnv = realLoadEnv;
           cleanup();

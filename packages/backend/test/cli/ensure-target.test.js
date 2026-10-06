@@ -54,24 +54,24 @@ module.exports = defineCases({
       name: 'a-fresh-target-gets-the-scaffold',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = seedTarget();
 
         try {
           const first = run(dir);
 
-          assert.equal(jetpack.exists(path.join(dir, '.firebaserc')), 'file', '.firebaserc is derived from the resolved config');
-          assert.equal(jetpack.exists(path.join(dir, 'firebase.json')), 'file', 'firebase.json is scaffolded from the template');
-          assert.equal(jetpack.exists(path.join(dir, 'src', 'index.js')), 'file', 'the authored Cloud Functions entry is seeded');
-          assert.equal(jetpack.exists(path.join(dir, 'firestore.rules')), 'file', "the brand's rules SOURCE half is seeded");
-          assert.equal(jetpack.exists(path.join(dir, 'database.rules.json')), 'file', 'the emulator dies ENOENT without it');
-          assert.equal(jetpack.exists(path.join(dir, 'config', 'omega.json5')), 'file', 'a standalone target carries the full config template');
+          expect(jetpack.exists(path.join(dir, '.firebaserc')), '.firebaserc is derived from the resolved config').toBe('file');
+          expect(jetpack.exists(path.join(dir, 'firebase.json')), 'firebase.json is scaffolded from the template').toBe('file');
+          expect(jetpack.exists(path.join(dir, 'src', 'index.js')), 'the authored Cloud Functions entry is seeded').toBe('file');
+          expect(jetpack.exists(path.join(dir, 'firestore.rules')), "the brand's rules SOURCE half is seeded").toBe('file');
+          expect(jetpack.exists(path.join(dir, 'database.rules.json')), 'the emulator dies ENOENT without it').toBe('file');
+          expect(jetpack.exists(path.join(dir, 'config', 'omega.json5')), 'a standalone target carries the full config template').toBe('file');
 
           const manifest = JSON.parse(jetpack.read(path.join(dir, 'package.json')));
-          assert.equal(typeof manifest.engines.node, 'string', 'engines.node is stamped from the framework pin');
+          expect(typeof manifest.engines.node, 'engines.node is stamped from the framework pin').toBe('string');
 
-          assert.equal(first.written.length > 0, true, 'the first run reports what it wrote');
-          assert.equal(first.lines.length > 0, true, 'the first run says so');
+          expect(first.written.length > 0, 'the first run reports what it wrote').toBe(true);
+          expect(first.lines.length > 0, 'the first run says so').toBe(true);
         } finally {
           jetpack.remove(dir);
         }
@@ -82,7 +82,7 @@ module.exports = defineCases({
       name: 'the-license-is-stated-once-and-never-overwritten',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // #884: UNLICENSED is npm's word for closed-source commercial code, and
         // every framework's ensure-target seeds it the same way, so a target
         // manifest never ships the "no license field" npm warning. A brand that
@@ -92,11 +92,11 @@ module.exports = defineCases({
 
         try {
           run(fresh);
-          assert.equal(manifestOf(fresh).license, 'UNLICENSED', 'a manifest stating no license gets the default');
+          expect(manifestOf(fresh).license, 'a manifest stating no license gets the default').toBe('UNLICENSED');
 
           jetpack.write(path.join(authored, 'package.json'), JSON.stringify({ name: 'fixture-backend', license: 'MIT' }, null, 2));
           run(authored);
-          assert.equal(manifestOf(authored).license, 'MIT', 'an authored license survives every verb run');
+          expect(manifestOf(authored).license, 'an authored license survives every verb run').toBe('MIT');
         } finally {
           jetpack.remove(fresh);
           jetpack.remove(authored);
@@ -108,7 +108,7 @@ module.exports = defineCases({
       name: 'a-second-run-is-a-silent-no-op',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = seedTarget();
 
         try {
@@ -118,11 +118,11 @@ module.exports = defineCases({
           const second = run(dir);
           const after = jetpack.inspectTree(dir, { checksum: 'sha1' });
 
-          assert.deepEqual(second.written, [], 'nothing is written twice');
-          assert.deepEqual(second.merged, [], 'a byte-identical default is not a merge');
-          assert.deepEqual(second.changed, [], 'nothing is migrated twice');
-          assert.deepEqual(second.lines, [], 'idempotent means quiet');
-          assert.equal(after.checksum, before.checksum, 'the tree is byte-identical after a second run');
+          expect(second.written, 'nothing is written twice').toEqual([]);
+          expect(second.merged, 'a byte-identical default is not a merge').toEqual([]);
+          expect(second.changed, 'nothing is migrated twice').toEqual([]);
+          expect(second.lines, 'idempotent means quiet').toEqual([]);
+          expect(after.checksum, 'the tree is byte-identical after a second run').toBe(before.checksum);
         } finally {
           jetpack.remove(dir);
         }
@@ -133,7 +133,7 @@ module.exports = defineCases({
       name: 'consumer-authored-files-are-never-clobbered',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = seedTarget();
 
         try {
@@ -142,8 +142,8 @@ module.exports = defineCases({
 
           run(dir);
 
-          assert.equal(jetpack.read(path.join(dir, 'src', 'index.js')), '// mine\n', 'an authored entry survives');
-          assert.equal(JSON.parse(jetpack.read(path.join(dir, 'package.json'))).engines.node, '20', 'an authored engines.node survives');
+          expect(jetpack.read(path.join(dir, 'src', 'index.js')), 'an authored entry survives').toBe('// mine\n');
+          expect(JSON.parse(jetpack.read(path.join(dir, 'package.json'))).engines.node, 'an authored engines.node survives').toBe('20');
         } finally {
           jetpack.remove(dir);
         }
@@ -154,7 +154,7 @@ module.exports = defineCases({
       name: 'the-standard-scripts-sync-to-their-defaults-on-every-run',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // ONE overwrite policy with the three sibling frameworks and with the
         // manager walk (#689): a key this framework declares is framework-owned
         // and takes the default on every verb run — a consumer who wants other
@@ -165,7 +165,7 @@ module.exports = defineCases({
           run(dir);
 
           for (const [key, value] of Object.entries(PROJECT_SCRIPTS)) {
-            assert.equal(manifestOf(dir).scripts[key], value, `a fresh target gets the framework default for ${key}`);
+            expect(manifestOf(dir).scripts[key], `a fresh target gets the framework default for ${key}`).toBe(value);
           }
 
           // A hand-edited standard key and a consumer-added one
@@ -176,16 +176,16 @@ module.exports = defineCases({
 
           const healed = run(dir);
           const after = manifestOf(dir);
-          assert.equal(after.scripts.deploy, PROJECT_SCRIPTS.deploy, 'an edited standard script is rewritten to the default');
-          assert.equal(after.scripts.render, 'render deploy', 'a key the framework never declares is the consumer\'s own');
-          assert.equal(healed.changed.length > 0, true, 'and the run reports the sync');
-          assert.equal(jetpack.read(path.join(dir, 'package.json')).endsWith('\n'), true, 'the write keeps npm\'s trailing newline, like every sibling writer');
+          expect(after.scripts.deploy, 'an edited standard script is rewritten to the default').toBe(PROJECT_SCRIPTS.deploy);
+          expect(after.scripts.render, 'a key the framework never declares is the consumer\'s own').toBe('render deploy');
+          expect(healed.changed.length > 0, 'and the run reports the sync').toBe(true);
+          expect(jetpack.read(path.join(dir, 'package.json')).endsWith('\n'), 'the write keeps npm\'s trailing newline, like every sibling writer').toBe(true);
 
           // Converged: a third run writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
           const third = run(dir);
-          assert.deepEqual(third.changed, [], 'a converged manifest is not a change');
-          assert.equal(jetpack.read(path.join(dir, 'package.json')), before, 'and is byte-identical');
+          expect(third.changed, 'a converged manifest is not a change').toEqual([]);
+          expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
         }
@@ -196,7 +196,7 @@ module.exports = defineCases({
       name: 'the-verb-scripts-derive-from-the-verb-table',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const dir = seedTarget();
 
         try {
@@ -207,17 +207,17 @@ module.exports = defineCases({
           const declaredScripts = frameworkPackage.projectScripts || {};
           for (const [verb, command] of Object.entries(derived)) {
             const declared = declaredScripts[verb];
-            assert.equal(scripts[verb], declared || command, `${verb} lands as ${declared ? 'its declared command' : 'its bare verb'}`);
+            expect(scripts[verb], `${verb} lands as ${declared ? 'its declared command' : 'its bare verb'}`).toBe(declared || command);
           }
-          assert.equal(scripts.start, 'omega dev', 'the dev row derives npm\'s start, like on every framework');
-          assert.equal(scripts.test, 'omega test', 'test is the verb like on every framework');
+          expect(scripts.start, 'the dev row derives npm\'s start, like on every framework').toBe('omega dev');
+          expect(scripts.test, 'test is the verb like on every framework').toBe('omega test');
           for (const retired of ['emulator', 'test:static', 'test:emulator']) {
-            assert.equal(scripts[retired], undefined, `no \`${retired}\` script: dev and test are the entries`);
+            expect(scripts[retired], `no \`${retired}\` script: dev and test are the entries`).toBe(undefined);
           }
 
           // No verb script is typed by hand: the manifest declares only what the table cannot derive
           const typed = Object.keys(declaredScripts).filter((key) => key in derived);
-          assert.deepEqual(typed, []);
+          expect(typed).toEqual([]);
         } finally {
           jetpack.remove(dir);
         }
@@ -228,13 +228,13 @@ module.exports = defineCases({
       name: 'the-standard-scripts-spell-the-verb-bare',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Bare `omega <verb>` inside a package script, web's form and the one
         // the three siblings share (#748): npm already puts node_modules/.bin
         // on the path there, so the `npx` prefix bought nothing. It stays
         // canonical for docs and the terminal, never for a script.
         for (const [key, value] of Object.entries(PROJECT_SCRIPTS)) {
-          assert.equal(value.includes('npx omega'), false, `${key} must spell the verb bare`);
+          expect(value.includes('npx omega'), `${key} must spell the verb bare`).toBe(false);
         }
 
         const dir = seedTarget();
@@ -249,14 +249,14 @@ module.exports = defineCases({
           run(dir);
           const healed = manifestOf(dir).scripts;
 
-          assert.equal(healed.start, PROJECT_SCRIPTS.start, 'the old `npx omega serve` heals to the bare verb');
-          assert.equal(healed.deploy, PROJECT_SCRIPTS.deploy, 'and so does every other framework-owned key');
-          assert.equal(healed.lint, 'npx eslint .', 'a key the framework never declares is the consumer\'s own');
+          expect(healed.start, 'the old `npx omega serve` heals to the bare verb').toBe(PROJECT_SCRIPTS.start);
+          expect(healed.deploy, 'and so does every other framework-owned key').toBe(PROJECT_SCRIPTS.deploy);
+          expect(healed.lint, 'a key the framework never declares is the consumer\'s own').toBe('npx eslint .');
 
           // Converged: the second pass writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
-          assert.deepEqual(run(dir).changed, [], 'a healed manifest is not a change');
-          assert.equal(jetpack.read(path.join(dir, 'package.json')), before, 'and is byte-identical');
+          expect(run(dir).changed, 'a healed manifest is not a change').toEqual([]);
+          expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
         }
@@ -267,7 +267,7 @@ module.exports = defineCases({
       name: 'a-custom-server-backend-keeps-the-verbs-its-mode-refuses',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Per KEY, not per target (#689): a custom-server backend (#584) names
         // its own start/deploy because those verbs refuse in that mode — the
         // rest of the standard keys are still this framework's.
@@ -285,20 +285,20 @@ module.exports = defineCases({
           run(dir);
           const scripts = manifestOf(dir).scripts;
 
-          assert.equal(scripts.start, 'node server.js', 'the brand names its own server command');
+          expect(scripts.start, 'the brand names its own server command').toBe('node server.js');
           for (const key of CUSTOM_OWNED) {
             if (key === 'start') continue;
-            assert.equal(scripts[key], undefined, `${key} is the brand's in custom mode — never written, never scaffolded`);
+            expect(scripts[key], `${key} is the brand's in custom mode — never written, never scaffolded`).toBe(undefined);
           }
           for (const key of Object.keys(PROJECT_SCRIPTS)) {
             if (CUSTOM_OWNED.includes(key)) continue;
-            assert.equal(scripts[key], PROJECT_SCRIPTS[key], `${key} still works in custom mode, so the framework still owns it`);
+            expect(scripts[key], `${key} still works in custom mode, so the framework still owns it`).toBe(PROJECT_SCRIPTS[key]);
           }
 
           // Converged: a second run writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
-          assert.deepEqual(run(dir).changed, [], 'a converged custom target is not a change');
-          assert.equal(jetpack.read(path.join(dir, 'package.json')), before, 'and is byte-identical');
+          expect(run(dir).changed, 'a converged custom target is not a change').toEqual([]);
+          expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
         }
@@ -309,13 +309,13 @@ module.exports = defineCases({
       name: 'staging-runs-it-first-so-every-verb-does',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // ensureStaged() is the one call every runtime surface makes before it
         // touches dist/ — emulator, serve, test, build, deploy. Reading it here
         // proves the wiring without booting a verb.
         const source = jetpack.read(path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'base-command.js'));
 
-        assert.match(source, /ensureTarget\(/, 'ensureStaged() runs the scaffold before it stages');
+        expect(source, 'ensureStaged() runs the scaffold before it stages').toMatch(/ensureTarget\(/);
       },
     },
 
@@ -323,7 +323,7 @@ module.exports = defineCases({
       name: 'a-verb-prints-the-scaffolds-warnings-and-build-runs-it-first',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // A brand target whose AGENTS.md carries notes is kept with a
         // move-it warning. The verb has to print that warning, not drop it,
         // and a bare `omega build` has to reach the scaffold at all.
@@ -342,15 +342,15 @@ module.exports = defineCases({
           command.logWarning = (message) => warnings.push(message);
           command.runEnsureTarget();
 
-          assert.ok(warnings.some((message) => message.includes('Kept AGENTS.md')), 'the scaffold warning reaches the verb output');
-          assert.match(jetpack.read(path.join(targetDir, 'AGENTS.md')), /VPN/, 'the notes stay');
+          expect(warnings.some((message) => message.includes('Kept AGENTS.md')), 'the scaffold warning reaches the verb output').toBeTruthy();
+          expect(jetpack.read(path.join(targetDir, 'AGENTS.md')), 'the notes stay').toMatch(/VPN/);
 
           // Build runs the scaffold before it stages: stop it at that seam.
           const order = [];
           command.attachVerbLog = () => {};
           command.runEnsureTarget = () => { order.push('ensureTarget'); throw new Error('stop'); };
           await command.execute().catch((error) => order.push(error.message));
-          assert.deepEqual(order, ['ensureTarget', 'stop'], 'build reaches ensureTarget first');
+          expect(order, 'build reaches ensureTarget first').toEqual(['ensureTarget', 'stop']);
         } finally {
           jetpack.remove(brand);
         }
@@ -361,7 +361,7 @@ module.exports = defineCases({
       name: 'a-workspace-root-is-refused-without-writing-a-file',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The accident: `omega deploy` at a workspace root scaffolded a whole
         // backend target into it — firebase.json, src/, rules — before failing
         // anyway ([#699](https://github.com/Omega-JS-Stack/omega/issues/699)).
@@ -380,13 +380,13 @@ module.exports = defineCases({
             refusal = e;
           }
 
-          assert.ok(refusal, 'a workspace root fails loud, not silently');
-          assert.match(refusal.message, /refusing to scaffold into/, 'the refusal says what it refused');
-          assert.match(refusal.message, /declares "workspaces"/, 'and why');
-          assert.equal(refusal.message.includes(dir), true, 'naming the directory it was aimed at');
+          expect(refusal, 'a workspace root fails loud, not silently').toBeTruthy();
+          expect(refusal.message, 'the refusal says what it refused').toMatch(/refusing to scaffold into/);
+          expect(refusal.message, 'and why').toMatch(/declares "workspaces"/);
+          expect(refusal.message.includes(dir), 'naming the directory it was aimed at').toBe(true);
 
-          assert.deepEqual(jetpack.list(dir), ['package.json'], 'nothing was scaffolded');
-          assert.equal(jetpack.read(manifestPath), before, 'the manifest is byte-identical');
+          expect(jetpack.list(dir), 'nothing was scaffolded').toEqual(['package.json']);
+          expect(jetpack.read(manifestPath), 'the manifest is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
         }
@@ -397,7 +397,7 @@ module.exports = defineCases({
       name: 'the-frameworks-own-tree-is-not-a-consumer-target',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Running the framework's own suite from packages/backend puts the
         // framework at the cwd. Scaffolding there would scatter the consumer
         // defaults through the package. Sibling of the same guard in
@@ -410,10 +410,10 @@ module.exports = defineCases({
 
           const result = run(dir);
 
-          assert.deepEqual(result.written, [], 'nothing is written into the framework tree');
-          assert.deepEqual(result.changed, [], 'the manifest is left alone');
-          assert.deepEqual(result.lines, [], 'and it says nothing — a normal state, not a broken one');
-          assert.equal(jetpack.exists(path.join(dir, 'firebase.json')), false, 'no consumer artifact appears');
+          expect(result.written, 'nothing is written into the framework tree').toEqual([]);
+          expect(result.changed, 'the manifest is left alone').toEqual([]);
+          expect(result.lines, 'and it says nothing — a normal state, not a broken one').toEqual([]);
+          expect(jetpack.exists(path.join(dir, 'firebase.json')), 'no consumer artifact appears').toBe(false);
         } finally {
           jetpack.remove(dir);
         }

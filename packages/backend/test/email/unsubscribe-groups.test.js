@@ -14,7 +14,7 @@
  * Plain-node unit test (no emulator, no network) — the build path is pure, so
  * the assertions run against the real Transactional.build().
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const { GROUP_KEYS, DEFAULT_GROUP_KEY } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -67,10 +67,10 @@ module.exports = defineCases({
       run() {
         const constants = require('../../dist/omega/libraries/email/constants.js');
 
-        assert.ok(!('GROUPS' in constants), 'the hardcoded id map is gone');
-        assert.deepEqual(GROUP_KEYS, ['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal']);
+        expect(!('GROUPS' in constants), 'the hardcoded id map is gone').toBeTruthy();
+        expect(GROUP_KEYS).toEqual(['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal']);
         for (const sender of Object.values(constants.SENDERS)) {
-          assert.ok(GROUP_KEYS.includes(sender.group), `sender names a group KEY, got ${sender.group}`);
+          expect(GROUP_KEYS.includes(sender.group), `sender names a group KEY, got ${sender.group}`).toBeTruthy();
         }
       },
     },
@@ -81,7 +81,7 @@ module.exports = defineCases({
       async run() {
         const email = await build({ sender: 'orders' });
 
-        assert.equal(email.asm.groupId, GROUP_IDS.orders);
+        expect(email.asm.groupId).toBe(GROUP_IDS.orders);
       },
     },
 
@@ -93,7 +93,7 @@ module.exports = defineCases({
 
         for (const [sender, config] of Object.entries(SENDERS)) {
           const email = await build({ sender });
-          assert.equal(email.asm.groupId, GROUP_IDS[config.group], `${sender} attached the wrong group`);
+          expect(email.asm.groupId, `${sender} attached the wrong group`).toBe(GROUP_IDS[config.group]);
         }
       },
     },
@@ -104,7 +104,7 @@ module.exports = defineCases({
       async run() {
         const email = await build({});
 
-        assert.equal(email.asm.groupId, GROUP_IDS[DEFAULT_GROUP_KEY]);
+        expect(email.asm.groupId).toBe(GROUP_IDS[DEFAULT_GROUP_KEY]);
       },
     },
 
@@ -113,10 +113,10 @@ module.exports = defineCases({
 
       async run() {
         const byKey = await build({ sender: 'orders', group: 'security' });
-        assert.equal(byKey.asm.groupId, GROUP_IDS.security, 'the key won over the sender default');
+        expect(byKey.asm.groupId, 'the key won over the sender default').toBe(GROUP_IDS.security);
 
         const byId = await build({ sender: 'orders', group: 424242 });
-        assert.equal(byId.asm.groupId, 424242, 'a caller-supplied id is used as-is');
+        expect(byId.asm.groupId, 'a caller-supplied id is used as-is').toBe(424242);
       },
     },
 
@@ -127,14 +127,11 @@ module.exports = defineCases({
         // The programmer error this guards: the manage walk never ran, so the
         // brand has no groups of its own. Sending anyway would attach an id
         // belonging to whichever account it was created in.
-        await assert.rejects(
-          () => build({ sender: 'orders' }, { groups: null }),
-          (error) => {
-            assert.equal(error.code, 400, 'classed as a build failure');
-            assert.match(error.message, /marketing\.campaigns\.providers\.sendgrid\.groups\.orders/, 'names the config path to set');
+        await expect((() => build({ sender: 'orders' }, { groups: null }))()).rejects.toThrow((error) => {
+            expect(error.code, 'classed as a build failure').toBe(400);
+            expect(error.message, 'names the config path to set').toMatch(/marketing\.campaigns\.providers\.sendgrid\.groups\.orders/);
             return true;
-          },
-        );
+          });
       },
     },
 
@@ -144,10 +141,7 @@ module.exports = defineCases({
       async run() {
         const { security, ...rest } = GROUP_IDS;
 
-        await assert.rejects(
-          () => build({ sender: 'security' }, { groups: rest }),
-          /groups\.security/,
-        );
+        await expect((() => build({ sender: 'security' }, { groups: rest }))()).rejects.toThrow(/groups\.security/);
       },
     },
   ],

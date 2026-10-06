@@ -28,7 +28,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refusal-reporting
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -112,23 +112,19 @@ module.exports = defineCases({
       async run() {
         const { captures, store } = await runSubscriptionUpdated({ sdk: sdkAnswering(), payloadUid: FORGED_UID });
 
-        assert.strictEqual(captures.length, 1, `A refusal reports exactly once, got ${JSON.stringify(captures)}`);
+        expect(captures.length, `A refusal reports exactly once, got ${JSON.stringify(captures)}`).toBe(1);
 
         const capture = captures[0];
 
-        assert.strictEqual(capture.level, 'warning', `A refusal is a decision, not a server fault, got ${capture.level}`);
-        assert.strictEqual(capture.tags.refusal, 'uid-mismatch', `The tag names the reason, got ${JSON.stringify(capture.tags)}`);
-        assert.strictEqual(capture.tags.provider, 'stripe', `The tag names the provider, got ${JSON.stringify(capture.tags)}`);
-        assert.strictEqual(capture.tags.eventId, EVENT_ID, `The event is nameable in the provider dashboard, got ${JSON.stringify(capture.tags)}`);
-        assert.strictEqual(capture.extra.eventId, EVENT_ID, `The event id rides the report body too, got ${JSON.stringify(capture.extra)}`);
-        assert.strictEqual(capture.extra.eventType, EVENT_TYPE, `The report says which event it was, got ${JSON.stringify(capture.extra)}`);
-        assert.match(capture.message, /uid-mismatch/, `The message says what was refused, got ${capture.message}`);
+        expect(capture.level, `A refusal is a decision, not a server fault, got ${capture.level}`).toBe('warning');
+        expect(capture.tags.refusal, `The tag names the reason, got ${JSON.stringify(capture.tags)}`).toBe('uid-mismatch');
+        expect(capture.tags.provider, `The tag names the provider, got ${JSON.stringify(capture.tags)}`).toBe('stripe');
+        expect(capture.tags.eventId, `The event is nameable in the provider dashboard, got ${JSON.stringify(capture.tags)}`).toBe(EVENT_ID);
+        expect(capture.extra.eventId, `The event id rides the report body too, got ${JSON.stringify(capture.extra)}`).toBe(EVENT_ID);
+        expect(capture.extra.eventType, `The report says which event it was, got ${JSON.stringify(capture.extra)}`).toBe(EVENT_TYPE);
+        expect(capture.message, `The message says what was refused, got ${capture.message}`).toMatch(/uid-mismatch/);
 
-        assert.strictEqual(
-          store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason,
-          capture.tags.refusal,
-          'The reported reason is the one stamped on the event doc',
-        );
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason, 'The reported reason is the one stamped on the event doc').toBe(capture.tags.refusal);
       },
     },
 
@@ -141,10 +137,10 @@ module.exports = defineCases({
 
         // Ids only, per the scrub rules: the stamp's own fields are the join
         // keys a human reconciles from, and the payload never rides along.
-        assert.strictEqual(capture.extra.payloadUid, FORGED_UID, `The claimed owner rides, got ${JSON.stringify(capture.extra)}`);
-        assert.strictEqual(capture.extra.providerUid, OWNER_UID, `The real owner rides, got ${JSON.stringify(capture.extra)}`);
-        assert.ok(!JSON.stringify(capture).includes('@'), `No email is ever assembled into the report, got ${JSON.stringify(capture)}`);
-        assert.ok(!JSON.stringify(capture).includes('current_period_end'), `The provider payload never rides, got ${JSON.stringify(capture)}`);
+        expect(capture.extra.payloadUid, `The claimed owner rides, got ${JSON.stringify(capture.extra)}`).toBe(FORGED_UID);
+        expect(capture.extra.providerUid, `The real owner rides, got ${JSON.stringify(capture.extra)}`).toBe(OWNER_UID);
+        expect(!JSON.stringify(capture).includes('@'), `No email is ever assembled into the report, got ${JSON.stringify(capture)}`).toBeTruthy();
+        expect(!JSON.stringify(capture).includes('current_period_end'), `The provider payload never rides, got ${JSON.stringify(capture)}`).toBeTruthy();
       },
     },
 
@@ -156,9 +152,9 @@ module.exports = defineCases({
         // reason needs no capture of its own.
         const { captures } = await runSubscriptionUpdated({ sdk: sdkThrowing(resourceMissing()) });
 
-        assert.strictEqual(captures.length, 1, `The #506 refusal reports too, got ${JSON.stringify(captures)}`);
-        assert.strictEqual(captures[0].tags.refusal, 'resource-not-found', `The tag names this reason, got ${JSON.stringify(captures[0].tags)}`);
-        assert.strictEqual(captures[0].extra.resourceId, RESOURCE_ID, `The stamp's resource rides, got ${JSON.stringify(captures[0].extra)}`);
+        expect(captures.length, `The #506 refusal reports too, got ${JSON.stringify(captures)}`).toBe(1);
+        expect(captures[0].tags.refusal, `The tag names this reason, got ${JSON.stringify(captures[0].tags)}`).toBe('resource-not-found');
+        expect(captures[0].extra.resourceId, `The stamp's resource rides, got ${JSON.stringify(captures[0].extra)}`).toBe(RESOURCE_ID);
       },
     },
 
@@ -168,8 +164,8 @@ module.exports = defineCases({
       async run() {
         const { captures, store } = await runSubscriptionUpdated({ sdk: sdkAnswering() });
 
-        assert.deepStrictEqual(captures, [], `An ordinary event is a non-event on the dashboard, got ${JSON.stringify(captures)}`);
-        assert.strictEqual(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'active', 'The subscription is written exactly as before');
+        expect(captures, `An ordinary event is a non-event on the dashboard, got ${JSON.stringify(captures)}`).toEqual([]);
+        expect(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'The subscription is written exactly as before').toBe('active');
       },
     },
 
@@ -181,13 +177,13 @@ module.exports = defineCases({
         // a clean no-op, never a second failure on top of the refusal
         const { captures, store } = await runSubscriptionUpdated({ sdk: sdkAnswering(), payloadUid: FORGED_UID, reporting: false });
 
-        assert.deepStrictEqual(captures, [], `Nothing is reported when reporting is off, got ${JSON.stringify(captures)}`);
+        expect(captures, `Nothing is reported when reporting is off, got ${JSON.stringify(captures)}`).toEqual([]);
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.strictEqual(event?.refusal?.reason, 'uid-mismatch', 'The stamp still lands');
-        assert.strictEqual(event?.status, 'completed', 'The refusal is still acknowledged, not failed');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'And the refused event still writes nothing');
+        expect(event?.refusal?.reason, 'The stamp still lands').toBe('uid-mismatch');
+        expect(event?.status, 'The refusal is still acknowledged, not failed').toBe('completed');
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'And the refused event still writes nothing').toBeTruthy();
       },
     },
   ],

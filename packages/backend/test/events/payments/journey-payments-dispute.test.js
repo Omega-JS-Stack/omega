@@ -35,7 +35,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
 
         if (!paidProduct) {
@@ -53,7 +53,7 @@ module.exports = defineCases({
           frequency: state.product.frequency,
         });
 
-        assert.isSuccess(response, 'Intent should succeed');
+        expect(response, 'Intent should succeed').toBeSuccess();
         state.orderId = response.data.orderId;
 
         await waitFor(async () => {
@@ -63,8 +63,8 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.status, 'active', 'The subscriber starts active');
-        assert.equal(userDoc.subscription.product.id, paidProduct.id, `The subscriber starts on ${paidProduct.id}`);
+        expect(userDoc.subscription.status, 'The subscriber starts active').toBe('active');
+        expect(userDoc.subscription.product.id, `The subscriber starts on ${paidProduct.id}`).toBe(paidProduct.id);
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
         state.price = userDoc.subscription.payment.price;
@@ -73,7 +73,7 @@ module.exports = defineCases({
 
     {
       name: 'an-alert-that-matches-nothing-is-recorded-as-no-match',
-      async run({ http, firestore, assert, state, config, waitFor }) {
+      async run({ http, firestore, expect, state, config, waitFor }) {
         // The branch that must stay reachable: an alert whose amount belongs to no
         // subscriber matches nothing, refunds nothing, and cancels nothing. A
         // dispute pipeline that force-cancelled on a near miss would be worse than
@@ -90,7 +90,7 @@ module.exports = defineCases({
           customerEmail: state.email,
         });
 
-        assert.isSuccess(response, 'The alert door should accept it');
+        expect(response, 'The alert door should accept it').toBeSuccess();
 
         await waitFor(async () => {
           const doc = await firestore.get(`payments-disputes/${alertId}`);
@@ -99,20 +99,20 @@ module.exports = defineCases({
 
         const dispute = await firestore.get(`payments-disputes/${alertId}`);
 
-        assert.equal(dispute.status, 'no-match', 'An amount nobody paid must not match a subscriber');
-        assert.equal(dispute.actions.refund, 'skipped', 'Nothing is refunded on a miss');
-        assert.equal(dispute.actions.cancel, 'skipped', 'And nothing is cancelled on a miss');
+        expect(dispute.status, 'An amount nobody paid must not match a subscriber').toBe('no-match');
+        expect(dispute.actions.refund, 'Nothing is refunded on a miss').toBe('skipped');
+        expect(dispute.actions.cancel, 'And nothing is cancelled on a miss').toBe('skipped');
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.status, 'active', 'The subscriber is untouched by an alert that matched nothing');
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, 'And keeps their plan');
+        expect(userDoc.subscription.status, 'The subscriber is untouched by an alert that matched nothing').toBe('active');
+        expect(userDoc.subscription.product.id, 'And keeps their plan').toBe(state.paidProductId);
       },
     },
 
     {
       name: 'the-real-alert-matches-the-charge',
-      async run({ http, firestore, assert, state, config, waitFor }) {
+      async run({ http, firestore, expect, state, config, waitFor }) {
         state.alertId = `_test-dispute-${Date.now()}`;
 
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${config.webhookKey}`, {
@@ -127,7 +127,7 @@ module.exports = defineCases({
           reasonCode: 'fraudulent',
         });
 
-        assert.isSuccess(response, 'The alert door should accept it');
+        expect(response, 'The alert door should accept it').toBeSuccess();
 
         await waitFor(async () => {
           const doc = await firestore.get(`payments-disputes/${state.alertId}`);
@@ -136,18 +136,18 @@ module.exports = defineCases({
 
         const dispute = await firestore.get(`payments-disputes/${state.alertId}`);
 
-        assert.equal(dispute.status, 'resolved', `The dispute should resolve, got ${dispute.status}: ${dispute.error || 'no error'}`);
-        assert.equal(dispute.match.uid, state.uid, 'It matched the right subscriber');
-        assert.equal(dispute.match.subscriptionId, state.subscriptionId, 'And their live subscription');
-        assert.equal(dispute.actions.refund, 'success', 'The disputed charge is refunded');
-        assert.equal(dispute.actions.cancel, 'success', 'And the subscription is cancelled');
-        assert.deepEqual(dispute.errors, [], 'With nothing left over');
+        expect(dispute.status, `The dispute should resolve, got ${dispute.status}: ${dispute.error || 'no error'}`).toBe('resolved');
+        expect(dispute.match.uid, 'It matched the right subscriber').toBe(state.uid);
+        expect(dispute.match.subscriptionId, 'And their live subscription').toBe(state.subscriptionId);
+        expect(dispute.actions.refund, 'The disputed charge is refunded').toBe('success');
+        expect(dispute.actions.cancel, 'And the subscription is cancelled').toBe('success');
+        expect(dispute.errors, 'With nothing left over').toEqual([]);
       },
     },
 
     {
       name: 'the-cancel-goes-through-the-webhook-pipeline',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // The cancel is NOT written onto the user. It is issued as the provider
         // event a real cancel produces, and the pipeline is what revokes access —
         // the same path a customer-initiated cancellation takes.
@@ -163,14 +163,14 @@ module.exports = defineCases({
             .find(d => d.event?.type === 'customer.subscription.deleted' && d.status === 'completed') || null;
         }, 20000, 500);
 
-        assert.equal(webhook.transition, 'subscription-cancelled', 'The forced cancel lands on the cancellation transition, like any other');
-        assert.equal(webhook.provider, 'test', 'It came through the pipeline as a provider event');
+        expect(webhook.transition, 'The forced cancel lands on the cancellation transition, like any other').toBe('subscription-cancelled');
+        expect(webhook.provider, 'It came through the pipeline as a provider event').toBe('test');
       },
     },
 
     {
       name: 'the-subscriber-loses-access',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`users/${state.uid}`);
           return doc?.subscription?.status === 'cancelled';
@@ -178,12 +178,12 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.status, 'cancelled', 'A chargeback ends the subscription outright — no term to serve out');
-        assert.equal(userDoc.subscription.cancellation.pending, false, 'Nothing is left pending: the cancel already happened');
+        expect(userDoc.subscription.status, 'A chargeback ends the subscription outright — no term to serve out').toBe('cancelled');
+        expect(userDoc.subscription.cancellation.pending, 'Nothing is left pending: the cancel already happened').toBe(false);
 
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.equal(orderDoc.unified.status, 'cancelled', 'The order mirrors it');
+        expect(orderDoc.unified.status, 'The order mirrors it').toBe('cancelled');
       },
     },
   ],

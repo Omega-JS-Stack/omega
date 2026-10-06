@@ -19,10 +19,9 @@
  *   3. The read sits inside a `@dev-only` block, so production ships neither
  *      the param nor what it unlocks (#226/#235/#245 were all this bug).
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const PKG = path.resolve(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
@@ -156,94 +155,97 @@ function scan() {
   });
 }
 
-test('#342: every `_dev_*` hook in client code is one the palette offers', () => {
-  const unknown = [];
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-hooks-guard',
+  tests: [
+    {
+      name: '#342: every `_dev_*` hook in client code is one the palette offers',
+      run: (ctx) => {
+        const unknown = [];
 
-  for (const file of scan()) {
-    file.code.split('\n').forEach((line, index) => {
-      for (const match of line.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
-        if (!DEV_HOOKS[match[0]]) {
-          unknown.push(`${file.rel}:${index + 1} — ${match[0]}`);
+        for (const file of scan()) {
+          file.code.split('\n').forEach((line, index) => {
+            for (const match of line.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
+              if (!DEV_HOOKS[match[0]]) {
+                unknown.push(`${file.rel}:${index + 1} — ${match[0]}`);
+              }
+            }
+          });
         }
-      }
-    });
-  }
 
-  assert.deepStrictEqual(
-    unknown,
-    [],
-    'a new `_dev_*` hook must be a palette control, and listed in DEV_HOOKS with the section that offers it',
-  );
-});
+        ctx.expect(unknown, 'a new `_dev_*` hook must be a palette control, and listed in DEV_HOOKS with the section that offers it').toEqual([]);
+      },
+    },
 
-test('#342: each listed hook really is wired to a palette section, and is really still read', () => {
-  const files = scan();
-  const byRel = new Map(files.map((file) => [file.rel, file]));
-  const used = new Set();
+    {
+      name: '#342: each listed hook really is wired to a palette section, and is really still read',
+      run: (ctx) => {
+        const files = scan();
+        const byRel = new Map(files.map((file) => [file.rel, file]));
+        const used = new Set();
 
-  files.forEach((file) => {
-    for (const match of file.code.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
-      used.add(match[0]);
-    }
-  });
+        files.forEach((file) => {
+          for (const match of file.code.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
+            used.add(match[0]);
+          }
+        });
 
-  for (const [param, entry] of Object.entries(DEV_HOOKS)) {
-    assert.ok(used.has(param), `DEV_HOOKS lists "${param}", but no client code reads it any more — drop the entry`);
+        for (const [param, entry] of Object.entries(DEV_HOOKS)) {
+          ctx.expect(used.has(param), `DEV_HOOKS lists "${param}", but no client code reads it any more — drop the entry`).toBeTruthy();
 
-    if (entry.exception) {
-      continue;
-    }
+          if (entry.exception) {
+            continue;
+          }
 
-    const section = byRel.get(entry.offeredBy);
-    assert.ok(section, `DEV_HOOKS points "${param}" at ${entry.offeredBy}, which does not exist`);
-    assert.ok(
-      section.code.includes(`'${param}'`),
-      `${entry.offeredBy} should carry the palette control for "${param}" — the table may not stand in for the wiring`,
-    );
-  }
-});
-
-test('#342: every hook read sits inside a `@dev-only` block, so production ships none of it', () => {
-  const leaked = [];
-
-  for (const file of scan()) {
-    if (DEV_ONLY_MODULES.includes(file.rel)) {
-      continue;
-    }
-
-    file.code.split('\n').forEach((line, index) => {
-      for (const match of line.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
-        if (DEV_HOOKS[match[0]]?.exception || file.devOnly.has(index)) {
-          continue;
+          const section = byRel.get(entry.offeredBy);
+          ctx.expect(section, `DEV_HOOKS points "${param}" at ${entry.offeredBy}, which does not exist`).toBeTruthy();
+          ctx.expect(section.code.includes(`'${param}'`), `${entry.offeredBy} should carry the palette control for "${param}" — the table may not stand in for the wiring`).toBeTruthy();
         }
-        leaked.push(`${file.rel}:${index + 1} — ${match[0]}`);
-      }
-    });
-  }
+      },
+    },
 
-  assert.deepStrictEqual(
-    leaked,
-    [],
-    'a dev hook read outside a `@dev-only` block survives the strip and ships to production',
-  );
-});
+    {
+      name: '#342: every hook read sits inside a `@dev-only` block, so production ships none of it',
+      run: (ctx) => {
+        const leaked = [];
 
-test('#342: no debug helper is hung on window — the palette is the way in', () => {
-  const helpers = [];
+        for (const file of scan()) {
+          if (DEV_ONLY_MODULES.includes(file.rel)) {
+            continue;
+          }
 
-  for (const file of scan()) {
-    file.code.split('\n').forEach((line, index) => {
-      for (const match of line.matchAll(/\bwindow\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)) {
-        if (!ALLOWED_GLOBALS[match[1]]) {
-          helpers.push(`${file.rel}:${index + 1} — window.${match[1]}`);
+          file.code.split('\n').forEach((line, index) => {
+            for (const match of line.matchAll(/_dev_[A-Za-z0-9_]+/g)) {
+              if (DEV_HOOKS[match[0]]?.exception || file.devOnly.has(index)) {
+                continue;
+              }
+              leaked.push(`${file.rel}:${index + 1} — ${match[0]}`);
+            }
+          });
         }
-      }
-    });
-  }
 
-  assert.deepStrictEqual(
-    helpers,
-    [],
-    'hand the capability to the palette with registerDevSection instead of hanging it on window',
-  );
+        ctx.expect(leaked, 'a dev hook read outside a `@dev-only` block survives the strip and ships to production').toEqual([]);
+      },
+    },
+
+    {
+      name: '#342: no debug helper is hung on window — the palette is the way in',
+      run: (ctx) => {
+        const helpers = [];
+
+        for (const file of scan()) {
+          file.code.split('\n').forEach((line, index) => {
+            for (const match of line.matchAll(/\bwindow\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)) {
+              if (!ALLOWED_GLOBALS[match[1]]) {
+                helpers.push(`${file.rel}:${index + 1} — window.${match[1]}`);
+              }
+            }
+          });
+        }
+
+        ctx.expect(helpers, 'hand the capability to the palette with registerDevSection instead of hanging it on window').toEqual([]);
+      },
+    },
+  ],
 });

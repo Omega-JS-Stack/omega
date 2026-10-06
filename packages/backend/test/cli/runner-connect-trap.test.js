@@ -15,9 +15,9 @@ module.exports = {
   type: 'group',
   tests: [{
     name: 'trap-state',
-    async run({ assert }) {
+    async run({ expect }) {
       const expected = process.env.PROBE_EXPECT_TRAP === 'true';
-      assert.equal(Boolean(globalThis.__omegaConnectTrap?.installed), expected, 'the trap state');
+      expect(Boolean(globalThis.__omegaConnectTrap?.installed), 'the trap state').toBe(expected);
       if (!expected) return;
 
       const server = net.createServer((socket) => socket.end());
@@ -30,7 +30,7 @@ module.exports = {
 
       let code = null;
       try { new net.Socket().connect(443, 'firestore.googleapis.com'); } catch (error) { code = error.code; }
-      assert.equal(code, 'CONNECT_TRAP', 'a non-loopback connect is refused');
+      expect(code, 'a non-loopback connect is refused').toBe('CONNECT_TRAP');
     },
   }],
 };
@@ -56,28 +56,28 @@ module.exports = defineCases({
       name: 'a-plain-run-discovers-unit-and-arms-the-trap-with-loopback-allowed',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = probe({ PROBE_EXPECT_TRAP: 'true' });
-        assert.equal(run.status, 0, run.output);
-        assert.ok(run.output.includes('trap-state'), `test/unit/ was discovered: ${run.output}`);
+        expect(run.status, run.output).toBe(0);
+        expect(run.output.includes('trap-state'), `test/unit/ was discovered: ${run.output}`).toBeTruthy();
       },
     },
     {
       name: 'an-extended-run-stands-the-trap-down',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = probe({ PROBE_EXPECT_TRAP: 'false', TEST_EXTENDED_MODE: 'true' });
-        assert.equal(run.status, 0, run.output);
+        expect(run.status, run.output).toBe(0);
       },
     },
     {
       name: 'a-lane-run-stands-the-trap-down',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = probe({ PROBE_EXPECT_TRAP: 'false', OMEGA_TEST_LANE: 'stripe-live' });
-        assert.equal(run.status, 0, run.output);
+        expect(run.status, run.output).toBe(0);
       },
     },
   ],

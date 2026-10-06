@@ -168,7 +168,7 @@ module.exports = defineCases({
     {
       name: 'authorize-with-a-passed-uid-answers-400-naming-it',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane();
 
         await getRoute({
@@ -179,18 +179,18 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 400, `even an ADMIN gets the 400: ${response.message}`);
-        assert.match(response.message, /uid/, `and the message names the dropped argument: ${response.message}`);
-        assert.match(response.message, /`status`, `refresh` or `delete`/, `and names every action that DOES take one, so the 400 is a redirection: ${response.message}`);
-        assert.equal(response.message.includes(OTHER_UID), false, "the caller's value is not echoed back");
-        assert.equal(writes.length, 0, 'nothing was written — no session was minted for anybody');
+        expect(response.options.code, `even an ADMIN gets the 400: ${response.message}`).toBe(400);
+        expect(response.message, `and the message names the dropped argument: ${response.message}`).toMatch(/uid/);
+        expect(response.message, `and names every action that DOES take one, so the 400 is a redirection: ${response.message}`).toMatch(/`status`, `refresh` or `delete`/);
+        expect(response.message.includes(OTHER_UID), "the caller's value is not echoed back").toBe(false);
+        expect(writes.length, 'nothing was written — no session was minted for anybody').toBe(0);
       },
     },
 
     {
       name: 'status-with-a-uid-as-an-admin-reads-that-users-record',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, responses } = lane({ [`users/${OTHER_UID}`]: storedUser(OTHER_UID) });
 
         // The admin has no connection of their OWN — a status that answered for
@@ -204,15 +204,15 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `status checks a connection AT THE PROVIDER, so a trusted server may run it: ${response.message}`);
-        assert.equal(response.message.status, 'connected', "and the record it read is the PASSED user's");
+        expect(response.options.code, `status checks a connection AT THE PROVIDER, so a trusted server may run it: ${response.message}`).toBe(undefined);
+        expect(response.message.status, "and the record it read is the PASSED user's").toBe('connected');
       },
     },
 
     {
       name: 'tokenize-with-a-passed-uid-answers-400-naming-it',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane();
 
         await postRoute({
@@ -228,16 +228,16 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 400, `the code belongs to the browser that carried it: ${response.message}`);
-        assert.match(response.message, /uid/, `and the message names the dropped argument: ${response.message}`);
-        assert.equal(writes.length, 0, 'the exchange never ran, so no record was written for either user');
+        expect(response.options.code, `the code belongs to the browser that carried it: ${response.message}`).toBe(400);
+        expect(response.message, `and the message names the dropped argument: ${response.message}`).toMatch(/uid/);
+        expect(writes.length, 'the exchange never ran, so no record was written for either user').toBe(0);
       },
     },
 
     {
       name: 'refresh-with-a-uid-as-an-admin-acts-on-that-user',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane({ [`users/${OTHER_UID}`]: storedUser(OTHER_UID) });
 
         await postRoute({
@@ -248,22 +248,22 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `a trusted server may refresh on a user's behalf: ${response.message}`);
-        assert.equal(response.message.success, true, 'and the refresh reports success');
-        assert.equal(response.message.token.access_token, 'refreshed-782', 'carrying the token it stored ([#783](https://github.com/Omega-JS-Stack/omega/issues/783))');
+        expect(response.options.code, `a trusted server may refresh on a user's behalf: ${response.message}`).toBe(undefined);
+        expect(response.message.success, 'and the refresh reports success').toBe(true);
+        expect(response.message.token.access_token, 'carrying the token it stored ([#783](https://github.com/Omega-JS-Stack/omega/issues/783))').toBe('refreshed-782');
 
         const write = writes.find((entry) => entry.path === `users/${OTHER_UID}` && entry.verb === 'set');
 
-        assert.ok(write, "the new token landed on the PASSED user's document");
-        assert.equal(writtenRecord(write).token.access_token, 'refreshed-782', 'and it is the refreshed token');
-        assert.equal(writes.some((entry) => entry.path === `users/${CALLER_UID}`), false, "and nothing landed on the admin's own — not even the lease");
+        expect(write, "the new token landed on the PASSED user's document").toBeTruthy();
+        expect(writtenRecord(write).token.access_token, 'and it is the refreshed token').toBe('refreshed-782');
+        expect(writes.some((entry) => entry.path === `users/${CALLER_UID}`), "and nothing landed on the admin's own — not even the lease").toBe(false);
       },
     },
 
     {
       name: 'delete-with-a-uid-as-an-admin-acts-on-that-user',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { ctx, writes, responses } = lane({ [`users/${OTHER_UID}`]: storedUser(OTHER_UID) });
 
         await deleteRoute({
@@ -274,20 +274,20 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `a trusted server may revoke on a user's behalf: ${response.message}`);
+        expect(response.options.code, `a trusted server may revoke on a user's behalf: ${response.message}`).toBe(undefined);
 
         const write = writes.find((entry) => entry.path === `users/${OTHER_UID}`);
 
-        assert.ok(write, "the deletion hit the PASSED user's document");
-        assert.equal(writtenRecord(write)?.methodName, 'FieldValue.delete', `and it is the one account's record that went: ${JSON.stringify(write.payload)}`);
-        assert.equal(writes.some((entry) => entry.path === `users/${CALLER_UID}`), false, "and nothing touched the admin's own");
+        expect(write, "the deletion hit the PASSED user's document").toBeTruthy();
+        expect(writtenRecord(write)?.methodName, `and it is the one account's record that went: ${JSON.stringify(write.payload)}`).toBe('FieldValue.delete');
+        expect(writes.some((entry) => entry.path === `users/${CALLER_UID}`), "and nothing touched the admin's own").toBe(false);
       },
     },
 
     {
       name: 'status-refresh-and-delete-with-a-uid-as-a-non-admin-answer-403',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const docs = { [`users/${OTHER_UID}`]: storedUser(OTHER_UID) };
 
         const statusLane = lane(docs);
@@ -298,8 +298,8 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, action: 'status', uid: OTHER_UID },
         });
 
-        assert.equal(answered(statusLane.responses).options.code, 403, "only an admin reads somebody else's connection status");
-        assert.equal(statusLane.writes.length, 0, 'and nothing was removed from their record');
+        expect(answered(statusLane.responses).options.code, "only an admin reads somebody else's connection status").toBe(403);
+        expect(statusLane.writes.length, 'and nothing was removed from their record').toBe(0);
 
         const refreshLane = lane(docs);
 
@@ -309,8 +309,8 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, action: 'refresh', uid: OTHER_UID },
         });
 
-        assert.equal(answered(refreshLane.responses).options.code, 403, 'only an admin refreshes for somebody else');
-        assert.equal(refreshLane.writes.length, 0, 'and nothing was written');
+        expect(answered(refreshLane.responses).options.code, 'only an admin refreshes for somebody else').toBe(403);
+        expect(refreshLane.writes.length, 'and nothing was written').toBe(0);
 
         const deleteLane = lane(docs);
 
@@ -320,15 +320,15 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, uid: OTHER_UID },
         });
 
-        assert.equal(answered(deleteLane.responses).options.code, 403, 'only an admin revokes for somebody else');
-        assert.equal(deleteLane.writes.length, 0, 'and nothing was deleted');
+        expect(answered(deleteLane.responses).options.code, 'only an admin revokes for somebody else').toBe(403);
+        expect(deleteLane.writes.length, 'and nothing was deleted').toBe(0);
       },
     },
 
     {
       name: 'the-self-path-of-authorize-and-status-is-unchanged',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const authorizeLane = lane();
 
         await getRoute({
@@ -339,13 +339,13 @@ module.exports = defineCases({
 
         const authorized = answered(authorizeLane.responses);
 
-        assert.equal(authorized.options.code, undefined, `no uid, no 400: ${authorized.message}`);
-        assert.match(authorized.message.url, /^https:\/\/provider\.test\/a\?/, "the provider's authorize url comes back");
+        expect(authorized.options.code, `no uid, no 400: ${authorized.message}`).toBe(undefined);
+        expect(authorized.message.url, "the provider's authorize url comes back").toMatch(/^https:\/\/provider\.test\/a\?/);
 
         const session = authorizeLane.writes.find((entry) => entry.path === `usage/${CALLER_UID}`);
 
-        assert.ok(session, "the one-time session was minted on the CALLER's usage document");
-        assert.ok(session.payload.connections[PROVIDER_ID].csrf, 'with its CSRF token');
+        expect(session, "the one-time session was minted on the CALLER's usage document").toBeTruthy();
+        expect(session.payload.connections[PROVIDER_ID].csrf, 'with its CSRF token').toBeTruthy();
 
         const statusLane = lane();
 
@@ -357,15 +357,15 @@ module.exports = defineCases({
 
         const status = answered(statusLane.responses);
 
-        assert.equal(status.options.code, undefined, `status still answers the caller: ${status.message}`);
-        assert.equal(status.message.status, 'connected', 'and the stored record reads connected');
+        expect(status.options.code, `status still answers the caller: ${status.message}`).toBe(undefined);
+        expect(status.message.status, 'and the stored record reads connected').toBe('connected');
       },
     },
 
     {
       name: 'the-self-path-of-tokenize-refresh-and-delete-is-unchanged',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const tokenizeLane = lane({
           [`usage/${CALLER_UID}`]: { connections: { [PROVIDER_ID]: { csrf: 'csrf-782', verifier: null, createdAt: Date.now() } } },
         });
@@ -382,13 +382,13 @@ module.exports = defineCases({
 
         const tokenized = answered(tokenizeLane.responses);
 
-        assert.equal(tokenized.options.code, undefined, `the callback page's call still completes: ${tokenized.message}`);
-        assert.equal(tokenized.message.success, true, 'reporting success');
+        expect(tokenized.options.code, `the callback page's call still completes: ${tokenized.message}`).toBe(undefined);
+        expect(tokenized.message.success, 'reporting success').toBe(true);
 
         const record = tokenizeLane.writes.find((entry) => entry.path === `users/${CALLER_UID}` && STORING.includes(entry.verb) && writtenRecord(entry));
 
-        assert.ok(record, "and the record landed on the state's user, under the identity id");
-        assert.equal(writtenRecord(record).token.access_token, 'access-782', 'carrying the exchanged token');
+        expect(record, "and the record landed on the state's user, under the identity id").toBeTruthy();
+        expect(writtenRecord(record).token.access_token, 'carrying the exchanged token').toBe('access-782');
 
         // The refresh reads the record in its lease TRANSACTION
         // ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)), so the
@@ -401,9 +401,9 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
-        assert.equal(answered(refreshLane.responses).options.code, undefined, 'a user still refreshes their own token');
-        assert.equal(answered(refreshLane.responses).message.token.access_token, 'refreshed-782', 'and gets it back in the answer');
-        assert.ok(refreshLane.writes.find((entry) => entry.path === `users/${CALLER_UID}` && entry.verb === 'set'), 'on their own document');
+        expect(answered(refreshLane.responses).options.code, 'a user still refreshes their own token').toBe(undefined);
+        expect(answered(refreshLane.responses).message.token.access_token, 'and gets it back in the answer').toBe('refreshed-782');
+        expect(refreshLane.writes.find((entry) => entry.path === `users/${CALLER_UID}` && entry.verb === 'set'), 'on their own document').toBeTruthy();
 
         const deleteLane = lane();
 
@@ -413,8 +413,8 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID },
         });
 
-        assert.equal(answered(deleteLane.responses).options.code, undefined, 'and still disconnects their own');
-        assert.ok(deleteLane.writes.find((entry) => entry.path === `users/${CALLER_UID}`), 'on their own document');
+        expect(answered(deleteLane.responses).options.code, 'and still disconnects their own').toBe(undefined);
+        expect(deleteLane.writes.find((entry) => entry.path === `users/${CALLER_UID}`), 'on their own document').toBeTruthy();
       },
     },
 
@@ -426,7 +426,7 @@ module.exports = defineCases({
       // Restoring one is the regression this case exists to catch.
       name: 'the-schemas-declare-uid-with-no-default',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Resolved the way services/settings.js does: the module is a function
         // of the request's raw parts answering a declaration, validated by
         // helpers/schema.js. GET requires a provider, so every GET names one.
@@ -445,18 +445,18 @@ module.exports = defineCases({
           ['POST', post({})],
           ['POST tokenize', post({ action: 'tokenize' })],
         ]) {
-          assert.equal(resolved.uid, '', `${label} resolves uid to the empty value, never a uid of its own`);
-          assert.equal(!!resolved.uid, false, `${label} reads as "no uid was passed", so the self path is not the 400`);
+          expect(resolved.uid, `${label} resolves uid to the empty value, never a uid of its own`).toBe('');
+          expect(!!resolved.uid, `${label} reads as "no uid was passed", so the self path is not the 400`).toBe(false);
         }
 
         // The field stays DECLARED, or a stale caller's value would be stripped
         // as an unknown key and never reach the 400 that names it
-        assert.equal(post({ uid: OTHER_UID }).uid, OTHER_UID, 'a passed uid still reaches the handler');
-        assert.equal(get({ uid: OTHER_UID }).uid, OTHER_UID, 'on both methods');
+        expect(post({ uid: OTHER_UID }).uid, 'a passed uid still reaches the handler').toBe(OTHER_UID);
+        expect(get({ uid: OTHER_UID }).uid, 'on both methods').toBe(OTHER_UID);
 
         // The defaults that DO exist are untouched
-        assert.equal(get({}).action, 'authorize', "GET's default action");
-        assert.equal(post({}).action, 'tokenize', "and POST's");
+        expect(get({}).action, "GET's default action").toBe('authorize');
+        expect(post({}).action, "and POST's").toBe('tokenize');
       },
     },
 
@@ -465,34 +465,34 @@ module.exports = defineCases({
       // parameter `GET /user` never had.
       name: 'the-doc-sends-a-trusted-read-to-the-admin-firestore-route',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const doc = jetpack.read(DOC_PATH);
 
-        assert.ok(doc, `the doc is where the test expects it: ${DOC_PATH}`);
-        assert.match(doc, /admin\/firestore/, 'the trusted read is the admin firestore route');
-        assert.match(doc, /plain text/, 'and the doc says plainly how the token is stored');
+        expect(doc, `the doc is where the test expects it: ${DOC_PATH}`).toBeTruthy();
+        expect(doc, 'the trusted read is the admin firestore route').toMatch(/admin\/firestore/);
+        expect(doc, 'and the doc says plainly how the token is stored').toMatch(/plain text/);
 
         const readSection = doc.slice(doc.indexOf('## Reading the token from another target'));
 
-        assert.ok(readSection.startsWith('## Reading the token from another target'), 'the section is still there to be read');
-        assert.match(readSection, /admin\/firestore\?path=users\//, 'and it is the admin firestore read a trusted service is sent to');
+        expect(readSection.startsWith('## Reading the token from another target'), 'the section is still there to be read').toBeTruthy();
+        expect(readSection, 'and it is the admin firestore read a trusted service is sent to').toMatch(/admin\/firestore\?path=users\//);
 
         // Every line of the section that names `GET /omega/user` (the route
         // itself, not `/omega/user/connections`) either says nothing about a
         // uid or says it takes none — never that it accepts one.
         const userLines = readSection.split('\n').filter((line) => /\/omega\/user\b(?!\/)/.test(line));
 
-        assert.equal(userLines.length > 0, true, 'the read as the user is still documented');
+        expect(userLines.length > 0, 'the read as the user is still documented').toBe(true);
 
         for (const line of userLines) {
           const claimsUid = /uid/.test(line) && !/\bno `?uid`?/i.test(line);
 
-          assert.equal(claimsUid, false, `GET /user is never described as taking a uid: ${line}`);
+          expect(claimsUid, `GET /user is never described as taking a uid: ${line}`).toBe(false);
         }
 
         // The exact claim that opened the issue: "As an admin — the same call
         // with `uid`", where "the same call" was the GET /user above it.
-        assert.equal(/same call[^\n]*uid/i.test(readSection), false, 'no bullet sends an admin back to that call with a uid');
+        expect(/same call[^\n]*uid/i.test(readSection), 'no bullet sends an admin back to that call with a uid').toBe(false);
       },
     },
   ],

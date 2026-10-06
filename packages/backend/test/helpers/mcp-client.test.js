@@ -9,7 +9,7 @@
  * untouched. Each case calls a REAL local HTTP server and reads the request it
  * received, so nothing about the wire is stubbed.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const http = require('node:http');
 const BEMClient = require('../../dist/mcp/client.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -44,7 +44,7 @@ module.exports = defineCases({
       async run() {
         const received = await callOnce((baseUrl) => new BEMClient({ baseUrl }).call('POST', '/notes', { text: 'hi' }));
 
-        assert.deepEqual(received, [{ method: 'POST', path: '/notes' }], 'no /omega/ prefix is added');
+        expect(received, 'no /omega/ prefix is added').toEqual([{ method: 'POST', path: '/notes' }]);
       },
     },
 
@@ -53,7 +53,7 @@ module.exports = defineCases({
       async run() {
         const received = await callOnce((baseUrl) => new BEMClient({ baseUrl: `${baseUrl}/` }).call('GET', '/omega/health', {}));
 
-        assert.deepEqual(received, [{ method: 'GET', path: '/omega/health' }], 'the base URL\'s trailing slash is dropped, the path kept whole');
+        expect(received, 'the base URL\'s trailing slash is dropped, the path kept whole').toEqual([{ method: 'GET', path: '/omega/health' }]);
       },
     },
 
@@ -62,10 +62,7 @@ module.exports = defineCases({
       async run() {
         const client = new BEMClient({ baseUrl: 'http://127.0.0.1:1' });
 
-        await assert.rejects(
-          () => client.call('GET', 'notes', {}),
-          /path "notes" must be the HTTP path as served, starting with "\/"/,
-        );
+        await expect((() => client.call('GET', 'notes', {}))()).rejects.toThrow(/path "notes" must be the HTTP path as served, starting with "\/"/);
       },
     },
   ],

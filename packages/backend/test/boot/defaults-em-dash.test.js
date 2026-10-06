@@ -18,14 +18,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'no-template-file-carries-an-em-dash',
-      async run({ assert }) {
-        assert.deepEqual(dashedFiles(TEMPLATES), []);
+      async run({ expect }) {
+        expect(dashedFiles(TEMPLATES)).toEqual([]);
       },
     },
     {
       name: 'no-defaults-file-carries-an-em-dash',
-      async run({ assert }) {
-        assert.deepEqual(dashedFiles(DEFAULTS), []);
+      async run({ expect }) {
+        expect(dashedFiles(DEFAULTS)).toEqual([]);
       },
     },
   ],

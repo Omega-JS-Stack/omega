@@ -27,13 +27,19 @@ const { runInitSetups, InitHookError } = require('./init-hooks.js');
 const { noMatchMessage } = require('./scope.js');
 const { makeExtendedModeWarning } = require('./extended-mode-warning.js');
 const { createReporter } = require('./reporter.js');
-const { createCaseSession, hostSession, registerSuite } = require('./register-suite.js');
+const { createCaseSession, hostSession, registerSuite, registerLazySuites } = require('./register-suite.js');
 const { guardStdout } = require('./guard-stdout.js');
+const { TIMEOUT_ARG } = require('./define-cases.js');
 const attachLogFile = require('../attach-log-file.js');
+const { mapLimited } = require('../map-limited.js');
 
 const ISOLATIONS = ['none', 'process'];
+const EVAL_FLAGS = ['-e', '--eval', '-p', '--print'];
+// The extended-mode warning's detail lines when a framework passes none of its own.
+const EXTENDED_MODE_LINES = ['Suites call REAL external services instead of skipping them.'];
 // The preload each `process` child takes, the one every package script names.
-const STDOUT_GUARD = path.join(__dirname, 'stdout-guard.js');
+// Resolved, never loaded here, and named so a host's vendor copy carries it.
+const STDOUT_GUARD = require.resolve('./stdout-guard.js');
 
 // Registrations waiting for their bootstrap file to load inside node:test's run().
 const plans = new Map();
@@ -52,12 +58,16 @@ function registerPlan(id) {
     for (const layer of plan.layers) {
       describe(layer.row.name, () => {
         after(() => layer.stop());
-        for (const entry of layer.entries) {
-          registerSuite(entry.suite, {
-            label: entry.label,
-            session: entry.session,
-            onEvent: (event, caseDef) => plan.onEvent(event, caseDef, entry, layer.row),
+        const onEventOf = (entry) => (event, caseDef) => plan.onEvent(event, caseDef, entry, layer.row);
+        if (layer.load) {
+          registerLazySuites(layer.files, (file) => {
+            const entry = layer.load(file);
+            return entry && { suite: entry.suite, session: entry.session, onEvent: onEventOf(entry) };
           });
+          return;
+        }
+        for (const entry of layer.entries) {
+          registerSuite(entry.suite, { label: entry.label, session: entry.session, onEvent: onEventOf(entry) });
         }
       });
     }
@@ -119,6 +129,21 @@ function createRunner(config) {
   if (!ISOLATIONS.includes(isolation)) {
     throw new Error(`Unknown isolation "${isolation}" (known: ${ISOLATIONS.join(', ')})`);
   }
+  const processOnly = ['concurrency', 'serial'].filter((key) => config[key] !== undefined);
+  if (isolation !== 'process' && processOnly.length > 0) {
+    throw new Error(`${processOnly[0]} needs isolation: 'process' (this runner's isolation is '${isolation}')`);
+  }
+  const concurrency = config.concurrency === undefined ? 1 : config.concurrency;
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error(`concurrency is the most files in flight, a whole number of 1 or more (got ${JSON.stringify(config.concurrency)})`);
+  }
+  const serial = config.serial === undefined ? [] : config.serial;
+  if (!Array.isArray(serial)) throw new Error(`serial is a list of directory names (got ${JSON.stringify(serial)})`);
+  // node hands each child its parent's own options, an eval script included, so
+  // every child of a `node -e` host would rerun that script instead of its file.
+  if (isolation === 'process' && process.execArgv.some((arg) => EVAL_FLAGS.includes(arg.split('=')[0]))) {
+    throw new Error("isolation: 'process' cannot run in a `node -e` or `node -p` process: node passes that script to every child it spawns. Start the runner from a file.");
+  }
 
   function record(results, reporter, test) {
     results.tests.push(test);
@@ -166,7 +191,9 @@ function createRunner(config) {
     return { ...entry, label, suite: { ...suite, layer, cases } };
   }
 
-  // One row's driver, started once, by the row's first case.
+  // One row's driver, started once, by the row's first case: `start({ projectRoot,
+  // options, suites, hooks, report })`, `report` on an app row alone. A one-row
+  // framework passes no `suites` key: no file is loaded when the driver starts.
   function rowDriver(row, driver, context) {
     let started = null;
     return {
@@ -175,7 +202,7 @@ function createRunner(config) {
           started = Promise.resolve(driver.start({
             projectRoot: config.projectRoot,
             options: context.options,
-            suites: context.suites,
+            ...(context.suites ? { suites: context.suites } : {}),
             hooks: context.hooks,
             ...(row.kind === 'app' ? { report } : {}),
           }));
@@ -187,6 +214,29 @@ function createRunner(config) {
         const handle = await started.catch(() => null);
         if (handle) await handle.stop();
       },
+    };
+  }
+
+  // A host suite's session: its cases under the stray watch, its ctx extras from the row's driver.
+  function hostEntrySession(entry, control, context) {
+    return hostSession({ ...entry.suite, cases: entry.suite.cases.map(context.stray.watch) }, {
+      expect,
+      defaultTimeout: config.defaultTimeout,
+      extrasFrom: control ? async () => {
+        const handle = await control.start();
+        return (info) => handle.extras(info);
+      } : undefined,
+    });
+  }
+
+  function rowStop(row, control, context) {
+    return async () => {
+      if (!control) return;
+      try {
+        await control.stop();
+      } catch (e) {
+        context.recordFailure({ id: `${row.name}#stop`, name: `${row.name} layer stop`, layer: row.name, error: e });
+      }
     };
   }
 
@@ -205,26 +255,22 @@ function createRunner(config) {
       });
       entries.forEach((entry) => { entry.session = session; });
     } else {
-      for (const entry of entries) {
-        entry.session = hostSession({ ...entry.suite, cases: entry.suite.cases.map(context.stray.watch) }, {
-          expect,
-          defaultTimeout: config.defaultTimeout,
-          extrasFrom: control ? async () => {
-            const handle = await control.start();
-            return (info) => handle.extras(info);
-          } : undefined,
-        });
-      }
+      entries.forEach((entry) => { entry.session = hostEntrySession(entry, control, context); });
     }
 
-    return { row, entries, stop: async () => {
-      if (!control) return;
-      try {
-        await control.stop();
-      } catch (e) {
-        context.recordFailure({ id: `${row.name}#stop`, name: `${row.name} layer stop`, layer: row.name, error: e });
-      }
-    } };
+    return { row, entries, stop: rowStop(row, control, context) };
+  }
+
+  // A one-row framework's only row, a host row: each file loads when the run
+  // reaches it, after the previous file's cleanup.
+  function lazyLayerPlan(row, driver, files, context) {
+    const control = driver ? rowDriver(row, driver, context) : null;
+    const load = (file) => {
+      const entry = context.load(file);
+      if (!entry || entry.suite.cases.length === 0) return null;
+      return { ...entry, session: hostEntrySession(entry, control, context) };
+    };
+    return { row, files, load, stop: rowStop(row, control, context) };
   }
 
   // Register the layers with node:test and resolve once the plan's root suite ends.
@@ -270,9 +316,10 @@ function createRunner(config) {
   // Run one file in its own node:test child, where it registers its cases through
   // defineCases. One run() per file: node stamps a case event with where its `it`
   // was called (register-suite.js), never with the file whose child sent it.
-  async function runInProcess(entry, options, reporter, results, layer) {
+  // Everything the file reports goes through `hold`, to be released in file order.
+  async function runInProcess(entry, { options, reporter, results, layer, cwd, hold }) {
     const { run } = require('node:test');
-    const fail = (error) => recordFailure(results, reporter, { id: entry.file, source: entry.source, file: entry.file, name: entry.rel, layer, error });
+    const fail = (error) => hold(() => recordFailure(results, reporter, { id: entry.file, source: entry.source, file: entry.file, name: entry.rel, layer, error }));
     const ancestors = [];
     const headed = new Set();
     let count = 0;
@@ -295,17 +342,18 @@ function createRunner(config) {
       const suite = ancestors.slice(0, data.nesting).join(' > ') || null;
       if (details.type === 'suite') {
         if (status === 'fail' && details.error.failureType !== 'subtestsFailed') {
-          recordFailure(results, reporter, { id: `${entry.file}#${data.name}`, source: entry.source, file: entry.file, name: data.name, layer, error: failureOf(details.error) });
+          const error = failureOf(details.error);
+          hold(() => recordFailure(results, reporter, { id: `${entry.file}#${data.name}`, source: entry.source, file: entry.file, name: data.name, layer, error }));
         }
         return;
       }
 
       if (suite && !headed.has(suite)) {
         headed.add(suite);
-        reporter.suite(suite);
+        hold(() => reporter.suite(suite));
       }
       const skipped = status === 'pass' && data.skip !== undefined;
-      record(results, reporter, {
+      const test = {
         id: `${entry.file}#${count++}`,
         source: entry.source,
         file: entry.file,
@@ -316,15 +364,28 @@ function createRunner(config) {
         durationMs: Math.round(details.duration_ms),
         ...(skipped ? { reason: typeof data.skip === 'string' ? data.skip : 'skipped' } : {}),
         ...(status === 'fail' ? { error: failureOf(details.error) } : {}),
-      });
+      };
+      hold(() => record(results, reporter, test));
     };
 
-    const stream = run({
-      files: [entry.file],
-      isolation: 'process',
-      execArgv: ['--require', STDOUT_GUARD],
-      ...(options.filter ? { testNamePatterns: [new RegExp(options.filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))] } : {}),
-    });
+    // run() skips every file when this process carries NODE_TEST_CONTEXT (a runner
+    // started inside a test file inherits it). Its check is synchronous, and each
+    // child it spawns gets a NODE_TEST_CONTEXT of its own.
+    const inherited = process.env.NODE_TEST_CONTEXT;
+    delete process.env.NODE_TEST_CONTEXT;
+    let stream;
+    try {
+      stream = run({
+        files: [entry.file],
+        isolation: 'process',
+        execArgv: ['--require', STDOUT_GUARD],
+        ...(config.defaultTimeout !== undefined ? { argv: [`${TIMEOUT_ARG}${config.defaultTimeout}`] } : {}),
+        ...(cwd ? { cwd } : {}),
+        ...(options.filter ? { testNamePatterns: [new RegExp(options.filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))] } : {}),
+      });
+    } finally {
+      if (inherited !== undefined) process.env.NODE_TEST_CONTEXT = inherited;
+    }
     stream.on('test:start', (data) => {
       ancestors.length = data.nesting;
       ancestors.push(data.name);
@@ -332,14 +393,14 @@ function createRunner(config) {
     stream.on('test:pass', settled('pass'));
     stream.on('test:fail', settled('fail'));
     // A child's own output reaches this process's streams, so the reporter's run and the tee hold it.
-    stream.on('test:stdout', (data) => process.stdout.write(data.message));
-    stream.on('test:stderr', (data) => process.stderr.write(data.message));
+    stream.on('test:stdout', (data) => hold(() => process.stdout.write(data.message)));
+    stream.on('test:stderr', (data) => hold(() => process.stderr.write(data.message)));
     // Only a child's diagnostics carry its file (an error raised after its case ended);
     // the run's own count lines carry none and repeat the Results block.
     stream.on('test:diagnostic', (data) => {
       if (!data.file) return;
       diagnostics.push(data.message);
-      process.stderr.write(`${data.message}\n`);
+      hold(() => process.stderr.write(`${data.message}\n`));
     });
     await new Promise((resolve, reject) => {
       stream.on('end', resolve);
@@ -348,13 +409,80 @@ function createRunner(config) {
     });
   }
 
+  function rootOf(entry) {
+    return config.roots.find((candidate) => path.resolve(config.projectRoot, candidate.dir) === entry.root);
+  }
+
+  // A root's `cwd` is its files' child cwd; with none, the child takes the runner's own.
+  function childCwd(entry) {
+    const root = rootOf(entry);
+    return root && root.cwd ? path.resolve(config.projectRoot, root.cwd) : undefined;
+  }
+
+  // node's run() honors `cwd` from Node 23 on; Node 22 drops it without a word, which
+  // matters only for a selected file whose root cwd is not this process's own.
+  function cwdNeedsNewerNode(files) {
+    if (Number(process.versions.node.split('.')[0]) >= 23) return null;
+    const ownCwd = fs.realpathSync(process.cwd());
+    const entry = files.find((file) => {
+      const dir = childCwd(file);
+      return dir !== undefined && (!fs.existsSync(dir) || fs.realpathSync(dir) !== ownCwd);
+    });
+    if (!entry) return null;
+    const root = rootOf(entry);
+    return new Error(`A root's cwd needs Node 23 or later under isolation: 'process' (this is Node ${process.versions.node}; the root ${root.dir} sets cwd ${root.cwd})`);
+  }
+
+  // Up to `concurrency` files in flight, then each `serial` file alone. A file's
+  // report is held until it ends and released in discovery order, so the output
+  // reads as a one-at-a-time run reads.
+  async function runFilesInProcesses(files, context) {
+    const held = files.map(() => null);
+    let next = 0;
+    const runOne = async (index) => {
+      const ops = [];
+      await runInProcess(files[index], { ...context, cwd: childCwd(files[index]), hold: (op) => ops.push(op) });
+      held[index] = ops;
+      for (; next < files.length && held[next]; next += 1) held[next].forEach((op) => op());
+    };
+    const isSerial = (entry) => path.dirname(entry.rel).split(path.sep).some((dir) => serial.includes(dir));
+    const indexes = files.map((_, index) => index);
+    await mapLimited(indexes.filter((index) => !isSerial(files[index])), concurrency, runOne);
+    await mapLimited(indexes.filter((index) => isSerial(files[index])), 1, runOne);
+  }
+
+  const driverFor = (row) => config.drivers && config.drivers[row.name];
+
+  // A row that needs a driver and has none fails the run naming the layer.
+  function lacksDriver(row, context) {
+    if (driverFor(row) || !needsDriver(row)) return false;
+    context.recordFailure({ name: `${row.name} layer`, layer: row.name, error: new Error(`The ${row.name} layer needs a driver to run its suites, and this runner has none`) });
+    return true;
+  }
+
+  function upFrontLayers(wanted, files, context) {
+    const byLayer = new Map(rows.map((row) => [row.name, []]));
+    for (const entry of files) {
+      const loaded = context.load(entry);
+      if (loaded && loaded.suite.cases.length > 0) byLayer.get(loaded.suite.layer).push(loaded);
+    }
+    return wanted
+      .filter((row) => byLayer.get(row.name).length > 0 && !lacksDriver(row, context))
+      .map((row) => layerPlan(row, driverFor(row), byLayer.get(row.name), context));
+  }
+
+  function lazyLayers(wanted, files, context) {
+    const row = wanted[0];
+    return lacksDriver(row, context) ? [] : [lazyLayerPlan(row, driverFor(row), files, context)];
+  }
+
   async function execute(options, reporter, results, stray) {
     const fail = (fields) => recordFailure(results, reporter, fields);
 
     reporter.start();
 
     if (process.env.TEST_EXTENDED_MODE) {
-      makeExtendedModeWarning(['Suites call REAL external services instead of skipping them.']).forEach((line) => reporter.note(line));
+      makeExtendedModeWarning(config.extendedModeLines || EXTENDED_MODE_LINES).forEach((line) => reporter.note(line));
     }
 
     let wanted = rows;
@@ -384,6 +512,12 @@ function createRunner(config) {
       return;
     }
 
+    const tooOld = isolation === 'process' ? cwdNeedsNewerNode(files) : null;
+    if (tooOld) {
+      fail({ name: `a root cwd on Node ${process.versions.node}`, error: tooOld });
+      return;
+    }
+
     let hooks;
     try {
       const initRoots = config.roots.map((root) => ({ dir: path.resolve(config.projectRoot, root.dir), label: root.source }));
@@ -395,28 +529,13 @@ function createRunner(config) {
     }
 
     if (isolation === 'process') {
-      for (const entry of files) await runInProcess(entry, options, reporter, results, wanted[0].name);
+      await runFilesInProcesses(files, { options, reporter, results, layer: wanted[0].name });
       return;
     }
 
-    const byLayer = new Map(rows.map((row) => [row.name, []]));
-    for (const entry of files) {
-      const loaded = loadSuite(entry, results, reporter, options.filter);
-      if (loaded && loaded.suite.cases.length > 0) byLayer.get(loaded.suite.layer).push(loaded);
-    }
-
-    const context = { options, hooks, stray, recordFailure: fail };
-    const layers = [];
-    for (const row of wanted) {
-      const entries = byLayer.get(row.name);
-      if (entries.length === 0) continue;
-      const driver = config.drivers && config.drivers[row.name];
-      if (!driver && needsDriver(row)) {
-        fail({ name: `${row.name} layer`, layer: row.name, error: new Error(`The ${row.name} layer needs a driver to run its suites, and this runner has none`) });
-        continue;
-      }
-      layers.push(layerPlan(row, driver, entries, context));
-    }
+    const context = { options, hooks, stray, recordFailure: fail, load: (entry) => loadSuite(entry, results, reporter, options.filter) };
+    // An app row's driver needs every suite to start, so only a one-row framework loads lazily.
+    const layers = rows.length === 1 ? lazyLayers(wanted, files, context) : upFrontLayers(wanted, files, context);
     if (layers.length === 0) return;
 
     const headed = new Set();

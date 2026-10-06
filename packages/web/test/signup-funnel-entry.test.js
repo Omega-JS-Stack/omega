@@ -22,8 +22,7 @@
  * downstream to observe. The CANONICAL call is the whole contract here, and the
  * last test holds it to the real catalog so the capture cannot drift from it.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -157,58 +156,76 @@ async function wireForm(initializer) {
   return { $form, events: globalThis.__omegaEvents };
 }
 
-test('#408: the first keystroke in the signup form counts the funnel entry, once', async () => {
-  const { $form, events } = await wireForm('initializeSignupForm');
+module.exports = defineCases({
+  type: 'group',
+  description: 'signup-funnel-entry',
+  tests: [
+    {
+      name: '#408: the first keystroke in the signup form counts the funnel entry, once',
+      run: async (ctx) => {
+        const { $form, events } = await wireForm('initializeSignupForm');
 
-  assert.deepStrictEqual(events, [], 'reaching the form is not starting a signup — a bounce would count as one');
+        ctx.expect(events, 'reaching the form is not starting a signup — a bounce would count as one').toEqual([]);
 
-  $form.dispatch('input', typing());
+        $form.dispatch('input', typing());
 
-  assert.deepStrictEqual(events, [['sign_up_started', { method: 'email' }]], 'the first keystroke is the entry');
+        ctx.expect(events, 'the first keystroke is the entry').toEqual([['sign_up_started', { method: 'email' }]]);
 
-  // Every later keystroke, and the click that submits: one visitor, one entry.
-  $form.dispatch('input', typing());
-  $form.dispatch('input', typing());
-  $form.dispatch('click', typing());
+        // Every later keystroke, and the click that submits: one visitor, one entry.
+        $form.dispatch('input', typing());
+        $form.dispatch('input', typing());
+        $form.dispatch('click', typing());
 
-  assert.strictEqual(events.length, 1, 'one fire per page view, not one per keystroke');
-});
+        ctx.expect(events.length, 'one fire per page view, not one per keystroke').toBe(1);
+      },
+    },
 
-test('#408: pressing a provider button counts the entry under that provider', async () => {
-  // The two listeners are what makes a provider signup countable at all — that
-  // visitor never types. The method is the button's, not the email default.
-  const { $form, events } = await wireForm('initializeSignupForm');
+    {
+      name: '#408: pressing a provider button counts the entry under that provider',
+      run: async (ctx) => {
+        // The two listeners are what makes a provider signup countable at all — that
+        // visitor never types. The method is the button's, not the email default.
+        const { $form, events } = await wireForm('initializeSignupForm');
 
-  $form.dispatch('click', providerClick('google.com'));
+        $form.dispatch('click', providerClick('google.com'));
 
-  assert.deepStrictEqual(events, [['sign_up_started', { method: 'google.com' }]]);
+        ctx.expect(events).toEqual([['sign_up_started', { method: 'google.com' }]]);
 
-  $form.dispatch('input', typing());
+        $form.dispatch('input', typing());
 
-  assert.strictEqual(events.length, 1, 'the flag is shared across both listeners');
-});
+        ctx.expect(events.length, 'the flag is shared across both listeners').toBe(1);
+      },
+    },
 
-test('#408: the signin form counts no funnel entry — it is not the signup page', async () => {
-  const { $form, events } = await wireForm('initializeSigninForm');
+    {
+      name: '#408: the signin form counts no funnel entry — it is not the signup page',
+      run: async (ctx) => {
+        const { $form, events } = await wireForm('initializeSigninForm');
 
-  $form.dispatch('input', typing());
-  $form.dispatch('click', providerClick('google.com'));
+        $form.dispatch('input', typing());
+        $form.dispatch('click', providerClick('google.com'));
 
-  assert.deepStrictEqual(events, [], 'a returning user signing in never entered the signup funnel');
-});
+        ctx.expect(events, 'a returning user signing in never entered the signup funnel').toEqual([]);
+      },
+    },
 
-test('#408: the entry speaks the catalog — name and params, not a local invention', async () => {
-  const { $form, events } = await wireForm('initializeSignupForm');
+    {
+      name: '#408: the entry speaks the catalog — name and params, not a local invention',
+      run: async (ctx) => {
+        const { $form, events } = await wireForm('initializeSignupForm');
 
-  $form.dispatch('input', typing());
+        $form.dispatch('input', typing());
 
-  const [[name, params]] = events;
-  const entry = entryFor(name);
+        const [[name, params]] = events;
+        const entry = entryFor(name);
 
-  assert.ok(entry, `${name} is in the catalog`);
-  assert.strictEqual(entry.placement, 'client', 'the funnel entry is the page\'s to fire');
+        ctx.expect(entry, `${name} is in the catalog`).toBeTruthy();
+        ctx.expect(entry.placement, 'the funnel entry is the page\'s to fire').toBe('client');
 
-  for (const key of Object.keys(params)) {
-    assert.ok(entry.params.includes(key), `${name} declares the "${key}" param`);
-  }
+        for (const key of Object.keys(params)) {
+          ctx.expect(entry.params.includes(key), `${name} declares the "${key}" param`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

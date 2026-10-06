@@ -15,13 +15,13 @@ module.exports = defineCases({
   tests: [
     {
       name: 'verify-starts-as-basic',
-      async run({ accounts, firestore, assert, state, config, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, skip, payments }) {
         const uid = accounts['journey-payments-trial'].uid;
         const userDoc = await firestore.get(`users/${uid}`);
 
-        assert.ok(userDoc, 'User doc should exist');
-        assert.equal(userDoc.subscription?.product?.id, 'basic', 'Should start as basic');
-        assert.equal(userDoc.subscription?.trial?.claimed, false, 'Trial should not be claimed');
+        expect(userDoc, 'User doc should exist').toBeTruthy();
+        expect(userDoc.subscription?.product?.id, 'Should start as basic').toBe('basic');
+        expect(userDoc.subscription?.trial?.claimed, 'Trial should not be claimed').toBe(false);
 
         // Resolve first paid product WITH a trial from config. The test provider
         // only creates a trialing subscription when product.trial.days > 0, so a
@@ -41,7 +41,7 @@ module.exports = defineCases({
 
     {
       name: 'create-trial-intent',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('journey-payments-trial').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
@@ -49,9 +49,9 @@ module.exports = defineCases({
           trial: true,
         });
 
-        assert.isSuccess(response, 'Intent should succeed');
-        assert.ok(response.data.id, 'Should return intent ID');
-        assert.ok(response.data.orderId, 'Should return orderId');
+        expect(response, 'Intent should succeed').toBeSuccess();
+        expect(response.data.id, 'Should return intent ID').toBeTruthy();
+        expect(response.data.orderId, 'Should return orderId').toBeTruthy();
 
         state.intentId = response.data.id;
         state.orderId = response.data.orderId;
@@ -63,7 +63,7 @@ module.exports = defineCases({
 
     {
       name: 'trial-activated',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Poll until trial subscription appears
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
@@ -72,53 +72,53 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
-        assert.equal(userDoc.subscription.trial.claimed, true, 'Trial should be claimed');
-        assert.equal(userDoc.subscription.payment.orderId, state.orderId, 'Order ID should match intent');
+        expect(userDoc.subscription.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
+        expect(userDoc.subscription.status, 'Status should be active').toBe('active');
+        expect(userDoc.subscription.trial.claimed, 'Trial should be claimed').toBe(true);
+        expect(userDoc.subscription.payment.orderId, 'Order ID should match intent').toBe(state.orderId);
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
 
         // Verify the auto-fired webhook triggered new-subscription (trial is a property, not a separate transition)
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
-        assert.ok(webhookDoc, 'Webhook doc should exist');
-        assert.equal(webhookDoc.transition, 'new-subscription', 'Transition should be new-subscription (trial detected inside handler)');
-        assert.equal(webhookDoc.orderId, state.orderId, 'Webhook doc orderId should match intent');
+        expect(webhookDoc, 'Webhook doc should exist').toBeTruthy();
+        expect(webhookDoc.transition, 'Transition should be new-subscription (trial detected inside handler)').toBe('new-subscription');
+        expect(webhookDoc.orderId, 'Webhook doc orderId should match intent').toBe(state.orderId);
       },
     },
 
     {
       name: 'intent-doc-completed',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
 
-        assert.ok(intentDoc, 'Intent doc should exist');
-        assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
-        assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after webhook processing');
-        assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');
+        expect(intentDoc, 'Intent doc should exist').toBeTruthy();
+        expect(intentDoc.id, 'ID should match orderId').toBe(state.orderId);
+        expect(intentDoc.status, 'Intent status should be completed after webhook processing').toBe('completed');
+        expect(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set').toBeTruthy();
       },
     },
 
     {
       name: 'order-doc-created',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.id, state.orderId, 'ID should match orderId');
-        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.unified.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
-        assert.equal(orderDoc.unified.trial.claimed, true, 'Trial should be claimed');
-        assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
-        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.id, 'ID should match orderId').toBe(state.orderId);
+        expect(orderDoc.type, 'Type should be subscription').toBe('subscription');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(orderDoc.unified.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
+        expect(orderDoc.unified.trial.claimed, 'Trial should be claimed').toBe(true);
+        expect(orderDoc.requests !== undefined, 'requests field should exist').toBeTruthy();
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should be null').toBe(null);
+        expect(orderDoc.requests.refund, 'requests.refund should be null').toBe(null);
       },
     },
 
     {
       name: 'send-trial-to-active-webhook',
-      async run({ http, assert, state, config, payments }) {
+      async run({ http, expect, state, config, payments }) {
         const futureDate = new Date();
         futureDate.setMonth(futureDate.getMonth() + 1);
 
@@ -145,13 +145,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted');
+        expect(response, 'Webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'trial-transitioned-to-active',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.eventId2}`);
           return doc?.status === 'completed';
@@ -159,14 +159,14 @@ module.exports = defineCases({
 
         // Trial → active paid is the same status/product, so no transition fires
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId2}`);
-        assert.equal(webhookDoc.transition, null, 'No transition (same status/product, trial already claimed)');
+        expect(webhookDoc.transition, 'No transition (same status/product, trial already claimed)').toBe(null);
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
-        assert.equal(userDoc.subscription.trial.claimed, true, 'Trial should remain claimed (historical)');
-        assert.equal(userDoc.subscription.payment.frequency, state.product.frequency, `Frequency should be ${state.product.frequency}`);
+        expect(userDoc.subscription.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
+        expect(userDoc.subscription.status, 'Status should be active').toBe('active');
+        expect(userDoc.subscription.trial.claimed, 'Trial should remain claimed (historical)').toBe(true);
+        expect(userDoc.subscription.payment.frequency, `Frequency should be ${state.product.frequency}`).toBe(state.product.frequency);
       },
     },
   ],

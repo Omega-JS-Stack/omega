@@ -59,10 +59,10 @@ module.exports = defineCases({
 
     {
       name: 'exports-constants',
-      async run({ assert }) {
-        assert.equal(IMAGE_MAX_DIMENSION, 2048, 'IMAGE_MAX_DIMENSION should be 2048');
-        assert.equal(IMAGE_JPEG_QUALITY, 80, 'IMAGE_JPEG_QUALITY should be 80');
-        assert.isType(resizeImage, 'function', 'resizeImage should be exported as a function');
+      async run({ expect }) {
+        expect(IMAGE_MAX_DIMENSION, 'IMAGE_MAX_DIMENSION should be 2048').toBe(2048);
+        expect(IMAGE_JPEG_QUALITY, 'IMAGE_JPEG_QUALITY should be 80').toBe(80);
+        expect(resizeImage, 'resizeImage should be exported as a function').toBeTypeOf('function');
       },
     },
 
@@ -70,18 +70,18 @@ module.exports = defineCases({
 
     {
       name: 'small-image-passes-through-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         const filepath = await makeJpeg(800, 600);
         const sizeBefore = jetpack.inspect(filepath).size;
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, false, 'Small image should not be resized');
-        assert.equal(result.width, 800, 'Width should be reported as-is');
-        assert.equal(result.height, 600, 'Height should be reported as-is');
+        expect(result.resized, 'Small image should not be resized').toBe(false);
+        expect(result.width, 'Width should be reported as-is').toBe(800);
+        expect(result.height, 'Height should be reported as-is').toBe(600);
 
         const sizeAfter = jetpack.inspect(filepath).size;
-        assert.equal(sizeAfter, sizeBefore, 'File on disk should be byte-identical (no re-encode)');
+        expect(sizeAfter, 'File on disk should be byte-identical (no re-encode)').toBe(sizeBefore);
 
         jetpack.remove(filepath);
       },
@@ -89,13 +89,13 @@ module.exports = defineCases({
 
     {
       name: 'image-exactly-at-max-passes-through',
-      async run({ assert }) {
+      async run({ expect }) {
         const filepath = await makeJpeg(IMAGE_MAX_DIMENSION, 1000);
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, false, 'Image exactly at the limit should not be resized');
-        assert.equal(result.width, IMAGE_MAX_DIMENSION, 'Width unchanged');
+        expect(result.resized, 'Image exactly at the limit should not be resized').toBe(false);
+        expect(result.width, 'Width unchanged').toBe(IMAGE_MAX_DIMENSION);
 
         jetpack.remove(filepath);
       },
@@ -105,20 +105,20 @@ module.exports = defineCases({
 
     {
       name: 'landscape-oversized-is-resized-to-max-width',
-      async run({ assert }) {
+      async run({ expect }) {
         // 8000x4000 landscape → long edge is width → clamp to 2048, height scales to 1024
         const filepath = await makeJpeg(8000, 4000);
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, true, 'Oversized landscape should be resized');
-        assert.equal(result.width, IMAGE_MAX_DIMENSION, 'Width clamped to IMAGE_MAX_DIMENSION');
-        assert.equal(result.height, IMAGE_MAX_DIMENSION / 2, 'Height scaled proportionally');
+        expect(result.resized, 'Oversized landscape should be resized').toBe(true);
+        expect(result.width, 'Width clamped to IMAGE_MAX_DIMENSION').toBe(IMAGE_MAX_DIMENSION);
+        expect(result.height, 'Height scaled proportionally').toBe(IMAGE_MAX_DIMENSION / 2);
 
         const meta = await sharp(filepath).metadata();
-        assert.equal(meta.width, IMAGE_MAX_DIMENSION, 'On-disk width matches reported width');
-        assert.equal(meta.height, IMAGE_MAX_DIMENSION / 2, 'On-disk height matches reported height');
-        assert.equal(meta.format, 'jpeg', 'On-disk format is JPEG');
+        expect(meta.width, 'On-disk width matches reported width').toBe(IMAGE_MAX_DIMENSION);
+        expect(meta.height, 'On-disk height matches reported height').toBe(IMAGE_MAX_DIMENSION / 2);
+        expect(meta.format, 'On-disk format is JPEG').toBe('jpeg');
 
         jetpack.remove(filepath);
       },
@@ -128,15 +128,15 @@ module.exports = defineCases({
 
     {
       name: 'portrait-oversized-is-resized-to-max-height',
-      async run({ assert }) {
+      async run({ expect }) {
         // 4000x8000 portrait → long edge is height → clamp to 2048, width scales to 1024
         const filepath = await makeJpeg(4000, 8000);
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, true, 'Oversized portrait should be resized');
-        assert.equal(result.width, IMAGE_MAX_DIMENSION / 2, 'Width scaled proportionally');
-        assert.equal(result.height, IMAGE_MAX_DIMENSION, 'Height clamped to IMAGE_MAX_DIMENSION');
+        expect(result.resized, 'Oversized portrait should be resized').toBe(true);
+        expect(result.width, 'Width scaled proportionally').toBe(IMAGE_MAX_DIMENSION / 2);
+        expect(result.height, 'Height clamped to IMAGE_MAX_DIMENSION').toBe(IMAGE_MAX_DIMENSION);
 
         jetpack.remove(filepath);
       },
@@ -146,20 +146,21 @@ module.exports = defineCases({
 
     {
       name: 'huge-image-is-resized-down',
-      async run({ assert }) {
+      async run({ expect }) {
         // 16384x10576 — the actual size from post-1779087609.
         const filepath = await makeJpeg(16384, 10576);
         const sizeBefore = jetpack.inspect(filepath).size;
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, true, 'Huge image should be resized');
-        assert.equal(result.width, IMAGE_MAX_DIMENSION, 'Long edge clamped to IMAGE_MAX_DIMENSION');
+        expect(result.resized, 'Huge image should be resized').toBe(true);
+        expect(result.width, 'Long edge clamped to IMAGE_MAX_DIMENSION').toBe(IMAGE_MAX_DIMENSION);
         // 16384:10576 ratio → height = 2048 * (10576/16384) = 1322
-        assert.inRange(result.height, 1321, 1323, 'Height scaled proportionally (within rounding)');
+        expect(result.height, 'Height scaled proportionally (within rounding)').toBeGreaterThanOrEqual(1321);
+        expect(result.height, 'Height scaled proportionally (within rounding)').toBeLessThanOrEqual(1323);
 
         const sizeAfter = jetpack.inspect(filepath).size;
-        assert.ok(sizeAfter < sizeBefore, 'Resized file on disk should be smaller than original');
+        expect(sizeAfter < sizeBefore, 'Resized file on disk should be smaller than original').toBeTruthy();
 
         jetpack.remove(filepath);
       },
@@ -169,14 +170,14 @@ module.exports = defineCases({
 
     {
       name: 'square-oversized-is-resized-to-square',
-      async run({ assert }) {
+      async run({ expect }) {
         const filepath = await makeJpeg(8000, 8000);
 
         const result = await resizeImage(makeAssistant(), filepath);
 
-        assert.equal(result.resized, true, 'Oversized square should be resized');
-        assert.equal(result.width, IMAGE_MAX_DIMENSION, 'Width clamped');
-        assert.equal(result.height, IMAGE_MAX_DIMENSION, 'Height clamped');
+        expect(result.resized, 'Oversized square should be resized').toBe(true);
+        expect(result.width, 'Width clamped').toBe(IMAGE_MAX_DIMENSION);
+        expect(result.height, 'Height clamped').toBe(IMAGE_MAX_DIMENSION);
 
         jetpack.remove(filepath);
       },

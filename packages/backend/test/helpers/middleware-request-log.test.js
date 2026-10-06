@@ -39,7 +39,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-bearer-api-key-never-reaches-the-headers-line',
-      async run({ assert }) {
+      async run({ expect }) {
         // The reported case: API-key auth arrives as a bearer header, so the
         // headers line carried a live `api.privateKey` on every API request.
         const logged = serialize(redactHeadersForLog({
@@ -47,14 +47,14 @@ module.exports = defineCases({
           'content-type': 'application/json',
         }));
 
-        assert.equal(logged.includes(PRIVATE_KEY), false, `the API key leaked into the headers line: ${logged}`);
-        assert.equal(logged.includes('application/json'), true, `a non-credential header was dropped: ${logged}`);
+        expect(logged.includes(PRIVATE_KEY), `the API key leaked into the headers line: ${logged}`).toBe(false);
+        expect(logged.includes('application/json'), `a non-credential header was dropped: ${logged}`).toBe(true);
       },
     },
 
     {
       name: 'every-credential-header-the-authenticator-reads-is-redacted',
-      async run({ assert }) {
+      async run({ expect }) {
         // The admin key and the __session cookie are the other two header
         // lanes context/authenticate.js reads — same class of live credential.
         const logged = serialize(redactHeadersForLog({
@@ -62,14 +62,14 @@ module.exports = defineCases({
           cookie: `__session=${SESSION_JWT}; theme=dark`,
         }));
 
-        assert.equal(logged.includes(ADMIN_KEY), false, `the admin key leaked into the headers line: ${logged}`);
-        assert.equal(logged.includes(SESSION_JWT), false, `the session token leaked into the headers line: ${logged}`);
+        expect(logged.includes(ADMIN_KEY), `the admin key leaked into the headers line: ${logged}`).toBe(false);
+        expect(logged.includes(SESSION_JWT), `the session token leaked into the headers line: ${logged}`).toBe(false);
       },
     },
 
     {
       name: 'the-payload-credential-channels-are-redacted',
-      async run({ assert }) {
+      async run({ expect }) {
         // The body/query lanes: `apiKey` and `authenticationToken` land in
         // ctx.request.data, which the request line stringifies whole.
         const logged = serialize(redactDataForLog({
@@ -78,28 +78,28 @@ module.exports = defineCases({
           message: 'hello',
         }));
 
-        assert.equal(logged.includes(PRIVATE_KEY), false, `data.apiKey leaked into the request line: ${logged}`);
-        assert.equal(logged.includes(SESSION_JWT), false, `data.authenticationToken leaked into the request line: ${logged}`);
-        assert.equal(logged.includes('hello'), true, `a non-credential field was dropped: ${logged}`);
+        expect(logged.includes(PRIVATE_KEY), `data.apiKey leaked into the request line: ${logged}`).toBe(false);
+        expect(logged.includes(SESSION_JWT), `data.authenticationToken leaked into the request line: ${logged}`).toBe(false);
+        expect(logged.includes('hello'), `a non-credential field was dropped: ${logged}`).toBe(true);
       },
     },
 
     {
       name: 'a-redacted-channel-still-reports-presence-and-last-4',
-      async run({ assert }) {
+      async run({ expect }) {
         // Same shape the authenticator's own lines use: enough to tell "a key
         // was sent" and to match it against a known key, never the key itself.
         const headers = redactHeadersForLog({ authorization: `Bearer ${PRIVATE_KEY}` });
         const data = redactDataForLog({ apiKey: PRIVATE_KEY });
 
-        assert.equal(headers.authorization, 'Bearer ***alue (29 chars)', serialize(headers));
-        assert.equal(data.apiKey, '***alue (29 chars)', serialize(data));
+        expect(headers.authorization, serialize(headers)).toBe('Bearer ***alue (29 chars)');
+        expect(data.apiKey, serialize(data)).toBe('***alue (29 chars)');
       },
     },
 
     {
       name: 'redaction-never-mutates-the-request',
-      async run({ assert }) {
+      async run({ expect }) {
         // ctx.request.headers IS req.headers and ctx.request.data is what the
         // route handler reads next — a redaction that wrote through would
         // break authentication itself.
@@ -110,24 +110,24 @@ module.exports = defineCases({
 
         redactHeadersForLog(headers);
 
-        assert.equal(headers.authorization, `Bearer ${PRIVATE_KEY}`, 'the headers object was mutated');
-        assert.equal(data.apiKey, PRIVATE_KEY, 'the request data was mutated');
-        assert.equal(redactedData.nested, data.nested, 'untouched branches are carried by reference');
+        expect(headers.authorization, 'the headers object was mutated').toBe(`Bearer ${PRIVATE_KEY}`);
+        expect(data.apiKey, 'the request data was mutated').toBe(PRIVATE_KEY);
+        expect(redactedData.nested, 'untouched branches are carried by reference').toBe(data.nested);
       },
     },
 
     {
       name: 'a-request-without-credentials-passes-through-unchanged',
-      async run({ assert }) {
+      async run({ expect }) {
         // The common case must stay fully readable — the line is the primary
         // request trace.
         const headers = { 'content-type': 'application/json', 'user-agent': 'omega-test' };
         const data = { name: 'set-a', count: 3 };
 
-        assert.deepEqual(redactHeadersForLog(headers), headers);
-        assert.deepEqual(redactDataForLog(data), data);
-        assert.deepEqual(redactHeadersForLog(undefined), {});
-        assert.deepEqual(redactDataForLog(undefined), {});
+        expect(redactHeadersForLog(headers)).toEqual(headers);
+        expect(redactDataForLog(data)).toEqual(data);
+        expect(redactHeadersForLog(undefined)).toEqual({});
+        expect(redactDataForLog(undefined)).toEqual({});
       },
     },
   ],

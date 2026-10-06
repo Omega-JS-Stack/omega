@@ -55,53 +55,53 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-provider',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/marketing/webhook', []);
-        assert.isError(response, 400, 'Should reject missing provider');
+        expect(response, 'Should reject missing provider').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/marketing/webhook?provider=sendgrid', []);
-        assert.isError(response, 401, 'Should reject missing key');
+        expect(response, 'Should reject missing key').toBeError(401);
       },
     },
 
     {
       name: 'rejects-invalid-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/marketing/webhook?provider=sendgrid&key=wrong-key', []);
-        assert.isError(response, 401, 'Should reject invalid key');
+        expect(response, 'Should reject invalid key').toBeError(401);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(
           `omega/marketing/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           []
         );
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'ignores-mismatched-brand',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Brand filter should silently ignore (200 with ignored: true), not error
         const response = await http.as('none').post(
           `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}&brand=some-other-brand-that-does-not-exist`,
           []
         );
-        assert.isSuccess(response, 'Should silently ignore mismatched brand (200 OK)');
-        assert.propertyEquals(response, 'data.ignored', true, 'Response should indicate ignored');
+        expect(response, 'Should silently ignore mismatched brand (200 OK)').toBeSuccess();
+        expect(response, 'Response should indicate ignored').toHaveProperty('data.ignored', true);
       },
     },
 
@@ -110,7 +110,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-group-unsubscribe-writes-consent',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('group-unsub');
@@ -121,21 +121,21 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email, timestamp: eventTimestamp, asmGroupId: 25928 })]
         );
 
-        assert.isSuccess(response, `Webhook should accept group_unsubscribe: ${JSON.stringify(response, null, 2)}`);
-        assert.propertyEquals(response, 'data.processed', 1, 'Should report 1 event processed');
+        expect(response, `Webhook should accept group_unsubscribe: ${JSON.stringify(response, null, 2)}`).toBeSuccess();
+        expect(response, 'Should report 1 event processed').toHaveProperty('data.processed', 1);
 
         // User doc should now show revoked marketing with source=sendgrid
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'marketing.status should be revoked');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'sendgrid', 'revokedAt.source should be sendgrid');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, eventTimestamp, 'revokedAt.timestampUNIX should match event timestamp');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status should be revoked').toBe('revoked');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'revokedAt.source should be sendgrid').toBe('sendgrid');
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, 'revokedAt.timestampUNIX should match event timestamp').toBe(eventTimestamp);
       },
     },
 
     {
       name: 'sendgrid-unsubscribe-event-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('unsub');
@@ -145,19 +145,19 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'unsubscribe', email })]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'Should process the unsubscribe event');
+        expect(response).toBeSuccess();
+        expect(response, 'Should process the unsubscribe event').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'marketing.status should be revoked');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'sendgrid', 'source should be sendgrid');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status should be revoked').toBe('revoked');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'source should be sendgrid').toBe('sendgrid');
       },
     },
 
     {
       name: 'sendgrid-spamreport-event-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('spamreport');
@@ -167,18 +167,18 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'spamreport', email })]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'Spamreport should be treated as a revoke');
+        expect(response).toBeSuccess();
+        expect(response, 'Spamreport should be treated as a revoke').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
       },
     },
 
     {
       name: 'sendgrid-hard-bounce-event-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('hard-bounce');
@@ -189,18 +189,18 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'bounce', email, bounceClassification: 'Invalid Address' })]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'Hard bounce should be treated as a revoke');
+        expect(response).toBeSuccess();
+        expect(response, 'Hard bounce should be treated as a revoke').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
       },
     },
 
     {
       name: 'sendgrid-dropped-hard-bounce-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('dropped');
@@ -211,11 +211,11 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'dropped', email, bounceClassification: 'Invalid Address' })]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'Dropped with Invalid Address should be treated as a revoke');
+        expect(response).toBeSuccess();
+        expect(response, 'Dropped with Invalid Address should be treated as a revoke').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
       },
     },
 
@@ -224,7 +224,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-technical-bounce-ignored',
       auth: 'none',
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('technical-bounce');
 
@@ -235,16 +235,16 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'bounce', email, bounceClassification: 'Technical Failure' })]
         );
 
-        assert.isSuccess(response, 'Should accept the request (not error) but ignore the event');
-        assert.propertyEquals(response, 'data.processed', 0, 'Technical bounce should not be processed');
-        assert.propertyEquals(response, 'data.skipped', 1, '1 event should be skipped');
+        expect(response, 'Should accept the request (not error) but ignore the event').toBeSuccess();
+        expect(response, 'Technical bounce should not be processed').toHaveProperty('data.processed', 0);
+        expect(response, '1 event should be skipped').toHaveProperty('data.skipped', 1);
       },
     },
 
     {
       name: 'sendgrid-bounce-without-classification-ignored',
       auth: 'none',
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('unclassified-bounce');
 
@@ -254,16 +254,16 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'bounce', email })]
         );
 
-        assert.isSuccess(response, 'Should accept the request (not error) but ignore the event');
-        assert.propertyEquals(response, 'data.processed', 0, 'Unclassified bounce should not be processed');
-        assert.propertyEquals(response, 'data.skipped', 1, '1 event should be skipped');
+        expect(response, 'Should accept the request (not error) but ignore the event').toBeSuccess();
+        expect(response, 'Unclassified bounce should not be processed').toHaveProperty('data.processed', 0);
+        expect(response, '1 event should be skipped').toHaveProperty('data.skipped', 1);
       },
     },
 
     {
       name: 'sendgrid-delivered-event-ignored',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('delivered');
 
@@ -272,16 +272,16 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'delivered', email })]
         );
 
-        assert.isSuccess(response, 'Should accept the request (not error) but ignore the event');
-        assert.propertyEquals(response, 'data.processed', 0, 'No events should be processed');
-        assert.propertyEquals(response, 'data.skipped', 1, '1 event should be skipped');
+        expect(response, 'Should accept the request (not error) but ignore the event').toBeSuccess();
+        expect(response, 'No events should be processed').toHaveProperty('data.processed', 0);
+        expect(response, '1 event should be skipped').toHaveProperty('data.skipped', 1);
       },
     },
 
     {
       name: 'sendgrid-open-event-ignored',
       auth: 'none',
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('open');
 
@@ -290,8 +290,8 @@ module.exports = defineCases({
           [sgEvent({ id: eventId, type: 'open', email })]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 0, 'Open events should be ignored');
+        expect(response).toBeSuccess();
+        expect(response, 'Open events should be ignored').toHaveProperty('data.processed', 0);
       },
     },
 
@@ -300,7 +300,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-unknown-email-silent-skip',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Email that doesn't match any user in this brand's Firestore — shared SendGrid scenario
         const eventId = sgEventId('unknown-email');
 
@@ -312,8 +312,8 @@ module.exports = defineCases({
         // Dispatcher still runs the handler (which returns handled:false). From the
         // dispatcher's POV this counts as 'processed=1' since the handler didn't throw.
         // The handler's internal "user-not-found" branch is silent by design.
-        assert.isSuccess(response, 'Should accept unknown-email gracefully');
-        assert.propertyEquals(response, 'data.failed', 0, 'No failures for unknown email');
+        expect(response, 'Should accept unknown-email gracefully').toBeSuccess();
+        expect(response, 'No failures for unknown email').toHaveProperty('data.failed', 0);
       },
     },
 
@@ -322,7 +322,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-batched-events-processed-independently',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const e1 = sgEventId('batch-1');
@@ -338,13 +338,13 @@ module.exports = defineCases({
           ]
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 2, '2 supported events should be processed');
-        assert.propertyEquals(response, 'data.skipped', 1, '1 unsupported event should be skipped');
+        expect(response).toBeSuccess();
+        expect(response, '2 supported events should be processed').toHaveProperty('data.processed', 2);
+        expect(response, '1 unsupported event should be skipped').toHaveProperty('data.skipped', 1);
 
         // User doc should be revoked
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
       },
     },
 
@@ -353,7 +353,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-duplicate-event-reprocessed-idempotently',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = sgEventId('duplicate');
@@ -363,8 +363,8 @@ module.exports = defineCases({
           `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email })]
         );
-        assert.isSuccess(response1);
-        assert.propertyEquals(response1, 'data.processed', 1, 'First delivery should process');
+        expect(response1).toBeSuccess();
+        expect(response1, 'First delivery should process').toHaveProperty('data.processed', 1);
 
         // Second delivery — same eventId. With no dedup ledger the handler runs
         // again, but the revoke is idempotent so the end state is unchanged.
@@ -372,11 +372,11 @@ module.exports = defineCases({
           `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email })]
         );
-        assert.isSuccess(response2);
-        assert.propertyEquals(response2, 'data.processed', 1, 'Re-delivery reprocesses (idempotent), not skipped');
+        expect(response2).toBeSuccess();
+        expect(response2, 'Re-delivery reprocesses (idempotent), not skipped').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'User remains revoked after re-delivery');
+        expect(userDoc?.consent?.marketing?.status, 'User remains revoked after re-delivery').toBe('revoked');
       },
     },
 
@@ -385,7 +385,7 @@ module.exports = defineCases({
     {
       name: 'sendgrid-event-without-eventId-processed',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
 
@@ -394,11 +394,11 @@ module.exports = defineCases({
           [{ event: 'group_unsubscribe', email, timestamp: Math.floor(Date.now() / 1000) }] // NO sg_event_id
         );
 
-        assert.isSuccess(response, 'Should accept the request');
-        assert.propertyEquals(response, 'data.processed', 1, 'Event without eventId is still processed (no dedup needed)');
+        expect(response, 'Should accept the request').toBeSuccess();
+        expect(response, 'Event without eventId is still processed (no dedup needed)').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'User should be revoked');
+        expect(userDoc?.consent?.marketing?.status, 'User should be revoked').toBe('revoked');
       },
     },
 
@@ -409,7 +409,7 @@ module.exports = defineCases({
     {
       name: 'beehiiv-subscription-unsubscribed-writes-consent',
       auth: 'none',
-      async run({ http, firestore, assert, accounts, config, skip }) {
+      async run({ http, firestore, expect, accounts, config, skip }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = `_test-bh-unsub-${Date.now()}`;
@@ -431,20 +431,20 @@ module.exports = defineCases({
           }
         );
 
-        assert.isSuccess(response, `Beehiiv unsub should succeed: ${JSON.stringify(response, null, 2)}`);
-        assert.propertyEquals(response, 'data.processed', 1, 'Should process 1 event');
+        expect(response, `Beehiiv unsub should succeed: ${JSON.stringify(response, null, 2)}`).toBeSuccess();
+        expect(response, 'Should process 1 event').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'marketing.status should be revoked');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'beehiiv', 'revokedAt.source should be beehiiv');
-        assert.ok(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'revokedAt.timestamp should be set');
+        expect(userDoc?.consent?.marketing?.status, 'marketing.status should be revoked').toBe('revoked');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'revokedAt.source should be beehiiv').toBe('beehiiv');
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'revokedAt.timestamp should be set').toBeTruthy();
       },
     },
 
     {
       name: 'beehiiv-subscription-deleted-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts, config }) {
+      async run({ http, firestore, expect, accounts, config }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = `_test-bh-deleted-${Date.now()}`;
@@ -461,19 +461,19 @@ module.exports = defineCases({
           }
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'subscription.deleted should be processed as a revoke');
+        expect(response).toBeSuccess();
+        expect(response, 'subscription.deleted should be processed as a revoke').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'beehiiv');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source).toBe('beehiiv');
       },
     },
 
     {
       name: 'beehiiv-subscription-paused-handled',
       auth: 'none',
-      async run({ http, firestore, assert, accounts, config }) {
+      async run({ http, firestore, expect, accounts, config }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const eventId = `_test-bh-paused-${Date.now()}`;
@@ -490,18 +490,18 @@ module.exports = defineCases({
           }
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 1, 'subscription.paused should be processed as a revoke');
+        expect(response).toBeSuccess();
+        expect(response, 'subscription.paused should be processed as a revoke').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked');
+        expect(userDoc?.consent?.marketing?.status).toBe('revoked');
       },
     },
 
     {
       name: 'beehiiv-publication-mismatch-silent-skip',
       auth: 'none',
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         // Send an event with a publication_id that does NOT match this brand's pub.
         // Simulates the shared-devbeans scenario where the parent forwarder fans
         // an event to brands that don't share the publication — they silent-skip.
@@ -529,25 +529,21 @@ module.exports = defineCases({
         // ran without error), but the handler returned
         // { handled: false, reason: 'publication-mismatch' }.
         // What matters: the user doc should NOT have been mutated.
-        assert.isSuccess(response, 'Pub-mismatch event should be accepted gracefully');
+        expect(response, 'Pub-mismatch event should be accepted gracefully').toBeSuccess();
 
         // Reload the user doc and verify revokedAt is byte-equivalent to before —
         // pub-mismatch must not write a new revoke entry.
         const afterDoc = await firestore.get(`users/${accounts['journey-webhook-revoke'].uid}`);
         const afterRevokedAt = afterDoc?.consent?.marketing?.revokedAt || null;
 
-        assert.deepEqual(
-          afterRevokedAt,
-          beforeRevokedAt,
-          'consent.marketing.revokedAt must be UNCHANGED after a pub-mismatch event (handler should silent-skip)'
-        );
+        expect(afterRevokedAt, 'consent.marketing.revokedAt must be UNCHANGED after a pub-mismatch event (handler should silent-skip)').toEqual(beforeRevokedAt);
       },
     },
 
     {
       name: 'beehiiv-unknown-email-silent-skip',
       auth: 'none',
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         // Email that doesn't map to any user — shared publication scenario where
         // multiple brands receive the same event but only one has the user.
         const publicationId = config.marketing?.newsletter?.providers?.beehiiv?.publicationId;
@@ -564,15 +560,15 @@ module.exports = defineCases({
           }
         );
 
-        assert.isSuccess(response, 'Unknown email should not error');
-        assert.propertyEquals(response, 'data.failed', 0, 'No failures for unknown email');
+        expect(response, 'Unknown email should not error').toBeSuccess();
+        expect(response, 'No failures for unknown email').toHaveProperty('data.failed', 0);
       },
     },
 
     {
       name: 'beehiiv-unsupported-event-ignored',
       auth: 'none',
-      async run({ http, assert, accounts, config }) {
+      async run({ http, expect, accounts, config }) {
         // 'subscription.created' (new signup) is NOT a revoke — should be ignored.
         const email = accounts['journey-webhook-revoke'].email;
         const publicationId = config.marketing?.newsletter?.providers?.beehiiv?.publicationId;
@@ -589,16 +585,16 @@ module.exports = defineCases({
           }
         );
 
-        assert.isSuccess(response);
-        assert.propertyEquals(response, 'data.processed', 0, 'Unsupported events should not be processed');
-        assert.propertyEquals(response, 'data.skipped', 1, 'Unsupported events should be skipped');
+        expect(response).toBeSuccess();
+        expect(response, 'Unsupported events should not be processed').toHaveProperty('data.processed', 0);
+        expect(response, 'Unsupported events should be skipped').toHaveProperty('data.skipped', 1);
       },
     },
 
     {
       name: 'beehiiv-duplicate-event-reprocessed-idempotently',
       auth: 'none',
-      async run({ http, firestore, assert, accounts, config, skip }) {
+      async run({ http, firestore, expect, accounts, config, skip }) {
         const uid = accounts['journey-webhook-revoke'].uid;
         const email = accounts['journey-webhook-revoke'].email;
         const publicationId = config.marketing?.newsletter?.providers?.beehiiv?.publicationId;
@@ -621,8 +617,8 @@ module.exports = defineCases({
           `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           payload
         );
-        assert.isSuccess(r1);
-        assert.propertyEquals(r1, 'data.processed', 1, 'First delivery should process');
+        expect(r1).toBeSuccess();
+        expect(r1, 'First delivery should process').toHaveProperty('data.processed', 1);
 
         // Second delivery — same id. No dedup ledger, so it reprocesses; the
         // revoke is idempotent so the end state is unchanged.
@@ -630,11 +626,11 @@ module.exports = defineCases({
           `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           payload
         );
-        assert.isSuccess(r2);
-        assert.propertyEquals(r2, 'data.processed', 1, 'Re-delivery reprocesses (idempotent), not skipped');
+        expect(r2).toBeSuccess();
+        expect(r2, 'Re-delivery reprocesses (idempotent), not skipped').toHaveProperty('data.processed', 1);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'User remains revoked after re-delivery');
+        expect(userDoc?.consent?.marketing?.status, 'User remains revoked after re-delivery').toBe('revoked');
       },
     },
   ],

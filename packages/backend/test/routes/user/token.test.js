@@ -15,15 +15,12 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/token', {});
 
-        assert.isSuccess(response, 'Create custom token should succeed for authenticated user');
-        assert.hasProperty(response, 'data.token', 'Response should contain token');
-        assert.ok(
-          typeof response.data.token === 'string' && response.data.token.length > 0,
-          'Token should be a non-empty string'
-        );
+        expect(response, 'Create custom token should succeed for authenticated user').toBeSuccess();
+        expect(response, 'Response should contain token').toHaveProperty('data.token');
+        expect(typeof response.data.token === 'string' && response.data.token.length > 0, 'Token should be a non-empty string').toBeTruthy();
       },
     },
 
@@ -33,14 +30,14 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/token', {});
 
-        assert.isSuccess(response, 'Create custom token should succeed');
+        expect(response, 'Create custom token should succeed').toBeSuccess();
 
         // JWT tokens have 3 parts separated by dots
         const parts = response.data.token.split('.');
-        assert.equal(parts.length, 3, 'Token should be a valid JWT with 3 parts');
+        expect(parts.length, 'Token should be a valid JWT with 3 parts').toBe(3);
       },
     },
 
@@ -51,11 +48,11 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/token', {});
 
-        assert.isSuccess(response, 'Create custom token should succeed for premium user');
-        assert.hasProperty(response, 'data.token', 'Response should contain token');
+        expect(response, 'Create custom token should succeed for premium user').toBeSuccess();
+        expect(response, 'Response should contain token').toHaveProperty('data.token');
       },
     },
 
@@ -65,10 +62,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/token', {});
 
-        assert.isError(response, 401, 'Create custom token should fail without authentication');
+        expect(response, 'Create custom token should fail without authentication').toBeError(401);
       },
     },
 
@@ -82,12 +79,12 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/token', {});
 
-        assert.isSuccess(response, 'Create custom token should succeed');
-        assert.equal(typeof response.data.token, 'string', 'Token should be at the TOP level of the body');
-        assert.equal(response.data.response, undefined, 'The legacy response envelope must not exist');
+        expect(response, 'Create custom token should succeed').toBeSuccess();
+        expect(typeof response.data.token, 'Token should be at the TOP level of the body').toBe('string');
+        expect(response.data.response, 'The legacy response envelope must not exist').toBe(undefined);
       },
     },
 
@@ -98,13 +95,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega', {
           command: 'user:create-custom-token',
           payload: {},
         });
 
-        assert.isError(response, null, 'Legacy command dispatch must not succeed');
+        expect(response, 'Legacy command dispatch must not succeed').toBeError();
       },
     },
   ],

@@ -17,7 +17,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const testData = {
           testField: 'read-test-value',
           timestamp: new Date().toISOString(),
@@ -32,7 +32,7 @@ module.exports = defineCases({
           document: testData,
         });
 
-        assert.isSuccess(writeResponse, 'Setup: Firestore write should succeed');
+        expect(writeResponse, 'Setup: Firestore write should succeed').toBeSuccess();
       },
     },
 
@@ -42,24 +42,16 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/firestore', {
           path: TEST_PATH,
         });
 
-        assert.isSuccess(readResponse, 'Firestore read should succeed with admin auth');
-        assert.hasProperty(readResponse, 'data.testField', 'Response should contain test data');
-        assert.equal(
-          readResponse.data.testField,
-          'read-test-value',
-          'Read data should match written data'
-        );
-        assert.hasProperty(readResponse, 'data.nested.field1', 'Response should contain nested data');
-        assert.equal(
-          readResponse.data.nested.field2,
-          42,
-          'Nested field should match written data'
-        );
+        expect(readResponse, 'Firestore read should succeed with admin auth').toBeSuccess();
+        expect(readResponse, 'Response should contain test data').toHaveProperty('data.testField');
+        expect(readResponse.data.testField, 'Read data should match written data').toBe('read-test-value');
+        expect(readResponse, 'Response should contain nested data').toHaveProperty('data.nested.field1');
+        expect(readResponse.data.nested.field2, 'Nested field should match written data').toBe(42);
       },
     },
 
@@ -69,16 +61,16 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/firestore', {
           path: '_test/nonexistent-document-12345',
         });
 
-        assert.isSuccess(readResponse, 'Reading non-existent document should succeed');
+        expect(readResponse, 'Reading non-existent document should succeed').toBeSuccess();
         const isEmpty = readResponse.data === undefined
           || readResponse.data === null
           || (typeof readResponse.data === 'object' && Object.keys(readResponse.data).length === 0);
-        assert.ok(isEmpty, 'Non-existent document should return undefined, null, or empty object');
+        expect(isEmpty, 'Non-existent document should return undefined, null, or empty object').toBeTruthy();
       },
     },
 
@@ -88,10 +80,10 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/firestore', {});
 
-        assert.isError(readResponse, 400, 'Missing path should return 400');
+        expect(readResponse, 'Missing path should return 400').toBeError(400);
       },
     },
 
@@ -101,12 +93,12 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/firestore', {
           path: TEST_PATH,
         });
 
-        assert.isError(readResponse, 401, 'Firestore read should fail without authentication');
+        expect(readResponse, 'Firestore read should fail without authentication').toBeError(401);
       },
     },
 
@@ -116,12 +108,12 @@ module.exports = defineCases({
       auth: 'user',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const readResponse = await http.get('omega/admin/firestore', {
           path: TEST_PATH,
         });
 
-        assert.isError(readResponse, 403, 'Firestore read should fail for non-admin user');
+        expect(readResponse, 'Firestore read should fail for non-admin user').toBeError(403);
       },
     },
 

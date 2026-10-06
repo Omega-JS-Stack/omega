@@ -27,8 +27,7 @@
  * subscription resolution via @omega.js/account, and Bootstrap's collapse
  * data-api modelled faithfully because the gate exists to beat it.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -322,479 +321,524 @@ async function wireCancelFlow(account, { winback, requestFails, without = [] } =
   return { opened, requests, notifications, clickTrigger, clickById, handlersFor, isAccordionOpen, attributesOf, state };
 }
 
-test('#268: the offer is the first step, and the questionnaire does not move behind it', async () => {
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
-
-  const event = clickTrigger();
-
-  assert.strictEqual(event.propagationStopped, true, 'the declarative collapse never gets the click');
-  assert.strictEqual(event.defaultPrevented, true, 'and the default action is cancelled');
-  assert.deepStrictEqual(opened, ['modal:cancel-winback-modal'], 'the offer is what opened');
-  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire never moved');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'a gated trigger is not a Bootstrap toggle at all');
-});
-
-test('#268: the gate is registered in the CAPTURE phase', async () => {
-  // Bootstrap delegates from `document`, so a bubble-phase listener would fire
-  // too late to stop it. Same detail #267's gate depends on.
-  const { handlersFor } = await wireCancelFlow(paidAccount());
-  const clicks = handlersFor('cancel-subscription-trigger-btn').filter((h) => h.type === 'click');
-
-  assert.ok(clicks.length > 0, 'the trigger is gated at all');
-  assert.ok(clicks.every((h) => h.capture === true), 'every gate on the trigger listens in the capture phase');
-});
-
-test('#268: accepting applies the discount and ABORTS the cancel', async () => {
-  const { opened, requests, notifications, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.deepStrictEqual(
-    requests.map((r) => r.url),
-    ['/omega/payments/winback'],
-    'accepting is one call to the apply route',
-  );
-  assert.strictEqual(requests[0].options.method, 'POST');
-  assert.strictEqual(requests[0].options.body.confirmed, true, 'the route requires explicit confirmation');
-
-  assert.ok(opened.includes('modal-hide:cancel-winback-modal'), 'the dialog closes behind the answer');
-  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire never opens — the cancel is off');
-  assert.ok(!opened.some((entry) => entry.startsWith('collapse:')), 'nothing asked the questionnaire to open');
-  assert.strictEqual(notifications.length, 1, 'the customer is told the discount landed');
-});
-
-test('#268: an accepted offer is not pitched a second time', async () => {
-  // The discount is applied to a live subscription; re-opening the flow must
-  // not offer another one, and the backend refuses a second claim anyway.
-  //
-  // A claimed offer is exactly the state the retention warning was built for
-  // ([#341]): nothing left to pitch, so the trigger keeps its gate and the next
-  // cancel click meets the fallback dialog instead of the questionnaire.
-  const { opened, clickTrigger, clickById, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'the trigger stays gated, because a dialog still stands in front of the questionnaire');
-
-  clickTrigger();
-
-  assert.strictEqual(
-    opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
-    1,
-    'the offer opened exactly once',
-  );
-  assert.ok(opened.includes('modal:cancel-retention-modal'), 'and the next cancel click meets the retention warning');
-  assert.strictEqual(isAccordionOpen(), false, 'the questionnaire waits behind it');
-});
-
-test('#268: declining continues to the questionnaire, unchanged', async () => {
-  const { opened, requests, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
-
-  clickTrigger();
-  await clickById('cancel-winback-decline-btn');
-
-  assert.deepStrictEqual(requests, [], 'declining calls no route at all');
-  assert.ok(opened.includes('modal-hide:cancel-winback-modal'), 'the offer closes');
-  assert.ok(opened.includes('collapse:cancel-subscription-accordion'), 'and the questionnaire opens behind it');
-  assert.strictEqual(isAccordionOpen(), true, 'the cancel flow carries on exactly as before');
-});
-
-test('#324: a fresh cancel attempt after a decline is pitched again', async () => {
-  // Ian's QA: decline the offer, close the questionnaire, click cancel again —
-  // and nothing was pitched. A decline is an answer to THIS attempt, not a
-  // one-shot switch for the session: the subscription is still live, the offer
-  // is still unclaimed, so the next attempt to cancel meets it again.
-  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
-
-  clickTrigger();
-  await clickById('cancel-winback-decline-btn');
-
-  assert.strictEqual(isAccordionOpen(), true, 'declining carries on to the questionnaire');
-
-  // Half of a toggle is closing — this click ends the attempt.
-  clickTrigger();
-
-  assert.strictEqual(isAccordionOpen(), false, 'the questionnaire is shut again');
-
-  // A NEW cancel attempt, on an eligible and unclaimed subscription.
-  clickTrigger();
-
-  assert.strictEqual(
-    opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
-    2,
-    'the offer is re-pitched',
-  );
-  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire waits behind it, exactly as the first time');
-});
-
-test('#324: every step of the reopened flow leaves a way forward', async () => {
-  // The whole point of the rewire: no click may leave the customer with neither
-  // the dialog nor the questionnaire. The second pitch answers the same two
-  // ways the first one does, so both are walked end to end.
-  //
-  // Past the accepted end of it the retention warning takes over ([#341]): the
-  // way forward is its "Cancel anyway" button rather than a bare click, and it
-  // is walked here too, because a way forward is the whole claim of this test.
-  const declined = await wireCancelFlow(paidAccount());
-
-  declined.clickTrigger();
-  await declined.clickById('cancel-winback-decline-btn');
-  declined.clickTrigger();
-  declined.clickTrigger();
-  await declined.clickById('cancel-winback-decline-btn');
-
-  assert.strictEqual(declined.isAccordionOpen(), true, 'declining the second pitch opens the questionnaire again');
-
-  const accepted = await wireCancelFlow(paidAccount());
-
-  accepted.clickTrigger();
-  await accepted.clickById('cancel-winback-decline-btn');
-  accepted.clickTrigger();
-  accepted.clickTrigger();
-  await accepted.clickById('cancel-winback-accept-btn');
-
-  assert.strictEqual(accepted.isAccordionOpen(), false, 'accepting the second pitch calls the cancel off');
-  assert.deepStrictEqual(accepted.requests.map((r) => r.url), ['/omega/payments/winback'], 'and applies the discount once');
-
-  accepted.clickTrigger();
-
-  assert.strictEqual(
-    accepted.opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
-    2,
-    'a CLAIMED offer is never pitched again',
-  );
-  assert.ok(accepted.opened.includes('modal:cancel-retention-modal'), 'the claimed state meets the retention warning instead ([#341])');
-  assert.strictEqual(accepted.isAccordionOpen(), false, 'which holds the questionnaire behind it');
-
-  await accepted.clickById('cancel-retention-continue-btn');
-
-  assert.strictEqual(accepted.isAccordionOpen(), true, 'and carrying on through it still reaches the questionnaire');
-});
-
-test('#324: a refusal the account cannot answer stays refused across attempts', async () => {
-  // `winbackSupported` is the other end of the state: the backend has said this
-  // account can never take the offer, so a fresh attempt is not a fresh chance.
-  //
-  // A refused offer is a cancel with nothing left to pitch, so the retention
-  // warning owns every later attempt ([#341]). The refusal itself opened the
-  // questionnaire, so the click after it is the toggle-close half and only shuts
-  // it; the one after THAT is the fresh attempt the fallback dialog meets.
-  const refusal = Object.assign(new Error('You have already claimed this offer'), {
-    properties: { additional: { code: 'offer-already-claimed' } },
-  });
-  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.strictEqual(isAccordionOpen(), true, 'the refusal opens the questionnaire');
-
-  clickTrigger();
-
-  assert.strictEqual(isAccordionOpen(), false, 'the next click is the toggle-close half, and only shuts it');
-
-  clickTrigger();
-
-  assert.strictEqual(
-    opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
-    1,
-    'and no later attempt pitches it again',
-  );
-  assert.ok(opened.includes('modal:cancel-retention-modal'), 'the fresh attempt meets the retention warning instead');
-  assert.strictEqual(isAccordionOpen(), false, 'which holds the questionnaire behind it');
-
-  await clickById('cancel-retention-continue-btn');
-
-  assert.strictEqual(isAccordionOpen(), true, 'and the cancel they came to make is still one click away');
-});
-
-test('#324: a page missing a dialog falls back to the questionnaire, never to a dead button', async () => {
-  // The gate works by taking the trigger's declarative toggle away, so the
-  // dialog it opens instead had better exist. A layout that dropped one (a
-  // consumer override, a trimmed template) must still be able to cancel.
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), { without: ['cancel-winback-modal'] });
-
-  const event = clickTrigger();
-
-  assert.deepStrictEqual(opened, [], 'no dialog opened — there is none to open');
-  assert.strictEqual(event.propagationStopped, false, 'so the declarative collapse keeps the click');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger stays a Bootstrap toggle');
-  assert.strictEqual(isAccordionOpen(), true, 'and the questionnaire opens on the first click');
-});
-
-test('#268: a brand that disabled the offer never sees the step', async () => {
-  // The offer step is off for this brand, and the click it would have taken now
-  // belongs to the retention warning ([#341]): the state the fallback dialog was
-  // added for. So the pin is that NO discount is ever pitched here, not that the
-  // click reaches the questionnaire untouched.
-  const { opened, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
-
-  const event = clickTrigger();
-
-  assert.strictEqual(state().billing.winbackOffer.show, false, 'the offer is off the table entirely');
-  assert.deepStrictEqual(opened, ['modal:cancel-retention-modal'], 'and the retention warning is the one dialog that opened');
-  assert.strictEqual(event.propagationStopped, true, 'the declarative collapse never gets the click');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'a gated trigger is not a Bootstrap toggle at all');
-  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire waits behind the dialog');
-});
-
-test('#268: a trial cancel is warned, never offered a discount', async () => {
-  // A trial has paid for nothing, and #267's warning owns that click. Pitching
-  // "off your next month" to someone whose access ends today is the wrong
-  // sentence, so the two gates are mutually exclusive by state.
-  const { opened, clickTrigger, state } = await wireCancelFlow(trialingAccount());
-
-  clickTrigger();
-
-  assert.deepStrictEqual(opened, ['modal:cancel-trial-warning-modal'], 'the trial warning is what opened');
-  assert.strictEqual(state().billing.winbackOffer.show, false, 'the offer is not on the table for a trial');
-  assert.strictEqual(state().billing.cancelWarning.show, true, 'and #267 is untouched');
-});
-
-test('#268: the offer names the brand\'s own number and the cycle it applies to', async () => {
-  // The headline IS the dialog now (#323): short, forward, the whole pitch in
-  // one line — and every number in it the brand's own.
-  const fifty = await wireCancelFlow(paidAccount());
-  assert.strictEqual(fifty.state().billing.winbackOffer.headline, 'Take 50% off your next month', 'the framework default is 50% off the next cycle');
-
-  const quarter = await wireCancelFlow(paidAccount(), { winback: { percent: 25 } });
-  assert.strictEqual(quarter.state().billing.winbackOffer.headline, 'Take 25% off your next month');
-
-  const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, provider: 'stripe', resourceId: 'sub_live_premium' } }));
-  assert.strictEqual(annual.state().billing.winbackOffer.headline, 'Take 50% off your next year', 'the cycle word follows the subscription, not the copy');
-
-  const amount = await wireCancelFlow(paidAccount(), { winback: { amount: 10 } });
-  assert.strictEqual(amount.state().billing.winbackOffer.headline, 'Take $10.00 off your next month', 'an amount offer reads in the brand currency');
-
-  const forever = await wireCancelFlow(paidAccount(), { winback: { duration: 'forever' } });
-  assert.strictEqual(forever.state().billing.winbackOffer.headline, 'Take 50% off for as long as you stay', 'a permanent cut does not promise one cycle');
-});
-
-test('#325: accepting the offer puts the discount on the card', async () => {
-  // Ian's QA: the discount applied server-side and the dashboard showed
-  // nothing. The route answers with the discount it applied, so the card can
-  // say what was just earned without waiting for a webhook to land.
-  const account = paidAccount();
-  const { clickTrigger, clickById, state } = await wireCancelFlow(account);
-
-  assert.strictEqual(state().billing.discount.show, false, 'nothing is applied before the offer is taken');
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.deepStrictEqual(
-    state().billing.discount,
-    { show: true, label: '50% off', when: 'Applied to your next month' },
-    'the saving is on the card, in words',
-  );
-
-  // The in-session patch carries the same source the backend persisted, so the
-  // gate reads one truth whether the discount arrived by patch or by reload.
-  assert.strictEqual(account.subscription.discount.source, 'winback', 'the patched discount is stamped as the claim');
-});
-
-test('#325: a declined offer leaves the card with no discount to announce', async () => {
-  const { clickTrigger, clickById, state } = await wireCancelFlow(paidAccount());
-
-  clickTrigger();
-  await clickById('cancel-winback-decline-btn');
-
-  assert.strictEqual(state().billing.discount.show, false, 'nothing was applied, so nothing is claimed on screen');
-});
-
-test('#325: a persisted winback claim suppresses the pitch, a checkout code does not', async () => {
-  // The backend stamps the discount it applies with `source: 'winback'`
-  // (payments/winback/post.js), so a claimant who reloads is never re-pitched a
-  // discount they already hold. The SOURCE is the signal, not the node itself:
-  // a checkout code rides the same `subscription.discount` shape, and holding
-  // one must never cost a customer the save offer.
-  const claimed = await wireCancelFlow(paidAccount({
-    discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback' },
-  }));
-
-  assert.strictEqual(claimed.state().billing.winbackOffer.show, false, 'a persisted claim never re-pitches');
-  assert.strictEqual(claimed.state().billing.discount.show, true, 'the discount it earned still shows on the card');
-
-  claimed.clickTrigger();
-  assert.deepStrictEqual(claimed.opened, ['modal:cancel-retention-modal'], 'and the cancel meets the retention warning, never a second pitch ([#341])');
-  assert.strictEqual(claimed.isAccordionOpen(), false, 'with the questionnaire behind it');
-
-  const checkout = await wireCancelFlow(paidAccount({
-    discount: { valid: true, code: 'WELCOME15', percent: 15, duration: 'once', source: 'checkout' },
-  }));
-
-  assert.strictEqual(checkout.state().billing.winbackOffer.show, true, 'a checkout code leaves the offer open');
-});
-
-test('#311: a subscription with no provider payment details is never pitched the offer', async () => {
-  // Paid, active, and unreachable: an admin-granted plan or an imported record
-  // carries no `payment.provider` / `payment.resourceId`, so the apply route
-  // has nothing to send a discount to and can only refuse. Pitching it anyway
-  // put the customer in a dialog whose only button 400s, so the gate reads the
-  // fields the accept path needs.
-  //
-  // What this cancel meets instead is the retention warning ([#341]), the
-  // fallback for exactly this state. No discount is pitched and no route is
-  // called, which is the whole of what #311 asks of it.
-  const cases = [
-    { what: 'no provider details at all', payment: { frequency: 'monthly', price: 10 } },
-    { what: 'a provider but no resource', payment: { frequency: 'monthly', price: 10, provider: 'stripe' } },
-    { what: 'a resource but no provider', payment: { frequency: 'monthly', price: 10, resourceId: 'sub_live_premium' } },
-  ];
-
-  for (const { what, payment } of cases) {
-    const { opened, requests, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount({ payment: payment }));
-
-    assert.strictEqual(state().billing.buttons.cancel, true, `${what}: the subscription can still be cancelled`);
-    assert.strictEqual(state().billing.winbackOffer.show, false, `${what}: but no offer stands in front of it`);
-
-    const event = clickTrigger();
-
-    assert.deepStrictEqual(opened, ['modal:cancel-retention-modal'], `${what}: the retention warning is the one dialog that opened`);
-    assert.strictEqual(event.propagationStopped, true, `${what}: the declarative collapse never gets the click`);
-    assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, `${what}: a gated trigger is not a Bootstrap toggle at all`);
-    assert.strictEqual(isAccordionOpen(), false, `${what}: and the questionnaire waits behind the dialog`);
-    assert.deepStrictEqual(requests, [], `${what}: nothing called the apply route`);
-  }
-});
-
-test('#268: a refusal the account cannot answer retires the offer and lets the cancel through', async () => {
-  // The same capability gate uncancel and plan-switch ride: the BACKEND answers
-  // whether this account can take the offer at all, and a refusal must never
-  // leave the customer stuck in a dialog with no way to cancel. Every dead-end
-  // code is one branch, so each is proven through it — including the one a
-  // PAST CLAIMANT hits when their account predates the persisted claim node
-  // ([#325]): with nothing on the account, the client re-pitches and the order
-  // doc's refusal is the catch ([#310]).
-  //
-  // The route now names EVERY refusal ([#311]), and all but the unconfirmed
-  // request are dead ends for this account — the brand turned the offer off,
-  // the subscription is not the state the offer is for, or it carries no
-  // provider to discount through. None of them change on a retry.
-  const deadEnds = [
-    { code: 'not-supported-by-provider', message: 'Your payment provider cannot apply this offer.' },
-    { code: 'offer-not-claimable', message: 'This offer is not available on your subscription.' },
-    { code: 'offer-already-claimed', message: 'You have already claimed this offer' },
-    { code: 'offer-disabled', message: 'This offer is not available' },
-    { code: 'no-active-subscription', message: 'No active paid subscription found' },
-    { code: 'trial-not-eligible', message: 'This offer is not available on a free trial' },
-    { code: 'cancellation-pending', message: 'Your subscription is already scheduled to cancel' },
-    { code: 'missing-payment-details', message: 'Subscription payment details not found' },
-    { code: 'unknown-provider', message: 'Unknown provider: not-a-provider' },
-  ];
-
-  for (const { code, message } of deadEnds) {
-    const refusal = Object.assign(new Error(message), { properties: { additional: { code: code } } });
-    const { opened, notifications, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
-
-    clickTrigger();
-    await clickById('cancel-winback-accept-btn');
-
-    assert.strictEqual(state().billing.winbackOffer.show, false, `${code}: the offer is retired for the session`);
-    assert.ok(opened.includes('modal-hide:cancel-winback-modal'), `${code}: the dialog closes`);
-    assert.strictEqual(isAccordionOpen(), true, `${code}: and the questionnaire opens, so the cancel can still be made`);
-    assert.strictEqual(notifications.at(-1).message, refusal.message, `${code}: the backend's own refusal is what the customer reads`);
-  }
-});
-
-test('#268: a failed apply leaves the offer on screen to try again', async () => {
-  const outage = new Error('We could not apply your discount right now. Please try again shortly.');
-  const { opened, notifications, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { requestFails: outage });
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.ok(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up');
-  assert.strictEqual(isAccordionOpen(), false, 'and a failure is never read as a decline');
-  assert.strictEqual(notifications.at(-1).message, outage.message);
-});
-
-test('#311: a refusal a retry CAN fix keeps the offer armed', async () => {
-  // Being coded is not being a dead end. `confirmation-required` says the
-  // request went out without its confirmation — the same button sending it
-  // again is exactly the fix — so it must never retire the offer the way an
-  // account-state refusal does.
-  const unconfirmed = Object.assign(new Error('Accepting the offer must be confirmed'), {
-    properties: { additional: { code: 'confirmation-required' } },
-  });
-  const { opened, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: unconfirmed });
-
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
-
-  assert.ok(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up');
-  assert.strictEqual(state().billing.winbackOffer.show, true, 'and the offer is still on the table');
-  assert.strictEqual(isAccordionOpen(), false, 'a fixable failure is never read as a decline');
-});
-
-test('#268: a state that cannot cancel is never offered anything', async () => {
-  const cases = [
-    { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
-    { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
-    { what: 'a subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
-  ];
-
-  for (const { what, account } of cases) {
-    const { state } = await wireCancelFlow(account);
-
-    assert.strictEqual(state().billing.buttons.cancel, false, `${what}: offers no cancel button`);
-    assert.strictEqual(state().billing.winbackOffer.show, false, `${what}: and no offer in front of it`);
-  }
-});
-
-test('#268: the built account page carries the dialog the gate opens', async () => {
-  // The gate stops the questionnaire and opens `#cancel-winback-modal` by id.
-  // If the markup ever loses it, a paid cancel becomes a dead button.
-  for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
-    delete globalThis[name];
-  }
-
-  const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
-  const pages = await buildWith(miniData, {}, 'billing-winback-test');
-  const page = pages.get('/dashboard/account');
-  assert.ok(page, 'account page built');
-
-  for (const id of ['cancel-winback-modal', 'cancel-winback-accept-btn', 'cancel-winback-decline-btn']) {
-    assert.ok(page.includes(`id="${id}"`), `the JS hook survives the markup: ${id}`);
-  }
-
-  // The offer's number is the brand's, so the dialog renders it from state
-  // rather than spelling one out in the template.
-  const modalAt = page.indexOf('id="cancel-winback-modal"');
-  const modal = page.slice(modalAt, page.indexOf('id="cancel-trial-warning-modal"'));
-  assert.ok(modal.length > 0, 'the offer dialog sits before the trial warning');
-  assert.ok(
-    modal.includes('data-omega-bind="@text billing.winbackOffer.headline"'),
-    'the offer copy is bound from the same state the gate reads',
-  );
-  assert.ok(!/\d+% off/.test(modal), 'no discount number is hardcoded in the markup');
-});
-
-test('#268: the build resolves the offer into the client config', async () => {
-  // The 50% default has ONE home (@omega.js/config). The browser must never
-  // apply it itself, so the build bakes the resolved offer into the client blob
-  // — a brand that configured nothing still ships an explicit answer.
-  for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
-    delete globalThis[name];
-  }
-
-  const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
-  const pages = await buildWith(
-    { ...miniData, payment: { currency: 'USD', products: PRODUCTS } },
-    {},
-    'billing-winback-config-test',
-  );
-  const page = pages.get('/dashboard/account');
-  assert.ok(page, 'account page built');
-
-  // The config a browser reads is the run's ONE `build.js` snapshot (#894), the
-  // file the chrome loads with its first script tag: the page itself carries no
-  // config blob any more, so the resolved offer is read out of the snapshot.
-  const payment = readBuildJson(pages).config.payment;
-  assert.ok(payment, 'the snapshot carries the payment section at all');
-  assert.strictEqual(payment.winback.enabled, true, 'the snapshot carries the resolved offer');
-  assert.strictEqual(payment.winback.percent, 50, 'with the framework default baked in');
-  assert.ok(!page.includes('"winback"'), 'and the page bakes no second copy of it');
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-winback-offer',
+  tests: [
+    {
+      name: '#268: the offer is the first step, and the questionnaire does not move behind it',
+      run: async (ctx) => {
+        const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
+
+        const event = clickTrigger();
+
+        ctx.expect(event.propagationStopped, 'the declarative collapse never gets the click').toBe(true);
+        ctx.expect(event.defaultPrevented, 'and the default action is cancelled').toBe(true);
+        ctx.expect(opened, 'the offer is what opened').toEqual(['modal:cancel-winback-modal']);
+        ctx.expect(isAccordionOpen(), 'and the questionnaire never moved').toBe(false);
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'a gated trigger is not a Bootstrap toggle at all').toBe(undefined);
+      },
+    },
+
+    {
+      name: '#268: the gate is registered in the CAPTURE phase',
+      run: async (ctx) => {
+        // Bootstrap delegates from `document`, so a bubble-phase listener would fire
+        // too late to stop it. Same detail #267's gate depends on.
+        const { handlersFor } = await wireCancelFlow(paidAccount());
+        const clicks = handlersFor('cancel-subscription-trigger-btn').filter((h) => h.type === 'click');
+
+        ctx.expect(clicks.length > 0, 'the trigger is gated at all').toBeTruthy();
+        ctx.expect(clicks.every((h) => h.capture === true), 'every gate on the trigger listens in the capture phase').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#268: accepting applies the discount and ABORTS the cancel',
+      run: async (ctx) => {
+        const { opened, requests, notifications, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(requests.map((r) => r.url), 'accepting is one call to the apply route').toEqual(['/omega/payments/winback']);
+        ctx.expect(requests[0].options.method).toBe('POST');
+        ctx.expect(requests[0].options.body.confirmed, 'the route requires explicit confirmation').toBe(true);
+
+        ctx.expect(opened.includes('modal-hide:cancel-winback-modal'), 'the dialog closes behind the answer').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'and the questionnaire never opens — the cancel is off').toBe(false);
+        ctx.expect(!opened.some((entry) => entry.startsWith('collapse:')), 'nothing asked the questionnaire to open').toBeTruthy();
+        ctx.expect(notifications.length, 'the customer is told the discount landed').toBe(1);
+      },
+    },
+
+    {
+      name: '#268: an accepted offer is not pitched a second time',
+      run: async (ctx) => {
+        // The discount is applied to a live subscription; re-opening the flow must
+        // not offer another one, and the backend refuses a second claim anyway.
+        //
+        // A claimed offer is exactly the state the retention warning was built for
+        // ([#341]): nothing left to pitch, so the trigger keeps its gate and the next
+        // cancel click meets the fallback dialog instead of the questionnaire.
+        const { opened, clickTrigger, clickById, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'the trigger stays gated, because a dialog still stands in front of the questionnaire').toBe(undefined);
+
+        clickTrigger();
+
+        ctx.expect(opened.filter((entry) => entry === 'modal:cancel-winback-modal').length, 'the offer opened exactly once').toBe(1);
+        ctx.expect(opened.includes('modal:cancel-retention-modal'), 'and the next cancel click meets the retention warning').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'the questionnaire waits behind it').toBe(false);
+      },
+    },
+
+    {
+      name: '#268: declining continues to the questionnaire, unchanged',
+      run: async (ctx) => {
+        const { opened, requests, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
+
+        clickTrigger();
+        await clickById('cancel-winback-decline-btn');
+
+        ctx.expect(requests, 'declining calls no route at all').toEqual([]);
+        ctx.expect(opened.includes('modal-hide:cancel-winback-modal'), 'the offer closes').toBeTruthy();
+        ctx.expect(opened.includes('collapse:cancel-subscription-accordion'), 'and the questionnaire opens behind it').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'the cancel flow carries on exactly as before').toBe(true);
+      },
+    },
+
+    {
+      name: '#324: a fresh cancel attempt after a decline is pitched again',
+      run: async (ctx) => {
+        // Ian's QA: decline the offer, close the questionnaire, click cancel again —
+        // and nothing was pitched. A decline is an answer to THIS attempt, not a
+        // one-shot switch for the session: the subscription is still live, the offer
+        // is still unclaimed, so the next attempt to cancel meets it again.
+        const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
+
+        clickTrigger();
+        await clickById('cancel-winback-decline-btn');
+
+        ctx.expect(isAccordionOpen(), 'declining carries on to the questionnaire').toBe(true);
+
+        // Half of a toggle is closing — this click ends the attempt.
+        clickTrigger();
+
+        ctx.expect(isAccordionOpen(), 'the questionnaire is shut again').toBe(false);
+
+        // A NEW cancel attempt, on an eligible and unclaimed subscription.
+        clickTrigger();
+
+        ctx.expect(opened.filter((entry) => entry === 'modal:cancel-winback-modal').length, 'the offer is re-pitched').toBe(2);
+        ctx.expect(isAccordionOpen(), 'and the questionnaire waits behind it, exactly as the first time').toBe(false);
+      },
+    },
+
+    {
+      name: '#324: every step of the reopened flow leaves a way forward',
+      run: async (ctx) => {
+        // The whole point of the rewire: no click may leave the customer with neither
+        // the dialog nor the questionnaire. The second pitch answers the same two
+        // ways the first one does, so both are walked end to end.
+        //
+        // Past the accepted end of it the retention warning takes over ([#341]): the
+        // way forward is its "Cancel anyway" button rather than a bare click, and it
+        // is walked here too, because a way forward is the whole claim of this test.
+        const declined = await wireCancelFlow(paidAccount());
+
+        declined.clickTrigger();
+        await declined.clickById('cancel-winback-decline-btn');
+        declined.clickTrigger();
+        declined.clickTrigger();
+        await declined.clickById('cancel-winback-decline-btn');
+
+        ctx.expect(declined.isAccordionOpen(), 'declining the second pitch opens the questionnaire again').toBe(true);
+
+        const accepted = await wireCancelFlow(paidAccount());
+
+        accepted.clickTrigger();
+        await accepted.clickById('cancel-winback-decline-btn');
+        accepted.clickTrigger();
+        accepted.clickTrigger();
+        await accepted.clickById('cancel-winback-accept-btn');
+
+        ctx.expect(accepted.isAccordionOpen(), 'accepting the second pitch calls the cancel off').toBe(false);
+        ctx.expect(accepted.requests.map((r) => r.url), 'and applies the discount once').toEqual(['/omega/payments/winback']);
+
+        accepted.clickTrigger();
+
+        ctx.expect(accepted.opened.filter((entry) => entry === 'modal:cancel-winback-modal').length, 'a CLAIMED offer is never pitched again').toBe(2);
+        ctx.expect(accepted.opened.includes('modal:cancel-retention-modal'), 'the claimed state meets the retention warning instead ([#341])').toBeTruthy();
+        ctx.expect(accepted.isAccordionOpen(), 'which holds the questionnaire behind it').toBe(false);
+
+        await accepted.clickById('cancel-retention-continue-btn');
+
+        ctx.expect(accepted.isAccordionOpen(), 'and carrying on through it still reaches the questionnaire').toBe(true);
+      },
+    },
+
+    {
+      name: '#324: a refusal the account cannot answer stays refused across attempts',
+      run: async (ctx) => {
+        // `winbackSupported` is the other end of the state: the backend has said this
+        // account can never take the offer, so a fresh attempt is not a fresh chance.
+        //
+        // A refused offer is a cancel with nothing left to pitch, so the retention
+        // warning owns every later attempt ([#341]). The refusal itself opened the
+        // questionnaire, so the click after it is the toggle-close half and only shuts
+        // it; the one after THAT is the fresh attempt the fallback dialog meets.
+        const refusal = Object.assign(new Error('You have already claimed this offer'), {
+          properties: { additional: { code: 'offer-already-claimed' } },
+        });
+        const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(isAccordionOpen(), 'the refusal opens the questionnaire').toBe(true);
+
+        clickTrigger();
+
+        ctx.expect(isAccordionOpen(), 'the next click is the toggle-close half, and only shuts it').toBe(false);
+
+        clickTrigger();
+
+        ctx.expect(opened.filter((entry) => entry === 'modal:cancel-winback-modal').length, 'and no later attempt pitches it again').toBe(1);
+        ctx.expect(opened.includes('modal:cancel-retention-modal'), 'the fresh attempt meets the retention warning instead').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'which holds the questionnaire behind it').toBe(false);
+
+        await clickById('cancel-retention-continue-btn');
+
+        ctx.expect(isAccordionOpen(), 'and the cancel they came to make is still one click away').toBe(true);
+      },
+    },
+
+    {
+      name: '#324: a page missing a dialog falls back to the questionnaire, never to a dead button',
+      run: async (ctx) => {
+        // The gate works by taking the trigger's declarative toggle away, so the
+        // dialog it opens instead had better exist. A layout that dropped one (a
+        // consumer override, a trimmed template) must still be able to cancel.
+        const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), { without: ['cancel-winback-modal'] });
+
+        const event = clickTrigger();
+
+        ctx.expect(opened, 'no dialog opened — there is none to open').toEqual([]);
+        ctx.expect(event.propagationStopped, 'so the declarative collapse keeps the click').toBe(false);
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'the trigger stays a Bootstrap toggle').toBe('collapse');
+        ctx.expect(isAccordionOpen(), 'and the questionnaire opens on the first click').toBe(true);
+      },
+    },
+
+    {
+      name: '#268: a brand that disabled the offer never sees the step',
+      run: async (ctx) => {
+        // The offer step is off for this brand, and the click it would have taken now
+        // belongs to the retention warning ([#341]): the state the fallback dialog was
+        // added for. So the pin is that NO discount is ever pitched here, not that the
+        // click reaches the questionnaire untouched.
+        const { opened, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+
+        const event = clickTrigger();
+
+        ctx.expect(state().billing.winbackOffer.show, 'the offer is off the table entirely').toBe(false);
+        ctx.expect(opened, 'and the retention warning is the one dialog that opened').toEqual(['modal:cancel-retention-modal']);
+        ctx.expect(event.propagationStopped, 'the declarative collapse never gets the click').toBe(true);
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'a gated trigger is not a Bootstrap toggle at all').toBe(undefined);
+        ctx.expect(isAccordionOpen(), 'and the questionnaire waits behind the dialog').toBe(false);
+      },
+    },
+
+    {
+      name: '#268: a trial cancel is warned, never offered a discount',
+      run: async (ctx) => {
+        // A trial has paid for nothing, and #267's warning owns that click. Pitching
+        // "off your next month" to someone whose access ends today is the wrong
+        // sentence, so the two gates are mutually exclusive by state.
+        const { opened, clickTrigger, state } = await wireCancelFlow(trialingAccount());
+
+        clickTrigger();
+
+        ctx.expect(opened, 'the trial warning is what opened').toEqual(['modal:cancel-trial-warning-modal']);
+        ctx.expect(state().billing.winbackOffer.show, 'the offer is not on the table for a trial').toBe(false);
+        ctx.expect(state().billing.cancelWarning.show, 'and #267 is untouched').toBe(true);
+      },
+    },
+
+    {
+      name: '#268: the offer names the brand\'s own number and the cycle it applies to',
+      run: async (ctx) => {
+        // The headline IS the dialog now (#323): short, forward, the whole pitch in
+        // one line — and every number in it the brand's own.
+        const fifty = await wireCancelFlow(paidAccount());
+        ctx.expect(fifty.state().billing.winbackOffer.headline, 'the framework default is 50% off the next cycle').toBe('Take 50% off your next month');
+
+        const quarter = await wireCancelFlow(paidAccount(), { winback: { percent: 25 } });
+        ctx.expect(quarter.state().billing.winbackOffer.headline).toBe('Take 25% off your next month');
+
+        const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, provider: 'stripe', resourceId: 'sub_live_premium' } }));
+        ctx.expect(annual.state().billing.winbackOffer.headline, 'the cycle word follows the subscription, not the copy').toBe('Take 50% off your next year');
+
+        const amount = await wireCancelFlow(paidAccount(), { winback: { amount: 10 } });
+        ctx.expect(amount.state().billing.winbackOffer.headline, 'an amount offer reads in the brand currency').toBe('Take $10.00 off your next month');
+
+        const forever = await wireCancelFlow(paidAccount(), { winback: { duration: 'forever' } });
+        ctx.expect(forever.state().billing.winbackOffer.headline, 'a permanent cut does not promise one cycle').toBe('Take 50% off for as long as you stay');
+      },
+    },
+
+    {
+      name: '#325: accepting the offer puts the discount on the card',
+      run: async (ctx) => {
+        // Ian's QA: the discount applied server-side and the dashboard showed
+        // nothing. The route answers with the discount it applied, so the card can
+        // say what was just earned without waiting for a webhook to land.
+        const account = paidAccount();
+        const { clickTrigger, clickById, state } = await wireCancelFlow(account);
+
+        ctx.expect(state().billing.discount.show, 'nothing is applied before the offer is taken').toBe(false);
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(state().billing.discount, 'the saving is on the card, in words').toEqual({ show: true, label: '50% off', when: 'Applied to your next month' });
+
+        // The in-session patch carries the same source the backend persisted, so the
+        // gate reads one truth whether the discount arrived by patch or by reload.
+        ctx.expect(account.subscription.discount.source, 'the patched discount is stamped as the claim').toBe('winback');
+      },
+    },
+
+    {
+      name: '#325: a declined offer leaves the card with no discount to announce',
+      run: async (ctx) => {
+        const { clickTrigger, clickById, state } = await wireCancelFlow(paidAccount());
+
+        clickTrigger();
+        await clickById('cancel-winback-decline-btn');
+
+        ctx.expect(state().billing.discount.show, 'nothing was applied, so nothing is claimed on screen').toBe(false);
+      },
+    },
+
+    {
+      name: '#325: a persisted winback claim suppresses the pitch, a checkout code does not',
+      run: async (ctx) => {
+        // The backend stamps the discount it applies with `source: 'winback'`
+        // (payments/winback/post.js), so a claimant who reloads is never re-pitched a
+        // discount they already hold. The SOURCE is the signal, not the node itself:
+        // a checkout code rides the same `subscription.discount` shape, and holding
+        // one must never cost a customer the save offer.
+        const claimed = await wireCancelFlow(paidAccount({
+          discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback' },
+        }));
+
+        ctx.expect(claimed.state().billing.winbackOffer.show, 'a persisted claim never re-pitches').toBe(false);
+        ctx.expect(claimed.state().billing.discount.show, 'the discount it earned still shows on the card').toBe(true);
+
+        claimed.clickTrigger();
+        ctx.expect(claimed.opened, 'and the cancel meets the retention warning, never a second pitch ([#341])').toEqual(['modal:cancel-retention-modal']);
+        ctx.expect(claimed.isAccordionOpen(), 'with the questionnaire behind it').toBe(false);
+
+        const checkout = await wireCancelFlow(paidAccount({
+          discount: { valid: true, code: 'WELCOME15', percent: 15, duration: 'once', source: 'checkout' },
+        }));
+
+        ctx.expect(checkout.state().billing.winbackOffer.show, 'a checkout code leaves the offer open').toBe(true);
+      },
+    },
+
+    {
+      name: '#311: a subscription with no provider payment details is never pitched the offer',
+      run: async (ctx) => {
+        // Paid, active, and unreachable: an admin-granted plan or an imported record
+        // carries no `payment.provider` / `payment.resourceId`, so the apply route
+        // has nothing to send a discount to and can only refuse. Pitching it anyway
+        // put the customer in a dialog whose only button 400s, so the gate reads the
+        // fields the accept path needs.
+        //
+        // What this cancel meets instead is the retention warning ([#341]), the
+        // fallback for exactly this state. No discount is pitched and no route is
+        // called, which is the whole of what #311 asks of it.
+        const cases = [
+          { what: 'no provider details at all', payment: { frequency: 'monthly', price: 10 } },
+          { what: 'a provider but no resource', payment: { frequency: 'monthly', price: 10, provider: 'stripe' } },
+          { what: 'a resource but no provider', payment: { frequency: 'monthly', price: 10, resourceId: 'sub_live_premium' } },
+        ];
+
+        for (const { what, payment } of cases) {
+          const { opened, requests, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount({ payment: payment }));
+
+          ctx.expect(state().billing.buttons.cancel, `${what}: the subscription can still be cancelled`).toBe(true);
+          ctx.expect(state().billing.winbackOffer.show, `${what}: but no offer stands in front of it`).toBe(false);
+
+          const event = clickTrigger();
+
+          ctx.expect(opened, `${what}: the retention warning is the one dialog that opened`).toEqual(['modal:cancel-retention-modal']);
+          ctx.expect(event.propagationStopped, `${what}: the declarative collapse never gets the click`).toBe(true);
+          ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], `${what}: a gated trigger is not a Bootstrap toggle at all`).toBe(undefined);
+          ctx.expect(isAccordionOpen(), `${what}: and the questionnaire waits behind the dialog`).toBe(false);
+          ctx.expect(requests, `${what}: nothing called the apply route`).toEqual([]);
+        }
+      },
+    },
+
+    {
+      name: '#268: a refusal the account cannot answer retires the offer and lets the cancel through',
+      run: async (ctx) => {
+        // The same capability gate uncancel and plan-switch ride: the BACKEND answers
+        // whether this account can take the offer at all, and a refusal must never
+        // leave the customer stuck in a dialog with no way to cancel. Every dead-end
+        // code is one branch, so each is proven through it — including the one a
+        // PAST CLAIMANT hits when their account predates the persisted claim node
+        // ([#325]): with nothing on the account, the client re-pitches and the order
+        // doc's refusal is the catch ([#310]).
+        //
+        // The route now names EVERY refusal ([#311]), and all but the unconfirmed
+        // request are dead ends for this account — the brand turned the offer off,
+        // the subscription is not the state the offer is for, or it carries no
+        // provider to discount through. None of them change on a retry.
+        const deadEnds = [
+          { code: 'not-supported-by-provider', message: 'Your payment provider cannot apply this offer.' },
+          { code: 'offer-not-claimable', message: 'This offer is not available on your subscription.' },
+          { code: 'offer-already-claimed', message: 'You have already claimed this offer' },
+          { code: 'offer-disabled', message: 'This offer is not available' },
+          { code: 'no-active-subscription', message: 'No active paid subscription found' },
+          { code: 'trial-not-eligible', message: 'This offer is not available on a free trial' },
+          { code: 'cancellation-pending', message: 'Your subscription is already scheduled to cancel' },
+          { code: 'missing-payment-details', message: 'Subscription payment details not found' },
+          { code: 'unknown-provider', message: 'Unknown provider: not-a-provider' },
+        ];
+
+        for (const { code, message } of deadEnds) {
+          const refusal = Object.assign(new Error(message), { properties: { additional: { code: code } } });
+          const { opened, notifications, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
+
+          clickTrigger();
+          await clickById('cancel-winback-accept-btn');
+
+          ctx.expect(state().billing.winbackOffer.show, `${code}: the offer is retired for the session`).toBe(false);
+          ctx.expect(opened.includes('modal-hide:cancel-winback-modal'), `${code}: the dialog closes`).toBeTruthy();
+          ctx.expect(isAccordionOpen(), `${code}: and the questionnaire opens, so the cancel can still be made`).toBe(true);
+          ctx.expect(notifications.at(-1).message, `${code}: the backend's own refusal is what the customer reads`).toBe(refusal.message);
+        }
+      },
+    },
+
+    {
+      name: '#268: a failed apply leaves the offer on screen to try again',
+      run: async (ctx) => {
+        const outage = new Error('We could not apply your discount right now. Please try again shortly.');
+        const { opened, notifications, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { requestFails: outage });
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'and a failure is never read as a decline').toBe(false);
+        ctx.expect(notifications.at(-1).message).toBe(outage.message);
+      },
+    },
+
+    {
+      name: '#311: a refusal a retry CAN fix keeps the offer armed',
+      run: async (ctx) => {
+        // Being coded is not being a dead end. `confirmation-required` says the
+        // request went out without its confirmation — the same button sending it
+        // again is exactly the fix — so it must never retire the offer the way an
+        // account-state refusal does.
+        const unconfirmed = Object.assign(new Error('Accepting the offer must be confirmed'), {
+          properties: { additional: { code: 'confirmation-required' } },
+        });
+        const { opened, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: unconfirmed });
+
+        clickTrigger();
+        await clickById('cancel-winback-accept-btn');
+
+        ctx.expect(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up').toBeTruthy();
+        ctx.expect(state().billing.winbackOffer.show, 'and the offer is still on the table').toBe(true);
+        ctx.expect(isAccordionOpen(), 'a fixable failure is never read as a decline').toBe(false);
+      },
+    },
+
+    {
+      name: '#268: a state that cannot cancel is never offered anything',
+      run: async (ctx) => {
+        const cases = [
+          { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
+          { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
+          { what: 'a subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
+        ];
+
+        for (const { what, account } of cases) {
+          const { state } = await wireCancelFlow(account);
+
+          ctx.expect(state().billing.buttons.cancel, `${what}: offers no cancel button`).toBe(false);
+          ctx.expect(state().billing.winbackOffer.show, `${what}: and no offer in front of it`).toBe(false);
+        }
+      },
+    },
+
+    {
+      name: '#268: the built account page carries the dialog the gate opens',
+      run: async (ctx) => {
+        // The gate stops the questionnaire and opens `#cancel-winback-modal` by id.
+        // If the markup ever loses it, a paid cancel becomes a dead button.
+        for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
+          delete globalThis[name];
+        }
+
+        const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
+        const pages = await buildWith(miniData, {}, 'billing-winback-test');
+        const page = pages.get('/dashboard/account');
+        ctx.expect(page, 'account page built').toBeTruthy();
+
+        for (const id of ['cancel-winback-modal', 'cancel-winback-accept-btn', 'cancel-winback-decline-btn']) {
+          ctx.expect(page.includes(`id="${id}"`), `the JS hook survives the markup: ${id}`).toBeTruthy();
+        }
+
+        // The offer's number is the brand's, so the dialog renders it from state
+        // rather than spelling one out in the template.
+        const modalAt = page.indexOf('id="cancel-winback-modal"');
+        const modal = page.slice(modalAt, page.indexOf('id="cancel-trial-warning-modal"'));
+        ctx.expect(modal.length > 0, 'the offer dialog sits before the trial warning').toBeTruthy();
+        ctx.expect(modal.includes('data-omega-bind="@text billing.winbackOffer.headline"'), 'the offer copy is bound from the same state the gate reads').toBeTruthy();
+        ctx.expect(!/\d+% off/.test(modal), 'no discount number is hardcoded in the markup').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#268: the build resolves the offer into the client config',
+      run: async (ctx) => {
+        // The 50% default has ONE home (@omega.js/config). The browser must never
+        // apply it itself, so the build bakes the resolved offer into the client blob
+        // — a brand that configured nothing still ships an explicit answer.
+        for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
+          delete globalThis[name];
+        }
+
+        const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
+        const pages = await buildWith(
+          { ...miniData, payment: { currency: 'USD', products: PRODUCTS } },
+          {},
+          'billing-winback-config-test',
+        );
+        const page = pages.get('/dashboard/account');
+        ctx.expect(page, 'account page built').toBeTruthy();
+
+        // The config a browser reads is the run's ONE `build.js` snapshot (#894), the
+        // file the chrome loads with its first script tag: the page itself carries no
+        // config blob any more, so the resolved offer is read out of the snapshot.
+        const payment = readBuildJson(pages).config.payment;
+        ctx.expect(payment, 'the snapshot carries the payment section at all').toBeTruthy();
+        ctx.expect(payment.winback.enabled, 'the snapshot carries the resolved offer').toBe(true);
+        ctx.expect(payment.winback.percent, 'with the framework default baked in').toBe(50);
+        ctx.expect(!page.includes('"winback"'), 'and the page bakes no second copy of it').toBeTruthy();
+      },
+    },
+  ],
 });

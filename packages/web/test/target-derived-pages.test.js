@@ -4,8 +4,7 @@
  * The derivation itself is unit-pinned in @omega.js/config (site-global.test.js);
  * these are the RENDER assertions — target present vs absent, on the pages.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildWith, miniData } = require('./lib/build.js');
 
@@ -29,47 +28,61 @@ const withTargets = {
 
 const RELEASES = 'https://github.com/mini-org/mini-releases/releases/latest';
 
-test('#26: declared targets fill the download page — every desktop card gets its link', async () => {
-  const pages = await buildWith(withTargets, {}, 'targets-download');
-  const download = pages.get('/download');
-  assert.ok(download, 'download page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'target-derived-pages',
+  tests: [
+    {
+      name: '#26: declared targets fill the download page — every desktop card gets its link',
+      run: async (ctx) => {
+        const pages = await buildWith(withTargets, {}, 'targets-download');
+        const download = pages.get('/download');
+        ctx.expect(download, 'download page built').toBeTruthy();
 
-  assert.equal(download.split(`${RELEASES}/download/`).length - 1, 4,
-    'mac + windows + linux (.deb and AppImage) all point at their derived direct download');
-  assert.ok(download.includes('omega-dl-card__actions omega-dl-card__actions--split'),
-    'Linux still splits its two derived artifacts');
-  assert.ok(!download.includes('Not available yet'), 'no desktop card falls back to the empty state');
+        ctx.expect(download.split(`${RELEASES}/download/`).length - 1, 'mac + windows + linux (.deb and AppImage) all point at their derived direct download').toBe(4);
+        ctx.expect(download.includes('omega-dl-card__actions omega-dl-card__actions--split'), 'Linux still splits its two derived artifacts').toBeTruthy();
+        ctx.expect(!download.includes('Not available yet'), 'no desktop card falls back to the empty state').toBeTruthy();
 
-  // Mobile stays underived (MAM is parked): the notify-me form, not a link.
-  assert.ok(download.includes('class="mobile-email-form"'), 'unshipped stores keep the notify form');
-});
+        // Mobile stays underived (MAM is parked): the notify-me form, not a link.
+        ctx.expect(download.includes('class="mobile-email-form"'), 'unshipped stores keep the notify form').toBeTruthy();
+      },
+    },
 
-test('#26: no desktop target → no download links, and nothing invented', async () => {
-  const pages = await buildWith(miniData, {}, 'targets-download-absent');
-  const download = pages.get('/download');
+    {
+      name: '#26: no desktop target → no download links, and nothing invented',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'targets-download-absent');
+        const download = pages.get('/download');
 
-  assert.ok(!download.includes('releases/latest'), 'no releases URL without a desktop target');
-  assert.equal((download.match(/Not available yet/g) || []).length, 3,
-    'mac, windows, and linux each show the designed empty state');
-  assert.ok(!download.includes('data-download="true"'), 'no download button anywhere on the page');
-});
+        ctx.expect(!download.includes('releases/latest'), 'no releases URL without a desktop target').toBeTruthy();
+        ctx.expect((download.match(/Not available yet/g) || []).length, 'mac, windows, and linux each show the designed empty state').toBe(3);
+        ctx.expect(!download.includes('data-download="true"'), 'no download button anywhere on the page').toBeTruthy();
+      },
+    },
 
-test('#26: extension listings fill the store buttons; unlisted browsers stay Coming soon', async () => {
-  const pages = await buildWith(withTargets, {}, 'targets-extension');
-  const extension = pages.get('/extension');
-  assert.ok(extension, 'extension page built');
+    {
+      name: '#26: extension listings fill the store buttons; unlisted browsers stay Coming soon',
+      run: async (ctx) => {
+        const pages = await buildWith(withTargets, {}, 'targets-extension');
+        const extension = pages.get('/extension');
+        ctx.expect(extension, 'extension page built').toBeTruthy();
 
-  assert.ok(extension.includes('https://chrome.example.com/mini'), 'the chrome listing renders its store link');
-  assert.ok(extension.includes('https://firefox.example.com/mini'), 'the firefox listing renders its store link');
-  assert.equal((extension.match(/data-install="true"/g) || []).length, 2, 'only the listed stores get a button');
-  assert.equal((extension.match(/Coming soon/g) || []).length, 4,
-    'edge, opera, safari, and brave keep the designed empty state');
-});
+        ctx.expect(extension.includes('https://chrome.example.com/mini'), 'the chrome listing renders its store link').toBeTruthy();
+        ctx.expect(extension.includes('https://firefox.example.com/mini'), 'the firefox listing renders its store link').toBeTruthy();
+        ctx.expect((extension.match(/data-install="true"/g) || []).length, 'only the listed stores get a button').toBe(2);
+        ctx.expect((extension.match(/Coming soon/g) || []).length, 'edge, opera, safari, and brave keep the designed empty state').toBe(4);
+      },
+    },
 
-test('#26: no extension target → every browser card is the empty state', async () => {
-  const pages = await buildWith(miniData, {}, 'targets-extension-absent');
-  const extension = pages.get('/extension');
+    {
+      name: '#26: no extension target → every browser card is the empty state',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'targets-extension-absent');
+        const extension = pages.get('/extension');
 
-  assert.ok(!extension.includes('data-install="true"'), 'no store button without listings');
-  assert.equal((extension.match(/Coming soon/g) || []).length, 6, 'all six browser cards wait');
+        ctx.expect(!extension.includes('data-install="true"'), 'no store button without listings').toBeTruthy();
+        ctx.expect((extension.match(/Coming soon/g) || []).length, 'all six browser cards wait').toBe(6);
+      },
+    },
+  ],
 });

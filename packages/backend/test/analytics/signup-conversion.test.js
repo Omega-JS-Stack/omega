@@ -71,29 +71,29 @@ module.exports = defineCases({
       name: 'the-server-half-carries-the-requests-ip-user-agent-and-cookies',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const fire = signup.buildSignupFire({
           authUser: authUser(),
           userRecord: userRecord(),
           request: { ip: IP, userAgent: USER_AGENT },
         });
 
-        assert.equal(fire.event, 'sign_up');
-        assert.equal(fire.eventId, `sign_up.${UID}`, 'the dedupe id is the one the browser half sends');
-        assert.deepEqual(fire.providers, ['meta', 'tiktok'], 'GA4 has no cross-source dedupe — the browser half owns it');
+        expect(fire.event).toBe('sign_up');
+        expect(fire.eventId, 'the dedupe id is the one the browser half sends').toBe(`sign_up.${UID}`);
+        expect(fire.providers, 'GA4 has no cross-source dedupe — the browser half owns it').toEqual(['meta', 'tiktok']);
 
         // The four things the auth trigger could never see.
-        assert.equal(fire.identity.ip, IP, 'the request\'s IP');
-        assert.equal(fire.identity.userAgent, USER_AGENT, 'and its user agent');
-        assert.equal(fire.attribution.fbp, 'fb.1.1754006400000.987654321', 'the platform cookies the browser posted');
-        assert.equal(fire.attribution.fbc, 'fb.1.1754006400000.REAL-COOKIE');
-        assert.equal(fire.attribution.ttp, 'TTP-COOKIE');
-        assert.equal(fire.attribution.source, 'meta', 'and the campaign that brought them here');
+        expect(fire.identity.ip, 'the request\'s IP').toBe(IP);
+        expect(fire.identity.userAgent, 'and its user agent').toBe(USER_AGENT);
+        expect(fire.attribution.fbp, 'the platform cookies the browser posted').toBe('fb.1.1754006400000.987654321');
+        expect(fire.attribution.fbc).toBe('fb.1.1754006400000.REAL-COOKIE');
+        expect(fire.attribution.ttp).toBe('TTP-COOKIE');
+        expect(fire.attribution.source, 'and the campaign that brought them here').toBe('meta');
 
         // Plus the account itself, through the shared reader.
-        assert.equal(fire.identity.emailHash, sha256('ada.lovelace@example.com'));
-        assert.equal(fire.identity.meta.ct, sha256('sandiego'), 'the personal set rides too');
-        assert.equal(fire.trackingConsent.marketing, true, 'the consent snapshot the record stored gates the fire');
+        expect(fire.identity.emailHash).toBe(sha256('ada.lovelace@example.com'));
+        expect(fire.identity.meta.ct, 'the personal set rides too').toBe(sha256('sandiego'));
+        expect(fire.trackingConsent.marketing, 'the consent snapshot the record stored gates the fire').toBe(true);
       },
     },
 
@@ -101,18 +101,18 @@ module.exports = defineCases({
       name: 'the-method-speaks-the-same-vocabulary-as-the-browser-half',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The client fires trackSignup('email') / trackSignup('google'); the
         // server twin must not say 'password' / 'google.com' for the same act.
-        assert.equal(signup.resolveSignupMethod({ providerData: [{ providerId: 'password' }] }), 'email');
-        assert.equal(signup.resolveSignupMethod({ providerData: [{ providerId: 'google.com' }] }), 'google');
-        assert.equal(signup.resolveSignupMethod({ providerData: [{ providerId: 'apple.com' }] }), 'apple');
-        assert.equal(signup.resolveSignupMethod({}), 'email', 'an unknown provider reads as the default email signup');
+        expect(signup.resolveSignupMethod({ providerData: [{ providerId: 'password' }] })).toBe('email');
+        expect(signup.resolveSignupMethod({ providerData: [{ providerId: 'google.com' }] })).toBe('google');
+        expect(signup.resolveSignupMethod({ providerData: [{ providerId: 'apple.com' }] })).toBe('apple');
+        expect(signup.resolveSignupMethod({}), 'an unknown provider reads as the default email signup').toBe('email');
 
         const fire = signup.buildSignupFire({ authUser: authUser('google.com'), userRecord: userRecord(), request: {} });
 
-        assert.equal(fire.params.method, 'google', 'and the params carry it');
-        assert.equal(fire.params.user_id, UID);
+        expect(fire.params.method, 'and the params carry it').toBe('google');
+        expect(fire.params.user_id).toBe(UID);
       },
     },
 
@@ -120,15 +120,15 @@ module.exports = defineCases({
       name: 'a-signup-with-nothing-behind-it-still-fires-on-external-id',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // A blocked pixel, a cleared jar, a request with no geolocation header:
         // absent match data never blocks the registration itself.
         const fire = signup.buildSignupFire({ authUser: { uid: UID }, userRecord: {}, request: {} });
 
-        assert.deepEqual(Object.keys(fire.attribution), [], 'no attribution to send');
-        assert.equal(Object.hasOwn(fire.identity, 'ip'), false, 'an absent key is absent, never empty');
-        assert.equal(fire.identity.externalId, UID, 'external_id alone still identifies the registration');
-        assert.equal(fire.trackingConsent, null, 'and an unrecorded snapshot is not a denial');
+        expect(Object.keys(fire.attribution), 'no attribution to send').toEqual([]);
+        expect(Object.hasOwn(fire.identity, 'ip'), 'an absent key is absent, never empty').toBe(false);
+        expect(fire.identity.externalId, 'external_id alone still identifies the registration').toBe(UID);
+        expect(fire.trackingConsent, 'and an unrecorded snapshot is not a denial').toBe(null);
       },
     },
   ],

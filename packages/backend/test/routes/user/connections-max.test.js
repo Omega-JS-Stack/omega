@@ -169,8 +169,8 @@ function messageOf(response) {
   return typeof response.message === 'string' ? response.message : JSON.stringify(response.message);
 }
 
-function assertServed(assert, response, what) {
-  assert.equal(response.options.code, undefined, `${what} is served: ${messageOf(response)}`);
+function assertServed(expect, response, what) {
+  expect(response.options.code, `${what} is served: ${messageOf(response)}`).toBe(undefined);
 }
 
 module.exports = defineCases({
@@ -185,65 +185,65 @@ module.exports = defineCases({
     {
       name: 'a-new-identity-past-the-default-max-of-1-is-refused-and-nothing-changes',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ accounts: [ALPHA()] });
         const before = storedAccounts(wired.store);
 
         const response = await tokenize(wired, 'sub-beta');
 
-        assert.equal(response.options.code, 400, `the refusal is a 400: ${messageOf(response)}`);
-        assert.equal(response.message, 'Connection limit reached for google: connections.google.max is 1.', 'it names the key that raises the cap, and its value');
-        assert.deepEqual(storedAccounts(wired.store), before, 'the stored account is exactly as it was');
+        expect(response.options.code, `the refusal is a 400: ${messageOf(response)}`).toBe(400);
+        expect(response.message, 'it names the key that raises the cap, and its value').toBe('Connection limit reached for google: connections.google.max is 1.');
+        expect(storedAccounts(wired.store), 'the stored account is exactly as it was').toEqual(before);
       },
     },
 
     {
       name: 'with-max-2-two-identities-are-stored-under-their-ids-with-their-own-tokens',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ max: 2 });
 
-        assertServed(assert, await tokenize(wired, 'sub-alpha'), 'the first tokenize');
-        assertServed(assert, await tokenize(wired, 'sub-beta'), 'the second tokenize');
+        assertServed(expect, await tokenize(wired, 'sub-alpha'), 'the first tokenize');
+        assertServed(expect, await tokenize(wired, 'sub-beta'), 'the second tokenize');
 
         const accounts = storedAccounts(wired.store);
 
-        assert.deepEqual(Object.keys(accounts).sort(), ['sub-alpha', 'sub-beta'], 'each account sits under its identity id, and nothing else sits beside them');
-        assert.equal(accounts['sub-alpha'].token.access_token, 'access-sub-alpha', 'the first keeps its own token');
-        assert.equal(accounts['sub-beta'].token.access_token, 'access-sub-beta', 'the second has its own');
-        assert.equal(accounts['sub-alpha'].identity.id, 'sub-alpha', 'each record carries its identity');
-        assert.equal(accounts['sub-beta'].identity.id, 'sub-beta');
-        assert.equal(accounts['sub-beta'].type, 'oauth2', 'and the record shape is unchanged one level down');
-        assert.deepEqual(wired.store.read(`users/${USER_UID}`).metadata.created, CREATED, "the document's birth stamp survives both writes");
+        expect(Object.keys(accounts).sort(), 'each account sits under its identity id, and nothing else sits beside them').toEqual(['sub-alpha', 'sub-beta']);
+        expect(accounts['sub-alpha'].token.access_token, 'the first keeps its own token').toBe('access-sub-alpha');
+        expect(accounts['sub-beta'].token.access_token, 'the second has its own').toBe('access-sub-beta');
+        expect(accounts['sub-alpha'].identity.id, 'each record carries its identity').toBe('sub-alpha');
+        expect(accounts['sub-beta'].identity.id).toBe('sub-beta');
+        expect(accounts['sub-beta'].type, 'and the record shape is unchanged one level down').toBe('oauth2');
+        expect(wired.store.read(`users/${USER_UID}`).metadata.created, "the document's birth stamp survives both writes").toEqual(CREATED);
       },
     },
 
     {
       name: 'the-same-identity-reconnecting-replaces-its-own-record-and-the-count-stays',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ accounts: [{ ...ALPHA(), stale: 'from-the-older-grant' }] });
 
-        assertServed(assert, await tokenize(wired, 'sub-alpha#again'), 'a reconnect of a linked account at max 1');
+        assertServed(expect, await tokenize(wired, 'sub-alpha#again'), 'a reconnect of a linked account at max 1');
 
         const accounts = storedAccounts(wired.store);
 
-        assert.deepEqual(Object.keys(accounts), ['sub-alpha'], 'still one account');
-        assert.equal(accounts['sub-alpha'].token.access_token, 'access-sub-alpha#again', 'its record holds the new grant');
-        assert.equal(accounts['sub-alpha'].token.refresh_token, 'refresh-sub-alpha#again', 'and the old token is gone');
-        assert.equal('stale' in accounts['sub-alpha'], false, 'the record is replaced whole: no field of the older grant is left');
-        assert.deepEqual(wired.store.read(`users/${USER_UID}`).metadata.created, CREATED, "and the document's birth stamp survives the reconnect");
+        expect(Object.keys(accounts), 'still one account').toEqual(['sub-alpha']);
+        expect(accounts['sub-alpha'].token.access_token, 'its record holds the new grant').toBe('access-sub-alpha#again');
+        expect(accounts['sub-alpha'].token.refresh_token, 'and the old token is gone').toBe('refresh-sub-alpha#again');
+        expect('stale' in accounts['sub-alpha'], 'the record is replaced whole: no field of the older grant is left').toBe(false);
+        expect(wired.store.read(`users/${USER_UID}`).metadata.created, "and the document's birth stamp survives the reconnect").toEqual(CREATED);
       },
     },
 
     {
       name: 'a-user-with-no-document-yet-gets-one-holding-the-account',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ noDoc: true });
 
-        assertServed(assert, await tokenize(wired, 'sub-alpha'), 'a tokenize for a user with no document');
-        assert.deepEqual(wired.store.read(`users/${USER_UID}`), {
+        assertServed(expect, await tokenize(wired, 'sub-alpha'), 'a tokenize for a user with no document');
+        expect(wired.store.read(`users/${USER_UID}`), 'the document is created holding the account under its id, and the metadata stamp').toEqual({
           connections: {
             [PROVIDER_ID]: {
               'sub-alpha': {
@@ -255,33 +255,33 @@ module.exports = defineCases({
             },
           },
           metadata: STAMP,
-        }, 'the document is created holding the account under its id, and the metadata stamp');
+        });
       },
     },
 
     {
       name: 'refresh-with-only-provider-serves-the-one-account-a-user-holds',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ accounts: [ALPHA()] });
 
         await postRoute({ ctx: wired.ctx, user: owner(wired.store), data: { provider: PROVIDER_ID, action: 'refresh' } });
 
-        assertServed(assert, answered(wired.responses), 'a refresh naming no id');
-        assert.deepEqual(stepsRun(), ['refresh:refresh-old-sub-alpha'], 'the one account refreshed');
+        assertServed(expect, answered(wired.responses), 'a refresh naming no id');
+        expect(stepsRun(), 'the one account refreshed').toEqual(['refresh:refresh-old-sub-alpha']);
 
         const accounts = storedAccounts(wired.store);
 
-        assert.deepEqual(Object.keys(accounts), ['sub-alpha'], 'no lease or token was written beside the account');
-        assert.equal(accounts['sub-alpha'].token.access_token, 'refreshed-refresh-old-sub-alpha', 'the new token is stored on it');
-        assert.equal(accounts['sub-alpha'].refreshing, undefined, 'and its lease is released');
+        expect(Object.keys(accounts), 'no lease or token was written beside the account').toEqual(['sub-alpha']);
+        expect(accounts['sub-alpha'].token.access_token, 'the new token is stored on it').toBe('refreshed-refresh-old-sub-alpha');
+        expect(accounts['sub-alpha'].refreshing, 'and its lease is released').toBe(undefined);
       },
     },
 
     {
       name: 'refresh-with-only-provider-is-refused-naming-id-when-two-accounts-exist',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ max: 2, accounts: [ALPHA(), BETA()] });
         const before = storedAccounts(wired.store);
 
@@ -289,74 +289,74 @@ module.exports = defineCases({
 
         const response = answered(wired.responses);
 
-        assert.equal(response.options.code, 400, `the refusal is a 400: ${messageOf(response)}`);
-        assert.equal(response.message, 'Several google connections exist: pass id.', 'it names the missing argument');
-        assert.deepEqual(stepsRun(), [], 'no refresh reached the provider');
-        assert.deepEqual(storedAccounts(wired.store), before, 'and nothing was written');
+        expect(response.options.code, `the refusal is a 400: ${messageOf(response)}`).toBe(400);
+        expect(response.message, 'it names the missing argument').toBe('Several google connections exist: pass id.');
+        expect(stepsRun(), 'no refresh reached the provider').toEqual([]);
+        expect(storedAccounts(wired.store), 'and nothing was written').toEqual(before);
       },
     },
 
     {
       name: 'refresh-with-id-refreshes-only-that-account',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ max: 2, accounts: [ALPHA(), BETA()] });
 
         await postRoute({ ctx: wired.ctx, user: owner(wired.store), data: { provider: PROVIDER_ID, id: 'sub-beta', action: 'refresh' } });
 
-        assertServed(assert, answered(wired.responses), 'a refresh naming its id');
-        assert.deepEqual(stepsRun(), ['refresh:refresh-old-sub-beta'], 'the named account, and only it, refreshed');
+        assertServed(expect, answered(wired.responses), 'a refresh naming its id');
+        expect(stepsRun(), 'the named account, and only it, refreshed').toEqual(['refresh:refresh-old-sub-beta']);
 
         const accounts = storedAccounts(wired.store);
 
-        assert.deepEqual(Object.keys(accounts).sort(), ['sub-alpha', 'sub-beta'], 'no lease or token was written beside the accounts');
-        assert.equal(accounts['sub-beta'].token.access_token, 'refreshed-refresh-old-sub-beta', 'its new token is stored');
-        assert.equal(accounts['sub-beta'].refreshing, undefined, 'and its lease is released');
-        assert.deepEqual(accounts['sub-alpha'], ALPHA(), 'the other account is untouched');
+        expect(Object.keys(accounts).sort(), 'no lease or token was written beside the accounts').toEqual(['sub-alpha', 'sub-beta']);
+        expect(accounts['sub-beta'].token.access_token, 'its new token is stored').toBe('refreshed-refresh-old-sub-beta');
+        expect(accounts['sub-beta'].refreshing, 'and its lease is released').toBe(undefined);
+        expect(accounts['sub-alpha'], 'the other account is untouched').toEqual(ALPHA());
       },
     },
 
     {
       name: 'disconnect-with-id-removes-only-that-record',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ max: 2, accounts: [ALPHA(), BETA()] });
 
         await deleteRoute({ ctx: wired.ctx, user: owner(wired.store), data: { provider: PROVIDER_ID, id: 'sub-alpha' } });
 
         const response = answered(wired.responses);
 
-        assertServed(assert, response, 'a disconnect naming its id');
-        assert.equal(response.message.success, true, 'the disconnect succeeds');
-        assert.deepEqual(stepsRun(), ['revoke:access-old-sub-alpha'], "only the named account's token was revoked");
-        assert.deepEqual(storedAccounts(wired.store), { 'sub-beta': BETA() }, "the other account and its token stay");
+        assertServed(expect, response, 'a disconnect naming its id');
+        expect(response.message.success, 'the disconnect succeeds').toBe(true);
+        expect(stepsRun(), "only the named account's token was revoked").toEqual(['revoke:access-old-sub-alpha']);
+        expect(storedAccounts(wired.store), "the other account and its token stay").toEqual({ 'sub-beta': BETA() });
       },
     },
 
     {
       name: 'status-with-only-provider-lists-every-account-with-its-display-name',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const wired = lane({ max: 2, accounts: [ALPHA(), BETA()] });
 
         await getRoute({ ctx: wired.ctx, user: owner(wired.store), data: { provider: PROVIDER_ID, action: 'status' } });
 
         const response = answered(wired.responses);
 
-        assertServed(assert, response, 'a status naming no id');
-        assert.deepEqual({ ...response.message, connections: [...(response.message.connections || [])].sort((a, b) => a.id.localeCompare(b.id)) }, {
+        assertServed(expect, response, 'a status naming no id');
+        expect({ ...response.message, connections: [...(response.message.connections || [])].sort((a, b) => a.id.localeCompare(b.id)) }, `every account is listed, each with its identity and its own status: ${messageOf(response)}`).toEqual({
           connections: [
             { id: 'sub-alpha', identity: { id: 'sub-alpha', name: 'Alpha Channel' }, status: 'connected' },
             { id: 'sub-beta', identity: { id: 'sub-beta', name: 'Beta Channel' }, status: 'connected' },
           ],
-        }, `every account is listed, each with its identity and its own status: ${messageOf(response)}`);
+        });
       },
     },
 
     {
       name: 'a-document-still-in-the-old-one-level-shape-holds-no-accounts',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Until the users migration runs, the record sits at `connections.google`
         // itself: its keys (`type`, `token`, `identity`, `updated`) are not accounts
         const wired = lane({ docs: { [`users/${USER_UID}`]: { auth: { uid: USER_UID }, metadata: { created: CREATED }, connections: { [PROVIDER_ID]: ALPHA() } } } });
@@ -365,45 +365,45 @@ module.exports = defineCases({
 
         const status = answered(wired.responses);
 
-        assertServed(assert, status, 'a status on an old-shape document');
-        assert.deepEqual(status.message, { status: 'disconnected' }, `no account is listed: ${messageOf(status)}`);
+        assertServed(expect, status, 'a status on an old-shape document');
+        expect(status.message, `no account is listed: ${messageOf(status)}`).toEqual({ status: 'disconnected' });
 
-        assertServed(assert, await tokenize(wired, 'sub-beta'), 'a tokenize at the default max of 1');
-        assert.equal(storedAccounts(wired.store)['sub-beta'].token.access_token, 'access-sub-beta', 'the new account is stored under its id');
+        assertServed(expect, await tokenize(wired, 'sub-beta'), 'a tokenize at the default max of 1');
+        expect(storedAccounts(wired.store)['sub-beta'].token.access_token, 'the new account is stored under its id').toBe('access-sub-beta');
       },
     },
 
     {
       name: 'an-entry-holding-only-a-lease-is-not-an-account',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const ghost = { refreshing: { instance: 'gone-instance', timestampUNIX: 1 } };
         const wired = lane({ docs: { [`users/${USER_UID}`]: { auth: { uid: USER_UID }, metadata: { created: CREATED }, connections: { [PROVIDER_ID]: { 'sub-ghost': ghost } } } } });
 
-        assertServed(assert, await tokenize(wired, 'sub-alpha'), 'a tokenize at the default max of 1 beside a ghost');
+        assertServed(expect, await tokenize(wired, 'sub-alpha'), 'a tokenize at the default max of 1 beside a ghost');
 
         await getRoute({ ctx: wired.ctx, user: owner(wired.store), data: { provider: PROVIDER_ID, action: 'status' } });
 
         const status = answered(wired.responses);
 
-        assertServed(assert, status, 'a status naming no id');
-        assert.deepEqual(status.message, { status: 'connected' }, `the one real account answers alone, the ghost unlisted: ${messageOf(status)}`);
+        assertServed(expect, status, 'a status naming no id');
+        expect(status.message, `the one real account answers alone, the ghost unlisted: ${messageOf(status)}`).toEqual({ status: 'connected' });
       },
     },
 
     {
       name: 'an-identity-another-user-holds-is-refused-as-before',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const theirs = { auth: { uid: OTHER_UID }, connections: { [PROVIDER_ID]: { 'sub-alpha': ALPHA() } } };
         const wired = lane({ max: 2, docs: { [`users/${OTHER_UID}`]: theirs } });
 
         const response = await tokenize(wired, 'sub-alpha');
 
-        assert.equal(response.options.code, 400, `the refusal is a 400: ${messageOf(response)}`);
-        assert.equal(response.message, 'This Google account is already connected to a Test Brand account', 'the uniqueness message is unchanged');
-        assert.deepEqual(storedAccounts(wired.store), {}, 'nothing was linked to the connecting user');
-        assert.deepEqual(wired.store.read(`users/${OTHER_UID}`), theirs, 'and the holder keeps the account');
+        expect(response.options.code, `the refusal is a 400: ${messageOf(response)}`).toBe(400);
+        expect(response.message, 'the uniqueness message is unchanged').toBe('This Google account is already connected to a Test Brand account');
+        expect(storedAccounts(wired.store), 'nothing was linked to the connecting user').toEqual({});
+        expect(wired.store.read(`users/${OTHER_UID}`), 'and the holder keeps the account').toEqual(theirs);
       },
     },
   ],

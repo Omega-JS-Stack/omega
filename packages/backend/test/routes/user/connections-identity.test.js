@@ -125,48 +125,44 @@ module.exports = defineCases({
       // this — the ordinary "connect again" — was refused as somebody else's
       name: 'reconnecting-your-own-account-passes',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await tokenize({ matches: [matchedDoc(OWNER_UID)] });
 
-        assert.equal(run.answer.options.code, undefined, `a user reconnecting is not a conflict: ${run.answer.message}`);
-        assert.equal(run.answer.message.success, true, 'the exchange completes');
+        expect(run.answer.options.code, `a user reconnecting is not a conflict: ${run.answer.message}`).toBe(undefined);
+        expect(run.answer.message.success, 'the exchange completes').toBe(true);
 
         const stored = run.writes.find((write) => write.path === `users/${OWNER_UID}` && write.payload.connections);
 
-        assert.ok(stored, 'and the record is written');
-        assert.equal(stored.payload.connections[PROVIDER_ID][IDENTITY_ID].identity.id, IDENTITY_ID, 'under the identity the provider answered');
+        expect(stored, 'and the record is written').toBeTruthy();
+        expect(stored.payload.connections[PROVIDER_ID][IDENTITY_ID].identity.id, 'under the identity the provider answered').toBe(IDENTITY_ID);
       },
     },
 
     {
       name: 'the-query-is-one-lookup-on-the-identity-id',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await tokenize({ matches: [] });
 
-        assert.equal(run.queries.length, 1, `ONE query, whatever the answer: ${JSON.stringify(run.queries)}`);
+        expect(run.queries.length, `ONE query, whatever the answer: ${JSON.stringify(run.queries)}`).toBe(1);
         // The id is a map key, so the field is a FieldPath (an id may carry a `.`)
         const { field, ...rest } = run.queries[0];
 
-        assert.deepEqual(rest, { collection: 'users', operator: '==', value: IDENTITY_ID }, 'an equality on the identity id');
-        assert.deepEqual(
-          typeof field === 'string' ? field.split('.') : field.segments,
-          ['connections', PROVIDER_ID, IDENTITY_ID, 'identity', 'id'],
-          'on the stored identity id, at its own record under the provider',
-        );
+        expect(rest, 'an equality on the identity id').toEqual({ collection: 'users', operator: '==', value: IDENTITY_ID });
+        expect(typeof field === 'string' ? field.split('.') : field.segments, 'on the stored identity id, at its own record under the provider').toEqual(['connections', PROVIDER_ID, IDENTITY_ID, 'identity', 'id']);
       },
     },
 
     {
       name: 'another-users-account-is-refused-with-400',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await tokenize({ matches: [matchedDoc(OTHER_UID)] });
 
-        assert.equal(run.answer.options.code, 400, `a connection somebody else holds is refused: ${run.answer.message}`);
-        assert.match(run.answer.message, /Identity Fixture/, "naming the provider by its human name");
-        assert.match(run.answer.message, /Test Brand/, 'and the brand it is already connected to');
-        assert.equal(run.writes.some((write) => write.path.startsWith('users/')), false, 'and nothing is written to any user');
+        expect(run.answer.options.code, `a connection somebody else holds is refused: ${run.answer.message}`).toBe(400);
+        expect(run.answer.message, "naming the provider by its human name").toMatch(/Identity Fixture/);
+        expect(run.answer.message, 'and the brand it is already connected to').toMatch(/Test Brand/);
+        expect(run.writes.some((write) => write.path.startsWith('users/')), 'and nothing is written to any user').toBe(false);
       },
     },
 
@@ -175,17 +171,17 @@ module.exports = defineCases({
       // match would silently let two accounts hold one identity
       name: 'an-identity-with-no-string-id-throws-naming-the-provider-file',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await tokenize({ source: providerSource({ identity: "{ name: 'No Id' }" }) });
 
-        assert.ok(run.thrown instanceof Error, 'a provider that answers no id is a programmer error, not a refusal');
-        assert.match(run.thrown.message, new RegExp(`${PROVIDER_ID}\\.js`), `the message names the file: ${run.thrown.message}`);
-        assert.match(run.thrown.message, /id/, 'and the field it is missing');
-        assert.equal(run.writes.some((write) => write.path.startsWith('users/')), false, 'nothing was stored');
+        expect(run.thrown instanceof Error, 'a provider that answers no id is a programmer error, not a refusal').toBeTruthy();
+        expect(run.thrown.message, `the message names the file: ${run.thrown.message}`).toMatch(new RegExp(`${PROVIDER_ID}\\.js`));
+        expect(run.thrown.message, 'and the field it is missing').toMatch(/id/);
+        expect(run.writes.some((write) => write.path.startsWith('users/')), 'nothing was stored').toBe(false);
 
         const numeric = await tokenize({ source: providerSource({ identity: '{ id: 12345 }' }) });
 
-        assert.ok(numeric.thrown instanceof Error, 'a number is not an id either — the query would never match one');
+        expect(numeric.thrown instanceof Error, 'a number is not an id either — the query would never match one').toBeTruthy();
       },
     },
 
@@ -193,44 +189,44 @@ module.exports = defineCases({
       // #793: an email changes hands, a `sub` does not
       name: 'google-answers-its-id-from-sub',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const identity = await google.identity({
           ctx: { log() {} },
           uid: OWNER_UID,
           token: { access_token: 'access-793', id_token: idToken({ sub: '110000000000000000001', email: 'buyer@example.com', name: 'Ian' }) },
         });
 
-        assert.equal(identity.id, '110000000000000000001', 'the id the route matches on is the sub');
-        assert.equal(identity.sub, '110000000000000000001', 'and the decoded profile is stored whole');
-        assert.equal(identity.email, 'buyer@example.com', 'email included — it is just no longer the key');
+        expect(identity.id, 'the id the route matches on is the sub').toBe('110000000000000000001');
+        expect(identity.sub, 'and the decoded profile is stored whole').toBe('110000000000000000001');
+        expect(identity.email, 'email included — it is just no longer the key').toBe('buyer@example.com');
       },
     },
 
     {
       name: 'every-packaged-provider-satisfies-the-shape',
 
-      async run({ assert }) {
+      async run({ expect }) {
         for (const provider of [google, discord, spotify, twitch, kick]) {
           const file = `${provider.provider}.js`;
 
-          assert.equal(assertProviderShape(provider, file), provider, `${file} loads`);
-          assert.equal(typeof provider.identity, 'function', `${file} declares identity()`);
-          assert.ok(provider.urls.authorize, `${file} says where the user is sent`);
-          assert.ok(provider.urls.token, `${file} says how the code becomes a token`);
-          assert.equal(provider.urls.status, undefined, `${file} declares no dead urls.status`);
-          assert.equal(provider.urls.tokenize, undefined, `${file} has no urls.tokenize any more`);
-          assert.equal(provider.urls.refresh, undefined, `${file} has no urls.refresh any more`);
-          assert.equal(provider.authParams, undefined, `${file} names its extra params \`params\``);
-          assert.equal(provider.verifyIdentity, undefined, `${file} carries no verifyIdentity()`);
-          assert.equal(provider.revokeToken, undefined, `${file} carries no revokeToken()`);
-          assert.equal(provider.verifyConnection, undefined, `${file} carries no verifyConnection()`);
+          expect(assertProviderShape(provider, file), `${file} loads`).toBe(provider);
+          expect(typeof provider.identity, `${file} declares identity()`).toBe('function');
+          expect(provider.urls.authorize, `${file} says where the user is sent`).toBeTruthy();
+          expect(provider.urls.token, `${file} says how the code becomes a token`).toBeTruthy();
+          expect(provider.urls.status, `${file} declares no dead urls.status`).toBe(undefined);
+          expect(provider.urls.tokenize, `${file} has no urls.tokenize any more`).toBe(undefined);
+          expect(provider.urls.refresh, `${file} has no urls.refresh any more`).toBe(undefined);
+          expect(provider.authParams, `${file} names its extra params \`params\``).toBe(undefined);
+          expect(provider.verifyIdentity, `${file} carries no verifyIdentity()`).toBe(undefined);
+          expect(provider.revokeToken, `${file} carries no revokeToken()`).toBe(undefined);
+          expect(provider.verifyConnection, `${file} carries no verifyConnection()`).toBe(undefined);
         }
 
-        assert.equal(typeof google.revoke, 'function', 'Google keeps its own revoke (the endpoint takes the token alone)');
-        assert.equal(typeof kick.revoke, 'function', 'and Kick (it wants a token hint)');
-        assert.equal(discord.revoke, undefined, 'Discord uses the RFC 7009 default');
-        assert.equal(twitch.revoke, undefined, 'and Twitch');
-        assert.equal(spotify.urls.revoke, undefined, 'Spotify declares no revoke url at all');
+        expect(typeof google.revoke, 'Google keeps its own revoke (the endpoint takes the token alone)').toBe('function');
+        expect(typeof kick.revoke, 'and Kick (it wants a token hint)').toBe('function');
+        expect(discord.revoke, 'Discord uses the RFC 7009 default').toBe(undefined);
+        expect(twitch.revoke, 'and Twitch').toBe(undefined);
+        expect(spotify.urls.revoke, 'Spotify declares no revoke url at all').toBe(undefined);
       },
     },
   ],

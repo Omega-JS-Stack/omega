@@ -163,51 +163,51 @@ function privacyCases(method, run) {
   return [
     {
       name: `${method}-no-log-line-carries-the-address`,
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await run();
 
         for (const args of [...calls.log, ...calls.warn, ...calls.error]) {
-          assert.equal(render(args).includes(EMAIL), false, `address written to a log line: ${render(args)}`);
+          expect(render(args).includes(EMAIL), `address written to a log line: ${render(args)}`).toBe(false);
         }
       },
     },
 
     {
       name: `${method}-no-log-line-carries-a-provider-payload`,
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await run();
 
         for (const args of [...calls.log, ...calls.warn, ...calls.error]) {
           const line = render(args);
 
-          assert.equal(line.includes('job-710'), false, `the SendGrid payload rides a log line: ${line}`);
-          assert.equal(line.includes('sub-710'), false, `the Beehiiv payload rides a log line: ${line}`);
+          expect(line.includes('job-710'), `the SendGrid payload rides a log line: ${line}`).toBe(false);
+          expect(line.includes('sub-710'), `the Beehiiv payload rides a log line: ${line}`).toBe(false);
         }
       },
     },
 
     {
       name: `${method}-the-result-line-names-each-provider-and-its-verdict`,
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await run();
         const line = calls.log.map(render).find((entry) => entry.includes(`Marketing.${method}() result:`));
 
-        assert.ok(line, `no result line was logged: ${calls.log.map(render).join(' | ')}`);
-        assert.match(line, /campaigns/, 'the result line should name the campaigns provider');
-        assert.match(line, /newsletter/, 'the result line should name the newsletter provider');
-        assert.match(line, /ok/, 'the result line should carry each provider\'s verdict');
+        expect(line, `no result line was logged: ${calls.log.map(render).join(' | ')}`).toBeTruthy();
+        expect(line, 'the result line should name the campaigns provider').toMatch(/campaigns/);
+        expect(line, 'the result line should name the newsletter provider').toMatch(/newsletter/);
+        expect(line, 'the result line should carry each provider\'s verdict').toMatch(/ok/);
       },
     },
 
     {
       name: `${method}-the-address-and-the-payloads-stay-reachable-at-debug`,
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await run();
         const debugged = calls.debug.map(render).join(' | ');
 
-        assert.match(debugged, new RegExp(EMAIL), `the address should stay reachable at debug: ${debugged}`);
-        assert.match(debugged, /job-710/, `the SendGrid payload should stay reachable at debug: ${debugged}`);
-        assert.match(debugged, /sub-710/, `the Beehiiv payload should stay reachable at debug: ${debugged}`);
+        expect(debugged, `the address should stay reachable at debug: ${debugged}`).toMatch(new RegExp(EMAIL));
+        expect(debugged, `the SendGrid payload should stay reachable at debug: ${debugged}`).toMatch(/job-710/);
+        expect(debugged, `the Beehiiv payload should stay reachable at debug: ${debugged}`).toMatch(/sub-710/);
       },
     },
   ];

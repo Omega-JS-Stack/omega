@@ -76,16 +76,16 @@ function deliverDisputeAlert(omega, alertId) {
 }
 
 // Exactly one of the two deliveries may be the one that processed.
-function assertExactlyOneProcessed(assert, sent, label) {
+function assertExactlyOneProcessed(expect, sent, label) {
   sent.forEach((response, index) => {
-    assert.equal(response.code, 200, `${label} delivery ${index + 1} should answer 200, got ${response.code}: ${JSON.stringify(response.body)}`);
+    expect(response.code, `${label} delivery ${index + 1} should answer 200, got ${response.code}: ${JSON.stringify(response.body)}`).toBe(200);
   });
 
   const processed = sent.filter((response) => !response.body?.duplicate);
   const duplicates = sent.filter((response) => response.body?.duplicate === true);
 
-  assert.equal(processed.length, 1, `${label}: exactly one delivery may process, got ${processed.length}`);
-  assert.equal(duplicates.length, 1, `${label}: the other delivery must be told it is a duplicate, got ${duplicates.length}`);
+  expect(processed.length, `${label}: exactly one delivery may process, got ${processed.length}`).toBe(1);
+  expect(duplicates.length, `${label}: the other delivery must be told it is a duplicate, got ${duplicates.length}`).toBe(1);
 }
 
 module.exports = defineCases({
@@ -97,7 +97,7 @@ module.exports = defineCases({
     {
       name: 'two-same-instant-webhook-deliveries-process-once',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const eventId = '_test-evt-dedup-race';
 
         const sent = await Promise.all([
@@ -105,14 +105,14 @@ module.exports = defineCases({
           deliverWebhook(omega, eventId),
         ]);
 
-        assertExactlyOneProcessed(assert, sent, 'webhook');
+        assertExactlyOneProcessed(expect, sent, 'webhook');
       },
     },
 
     {
       name: 'a-failed-webhook-is-still-reclaimable',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const eventId = '_test-evt-dedup-race-retry';
 
         // The retry path the atomic claim must preserve: a previously FAILED
@@ -121,8 +121,8 @@ module.exports = defineCases({
 
         const sent = await deliverWebhook(omega, eventId);
 
-        assert.equal(sent.code, 200, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(!sent.body?.duplicate, 'A failed webhook must not be reported as a duplicate');
+        expect(sent.code, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(!sent.body?.duplicate, 'A failed webhook must not be reported as a duplicate').toBeTruthy();
       },
     },
 
@@ -138,7 +138,7 @@ module.exports = defineCases({
       // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
       name: 'a-reclaimed-webhook-starts-a-fresh-retry-ladder',
       auth: 'none',
-      async run({ assert, omega, firestore, waitFor }) {
+      async run({ expect, omega, firestore, waitFor }) {
         const eventId = '_test-evt-dedup-race-deadlettered';
 
         // A doc the sweep gave up on: the ceiling burned, stamped once, terminal.
@@ -152,8 +152,8 @@ module.exports = defineCases({
 
         const sent = await deliverWebhook(omega, eventId);
 
-        assert.equal(sent.code, 200, `A redelivery should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(!sent.body?.duplicate, 'A dead-lettered webhook must still be reclaimable — redelivery is the escape hatch');
+        expect(sent.code, `A redelivery should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(!sent.body?.duplicate, 'A dead-lettered webhook must still be reclaimable — redelivery is the escape hatch').toBeTruthy();
 
         // The trigger takes it from here; either terminal state proves the claim
         // landed and the pipeline ran it again.
@@ -162,24 +162,24 @@ module.exports = defineCases({
           return ['completed', 'failed'].includes(doc?.status) ? doc : null;
         }, 20000, 250);
 
-        assert.ok(!settled.deadLetter, 'The reclaim clears the dead-letter stamp — the doc is live again');
-        assert.ok((settled.retryCount || 0) < 5, `The reclaim restarts the ladder rather than resuming a burned one, got retryCount=${settled.retryCount}`);
-        assert.notEqual(settled.error, 'Previous error', 'The reclaim replaces the record wholesale — the previous failure does not survive it');
+        expect(!settled.deadLetter, 'The reclaim clears the dead-letter stamp — the doc is live again').toBeTruthy();
+        expect((settled.retryCount || 0) < 5, `The reclaim restarts the ladder rather than resuming a burned one, got retryCount=${settled.retryCount}`).toBeTruthy();
+        expect(settled.error, 'The reclaim replaces the record wholesale — the previous failure does not survive it').not.toBe('Previous error');
       },
     },
 
     {
       name: 'a-failed-dispute-alert-is-still-reclaimable',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const alertId = '_test-dispute-dedup-race-retry';
 
         await firestore.set(`payments-disputes/${alertId}`, { id: alertId, status: 'failed', error: 'Previous error' });
 
         const sent = await deliverDisputeAlert(omega, alertId);
 
-        assert.equal(sent.code, 200, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(!sent.body?.duplicate, 'A failed dispute alert must not be reported as a duplicate');
+        expect(sent.code, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(!sent.body?.duplicate, 'A failed dispute alert must not be reported as a duplicate').toBeTruthy();
       },
     },
   ],

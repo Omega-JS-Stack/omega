@@ -69,7 +69,7 @@ module.exports = defineCases({
       name: 'an-account-with-a-phone-sends-the-hashed-number',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { telephone: { countryCode: 1, national: NATIONAL } },
@@ -77,9 +77,9 @@ module.exports = defineCases({
 
         // GA4's spec hashes the E.164 form, plus included — the same digest
         // TikTok's Events API takes (#392).
-        assert.equal(userData.sha256_phone_number, sha256(`+1${NATIONAL}`), 'the phone rides as SHA256 of the E.164 number');
-        assert.equal(userData.sha256_email_address, sha256(EMAIL), 'the email key is untouched by the phone fix');
-        assert.equal(JSON.stringify(userData).includes(`${NATIONAL}`), false, 'the raw number must never appear anywhere in the payload');
+        expect(userData.sha256_phone_number, 'the phone rides as SHA256 of the E.164 number').toBe(sha256(`+1${NATIONAL}`));
+        expect(userData.sha256_email_address, 'the email key is untouched by the phone fix').toBe(sha256(EMAIL));
+        expect(JSON.stringify(userData).includes(`${NATIONAL}`), 'the raw number must never appear anywhere in the payload').toBe(false);
       },
     },
 
@@ -87,14 +87,14 @@ module.exports = defineCases({
       name: 'the-schema-default-sends-no-phone-hash',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData, user } = userDataFor(omega, { auth: { uid: UID, email: EMAIL } });
 
         // The premise: an account with no phone carries 0, not an absent branch.
-        assert.equal(user.personal.telephone.national, 0, 'the schema default is 0');
+        expect(user.personal.telephone.national, 'the schema default is 0').toBe(0);
 
-        assert.equal(userData.sha256_phone_number, undefined, 'no phone on file means no match key, never a hash of 0');
-        assert.equal(Object.values(userData).includes(sha256('0')), false, 'the default must not be hashed under any key');
+        expect(userData.sha256_phone_number, 'no phone on file means no match key, never a hash of 0').toBe(undefined);
+        expect(Object.values(userData).includes(sha256('0')), 'the default must not be hashed under any key').toBe(false);
       },
     },
 
@@ -102,14 +102,14 @@ module.exports = defineCases({
       name: 'a-messy-email-hashes-its-canonical-form',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData } = userDataFor(omega, { auth: { uid: UID, email: MESSY_EMAIL } });
 
         // Casing and padding are the account doc's business, never the match
         // key's: GA4 matches the digest of the trimmed, lowercased address, and
         // a raw hash silently misses every user whose email was stored with a
         // capital in it (#397).
-        assert.equal(userData.sha256_email_address, MESSY_EMAIL_DIGEST, 'the email rides as SHA256 of the normalized address');
+        expect(userData.sha256_email_address, 'the email rides as SHA256 of the normalized address').toBe(MESSY_EMAIL_DIGEST);
       },
     },
 
@@ -117,7 +117,7 @@ module.exports = defineCases({
       name: 'messy-names-hash-their-canonical-form',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { name: { first: MESSY_FIRST, last: MESSY_LAST } },
@@ -126,8 +126,8 @@ module.exports = defineCases({
         // GA4's user-data spec normalizes a name exactly like an email — trimmed
         // and lowercased — so hashing what the account happened to store missed
         // every user whose name carried a capital or a stray space (#403).
-        assert.equal(userData.address.sha256_first_name, MESSY_FIRST_DIGEST, 'the given name rides as SHA256 of its normalized form');
-        assert.equal(userData.address.sha256_last_name, MESSY_LAST_DIGEST, 'the family name rides as SHA256 of its normalized form');
+        expect(userData.address.sha256_first_name, 'the given name rides as SHA256 of its normalized form').toBe(MESSY_FIRST_DIGEST);
+        expect(userData.address.sha256_last_name, 'the family name rides as SHA256 of its normalized form').toBe(MESSY_LAST_DIGEST);
       },
     },
 
@@ -135,15 +135,15 @@ module.exports = defineCases({
       name: 'an-account-with-no-name-sends-no-name-hash',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData, user } = userDataFor(omega, { auth: { uid: UID, email: EMAIL } });
 
         // The schema's default is null, and a normalizer must never turn an
         // absent name into the digest of '' — one junk key shared by everybody.
-        assert.equal(user.personal.name.first, null, 'the schema default is null');
+        expect(user.personal.name.first, 'the schema default is null').toBe(null);
 
-        assert.equal(userData.address.sha256_first_name, undefined, 'no name on file means no match key');
-        assert.equal(userData.address.sha256_last_name, undefined, 'no name on file means no match key');
+        expect(userData.address.sha256_first_name, 'no name on file means no match key').toBe(undefined);
+        expect(userData.address.sha256_last_name, 'no name on file means no match key').toBe(undefined);
       },
     },
 
@@ -157,17 +157,17 @@ module.exports = defineCases({
       name: 'the-address-block-comes-off-the-account-per-ga4-spec',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { location: { country: 'us', region: 'California', city: 'San Diego' } },
         });
 
-        assert.equal(userData.address.city, 'san diego', 'city: lowercased and trimmed, never hashed');
-        assert.equal(userData.address.region, 'california', 'region: the NAME, GA4\'s own sample shape');
-        assert.equal(userData.address.country, 'US', 'country: uppercase ISO 3166-1 alpha-2');
-        assert.equal(userData.address.postal_code, undefined, 'nothing on file means no key at all');
-        assert.equal(userData.address.sha256_street, undefined);
+        expect(userData.address.city, 'city: lowercased and trimmed, never hashed').toBe('san diego');
+        expect(userData.address.region, 'region: the NAME, GA4\'s own sample shape').toBe('california');
+        expect(userData.address.country, 'country: uppercase ISO 3166-1 alpha-2').toBe('US');
+        expect(userData.address.postal_code, 'nothing on file means no key at all').toBe(undefined);
+        expect(userData.address.sha256_street).toBe(undefined);
       },
     },
 
@@ -180,16 +180,16 @@ module.exports = defineCases({
       name: 'the-postal-code-and-street-come-off-the-account-schema',
       auth: 'none',
 
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         const { userData, user } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { location: { postalCode: '94035-1234', street: ' 123 Main Street. ' } },
         });
 
-        assert.equal(user.personal.location.postalCode, '94035-1234', 'precondition: the resolver keeps the schema field');
+        expect(user.personal.location.postalCode, 'precondition: the resolver keeps the schema field').toBe('94035-1234');
 
-        assert.equal(userData.address.postal_code, '94035-1234', 'the postal code rides in the clear, only . and ~ removed');
-        assert.equal(userData.address.sha256_street, sha256('123 main street'), 'the street is hashed, its digits kept');
+        expect(userData.address.postal_code, 'the postal code rides in the clear, only . and ~ removed').toBe('94035-1234');
+        expect(userData.address.sha256_street, 'the street is hashed, its digits kept').toBe(sha256('123 main street'));
       },
     },
   ],

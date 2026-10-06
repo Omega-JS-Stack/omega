@@ -6,10 +6,9 @@
  * Reads dist/, which `omega test` builds before it runs this suite (or run
  * `omega build` first when calling node --test directly).
  *
- *   node --test test/build/download.test.js
+ * Run (from this target): npx omega test build/download
  */
-const assert = require('node:assert/strict');
-const test = require('node:test');
+const { defineCases } = require('@omega.js/web/test');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -19,19 +18,31 @@ const LATEST = 'https://github.com/Omega-JS-Stack/playground-releases/releases/l
 // The html minifier drops attribute quotes where it can, so the match allows both spellings
 const href = (url) => new RegExp(`href=["']?${url.replace(/[.?]/g, '\\$&')}["' >]`);
 
-test('/download names the brand', () => {
-  assert.match(fs.readFileSync(PAGE, 'utf8'), /<title>Download - OMEGA Playground<\/title>/);
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'download',
+  tests: [
+    {
+      name: '/download names the brand',
+      run: (ctx) => {
+        ctx.expect(fs.readFileSync(PAGE, 'utf8')).toMatch(/<title>Download - OMEGA Playground<\/title>/);
+      },
+    },
 
-test('/download links every desktop installer', () => {
-  const html = fs.readFileSync(PAGE, 'utf8');
+    {
+      name: '/download links every desktop installer',
+      run: (ctx) => {
+        const html = fs.readFileSync(PAGE, 'utf8');
 
-  for (const asset of [
-    'OMEGA-Playground-mac-dmg.dmg',
-    'OMEGA-Playground-windows-nsis.exe',
-    'OMEGA-Playground-linux-deb.deb',
-    'OMEGA-Playground-linux-appimage.AppImage',
-  ]) {
-    assert.match(html, href(`${LATEST}/${asset}`), `${asset} is linked`);
-  }
+        for (const asset of [
+          'OMEGA-Playground-mac-dmg.dmg',
+          'OMEGA-Playground-windows-nsis.exe',
+          'OMEGA-Playground-linux-deb.deb',
+          'OMEGA-Playground-linux-appimage.AppImage',
+        ]) {
+          ctx.expect(html, `${asset} is linked`).toMatch(href(`${LATEST}/${asset}`));
+        }
+      },
+    },
+  ],
 });

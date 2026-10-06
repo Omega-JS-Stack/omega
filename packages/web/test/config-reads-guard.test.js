@@ -10,10 +10,9 @@
  * moment a conversion is reverted or a new direct read is added, without
  * needing a scenario that exposes the stale render.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', 'src');
 
@@ -110,35 +109,49 @@ function directReads(source) {
   return found;
 }
 
-for (const module of CONFIG_TIME_MODULES) {
-  test(`${module.file} reads the filesystem only through the captured-read helper`, () => {
-    const source = fs.readFileSync(path.join(SRC, module.file), 'utf8');
-    const allowedFunctions = module.functions || [];
-    const allowedSnippets = module.snippets || [];
+module.exports = defineCases({
+  type: 'group',
+  description: 'config-reads-guard',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const module of CONFIG_TIME_MODULES) {
+        cases.push({
+          name: `${module.file} reads the filesystem only through the captured-read helper`,
+          run: (ctx) => {
+            const source = fs.readFileSync(path.join(SRC, module.file), 'utf8');
+            const allowedFunctions = module.functions || [];
+            const allowedSnippets = module.snippets || [];
 
-    const offenders = directReads(source).filter((entry) => (
-      !allowedFunctions.includes(entry.fn)
-      && !allowedSnippets.some((snippet) => entry.text.includes(snippet))
-    ));
+            const offenders = directReads(source).filter((entry) => (
+              !allowedFunctions.includes(entry.fn)
+              && !allowedSnippets.some((snippet) => entry.text.includes(snippet))
+            ));
 
-    assert.deepEqual(offenders, [], offenders.map((entry) => (
-      `src/${module.file}:${entry.line} (${entry.fn}) reads directly — ${entry.text} — ${FIX}`
-    )).join('\n'));
-  });
-}
+            ctx.expect(offenders, offenders.map((entry) => (
+              `src/${module.file}:${entry.line} (${entry.fn}) reads directly — ${entry.text} — ${FIX}`
+            )).join('\n')).toEqual([]);
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('every guard exception still matches a read in its module', () => {
-  for (const module of CONFIG_TIME_MODULES) {
-    const source = fs.readFileSync(path.join(SRC, module.file), 'utf8');
-    const reads = directReads(source);
+    {
+      name: 'every guard exception still matches a read in its module',
+      run: (ctx) => {
+        for (const module of CONFIG_TIME_MODULES) {
+          const source = fs.readFileSync(path.join(SRC, module.file), 'utf8');
+          const reads = directReads(source);
 
-    for (const fn of module.functions || []) {
-      assert.ok(reads.some((entry) => entry.fn === fn),
-        `src/${module.file}: ${fn} no longer reads directly — drop it from the guard's exceptions`);
-    }
-    for (const snippet of module.snippets || []) {
-      assert.ok(reads.some((entry) => entry.text.includes(snippet)),
-        `src/${module.file}: no read matches the exception "${snippet}" — drop or update it`);
-    }
-  }
+          for (const fn of module.functions || []) {
+            ctx.expect(reads.some((entry) => entry.fn === fn), `src/${module.file}: ${fn} no longer reads directly — drop it from the guard's exceptions`).toBeTruthy();
+          }
+          for (const snippet of module.snippets || []) {
+            ctx.expect(reads.some((entry) => entry.text.includes(snippet)), `src/${module.file}: no read matches the exception "${snippet}" — drop or update it`).toBeTruthy();
+          }
+        }
+      },
+    },
+  ],
 });

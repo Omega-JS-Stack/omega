@@ -30,7 +30,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'svg-retry-attempts-accumulate-into-the-section-tokens',
-      async run({ assert }) {
+      async run({ expect }) {
         const ctx = new Context(bootOmega());
         const ai = ctx.ai;
 
@@ -42,14 +42,10 @@ module.exports = defineCases({
           ctx: ctx,
         });
 
-        assert.equal(result.meta.attempts, 2, 'both attempts ran');
-        assert.equal(result.fallback, true, 'no usable svg, placeholder illustration used');
-        assert.equal(result.meta.tokens.total.count > 0, true, 'usage accounted');
-        assert.deepEqual(
-          result.meta.tokens,
-          ai.tokens,
-          'section meta carries every attempt the AI instance spent, not just the last',
-        );
+        expect(result.meta.attempts, 'both attempts ran').toBe(2);
+        expect(result.fallback, 'no usable svg, placeholder illustration used').toBe(true);
+        expect(result.meta.tokens.total.count > 0, 'usage accounted').toBe(true);
+        expect(result.meta.tokens, 'section meta carries every attempt the AI instance spent, not just the last').toEqual(ai.tokens);
       },
     },
   ],

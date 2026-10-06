@@ -13,88 +13,88 @@ module.exports = defineCases({
   tests: [
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-missing-confirmed',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/cancel', {
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject missing confirmed field');
+        expect(response, 'Should reject missing confirmed field').toBeError(400);
       },
     },
 
     {
       name: 'rejects-basic-user',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject basic user with no paid subscription');
+        expect(response, 'Should reject basic user with no paid subscription').toBeError(400);
       },
     },
 
     {
       name: 'rejects-no-provider-or-resource-id',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // cancel-no-provider starts with payment.provider=null
         const response = await http.as('cancel-no-provider').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject when no provider or resourceId is set');
+        expect(response, 'Should reject when no provider or resourceId is set').toBeError(400);
       },
     },
 
     {
       name: 'rejects-already-pending-cancellation',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // cancel-already-pending starts with cancellation.pending=true
         const response = await http.as('cancel-already-pending').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject when cancellation already pending');
+        expect(response, 'Should reject when cancellation already pending').toBeError(400);
       },
     },
 
     {
       name: 'rejects-subscription-younger-than-24-hours',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // cancel-too-young starts with startDate set to now (< 24 hours old)
         const response = await http.as('cancel-too-young').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject subscription younger than 24 hours');
+        expect(response, 'Should reject subscription younger than 24 hours').toBeError(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // cancel-unknown-provider starts with provider='unknown-provider'
         const response = await http.as('cancel-unknown-provider').post('omega/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'allows-suspended-subscription',
-      async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
+      async run({ http, expect, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['cancel-suspended'].uid;
 
         const response = await http.as('cancel-suspended').post('omega/payments/cancel', {
@@ -103,8 +103,8 @@ module.exports = defineCases({
           skipGuards: true,
         });
 
-        assert.isSuccess(response, 'Should allow cancelling a suspended subscription');
-        assert.equal(response.data.success, true, 'Should return success: true');
+        expect(response, 'Should allow cancelling a suspended subscription').toBeSuccess();
+        expect(response.data.success, 'Should return success: true').toBe(true);
 
         // Verify the subscription was reset to cancelled (via fallback or webhook)
         await waitFor(async () => {
@@ -117,7 +117,7 @@ module.exports = defineCases({
 
     {
       name: 'succeeds-with-test-provider',
-      async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
+      async run({ http, expect, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['route-cancel-success'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
         if (!paidProduct) {
@@ -131,7 +131,7 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isSuccess(intentResponse, 'Intent should succeed');
+        expect(intentResponse, 'Intent should succeed').toBeSuccess();
 
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
@@ -148,8 +148,8 @@ module.exports = defineCases({
           skipGuards: true,
         });
 
-        assert.isSuccess(cancelResponse, 'Cancel should succeed');
-        assert.equal(cancelResponse.data.success, true, 'Should return success: true');
+        expect(cancelResponse, 'Cancel should succeed').toBeSuccess();
+        expect(cancelResponse.data.success, 'Should return success: true').toBe(true);
 
         // Step 3: Verify cancellation.pending was set via the webhook pipeline
         await waitFor(async () => {
@@ -158,7 +158,7 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.subscription?.cancellation?.pending, true, 'Cancellation should be pending');
+        expect(userDoc?.subscription?.cancellation?.pending, 'Cancellation should be pending').toBe(true);
       },
     },
   ],

@@ -16,8 +16,7 @@
  * esbuild — the convention checkout-discount.test.js and
  * checkout-one-time-summary.test.js set — with the client stubbed.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -97,78 +96,99 @@ async function bindingsFor(product, providers, { frequency = 'annually', capabil
   return modules.buildBindingsState();
 }
 
-test('#642: the crypto button shows when the coinbase provider is switched on', async () => {
-  const bound = await bindingsFor(ONE_TIME, { coinbase: { enabled: true } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-crypto',
+  tests: [
+    {
+      name: '#642: the crypto button shows when the coinbase provider is switched on',
+      run: async (ctx) => {
+        const bound = await bindingsFor(ONE_TIME, { coinbase: { enabled: true } });
 
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'an enabled provider offers the button');
-});
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'an enabled provider offers the button').toBe(true);
+      },
+    },
 
-test('#642: an unconfigured brand never sees a crypto button', async () => {
-  // Three shapes of "not configured", because the config default materializes
-  // the block into EVERY brand (`{ enabled: false }`): a block that exists is
-  // not an ON, and only the literal `true` is.
-  for (const providers of [{}, { coinbase: {} }, { coinbase: { enabled: false } }]) {
-    const bound = await bindingsFor(ONE_TIME, providers);
+    {
+      name: '#642: an unconfigured brand never sees a crypto button',
+      run: async (ctx) => {
+        // Three shapes of "not configured", because the config default materializes
+        // the block into EVERY brand (`{ enabled: false }`): a block that exists is
+        // not an ON, and only the literal `true` is.
+        for (const providers of [{}, { coinbase: {} }, { coinbase: { enabled: false } }]) {
+          const bound = await bindingsFor(ONE_TIME, providers);
 
-    assert.strictEqual(
-      bound.checkout.paymentMethods.crypto, false,
-      `no button without an explicit enable: ${JSON.stringify(providers)}`,
-    );
-  }
-});
+          ctx.expect(bound.checkout.paymentMethods.crypto, `no button without an explicit enable: ${JSON.stringify(providers)}`).toBe(false);
+        }
+      },
+    },
 
-test('#642: a subscription never offers crypto, however the provider is configured', async () => {
-  // Coinbase Commerce has no recurring anything — the backend's intent provider
-  // refuses a subscription, so the button must not be reachable there at all.
-  const bound = await bindingsFor(SUBSCRIPTION, { coinbase: { enabled: true } });
+    {
+      name: '#642: a subscription never offers crypto, however the provider is configured',
+      run: async (ctx) => {
+        // Coinbase Commerce has no recurring anything — the backend's intent provider
+        // refuses a subscription, so the button must not be reachable there at all.
+        const bound = await bindingsFor(SUBSCRIPTION, { coinbase: { enabled: true } });
 
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, false, 'a plan cannot be bought in crypto');
-  assert.strictEqual(bound.checkout.product.isSubscription, true, 'and it really is the subscription branch');
-});
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'a plan cannot be bought in crypto').toBe(false);
+        ctx.expect(bound.checkout.product.isSubscription, 'and it really is the subscription branch').toBe(true);
+      },
+    },
 
-test('#642: the crypto button starts a coinbase intent', async () => {
-  const { resolveProvider } = await loadState();
+    {
+      name: '#642: the crypto button starts a coinbase intent',
+      run: async (ctx) => {
+        const { resolveProvider } = await loadState();
 
-  assert.strictEqual(resolveProvider('crypto'), 'coinbase', 'the method maps to the provider the backend loads');
+        ctx.expect(resolveProvider('crypto'), 'the method maps to the provider the backend loads').toBe('coinbase');
 
-  // The siblings are untouched by the new entry
-  assert.strictEqual(resolveProvider('paypal'), 'paypal');
-});
+        // The siblings are untouched by the new entry
+        ctx.expect(resolveProvider('paypal')).toBe('paypal');
+      },
+    },
 
-test('#642: switching the provider on adds nothing to the other methods', async () => {
-  const { crypto, ...others } = (await bindingsFor(ONE_TIME, { coinbase: { enabled: true } })).checkout.paymentMethods;
+    {
+      name: '#642: switching the provider on adds nothing to the other methods',
+      run: async (ctx) => {
+        const { crypto, ...others } = (await bindingsFor(ONE_TIME, { coinbase: { enabled: true } })).checkout.paymentMethods;
 
-  assert.strictEqual(crypto, true);
-  assert.deepStrictEqual(
-    others, { card: false, paypal: false, applePay: false, googlePay: false },
-    'a crypto-only brand offers crypto and nothing else',
-  );
-});
+        ctx.expect(crypto).toBe(true);
+        ctx.expect(others, 'a crypto-only brand offers crypto and nothing else').toEqual({ card: false, paypal: false, applePay: false, googlePay: false });
+      },
+    },
 
-test('#849: which product types crypto sells is its capability row, never its name', async () => {
-  const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
-  const bound = await bindingsFor(SUBSCRIPTION, { coinbase: { enabled: true } }, { capabilities: sellsPlans });
+    {
+      name: '#849: which product types crypto sells is its capability row, never its name',
+      run: async (ctx) => {
+        const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
+        const bound = await bindingsFor(SUBSCRIPTION, { coinbase: { enabled: true } }, { capabilities: sellsPlans });
 
-  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'a row that sells subscriptions offers the button on a plan');
+        ctx.expect(bound.checkout.paymentMethods.crypto, 'a row that sells subscriptions offers the button on a plan').toBe(true);
 
-  const noOneTime = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, oneTime: false } };
-  const hidden = await bindingsFor(ONE_TIME, { coinbase: { enabled: true } }, { capabilities: noOneTime });
+        const noOneTime = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, oneTime: false } };
+        const hidden = await bindingsFor(ONE_TIME, { coinbase: { enabled: true } }, { capabilities: noOneTime });
 
-  assert.strictEqual(hidden.checkout.paymentMethods.crypto, false, 'and a row that sells no one-time purchase hides it');
-});
+        ctx.expect(hidden.checkout.paymentMethods.crypto, 'and a row that sells no one-time purchase hides it').toBe(false);
+      },
+    },
 
-test('#849: a crypto-only brand can sell a plan only where the table says crypto sells plans', async () => {
-  // The page's "no payment methods" check reads the same rows as the buttons
-  const refused = await bootCheckout({ providers: { coinbase: { enabled: true } } });
-  const error = refused.updates[refused.updates.length - 1].checkout.error;
+    {
+      name: '#849: a crypto-only brand can sell a plan only where the table says crypto sells plans',
+      run: async (ctx) => {
+        // The page's "no payment methods" check reads the same rows as the buttons
+        const refused = await bootCheckout({ providers: { coinbase: { enabled: true } } });
+        const error = refused.updates[refused.updates.length - 1].checkout.error;
 
-  assert.strictEqual(error.show, true, 'no method can pay for a plan');
-  assert.match(error.message, /No payment methods/);
+        ctx.expect(error.show, 'no method can pay for a plan').toBe(true);
+        ctx.expect(error.message).toMatch(/No payment methods/);
 
-  const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
-  const offered = await bootCheckout({ providers: { coinbase: { enabled: true } }, capabilities: sellsPlans });
+        const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
+        const offered = await bootCheckout({ providers: { coinbase: { enabled: true } }, capabilities: sellsPlans });
 
-  assert.strictEqual(offered.updates[0].checkout.error.show, false, 'a row that sells plans paints the checkout');
-  assert.strictEqual(offered.updates[0].checkout.paymentMethods.crypto, true, 'with the crypto button on it');
-  await offered.answerEligibility(false);
+        ctx.expect(offered.updates[0].checkout.error.show, 'a row that sells plans paints the checkout').toBe(false);
+        ctx.expect(offered.updates[0].checkout.paymentMethods.crypto, 'with the crypto button on it').toBe(true);
+        await offered.answerEligibility(false);
+      },
+    },
+  ],
 });

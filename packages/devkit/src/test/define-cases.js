@@ -6,6 +6,18 @@
 
 const path = require('path');
 
+// The argument a runner hands each process-isolated child, carrying its default timeout.
+const TIMEOUT_ARG = '--omega-default-timeout=';
+
+/**
+ * The default timeout the runner handed this child, if any.
+ * @returns {number|undefined} Milliseconds, or undefined when run directly.
+ */
+function handedTimeout() {
+  const arg = process.argv.find((value) => value.startsWith(TIMEOUT_ARG));
+  return arg ? Number(arg.slice(TIMEOUT_ARG.length)) : undefined;
+}
+
 /**
  * Resolve the file that called defineCases.
  * @returns {string|null} Absolute path, or null when the stack is unreadable.
@@ -97,7 +109,7 @@ function registerSelf(spec, file) {
   const label = suite.description || path.basename(file);
 
   if (row && !needsDriver(row)) {
-    registerSuite(suite, { label, session: hostSession(suite, { expect }) });
+    registerSuite(suite, { label, session: hostSession(suite, { expect, defaultTimeout: handedTimeout() }) });
     return;
   }
 
@@ -126,3 +138,4 @@ function defineCases(spec) {
 }
 
 module.exports = defineCases;
+module.exports.TIMEOUT_ARG = TIMEOUT_ARG;

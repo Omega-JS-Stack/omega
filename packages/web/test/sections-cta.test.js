@@ -8,11 +8,10 @@
  * entirely (section level AND through the index layout that composes it), and
  * an absent `enabled` keeps today's default exactly.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -45,41 +44,56 @@ function makeEngine() {
 
 const COPY = 'headline: "Ready to ship"\nsubheadline: "Start free today."\nprimary_button:\n  text: "Start free"\n  href: "/signup"\n';
 
-test('#473: enabled: false removes the band entirely', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(`{% section "marketing/cta" %}\nenabled: false\n${COPY}{% endsection %}`, {});
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-cta',
+  tests: [
+    {
+      name: '#473: enabled: false removes the band entirely',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(`{% section "marketing/cta" %}\nenabled: false\n${COPY}{% endsection %}`, {});
 
-  assert.strictEqual(html.trim(), '', 'no band, no panel, no empty section shell');
-  assert.deepEqual(warnings, [], 'the gate is a declared arg, not an unknown one');
-});
+        ctx.expect(html.trim(), 'no band, no panel, no empty section shell').toBe('');
+        ctx.expect(warnings, 'the gate is a declared arg, not an unknown one').toEqual([]);
+      },
+    },
 
-test('#473: an absent enabled keeps today\'s default — the band renders whole', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(`{% section "marketing/cta" %}\n${COPY}{% endsection %}`, {});
+    {
+      name: '#473: an absent enabled keeps today\'s default — the band renders whole',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(`{% section "marketing/cta" %}\n${COPY}{% endsection %}`, {});
 
-  assert.ok(html.includes('class="omega-cta omega-ink-panel"'), 'the ink panel renders as before');
-  assert.ok(html.includes('Ready to ship'), 'with its copy');
-  assert.ok(html.includes('href="/signup"'), 'and its button');
-  assert.deepEqual(warnings, []);
-});
+        ctx.expect(html.includes('class="omega-cta omega-ink-panel"'), 'the ink panel renders as before').toBeTruthy();
+        ctx.expect(html.includes('Ready to ship'), 'with its copy').toBeTruthy();
+        ctx.expect(html.includes('href="/signup"'), 'and its button').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('#473: the base index layout composes the band through the gate', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cta-gate-'));
-  const consumerDir = path.join(tmp, 'src');
-  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
-  fs.writeFileSync(path.join(consumerDir, 'src.11tydata.json'), JSON.stringify({ cta: { enabled: false } }));
-  fs.writeFileSync(
-    path.join(consumerDir, 'pages', 'index.md'),
-    ['---', 'layout: blueprint/index', 'permalink: /', '---', ''].join('\n'),
-  );
+    {
+      name: '#473: the base index layout composes the band through the gate',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cta-gate-'));
+        const consumerDir = path.join(tmp, 'src');
+        fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+        fs.writeFileSync(path.join(consumerDir, 'src.11tydata.json'), JSON.stringify({ cta: { enabled: false } }));
+        fs.writeFileSync(
+          path.join(consumerDir, 'pages', 'index.md'),
+          ['---', 'layout: blueprint/index', 'permalink: /', '---', ''].join('\n'),
+        );
 
-  try {
-    const pages = await buildSite(consumerDir, { ...bareData, ...miniData }, {}, 'cta-gate');
-    const html = pages.get('/');
-    assert.ok(!html.includes('omega-cta omega-ink-panel'), 'the composed band is gone, not blanked');
-    assert.ok(!html.includes('Ready to build something people remember?'), 'and so are the framework default words');
-    assert.ok(html.includes('omega-bento'), 'the rest of the composition is untouched');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+        try {
+          const pages = await buildSite(consumerDir, { ...bareData, ...miniData }, {}, 'cta-gate');
+          const html = pages.get('/');
+          ctx.expect(!html.includes('omega-cta omega-ink-panel'), 'the composed band is gone, not blanked').toBeTruthy();
+          ctx.expect(!html.includes('Ready to build something people remember?'), 'and so are the framework default words').toBeTruthy();
+          ctx.expect(html.includes('omega-bento'), 'the rest of the composition is untouched').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

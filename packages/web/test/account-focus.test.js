@@ -8,9 +8,8 @@
  * replacement). The replacement is the page's own ring recipe, on
  * `:focus-visible` so a mouse click never paints it.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { PKG } = require('./lib/build.js');
@@ -24,19 +23,24 @@ function rulesFor(css, needle) {
     .filter((rule) => rule.selector.includes(needle));
 }
 
-test('#243: the accordion trigger rings on :focus-visible, and nothing kills an outline bare', () => {
-  const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
+module.exports = defineCases({
+  type: 'group',
+  description: 'account-focus',
+  tests: [
+    {
+      name: '#243: the accordion trigger rings on :focus-visible, and nothing kills an outline bare',
+      run: (ctx) => {
+        const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
 
-  const rings = rulesFor(css, '.accordion-trigger:focus-visible');
-  assert.ok(rings.length > 0, 'the trigger declares a keyboard focus ring');
-  for (const ring of rings) {
-    assert.match(ring.body, /outline:\s*2px solid var\(--omega-accent\)/, 'the page\'s ring recipe, token-painted');
-    assert.match(ring.body, /outline-offset:\s*2px/, 'offset so the ring clears the text');
-  }
+        const rings = rulesFor(css, '.accordion-trigger:focus-visible');
+        ctx.expect(rings.length > 0, 'the trigger declares a keyboard focus ring').toBeTruthy();
+        for (const ring of rings) {
+          ctx.expect(ring.body, 'the page\'s ring recipe, token-painted').toMatch(/outline:\s*2px solid var\(--omega-accent\)/);
+          ctx.expect(ring.body, 'offset so the ring clears the text').toMatch(/outline-offset:\s*2px/);
+        }
 
-  assert.deepStrictEqual(
-    rulesFor(css, ':focus').filter((rule) => /outline:\s*none/.test(rule.body)).map((rule) => rule.selector),
-    [],
-    'no focus rule strips the outline without a replacement',
-  );
+        ctx.expect(rulesFor(css, ':focus').filter((rule) => /outline:\s*none/.test(rule.body)).map((rule) => rule.selector), 'no focus rule strips the outline without a replacement').toEqual([]);
+      },
+    },
+  ],
 });

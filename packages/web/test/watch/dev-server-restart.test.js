@@ -16,11 +16,10 @@
  * a new dev-server instance and a `close` on the listening socket — plus an
  * HTTP GET proving the same server still answers after the reset.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { resolvePorts } = require('@omega.js/config');
 
 const { configureOmega } = require('../../src/index.js');
@@ -30,7 +29,7 @@ const { registerTemplateWatchTargets, devServerOptions } = require('../../src/co
 // fixture; the deadline is the point at which "the edit never landed" is the
 // only remaining explanation. It scales with the lane's load knob (#211) and
 // with this machine's measured contention (#615).
-const { POLL_MS, buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done
 // — the restart, if one is coming, rides the END of the rebuild (Eleventy
 // reloads the server after write), so the assertions wait for silence first.
@@ -170,66 +169,69 @@ async function startDevServer(t, fixture) {
   };
 }
 
-test('the dev-server options are ONE object for the session', () => {
-  const first = devServerOptions('/tmp/site-out', 9099);
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-server-restart',
+  timeout: caseTimeoutMs(),
+  tests: [
+    {
+      name: 'the dev-server options are ONE object for the session',
+      run: (ctx) => {
+        const first = devServerOptions('/tmp/site-out', 9099);
 
-  // assert.ok, not assert.equal: a failure here prints the message, not two
-  // dumps of an options object whose diff is every middleware closure.
-  assert.ok(
-    devServerOptions('/tmp/site-out', 9099) === first,
-    'every config reset must hand Eleventy the identical options object — a rebuilt one carries fresh middleware closures, which deepStrictEqual can only read as "changed"',
-  );
+        // toBeTruthy, not toBe: a failure here prints the message, not two
+        // dumps of an options object whose diff is every middleware closure.
+        ctx.expect(devServerOptions('/tmp/site-out', 9099) === first, 'every config reset must hand Eleventy the identical options object — a rebuilt one carries fresh middleware closures, which deepStrictEqual can only read as "changed"').toBeTruthy();
 
-  // The live auth-port getter is what `omega dev` actually passes (#300), and a
-  // config reset re-evaluates the callback that closes over it — two DISTINCT
-  // getter identities must still resolve to the one cached object
-  const live = devServerOptions('/tmp/site-out-live', () => 9099);
-  assert.ok(
-    devServerOptions('/tmp/site-out-live', () => 9200) === live,
-    'a getter keys as `live`, so its identity can never restart the server',
-  );
+        // The live auth-port getter is what `omega dev` actually passes (#300), and a
+        // config reset re-evaluates the callback that closes over it — two DISTINCT
+        // getter identities must still resolve to the one cached object
+        const live = devServerOptions('/tmp/site-out-live', () => 9099);
+        ctx.expect(devServerOptions('/tmp/site-out-live', () => 9200) === live, 'a getter keys as `live`, so its identity can never restart the server').toBeTruthy();
 
-  // The dev-chrome getter the serve-time ports injection rides (#346) is the
-  // second one `omega dev` passes, and it keys exactly the same way
-  const injecting = devServerOptions('/tmp/site-out-inject', () => 9099, () => ({ ports: { auth: 9099 } }));
-  assert.ok(
-    devServerOptions('/tmp/site-out-inject', () => 9200, () => ({ ports: { auth: 9200 } })) === injecting,
-    'the injecting server is one object for the session too',
-  );
-});
+        // The dev-chrome getter the serve-time ports injection rides (#346) is the
+        // second one `omega dev` passes, and it keys exactly the same way
+        const injecting = devServerOptions('/tmp/site-out-inject', () => 9099, () => ({ ports: { auth: 9099 } }));
+        ctx.expect(devServerOptions('/tmp/site-out-inject', () => 9200, () => ({ ports: { auth: 9200 } })) === injecting, 'the injecting server is one object for the session too').toBeTruthy();
+      },
+    },
 
-test('a config reset does not restart the dev server', async (t) => {
-  const fixture = app();
-  const dev = await startDevServer(t, fixture);
+    {
+      name: 'a config reset does not restart the dev server',
+      run: async (ctx) => {
+        const fixture = app();
+        const dev = await startDevServer(ctx, fixture);
 
-  const devServer = dev.serve._server;
-  const socket = devServer._server;
-  let closes = 0;
-  socket.on('close', () => { closes += 1; });
+        const devServer = dev.serve._server;
+        const socket = devServer._server;
+        let closes = 0;
+        socket.on('close', () => { closes += 1; });
 
-  assert.equal((await fetch(`http://localhost:${dev.port}/`)).status, 200, 'the server answers before the reset');
+        ctx.expect((await fetch(`http://localhost:${dev.port}/`)).status, 'the server answers before the reset').toBe(200);
 
-  // The consumer layout is a config-time capture, so an edit here rides the
-  // reset lane (dev-watch.test.js proves the reset itself).
-  const runsBeforeEdit = dev.configRuns.count;
-  fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
-  await dev.settleAfter(/data-layout="AFTER"/);
+        // The consumer layout is a config-time capture, so an edit here rides the
+        // reset lane (dev-watch.test.js proves the reset itself).
+        const runsBeforeEdit = dev.configRuns.count;
+        fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
+        await dev.settleAfter(/data-layout="AFTER"/);
 
-  // EVENT-keyed, not count-keyed (#344). This asserts the edit rode the RESET
-  // lane, which is what makes every assertion below mean anything — but never
-  // how MANY resets it took. One save legitimately reaches chokidar once per
-  // registered path form (src/commands/dev.js registers two for a cwd-
-  // contained dir, on purpose and measured), and whether those events land in
-  // one throttle window or two is the machine's load, not the product: 3 !== 2
-  // was this suite's most frequent lane-only failure. The product promise is
-  // the four assertions below, and they hold PER reset — with two resets,
-  // `closes === 0` is a stronger statement, not a weaker one.
-  assert.ok(dev.configRuns.count > runsBeforeEdit,
-    `the edit rode the config-reset lane — the config callback re-ran (was ${runsBeforeEdit}, now ${dev.configRuns.count})`);
-  // assert.ok again: the instances differ by their whole socket state, and the
-  // diff of two dev servers buries the one fact that matters.
-  assert.ok(dev.serve._server === devServer, 'the SAME dev server survived the reset — a restart builds a new instance');
-  assert.equal(closes, 0, 'the listening socket was never closed — a restart closes it before relistening');
-  assert.equal(dev.serve.hasOptionsChanged(), false, 'the server options read as unchanged across the reset');
-  assert.equal((await fetch(`http://localhost:${dev.port}/`)).status, 200, 'the same server still answers after the reset');
+        // EVENT-keyed, not count-keyed (#344). This asserts the edit rode the RESET
+        // lane, which is what makes every assertion below mean anything — but never
+        // how MANY resets it took. One save legitimately reaches chokidar once per
+        // registered path form (src/commands/dev.js registers two for a cwd-
+        // contained dir, on purpose and measured), and whether those events land in
+        // one throttle window or two is the machine's load, not the product: 3 !== 2
+        // was this suite's most frequent lane-only failure. The product promise is
+        // the four assertions below, and they hold PER reset — with two resets,
+        // `closes === 0` is a stronger statement, not a weaker one.
+        ctx.expect(dev.configRuns.count > runsBeforeEdit, `the edit rode the config-reset lane — the config callback re-ran (was ${runsBeforeEdit}, now ${dev.configRuns.count})`).toBeTruthy();
+        // toBeTruthy again: the instances differ by their whole socket state, and the
+        // diff of two dev servers buries the one fact that matters.
+        ctx.expect(dev.serve._server === devServer, 'the SAME dev server survived the reset — a restart builds a new instance').toBeTruthy();
+        ctx.expect(closes, 'the listening socket was never closed — a restart closes it before relistening').toBe(0);
+        ctx.expect(dev.serve.hasOptionsChanged(), 'the server options read as unchanged across the reset').toBe(false);
+        ctx.expect((await fetch(`http://localhost:${dev.port}/`)).status, 'the same server still answers after the reset').toBe(200);
+      },
+    },
+  ],
 });

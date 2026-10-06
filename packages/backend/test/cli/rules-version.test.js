@@ -52,41 +52,41 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-realtime-marker-block-carries-the-schema-version-stamp',
-      async run({ assert }) {
+      async run({ expect }) {
         const generated = generateRules();
         const stamp = `// ========== OMEGA Rules (v${RULES_VERSION}) ==========`;
 
-        assert.equal(typeof RULES_VERSION, 'string', 'RULES_VERSION must be exported by the generator');
-        assert.equal(generated.databaseRulesWhole.includes(stamp), true, `database.rules.json must carry ${stamp}`);
-        assert.equal(generated.databaseRulesWhole.includes('(v0.0.0)'), false, 'the template placeholder must be replaced');
+        expect(typeof RULES_VERSION, 'RULES_VERSION must be exported by the generator').toBe('string');
+        expect(generated.databaseRulesWhole.includes(stamp), `database.rules.json must carry ${stamp}`).toBe(true);
+        expect(generated.databaseRulesWhole.includes('(v0.0.0)'), 'the template placeholder must be replaced').toBe(false);
       },
     },
 
     {
       name: 'the-compiled-firestore-artifact-stamps-the-same-constant',
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled } = compileRules({ brandSource: jetpack.read(BRAND_RULES_SEED) });
 
-        assert.equal(compiled.includes(`rules schema v${RULES_VERSION}`), true, `the compiled artifact must carry the v${RULES_VERSION} stamp`);
-        assert.equal(compiled.includes('OMEGA Rules (v'), false, 'the compiled model carries no marker block');
+        expect(compiled.includes(`rules schema v${RULES_VERSION}`), `the compiled artifact must carry the v${RULES_VERSION} stamp`).toBe(true);
+        expect(compiled.includes('OMEGA Rules (v'), 'the compiled model carries no marker block').toBe(false);
       },
     },
 
     {
       name: 'the-stamp-never-reads-the-package-version',
-      async run({ assert }) {
+      async run({ expect }) {
         const generated = generateRules();
         const { compiled } = compileRules({ brandSource: jetpack.read(BRAND_RULES_SEED) });
 
-        assert.equal(generated.databaseRulesWhole.includes(PACKAGE_VERSION_SENTINEL), false, 'database.rules.json must not stamp the package version');
-        assert.equal(compiled.includes(PACKAGE_VERSION_SENTINEL), false, 'the compiled artifact must not stamp the package version');
-        assert.equal(fs.readFileSync(COMPILER_SOURCE, 'utf8').includes("package.json').version"), false, 'the compiler must not read the package version');
+        expect(generated.databaseRulesWhole.includes(PACKAGE_VERSION_SENTINEL), 'database.rules.json must not stamp the package version').toBe(false);
+        expect(compiled.includes(PACKAGE_VERSION_SENTINEL), 'the compiled artifact must not stamp the package version').toBe(false);
+        expect(fs.readFileSync(COMPILER_SOURCE, 'utf8').includes("package.json').version"), 'the compiler must not read the package version').toBe(false);
       },
     },
 
     {
       name: 'the-target-check-expects-the-same-stamp',
-      async run({ assert }) {
+      async run({ expect }) {
         // Source-level: the check lives inside runTargetChecks(), which needs a
         // real project to execute. If it drifts back to the package version it
         // never matches what the generator writes, and the checks rewrite
@@ -94,10 +94,10 @@ module.exports = defineCases({
         const source = fs.readFileSync(SETUP_SOURCE, 'utf8');
         const line = source.split('\n').find((l) => l.includes('rulesVersionRegex ='));
 
-        assert.equal(!!line, true, 'the rulesVersionRegex assignment must exist in target-checks.js');
-        assert.equal(line.includes('RULES_VERSION'), true, 'the version check must build its regex from RULES_VERSION');
-        assert.equal(line.includes('self.default.version'), false, 'the version check must not read the package version');
-        assert.equal(/RULES_VERSION.*require\('\.\/compile-rules'\)/.test(source), true, 'RULES_VERSION must come from the compiler, not a second copy');
+        expect(!!line, 'the rulesVersionRegex assignment must exist in target-checks.js').toBe(true);
+        expect(line.includes('RULES_VERSION'), 'the version check must build its regex from RULES_VERSION').toBe(true);
+        expect(line.includes('self.default.version'), 'the version check must not read the package version').toBe(false);
+        expect(/RULES_VERSION.*require\('\.\/compile-rules'\)/.test(source), 'RULES_VERSION must come from the compiler, not a second copy').toBe(true);
       },
     },
   ],

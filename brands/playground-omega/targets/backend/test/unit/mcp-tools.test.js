@@ -4,10 +4,9 @@
  * handler tool carries its code instead of a path. A tool whose `path` names no
  * route answers 404 on every call, and nothing else would notice.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { defineCases } = require('@omega.js/backend/test');
+const { defineCases, expect } = require('@omega.js/backend/test');
 
 const APP_DIR = path.join(__dirname, '..', '..');
 const SRC = path.join(APP_DIR, 'src');
@@ -26,8 +25,8 @@ module.exports = defineCases({
 
         // The loader answers [] for a missing, non-array, or malformed file, so an
         // empty answer is the failure signal
-        assert.ok(tools.length > 0, 'the loader rejected src/mcp.js (see its console.error for why)');
-        assert.deepEqual(tools.map((tool) => tool.name).sort(), ['count_notes', 'create_note', 'list_notes']);
+        expect(tools.length > 0, 'the loader rejected src/mcp.js (see its console.error for why)').toBeTruthy();
+        expect(tools.map((tool) => tool.name).sort()).toEqual(['count_notes', 'create_note', 'list_notes']);
       },
     },
 
@@ -40,8 +39,8 @@ module.exports = defineCases({
           const route = tool.path.replace(/^\//, '');
           const file = path.join(SRC, 'routes', route, `${tool.method.toLowerCase()}.js`);
 
-          assert.ok(fs.existsSync(file), `${tool.name} calls ${tool.method} ${tool.path}, but src/routes/${route}/${tool.method.toLowerCase()}.js does not exist`);
-          assert.equal(tool.role, 'user', `${tool.name} is a signed-in user's tool`);
+          expect(fs.existsSync(file), `${tool.name} calls ${tool.method} ${tool.path}, but src/routes/${route}/${tool.method.toLowerCase()}.js does not exist`).toBeTruthy();
+          expect(tool.role, `${tool.name} is a signed-in user's tool`).toBe('user');
         }
       },
     },
@@ -52,9 +51,9 @@ module.exports = defineCases({
       run() {
         const tool = loadConsumerTools(SRC).find((t) => t.name === 'count_notes');
 
-        assert.equal(typeof tool.handler, 'function', 'count_notes carries a handler');
-        assert.equal(tool.path, undefined, 'and no path: it never goes over HTTP');
-        assert.equal(tool.role, 'user', 'a handler tool receives the signed-in caller, so it counts that user\'s own notes');
+        expect(typeof tool.handler, 'count_notes carries a handler').toBe('function');
+        expect(tool.path, 'and no path: it never goes over HTTP').toBe(undefined);
+        expect(tool.role, 'a handler tool receives the signed-in caller, so it counts that user\'s own notes').toBe('user');
       },
     },
   ],

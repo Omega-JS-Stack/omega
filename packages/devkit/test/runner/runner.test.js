@@ -110,5 +110,16 @@ module.exports = defineCases({
         ctx.expect(result.tests[0]).toHaveProperty('status', 'pass');
       },
     },
+    {
+      name: 'an extended run warns with the extendedModeLines the runner was given',
+      run(ctx) {
+        const { error, output } = runScenario('extended-lines');
+
+        ctx.expect(error, output).toBeNull();
+        ctx.expect(output).toContain('TEST_EXTENDED_MODE IS TRUE');
+        ctx.expect(output).toContain('fixture extended detail');
+        ctx.expect(output, 'the given lines replace the default').not.toContain('Suites call REAL external services');
+      },
+    },
   ],
 });

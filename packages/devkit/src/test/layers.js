@@ -25,7 +25,7 @@ const LAYERS = {
     { name: 'build', kind: 'host', extras: [] },
   ],
   backend: [
-    { name: 'emulator', kind: 'host', extras: ['http', 'accounts', 'firestore', 'pubsub', 'admin', 'omega', 'rules', 'config', 'payments'] },
+    { name: 'emulator', kind: 'host', extras: ['http', 'accounts', 'firestore', 'pubsub', 'admin', 'omega', 'ctx', 'rules', 'config', 'payments'] },
   ],
   node: [
     { name: 'node', kind: 'host', extras: [] },

@@ -18,11 +18,11 @@
  * manifest, and the template reads `assetManifest.brandmarkSvg`. No config
  * key, and no template guessing a filename it never saw on disk.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const jetpack = require('fs-jetpack');
 
 const { resolveStaticDirs, brandmarkSvgUrl } = require('../src/static-assets.js');
@@ -58,42 +58,42 @@ function manifestWith(brandmarkSvg) {
 /** The nav's brand `<img src>` (cachebreak query stripped). */
 function navLogo(html) {
   const match = html.match(/<a class="navbar-brand omega-nav__brand[^"]*"[^>]*>\s*<img src="([^"?]+)/);
-  assert.ok(match, 'the nav renders a brand image');
+  expect(match, 'the nav renders a brand image').toBeTruthy();
   return match[1];
 }
 
 /** The footer's brand image url — lazy-mounted, so it rides `data-lazy`. */
 function footerLogo(html) {
   const match = html.match(/<footer class="omega-footer[\s\S]*?data-lazy="@src ([^"]+)"/);
-  assert.ok(match, 'the footer renders a brand image');
+  expect(match, 'the footer renders a brand image').toBeTruthy();
   return match[1];
 }
 
 /** The auth card's brand `<img src>` — signin/signup/reset/token and the connections callback share it. */
 function authLogo(html) {
   const match = html.match(/omega-auth__brand">\s*<img src="([^"?]+)/);
-  assert.ok(match, 'the auth card renders a brand image');
+  expect(match, 'the auth card renders a brand image').toBeTruthy();
   return match[1];
 }
 
 /** The checkout head's brand `<img src>` (our own page chrome, not the provider's product image). */
 function checkoutLogo(html) {
   const match = html.match(/omega-checkout__brand"[\s\S]*?<img src="([^"?]+)/);
-  assert.ok(match, 'the checkout head renders a brand image');
+  expect(match, 'the checkout head renders a brand image').toBeTruthy();
   return match[1];
 }
 
 /** A download-page brandmark url — lazy-mounted like the footer's, so it rides `data-lazy`. */
 function downloadLogo(html) {
   const match = html.match(/data-lazy="@src ([^"]+)" class="brandmark"/);
-  assert.ok(match, 'the download page renders a brand image');
+  expect(match, 'the download page renders a brand image').toBeTruthy();
   return match[1];
 }
 
 /** The redirect chrome's brand mark (core/_layouts/modules/utilities/redirect.html). */
 function redirectLogo(html) {
   const match = html.match(/class="omega-redirect__mark"[^>]*>\s*<img src="([^"?]+)/);
-  assert.ok(match, 'the redirect page renders its brand mark');
+  expect(match, 'the redirect page renders its brand mark').toBeTruthy();
   return match[1];
 }
 
@@ -121,95 +121,128 @@ function mintRoot(t, files) {
   return root;
 }
 
-test('#467: the static lane reports the bridged svg url when the mint produced one', (t) => {
-  const root = mintRoot(t, {
-    '.omega/assets/logo/brandmark/color-x.svg': '<svg/>',
-    '.omega/assets/logo/brandmark/color-512.png': 'png',
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'brandmark-svg',
+  tests: [
+    {
+      name: '#467: the static lane reports the bridged svg url when the mint produced one',
+      run: (ctx) => {
+        const root = mintRoot(ctx, {
+          '.omega/assets/logo/brandmark/color-x.svg': '<svg/>',
+          '.omega/assets/logo/brandmark/color-512.png': 'png',
+        });
 
-  const dirs = resolveStaticDirs({ brandRoot: root, assetsDir: path.join(root, 'src', 'assets') });
+        const dirs = resolveStaticDirs({ brandRoot: root, assetsDir: path.join(root, 'src', 'assets') });
 
-  assert.equal(brandmarkSvgUrl(dirs), SVG_URL);
-});
+        ctx.expect(brandmarkSvgUrl(dirs)).toBe(SVG_URL);
+      },
+    },
 
-test('#467: a mint with only the raster ladder reports nothing', (t) => {
-  const root = mintRoot(t, { '.omega/assets/logo/brandmark/color-512.png': 'png' });
+    {
+      name: '#467: a mint with only the raster ladder reports nothing',
+      run: (ctx) => {
+        const root = mintRoot(ctx, { '.omega/assets/logo/brandmark/color-512.png': 'png' });
 
-  const dirs = resolveStaticDirs({ brandRoot: root, assetsDir: path.join(root, 'src', 'assets') });
+        const dirs = resolveStaticDirs({ brandRoot: root, assetsDir: path.join(root, 'src', 'assets') });
 
-  assert.equal(brandmarkSvgUrl(dirs), null, 'no svg on disk, no url');
-});
+        ctx.expect(brandmarkSvgUrl(dirs), 'no svg on disk, no url').toBe(null);
+      },
+    },
 
-test("#467: a consumer's own src/assets svg counts — it wins the same collision", (t) => {
-  const root = mintRoot(t, { 'src/assets/images/brand/brandmark.svg': '<svg/>' });
+    {
+      name: "#467: a consumer's own src/assets svg counts — it wins the same collision",
+      run: (ctx) => {
+        const root = mintRoot(ctx, { 'src/assets/images/brand/brandmark.svg': '<svg/>' });
 
-  const dirs = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(root, 'src', 'assets') });
+        const dirs = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(root, 'src', 'assets') });
 
-  assert.equal(brandmarkSvgUrl(dirs), SVG_URL);
-});
+        ctx.expect(brandmarkSvgUrl(dirs)).toBe(SVG_URL);
+      },
+    },
 
-// ─── The read ────────────────────────────────────────────────────────────────
+    // ─── The read ────────────────────────────────────────────────────────────────
 
-test('#467: nav and footer take the bridged svg when the mint produced one', async () => {
-  const html = await home(SVG_URL, 'brandmark-svg-present');
+    {
+      name: '#467: nav and footer take the bridged svg when the mint produced one',
+      run: async (ctx) => {
+        const html = await home(SVG_URL, 'brandmark-svg-present');
 
-  assert.equal(navLogo(html), SVG_URL, 'nav logo is the vector');
-  assert.equal(footerLogo(html), SVG_URL, 'footer logo is the vector');
-});
+        ctx.expect(navLogo(html), 'nav logo is the vector').toBe(SVG_URL);
+        ctx.expect(footerLogo(html), 'footer logo is the vector').toBe(SVG_URL);
+      },
+    },
 
-test('#467: no minted svg → both fall back to the configured raster', async () => {
-  const html = await home(null, 'brandmark-svg-absent');
+    {
+      name: '#467: no minted svg → both fall back to the configured raster',
+      run: async (ctx) => {
+        const html = await home(null, 'brandmark-svg-absent');
 
-  assert.equal(navLogo(html), PNG_URL, 'nav logo is the configured raster');
-  assert.equal(footerLogo(html), PNG_URL, 'footer logo is the configured raster');
-});
+        ctx.expect(navLogo(html), 'nav logo is the configured raster').toBe(PNG_URL);
+        ctx.expect(footerLogo(html), 'footer logo is the configured raster').toBe(PNG_URL);
+      },
+    },
 
-test('#467: the config value stays the raster — OG and payment still read it', async () => {
-  const html = await home(SVG_URL, 'brandmark-svg-og');
+    {
+      name: '#467: the config value stays the raster — OG and payment still read it',
+      run: async (ctx) => {
+        const html = await home(SVG_URL, 'brandmark-svg-og');
 
-  const og = html.match(/<meta property="og:image" content="([^"?]+)/);
-  assert.ok(og, 'the page carries an og:image');
-  assert.equal(og[1], `${miniData.url}${PNG_URL}`, 'social cards keep the raster');
-});
+        const og = html.match(/<meta property="og:image" content="([^"?]+)/);
+        ctx.expect(og, 'the page carries an og:image').toBeTruthy();
+        ctx.expect(og[1], 'social cards keep the raster').toBe(`${miniData.url}${PNG_URL}`);
+      },
+    },
 
-test('#467: a section-data logo.src still outranks both', async (t) => {
-  // The fixture copy lives UNDER cwd: Eleventy matches its `**/_layouts/**`
-  // ignores against cwd-relative paths, and a `../../`-relative input dir
-  // slips past them (the farm gotcha engine.js documents).
-  const root = path.join(PKG, '.omega', `brandmark-override-site-${process.pid}`);
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    {
+      name: '#467: a section-data logo.src still outranks both',
+      run: async (ctx) => {
+        // The fixture copy lives UNDER cwd: Eleventy matches its `**/_layouts/**`
+        // ignores against cwd-relative paths, and a `../../`-relative input dir
+        // slips past them (the farm gotcha engine.js documents).
+        const root = path.join(PKG, '.omega', `brandmark-override-site-${process.pid}`);
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  jetpack.copy(MINI, root, { overwrite: true });
-  for (const section of ['nav', 'footer']) {
-    jetpack.write(
-      path.join(root, '_includes', 'frontend', 'sections', `${section}.json`),
-      JSON.stringify({ logo: { src: '/custom/mark.svg', href: '/', text: 'MiniCo' } }),
-    );
-  }
+        jetpack.copy(MINI, root, { overwrite: true });
+        for (const section of ['nav', 'footer']) {
+          jetpack.write(
+            path.join(root, '_includes', 'frontend', 'sections', `${section}.json`),
+            JSON.stringify({ logo: { src: '/custom/mark.svg', href: '/', text: 'MiniCo' } }),
+          );
+        }
 
-  const pages = await buildSite(root, rasterData, { assetManifest: manifestWith(SVG_URL) }, 'brandmark-svg-override');
-  const html = pages.get('/');
+        const pages = await buildSite(root, rasterData, { assetManifest: manifestWith(SVG_URL) }, 'brandmark-svg-override');
+        const html = pages.get('/');
 
-  assert.equal(navLogo(html), '/custom/mark.svg', 'the authored nav logo wins');
-  assert.equal(footerLogo(html), '/custom/mark.svg', 'the authored footer logo wins');
-});
+        ctx.expect(navLogo(html), 'the authored nav logo wins').toBe('/custom/mark.svg');
+        ctx.expect(footerLogo(html), 'the authored footer logo wins').toBe('/custom/mark.svg');
+      },
+    },
 
-// ─── The rest of the visible lockups ─────────────────────────────────────────
+    // ─── The rest of the visible lockups ─────────────────────────────────────────
 
-test('#467: the other visible lockups take the bridged svg too', async () => {
-  const pages = await sitePages(SVG_URL, 'brandmark-svg-lockups');
+    {
+      name: '#467: the other visible lockups take the bridged svg too',
+      run: async (ctx) => {
+        const pages = await sitePages(SVG_URL, 'brandmark-svg-lockups');
 
-  assert.equal(authLogo(pages.get('/signin')), SVG_URL, 'the auth card is the vector');
-  assert.equal(checkoutLogo(pages.get('/payment/checkout')), SVG_URL, 'the checkout head is the vector');
-  assert.equal(downloadLogo(pages.get('/download')), SVG_URL, 'the download cards are the vector');
-  assert.equal(redirectLogo(pages.get('/careers')), SVG_URL, 'the redirect chrome mark is the vector');
-});
+        ctx.expect(authLogo(pages.get('/signin')), 'the auth card is the vector').toBe(SVG_URL);
+        ctx.expect(checkoutLogo(pages.get('/payment/checkout')), 'the checkout head is the vector').toBe(SVG_URL);
+        ctx.expect(downloadLogo(pages.get('/download')), 'the download cards are the vector').toBe(SVG_URL);
+        ctx.expect(redirectLogo(pages.get('/careers')), 'the redirect chrome mark is the vector').toBe(SVG_URL);
+      },
+    },
 
-test('#467: and every one of them falls back to the configured raster', async () => {
-  const pages = await sitePages(null, 'brandmark-svg-lockups-absent');
+    {
+      name: '#467: and every one of them falls back to the configured raster',
+      run: async (ctx) => {
+        const pages = await sitePages(null, 'brandmark-svg-lockups-absent');
 
-  assert.equal(authLogo(pages.get('/signin')), PNG_URL, 'the auth card is the configured raster');
-  assert.equal(checkoutLogo(pages.get('/payment/checkout')), PNG_URL, 'the checkout head is the configured raster');
-  assert.equal(downloadLogo(pages.get('/download')), PNG_URL, 'the download cards are the configured raster');
-  assert.equal(redirectLogo(pages.get('/careers')), PNG_URL, 'the redirect chrome mark is the configured raster');
+        ctx.expect(authLogo(pages.get('/signin')), 'the auth card is the configured raster').toBe(PNG_URL);
+        ctx.expect(checkoutLogo(pages.get('/payment/checkout')), 'the checkout head is the configured raster').toBe(PNG_URL);
+        ctx.expect(downloadLogo(pages.get('/download')), 'the download cards are the configured raster').toBe(PNG_URL);
+        ctx.expect(redirectLogo(pages.get('/careers')), 'the redirect chrome mark is the configured raster').toBe(PNG_URL);
+      },
+    },
+  ],
 });

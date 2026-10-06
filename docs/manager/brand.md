@@ -182,7 +182,7 @@ Every verb tees its whole run to a file: truncated on each launch, ANSI-stripped
 |---|---|
 | brand root | one file per verb — `logs/manage.log` (the manage cycle) · `logs/dev.log` (`npm start`'s dev fan-out across every leg; consecutive duplicate lines collapse to one `  (repeated N×)` note) · `logs/build.log` · `logs/clean.log` · `logs/deploy.log` · `logs/update.log` · `logs/test.log` · `logs/pipeline.log`. A fan-out log holds the walk's OWN verdict (header, skips, summary) — each target's output is in that target's own log |
 | any target | `targets/<target>/logs/dev.log`, `logs/build.log`, `logs/test.log` |
-| backend, extra | `targets/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, `dist/test.log` — beside firebase-tools' `*-debug.log` |
+| backend, extra | `targets/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, beside firebase-tools' `*-debug.log` (the test runner's output is in `logs/test.log`) |
 | desktop, extra | `targets/desktop/logs/runtime.log` — the running app itself (packaged builds: the OS log dir) |
 
 ```bash

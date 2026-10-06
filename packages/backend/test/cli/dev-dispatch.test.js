@@ -20,20 +20,20 @@ module.exports = defineCases({
       name: 'dev-and-its-aliases-dispatch-to-dev',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         for (const token of ['dev', 'start', '--dev']) {
-          assert.equal(dispatched(token)?.name, 'dev', `\`omega ${token}\` resolves to dev`);
+          expect(dispatched(token)?.name, `\`omega ${token}\` resolves to dev`).toBe('dev');
         }
-        assert.equal(dispatched('serve')?.name, 'serve', '`omega serve` is the backend\'s own verb, never dev');
-        assert.equal(dispatched('emulator')?.name, 'emulator', '`emulator` stays a verb');
+        expect(dispatched('serve')?.name, '`omega serve` is the backend\'s own verb, never dev').toBe('serve');
+        expect(dispatched('emulator')?.name, '`emulator` stays a verb').toBe('emulator');
       },
     },
     {
       name: 'dev-is-the-emulator-command',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(DevCommand.prototype instanceof EmulatorCommand, true, 'dev boots what `omega emulator` boots');
+      async run({ expect }) {
+        expect(DevCommand.prototype instanceof EmulatorCommand, 'dev boots what `omega emulator` boots').toBe(true);
       },
     },
   ],

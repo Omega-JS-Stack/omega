@@ -86,49 +86,45 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-cart-whose-checkout-just-started-is-never-mailed',
-      async run({ assert }) {
+      async run({ expect }) {
         const nowUNIX = Math.floor(Date.now() / 1000);
 
         // The shopper asked for a session a minute ago and is at the provider's
         // page right now — which is exactly the state that got mailed.
         const { store, sent, logs } = await runSweep(dueCart({ lastActivityAt: nowUNIX - 60 }));
 
-        assert.equal(sent.length, 0, `A shopper mid-checkout owes no nudge, got ${sent.length}: ${logs.join(' | ')}`);
+        expect(sent.length, `A shopper mid-checkout owes no nudge, got ${sent.length}: ${logs.join(' | ')}`).toBe(0);
 
         const cart = store.get(`${COLLECTION}/${UID}`);
 
-        assert.equal(cart.status, 'pending', 'The cart is still open — deferring is not completing it');
-        assert.equal(cart.reminderIndex, 0, 'And it did not spend a reminder it never sent');
-        assert.equal(
-          cart.nextReminderAt,
-          (nowUNIX - 60) + REMINDER_DELAYS[0],
-          'The reminder clock restarts from the activity, so the same window is measured from the last touch',
-        );
+        expect(cart.status, 'The cart is still open — deferring is not completing it').toBe('pending');
+        expect(cart.reminderIndex, 'And it did not spend a reminder it never sent').toBe(0);
+        expect(cart.nextReminderAt, 'The reminder clock restarts from the activity, so the same window is measured from the last touch').toBe((nowUNIX - 60) + REMINDER_DELAYS[0]);
       },
     },
 
     {
       name: 'a-cart-whose-activity-has-gone-quiet-is-still-mailed',
-      async run({ assert }) {
+      async run({ expect }) {
         const nowUNIX = Math.floor(Date.now() / 1000);
 
         // A checkout started and went nowhere: past the window, this IS the
         // abandonment the sweep exists for.
         const { sent } = await runSweep(dueCart({ lastActivityAt: nowUNIX - REMINDER_DELAYS[0] - 60 }));
 
-        assert.equal(sent.length, 1, `A cart quiet longer than the window is abandoned, got ${sent.length}`);
-        assert.equal(sent[0].data.content.event, 'abandoned-cart', 'And it is the abandoned-cart mail that goes out');
+        expect(sent.length, `A cart quiet longer than the window is abandoned, got ${sent.length}`).toBe(1);
+        expect(sent[0].data.content.event, 'And it is the abandoned-cart mail that goes out').toBe('abandoned-cart');
       },
     },
 
     {
       name: 'a-cart-that-never-reached-a-checkout-is-mailed-as-before',
-      async run({ assert }) {
+      async run({ expect }) {
         // Every cart written before this stamp existed carries no activity at
         // all — the sweep must read that as "nothing happened", not as "just now"
         const { sent } = await runSweep(dueCart());
 
-        assert.equal(sent.length, 1, `An untouched cart is the ordinary abandoned one, got ${sent.length}`);
+        expect(sent.length, `An untouched cart is the ordinary abandoned one, got ${sent.length}`).toBe(1);
       },
     },
   ],

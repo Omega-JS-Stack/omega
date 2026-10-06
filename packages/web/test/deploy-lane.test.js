@@ -12,11 +12,10 @@
  * Offline by construction: a dry run builds the plan and sends nothing, so no
  * lane step runs at all (the temp brand's repo has no remote to push to either).
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { execFileSync } = require('node:child_process');
 
 const deploy = require('../src/commands/deploy.js');
@@ -96,69 +95,84 @@ async function runDeploy(dir, options) {
   }
 }
 
-test('#872: a LINKED brand dispatches CI; the auto-switch to the direct lane is gone', async () => {
-  const { brandRoot, target } = linkedBrand();
+module.exports = defineCases({
+  type: 'group',
+  description: 'deploy-lane',
+  tests: [
+    {
+      name: '#872: a LINKED brand dispatches CI; the auto-switch to the direct lane is gone',
+      run: async (ctx) => {
+        const { brandRoot, target } = linkedBrand();
 
-  try {
-    const output = await runDeploy(target, { dryRun: true });
+        try {
+          const output = await runDeploy(target, { dryRun: true });
 
-    assert.match(output, /would send:/, 'the plan is a workflow_dispatch, not a local build');
-    assert.match(output, /\(snapshot lane, ref omega-deploy\)/, 'a linked brand that owns its repo snapshots to its own branch');
-    assert.match(output, /actions\/workflows\/web-build\.yml\/dispatches/, 'the composed workflow name (#265) is what a brand dispatches');
-    assert.ok(!output.includes('direct deploy would'), 'a linked tree no longer switches itself to the direct lane');
-    assert.ok(!output.includes('Linked local packages detected'), 'and no longer announces that it did');
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('#915: a PLAIN brand takes the SAME lane, on the same branch: there is no push lane left', async () => {
-  const { brandRoot, target } = linkedBrand({ linked: false });
-
-  try {
-    const output = await runDeploy(target, { dryRun: true });
-
-    // It used to commit the developer's branch with `git add -A` and dispatch
-    // that branch. CI only ever builds omega-deploy now, whoever started the
-    // deploy, and main receives the composed workflow files alone.
-    assert.match(output, /DRY RUN \(snapshot lane, ref omega-deploy\)/, 'the one lane, named in the header every verb prints');
-    assert.match(output, /"ref":"omega-deploy"/, 'and the dispatch body names that branch');
-    assert.match(output, /default branch/, 'the workflow half of the plan says where those files would go');
-    assert.ok(!output.includes('push lane'), 'nothing still calls it a push lane');
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('#872: --direct is how a human asks for the local lane', async () => {
-  const { brandRoot, target } = linkedBrand();
-
-  try {
-    const output = await runDeploy(target, { dryRun: true, direct: true });
-
-    assert.match(output, /direct deploy would/, 'the direct plan is printed on request');
-    assert.match(output, /gh-pages/, 'and it is the gh-pages push, built here');
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
-
-test('#869: a target whose version drifted from the brand root is refused before the precheck', async () => {
-  const { brandRoot, target } = linkedBrand({ version: '1.0.1' });
-
-  try {
-    // Every lane is refused, the dry run included: the check is a READ, and a
-    // drifted target must not push its secrets or dispatch the wrong number.
-    await assert.rejects(
-      () => runDeploy(target, { dryRun: true }),
-      (error) => {
-        assert.equal(error.refusal, true, 'a refusal prints its message alone');
-        assert.match(error.message, /targets\/web is 1\.0\.0 but the brand is 1\.0\.1/, 'names the target and both numbers');
-        assert.match(error.message, /omega bump/, 'and the fix');
-        return true;
+          ctx.expect(output, 'the plan is a workflow_dispatch, not a local build').toMatch(/would send:/);
+          ctx.expect(output, 'a linked brand that owns its repo snapshots to its own branch').toMatch(/\(snapshot lane, ref omega-deploy\)/);
+          ctx.expect(output, 'the composed workflow name (#265) is what a brand dispatches').toMatch(/actions\/workflows\/web-build\.yml\/dispatches/);
+          ctx.expect(!output.includes('direct deploy would'), 'a linked tree no longer switches itself to the direct lane').toBeTruthy();
+          ctx.expect(!output.includes('Linked local packages detected'), 'and no longer announces that it did').toBeTruthy();
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
       },
-    );
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
+    },
+
+    {
+      name: '#915: a PLAIN brand takes the SAME lane, on the same branch: there is no push lane left',
+      run: async (ctx) => {
+        const { brandRoot, target } = linkedBrand({ linked: false });
+
+        try {
+          const output = await runDeploy(target, { dryRun: true });
+
+          // It used to commit the developer's branch with `git add -A` and dispatch
+          // that branch. CI only ever builds omega-deploy now, whoever started the
+          // deploy, and main receives the composed workflow files alone.
+          ctx.expect(output, 'the one lane, named in the header every verb prints').toMatch(/DRY RUN \(snapshot lane, ref omega-deploy\)/);
+          ctx.expect(output, 'and the dispatch body names that branch').toMatch(/"ref":"omega-deploy"/);
+          ctx.expect(output, 'the workflow half of the plan says where those files would go').toMatch(/default branch/);
+          ctx.expect(!output.includes('push lane'), 'nothing still calls it a push lane').toBeTruthy();
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#872: --direct is how a human asks for the local lane',
+      run: async (ctx) => {
+        const { brandRoot, target } = linkedBrand();
+
+        try {
+          const output = await runDeploy(target, { dryRun: true, direct: true });
+
+          ctx.expect(output, 'the direct plan is printed on request').toMatch(/direct deploy would/);
+          ctx.expect(output, 'and it is the gh-pages push, built here').toMatch(/gh-pages/);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#869: a target whose version drifted from the brand root is refused before the precheck',
+      run: async (ctx) => {
+        const { brandRoot, target } = linkedBrand({ version: '1.0.1' });
+
+        try {
+          // Every lane is refused, the dry run included: the check is a READ, and a
+          // drifted target must not push its secrets or dispatch the wrong number.
+          await ctx.expect((() => runDeploy(target, { dryRun: true }))()).rejects.toThrow((error) => {
+              ctx.expect(error.refusal, 'a refusal prints its message alone').toBe(true);
+              ctx.expect(error.message, 'names the target and both numbers').toMatch(/targets\/web is 1\.0\.0 but the brand is 1\.0\.1/);
+              ctx.expect(error.message, 'and the fix').toMatch(/omega bump/);
+              return true;
+            });
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

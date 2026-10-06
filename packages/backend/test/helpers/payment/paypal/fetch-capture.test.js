@@ -64,7 +64,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'retrieves-the-capture',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = { [CAPTURE_ENDPOINT]: FIXTURE_CAPTURE };
 
@@ -72,16 +72,16 @@ module.exports = defineCases({
           return PayPal.fetchResource('capture', CAPTURE_ID, {});
         });
 
-        assert.equal(resource.id, CAPTURE_ID, 'The capture itself is the resource');
-        assert.equal(resource.status, 'REFUNDED', 'The live capture status comes through');
-        assert.equal(calls.length, 1, 'The capture should be read once — a v2 capture needs no second call');
-        assert.equal(calls[0], CAPTURE_ENDPOINT, 'The fetch should GET the v2 captures endpoint');
+        expect(resource.id, 'The capture itself is the resource').toBe(CAPTURE_ID);
+        expect(resource.status, 'The live capture status comes through').toBe('REFUNDED');
+        expect(calls.length, 'The capture should be read once — a v2 capture needs no second call').toBe(1);
+        expect(calls[0], 'The fetch should GET the v2 captures endpoint').toBe(CAPTURE_ENDPOINT);
       },
     },
 
     {
       name: 'the-capture-carries-its-identifiers-directly',
-      async run({ assert }) {
+      async run({ expect }) {
         // The whole reason the v1 sale branch does not fit: a v2 capture holds
         // our custom_id itself, so nothing has to be folded onto it.
         const responses = { [CAPTURE_ENDPOINT]: FIXTURE_CAPTURE };
@@ -90,15 +90,15 @@ module.exports = defineCases({
           return PayPal.fetchResource('capture', CAPTURE_ID, {});
         });
 
-        assert.equal(PayPal.getUid(resource), 'test-user-123', 'The uid reads straight off the capture');
-        assert.equal(PayPal.getOrderId(resource), 'ord-test-456', 'The orderId reads straight off the capture');
-        assert.equal(PayPal.toUnifiedOneTime(resource, {}).product.id, 'credits-100', 'The productId reads straight off the capture');
+        expect(PayPal.getUid(resource), 'The uid reads straight off the capture').toBe('test-user-123');
+        expect(PayPal.getOrderId(resource), 'The orderId reads straight off the capture').toBe('ord-test-456');
+        expect(PayPal.toUnifiedOneTime(resource, {}).product.id, 'The productId reads straight off the capture').toBe('credits-100');
       },
     },
 
     {
       name: 'a-failed-fetch-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // The capture the pipeline acts on is the one PayPal answered with. A fetch
         // that fails has no answer to give ([#506]).
         let threw = null;
@@ -114,9 +114,9 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed fetch must throw');
-        assert.equal(threw.notFound, false, 'An unreachable PayPal is transient, not a capture that does not exist');
-        assert.match(threw.message, /could not be reached/, 'The failure says the lookup never got an answer');
+        expect(threw, 'A failed fetch must throw').toBeTruthy();
+        expect(threw.notFound, 'An unreachable PayPal is transient, not a capture that does not exist').toBe(false);
+        expect(threw.message, 'The failure says the lookup never got an answer').toMatch(/could not be reached/);
       },
     },
   ],

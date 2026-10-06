@@ -134,12 +134,11 @@ surface attaches it at its entry point.
 | **Per target** — every framework, same three names | | |
 | `omega dev` (web) · `omega serve` / `omega emulator` (backend) · `npm start` (desktop, extension) | `<targetRoot>/logs/dev.log` | the whole dev run: boot, ports, watcher rebuilds, the crash — plus every child chunk the verb mirrored (see below) |
 | `omega build` (web, backend) · production gulp build (desktop, extension) | `<targetRoot>/logs/build.log` | the whole production build |
-| `omega test` | `<targetRoot>/logs/test.log` | suite names, pass/fail, harness boot lines |
+| `omega test` | `<targetRoot>/logs/test.log` | suite names, pass/fail, harness boot lines; on backend, the runner child's whole output too (it writes no log of its own) |
 | `omega deploy` (web, backend, extension, desktop) | `<targetRoot>/logs/deploy.log` | the whole deploy: the scaffold, the precheck and its refusals, the dispatch, then the followed run's job logs and its verdict ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)) |
 | **Backend children** — firebase's own processes, beside firebase-tools' debug logs. The verb mirrors every child chunk to its own terminal, so the `logs/<verb>.log` above is a SUPERSET of these; a child file is the child-ONLY view (and the one that `roll()`s mid-run) | | |
 | the firebase emulator child | `<targetRoot>/dist/emulator.log` | emulator traffic: function invocations, Firestore/auth calls |
 | the `firebase serve` child | `<targetRoot>/dist/dev.log` | serve output; rolls on each reload |
-| the test runner child | `<targetRoot>/dist/test.log` | the runner's own output under `omega test` |
 | `omega deploy --direct` (the firebase child) | `<targetRoot>/dist/deploy.log` | the `firebase deploy` transcript (the verb's own record is `logs/deploy.log`, one row up) |
 | `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
 | firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |

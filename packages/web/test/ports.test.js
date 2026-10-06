@@ -14,10 +14,9 @@
  * CONSUMER-LOCAL layouts (the sweet-saucy pattern), resolved as the top
  * layout layer above the packaged themes.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 // The lane NAMES the environment
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
 // that ONE input instead of a loose `options.environment`, and a fixture build
@@ -55,95 +54,113 @@ async function buildPorts() {
 }
 
 let pages;
-before(async () => {
-  pages = await buildPorts();
-});
 
-test('real classy contact: layout-frontmatter Liquid, fixed icon args, full sections', () => {
-  const html = pages.get('/contact');
-  assert.ok(html, '/contact/ rendered');
+module.exports = defineCases({
+  type: 'group',
+  description: 'ports',
+  setup: async () => {
+    pages = await buildPorts();
+  },
+  tests: [
+    {
+      name: 'real classy contact: layout-frontmatter Liquid, fixed icon args, full sections',
+      run: (ctx) => {
+        const html = pages.get('/contact');
+        ctx.expect(html, '/contact/ rendered').toBeTruthy();
 
-  // Layout frontmatter carries {{ site.brand.name }} — must render per-site
-  assert.ok(html.includes('Have questions about PortsCo? Our support team is here to help you'),
-    'layout-frontmatter {{ site.brand.name }} rendered');
+        // Layout frontmatter carries {{ site.brand.name }} — must render per-site
+        ctx.expect(html.includes('Have questions about PortsCo? Our support team is here to help you'), 'layout-frontmatter {{ site.brand.name }} rendered').toBeTruthy();
 
-  // Hero + form + methods from the layout defaults blob
-  assert.ok(html.includes('Get in') && html.includes('touch'), 'hero headline + accent');
-  assert.ok(html.includes('id="contact-form"'), 'contact form present');
-  assert.ok(html.includes('Email support') && html.includes('Live chat'), 'contact methods rendered');
+        // Hero + form + methods from the layout defaults blob
+        ctx.expect(html.includes('Get in') && html.includes('touch'), 'hero headline + accent').toBeTruthy();
+        ctx.expect(html.includes('id="contact-form"'), 'contact form present').toBeTruthy();
+        ctx.expect(html.includes('Email support') && html.includes('Live chat'), 'contact methods rendered').toBeTruthy();
 
-  // FAQ accordion — 3 items from layout defaults
-  assert.ok(html.includes('contactFaqAccordion'), 'FAQ accordion present');
-  assert.strictEqual((html.match(/accordion-item/g) || []).length, 3, '3 FAQ items');
+        // FAQ accordion — 3 items from layout defaults
+        ctx.expect(html.includes('contactFaqAccordion'), 'FAQ accordion present').toBeTruthy();
+        ctx.expect((html.match(/accordion-item/g) || []).length, '3 FAQ items').toBe(3);
 
-  // Fix-forward interpolated icon args (upstream silently emits "text- display-4")
-  assert.ok(html.includes('text-warning display-4'), 'stat icon color class interpolated');
-  assert.ok(!html.includes('text-{{'), 'no raw Liquid left in classes');
-});
+        // Fix-forward interpolated icon args (upstream silently emits "text- display-4")
+        ctx.expect(html.includes('text-warning display-4'), 'stat icon color class interpolated').toBeTruthy();
+        ctx.expect(!html.includes('text-{{'), 'no raw Liquid left in classes').toBeTruthy();
+      },
+    },
 
-test('real sweet-saucy recipe: page-scoped meta, omega_member vs real team doc, verts/unit sections', () => {
-  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
-  assert.ok(html, 'recipe page rendered');
+    {
+      name: 'real sweet-saucy recipe: page-scoped meta, omega_member vs real team doc, verts/unit sections',
+      run: (ctx) => {
+        const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
+        ctx.expect(html, 'recipe page rendered').toBeTruthy();
 
-  // Layout-frontmatter meta carries {{ page.recipe.title }} — page-scoped rendering
-  assert.ok(html.includes('<title>The Best Brown Butter Chocolate Chip Cookies Recipe - PortsCo</title>'),
-    'page-scoped layout-frontmatter meta.title rendered');
+        // Layout-frontmatter meta carries {{ page.recipe.title }} — page-scoped rendering
+        ctx.expect(html.includes('<title>The Best Brown Butter Chocolate Chip Cookies Recipe - PortsCo</title>'), 'page-scoped layout-frontmatter meta.title rendered').toBeTruthy();
 
-  assert.ok(html.includes('The Best Brown Butter Chocolate Chip Cookies Recipe</h1>'), 'hero h1');
-  assert.ok(html.includes('/recipes/cuisines/american'), 'cuisine slug breadcrumb');
-  assert.strictEqual((html.match(/recipe-ingredient-check/g) || []).length, 11, '11 ingredient checkboxes');
+        ctx.expect(html.includes('The Best Brown Butter Chocolate Chip Cookies Recipe</h1>'), 'hero h1').toBeTruthy();
+        ctx.expect(html.includes('/recipes/cuisines/american'), 'cuisine slug breadcrumb').toBeTruthy();
+        ctx.expect((html.match(/recipe-ingredient-check/g) || []).length, '11 ingredient checkboxes').toBe(11);
 
-  // omega_member against the REAL UJM default team doc
-  assert.ok(html.includes('Alex Raeburn'), 'omega_member name resolved from team collection');
-  assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'omega_member url resolved');
+        // omega_member against the REAL UJM default team doc
+        ctx.expect(html.includes('Alex Raeburn'), 'omega_member name resolved from team collection').toBeTruthy();
+        ctx.expect(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'omega_member url resolved').toBeTruthy();
 
-  // The modern verts/unit section, 3 placements by type (client/slot values
-  // live in config — the client verts module reads them at mount, never markup)
-  assert.ok(html.includes('data-omega-vert="in-article"'), 'in-article placement');
-  assert.ok(html.includes('data-omega-vert="display"'), 'display placement');
-  assert.ok(html.includes('data-omega-vert="multiplex"'), 'multiplex placement');
+        // The modern verts/unit section, 3 placements by type (client/slot values
+        // live in config — the client verts module reads them at mount, never markup)
+        ctx.expect(html.includes('data-omega-vert="in-article"'), 'in-article placement').toBeTruthy();
+        ctx.expect(html.includes('data-omega-vert="display"'), 'display placement').toBeTruthy();
+        ctx.expect(html.includes('data-omega-vert="multiplex"'), 'multiplex placement').toBeTruthy();
 
-  // Recipe image path built from recipe.id + page slug
-  assert.ok(html.includes('/assets/images/recipes/recipe-1764775196/the-best-brown-butter-chocolate-chip-cookies.jpg'),
-    'recipe image path');
-});
+        // Recipe image path built from recipe.id + page slug
+        ctx.expect(html.includes('/assets/images/recipes/recipe-1764775196/the-best-brown-butter-chocolate-chip-cookies.jpg'), 'recipe image path').toBeTruthy();
+      },
+    },
 
-test('real sweet-saucy recipe: JSON-LD Recipe schema is valid and complete', () => {
-  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
-  const match = html.match(/<script id="omega-schema-recipe" type="application\/ld\+json">([\s\S]*?)<\/script>/);
-  assert.ok(match, 'schema script present');
+    {
+      name: 'real sweet-saucy recipe: JSON-LD Recipe schema is valid and complete',
+      run: (ctx) => {
+        const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
+        const match = html.match(/<script id="omega-schema-recipe" type="application\/ld\+json">([\s\S]*?)<\/script>/);
+        ctx.expect(match, 'schema script present').toBeTruthy();
 
-  const schema = JSON.parse(match[1]);
-  assert.strictEqual(schema['@type'], 'Recipe');
-  assert.strictEqual(schema.name, 'The Best Brown Butter Chocolate Chip Cookies');
-  assert.strictEqual(schema.prepTime, 'PT240M');
-  assert.strictEqual(schema.cookTime, 'PT9M');
-  assert.strictEqual(schema.totalTime, 'PT249M');
-  assert.strictEqual(schema.author.name, 'Alex Raeburn');
-  assert.strictEqual(schema.recipeIngredient.length, 11);
-  assert.strictEqual(schema.recipeInstructions.length, 11);
-  assert.strictEqual(schema.recipeInstructions[10].position, 11);
-  assert.strictEqual(schema.aggregateRating.ratingValue, 4.9);
-  assert.strictEqual(schema.publisher['@id'], 'https://ports.example.com#Corporation');
-  assert.ok(schema.image[0].startsWith('https://ports.example.com/assets/images/recipes/'), 'absolute_url image');
-  assert.ok(schema.datePublished.startsWith('2024-06-01'), 'date_to_xmlschema on page.date');
-});
+        const schema = JSON.parse(match[1]);
+        ctx.expect(schema['@type']).toBe('Recipe');
+        ctx.expect(schema.name).toBe('The Best Brown Butter Chocolate Chip Cookies');
+        ctx.expect(schema.prepTime).toBe('PT240M');
+        ctx.expect(schema.cookTime).toBe('PT9M');
+        ctx.expect(schema.totalTime).toBe('PT249M');
+        ctx.expect(schema.author.name).toBe('Alex Raeburn');
+        ctx.expect(schema.recipeIngredient.length).toBe(11);
+        ctx.expect(schema.recipeInstructions.length).toBe(11);
+        ctx.expect(schema.recipeInstructions[10].position).toBe(11);
+        ctx.expect(schema.aggregateRating.ratingValue).toBe(4.9);
+        ctx.expect(schema.publisher['@id']).toBe('https://ports.example.com#Corporation');
+        ctx.expect(schema.image[0].startsWith('https://ports.example.com/assets/images/recipes/'), 'absolute_url image').toBeTruthy();
+        ctx.expect(schema.datePublished.startsWith('2024-06-01'), 'date_to_xmlschema on page.date').toBeTruthy();
+      },
+    },
 
-test('real somiibo index: verbatim content page with consumer include', () => {
-  const html = pages.get('/');
-  assert.ok(html, 'index rendered');
+    {
+      name: 'real somiibo index: verbatim content page with consumer include',
+      run: (ctx) => {
+        const html = pages.get('/');
+        ctx.expect(html, 'index rendered').toBeTruthy();
 
-  assert.ok(html.includes('Grow your social media on'), 'hero headline');
-  assert.ok(html.includes('<title>PortsCo - Real Layout Ports</title>'), 'frontmatter {{ site.meta.title }}');
+        ctx.expect(html.includes('Grow your social media on'), 'hero headline').toBeTruthy();
+        ctx.expect(html.includes('<title>PortsCo - Real Layout Ports</title>'), 'frontmatter {{ site.meta.title }}').toBeTruthy();
 
-  // Consumer _includes: hero-demo.html with include-param defaults
-  assert.ok(html.includes('PortsCo Dashboard'), 'hero-demo include default title (site.brand.name)');
-  assert.ok(html.includes('data-action-1="New follower"'), 'hero-demo config bridge');
+        // Consumer _includes: hero-demo.html with include-param defaults
+        ctx.expect(html.includes('PortsCo Dashboard'), 'hero-demo include default title (site.brand.name)').toBeTruthy();
+        ctx.expect(html.includes('data-action-1="New follower"'), 'hero-demo config bridge').toBeTruthy();
 
-  assert.ok(html.includes('/platforms/instagram-bot'), 'platform cards');
-  assert.ok((html.match(/data-omega-fa="/g) || []).length > 30, 'dozens of icons inlined at build');
-});
+        ctx.expect(html.includes('/platforms/instagram-bot'), 'platform cards').toBeTruthy();
+        ctx.expect((html.match(/data-omega-fa="/g) || []).length > 30, 'dozens of icons inlined at build').toBeTruthy();
+      },
+    },
 
-test('team doc renders at its permalink (Jekyll outputs team pages)', () => {
-  assert.ok(pages.get('/team/alex-raeburn'), 'team page output exists');
+    {
+      name: 'team doc renders at its permalink (Jekyll outputs team pages)',
+      run: (ctx) => {
+        ctx.expect(pages.get('/team/alex-raeburn'), 'team page output exists').toBeTruthy();
+      },
+    },
+  ],
 });

@@ -39,7 +39,7 @@ module.exports = defineCases({
       // The exit code IS the contract: the observed #331 run printed the ✗ and
       // read as a success. Spawn the real bin — nothing else pins an exit code.
       name: 'deploy-exits-nonzero-when-staging-fails',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = makeTmp();
 
         const targetRoot = path.join(tmp, 'app');
@@ -64,8 +64,8 @@ module.exports = defineCases({
           env: { ...process.env, OMEGA_SKIP_FRESHNESS: '1' },
         });
 
-        assert.notEqual(run.status, 0, `a failed staging exits nonzero (got ${run.status})`);
-        assert.ok(/brokenpkg/.test(run.stdout + run.stderr), 'the failure names the package it could not stage');
+        expect(run.status, `a failed staging exits nonzero (got ${run.status})`).not.toBe(0);
+        expect(/brokenpkg/.test(run.stdout + run.stderr), 'the failure names the package it could not stage').toBeTruthy();
 
         jetpack.remove(tmp);
       },
@@ -73,7 +73,7 @@ module.exports = defineCases({
 
     {
       name: 'stage-functions-carries-the-composed-config-across-the-upload-boundary',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = makeTmp();
 
         // Brand monorepo shape under the src/dist pillar: authored target tree
@@ -109,42 +109,42 @@ module.exports = defineCases({
         const { distDir } = stageFunctions({ projectDir: targetRoot });
 
         // src copied, derived manifest, stale content wiped, artifacts preserved
-        assert.equal(jetpack.read(path.join(distDir, 'index.js')), 'module.exports = 1;\n');
-        assert.equal(jetpack.read(path.join(distDir, 'routes', 'ping', 'get.js')), 'module.exports = 2;\n');
-        assert.equal(jetpack.read(path.join(distDir, '.dotrc')), 'dotfiles ride the copy\n', 'dotfiles in src/ are copied');
-        assert.equal(jetpack.exists(path.join(distDir, 'stale-old-file.js')), false, 'previous stage wiped');
+        expect(jetpack.read(path.join(distDir, 'index.js'))).toBe('module.exports = 1;\n');
+        expect(jetpack.read(path.join(distDir, 'routes', 'ping', 'get.js'))).toBe('module.exports = 2;\n');
+        expect(jetpack.read(path.join(distDir, '.dotrc')), 'dotfiles in src/ are copied').toBe('dotfiles ride the copy\n');
+        expect(jetpack.exists(path.join(distDir, 'stale-old-file.js')), 'previous stage wiped').toBe(false);
 
         // public/: consumer override wins, template default fills the gap
-        assert.equal(jetpack.read(path.join(distDir, 'public', '404.html')), 'CONSUMER 404\n', 'src/public override wins');
-        assert.ok(jetpack.exists(path.join(distDir, 'public', 'index.html')), 'template default fills the gap');
-        assert.equal(jetpack.exists(path.join(distDir, 'public', 'public')), false, 'src/public never double-nests');
-        assert.equal(jetpack.read(path.join(distDir, 'node_modules', 'marker.txt')), 'kept', 'node_modules preserved');
-        assert.equal(jetpack.read(path.join(distDir, 'emulator.log')), 'kept', 'logs preserved');
-        assert.equal(jetpack.read(path.join(distDir, '.env')), 'FAKE_KEY="value"\n', '.env rides the artifact');
+        expect(jetpack.read(path.join(distDir, 'public', '404.html')), 'src/public override wins').toBe('CONSUMER 404\n');
+        expect(jetpack.exists(path.join(distDir, 'public', 'index.html')), 'template default fills the gap').toBeTruthy();
+        expect(jetpack.exists(path.join(distDir, 'public', 'public')), 'src/public never double-nests').toBe(false);
+        expect(jetpack.read(path.join(distDir, 'node_modules', 'marker.txt')), 'node_modules preserved').toBe('kept');
+        expect(jetpack.read(path.join(distDir, 'emulator.log')), 'logs preserved').toBe('kept');
+        expect(jetpack.read(path.join(distDir, '.env')), '.env rides the artifact').toBe('FAKE_KEY="value"\n');
         const manifest = jetpack.read(path.join(distDir, 'package.json'), 'json');
-        assert.equal(manifest.name, 'acme-backend-functions');
-        assert.equal(manifest.main, 'index.js');
-        assert.equal(manifest.engines.node, '22');
+        expect(manifest.name).toBe('acme-backend-functions');
+        expect(manifest.main).toBe('index.js');
+        expect(manifest.engines.node).toBe('22');
         // #884: the target's license rides into the artifact, so the uploaded
         // package states the same thing the target does
-        assert.equal(manifest.license, 'UNLICENSED', "the target manifest's license carries into the staged one");
-        assert.deepEqual(manifest.dependencies, {
+        expect(manifest.license, "the target manifest's license carries into the staged one").toBe('UNLICENSED');
+        expect(manifest.dependencies).toEqual({
           'firebase-admin': '^13.0.0',
           '@acme/lib': 'file:../../../libs/lib', // target-root-relative → dist-relative
         });
-        assert.equal(manifest.scripts, undefined, 'scripts never ship in the artifact');
+        expect(manifest.scripts, 'scripts never ship in the artifact').toBe(undefined);
 
         // Simulate the upload: the staged folder ALONE, no brand parent —
         // the real loader must resolve brand values, not defaults
-        assert.ok(jetpack.read(path.join(distDir, 'config', 'omega.json5')).startsWith('// Staged by `omega build`'), 'staged config carries the banner');
+        expect(jetpack.read(path.join(distDir, 'config', 'omega.json5')).startsWith('// Staged by `omega build`'), 'staged config carries the banner').toBeTruthy();
         const uploadDir = path.join(tmp, 'upload');
         jetpack.copy(distDir, uploadDir);
         const uploaded = loadConfig(uploadDir, 'backend', {
           defaults: { brand: { id: 'my-app', name: 'My Brand' } },
         });
-        assert.equal(uploaded.config.brand.name, 'Acme Corp', 'brand layer crossed the boundary');
-        assert.equal(uploaded.config.flavor, 'api', 'brand target section survived the flatten');
-        assert.equal(uploaded.enabled, true);
+        expect(uploaded.config.brand.name, 'brand layer crossed the boundary').toBe('Acme Corp');
+        expect(uploaded.config.flavor, 'brand target section survived the flatten').toBe('api');
+        expect(uploaded.enabled).toBe(true);
 
         // Re-stage after a brand edit: the staged config NEVER feeds back in
         // as a local layer (the wipe runs before the compose) — no staleness
@@ -154,7 +154,7 @@ module.exports = defineCases({
         }`);
         stageFunctions({ projectDir: targetRoot });
         const restaged = loadConfig(distDir, 'backend');
-        assert.equal(restaged.config.brand.name, 'Acme Corp RENAMED', 'brand edit reflected on re-stage');
+        expect(restaged.config.brand.name, 'brand edit reflected on re-stage').toBe('Acme Corp RENAMED');
 
         jetpack.remove(tmp);
       },
@@ -162,7 +162,7 @@ module.exports = defineCases({
 
     {
       name: 'stage-functions-composes-the-artifact-for-ONE-environment',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = makeTmp();
         const targetRoot = path.join(tmp, 'targets', 'backend');
 
@@ -188,8 +188,8 @@ module.exports = defineCases({
         // test credential and never touches the live account
         const local = stageFunctions({ projectDir: targetRoot, environment: 'development' });
         const localStaged = jetpack.read(path.join(local.distDir, '.env'));
-        assert.equal(/^STRIPE_SECRET_KEY="sk_test_fixture"$/m.test(localStaged), true, 'the development overlay wins locally');
-        assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(localStaged), true, 'keys no overlay touches come from the base');
+        expect(/^STRIPE_SECRET_KEY="sk_test_fixture"$/m.test(localStaged), 'the development overlay wins locally').toBe(true);
+        expect(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(localStaged), 'keys no overlay touches come from the base').toBe(true);
 
         // The DEPLOY stage composes base + production. No `.env.production`
         // exists, so the base ships — and the development overlay's value never
@@ -197,10 +197,10 @@ module.exports = defineCases({
         const deploy = stageFunctions({ projectDir: targetRoot, environment: 'production' });
         const staged = jetpack.read(path.join(deploy.distDir, '.env'));
 
-        assert.equal(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), true, 'the deployed artifact carries the live key');
-        assert.equal(staged.includes('sk_test_fixture'), false, "another environment's value never rides the upload");
-        assert.equal(/_DEV=/.test(staged), false, 'the _DEV twins are gone from the mechanism entirely (#586)');
-        assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(staged), true, 'unrelated keys are untouched');
+        expect(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), 'the deployed artifact carries the live key').toBe(true);
+        expect(staged.includes('sk_test_fixture'), "another environment's value never rides the upload").toBe(false);
+        expect(/_DEV=/.test(staged), 'the _DEV twins are gone from the mechanism entirely (#586)').toBe(false);
+        expect(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(staged), 'unrelated keys are untouched').toBe(true);
 
         jetpack.remove(tmp);
       },
@@ -208,22 +208,22 @@ module.exports = defineCases({
 
     {
       name: 'stage-functions-requires-the-authored-tree',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = makeTmp();
 
-        // (The runner's assert has no .throws — capture manually.)
+        // The message a call throws, or '' when it returns, for the regex checks below.
         const messageOf = (fn) => {
           try { fn(); return ''; } catch (e) { return e.message; }
         };
 
         // No package.json at the target root → the manifest moved (clear error)
         jetpack.write(path.join(tmp, 'src', 'index.js'), '// code');
-        assert.ok(/manifest lives at the TARGET ROOT/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing manifest names the target-root home');
+        expect(/manifest lives at the TARGET ROOT/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing manifest names the target-root home').toBeTruthy();
 
         // Manifest but no src/ → instruct the src-first move
         jetpack.write(path.join(tmp, 'package.json'), JSON.stringify({ name: 'x', private: true }));
         jetpack.remove(path.join(tmp, 'src'));
-        assert.ok(/backend targets are src-first/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing src/ instructs the src-first move');
+        expect(/backend targets are src-first/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing src/ instructs the src-first move').toBeTruthy();
 
         jetpack.remove(tmp);
       },
@@ -231,7 +231,7 @@ module.exports = defineCases({
 
     {
       name: 'stage-functions-refuses-the-framework-package-itself',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = makeTmp();
 
         // The framework package's own shape: a package.json named
@@ -249,9 +249,9 @@ module.exports = defineCases({
         };
         const message = messageOf(() => stageFunctions({ projectDir: tmp }));
 
-        assert.ok(/@omega\.js\/backend framework package/.test(message), `refusal names the framework package: ${message}`);
-        assert.ok(/npm run prepare/.test(message), 'refusal names how the framework dist/ is built');
-        assert.equal(jetpack.read(path.join(tmp, 'dist', 'index.js')), '// prepared output', 'refusal lands BEFORE the wipe — the prepared dist/ survives');
+        expect(/@omega\.js\/backend framework package/.test(message), `refusal names the framework package: ${message}`).toBeTruthy();
+        expect(/npm run prepare/.test(message), 'refusal names how the framework dist/ is built').toBeTruthy();
+        expect(jetpack.read(path.join(tmp, 'dist', 'index.js')), 'refusal lands BEFORE the wipe — the prepared dist/ survives').toBe('// prepared output');
 
         jetpack.remove(tmp);
       },

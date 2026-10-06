@@ -56,7 +56,7 @@ At publish time, a `prepublishOnly` script first removes the self-test fixture's
 
 ## Log files
 
-CLI commands tee output to `dist/*.log` (`dev.log`, `emulator.log`, `test.log`, `production.log`) — co-located with firebase-tools' own debug logs. Full reference: [logging.md](logging.md).
+CLI commands tee output to `dist/*.log` (`dev.log`, `emulator.log`, `production.log`), co-located with firebase-tools' own debug logs. Full reference: [logging.md](logging.md).
 
 ## See also
 

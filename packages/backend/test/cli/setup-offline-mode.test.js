@@ -112,9 +112,9 @@ module.exports = defineCases({
       name: 'offline-is-a-declared-boolean',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Undeclared, the next positional would land as --offline's value.
-        assert.equal(BOOLEAN_FLAGS.includes('offline'), true, 'offline must be in the declared boolean list');
+        expect(BOOLEAN_FLAGS.includes('offline'), 'offline must be in the declared boolean list').toBe(true);
       },
     },
 
@@ -122,21 +122,17 @@ module.exports = defineCases({
       name: 'indexes-drift-fails-into-the-live-deploy-without-the-flag',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The bug, pinned: a plain scaffold run reaches `firebase deploy`.
         const targetPath = seedTarget();
         const test = buildIndexesTest(targetPath, {});
 
         await withSpawnTrap(async (spawned) => {
-          assert.equal(await test.run(), false, 'drift must fail so the runner calls fix()');
+          expect(await test.run(), 'drift must fail so the runner calls fix()').toBe(false);
 
           await test.fix().catch(() => {});
 
-          assert.equal(
-            spawned.some((c) => c.startsWith('firebase deploy')),
-            true,
-            'without --offline the fix deploys indexes to the live project',
-          );
+          expect(spawned.some((c) => c.startsWith('firebase deploy')), 'without --offline the fix deploys indexes to the live project').toBe(true);
         }, (command) => {
           if (command.startsWith('firebase deploy')) {
             return '';
@@ -153,7 +149,7 @@ module.exports = defineCases({
       name: 'indexes-drift-downgrades-to-a-warning-under-offline',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget();
         const test = buildIndexesTest(targetPath, { offline: true });
 
@@ -161,15 +157,11 @@ module.exports = defineCases({
           // The read-only drift report still runs — the check reports what is
           // out of sync — but the verdict is a non-blocking warning, so the
           // runner never reaches the mutating fix.
-          assert.equal(await test.run(), 'warn', '--offline downgrades drift to a reported warning');
-          assert.equal(
-            spawned.some((c) => c.startsWith('firebase deploy')),
-            false,
-            'no live deploy may spawn under --offline',
-          );
+          expect(await test.run(), '--offline downgrades drift to a reported warning').toBe('warn');
+          expect(spawned.some((c) => c.startsWith('firebase deploy')), 'no live deploy may spawn under --offline').toBe(false);
         }, liveIndexRead);
 
-        assert.match(test.getWarning().join(' '), /--offline/, 'the warning must name the flag that suppressed the deploy');
+        expect(test.getWarning().join(' '), 'the warning must name the flag that suppressed the deploy').toMatch(/--offline/);
 
         jetpack.remove(targetPath);
       },
@@ -179,7 +171,7 @@ module.exports = defineCases({
       name: 'indexes-fix-spawns-nothing-under-offline',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Belt for any direct caller: run() already warns instead of failing,
         // so the runner cannot reach this fix.
         const targetPath = seedTarget();
@@ -188,14 +180,10 @@ module.exports = defineCases({
         await withSpawnTrap(async (spawned) => {
           await test.fix();
 
-          assert.deepEqual(spawned, [], 'fix() must spawn nothing under --offline');
+          expect(spawned, 'fix() must spawn nothing under --offline').toEqual([]);
         });
 
-        assert.deepEqual(
-          JSON.parse(jetpack.read(path.join(targetPath, 'firestore.indexes.json'))),
-          LOCAL_INDEXES,
-          'the committed index file stays untouched under --offline',
-        );
+        expect(JSON.parse(jetpack.read(path.join(targetPath, 'firestore.indexes.json'))), 'the committed index file stays untouched under --offline').toEqual(LOCAL_INDEXES);
 
         jetpack.remove(targetPath);
       },
@@ -205,15 +193,15 @@ module.exports = defineCases({
       name: 'storage-lifecycle-runs-gsutil-without-the-flag',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The bug's second half: this check IS the mutation.
         const test = buildStorageTest({});
 
         await withSpawnTrap(async (spawned) => {
           await test.run();
 
-          assert.equal(spawned.length > 0, true, 'without --offline the check spawns gsutil');
-          assert.equal(spawned.every((c) => c.startsWith('gsutil ')), true, 'every spawned command is gsutil');
+          expect(spawned.length > 0, 'without --offline the check spawns gsutil').toBe(true);
+          expect(spawned.every((c) => c.startsWith('gsutil ')), 'every spawned command is gsutil').toBe(true);
         }, () => {
           throw new Error('bucket unreachable');
         });
@@ -224,15 +212,15 @@ module.exports = defineCases({
       name: 'storage-lifecycle-spawns-nothing-under-offline',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const test = buildStorageTest({ offline: true });
 
         await withSpawnTrap(async (spawned) => {
-          assert.equal(await test.run(), 'warn', '--offline downgrades the policy write to a reported warning');
-          assert.deepEqual(spawned, [], 'no gsutil process may spawn under --offline');
+          expect(await test.run(), '--offline downgrades the policy write to a reported warning').toBe('warn');
+          expect(spawned, 'no gsutil process may spawn under --offline').toEqual([]);
         });
 
-        assert.match(test.getWarning().join(' '), /--offline/, 'the warning must name the flag that suppressed the write');
+        expect(test.getWarning().join(' '), 'the warning must name the flag that suppressed the write').toMatch(/--offline/);
       },
     },
 
@@ -240,7 +228,7 @@ module.exports = defineCases({
       name: 'storage-lifecycle-passes-demo-projects-even-under-offline',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // A demo-* project has no live buckets: the demo gate wins over the
         // offline warning, so a demo scaffold does not warn about a policy
         // that can never apply.
@@ -249,8 +237,8 @@ module.exports = defineCases({
         });
 
         await withSpawnTrap(async (spawned) => {
-          assert.equal(await test.run(), true, 'demo projects pass, never warn');
-          assert.deepEqual(spawned, [], 'no process may spawn for a demo project');
+          expect(await test.run(), 'demo projects pass, never warn').toBe(true);
+          expect(spawned, 'no process may spawn for a demo project').toEqual([]);
         });
       },
     },
@@ -259,7 +247,7 @@ module.exports = defineCases({
       name: 'seed-campaigns-opt-in-loses-to-offline',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // --offline promises NO live mutations for the whole run; the seeding
         // fix() writes real Firestore docs, so the opt-in is ignored and the
         // drift verdict stays a non-blocking warning.
@@ -267,9 +255,9 @@ module.exports = defineCases({
           main: { projectId: 'real-project', argv: { offline: true, seedCampaigns: true, 'seed-campaigns': true }, firebaseProjectPath: '/nonexistent/project' },
         });
 
-        assert.equal(test._seedingRequested(), false, '--offline must override --seed-campaigns');
-        assert.equal(test._driftVerdict(), 'warn', 'drift stays a warning, so the runner never calls the seeding fix()');
-        assert.match(test.getWarning().join(' '), /--offline/, 'the warning names the flag that suppressed the write, not the opt-in the user already passed');
+        expect(test._seedingRequested(), '--offline must override --seed-campaigns').toBe(false);
+        expect(test._driftVerdict(), 'drift stays a warning, so the runner never calls the seeding fix()').toBe('warn');
+        expect(test.getWarning().join(' '), 'the warning names the flag that suppressed the write, not the opt-in the user already passed').toMatch(/--offline/);
       },
     },
   ],

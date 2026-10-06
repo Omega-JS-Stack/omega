@@ -12,8 +12,8 @@
  * DOM, so the bound elements are parsed out of the page into the minimum
  * surface the bindings module touches.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -116,43 +116,10 @@ async function bind(html, user) {
 /** The first element bound with exactly `binding`. */
 function boundWith(elements, binding) {
   const element = elements.find((candidate) => candidate.attributes['data-omega-bind'] === binding);
-  assert.ok(element, `the page carries an element bound with "${binding}"`);
+  expect(element, `the page carries an element bound with "${binding}"`).toBeTruthy();
 
   return element;
 }
-
-test('#945: the account page shows the User\'s profile name and avatar', async () => {
-  const pages = await miniPages();
-  const page = pages.get('/dashboard/account');
-  assert.ok(page, 'account page built');
-
-  // The profile card's own markup: the nav's account dropdown binds the same paths
-  const opens = page.indexOf('<form id="profile-form"');
-  assert.ok(opens > -1, 'the profile form rendered');
-  const profile = page.slice(opens, page.indexOf('</form>', opens));
-
-  const elements = await bind(profile, SIGNED_IN());
-
-  assert.strictEqual(boundWith(elements, '@text auth.user.profile.displayName').textContent, 'Ada Lovelace');
-  assert.strictEqual(boundWith(elements, '@attr src auth.user.profile.photoURL').getAttribute('src'), 'https://img.brand.test/ada.png');
-});
-
-test('#945: the app sidebar hides its signed-in block for the signed-out User', async () => {
-  const selectorData = JSON.parse(fs.readFileSync(path.join(SELECTOR_FIXTURE, 'site-data.json'), 'utf8'));
-  const pages = await buildSite(SELECTOR_FIXTURE, selectorData, {}, 'user-bindings-sidebar');
-  const app = pages.get('/app');
-  assert.ok(app, 'app surface built');
-
-  const opens = app.indexOf('<aside class="omega-shell__sidebar"');
-  const sidebar = app.slice(opens, app.indexOf('</aside>', opens));
-
-  const signedOut = await bind(sidebar, new User());
-  assert.strictEqual(boundWith(signedOut, '@show auth.user.authenticated').hidden, true, 'a User is always truthy: only `authenticated` says signed in');
-
-  const signedIn = await bind(sidebar, SIGNED_IN());
-  assert.strictEqual(boundWith(signedIn, '@show auth.user.authenticated').hidden, false, 'the signed-in block shows for a signed-in User');
-  assert.strictEqual(boundWith(signedIn, '@text auth.user.profile.displayName').textContent, 'Ada Lovelace');
-});
 
 /**
  * Run the built page's first-paint nav script over its own nav, with `stored`
@@ -160,7 +127,7 @@ test('#945: the app sidebar hides its signed-in block for the signed-out User', 
  */
 function runFirstPaint(page, stored) {
   const start = page.indexOf('<!-- Script to quickly handle nav user state -->');
-  assert.ok(start > -1, 'the page carries the first-paint nav script');
+  expect(start > -1, 'the page carries the first-paint nav script').toBeTruthy();
   const source = page.slice(page.indexOf('<script', start), page.indexOf('</script>', start));
   const script = source.slice(source.indexOf('>') + 1);
 
@@ -178,17 +145,65 @@ function runFirstPaint(page, stored) {
   };
 }
 
-test('#945: the first-paint nav script reads the stored User and flips the nav before boot', async () => {
-  const pages = await miniPages();
-  const page = pages.get('/');
-  assert.ok(page, 'home page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'user-bindings',
+  tests: [
+    {
+      name: '#945: the account page shows the User\'s profile name and avatar',
+      run: async (ctx) => {
+        const pages = await miniPages();
+        const page = pages.get('/dashboard/account');
+        ctx.expect(page, 'account page built').toBeTruthy();
 
-  // The client stores its auth state as-is, and a User serializes to its document
-  const signedIn = runFirstPaint(page, { auth: { user: SIGNED_IN(), denied: false } });
-  assert.strictEqual(signedIn.signedInOnly.hidden, false, 'the account dropdown shows for a stored signed-in User');
-  assert.strictEqual(signedIn.signedOutOnly.hidden, true, 'and the sign-up button hides');
+        // The profile card's own markup: the nav's account dropdown binds the same paths
+        const opens = page.indexOf('<form id="profile-form"');
+        ctx.expect(opens > -1, 'the profile form rendered').toBeTruthy();
+        const profile = page.slice(opens, page.indexOf('</form>', opens));
 
-  const signedOut = runFirstPaint(page, { auth: { user: new User(), denied: false } });
-  assert.strictEqual(signedOut.signedInOnly.hidden, true, 'a stored signed-out User leaves the dropdown hidden');
-  assert.strictEqual(signedOut.signedOutOnly.hidden, false, 'and the sign-up button showing');
+        const elements = await bind(profile, SIGNED_IN());
+
+        ctx.expect(boundWith(elements, '@text auth.user.profile.displayName').textContent).toBe('Ada Lovelace');
+        ctx.expect(boundWith(elements, '@attr src auth.user.profile.photoURL').getAttribute('src')).toBe('https://img.brand.test/ada.png');
+      },
+    },
+
+    {
+      name: '#945: the app sidebar hides its signed-in block for the signed-out User',
+      run: async (ctx) => {
+        const selectorData = JSON.parse(fs.readFileSync(path.join(SELECTOR_FIXTURE, 'site-data.json'), 'utf8'));
+        const pages = await buildSite(SELECTOR_FIXTURE, selectorData, {}, 'user-bindings-sidebar');
+        const app = pages.get('/app');
+        ctx.expect(app, 'app surface built').toBeTruthy();
+
+        const opens = app.indexOf('<aside class="omega-shell__sidebar"');
+        const sidebar = app.slice(opens, app.indexOf('</aside>', opens));
+
+        const signedOut = await bind(sidebar, new User());
+        ctx.expect(boundWith(signedOut, '@show auth.user.authenticated').hidden, 'a User is always truthy: only `authenticated` says signed in').toBe(true);
+
+        const signedIn = await bind(sidebar, SIGNED_IN());
+        ctx.expect(boundWith(signedIn, '@show auth.user.authenticated').hidden, 'the signed-in block shows for a signed-in User').toBe(false);
+        ctx.expect(boundWith(signedIn, '@text auth.user.profile.displayName').textContent).toBe('Ada Lovelace');
+      },
+    },
+
+    {
+      name: '#945: the first-paint nav script reads the stored User and flips the nav before boot',
+      run: async (ctx) => {
+        const pages = await miniPages();
+        const page = pages.get('/');
+        ctx.expect(page, 'home page built').toBeTruthy();
+
+        // The client stores its auth state as-is, and a User serializes to its document
+        const signedIn = runFirstPaint(page, { auth: { user: SIGNED_IN(), denied: false } });
+        ctx.expect(signedIn.signedInOnly.hidden, 'the account dropdown shows for a stored signed-in User').toBe(false);
+        ctx.expect(signedIn.signedOutOnly.hidden, 'and the sign-up button hides').toBe(true);
+
+        const signedOut = runFirstPaint(page, { auth: { user: new User(), denied: false } });
+        ctx.expect(signedOut.signedInOnly.hidden, 'a stored signed-out User leaves the dropdown hidden').toBe(true);
+        ctx.expect(signedOut.signedOutOnly.hidden, 'and the sign-up button showing').toBe(false);
+      },
+    },
+  ],
 });

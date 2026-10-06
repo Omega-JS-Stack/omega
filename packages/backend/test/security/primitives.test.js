@@ -24,10 +24,10 @@ module.exports = defineCases({
       name: 'safe-compare-equality',
       auth: 'none',
 
-      async run({ assert }) {
-        if (!((safeCompare('secret-key', 'secret-key')) === true)) { assert.fail('equal strings compare true'); }
-        if (!((safeCompare('secret-key', 'secret-kez')) === false)) { assert.fail('different strings compare false'); }
-        if (!((safeCompare('short', 'a-much-longer-value')) === false)) { assert.fail('length mismatch compares false'); }
+      async run({ expect }) {
+        if (!((safeCompare('secret-key', 'secret-key')) === true)) { expect.fail('equal strings compare true'); }
+        if (!((safeCompare('secret-key', 'secret-kez')) === false)) { expect.fail('different strings compare false'); }
+        if (!((safeCompare('short', 'a-much-longer-value')) === false)) { expect.fail('length mismatch compares false'); }
       },
     },
 
@@ -35,12 +35,12 @@ module.exports = defineCases({
       name: 'safe-compare-rejects-empty-and-non-strings',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // An unset OMEGA_ADMIN_KEY/OMEGA_WEBHOOK_KEY must never match anything
-        if (!((safeCompare('', '')) === false)) { assert.fail('empty vs empty is false'); }
-        if (!((safeCompare('x', '')) === false)) { assert.fail('value vs empty is false'); }
-        if (!((safeCompare(undefined, 'x')) === false)) { assert.fail('undefined is false'); }
-        if (!((safeCompare(null, null)) === false)) { assert.fail('null is false'); }
+        if (!((safeCompare('', '')) === false)) { expect.fail('empty vs empty is false'); }
+        if (!((safeCompare('x', '')) === false)) { expect.fail('value vs empty is false'); }
+        if (!((safeCompare(undefined, 'x')) === false)) { expect.fail('undefined is false'); }
+        if (!((safeCompare(null, null)) === false)) { expect.fail('null is false'); }
       },
     },
 
@@ -48,9 +48,9 @@ module.exports = defineCases({
       name: 'load-provider-allows-valid-names',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const stripe = loadProvider(PROVIDERS_DIR, 'stripe');
-        if (!(typeof stripe === 'object' || typeof stripe === 'function')) { assert.fail('stripe provider loads'); }
+        if (!(typeof stripe === 'object' || typeof stripe === 'function')) { expect.fail('stripe provider loads'); }
       },
     },
 
@@ -58,7 +58,7 @@ module.exports = defineCases({
       name: 'load-provider-rejects-traversal-names',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const invalid = ['../post', '..', 'stripe/../../post', 'Stripe', 'a.b', '', null, 'a b'];
 
         for (const name of invalid) {
@@ -68,7 +68,7 @@ module.exports = defineCases({
           } catch (e) {
             threw = true;
           }
-          if (!threw) { assert.fail(`"${name}" must be rejected`); }
+          if (!threw) { expect.fail(`"${name}" must be rejected`); }
         }
       },
     },
@@ -77,9 +77,9 @@ module.exports = defineCases({
       name: 'load-template-allows-valid-ids',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const nested = loadTemplate(TEMPLATES_DIR, 'general:download-app-link');
-        if (!(typeof nested === 'function')) { assert.fail('nested template loads by colon-joined id'); }
+        if (!(typeof nested === 'function')) { expect.fail('nested template loads by colon-joined id'); }
       },
     },
 
@@ -87,7 +87,7 @@ module.exports = defineCases({
       name: 'load-template-rejects-traversal-ids',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const invalid = ['..:..:..:etc:passwd', '../general', '..', 'general:../..', 'General:Download', 'a.b', '', null, 'a b:c'];
 
         for (const id of invalid) {
@@ -97,7 +97,7 @@ module.exports = defineCases({
           } catch (e) {
             threw = true;
           }
-          if (!threw) { assert.fail(`"${id}" must be rejected`); }
+          if (!threw) { expect.fail(`"${id}" must be rejected`); }
         }
       },
     },

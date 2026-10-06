@@ -8,29 +8,40 @@
  * Reads dist/, which `omega test` builds before it runs this suite (or run
  * `omega build` first when calling node --test directly).
  *
- *   node --test test/build/config.test.js
+ * Run (from this target): npx omega test build/config
  */
-const assert = require('node:assert/strict');
-const test = require('node:test');
+const { defineCases } = require('@omega.js/web/test');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadSiteData } = require('@omega.js/web/consumer');
 
 const ROOT = path.join(__dirname, '..', '..');
 
-test('the config resolves this brand, as the web target', () => {
-  const site = loadSiteData(ROOT);
+module.exports = defineCases({
+  type: 'group',
+  description: 'config',
+  tests: [
+    {
+      name: 'the config resolves this brand, as the web target',
+      run: (ctx) => {
+        const site = loadSiteData(ROOT);
 
-  assert.equal(site.brand.id, 'playground');
-  assert.equal(site.brand.name, 'OMEGA Playground');
-  assert.equal(site.url, 'https://playground.omegajs.dev', 'the subdomain, never the real brand\'s omegajs.dev');
-  assert.deepEqual(site.target, { name: 'web', type: 'web' }, 'the folder names the target');
-  assert.equal(site.theme.id, 'classy');
-});
+        ctx.expect(site.brand.id).toBe('playground');
+        ctx.expect(site.brand.name).toBe('OMEGA Playground');
+        ctx.expect(site.url, 'the subdomain, never the real brand\'s omegajs.dev').toBe('https://playground.omegajs.dev');
+        ctx.expect(site.target, 'the folder names the target').toEqual({ name: 'web', type: 'web' });
+        ctx.expect(site.theme.id).toBe('classy');
+      },
+    },
 
-test('the home page renders through the classy theme under the brand name', () => {
-  const html = fs.readFileSync(path.join(ROOT, 'dist', 'index.html'), 'utf8');
+    {
+      name: 'the home page renders through the classy theme under the brand name',
+      run: (ctx) => {
+        const html = fs.readFileSync(path.join(ROOT, 'dist', 'index.html'), 'utf8');
 
-  assert.match(html, /data-theme-id=["']?classy/, 'the theme root layout rendered it');
-  assert.match(html, /<title>OMEGA Playground: see what OMEGA can do<\/title>/, 'with its meta title');
+        ctx.expect(html, 'the theme root layout rendered it').toMatch(/data-theme-id=["']?classy/);
+        ctx.expect(html, 'with its meta title').toMatch(/<title>OMEGA Playground: see what OMEGA can do<\/title>/);
+      },
+    },
+  ],
 });

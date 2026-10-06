@@ -12,7 +12,7 @@
  *   lookup error). The emulator suites (test/routes/marketing/*) remain the
  *   integration surface for the real Firestore paths.
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const Marketing = require('../../../dist/omega/libraries/email/marketing/index.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -24,18 +24,18 @@ delete process.env.TEST_EXTENDED_MODE;
 
 // ─── isMarketingRevoked(): ONLY the literal 'revoked' blocks ───
 const GATE_CASES = [
-  { name: 'status revoked', doc: { consent: { marketing: { status: 'revoked' } } }, expect: true },
-  { name: 'status granted', doc: { consent: { marketing: { status: 'granted' } } }, expect: false },
-  { name: 'status null', doc: { consent: { marketing: { status: null } } }, expect: false },
-  { name: 'status missing', doc: { consent: { marketing: {} } }, expect: false },
-  { name: 'marketing missing', doc: { consent: {} }, expect: false },
-  { name: 'consent missing (legacy user)', doc: { auth: { email: 'legacy@gmail.com' } }, expect: false },
-  { name: 'empty doc', doc: {}, expect: false },
-  { name: 'null doc (no user)', doc: null, expect: false },
-  { name: 'undefined doc', doc: undefined, expect: false },
-  { name: 'status REVOKED (case-sensitive literal)', doc: { consent: { marketing: { status: 'REVOKED' } } }, expect: false },
-  { name: 'status pending (future enum value)', doc: { consent: { marketing: { status: 'pending' } } }, expect: false },
-  { name: 'status true (non-string)', doc: { consent: { marketing: { status: true } } }, expect: false },
+  { name: 'status revoked', doc: { consent: { marketing: { status: 'revoked' } } }, expected: true },
+  { name: 'status granted', doc: { consent: { marketing: { status: 'granted' } } }, expected: false },
+  { name: 'status null', doc: { consent: { marketing: { status: null } } }, expected: false },
+  { name: 'status missing', doc: { consent: { marketing: {} } }, expected: false },
+  { name: 'marketing missing', doc: { consent: {} }, expected: false },
+  { name: 'consent missing (legacy user)', doc: { auth: { email: 'legacy@gmail.com' } }, expected: false },
+  { name: 'empty doc', doc: {}, expected: false },
+  { name: 'null doc (no user)', doc: null, expected: false },
+  { name: 'undefined doc', doc: undefined, expected: false },
+  { name: 'status REVOKED (case-sensitive literal)', doc: { consent: { marketing: { status: 'REVOKED' } } }, expected: false },
+  { name: 'status pending (future enum value)', doc: { consent: { marketing: { status: 'pending' } } }, expected: false },
+  { name: 'status true (non-string)', doc: { consent: { marketing: { status: true } } }, expected: false },
 ];
 
 /**
@@ -121,13 +121,13 @@ module.exports = defineCases({
   type: 'group',
   tests: [
     // ─── 1. isMarketingRevoked() semantics ───
-    ...GATE_CASES.map(({ name, doc, expect }) => ({
+    ...GATE_CASES.map(({ name, doc, expected }) => ({
       name: `isMarketingRevoked: ${name}`,
 
       run() {
         const actual = isMarketingRevoked(doc);
 
-        assert.strictEqual(actual, expect, `Expected ${expect}, got ${actual}`);
+        expect(actual, `Expected ${expected}, got ${actual}`).toBe(expected);
       },
     })),
 
@@ -139,9 +139,9 @@ module.exports = defineCases({
         const { ctx, calls } = buildAssistant(null);
         const result = await new Marketing(ctx).sync(REVOKED_DOC);
 
-        assert.strictEqual(result.blocked, 'consent', `Expected blocked='consent', got ${JSON.stringify(result)}`);
-        assert.strictEqual(result.email, 'revoked.user@gmail.com', `blocked result must include the email, got ${JSON.stringify(result)}`);
-        assert.strictEqual(calls.warns.length, 1, `revoked skip must log a warn, got ${calls.warns.length}`);
+        expect(result.blocked, `Expected blocked='consent', got ${JSON.stringify(result)}`).toBe('consent');
+        expect(result.email, `blocked result must include the email, got ${JSON.stringify(result)}`).toBe('revoked.user@gmail.com');
+        expect(calls.warns.length, `revoked skip must log a warn, got ${calls.warns.length}`).toBe(1);
       },
     },
 
@@ -153,7 +153,7 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(null);
         const result = await new Marketing(ctx).sync(LEGACY_DOC);
 
-        assert.strictEqual(result.blocked, undefined, `Expected no block, got ${JSON.stringify(result)}`);
+        expect(result.blocked, `Expected no block, got ${JSON.stringify(result)}`).toBe(undefined);
       },
     },
 
@@ -165,7 +165,7 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(null);
         const result = await new Marketing(ctx).sync(GRANTED_DOC);
 
-        assert.strictEqual(result.blocked, undefined, `Expected no block, got ${JSON.stringify(result)}`);
+        expect(result.blocked, `Expected no block, got ${JSON.stringify(result)}`).toBe(undefined);
       },
     },
 
@@ -178,8 +178,8 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(admin);
         const result = await new Marketing(ctx).sync('revoked-uid');
 
-        assert.strictEqual(result.blocked, 'consent', `Expected blocked='consent', got ${JSON.stringify(result)}`);
-        assert.strictEqual(captured.docPaths[0], 'users/revoked-uid', `Expected a users/{uid} fetch, got ${JSON.stringify(captured.docPaths)}`);
+        expect(result.blocked, `Expected blocked='consent', got ${JSON.stringify(result)}`).toBe('consent');
+        expect(captured.docPaths[0], `Expected a users/{uid} fetch, got ${JSON.stringify(captured.docPaths)}`).toBe('users/revoked-uid');
       },
     },
 
@@ -192,20 +192,17 @@ module.exports = defineCases({
         const { ctx, calls } = buildAssistant(admin);
         const result = await new Marketing(ctx).add({ email: 'revoked.user@gmail.com' });
 
-        assert.strictEqual(result.blocked, 'consent', `Expected blocked='consent', got ${JSON.stringify(result)}`);
-        assert.strictEqual(result.email, 'revoked.user@gmail.com', `blocked result must include the email, got ${JSON.stringify(result)}`);
-        assert.strictEqual(calls.warns.length, 1, `revoked skip must log a warn, got ${calls.warns.length}`);
+        expect(result.blocked, `Expected blocked='consent', got ${JSON.stringify(result)}`).toBe('consent');
+        expect(result.email, `blocked result must include the email, got ${JSON.stringify(result)}`).toBe('revoked.user@gmail.com');
+        expect(calls.warns.length, `revoked skip must log a warn, got ${calls.warns.length}`).toBe(1);
 
         const query = captured.queries[0];
 
-        assert.ok(
-          query
+        expect(query
             && query.collection === 'users'
             && query.field === 'auth.email'
             && query.op === '=='
-            && query.value === 'revoked.user@gmail.com',
-          `add() must look up users by auth.email (the webhook-provider query), got ${JSON.stringify(query)}`,
-        );
+            && query.value === 'revoked.user@gmail.com', `add() must look up users by auth.email (the webhook-provider query), got ${JSON.stringify(query)}`).toBeTruthy();
       },
     },
 
@@ -218,7 +215,7 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(admin);
         await new Marketing(ctx).add({ email: '  Revoked.User@GMAIL.com  ' });
 
-        assert.strictEqual(captured.queries[0]?.value, 'revoked.user@gmail.com', `Got ${JSON.stringify(captured.queries[0])}`);
+        expect(captured.queries[0]?.value, `Got ${JSON.stringify(captured.queries[0])}`).toBe('revoked.user@gmail.com');
       },
     },
 
@@ -231,7 +228,7 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(admin);
         const result = await new Marketing(ctx).add({ email: 'newsletter.reader@gmail.com' });
 
-        assert.strictEqual(result.blocked, undefined, `Expected no block, got ${JSON.stringify(result)}`);
+        expect(result.blocked, `Expected no block, got ${JSON.stringify(result)}`).toBe(undefined);
       },
     },
 
@@ -244,7 +241,7 @@ module.exports = defineCases({
         const { ctx } = buildAssistant(admin);
         const result = await new Marketing(ctx).add({ email: 'legacy.user@gmail.com' });
 
-        assert.strictEqual(result.blocked, undefined, `Expected no block, got ${JSON.stringify(result)}`);
+        expect(result.blocked, `Expected no block, got ${JSON.stringify(result)}`).toBe(undefined);
       },
     },
 
@@ -257,8 +254,8 @@ module.exports = defineCases({
         const { ctx, calls } = buildAssistant(admin);
         const result = await new Marketing(ctx).add({ email: 'someone@gmail.com' });
 
-        assert.strictEqual(result.blocked, undefined, `Expected no block, got ${JSON.stringify(result)}`);
-        assert.strictEqual(calls.errors.length, 1, `lookup error must be logged, got ${calls.errors.length}`);
+        expect(result.blocked, `Expected no block, got ${JSON.stringify(result)}`).toBe(undefined);
+        expect(calls.errors.length, `lookup error must be logged, got ${calls.errors.length}`).toBe(1);
       },
     },
   ],

@@ -23,7 +23,7 @@
  *
  * Run: npx omega test framework:email/testing-capture
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -53,22 +53,22 @@ module.exports = defineCases({
         delete process.env.TEST_EXTENDED_MODE;
 
         try {
-          assert.equal(capture.isCapturing(testingCtx), true, 'a testing send is captured');
-          assert.equal(capture.isCapturing(productionCtx), false, 'a production send is delivered');
+          expect(capture.isCapturing(testingCtx), 'a testing send is captured').toBe(true);
+          expect(capture.isCapturing(productionCtx), 'a production send is delivered').toBe(false);
 
           // The lane that deliberately sends real mail is untouched by #774.
           process.env.TEST_EXTENDED_MODE = 'true';
-          assert.equal(capture.isCapturing(testingCtx), false, 'extended mode still delivers');
+          expect(capture.isCapturing(testingCtx), 'extended mode still delivers').toBe(false);
 
           // Read per call, never cached: the test command flips this on a RUNNING
           // emulator through .temp/test-mode.json.
           delete process.env.TEST_EXTENDED_MODE;
-          assert.equal(capture.isCapturing(testingCtx), true, 'and flips back within the same process');
+          expect(capture.isCapturing(testingCtx), 'and flips back within the same process').toBe(true);
 
           // The one direction a fallback must never take: a ctx that cannot answer
           // would read as "not testing", which hands a test's email to SendGrid.
-          assert.throws(() => capture.isCapturing({}), /no isTesting/, 'a ctx that cannot answer fails loudly');
-          assert.throws(() => capture.isCapturing(null), /no isTesting/, 'and so does no ctx at all');
+          expect(() => capture.isCapturing({}), 'a ctx that cannot answer fails loudly').toThrow(/no isTesting/);
+          expect(() => capture.isCapturing(null), 'and so does no ctx at all').toThrow(/no isTesting/);
         } finally {
           if (wasExtended === undefined) {
             delete process.env.TEST_EXTENDED_MODE;
@@ -88,18 +88,10 @@ module.exports = defineCases({
         // The emulator's workers and the test runner are different processes with
         // different staged trees; the parent of each is the same project root,
         // which is exactly how the test-mode watcher finds the file it shares.
-        assert.equal(capture.resolveProjectDir(omega), SCRATCH_DIR, 'the project root is the parent of omega.cwd');
-        assert.equal(
-          capture.getCaptureFilePath(SCRATCH_DIR),
-          path.join(SCRATCH_DIR, TEMP_DIR_NAME, capture.CAPTURE_FILENAME),
-          'and the store lives in the same .temp/ as test-mode.json',
-        );
+        expect(capture.resolveProjectDir(omega), 'the project root is the parent of omega.cwd').toBe(SCRATCH_DIR);
+        expect(capture.getCaptureFilePath(SCRATCH_DIR), 'and the store lives in the same .temp/ as test-mode.json').toBe(path.join(SCRATCH_DIR, TEMP_DIR_NAME, capture.CAPTURE_FILENAME));
 
-        assert.throws(
-          () => capture.resolveProjectDir({}),
-          /omega\.cwd is unset/,
-          'a omega that never booted fails loudly rather than writing to some other directory',
-        );
+        expect(() => capture.resolveProjectDir({}), 'a omega that never booted fails loudly rather than writing to some other directory').toThrow(/omega\.cwd is unset/);
       },
     },
 
@@ -110,7 +102,7 @@ module.exports = defineCases({
         const omega = scratchOmega();
 
         capture.clearCaptured(omega);
-        assert.deepEqual(capture.readCaptured(omega), [], 'a missing store reads as no emails, never as an error');
+        expect(capture.readCaptured(omega), 'a missing store reads as no emails, never as an error').toEqual([]);
 
         capture.recordCaptured(omega, {
           to: [{ email: 'first@test.dev', name: 'First' }],
@@ -128,17 +120,17 @@ module.exports = defineCases({
 
         const records = capture.readCaptured(omega);
 
-        assert.equal(records.length, 2, 'both sends are recorded');
-        assert.deepEqual(records[0].to, ['first@test.dev'], 'the record names the recipient by address');
-        assert.equal(records[0].template, 'card');
-        assert.equal(records[0].subject, 'Welcome aboard');
-        assert.equal(records[0].summary, 'Hello First', 'and carries the rendered text');
-        assert.equal(records[0].sendAt, null, 'an immediate send is scheduled for nothing');
-        assert.deepEqual(records[1].to, ['second@test.dev', 'cc@test.dev'], 'every recipient of a send lands in one record');
-        assert.equal(records[1].sendAt, 1900000000, 'a scheduled send records the second it is due');
+        expect(records.length, 'both sends are recorded').toBe(2);
+        expect(records[0].to, 'the record names the recipient by address').toEqual(['first@test.dev']);
+        expect(records[0].template).toBe('card');
+        expect(records[0].subject).toBe('Welcome aboard');
+        expect(records[0].summary, 'and carries the rendered text').toBe('Hello First');
+        expect(records[0].sendAt, 'an immediate send is scheduled for nothing').toBe(null);
+        expect(records[1].to, 'every recipient of a send lands in one record').toEqual(['second@test.dev', 'cc@test.dev']);
+        expect(records[1].sendAt, 'a scheduled send records the second it is due').toBe(1900000000);
 
         capture.clearCaptured(omega);
-        assert.deepEqual(capture.readCaptured(omega), [], 'clear empties the store, so a test reads only its own act');
+        expect(capture.readCaptured(omega), 'clear empties the store, so a test reads only its own act').toEqual([]);
       },
     },
 
@@ -154,14 +146,10 @@ module.exports = defineCases({
           <p>&#128512; &ndash; total</p>
         `;
 
-        assert.equal(
-          capture.summarize(html),
-          'Order confirmed Sandbox Brand&Co Premium Billed monthly 😀 – total',
-          'styles and markup drop out, entities decode, whitespace collapses',
-        );
-        assert.equal(capture.summarize(''), '', 'an empty body summarizes to nothing');
-        assert.equal(capture.summarize(undefined), '', 'and so does a missing one');
-        assert.equal(capture.summarize('x'.repeat(capture.SUMMARY_LIMIT + 500)).length, capture.SUMMARY_LIMIT, 'a long body is capped');
+        expect(capture.summarize(html), 'styles and markup drop out, entities decode, whitespace collapses').toBe('Order confirmed Sandbox Brand&Co Premium Billed monthly 😀 – total');
+        expect(capture.summarize(''), 'an empty body summarizes to nothing').toBe('');
+        expect(capture.summarize(undefined), 'and so does a missing one').toBe('');
+        expect(capture.summarize('x'.repeat(capture.SUMMARY_LIMIT + 500)).length, 'a long body is capped').toBe(capture.SUMMARY_LIMIT);
       },
     },
 
@@ -183,12 +171,9 @@ module.exports = defineCases({
         const contents = jetpack.read(capture.getCaptureFilePath(SCRATCH_DIR), 'utf8');
         const lines = contents.split('\n').filter((line) => line.trim());
 
-        assert.equal(lines.length, 1, 'one send is one line');
-        assert.ok(
-          lines[0].length <= capture.LINE_LIMIT,
-          `a record must fit the PIPE_BUF bound the appends rely on, got ${lines[0].length}`,
-        );
-        assert.equal(capture.readCaptured(omega).length, 1, 'and it still parses');
+        expect(lines.length, 'one send is one line').toBe(1);
+        expect(lines[0].length <= capture.LINE_LIMIT, `a record must fit the PIPE_BUF bound the appends rely on, got ${lines[0].length}`).toBeTruthy();
+        expect(capture.readCaptured(omega).length, 'and it still parses').toBe(1);
 
         capture.clearCaptured(omega);
         jetpack.remove(SCRATCH_DIR);
@@ -208,12 +193,8 @@ module.exports = defineCases({
         // Appending it would tear a concurrent process's line and lose both records.
         const bulk = Array.from({ length: 200 }, (unused, index) => ({ email: `_test-bulk-${index}@a-fairly-long-domain.example.com` }));
 
-        assert.throws(
-          () => capture.recordCaptured(omega, { to: bulk, template: 'card', subject: 'Bulk', html: '<p>hi</p>' }),
-          /nothing left to trim/,
-          'an unrecordable send fails loudly rather than corrupting the store',
-        );
-        assert.deepEqual(capture.readCaptured(omega), [], 'and nothing was written');
+        expect(() => capture.recordCaptured(omega, { to: bulk, template: 'card', subject: 'Bulk', html: '<p>hi</p>' }), 'an unrecordable send fails loudly rather than corrupting the store').toThrow(/nothing left to trim/);
+        expect(capture.readCaptured(omega), 'and nothing was written').toEqual([]);
 
         jetpack.remove(SCRATCH_DIR);
       },
@@ -242,16 +223,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(result.status, 'captured', 'a testing send reports what happened to it');
-        assert.ok(result.options.content[0].value.includes('<html'), 'and it went through the full render on the way');
+        expect(result.status, 'a testing send reports what happened to it').toBe('captured');
+        expect(result.options.content[0].value.includes('<html'), 'and it went through the full render on the way').toBeTruthy();
 
         const records = capture.readCaptured(omega);
 
-        assert.equal(records.length, 1, `exactly one email was recorded, got ${records.length}`);
-        assert.deepEqual(records[0].to, ['_test.capture-seam@test.dev']);
-        assert.equal(records[0].template, 'card');
-        assert.equal(records[0].subject, 'The seam records this one');
-        assert.match(records[0].summary, /This email was never handed to SendGrid\./, 'the summary carries the rendered body text');
+        expect(records.length, `exactly one email was recorded, got ${records.length}`).toBe(1);
+        expect(records[0].to).toEqual(['_test.capture-seam@test.dev']);
+        expect(records[0].template).toBe('card');
+        expect(records[0].subject).toBe('The seam records this one');
+        expect(records[0].summary, 'the summary carries the rendered body text').toMatch(/This email was never handed to SendGrid\./);
 
         capture.clearCaptured(omega);
       },

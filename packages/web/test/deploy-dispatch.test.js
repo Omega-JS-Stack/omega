@@ -12,11 +12,10 @@
  * token read are all swapped for stubs, so nothing here touches git, `gh` or
  * the network.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const DEPLOY = require.resolve('../src/commands/deploy.js');
 
@@ -121,72 +120,81 @@ async function runDeploy(follower, options = {}) {
   return { sent, followed, error, lines, targetDir, brandRoot };
 }
 
-test('deploy: the dispatched run is followed with the repo and workflow the dispatch used (#873, #847)', async () => {
-  const { sent, followed, error, targetDir, brandRoot } = await runDeploy(async () => ({ run: {}, conclusion: 'success' }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'deploy-dispatch',
+  tests: [
+    {
+      name: 'deploy: the dispatched run is followed with the repo and workflow the dispatch used (#873, #847)',
+      run: async (ctx) => {
+        const { sent, followed, error, targetDir, brandRoot } = await runDeploy(async () => ({ run: {}, conclusion: 'success' }));
 
-  try {
-    assert.strictEqual(error, null, error && error.message);
+        try {
+          ctx.expect(error, error && error.message).toBe(null);
 
-    // The dispatch address is devkit's ONE helper's (#847): the repo the brand's
-    // config names (never the website repo this target publishes to, #883), and
-    // the per-target workflow the scaffold composed at the brand root (#265).
-    assert.strictEqual(sent.length, 1);
-    assert.deepStrictEqual(
-      { owner: sent[0].owner, repo: sent[0].repo, workflow: sent[0].workflow },
-      { owner: 'Acme-Org', repo: 'acme-omega', workflow: 'web-build.yml' },
-    );
+          // The dispatch address is devkit's ONE helper's (#847): the repo the brand's
+          // config names (never the website repo this target publishes to, #883), and
+          // the per-target workflow the scaffold composed at the brand root (#265).
+          ctx.expect(sent.length).toBe(1);
+          ctx.expect({ owner: sent[0].owner, repo: sent[0].repo, workflow: sent[0].workflow }).toEqual({ owner: 'Acme-Org', repo: 'acme-omega', workflow: 'web-build.yml' });
 
-    assert.strictEqual(followed.length, 1);
-    assert.strictEqual(followed[0].owner, 'Acme-Org');
-    assert.strictEqual(followed[0].repo, 'acme-omega');
-    // The COMPOSED name (#265), the one the dispatch itself named.
-    assert.strictEqual(followed[0].workflow, 'web-build.yml');
-    assert.strictEqual(followed[0].token, 'tok');
-    assert.ok(followed[0].since instanceof Date, 'the instant read before the dispatch');
-    // And the whole verb went to the target's own deploy log (#873).
-    assert.ok(fs.existsSync(path.join(targetDir, 'logs', 'deploy.log')), 'the verb tees logs/deploy.log');
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+          ctx.expect(followed.length).toBe(1);
+          ctx.expect(followed[0].owner).toBe('Acme-Org');
+          ctx.expect(followed[0].repo).toBe('acme-omega');
+          // The COMPOSED name (#265), the one the dispatch itself named.
+          ctx.expect(followed[0].workflow).toBe('web-build.yml');
+          ctx.expect(followed[0].token).toBe('tok');
+          ctx.expect(followed[0].since instanceof Date, 'the instant read before the dispatch').toBeTruthy();
+          // And the whole verb went to the target's own deploy log (#873).
+          ctx.expect(fs.existsSync(path.join(targetDir, 'logs', 'deploy.log')), 'the verb tees logs/deploy.log').toBeTruthy();
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('deploy: a follower that throws is the verb throwing, so a red run exits 1 (#873)', async () => {
-  const { error, brandRoot } = await runDeploy(async () => {
-    throw new Error('web-build.yml concluded failure: https://github.com/Acme-Org/acme-omega/actions/runs/7');
-  });
+    {
+      name: 'deploy: a follower that throws is the verb throwing, so a red run exits 1 (#873)',
+      run: async (ctx) => {
+        const { error, brandRoot } = await runDeploy(async () => {
+          throw new Error('web-build.yml concluded failure: https://github.com/Acme-Org/acme-omega/actions/runs/7');
+        });
 
-  try {
-    assert.match(error && error.message, /concluded failure/);
-    assert.match(error.message, /actions\/runs\/7/);
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
-});
+        try {
+          ctx.expect(error && error.message).toMatch(/concluded failure/);
+          ctx.expect(error.message).toMatch(/actions\/runs\/7/);
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
 
-// #901: the brand root pushes the snapshot ONCE and hands every target of the
-// run the sha, so this verb dispatches against it and pushes nothing. The flag
-// is the root's word to the verb, never typed by a human.
-test('deploy: --snapshot=<sha> reaches the executor as the run\'s snapshot (#901)', async () => {
-  const { sent, followed, error, lines, brandRoot } = await runDeploy(
-    async () => ({ run: {}, conclusion: 'success' }),
-    { snapshot: 'abc1234567890' },
-  );
+    // #901: the brand root pushes the snapshot ONCE and hands every target of the
+    // run the sha, so this verb dispatches against it and pushes nothing. The flag
+    // is the root's word to the verb, never typed by a human.
+    {
+      name: 'deploy: --snapshot=<sha> reaches the executor as the run\'s snapshot (#901)',
+      run: async (ctx) => {
+        const { sent, followed, error, lines, brandRoot } = await runDeploy(
+          async () => ({ run: {}, conclusion: 'success' }),
+          { snapshot: 'abc1234567890' },
+        );
 
-  try {
-    assert.strictEqual(error, null, error && error.message);
-    assert.strictEqual(sent.length, 1);
-    assert.strictEqual(sent[0].snapshot, 'abc1234567890');
+        try {
+          ctx.expect(error, error && error.message).toBe(null);
+          ctx.expect(sent.length).toBe(1);
+          ctx.expect(sent[0].snapshot).toBe('abc1234567890');
 
-    // And the sha the executor answers with is what the run is BOTH labelled
-    // with and held to (#902): the dispatch line names it, and the follower
-    // refuses a run whose head is anything else.
-    assert.ok(
-      lines.join('\n').includes('Dispatched web-build.yml (snapshot lane, ref omega-deploy @ abc1234)'),
-      `the dispatch line names the snapshot sha (printed: ${lines.join('\n')})`,
-    );
-    assert.strictEqual(followed.length, 1);
-    assert.strictEqual(followed[0].headSha, 'abc1234567890');
-  } finally {
-    fs.rmSync(brandRoot, { recursive: true, force: true });
-  }
+          // And the sha the executor answers with is what the run is BOTH labelled
+          // with and held to (#902): the dispatch line names it, and the follower
+          // refuses a run whose head is anything else.
+          ctx.expect(lines.join('\n').includes('Dispatched web-build.yml (snapshot lane, ref omega-deploy @ abc1234)'), `the dispatch line names the snapshot sha (printed: ${lines.join('\n')})`).toBeTruthy();
+          ctx.expect(followed.length).toBe(1);
+          ctx.expect(followed[0].headSha).toBe('abc1234567890');
+        } finally {
+          fs.rmSync(brandRoot, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

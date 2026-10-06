@@ -6,11 +6,10 @@
  * plain node resolution from the importing file finds nothing: only the resolve
  * hook can satisfy the import, which is exactly a real consumer's situation.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { buildAssets } = require('../src/assets.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -80,49 +79,64 @@ export default function () {
 // The library's own default palette — present in its bundle, nowhere else.
 const CHART_MARKER = 'var(--ts-chart-1, #2563eb)';
 
-test('a consumer page imports a framework dependency bare, and SHARES its chunk with core', async () => {
-  const { build, outDir, cleanup } = await buildConsumer({ 'js/pages/charts/index.js': CHART_PAGE });
-  try {
-    const manifest = await build;
-    assert.ok(manifest.js.pages['charts/index'], 'the consumer page bundled');
+module.exports = defineCases({
+  type: 'group',
+  description: 'framework-deps',
+  tests: [
+    {
+      name: 'a consumer page imports a framework dependency bare, and SHARES its chunk with core',
+      run: async (ctx) => {
+        const { build, outDir, cleanup } = await buildConsumer({ 'js/pages/charts/index.js': CHART_PAGE });
+        try {
+          const manifest = await build;
+          ctx.expect(manifest.js.pages['charts/index'], 'the consumer page bundled').toBeTruthy();
 
-    // @tanstack/charts exists in exactly ONE output file — the shared chunk —
-    // and both the consumer page and core's admin page reach it.
-    const files = walkJs(path.join(outDir, 'assets', 'js'));
-    const withChart = files.filter((f) => fs.readFileSync(f, 'utf8').includes(CHART_MARKER));
-    assert.strictEqual(withChart.length, 1, `@tanstack/charts in exactly one file (found ${withChart.length})`);
-    assert.ok(withChart[0].includes(`${path.sep}chunks${path.sep}`), '@tanstack/charts lives in a shared chunk');
+          // @tanstack/charts exists in exactly ONE output file — the shared chunk —
+          // and both the consumer page and core's admin page reach it.
+          const files = walkJs(path.join(outDir, 'assets', 'js'));
+          const withChart = files.filter((f) => fs.readFileSync(f, 'utf8').includes(CHART_MARKER));
+          ctx.expect(withChart.length, `@tanstack/charts in exactly one file (found ${withChart.length})`).toBe(1);
+          ctx.expect(withChart[0].includes(`${path.sep}chunks${path.sep}`), '@tanstack/charts lives in a shared chunk').toBeTruthy();
 
-    assert.ok(readGraph(outDir, manifest.js.pages['charts/index']).includes(CHART_MARKER), 'consumer page graph reaches @tanstack/charts');
-    assert.ok(readGraph(outDir, manifest.js.pages['admin/index']).includes(CHART_MARKER), 'core admin page graph reaches the SAME @tanstack/charts');
-  } finally {
-    cleanup();
-  }
-});
+          ctx.expect(readGraph(outDir, manifest.js.pages['charts/index']).includes(CHART_MARKER), 'consumer page graph reaches @tanstack/charts').toBeTruthy();
+          ctx.expect(readGraph(outDir, manifest.js.pages['admin/index']).includes(CHART_MARKER), 'core admin page graph reaches the SAME @tanstack/charts').toBeTruthy();
+        } finally {
+          cleanup();
+        }
+      },
+    },
 
-test("the framework's copy wins over a consumer-declared duplicate", async () => {
-  const { build, outDir, cleanup } = await buildConsumer({
-    'js/pages/charts/index.js': CHART_PAGE,
-    'node_modules/@tanstack/charts/package.json': JSON.stringify({ name: '@tanstack/charts', version: '0.0.0', type: 'module', main: 'index.js' }),
-    'node_modules/@tanstack/charts/index.js': 'export const defineChart = (d) => d; export const barY = () => 1; export const CONSUMER_COPY = true;',
-  });
-  try {
-    const manifest = await build;
-    const graph = readGraph(outDir, manifest.js.pages['charts/index']);
-    assert.ok(graph.includes(CHART_MARKER), "the framework's @tanstack/charts bundled");
-    assert.ok(!graph.includes('CONSUMER_COPY'), "the consumer's own copy was NOT used");
-  } finally {
-    cleanup();
-  }
-});
+    {
+      name: "the framework's copy wins over a consumer-declared duplicate",
+      run: async (ctx) => {
+        const { build, outDir, cleanup } = await buildConsumer({
+          'js/pages/charts/index.js': CHART_PAGE,
+          'node_modules/@tanstack/charts/package.json': JSON.stringify({ name: '@tanstack/charts', version: '0.0.0', type: 'module', main: 'index.js' }),
+          'node_modules/@tanstack/charts/index.js': 'export const defineChart = (d) => d; export const barY = () => 1; export const CONSUMER_COPY = true;',
+        });
+        try {
+          const manifest = await build;
+          const graph = readGraph(outDir, manifest.js.pages['charts/index']);
+          ctx.expect(graph.includes(CHART_MARKER), "the framework's @tanstack/charts bundled").toBeTruthy();
+          ctx.expect(!graph.includes('CONSUMER_COPY'), "the consumer's own copy was NOT used").toBeTruthy();
+        } finally {
+          cleanup();
+        }
+      },
+    },
 
-test('a name the framework does not declare still fails with the normal resolution error', async () => {
-  const { build, cleanup } = await buildConsumer({
-    'js/pages/nope/index.js': "import 'totally-not-a-framework-dep';\nexport default function () {}\n",
-  });
-  try {
-    await assert.rejects(build, /Could not resolve "totally-not-a-framework-dep"/);
-  } finally {
-    cleanup();
-  }
+    {
+      name: 'a name the framework does not declare still fails with the normal resolution error',
+      run: async (ctx) => {
+        const { build, cleanup } = await buildConsumer({
+          'js/pages/nope/index.js': "import 'totally-not-a-framework-dep';\nexport default function () {}\n",
+        });
+        try {
+          await ctx.expect(build).rejects.toThrow(/Could not resolve "totally-not-a-framework-dep"/);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+  ],
 });

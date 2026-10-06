@@ -33,7 +33,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-transition-claim
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const onWrite = require('../../../dist/omega/events/firestore/payments-webhooks/on-write.js');
 const { CLAIM_WINDOW_MS } = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/index.js');
 const { buildAdmin, CONFIG, subscriptionPayload } = require('./_webhook-harness.js');
@@ -178,46 +178,33 @@ module.exports = defineCases({
         });
 
         const detected = logs.filter((line) => line.includes('Transition detected: subscription/new-subscription'));
-        assert.equal(detected.length, 2, `both runs must detect the transition — otherwise they never raced, got: ${logs.join(' | ')}`);
+        expect(detected.length, `both runs must detect the transition — otherwise they never raced, got: ${logs.join(' | ')}`).toBe(2);
 
-        assert.equal(dispatchCount(logs, 'new-subscription'), 1, `exactly one run may dispatch new-subscription, got: ${logs.join(' | ')}`);
+        expect(dispatchCount(logs, 'new-subscription'), `exactly one run may dispatch new-subscription, got: ${logs.join(' | ')}`).toBe(1);
 
         // The other two effects of the same transition, which the live sighting
         // duplicated alongside the email: one conversion (GA4 deduplicates neither a
         // custom `trial_start` nor a second event id) and one marketing sync.
-        assert.equal(seamCount(logs, 'Payment analytics'), 1, `exactly one run may fire payment analytics, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Marketing sync'), 1, `exactly one run may sync the marketing contact, got: ${logs.join(' | ')}`);
-        assert.ok(
-          logs.some((line) => line.includes('Payment analytics suppressed (claimed by')),
-          `the loser says why it tracked nothing, got: ${logs.join(' | ')}`,
-        );
-        assert.ok(
-          logs.some((line) => line.includes('Marketing sync suppressed (claimed by')),
-          `and why it synced nothing, got: ${logs.join(' | ')}`,
-        );
+        expect(seamCount(logs, 'Payment analytics'), `exactly one run may fire payment analytics, got: ${logs.join(' | ')}`).toBe(1);
+        expect(seamCount(logs, 'Marketing sync'), `exactly one run may sync the marketing contact, got: ${logs.join(' | ')}`).toBe(1);
+        expect(logs.some((line) => line.includes('Payment analytics suppressed (claimed by')), `the loser says why it tracked nothing, got: ${logs.join(' | ')}`).toBeTruthy();
+        expect(logs.some((line) => line.includes('Marketing sync suppressed (claimed by')), `and why it synced nothing, got: ${logs.join(' | ')}`).toBeTruthy();
 
         const claim = store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'];
-        assert.ok([CREATED_EVENT, INVOICE_EVENT].includes(claim.eventId), 'the claim names the event that won it');
-        assert.ok(claim.timestampUNIX > 0, 'the claim is stamped');
+        expect([CREATED_EVENT, INVOICE_EVENT].includes(claim.eventId), 'the claim names the event that won it').toBeTruthy();
+        expect(claim.timestampUNIX > 0, 'the claim is stamped').toBeTruthy();
 
         const suppressed = logs.filter((line) => line.includes('Transition suppressed (claimed by'));
-        assert.equal(suppressed.length, 1, `the loser says so, once, got: ${logs.join(' | ')}`);
-        assert.ok(
-          suppressed[0].includes(`Transition suppressed (claimed by ${claim.eventId}): subscription/new-subscription on payments-orders/${ORDER_ID}`),
-          `the suppression names the winner and the order, got: ${suppressed[0]}`,
-        );
+        expect(suppressed.length, `the loser says so, once, got: ${logs.join(' | ')}`).toBe(1);
+        expect(suppressed[0].includes(`Transition suppressed (claimed by ${claim.eventId}): subscription/new-subscription on payments-orders/${ORDER_ID}`), `the suppression names the winner and the order, got: ${suppressed[0]}`).toBeTruthy();
 
         // Everything the claim does NOT change: both events are still acknowledged
         // (a provider must stop redelivering them), both still record what they saw,
         // and the subscriber is on the plan they paid for.
-        assert.equal(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'completed', 'the first event completes');
-        assert.equal(store.get(`payments-webhooks/${INVOICE_EVENT}`).status, 'completed', 'the second event completes too — suppression is not a failure');
-        assert.equal(store.get(`users/${UID}`).subscription.product.id, 'premium', 'the subscriber is on the plan they bought');
-        assert.deepEqual(
-          store.get(`payments-orders/${ORDER_ID}`).requests,
-          { cancellation: null, refund: null },
-          'the order still gets its requests node — the claim writes the order doc first, so a bare existence test would have skipped it',
-        );
+        expect(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'the first event completes').toBe('completed');
+        expect(store.get(`payments-webhooks/${INVOICE_EVENT}`).status, 'the second event completes too — suppression is not a failure').toBe('completed');
+        expect(store.get(`users/${UID}`).subscription.product.id, 'the subscriber is on the plan they bought').toBe('premium');
+        expect(store.get(`payments-orders/${ORDER_ID}`).requests, 'the order still gets its requests node — the claim writes the order doc first, so a bare existence test would have skipped it').toEqual({ cancellation: null, refund: null });
       },
     },
 
@@ -246,18 +233,11 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(dispatchCount(logs, 'new-subscription'), 0, `nothing may dispatch against a claim, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Payment analytics'), 0, `nor track against one, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Marketing sync'), 0, `nor sync against one, got: ${logs.join(' | ')}`);
-        assert.ok(
-          logs.some((line) => line.includes(`Transition suppressed (claimed by ${CREATED_EVENT})`)),
-          `the skip names the event holding the claim, got: ${logs.join(' | ')}`,
-        );
-        assert.equal(
-          store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'].eventId,
-          CREATED_EVENT,
-          'the standing claim is left exactly as it was — a loser never overwrites the winner',
-        );
+        expect(dispatchCount(logs, 'new-subscription'), `nothing may dispatch against a claim, got: ${logs.join(' | ')}`).toBe(0);
+        expect(seamCount(logs, 'Payment analytics'), `nor track against one, got: ${logs.join(' | ')}`).toBe(0);
+        expect(seamCount(logs, 'Marketing sync'), `nor sync against one, got: ${logs.join(' | ')}`).toBe(0);
+        expect(logs.some((line) => line.includes(`Transition suppressed (claimed by ${CREATED_EVENT})`)), `the skip names the event holding the claim, got: ${logs.join(' | ')}`).toBeTruthy();
+        expect(store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'].eventId, 'the standing claim is left exactly as it was — a loser never overwrites the winner').toBe(CREATED_EVENT);
       },
     },
 
@@ -286,13 +266,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(dispatchCount(logs, 'subscription-cancelled'), 1, `the cancellation dispatches on its own name, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Payment analytics'), 1, `and tracks, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Marketing sync'), 1, `and syncs — a spent claim gates only its own name, got: ${logs.join(' | ')}`);
+        expect(dispatchCount(logs, 'subscription-cancelled'), `the cancellation dispatches on its own name, got: ${logs.join(' | ')}`).toBe(1);
+        expect(seamCount(logs, 'Payment analytics'), `and tracks, got: ${logs.join(' | ')}`).toBe(1);
+        expect(seamCount(logs, 'Marketing sync'), `and syncs — a spent claim gates only its own name, got: ${logs.join(' | ')}`).toBe(1);
 
         const claims = store.get(`payments-orders/${ORDER_ID}`).transitions;
-        assert.equal(claims['subscription-cancelled'].eventId, '_test-claim-subscription-deleted', 'the cancellation takes its own claim');
-        assert.equal(claims['new-subscription'].eventId, CREATED_EVENT, 'and the earlier claim stands beside it');
+        expect(claims['subscription-cancelled'].eventId, 'the cancellation takes its own claim').toBe('_test-claim-subscription-deleted');
+        expect(claims['new-subscription'].eventId, 'and the earlier claim stands beside it').toBe(CREATED_EVENT);
       },
     },
 
@@ -326,15 +306,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(dispatchCount(logs, 'payment-failed'), 1, `the second dunning cycle dispatches, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Payment analytics'), 1, `and tracks, got: ${logs.join(' | ')}`);
-        assert.equal(seamCount(logs, 'Marketing sync'), 1, `and syncs, got: ${logs.join(' | ')}`);
+        expect(dispatchCount(logs, 'payment-failed'), `the second dunning cycle dispatches, got: ${logs.join(' | ')}`).toBe(1);
+        expect(seamCount(logs, 'Payment analytics'), `and tracks, got: ${logs.join(' | ')}`).toBe(1);
+        expect(seamCount(logs, 'Marketing sync'), `and syncs, got: ${logs.join(' | ')}`).toBe(1);
 
         const claim = store.get(`payments-orders/${ORDER_ID}`).transitions['payment-failed'];
-        assert.equal(claim.eventId, '_test-claim-invoice-failed-2', 'the spent claim is retaken by the event that repeated the transition');
-        assert.equal(claim.status, 'done', 'and settles like any other');
-        assert.ok(claim.timestampUNIX > spentUNIX, 'restamped, so it speaks for its own window and no longer for the first cycle');
-        assert.ok(CLAIM_WINDOW_MS < 30 * 86400 * 1000, 'the fixture has to be older than the window it is testing');
+        expect(claim.eventId, 'the spent claim is retaken by the event that repeated the transition').toBe('_test-claim-invoice-failed-2');
+        expect(claim.status, 'and settles like any other').toBe('done');
+        expect(claim.timestampUNIX > spentUNIX, 'restamped, so it speaks for its own window and no longer for the first cycle').toBeTruthy();
+        expect(CLAIM_WINDOW_MS < 30 * 86400 * 1000, 'the fixture has to be older than the window it is testing').toBeTruthy();
       },
     },
 
@@ -358,12 +338,12 @@ module.exports = defineCases({
           failPath: (path) => faulty.writes && path === `users/${UID}`,
         });
 
-        assert.equal(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'failed', 'the run failed after it claimed');
-        assert.equal(store.get(`users/${UID}`).subscription.product.id, 'basic', 'and wrote no subscription — that is what the retry is for');
+        expect(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'the run failed after it claimed').toBe('failed');
+        expect(store.get(`users/${UID}`).subscription.product.id, 'and wrote no subscription — that is what the retry is for').toBe('basic');
 
         const claim = store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'];
-        assert.equal(claim.status, 'failed', 'the claim records how the run ended, so a retry can tell abandoned from finished');
-        assert.equal(claim.eventId, CREATED_EVENT, 'and still names the event that took it');
+        expect(claim.status, 'the claim records how the run ended, so a retry can tell abandoned from finished').toBe('failed');
+        expect(claim.eventId, 'and still names the event that took it').toBe(CREATED_EVENT);
 
         // The sweep flips the failed doc back to pending, and the trigger sees the
         // same event id a second time — with the fault cleared.
@@ -372,17 +352,13 @@ module.exports = defineCases({
         await run(webhookDoc(CREATED_EVENT, 'customer.subscription.created'));
         const retryLogs = logs.slice(mark);
 
-        assert.equal(dispatchCount(retryLogs, 'new-subscription'), 1, `the retry reclaims and dispatches once, got: ${retryLogs.join(' | ')}`);
-        assert.equal(seamCount(retryLogs, 'Payment analytics'), 1, `and tracks once, got: ${retryLogs.join(' | ')}`);
-        assert.equal(seamCount(retryLogs, 'Marketing sync'), 1, `and syncs once, got: ${retryLogs.join(' | ')}`);
+        expect(dispatchCount(retryLogs, 'new-subscription'), `the retry reclaims and dispatches once, got: ${retryLogs.join(' | ')}`).toBe(1);
+        expect(seamCount(retryLogs, 'Payment analytics'), `and tracks once, got: ${retryLogs.join(' | ')}`).toBe(1);
+        expect(seamCount(retryLogs, 'Marketing sync'), `and syncs once, got: ${retryLogs.join(' | ')}`).toBe(1);
 
-        assert.equal(store.get(`users/${UID}`).subscription.product.id, 'premium', 'the subscriber ends up on the plan they paid for');
-        assert.equal(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'completed', 'and the event completes');
-        assert.equal(
-          store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'].status,
-          'done',
-          'the claim that finished says so — a third run finds it spent, not retakeable',
-        );
+        expect(store.get(`users/${UID}`).subscription.product.id, 'the subscriber ends up on the plan they paid for').toBe('premium');
+        expect(store.get(`payments-webhooks/${CREATED_EVENT}`).status, 'and the event completes').toBe('completed');
+        expect(store.get(`payments-orders/${ORDER_ID}`).transitions['new-subscription'].status, 'the claim that finished says so — a third run finds it spent, not retakeable').toBe('done');
       },
     },
   ],

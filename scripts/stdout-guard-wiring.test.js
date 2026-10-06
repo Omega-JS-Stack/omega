@@ -6,9 +6,9 @@
  * `node --test` reads each child file's results as v8 frames on that child's
  * STDOUT, and console bytes on the same fd desync node 24's parser and kill a
  * random file. The runner carries the stdout guard itself, so a script is
- * protected exactly when it runs the runner. The frameworks still on their own
- * entry are listed by name, and a listed package already on the runner fails
- * here as a stale entry.
+ * protected exactly when it runs the runner. The four frameworks are own
+ * entries, listed by name: their `test` script runs the package's own CLI file
+ * (its `omega test`), never devkit's cli.js, and spells no `--test`.
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
@@ -18,14 +18,11 @@ const ROOT = path.join(__dirname, '..');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
 const CLI = path.join(PACKAGES_DIR, 'devkit', 'src', 'test', 'cli.js');
 
-// The packages whose `test` script is still their own entry; each leaves the
-// list in the change that moves it onto the runner.
+// The packages whose `test` script is their own CLI file's `omega test`.
 const OWN_ENTRY = ['web', 'backend', 'desktop', 'extension'];
 
 // The runner flag itself, not its `--test-timeout`/`--test-concurrency` kin.
 const RUNS_NODE_TEST = /(^|\s)--test(\s|$)/;
-// What an own entry's `node --test` invocation carries, since no runner guards it.
-const GUARD_PRELOAD = '--require @omega.js/devkit/test/stdout-guard';
 
 /** Every package dir name with a manifest, from a flat listing (a tree walk can hit dist symlink loops). */
 function packageNames() {
@@ -35,9 +32,21 @@ function packageNames() {
     .sort();
 }
 
+/** A package's manifest. */
+function manifest(name) {
+  return JSON.parse(jetpack.read(path.join(PACKAGES_DIR, name, 'package.json')));
+}
+
 /** A package's `test` script, or undefined. */
 function testScript(name) {
-  return JSON.parse(jetpack.read(path.join(PACKAGES_DIR, name, 'package.json'))).scripts?.test;
+  return manifest(name).scripts?.test;
+}
+
+/** Whether a package's command runs its own CLI file: a token that resolves, from its dir, to its `./cli` export. */
+function runsOwnCli(name, command) {
+  const dir = path.join(PACKAGES_DIR, name);
+  const cli = manifest(name).exports?.['./cli'];
+  return Boolean(cli) && command.split(/\s+/).some((token) => path.resolve(dir, token) === path.resolve(dir, cli));
 }
 
 /** Whether a command runs the devkit runner: a token that resolves, from `dir`, to its cli. */
@@ -64,16 +73,17 @@ module.exports = defineCases({
     },
 
     {
-      name: 'every listed own entry is a package not on the runner yet, and each of its node --test invocations preloads the guard',
+      name: 'every own entry\'s test script runs its own CLI file, never the devkit cli, and spells no --test',
       run: (ctx) => {
         const names = packageNames();
-        const stale = OWN_ENTRY.filter((name) => !names.includes(name) || runsCli(path.join(PACKAGES_DIR, name), testScript(name) || ''));
-        const unguarded = OWN_ENTRY.filter((name) => names.includes(name)).flatMap((name) => (testScript(name) || '').split('&&')
-          .filter((invocation) => RUNS_NODE_TEST.test(invocation) && !invocation.includes(GUARD_PRELOAD))
-          .map((invocation) => `packages/${name}: ${invocation.trim()}`));
+        const offenders = [];
+        for (const name of OWN_ENTRY) {
+          const command = names.includes(name) ? testScript(name) : undefined;
+          if (!command) offenders.push(`packages/${name}: no package, or no test script`);
+          else if (!runsOwnCli(name, command) || runsCli(path.join(PACKAGES_DIR, name), command) || RUNS_NODE_TEST.test(command)) offenders.push(`packages/${name}: ${command}`);
+        }
 
-        ctx.expect(stale, `stale OWN_ENTRY names (gone, or already on the runner): ${stale.join(', ')}`).toEqual([]);
-        ctx.expect(unguarded, `these node --test invocations lack \`${GUARD_PRELOAD}\`:\n  ${unguarded.join('\n  ')}`).toEqual([]);
+        ctx.expect(offenders, `these own entries do not run their own CLI file alone:\n  ${offenders.join('\n  ')}`).toEqual([]);
       },
     },
 

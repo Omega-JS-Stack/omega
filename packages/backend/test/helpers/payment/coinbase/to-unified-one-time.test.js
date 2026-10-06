@@ -50,61 +50,61 @@ module.exports = defineCases({
 
     {
       name: 'status-completed',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime(CHARGE_CONFIRMED).status, 'completed', 'COMPLETED → completed');
+      async run({ expect }) {
+        expect(toUnifiedOneTime(CHARGE_CONFIRMED).status, 'COMPLETED → completed').toBe('completed');
       },
     },
 
     {
       name: 'status-pending',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime(CHARGE_PENDING).status, 'pending', 'PENDING → pending — money detected, not settled');
+      async run({ expect }) {
+        expect(toUnifiedOneTime(CHARGE_PENDING).status, 'PENDING → pending — money detected, not settled').toBe('pending');
       },
     },
 
     {
       name: 'status-expired-is-failed',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime(CHARGE_FAILED).status, 'failed', 'EXPIRED → failed');
+      async run({ expect }) {
+        expect(toUnifiedOneTime(CHARGE_FAILED).status, 'EXPIRED → failed').toBe('failed');
       },
     },
 
     {
       name: 'status-resolved-is-completed',
-      async run({ assert }) {
+      async run({ expect }) {
         // An under/overpaid charge the merchant RESOLVED is money accepted — it
         // books the way a clean COMPLETED does
-        assert.equal(toUnifiedOneTime(chargeEndingOn('RESOLVED')).status, 'completed');
+        expect(toUnifiedOneTime(chargeEndingOn('RESOLVED')).status).toBe('completed');
       },
     },
 
     {
       name: 'status-canceled-is-failed',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime(chargeEndingOn('CANCELED')).status, 'failed');
+      async run({ expect }) {
+        expect(toUnifiedOneTime(chargeEndingOn('CANCELED')).status).toBe('failed');
       },
     },
 
     {
       name: 'status-new-is-pending',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime(chargeEndingOn('NEW')).status, 'pending', 'A charge nobody has paid yet is pending, never failed');
+      async run({ expect }) {
+        expect(toUnifiedOneTime(chargeEndingOn('NEW')).status, 'A charge nobody has paid yet is pending, never failed').toBe('pending');
       },
     },
 
     {
       name: 'an-unmapped-status-passes-through-lowercased',
-      async run({ assert }) {
+      async run({ expect }) {
         // Inventing `failed` for a word we do not know would revoke a purchase
         // that may be perfectly fine — the siblings pass their own words through
-        assert.equal(toUnifiedOneTime(chargeEndingOn('UNRESOLVED')).status, 'unresolved');
+        expect(toUnifiedOneTime(chargeEndingOn('UNRESOLVED')).status).toBe('unresolved');
       },
     },
 
     {
       name: 'a-charge-with-no-timeline-is-unknown',
-      async run({ assert }) {
-        assert.equal(toUnifiedOneTime({ id: 'ch_bare' }).status, 'unknown', 'Absent data never claims an outcome');
+      async run({ expect }) {
+        expect(toUnifiedOneTime({ id: 'ch_bare' }).status, 'Absent data never claims an outcome').toBe('unknown');
       },
     },
 
@@ -112,69 +112,69 @@ module.exports = defineCases({
 
     {
       name: 'resolves-the-product-from-charge-metadata',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime(CHARGE_CONFIRMED);
 
-        assert.equal(result.product.id, 'launch-kit');
-        assert.equal(result.product.name, 'Starter Library');
+        expect(result.product.id).toBe('launch-kit');
+        expect(result.product.name).toBe('Starter Library');
       },
     },
 
     {
       name: 'prices-from-config-not-from-the-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         // The catalog is the price of record, the way every sibling reads it —
         // a charge's local amount can carry a discount off it
         const result = toUnifiedOneTime(CHARGE_CONFIRMED);
 
-        assert.equal(result.payment.price, 49.99);
+        expect(result.payment.price).toBe(49.99);
       },
     },
 
     {
       name: 'unknown-product-degrades-without-throwing',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ id: 'ch_x', metadata: { productId: 'not-in-catalog' }, timeline: [{ status: 'COMPLETED' }] });
 
-        assert.equal(result.product.id, 'not-in-catalog');
-        assert.equal(result.payment.price, 0);
+        expect(result.product.id).toBe('not-in-catalog');
+        expect(result.payment.price).toBe(0);
       },
     },
 
     {
       name: 'carries-the-order-and-the-resource',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime(CHARGE_CONFIRMED, { eventName: 'charge:confirmed', eventId: '_test-evt-charge-confirmed' });
 
-        assert.equal(result.payment.provider, 'coinbase');
-        assert.equal(result.payment.orderId, '_test-order-coinbase-1');
-        assert.equal(result.payment.resourceId, '8f783fa6-eaa3-4460-af64-cac26b183ed1');
-        assert.equal(result.payment.updatedBy.event.name, 'charge:confirmed');
-        assert.equal(result.payment.updatedBy.event.id, '_test-evt-charge-confirmed');
-        assert.ok(result.payment.updatedBy.date.timestampUNIX > 0, 'The write stamps when it happened');
+        expect(result.payment.provider).toBe('coinbase');
+        expect(result.payment.orderId).toBe('_test-order-coinbase-1');
+        expect(result.payment.resourceId).toBe('8f783fa6-eaa3-4460-af64-cac26b183ed1');
+        expect(result.payment.updatedBy.event.name).toBe('charge:confirmed');
+        expect(result.payment.updatedBy.event.id).toBe('_test-evt-charge-confirmed');
+        expect(result.payment.updatedBy.date.timestampUNIX > 0, 'The write stamps when it happened').toBeTruthy();
       },
     },
 
     {
       name: 'getUid-and-getOrderId-read-the-charge-record',
-      async run({ assert }) {
-        assert.equal(Coinbase.getUid(CHARGE_CONFIRMED), '_test-coinbase-buyer');
-        assert.equal(Coinbase.getOrderId(CHARGE_CONFIRMED), '_test-order-coinbase-1');
+      async run({ expect }) {
+        expect(Coinbase.getUid(CHARGE_CONFIRMED)).toBe('_test-coinbase-buyer');
+        expect(Coinbase.getOrderId(CHARGE_CONFIRMED)).toBe('_test-order-coinbase-1');
 
         // A charge carrying nothing answers nothing, never undefined
-        assert.equal(Coinbase.getUid({}), null);
-        assert.equal(Coinbase.getOrderId({}), null);
+        expect(Coinbase.getUid({})).toBe(null);
+        expect(Coinbase.getOrderId({})).toBe(null);
       },
     },
 
     {
       name: 'buildMetadata-is-the-one-shape-the-readers-expect',
-      async run({ assert }) {
+      async run({ expect }) {
         const metadata = Coinbase.buildMetadata('u1', 'ord-1', 'launch-kit');
 
-        assert.deepEqual(metadata, { uid: 'u1', orderId: 'ord-1', productId: 'launch-kit' });
-        assert.equal(Coinbase.getUid({ metadata }), 'u1', 'What the intent writes is what the pipeline reads');
-        assert.equal(Coinbase.getOrderId({ metadata }), 'ord-1');
+        expect(metadata).toEqual({ uid: 'u1', orderId: 'ord-1', productId: 'launch-kit' });
+        expect(Coinbase.getUid({ metadata }), 'What the intent writes is what the pipeline reads').toBe('u1');
+        expect(Coinbase.getOrderId({ metadata })).toBe('ord-1');
       },
     },
 
@@ -182,7 +182,7 @@ module.exports = defineCases({
 
     {
       name: 'a-charge-is-never-a-subscription',
-      async run({ assert }) {
+      async run({ expect }) {
         // Fabricating one would grant recurring access off a single crypto
         // payment, so the bug stops here instead
         let threw = false;
@@ -191,10 +191,10 @@ module.exports = defineCases({
           Coinbase.toUnifiedSubscription(CHARGE_CONFIRMED, { config: MOCK_CONFIG });
         } catch (e) {
           threw = true;
-          assert.match(e.message, /no subscriptions/i, 'The refusal says why');
+          expect(e.message, 'The refusal says why').toMatch(/no subscriptions/i);
         }
 
-        assert.ok(threw, 'toUnifiedSubscription() must refuse');
+        expect(threw, 'toUnifiedSubscription() must refuse').toBeTruthy();
       },
     },
   ],

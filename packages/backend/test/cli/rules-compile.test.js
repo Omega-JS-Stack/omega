@@ -152,15 +152,15 @@ module.exports = defineCases({
       name: 'compiled-header-names-both-sources-and-forbids-editing',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const header = compileSeed().split('rules_version')[0];
 
-        assert.match(header, /GENERATED FILE — DO NOT EDIT/, 'the artifact must say it is generated');
-        assert.match(header, /\.\/firestore\.rules/, 'the header must name the BRAND source');
-        assert.match(header, /EDIT THAT FILE/, 'the header must say which file to edit instead');
-        assert.match(header, /node_modules\/@omega\.js\/backend\/templates\/firestore\.framework\.rules/, 'the header must name the framework half by its install path');
-        assert.match(header, new RegExp(`rules schema v${RULES_VERSION.replace(/\./g, '\\.')}`), 'the header must stamp the rules schema version');
-        assert.match(header, /MERGED/, 'the header must say that a matching block of yours merges in');
+        expect(header, 'the artifact must say it is generated').toMatch(/GENERATED FILE — DO NOT EDIT/);
+        expect(header, 'the header must name the BRAND source').toMatch(/\.\/firestore\.rules/);
+        expect(header, 'the header must say which file to edit instead').toMatch(/EDIT THAT FILE/);
+        expect(header, 'the header must name the framework half by its install path').toMatch(/node_modules\/@omega\.js\/backend\/templates\/firestore\.framework\.rules/);
+        expect(header, 'the header must stamp the rules schema version').toMatch(new RegExp(`rules schema v${RULES_VERSION.replace(/\./g, '\\.')}`));
+        expect(header, 'the header must say that a matching block of yours merges in').toMatch(/MERGED/);
       },
     },
 
@@ -171,15 +171,15 @@ module.exports = defineCases({
       name: 'both-halves-share-one-documents-scope',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const compiled = compileRules({ brandSource: brandSourceWith('    function brandOnlyHelper() {\n      return true;\n    }') }).compiled;
         const body = extractDocumentsBody(compiled, 'compiled');
 
-        assert.equal(compiled.match(/rules_version/g).length, 1, 'exactly one rules_version declaration');
-        assert.equal(compiled.match(/service cloud\.firestore/g).length, 1, 'exactly one service block');
-        assert.equal((compiled.match(/match \/databases\/\{database\}\/documents/g) || []).length, 1, 'exactly one documents match block');
-        assert.match(body, /function brandOnlyHelper\(\)/, 'a brand function must land in the shared scope');
-        assert.match(body, /function isUser\(identity\)/, 'the framework helpers must land in the same scope');
+        expect(compiled.match(/rules_version/g).length, 'exactly one rules_version declaration').toBe(1);
+        expect(compiled.match(/service cloud\.firestore/g).length, 'exactly one service block').toBe(1);
+        expect((compiled.match(/match \/databases\/\{database\}\/documents/g) || []).length, 'exactly one documents match block').toBe(1);
+        expect(body, 'a brand function must land in the shared scope').toMatch(/function brandOnlyHelper\(\)/);
+        expect(body, 'the framework helpers must land in the same scope').toMatch(/function isUser\(identity\)/);
       },
     },
 
@@ -190,7 +190,7 @@ module.exports = defineCases({
       name: 'a-brand-block-merges-into-the-framework-block-it-matches',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled, merged, warnings } = compileRules({
           brandSource: brandSourceWith([
             '    match /users/{uid} {',
@@ -199,16 +199,12 @@ module.exports = defineCases({
           ].join('\n')),
         });
 
-        assert.deepEqual(merged, ['/users/{uid}'], 'the merged block must be reported');
-        assert.deepEqual(warnings, [], 'a same-op merge has nothing to warn about');
-        assert.match(
-          compiled,
-          /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\) && isEmailVerified\(\)\);/,
-          'the brand condition must be parenthesized and ANDed onto the framework\'s',
-        );
-        assert.equal((compiled.match(/match \/users\/\{uid\} \{/g) || []).length, 1, 'the brand block must be MERGED, never left as a widening sibling');
-        assert.match(compiled, /allow read: if isUser\(uid\);/, 'an op the brand said nothing about is untouched');
-        assert.match(compiled, /⤷ merged with your firestore\.rules/, 'the artifact must mark what merged into what');
+        expect(merged, 'the merged block must be reported').toEqual(['/users/{uid}']);
+        expect(warnings, 'a same-op merge has nothing to warn about').toEqual([]);
+        expect(compiled, 'the brand condition must be parenthesized and ANDed onto the framework\'s').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\) && isEmailVerified\(\)\);/);
+        expect((compiled.match(/match \/users\/\{uid\} \{/g) || []).length, 'the brand block must be MERGED, never left as a widening sibling').toBe(1);
+        expect(compiled, 'an op the brand said nothing about is untouched').toMatch(/allow read: if isUser\(uid\);/);
+        expect(compiled, 'the artifact must mark what merged into what').toMatch(/⤷ merged with your firestore\.rules/);
       },
     },
 
@@ -218,7 +214,7 @@ module.exports = defineCases({
       name: 'a-brand-wildcard-name-is-canonicalized-and-renamed',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled, merged } = compileRules({
           brandSource: brandSourceWith([
             '    match /users/{userId} {',
@@ -235,10 +231,10 @@ module.exports = defineCases({
         // (never the comments) have to be free of the brand's own name.
         const code = compiled.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
-        assert.deepEqual(merged, ['/users/{uid}'], 'the block must merge despite the different wildcard name');
-        assert.equal(code.includes('userId'), false, 'no rule may still name the brand\'s own wildcard');
-        assert.match(compiled, /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(isUser\(uid\)\);/, 'the folded condition must read the framework\'s variable');
-        assert.match(compiled, /match \/journal\/\{entryId\} \{\n\s+allow read: if isUser\(uid\);/, 'a nested match must splice in, renamed');
+        expect(merged, 'the block must merge despite the different wildcard name').toEqual(['/users/{uid}']);
+        expect(code.includes('userId'), 'no rule may still name the brand\'s own wildcard').toBe(false);
+        expect(compiled, 'the folded condition must read the framework\'s variable').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(isUser\(uid\)\);/);
+        expect(compiled, 'a nested match must splice in, renamed').toMatch(/match \/journal\/\{entryId\} \{\n\s+allow read: if isUser\(uid\);/);
       },
     },
 
@@ -251,7 +247,7 @@ module.exports = defineCases({
       name: 'a-brand-only-path-passes-through-and-a-brand-only-op-appends',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled, warnings } = compileRules({
           brandSource: brandSourceWith([
             '    match /leaderboards/{id} {',
@@ -268,11 +264,11 @@ module.exports = defineCases({
         const brandSection = compiled.split('Framework rules (@omega.js/backend)')[0];
         const userBlock = compiled.split('match /users/{uid} {')[1].split('\n    }')[0];
 
-        assert.match(brandSection, /match \/leaderboards\/\{id\} \{/, 'a brand-only path stays in the brand section, untouched');
-        assert.match(userBlock, /⤷ from your firestore\.rules\n\s+allow delete: if isUser\(uid\);/, 'a brand-only op appends into the merged block');
-        assert.match(userBlock, /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\);/, 'the framework ops are untouched by an op it does not declare');
-        assert.equal(warnings.length, 1, `expected the widening warning, got ${warnings.length}`);
-        assert.match(warnings[0], /your `allow get` overlaps the framework's `allow read`/, 'the widen-not-tighten case must be reported, never silent');
+        expect(brandSection, 'a brand-only path stays in the brand section, untouched').toMatch(/match \/leaderboards\/\{id\} \{/);
+        expect(userBlock, 'a brand-only op appends into the merged block').toMatch(/⤷ from your firestore\.rules\n\s+allow delete: if isUser\(uid\);/);
+        expect(userBlock, 'the framework ops are untouched by an op it does not declare').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\);/);
+        expect(warnings.length, `expected the widening warning, got ${warnings.length}`).toBe(1);
+        expect(warnings[0], 'the widen-not-tighten case must be reported, never silent').toMatch(/your `allow get` overlaps the framework's `allow read`/);
 
         // The other direction — ONE brand op covering SEVERAL framework ops.
         // The remedy has to name every one of them: obeying `allow create`
@@ -285,9 +281,9 @@ module.exports = defineCases({
           ].join('\n')),
         });
 
-        assert.equal(aliasWarnings.length, 1, `expected the widening warning, got ${aliasWarnings.length}`);
-        assert.match(aliasWarnings[0], /your `allow write` overlaps the framework's `allow create, update`/, 'the warning must name every framework op the brand op covers');
-        assert.match(aliasWarnings[0], /Meant to tighten\? Write `allow create, update`\./, 'the remedy must name every overlapping op, or obeying it half-tightens');
+        expect(aliasWarnings.length, `expected the widening warning, got ${aliasWarnings.length}`).toBe(1);
+        expect(aliasWarnings[0], 'the warning must name every framework op the brand op covers').toMatch(/your `allow write` overlaps the framework's `allow create, update`/);
+        expect(aliasWarnings[0], 'the remedy must name every overlapping op, or obeying it half-tightens').toMatch(/Meant to tighten\? Write `allow create, update`\./);
       },
     },
 
@@ -296,7 +292,7 @@ module.exports = defineCases({
       name: 'a-multi-op-framework-statement-splits-only-for-the-tightened-op',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled } = compileRules({
           brandSource: brandSourceWith([
             '    match /payments-carts/{cartId} {',
@@ -307,8 +303,8 @@ module.exports = defineCases({
 
         const block = compiled.split('match /payments-carts/{uid} {')[1].split('\n    }')[0];
 
-        assert.match(block, /allow create: if isUser\(uid\)[\s\S]*?'pending';/, 'the untightened op keeps the framework condition alone');
-        assert.match(block, /allow update: if isUser\(uid\)[\s\S]*?'pending' && \(getIncomingData\(\)\.total < 100\);/, 'only the tightened op carries the brand condition');
+        expect(block, 'the untightened op keeps the framework condition alone').toMatch(/allow create: if isUser\(uid\)[\s\S]*?'pending';/);
+        expect(block, 'only the tightened op carries the brand condition').toMatch(/allow update: if isUser\(uid\)[\s\S]*?'pending' && \(getIncomingData\(\)\.total < 100\);/);
       },
     },
 
@@ -320,7 +316,7 @@ module.exports = defineCases({
       name: 'two-brand-blocks-on-one-path-both-tighten-in-order',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { compiled, merged } = compileRules({
           brandSource: brandSourceWith([
             '    match /users/{userId} {',
@@ -333,15 +329,11 @@ module.exports = defineCases({
           ].join('\n')),
         });
 
-        assert.deepEqual(merged, ['/users/{uid}', '/users/{uid}'], 'both blocks must merge into the same framework block');
-        assert.match(
-          compiled,
-          /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\)\) && \(isEmailVerified\(\)\);/,
-          'both brand conditions must AND on, in the order they were written',
-        );
-        assert.equal((compiled.match(/match \/users\/\{uid\} \{/g) || []).length, 1, 'the two blocks must land in the ONE framework block');
-        assert.equal((compiled.match(/⤷ merged with your firestore\.rules/g) || []).length, 2, 'every merge must be marked, not just the last one');
-        assert.match(compiled, /allow read: if isUser\(uid\);/, 'an op neither block declared is untouched');
+        expect(merged, 'both blocks must merge into the same framework block').toEqual(['/users/{uid}', '/users/{uid}']);
+        expect(compiled, 'both brand conditions must AND on, in the order they were written').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\)\) && \(isEmailVerified\(\)\);/);
+        expect((compiled.match(/match \/users\/\{uid\} \{/g) || []).length, 'the two blocks must land in the ONE framework block').toBe(1);
+        expect((compiled.match(/⤷ merged with your firestore\.rules/g) || []).length, 'every merge must be marked, not just the last one').toBe(2);
+        expect(compiled, 'an op neither block declared is untouched').toMatch(/allow read: if isUser\(uid\);/);
       },
     },
 
@@ -355,13 +347,13 @@ module.exports = defineCases({
       name: 'the-framework-users-rule-declares-create-and-update-only',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const block = compileSeed().split('match /users/{uid} {')[1].split('\n    }')[0];
 
-        assert.match(block, /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\);/, 'the write ops must be named, not spelled `write`');
-        assert.match(block, /allow read: if isUser\(uid\);/, 'the read rule is unchanged');
-        assert.equal(/allow[^:]*\bwrite\b/.test(block), false, 'no `allow write` may survive — it silently covers delete');
-        assert.equal(/allow[^:]*\bdelete\b/.test(block), false, 'and delete is deliberately left to the admin catch-all');
+        expect(block, 'the write ops must be named, not spelled `write`').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\);/);
+        expect(block, 'the read rule is unchanged').toMatch(/allow read: if isUser\(uid\);/);
+        expect(/allow[^:]*\bwrite\b/.test(block), 'no `allow write` may survive — it silently covers delete').toBe(false);
+        expect(/allow[^:]*\bdelete\b/.test(block), 'and delete is deliberately left to the admin catch-all').toBe(false);
       },
     },
 
@@ -370,14 +362,14 @@ module.exports = defineCases({
       name: 'notifications-update-requires-token-to-equal-the-doc-id',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const compiled = compileSeed();
         const block = compiled.split('match /notifications/{token} {')[1].split('    }')[0];
         const update = block.split('allow update:')[1];
 
-        assert.match(update, /getIncomingData\(\)\.token == token/, 'update must require the incoming token to equal the doc id');
-        assert.match(update, /getIncomingData\(\)\.token == getExistingData\(\)\.token/, 'update must keep the token immutable');
-        assert.match(block, /allow get: if true;/, 'get: if true stays by design (token-as-capability)');
+        expect(update, 'update must require the incoming token to equal the doc id').toMatch(/getIncomingData\(\)\.token == token/);
+        expect(update, 'update must keep the token immutable').toMatch(/getIncomingData\(\)\.token == getExistingData\(\)\.token/);
+        expect(block, 'get: if true stays by design (token-as-capability)').toMatch(/allow get: if true;/);
       },
     },
 
@@ -389,42 +381,42 @@ module.exports = defineCases({
       name: 'a-hook-era-source-drops-default-hooks-and-keeps-a-customized-one',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-hooks-', HOOK_ERA_SOURCE);
 
         const result = ensureBrandRulesSource({ projectDir: targetPath });
         const migrated = jetpack.read(path.join(targetPath, 'firestore.rules'));
 
-        assert.equal(result.migrated, true, 'the hook era must be detected');
-        assert.deepEqual(result.strippedHooks, ['protectedFields'], 'the default-bodied hook must be reported as stripped');
-        assert.deepEqual(result.keptHooks, ['canWriteUser'], 'the customized hook must be reported as kept');
+        expect(result.migrated, 'the hook era must be detected').toBe(true);
+        expect(result.strippedHooks, 'the default-bodied hook must be reported as stripped').toEqual(['protectedFields']);
+        expect(result.keptHooks, 'the customized hook must be reported as kept').toEqual(['canWriteUser']);
 
-        assert.equal(migrated.includes('function protectedFields('), false, 'the default-bodied hook must be gone');
-        assert.match(migrated, /function canWriteUser\(\) \{/, 'the customized hook must survive as a plain function');
-        assert.match(migrated, /getIncomingData\(\)\.keys\(\)\.hasAny\(\['profile'\]\)/, 'the brand\'s own condition must survive, with only its renamed calls rewritten');
-        assert.match(migrated, /Kept from the retired `canWriteUser\(\)` framework hook/, 'the kept function must say why it is still there');
-        assert.match(migrated, /isEmailVerified\(\)/, 'a call to a renamed helper must be renamed with it');
-        assert.equal(/\bemailVerified\(\)/.test(migrated.replace(/isEmailVerified/g, '')), false, 'no call to the old name may survive');
+        expect(migrated.includes('function protectedFields('), 'the default-bodied hook must be gone').toBe(false);
+        expect(migrated, 'the customized hook must survive as a plain function').toMatch(/function canWriteUser\(\) \{/);
+        expect(migrated, 'the brand\'s own condition must survive, with only its renamed calls rewritten').toMatch(/getIncomingData\(\)\.keys\(\)\.hasAny\(\['profile'\]\)/);
+        expect(migrated, 'the kept function must say why it is still there').toMatch(/Kept from the retired `canWriteUser\(\)` framework hook/);
+        expect(migrated, 'a call to a renamed helper must be renamed with it').toMatch(/isEmailVerified\(\)/);
+        expect(/\bemailVerified\(\)/.test(migrated.replace(/isEmailVerified/g, '')), 'no call to the old name may survive').toBe(false);
 
-        assert.match(migrated, /match \/leaderboards\/\{id\}/, 'the brand\'s own rules must survive the migration');
-        assert.equal(migrated.includes('─── Framework hooks ───'), false, 'the hook section header must go with the hooks');
-        assert.equal(migrated.includes('Both are REQUIRED'), false, 'the hook-era instructions must go with them');
-        assert.match(migrated, /MERGE-BY-MATCH/, 'the stale header must be replaced with the current one');
+        expect(migrated, 'the brand\'s own rules must survive the migration').toMatch(/match \/leaderboards\/\{id\}/);
+        expect(migrated.includes('─── Framework hooks ───'), 'the hook section header must go with the hooks').toBe(false);
+        expect(migrated.includes('Both are REQUIRED'), 'the hook-era instructions must go with them').toBe(false);
+        expect(migrated, 'the stale header must be replaced with the current one').toMatch(/MERGE-BY-MATCH/);
 
         // Idempotent: a second setup has nothing left to do.
         const second = ensureBrandRulesSource({ projectDir: targetPath });
-        assert.equal(second.migrated, false, 'the migration must run once');
-        assert.equal(jetpack.read(path.join(targetPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
+        expect(second.migrated, 'the migration must run once').toBe(false);
+        expect(jetpack.read(path.join(targetPath, 'firestore.rules')), 'a second setup must not touch the file').toBe(migrated);
 
         // …and the question SETTLES. The kept function is the brand's own code
         // now, so a migrated file must stop answering "unmigrated" — otherwise
         // every future setup re-reports it and re-prints the warning forever.
-        assert.equal(needsRulesMigration(migrated), false, 'a migrated file must stop reporting as unmigrated');
+        expect(needsRulesMigration(migrated), 'a migrated file must stop reporting as unmigrated').toBe(false);
 
         // …and what it produced compiles.
         const { compiled } = compileRules({ brandSource: migrated });
-        assert.match(compiled, /match \/leaderboards\/\{id\}/, 'the compiled artifact carries the brand rules');
-        assert.match(compiled, /match \/notifications\/\{token\}/, 'the compiled artifact carries the framework rules');
+        expect(compiled, 'the compiled artifact carries the brand rules').toMatch(/match \/leaderboards\/\{id\}/);
+        expect(compiled, 'the compiled artifact carries the framework rules').toMatch(/match \/notifications\/\{token\}/);
       },
     },
 
@@ -434,26 +426,26 @@ module.exports = defineCases({
       name: 'legacy-marker-file-migrates-once-and-keeps-the-custom-region',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-legacy-', LEGACY_SOURCE);
 
         const first = ensureBrandRulesSource({ projectDir: targetPath });
         const migrated = jetpack.read(path.join(targetPath, 'firestore.rules'));
 
-        assert.equal(first.migrated, true, 'the legacy marker block must be detected');
-        assert.match(migrated, /match \/leaderboards\/\{id\}/, 'the brand\'s custom region must be preserved');
-        assert.equal(migrated.includes('OMEGA Rules (v'), false, 'the managed marker block must be gone');
-        assert.equal(migrated.includes('End OMEGA Rules'), false, 'the closing marker must be gone too');
-        assert.equal(migrated.includes('function protectedFields('), false, 'the migration must seed no hooks — they are retired');
+        expect(first.migrated, 'the legacy marker block must be detected').toBe(true);
+        expect(migrated, 'the brand\'s custom region must be preserved').toMatch(/match \/leaderboards\/\{id\}/);
+        expect(migrated.includes('OMEGA Rules (v'), 'the managed marker block must be gone').toBe(false);
+        expect(migrated.includes('End OMEGA Rules'), 'the closing marker must be gone too').toBe(false);
+        expect(migrated.includes('function protectedFields('), 'the migration must seed no hooks — they are retired').toBe(false);
 
         const second = ensureBrandRulesSource({ projectDir: targetPath });
-        assert.equal(second.migrated, false, 'migration must run once');
-        assert.equal(jetpack.read(path.join(targetPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
+        expect(second.migrated, 'migration must run once').toBe(false);
+        expect(jetpack.read(path.join(targetPath, 'firestore.rules')), 'a second setup must not touch the file').toBe(migrated);
 
         // The migrated file still compiles, and the framework half comes back.
         const compiled = compileRules({ brandSource: migrated }).compiled;
-        assert.match(compiled, /match \/leaderboards\/\{id\}/, 'the compiled artifact carries the brand rules');
-        assert.match(compiled, /match \/notifications\/\{token\}/, 'the compiled artifact carries the framework rules');
+        expect(compiled, 'the compiled artifact carries the brand rules').toMatch(/match \/leaderboards\/\{id\}/);
+        expect(compiled, 'the compiled artifact carries the framework rules').toMatch(/match \/notifications\/\{token\}/);
       },
     },
 
@@ -464,17 +456,17 @@ module.exports = defineCases({
       name: 'a-legacy-marker-source-is-refused-instead-of-compiled',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-refuse-', LEGACY_SOURCE);
         const warnings = [];
 
         const result = compileFirestoreRules({ projectDir: targetPath, onWarn: (message) => warnings.push(message) });
 
-        assert.equal(result.refused, true, 'the build must report the refusal');
-        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), false, 'an unmigrated source must leave no artifact behind');
-        assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
-        assert.match(warnings[0], /legacy OMEGA Rules marker block/, 'the refusal must name what it found');
-        assert.match(warnings[0], /npx omega (test|migrate:rules)/, 'the refusal must name the command that moves the tree forward');
+        expect(result.refused, 'the build must report the refusal').toBe(true);
+        expect(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'an unmigrated source must leave no artifact behind').toBe(false);
+        expect(warnings.length, `expected one warning, got ${warnings.length}`).toBe(1);
+        expect(warnings[0], 'the refusal must name what it found').toMatch(/legacy OMEGA Rules marker block/);
+        expect(warnings[0], 'the refusal must name the command that moves the tree forward').toMatch(/npx omega (test|migrate:rules)/);
 
         // The pure compile refuses at the break point too, so no other caller
         // can talk it into the duplicate-function artifact.
@@ -485,15 +477,15 @@ module.exports = defineCases({
           threw = error;
         }
 
-        assert.ok(threw, 'compiling an unmigrated source must throw');
-        assert.match(threw.message, /npx omega migrate:rules/, 'the error must name the run-alone migration verb');
+        expect(threw, 'compiling an unmigrated source must throw').toBeTruthy();
+        expect(threw.message, 'the error must name the run-alone migration verb').toMatch(/npx omega migrate:rules/);
 
         // The STAGE only reports it, because setup stages before its checks
         // run — a throw here would kill the very run that migrates the file.
         const { staged } = stageFunctions({ projectDir: targetPath });
 
-        assert.equal(staged.some((step) => step.includes('firestore.rules')), false, 'the stage must not claim a compile it refused');
-        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), false, 'and it must still leave no artifact');
+        expect(staged.some((step) => step.includes('firestore.rules')), 'the stage must not claim a compile it refused').toBe(false);
+        expect(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), 'and it must still leave no artifact').toBe(false);
       },
     },
 
@@ -503,13 +495,13 @@ module.exports = defineCases({
       name: 'every-stage-recompiles-the-artifact-from-the-brand-source',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-stage-', jetpack.read(BRAND_RULES_SEED));
         const artifact = path.join(targetPath, COMPILED_RULES_FILE);
 
         const { staged } = stageFunctions({ projectDir: targetPath });
-        assert.equal(staged.some((step) => step.includes('firestore.rules')), true, 'the stage must report the compile step');
-        assert.equal(jetpack.exists(artifact), 'file', 'the stage must write the compiled artifact');
+        expect(staged.some((step) => step.includes('firestore.rules')), 'the stage must report the compile step').toBe(true);
+        expect(jetpack.exists(artifact), 'the stage must write the compiled artifact').toBe('file');
 
         // A brand-source edit reaches the artifact on the next stage — this is
         // what the watch does when firestore.rules changes.
@@ -517,7 +509,7 @@ module.exports = defineCases({
         jetpack.write(source, brandSourceWith('    match /posts/{id} {\n      allow read: if true;\n    }'));
         stageFunctions({ projectDir: targetPath });
 
-        assert.equal(jetpack.read(artifact).includes('match /posts/{id} {'), true, 'a brand-source edit must recompile');
+        expect(jetpack.read(artifact).includes('match /posts/{id} {'), 'a brand-source edit must recompile').toBe(true);
       },
     },
 
@@ -526,12 +518,12 @@ module.exports = defineCases({
       name: 'firebase-json-targets-the-compiled-artifact',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const template = jetpack.read(path.join(TEMPLATES_DIR, 'firebase.json'), 'json');
         const fixture = jetpack.read(path.join(FIXTURE_DIR, 'firebase.json'), 'json');
 
-        assert.equal(template.firestore.rules, COMPILED_RULES_FILE, 'the shipped firebase.json must point at the compiled artifact');
-        assert.equal(fixture.firestore.rules, COMPILED_RULES_FILE, 'the self-test fixture must point at the compiled artifact');
+        expect(template.firestore.rules, 'the shipped firebase.json must point at the compiled artifact').toBe(COMPILED_RULES_FILE);
+        expect(fixture.firestore.rules, 'the self-test fixture must point at the compiled artifact').toBe(COMPILED_RULES_FILE);
       },
     },
 
@@ -542,18 +534,18 @@ module.exports = defineCases({
       name: 'a-stale-firebase-json-target-is-reported-loudly',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget('omega-rules-stale-', jetpack.read(BRAND_RULES_SEED));
         const warnings = [];
 
         jetpack.write(path.join(targetPath, 'firebase.json'), JSON.stringify({ firestore: { rules: 'firestore.rules' } }, null, 2));
         compileFirestoreRules({ projectDir: targetPath, onWarn: (message) => warnings.push(message) });
 
-        assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
-        assert.match(warnings[0], /firebase\.json points firestore\.rules at "firestore\.rules"/, 'the warning must name the stale target');
+        expect(warnings.length, `expected one warning, got ${warnings.length}`).toBe(1);
+        expect(warnings[0], 'the warning must name the stale target').toMatch(/firebase\.json points firestore\.rules at "firestore\.rules"/);
         // Setup DEFERS on this tree ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)) —
         // the warning has to name the command that actually moves it.
-        assert.ok(warnings[0].includes(RULES_MIGRATION_COMMAND), `the warning must say how to fix it (${RULES_MIGRATION_COMMAND})`);
+        expect(warnings[0].includes(RULES_MIGRATION_COMMAND), `the warning must say how to fix it (${RULES_MIGRATION_COMMAND})`).toBeTruthy();
       },
     },
 
@@ -563,17 +555,17 @@ module.exports = defineCases({
       name: 'the-seeded-brand-source-teaches-the-merge-and-the-helpers',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const seed = jetpack.read(BRAND_RULES_SEED);
 
-        assert.equal(seed.includes('OMEGA Rules'), false, 'the seed must carry no managed marker block');
-        assert.match(seed, /templates\/firestore\.framework\.rules/, 'the seed must point at the framework half');
-        assert.match(seed, /MERGE-BY-MATCH/, 'the seed must teach the merge model');
-        assert.match(seed, /allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\) && isEmailVerified\(\)\);/, 'the seed must carry the worked example of a merge');
+        expect(seed.includes('OMEGA Rules'), 'the seed must carry no managed marker block').toBe(false);
+        expect(seed, 'the seed must point at the framework half').toMatch(/templates\/firestore\.framework\.rules/);
+        expect(seed, 'the seed must teach the merge model').toMatch(/MERGE-BY-MATCH/);
+        expect(seed, 'the seed must carry the worked example of a merge').toMatch(/allow create, update: if isUser\(uid\) && !isWritingFrameworkField\(\) && \(!isWritingAny\(\['xp'\]\) && isEmailVerified\(\)\);/);
         for (const helper of ['isUser', 'isAdmin', 'isAuthenticated', 'getAuthUid', 'getAuthEmail', 'getRoles', 'getExistingData', 'getIncomingData', 'isWritingField', 'isWritingAny', 'isOwner', 'isEmailVerified']) {
-          assert.match(seed, new RegExp(`${helper}\\(`), `the seed must name the ${helper}() helper as callable`);
+          expect(seed, `the seed must name the ${helper}() helper as callable`).toMatch(new RegExp(`${helper}\\(`));
         }
-        assert.match(seed, /TOP-LEVEL: protecting `xp\.total` means listing `'xp'`/, 'the seed must warn that the field list is top-level');
+        expect(seed, 'the seed must warn that the field list is top-level').toMatch(/TOP-LEVEL: protecting `xp\.total` means listing `'xp'`/);
       },
     },
 
@@ -592,7 +584,7 @@ module.exports = defineCases({
       name: 'no-retired-name-survives-the-rename-sweep',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const exempt = [path.join(PACKAGE_DIR, 'dist', 'cli', 'utils', 'compile-rules.js')];
         const files = [
           ...jetpack.find(TEMPLATES_DIR, { matching: '*.rules' }).map((file) => path.resolve(file)),
@@ -609,12 +601,12 @@ module.exports = defineCases({
           }
         }
 
-        assert.deepEqual(offenders, [], `retired names still in the tree: ${offenders.join(', ')}`);
+        expect(offenders, `retired names still in the tree: ${offenders.join(', ')}`).toEqual([]);
 
         // …and the artifact a consumer deploys names none of them either.
         const compiled = compileSeed();
         for (const name of RETIRED_NAMES) {
-          assert.equal(new RegExp(`\\b${name}\\b`).test(compiled), false, `the compiled ruleset must not name ${name}`);
+          expect(new RegExp(`\\b${name}\\b`).test(compiled), `the compiled ruleset must not name ${name}`).toBe(false);
         }
       },
     },

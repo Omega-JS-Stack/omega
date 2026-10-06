@@ -91,7 +91,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'lists-the-callers-own-orders-newest-first',
-      async run({ assert }) {
+      async run({ expect }) {
         const { code, body } = await callRoute({
           seed: {
             'payments-orders/1111-1111-1111': order('1111-1111-1111', { ago: 3 * DAY }),
@@ -102,18 +102,14 @@ module.exports = defineCases({
           settings: { uid: OWNER, limit: 25 },
         });
 
-        assert.equal(code, 200, `The caller's own history is theirs to read, got ${code}: ${body}`);
-        assert.deepEqual(
-          body.orders.map((entry) => entry.id),
-          ['2222-2222-2222', '1111-1111-1111', '3333-3333-3333'],
-          'Newest purchase first — the account page lists a history, not a set',
-        );
+        expect(code, `The caller's own history is theirs to read, got ${code}: ${body}`).toBe(200);
+        expect(body.orders.map((entry) => entry.id), 'Newest purchase first — the account page lists a history, not a set').toEqual(['2222-2222-2222', '1111-1111-1111', '3333-3333-3333']);
       },
     },
 
     {
       name: 'never-lists-somebody-elses-purchase',
-      async run({ assert }) {
+      async run({ expect }) {
         const { body } = await callRoute({
           seed: {
             'payments-orders/4444-4444-4444': order('4444-4444-4444'),
@@ -123,40 +119,40 @@ module.exports = defineCases({
           settings: { uid: OWNER, limit: 25 },
         });
 
-        assert.deepEqual(body.orders.map((entry) => entry.id), ['4444-4444-4444'], 'Only the caller\'s own order comes back');
+        expect(body.orders.map((entry) => entry.id), 'Only the caller\'s own order comes back').toEqual(['4444-4444-4444']);
       },
     },
 
     {
       name: 'a-non-admin-cannot-ask-about-another-account',
-      async run({ assert }) {
+      async run({ expect }) {
         const { code, body } = await callRoute({
           seed: { 'payments-orders/6666-6666-6666': order('6666-6666-6666', { owner: STRANGER }) },
           user: caller(OWNER),
           settings: { uid: STRANGER, limit: 25 },
         });
 
-        assert.equal(code, 403, `Reading another account's purchases is an admin act, got ${code}`);
-        assert.match(`${body}`, /admin/i, 'And it says so');
+        expect(code, `Reading another account's purchases is an admin act, got ${code}`).toBe(403);
+        expect(`${body}`, 'And it says so').toMatch(/admin/i);
       },
     },
 
     {
       name: 'an-unauthenticated-caller-is-refused',
-      async run({ assert }) {
+      async run({ expect }) {
         const { code } = await callRoute({
           seed: {},
           user: caller(OWNER, { authenticated: false }),
           settings: { uid: OWNER, limit: 25 },
         });
 
-        assert.equal(code, 401, `A purchase history is never public, got ${code}`);
+        expect(code, `A purchase history is never public, got ${code}`).toBe(401);
       },
     },
 
     {
       name: 'the-summary-carries-what-the-page-shows-and-nothing-else',
-      async run({ assert }) {
+      async run({ expect }) {
         const { body } = await callRoute({
           seed: { 'payments-orders/7777-7777-7777': order('7777-7777-7777') },
           user: caller(OWNER),
@@ -165,28 +161,28 @@ module.exports = defineCases({
 
         const entry = body.orders[0];
 
-        assert.equal(entry.productName, '100 Credits', 'What was bought');
-        assert.equal(entry.amount, 9.99, 'For how much');
-        assert.equal(entry.currency, 'USD', 'In what currency');
-        assert.equal(entry.status, 'completed', 'And what state it is in');
-        assert.ok(entry.date.timestampUNIX > 0, 'And when — the list is ordered by it');
+        expect(entry.productName, 'What was bought').toBe('100 Credits');
+        expect(entry.amount, 'For how much').toBe(9.99);
+        expect(entry.currency, 'In what currency').toBe('USD');
+        expect(entry.status, 'And what state it is in').toBe('completed');
+        expect(entry.date.timestampUNIX > 0, 'And when — the list is ordered by it').toBeTruthy();
 
         // The order doc carries the provider's whole raw resource, the request's
         // IP and user agent, and the attribution that sold it. None of it is the
         // browser's business.
         const serialized = JSON.stringify(entry);
 
-        assert.equal(entry.raw, undefined, 'The provider payload never leaves the backend');
-        assert.equal(entry.request, undefined, 'Nor the request context');
-        assert.equal(entry.attribution, undefined, 'Nor the attribution');
-        assert.ok(!serialized.includes('203.0.113.7'), `No IP rides the summary: ${serialized}`);
-        assert.ok(!serialized.includes('buyer@test.dev'), `No provider-side email either: ${serialized}`);
+        expect(entry.raw, 'The provider payload never leaves the backend').toBe(undefined);
+        expect(entry.request, 'Nor the request context').toBe(undefined);
+        expect(entry.attribution, 'Nor the attribution').toBe(undefined);
+        expect(!serialized.includes('203.0.113.7'), `No IP rides the summary: ${serialized}`).toBeTruthy();
+        expect(!serialized.includes('buyer@test.dev'), `No provider-side email either: ${serialized}`).toBeTruthy();
       },
     },
 
     {
       name: 'refundable-answers-what-the-refund-route-would-answer',
-      async run({ assert }) {
+      async run({ expect }) {
         const { body } = await callRoute({
           seed: {
             'payments-orders/8888-0001-0001': order('8888-0001-0001'),
@@ -201,21 +197,21 @@ module.exports = defineCases({
 
         const refundable = Object.fromEntries(body.orders.map((entry) => [entry.id, entry.refundable]));
 
-        assert.equal(refundable['8888-0001-0001'], true, 'A recent, unrefunded one-time purchase is refundable');
-        assert.equal(refundable['8888-0002-0002'], false, 'One already refunded is not offered again');
-        assert.equal(refundable['8888-0003-0003'], false, 'Nor one past the 6-month window');
-        assert.equal(refundable['8888-0004-0004'], false, 'A subscription order refunds through the subscription lane, not this one');
+        expect(refundable['8888-0001-0001'], 'A recent, unrefunded one-time purchase is refundable').toBe(true);
+        expect(refundable['8888-0002-0002'], 'One already refunded is not offered again').toBe(false);
+        expect(refundable['8888-0003-0003'], 'Nor one past the 6-month window').toBe(false);
+        expect(refundable['8888-0004-0004'], 'A subscription order refunds through the subscription lane, not this one').toBe(false);
 
         // A checkout that was opened and never paid keeps its provider and its
         // resourceId, so every other refusal passes it — and the button it used
         // to earn asks the provider to reverse a charge that never happened
-        assert.equal(refundable['8888-0005-0005'], false, 'A purchase that never completed has nothing to refund');
+        expect(refundable['8888-0005-0005'], 'A purchase that never completed has nothing to refund').toBe(false);
       },
     },
 
     {
       name: 'the-limit-cuts-the-list-at-the-newest',
-      async run({ assert }) {
+      async run({ expect }) {
         const { body } = await callRoute({
           seed: {
             'payments-orders/9999-0001-0001': order('9999-0001-0001', { ago: 1 * DAY }),
@@ -226,7 +222,7 @@ module.exports = defineCases({
           settings: { uid: OWNER, limit: 2 },
         });
 
-        assert.deepEqual(body.orders.map((entry) => entry.id), ['9999-0001-0001', '9999-0002-0002'], 'The newest two, not an arbitrary two');
+        expect(body.orders.map((entry) => entry.id), 'The newest two, not an arbitrary two').toEqual(['9999-0001-0001', '9999-0002-0002']);
       },
     },
   ],

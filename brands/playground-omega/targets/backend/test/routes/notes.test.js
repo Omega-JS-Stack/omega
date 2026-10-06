@@ -26,17 +26,17 @@ module.exports = defineCases({
     {
       name: 'signed-out-caller-is-refused',
 
-      async run({ http, assert }) {
-        assert.isError(await http.as('none').get(ROUTE), 401, 'listing needs a signed-in caller');
-        assert.isError(await http.as('none').post(ROUTE, { text: 'Anonymous' }), 401, 'so does creating');
-        assert.isError(await http.as('none').delete(ROUTE, { id: 'any' }), 401, 'and deleting');
+      async run({ http, expect }) {
+        expect(await http.as('none').get(ROUTE), 'listing needs a signed-in caller').toBeError(401);
+        expect(await http.as('none').post(ROUTE, { text: 'Anonymous' }), 'so does creating').toBeError(401);
+        expect(await http.as('none').delete(ROUTE, { id: 'any' }), 'and deleting').toBeError(401);
       },
     },
 
     {
       name: 'the-auth-hook-seeded-a-welcome-note',
 
-      async run({ http, assert, waitFor }) {
+      async run({ http, expect, waitFor }) {
         // The on-create hook runs in the auth trigger, after the persona was
         // created, so its write lands on its own schedule
         const welcome = await waitFor(async () => {
@@ -44,14 +44,14 @@ module.exports = defineCases({
           return response.data?.notes?.find((note) => note.text === WELCOME_TEXT);
         }, 20000, 500);
 
-        assert.ok(welcome, 'the new account starts with the welcome note');
+        expect(welcome, 'the new account starts with the welcome note').toBeTruthy();
       },
     },
 
     {
       name: 'create-stores-the-note-under-the-caller',
 
-      async run({ http, assert, firestore, accounts, state }) {
+      async run({ http, expect, firestore, accounts, state }) {
         // The list orders by metadata.created.timestampUNIX, the family's order
         // key, which has one-second resolution: a note created in the same
         // second as an earlier one (the MCP suite's) ties, and the tie breaks
@@ -60,18 +60,18 @@ module.exports = defineCases({
 
         const response = await http.as('notes-owner').post(ROUTE, { text: '  First note  ', id: 'caller-picked-id' });
 
-        assert.isSuccess(response, 'a signed-in caller creates a note');
+        expect(response, 'a signed-in caller creates a note').toBeSuccess();
 
         const note = response.data.note;
 
-        assert.notEqual(note.id, 'caller-picked-id', 'the schema mints the id, the caller cannot set it');
-        assert.equal(note.text, 'First note', 'the text is trimmed');
+        expect(note.id, 'the schema mints the id, the caller cannot set it').not.toBe('caller-picked-id');
+        expect(note.text, 'the text is trimmed').toBe('First note');
 
         const stored = await firestore.get(`notes/${note.id}`);
 
-        assert.equal(stored.owner, accounts['notes-owner'].uid, 'the note belongs to the caller');
-        assert.equal(stored.text, 'First note', 'as sent');
-        assert.ok(stored.metadata.created.timestampUNIX > 0, 'stamped under metadata.created');
+        expect(stored.owner, 'the note belongs to the caller').toBe(accounts['notes-owner'].uid);
+        expect(stored.text, 'as sent').toBe('First note');
+        expect(stored.metadata.created.timestampUNIX > 0, 'stamped under metadata.created').toBeTruthy();
 
         state.id = note.id;
       },
@@ -80,60 +80,60 @@ module.exports = defineCases({
     {
       name: 'list-returns-the-callers-notes-newest-first',
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('notes-owner').get(ROUTE);
 
-        assert.isSuccess(response, 'the owner lists their notes');
-        assert.equal(response.data.notes[0].id, state.id, 'the newest note leads');
+        expect(response, 'the owner lists their notes').toBeSuccess();
+        expect(response.data.notes[0].id, 'the newest note leads').toBe(state.id);
 
         const other = await http.as('notes-other').get(ROUTE);
 
-        assert.isSuccess(other, 'another account lists its own');
-        assert.ok(!other.data.notes.some((note) => note.id === state.id), 'and never sees this one');
+        expect(other, 'another account lists its own').toBeSuccess();
+        expect(!other.data.notes.some((note) => note.id === state.id), 'and never sees this one').toBeTruthy();
       },
     },
 
     {
       name: 'list-honours-the-limit',
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('notes-owner').get(ROUTE, { limit: 1 });
 
-        assert.isSuccess(response, 'a limit is accepted');
-        assert.equal(response.data.notes.length, 1, 'and caps the page');
+        expect(response, 'a limit is accepted').toBeSuccess();
+        expect(response.data.notes.length, 'and caps the page').toBe(1);
       },
     },
 
     {
       name: 'empty-text-is-refused-by-the-schema',
 
-      async run({ http, assert }) {
-        assert.isError(await http.as('notes-owner').post(ROUTE, { text: '' }), 400, 'an empty note is refused');
-        assert.isError(await http.as('notes-owner').post(ROUTE, { text: '   ' }), 400, 'and so is a blank one');
-        assert.isError(await http.as('notes-owner').delete(ROUTE, {}), 400, 'a delete names its note');
+      async run({ http, expect }) {
+        expect(await http.as('notes-owner').post(ROUTE, { text: '' }), 'an empty note is refused').toBeError(400);
+        expect(await http.as('notes-owner').post(ROUTE, { text: '   ' }), 'and so is a blank one').toBeError(400);
+        expect(await http.as('notes-owner').delete(ROUTE, {}), 'a delete names its note').toBeError(400);
       },
     },
 
     {
       name: 'another-account-cannot-delete-the-note',
 
-      async run({ http, assert, firestore, state }) {
+      async run({ http, expect, firestore, state }) {
         const response = await http.as('notes-other').delete(ROUTE, { id: state.id });
 
-        assert.isError(response, 403, 'only the owner deletes a note');
-        assert.ok(await firestore.exists(`notes/${state.id}`), 'and the note is still there');
+        expect(response, 'only the owner deletes a note').toBeError(403);
+        expect(await firestore.exists(`notes/${state.id}`), 'and the note is still there').toBeTruthy();
       },
     },
 
     {
       name: 'the-owner-deletes-the-note',
 
-      async run({ http, assert, firestore, state }) {
+      async run({ http, expect, firestore, state }) {
         const response = await http.as('notes-owner').delete(ROUTE, { id: state.id });
 
-        assert.isSuccess(response, 'the owner deletes their note');
-        assert.equal(await firestore.exists(`notes/${state.id}`), false, 'and it is gone');
-        assert.isError(await http.as('notes-owner').delete(ROUTE, { id: state.id }), 404, 'a second delete finds nothing');
+        expect(response, 'the owner deletes their note').toBeSuccess();
+        expect(await firestore.exists(`notes/${state.id}`), 'and it is gone').toBe(false);
+        expect(await http.as('notes-owner').delete(ROUTE, { id: state.id }), 'a second delete finds nothing').toBeError(404);
       },
     },
   ],

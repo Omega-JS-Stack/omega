@@ -19,10 +19,10 @@
  * team member's link id name a platform, and social profiles are always brand
  * marks, so the family is derived once at the one site that knows it.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { after, test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const jetpack = require('fs-jetpack');
 
 const { buildSite, miniData, MINI, PKG } = require('./lib/build.js');
@@ -302,9 +302,9 @@ const THEME_OF = {
 function writeShadow(root, shadow) {
   const shipped = fs.readFileSync(path.join(THEMES, shadow.theme, '_layouts', `${shadow.layout}.html`), 'utf8');
   const parts = shipped.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  assert.ok(parts, `${shadow.layout} ships with frontmatter`);
+  expect(parts, `${shadow.layout} ships with frontmatter`).toBeTruthy();
   const parent = parts[1].match(/^layout:.*$/m);
-  assert.ok(parent, `${shadow.layout} names its parent layout`);
+  expect(parent, `${shadow.layout} names its parent layout`).toBeTruthy();
 
   jetpack.write(
     path.join(root, '_layouts', `${shadow.layout}.html`),
@@ -344,10 +344,6 @@ function build(name) {
   return built;
 }
 
-after(() => {
-  for (const root of ROOTS) fs.rmSync(root, { recursive: true, force: true });
-});
-
 /** One render case per changed section or layout: the authored string reaches the markup, unwrapped. */
 const CASES = [
   { what: 'the marketing/hero section', build: 'classy-proof', url: '/proof/sections', brand: 'fa-brands fa-docker', bare: 'gavel' },
@@ -370,55 +366,87 @@ const CASES = [
   { what: 'the neobrutalism index layout', build: 'neobrutalism-proof', url: '/proof/neo', brand: 'fa-brands fa-figma', bare: 'chess-rook' },
 ];
 
-for (const { what, build: name, url, brand, bare } of CASES) {
-  test(`#929: ${what} emits an arg icon exactly as authored`, async () => {
-    const html = (await build(name)).get(url);
-    assert.ok(html, `${url} rendered`);
+module.exports = defineCases({
+  type: 'group',
+  description: 'section-arg-icons',
+  cleanup: () => {
+    for (const root of ROOTS) fs.rmSync(root, { recursive: true, force: true });
+  },
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const { what, build: name, url, brand, bare } of CASES) {
+        cases.push({
+          name: `#929: ${what} emits an arg icon exactly as authored`,
+          run: async (ctx) => {
+            const html = (await build(name)).get(url);
+            ctx.expect(html, `${url} rendered`).toBeTruthy();
 
-    assert.ok(html.includes(brand), `the authored brand classes (${brand}) reach the markup`);
-    assert.ok(!html.includes(`fa-solid ${brand.split(' ')[1]}`), 'nothing re-wraps them as solid');
-    assert.match(html, new RegExp(`<i class="${bare}[ "]`), 'a bare name lands as the bare class it is');
-    assert.ok(!html.includes(`fa-solid fa-${bare}`), `the fa-solid wrapper is gone (fa-${bare})`);
-  });
-}
+            ctx.expect(html.includes(brand), `the authored brand classes (${brand}) reach the markup`).toBeTruthy();
+            ctx.expect(!html.includes(`fa-solid ${brand.split(' ')[1]}`), 'nothing re-wraps them as solid').toBeTruthy();
+            ctx.expect(html, 'a bare name lands as the bare class it is').toMatch(new RegExp(`<i class="${bare}[ "]`));
+            ctx.expect(!html.includes(`fa-solid fa-${bare}`), `the fa-solid wrapper is gone (fa-${bare})`).toBeTruthy();
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#929: the footer derives a social platform\'s brand family from the ONE key the brand names', async () => {
-  const html = (await build('classy')).get('/');
+    {
+      name: '#929: the footer derives a social platform\'s brand family from the ONE key the brand names',
+      run: async (ctx) => {
+        const html = (await build('classy')).get('/');
 
-  assert.match(html, /<i class="fa-brands fa-github fa-sm"/, 'a github platform renders the brand mark');
-  assert.ok(!html.includes('fa-solid fa-github'), 'never the solid family a brand mark has no glyph in');
+        ctx.expect(html, 'a github platform renders the brand mark').toMatch(/<i class="fa-brands fa-github fa-sm"/);
+        ctx.expect(!html.includes('fa-solid fa-github'), 'never the solid family a brand mark has no glyph in').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#929: a team member link renders its platform as a brand mark, and website as the one solid globe',
+      run: async (ctx) => {
+        const pages = await build('classy');
+
+        const brandMark = pages.get('/team/riley-nakamura');
+        ctx.expect(brandMark, 'the link id names the brand mark').toMatch(/<i class="fa-brands fa-x-twitter fa-sm"/);
+        // The solid family carries no x-twitter glyph, so the old wrap rendered nothing at all.
+        ctx.expect(!brandMark.includes('fa-solid fa-x-twitter'), 'no solid wrapper on a brand platform').toBeTruthy();
+
+        const website = pages.get('/team/sam-okafor');
+        ctx.expect(website, 'website is the one link that is not a brand mark').toMatch(/<i class="fa-solid fa-globe fa-sm"/);
+      },
+    },
+
+    {
+      name: '#929: the team grid renders every member link the same way',
+      run: async (ctx) => {
+        const html = (await build('classy')).get('/team');
+
+        ctx.expect(html.includes('fa-brands fa-x-twitter'), 'the grid reaches the brands family too').toBeTruthy();
+        ctx.expect(html.includes('fa-brands fa-linkedin'), 'and every other platform a member names').toBeTruthy();
+        ctx.expect(!html.includes('fa-solid fa-linkedin'), 'with no solid wrapper left on the card links').toBeTruthy();
+      },
+    },
+
+    ...(() => {
+      const cases = [];
+      for (const name of ['classy', 'newsflash', 'neobrutalism']) {
+        cases.push({
+          name: `#929: no packaged ${name} page double-wraps a class-string icon`,
+          run: async (ctx) => {
+            const offenders = [];
+            for (const [url, html] of await build(name)) {
+              if (/fa-(solid|brands|regular|sharp) fa-fa-/.test(html)) offenders.push(url);
+            }
+
+            // A packaged default that carries the class string and a template that
+            // still wraps it produce `fa-solid fa-fa-solid fa-rocket`, the one string
+            // that proves a site was missed, wherever it lives.
+            ctx.expect(offenders, 'every packaged icon default flows through an unwrapped site').toEqual([]);
+          },
+        });
+      }
+      return cases;
+    })(),
+  ],
 });
-
-test('#929: a team member link renders its platform as a brand mark, and website as the one solid globe', async () => {
-  const pages = await build('classy');
-
-  const brandMark = pages.get('/team/riley-nakamura');
-  assert.match(brandMark, /<i class="fa-brands fa-x-twitter fa-sm"/, 'the link id names the brand mark');
-  // The solid family carries no x-twitter glyph, so the old wrap rendered nothing at all.
-  assert.ok(!brandMark.includes('fa-solid fa-x-twitter'), 'no solid wrapper on a brand platform');
-
-  const website = pages.get('/team/sam-okafor');
-  assert.match(website, /<i class="fa-solid fa-globe fa-sm"/, 'website is the one link that is not a brand mark');
-});
-
-test('#929: the team grid renders every member link the same way', async () => {
-  const html = (await build('classy')).get('/team');
-
-  assert.ok(html.includes('fa-brands fa-x-twitter'), 'the grid reaches the brands family too');
-  assert.ok(html.includes('fa-brands fa-linkedin'), 'and every other platform a member names');
-  assert.ok(!html.includes('fa-solid fa-linkedin'), 'with no solid wrapper left on the card links');
-});
-
-for (const name of ['classy', 'newsflash', 'neobrutalism']) {
-  test(`#929: no packaged ${name} page double-wraps a class-string icon`, async () => {
-    const offenders = [];
-    for (const [url, html] of await build(name)) {
-      if (/fa-(solid|brands|regular|sharp) fa-fa-/.test(html)) offenders.push(url);
-    }
-
-    // A packaged default that carries the class string and a template that
-    // still wraps it produce `fa-solid fa-fa-solid fa-rocket`, the one string
-    // that proves a site was missed, wherever it lives.
-    assert.deepEqual(offenders, [], 'every packaged icon default flows through an unwrapped site');
-  });
-}

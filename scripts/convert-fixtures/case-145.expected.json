@@ -1,0 +1,9 @@
+{
+  "description": "case-145",
+  "fileLacks": ["node:test", "\\bassert\\b", "@omega\\.js/devkit"],
+  "fileHas": ["const { defineCases } = require('@omega.js/web/test');"],
+  "fileCount": { "require(": 1 },
+  "tests": [
+    { "name": "a", "has": ["ctx.expect(1).toBe(1)"] }
+  ]
+}

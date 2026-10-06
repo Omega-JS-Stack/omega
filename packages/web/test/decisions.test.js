@@ -7,11 +7,10 @@
  * follow, and the collision diagnostic is loud in dev and fatal in a
  * production build.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const reads = require('@omega.js/devkit/reads');
 const { setEnvironment } = require('@omega.js/config/environment');
@@ -54,100 +53,128 @@ function consumer(t, files, options) {
   } };
 }
 
-test('the consumer scan is a rescan capture, never a config-reset target', (t) => {
-  const app = consumer(t, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'decisions',
+  tests: [
+    {
+      name: 'the consumer scan is a rescan capture, never a config-reset target',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
 
-  assert.deepEqual(reads.recordedTargets(), [],
-    'a reset target here would rebuild the whole config on every page edit');
-  assert.deepEqual(reads.rescanTargets().map((target) => target.dir).sort(),
-    [path.join(app.root, '_posts'), path.join(app.root, 'pages')],
-    'both scans arm, including the collection dir the brand has not authored yet');
-});
+        ctx.expect(reads.recordedTargets(), 'a reset target here would rebuild the whole config on every page edit').toEqual([]);
+        ctx.expect(reads.rescanTargets().map((target) => target.dir).sort(), 'both scans arm, including the collection dir the brand has not authored yet').toEqual([path.join(app.root, '_posts'), path.join(app.root, 'pages')]);
+      },
+    },
 
-test('re-running the pages capture updates the suppression answer', (t) => {
-  const app = consumer(t, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
-  const pagesTarget = reads.rescanTargets().find((target) => target.dir.endsWith('pages'));
+    {
+      name: 're-running the pages capture updates the suppression answer',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
+        const pagesTarget = reads.rescanTargets().find((target) => target.dir.endsWith('pages'));
 
-  assert.equal(app.decisions.suppresses('/about'), false);
-  app.write('pages/about.md', '---\npermalink: /about\n---\nabout');
-  pagesTarget.rerun();
+        ctx.expect(app.decisions.suppresses('/about')).toBe(false);
+        app.write('pages/about.md', '---\npermalink: /about\n---\nabout');
+        pagesTarget.rerun();
 
-  assert.equal(app.decisions.suppresses('/about'), true,
-    'the new page takes the URL over — the framework default steps aside on the next render');
-});
+        ctx.expect(app.decisions.suppresses('/about'), 'the new page takes the URL over — the framework default steps aside on the next render').toBe(true);
+      },
+    },
 
-test('re-running the collection capture flips the own-content answer', (t) => {
-  const app = consumer(t, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
-  const postsTarget = reads.rescanTargets().find((target) => target.dir.endsWith('_posts'));
+    {
+      name: 're-running the collection capture flips the own-content answer',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
+        const postsTarget = reads.rescanTargets().find((target) => target.dir.endsWith('_posts'));
 
-  assert.equal(app.decisions.hasOwn('_posts'), false, 'a content-less brand gets the sample corpus');
-  app.write('_posts/2026-01-01-hello.md', '---\ntitle: Hello\n---\nhello');
-  postsTarget.rerun();
+        ctx.expect(app.decisions.hasOwn('_posts'), 'a content-less brand gets the sample corpus').toBe(false);
+        app.write('_posts/2026-01-01-hello.md', '---\ntitle: Hello\n---\nhello');
+        postsTarget.rerun();
 
-  assert.equal(app.decisions.hasOwn('_posts'), true, 'the first real post ends the samples');
-});
+        ctx.expect(app.decisions.hasOwn('_posts'), 'the first real post ends the samples').toBe(true);
+      },
+    },
 
-test('refresh re-runs every capture at once', (t) => {
-  const app = consumer(t, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
+    {
+      name: 'refresh re-runs every capture at once',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/index.md': '---\npermalink: /\n---\nhome' });
 
-  app.write('pages/about.md', '---\npermalink: /about\n---\nabout');
-  app.write('_posts/2026-01-01-hello.md', '---\ntitle: Hello\n---\nhello');
-  app.decisions.refresh();
+        app.write('pages/about.md', '---\npermalink: /about\n---\nabout');
+        app.write('_posts/2026-01-01-hello.md', '---\ntitle: Hello\n---\nhello');
+        app.decisions.refresh();
 
-  assert.equal(app.decisions.suppresses('/about'), true);
-  assert.equal(app.decisions.hasOwn('_posts'), true);
-});
+        ctx.expect(app.decisions.suppresses('/about')).toBe(true);
+        ctx.expect(app.decisions.hasOwn('_posts')).toBe(true);
+      },
+    },
 
-test('a consumer-vs-consumer collision is reported loudly in dev', (t) => {
-  const app = consumer(t, {
-    'pages/about.md': '---\npermalink: /about\n---\nabout',
-    'pages/company/about.md': '---\npermalink: /about.html\n---\nabout',
-  });
-  app.decisions.framework([]);
+    {
+      name: 'a consumer-vs-consumer collision is reported loudly in dev',
+      run: (ctx) => {
+        const app = consumer(ctx, {
+          'pages/about.md': '---\npermalink: /about\n---\nabout',
+          'pages/company/about.md': '---\npermalink: /about.html\n---\nabout',
+        });
+        app.decisions.framework([]);
 
-  assert.equal(app.logged.length, 1, 'one collision, one diagnostic');
-  assert.match(app.logged[0], /Permalink collision at \/about/);
-  assert.match(app.logged[0], /pages\/about\.md/);
-  assert.match(app.logged[0], /pages\/company\/about\.md/);
-});
+        ctx.expect(app.logged.length, 'one collision, one diagnostic').toBe(1);
+        ctx.expect(app.logged[0]).toMatch(/Permalink collision at \/about/);
+        ctx.expect(app.logged[0]).toMatch(/pages\/about\.md/);
+        ctx.expect(app.logged[0]).toMatch(/pages\/company\/about\.md/);
+      },
+    },
 
-test('a consumer page overriding a default page is never reported', (t) => {
-  const app = consumer(t, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
-  app.decisions.framework([{ label: 'defaults/pages/about.md', url: '/about' }]);
+    {
+      name: 'a consumer page overriding a default page is never reported',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
+        app.decisions.framework([{ label: 'defaults/pages/about.md', url: '/about' }]);
 
-  assert.deepEqual(app.logged, [], 'suppression IS the override — warning about it would train the brand to ignore the log');
-  assert.deepEqual(app.decisions.suppressedUrls(), ['/about']);
-});
+        ctx.expect(app.logged, 'suppression IS the override — warning about it would train the brand to ignore the log').toEqual([]);
+        ctx.expect(app.decisions.suppressedUrls()).toEqual(['/about']);
+      },
+    },
 
-test('a consumer page landing on a default page URL by a different spelling is reported', (t) => {
-  const app = consumer(t, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
-  app.decisions.framework([{ label: 'defaults/pages/about.md', url: '/about.html' }]);
+    {
+      name: 'a consumer page landing on a default page URL by a different spelling is reported',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
+        app.decisions.framework([{ label: 'defaults/pages/about.md', url: '/about.html' }]);
 
-  assert.equal(app.logged.length, 1);
-  assert.match(app.logged[0], /Permalink collision at \/about/);
-  assert.match(app.logged[0], /defaults\/pages\/about\.md/);
-  assert.match(app.logged[0], /exact/, 'the fix is the exact permalink — that is what suppresses the default page');
-});
+        ctx.expect(app.logged.length).toBe(1);
+        ctx.expect(app.logged[0]).toMatch(/Permalink collision at \/about/);
+        ctx.expect(app.logged[0]).toMatch(/defaults\/pages\/about\.md/);
+        ctx.expect(app.logged[0], 'the fix is the exact permalink — that is what suppresses the default page').toMatch(/exact/);
+      },
+    },
 
-test('the diagnostic re-emits on every rescan while the collision persists', (t) => {
-  const app = consumer(t, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
-  app.decisions.framework([]);
-  assert.deepEqual(app.logged, []);
+    {
+      name: 'the diagnostic re-emits on every rescan while the collision persists',
+      run: (ctx) => {
+        const app = consumer(ctx, { 'pages/about.md': '---\npermalink: /about\n---\nabout' });
+        app.decisions.framework([]);
+        ctx.expect(app.logged).toEqual([]);
 
-  app.write('pages/company/about.md', '---\npermalink: /about.html\n---\nabout');
-  reads.rescanTargets().find((target) => target.dir.endsWith('pages')).rerun();
-  assert.equal(app.logged.length, 1, 'the rescan finds it');
+        app.write('pages/company/about.md', '---\npermalink: /about.html\n---\nabout');
+        reads.rescanTargets().find((target) => target.dir.endsWith('pages')).rerun();
+        ctx.expect(app.logged.length, 'the rescan finds it').toBe(1);
 
-  app.decisions.refresh();
-  assert.equal(app.logged.length, 2, 'still colliding, still loud — a fixed collision simply stops emitting');
-});
+        app.decisions.refresh();
+        ctx.expect(app.logged.length, 'still colliding, still loud — a fixed collision simply stops emitting').toBe(2);
+      },
+    },
 
-test('a production build fails on a collision', (t) => {
-  const app = consumer(t, {
-    'pages/about.md': '---\npermalink: /about\n---\nabout',
-    'pages/company/about.md': '---\npermalink: /about/\n---\nabout',
-  }, { environment: 'production' });
+    {
+      name: 'a production build fails on a collision',
+      run: (ctx) => {
+        const app = consumer(ctx, {
+          'pages/about.md': '---\npermalink: /about\n---\nabout',
+          'pages/company/about.md': '---\npermalink: /about/\n---\nabout',
+        }, { environment: 'production' });
 
-  assert.throws(() => app.decisions.framework([]), /Permalink collision at \/about/,
-    'a shipped site with two files at one URL is a broken site — the build stops');
+        ctx.expect(() => app.decisions.framework([]), 'a shipped site with two files at one URL is a broken site — the build stops').toThrow(/Permalink collision at \/about/);
+      },
+    },
+  ],
 });

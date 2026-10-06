@@ -17,8 +17,7 @@
  * esbuild with @omega.js/client stubbed, over a hand-rolled document that is
  * only what the panels touch (node has no DOM and web pulls in no jsdom).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -211,165 +210,195 @@ async function settle() {
   }
 }
 
-test('#343: the referrals panel renders the referrals a persona carries', async () => {
-  // The REFERRER persona's list — the only account seeded with referrals
-  // ([#363](https://github.com/Omega-JS-Stack/omega/issues/363)): every persona
-  // demonstrates its own scenario, so the affiliate story is told by the
-  // account built for it, and this is the list it carries.
-  const referrals = [
-    referral('_test-premium-active', 2 * DAY),
-    referral('_test-basic', 9 * DAY),
-    referral('_test-premium-expired', 24 * DAY),
-    referral('_test-refunded', 51 * DAY),
-  ];
+module.exports = defineCases({
+  type: 'group',
+  description: 'account-persona-previews',
+  tests: [
+    {
+      name: '#343: the referrals panel renders the referrals a persona carries',
+      run: async (ctx) => {
+        // The REFERRER persona's list — the only account seeded with referrals
+        // ([#363](https://github.com/Omega-JS-Stack/omega/issues/363)): every persona
+        // demonstrates its own scenario, so the affiliate story is told by the
+        // account built for it, and this is the list it carries.
+        const referrals = [
+          referral('_test-premium-active', 2 * DAY),
+          referral('_test-basic', 9 * DAY),
+          referral('_test-premium-expired', 24 * DAY),
+          referral('_test-refunded', 51 * DAY),
+        ];
 
-  const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData(persona({ affiliate: { code: 'TESTREF', referrals } }));
-  });
+        const elements = await renderPanels(async (bundle) => {
+          bundle.referrals.loadData(persona({ affiliate: { code: 'TESTREF', referrals } }));
+        });
 
-  const list = elements.get('referrals-list').innerHTML;
+        const list = elements.get('referrals-list').innerHTML;
 
-  for (const entry of referrals) {
-    assert.ok(list.includes(entry.uid), `the panel lists ${entry.uid}`);
-  }
+        for (const entry of referrals) {
+          ctx.expect(list.includes(entry.uid), `the panel lists ${entry.uid}`).toBeTruthy();
+        }
 
-  assert.equal(elements.get('total-referrals').textContent, '4', 'every referral is counted');
-  assert.equal(elements.get('referrals-badge').textContent, '4', 'and the nav badge agrees');
-  assert.equal(elements.get('referral-code-input').value, 'https://example.com?ref=TESTREF', 'the persona\'s own link');
+        ctx.expect(elements.get('total-referrals').textContent, 'every referral is counted').toBe('4');
+        ctx.expect(elements.get('referrals-badge').textContent, 'and the nav badge agrees').toBe('4');
+        ctx.expect(elements.get('referral-code-input').value, 'the persona\'s own link').toBe('https://example.com?ref=TESTREF');
 
-  // The bug the fixtures hid: an ISO timestamp is what a signup writes, and the
-  // panel did arithmetic on it — every real referral read `NaN years ago`.
-  assert.ok(!/NaN/.test(list), 'no referral renders an unreadable date');
-  assert.match(list, /2 days ago/, 'the newest referral is dated from its ISO timestamp');
-  assert.match(list, /1 month ago/, 'and so is the oldest');
-});
-
-test('#343: the referrals panel counts this month from the same timestamps', async () => {
-  // "This month" is a calendar month, so the recent referral is dated to keep
-  // this assertion about the timestamp READ rather than about today's date.
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  const withinThisMonth = Math.min(Date.now() - startOfMonth, 12 * HOUR);
-
-  const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData(persona({
-      affiliate: {
-        code: 'TESTREF',
-        referrals: [referral('_test-basic', withinThisMonth), referral('_test-refunded', 120 * DAY)],
+        // The bug the fixtures hid: an ISO timestamp is what a signup writes, and the
+        // panel did arithmetic on it — every real referral read `NaN years ago`.
+        ctx.expect(!/NaN/.test(list), 'no referral renders an unreadable date').toBeTruthy();
+        ctx.expect(list, 'the newest referral is dated from its ISO timestamp').toMatch(/2 days ago/);
+        ctx.expect(list, 'and so is the oldest').toMatch(/1 month ago/);
       },
-    }));
-  });
+    },
 
-  assert.equal(elements.get('total-referrals').textContent, '2', 'both referrals are counted in the total');
-  assert.equal(elements.get('recent-referrals').textContent, '1', 'only the recent one counts towards this month');
-});
+    {
+      name: '#343: the referrals panel counts this month from the same timestamps',
+      run: async (ctx) => {
+        // "This month" is a calendar month, so the recent referral is dated to keep
+        // this assertion about the timestamp READ rather than about today's date.
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+        const withinThisMonth = Math.min(Date.now() - startOfMonth, 12 * HOUR);
 
-test('#343: an account that referred nobody still renders its empty state', async () => {
-  const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData(persona({ affiliate: { code: 'FRESH', referrals: [] } }));
-  });
+        const elements = await renderPanels(async (bundle) => {
+          bundle.referrals.loadData(persona({
+            affiliate: {
+              code: 'TESTREF',
+              referrals: [referral('_test-basic', withinThisMonth), referral('_test-refunded', 120 * DAY)],
+            },
+          }));
+        });
 
-  assert.equal(elements.get('total-referrals').textContent, '0', 'nothing is counted');
-  assert.match(elements.get('referrals-list').innerHTML, /No referrals yet/, 'and the panel says so');
-});
-
-test('#401: an account that arrived through a referral is told who referred it', async () => {
-  // The REFERRED persona: its own affiliate code is unused (nobody signed up
-  // through it), and the one state it carries is the inbound linkage.
-  const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData(persona({
-      affiliate: { code: 'OWNCODE', referrals: [] },
-      attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
-    }));
-  });
-
-  assert.equal(elements.get('referred-by-code').textContent, 'TESTREF', 'the code the signup came in on');
-  assert.equal(elements.get('referred-by-time').textContent, '2 days ago', 'dated off the same ISO stamp the referrer\'s half carries');
-  assert.ok(!elements.get('referred-by').classList.contains('d-none'), 'and the line is shown');
-});
-
-test('#401: the inbound line goes away again when the next account carries none', async () => {
-  // `omega.auth.listen` fires per auth state, so ONE page can render a second
-  // account: Referred, then anyone else. Hiding is therefore an ACTIVE branch,
-  // not the markup's default — without it the second account keeps reading
-  // "Referred by TESTREF", a referral it never had.
-  let shownForReferred = null;
-
-  const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData(persona({
-      affiliate: { code: 'OWNCODE', referrals: [] },
-      attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
-    }));
-
-    // Read off the document the panel just wrote to, before the second account
-    // lands on the same elements.
-    shownForReferred = !document.getElementById('referred-by').classList.contains('d-none');
-
-    // The next account, carrying the schema's nulled block rather than no block
-    // at all — the shape every doc a backend wrote actually has.
-    bundle.referrals.loadData(persona({
-      affiliate: { code: 'FRESH', referrals: [] },
-      attribution: { affiliate: noInboundReferral() },
-    }));
-  });
-
-  assert.ok(shownForReferred, 'the referred account shows the line');
-  assert.ok(elements.get('referred-by').classList.contains('d-none'), 'and it is hidden again for one nobody referred');
-});
-
-test('#401: the inbound line ships hidden in the markup', async () => {
-  // The premise the panel is built on: it UNHIDES. A layout that dropped the
-  // class would show an empty "Referred by" to every account, and no assertion
-  // over the panel alone could see it.
-  const layout = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
-  const tag = layout.match(/<[a-z]+[^>]*\bid="referred-by"[^>]*>/);
-
-  assert.ok(tag, 'the account layout carries the inbound-referral element');
-  assert.match(tag[0], /class="[^"]*\bd-none\b/, 'and it ships hidden');
-});
-
-test('#343: the sessions panel renders the devices a persona is signed in on', async () => {
-  const sessions = {
-    '_test-session-premium-active-1': session('_test-premium-active', 'ios', '198.51.100.229', 1 * HOUR),
-    '_test-session-premium-active-2': session('_test-premium-active', 'linux', '198.51.100.230', 20 * HOUR),
-    '_test-session-premium-active-3': session('_test-premium-active', 'mac', '198.51.100.227', 73 * HOUR),
-  };
-
-  const elements = await renderPanels(async (bundle) => {
-    bundle.security.loadData(persona({
-      activity: {
-        client: { platform: 'windows', mobile: false, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36' },
-        geolocation: { ip: '198.51.100.12', city: 'Manchester', region: 'England', country: 'GB' },
-        created: { timestamp: new Date(Date.now() - (2 * HOUR)).toISOString(), timestampUNIX: Math.floor((Date.now() - (2 * HOUR)) / 1000) },
+        ctx.expect(elements.get('total-referrals').textContent, 'both referrals are counted in the total').toBe('2');
+        ctx.expect(elements.get('recent-referrals').textContent, 'only the recent one counts towards this month').toBe('1');
       },
-    }));
-    await settle();
-  }, { sessions });
+    },
 
-  const list = elements.get('active-sessions-list').innerHTML;
+    {
+      name: '#343: an account that referred nobody still renders its empty state',
+      run: async (ctx) => {
+        const elements = await renderPanels(async (bundle) => {
+          bundle.referrals.loadData(persona({ affiliate: { code: 'FRESH', referrals: [] } }));
+        });
 
-  // The seeded platforms, as the panel names them (getPlatformName).
-  assert.ok(list.includes('iOS'), 'the phone is listed');
-  assert.ok(list.includes('Linux'), 'the linux box is listed');
-  assert.ok(list.includes('macOS'), 'the mac is listed');
-  assert.ok(list.includes('198.51.100.229'), 'each device shows where it connected from');
-  assert.ok(list.includes('Current'), 'and the browser in front of you is marked as the current session');
-  assert.ok(!/NaN|Unknown Device/.test(list), 'every device reads as a real device at a real time');
-});
-
-test('#343: a persona signed in nowhere else still shows its current session', async () => {
-  const elements = await renderPanels(async (bundle) => {
-    bundle.security.loadData(persona({
-      activity: {
-        client: { platform: 'mac', mobile: false, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0.0.0 Safari/537.36' },
-        geolocation: { ip: '192.0.2.44', city: 'San Diego', region: 'California', country: 'US' },
-        created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
+        ctx.expect(elements.get('total-referrals').textContent, 'nothing is counted').toBe('0');
+        ctx.expect(elements.get('referrals-list').innerHTML, 'and the panel says so').toMatch(/No referrals yet/);
       },
-    }));
-    await settle();
-  }, { sessions: {} });
+    },
 
-  const list = elements.get('active-sessions-list').innerHTML;
+    {
+      name: '#401: an account that arrived through a referral is told who referred it',
+      run: async (ctx) => {
+        // The REFERRED persona: its own affiliate code is unused (nobody signed up
+        // through it), and the one state it carries is the inbound linkage.
+        const elements = await renderPanels(async (bundle) => {
+          bundle.referrals.loadData(persona({
+            affiliate: { code: 'OWNCODE', referrals: [] },
+            attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
+          }));
+        });
 
-  assert.ok(list.includes('Current'), 'the current session is always there');
-  assert.ok(!list.includes('No active sessions found'), 'so the panel is never empty for a signed-in account');
+        ctx.expect(elements.get('referred-by-code').textContent, 'the code the signup came in on').toBe('TESTREF');
+        ctx.expect(elements.get('referred-by-time').textContent, 'dated off the same ISO stamp the referrer\'s half carries').toBe('2 days ago');
+        ctx.expect(!elements.get('referred-by').classList.contains('d-none'), 'and the line is shown').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#401: the inbound line goes away again when the next account carries none',
+      run: async (ctx) => {
+        // `omega.auth.listen` fires per auth state, so ONE page can render a second
+        // account: Referred, then anyone else. Hiding is therefore an ACTIVE branch,
+        // not the markup's default — without it the second account keeps reading
+        // "Referred by TESTREF", a referral it never had.
+        let shownForReferred = null;
+
+        const elements = await renderPanels(async (bundle) => {
+          bundle.referrals.loadData(persona({
+            affiliate: { code: 'OWNCODE', referrals: [] },
+            attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
+          }));
+
+          // Read off the document the panel just wrote to, before the second account
+          // lands on the same elements.
+          shownForReferred = !document.getElementById('referred-by').classList.contains('d-none');
+
+          // The next account, carrying the schema's nulled block rather than no block
+          // at all — the shape every doc a backend wrote actually has.
+          bundle.referrals.loadData(persona({
+            affiliate: { code: 'FRESH', referrals: [] },
+            attribution: { affiliate: noInboundReferral() },
+          }));
+        });
+
+        ctx.expect(shownForReferred, 'the referred account shows the line').toBeTruthy();
+        ctx.expect(elements.get('referred-by').classList.contains('d-none'), 'and it is hidden again for one nobody referred').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#401: the inbound line ships hidden in the markup',
+      run: async (ctx) => {
+        // The premise the panel is built on: it UNHIDES. A layout that dropped the
+        // class would show an empty "Referred by" to every account, and no assertion
+        // over the panel alone could see it.
+        const layout = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
+        const tag = layout.match(/<[a-z]+[^>]*\bid="referred-by"[^>]*>/);
+
+        ctx.expect(tag, 'the account layout carries the inbound-referral element').toBeTruthy();
+        ctx.expect(tag[0], 'and it ships hidden').toMatch(/class="[^"]*\bd-none\b/);
+      },
+    },
+
+    {
+      name: '#343: the sessions panel renders the devices a persona is signed in on',
+      run: async (ctx) => {
+        const sessions = {
+          '_test-session-premium-active-1': session('_test-premium-active', 'ios', '198.51.100.229', 1 * HOUR),
+          '_test-session-premium-active-2': session('_test-premium-active', 'linux', '198.51.100.230', 20 * HOUR),
+          '_test-session-premium-active-3': session('_test-premium-active', 'mac', '198.51.100.227', 73 * HOUR),
+        };
+
+        const elements = await renderPanels(async (bundle) => {
+          bundle.security.loadData(persona({
+            activity: {
+              client: { platform: 'windows', mobile: false, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36' },
+              geolocation: { ip: '198.51.100.12', city: 'Manchester', region: 'England', country: 'GB' },
+              created: { timestamp: new Date(Date.now() - (2 * HOUR)).toISOString(), timestampUNIX: Math.floor((Date.now() - (2 * HOUR)) / 1000) },
+            },
+          }));
+          await settle();
+        }, { sessions });
+
+        const list = elements.get('active-sessions-list').innerHTML;
+
+        // The seeded platforms, as the panel names them (getPlatformName).
+        ctx.expect(list.includes('iOS'), 'the phone is listed').toBeTruthy();
+        ctx.expect(list.includes('Linux'), 'the linux box is listed').toBeTruthy();
+        ctx.expect(list.includes('macOS'), 'the mac is listed').toBeTruthy();
+        ctx.expect(list.includes('198.51.100.229'), 'each device shows where it connected from').toBeTruthy();
+        ctx.expect(list.includes('Current'), 'and the browser in front of you is marked as the current session').toBeTruthy();
+        ctx.expect(!/NaN|Unknown Device/.test(list), 'every device reads as a real device at a real time').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#343: a persona signed in nowhere else still shows its current session',
+      run: async (ctx) => {
+        const elements = await renderPanels(async (bundle) => {
+          bundle.security.loadData(persona({
+            activity: {
+              client: { platform: 'mac', mobile: false, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0.0.0 Safari/537.36' },
+              geolocation: { ip: '192.0.2.44', city: 'San Diego', region: 'California', country: 'US' },
+              created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
+            },
+          }));
+          await settle();
+        }, { sessions: {} });
+
+        const list = elements.get('active-sessions-list').innerHTML;
+
+        ctx.expect(list.includes('Current'), 'the current session is always there').toBeTruthy();
+        ctx.expect(!list.includes('No active sessions found'), 'so the panel is never empty for a signed-in account').toBeTruthy();
+      },
+    },
+  ],
 });

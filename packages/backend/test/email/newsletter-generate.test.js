@@ -93,7 +93,7 @@ module.exports = defineCases({
   // CI). Set TEST_EXTENDED_MODE=1 to switch to the full AI pipeline that fetches
   // real sources, calls the structure + SVG providers, and writes a preview.
   // Other modes (FIXTURE, THEME_ONLY, RELEASE, PEEK) are also opt-in via env.
-  async run({ assert, config, omega, ctx, skip }) {
+  async run({ expect, config, omega, ctx, skip }) {
     const env = process.env;
 
     // --- Apply env overrides into newsletterConfig ---
@@ -158,12 +158,11 @@ module.exports = defineCases({
         .replace(/^fixture:/, '');
       const fixturePath = path.join(__dirname, 'fixtures', `${requestedFixture}.json`);
 
-      assert.ok(jetpack.exists(fixturePath),
-        `Fixture not found: ${fixturePath}. Available fixtures: ${jetpack.list(path.join(__dirname, 'fixtures')).filter((f) => f.endsWith('.json')).join(', ')}. Every registered template should ship a matching fixture in test/email/fixtures/.`);
+      expect(jetpack.exists(fixturePath), `Fixture not found: ${fixturePath}. Available fixtures: ${jetpack.list(path.join(__dirname, 'fixtures')).filter((f) => f.endsWith('.json')).join(', ')}. Every registered template should ship a matching fixture in test/email/fixtures/.`).toBeTruthy();
 
       const structure = jetpack.read(fixturePath, 'json');
 
-      assert.ok(structure, `Fixture ${requestedFixture}.json failed to parse as JSON`);
+      expect(structure, `Fixture ${requestedFixture}.json failed to parse as JSON`).toBeTruthy();
 
       // Pin the template to the fixture name — fixtures are authored for a
       // specific template's content shape, so this prevents the obvious bug
@@ -224,8 +223,8 @@ module.exports = defineCases({
         try { execSync(`open "${previewPath}"`); } catch (e) { /* no-op */ }
       }
 
-      assert.ok(html.includes('<html'), 'Rendered HTML');
-      assert.ok(markdown.includes('# '), 'Rendered markdown has a heading');
+      expect(html.includes('<html'), 'Rendered HTML').toBeTruthy();
+      expect(markdown.includes('# '), 'Rendered markdown has a heading').toBeTruthy();
       return;
     }
 
@@ -238,13 +237,13 @@ module.exports = defineCases({
         explicit: env.NEWSLETTER_REUSE_RUN,
       });
 
-      assert.ok(sourceRun, 'Found a previous run to reuse (set NEWSLETTER_REUSE_RUN=run-<stamp> if needed)');
+      expect(sourceRun, 'Found a previous run to reuse (set NEWSLETTER_REUSE_RUN=run-<stamp> if needed)').toBeTruthy();
 
       console.log(`[theme-only] reusing structure + images from: ${path.basename(sourceRun)}`);
 
       const structure = jetpack.read(path.join(sourceRun, 'structure.json'), 'json');
 
-      assert.ok(structure?.sections?.length, 'Previous run has a valid structure.json');
+      expect(structure?.sections?.length, 'Previous run has a valid structure.json').toBeTruthy();
 
       // Copy section PNGs from previous run into this run's dir so paths resolve
       const imagePaths = [];
@@ -321,7 +320,7 @@ module.exports = defineCases({
         try { execSync(`open "${previewPath}"`); } catch (e) { /* no-op */ }
       }
 
-      assert.ok(html.includes('<html'), 'Rendered HTML');
+      expect(html.includes('<html'), 'Rendered HTML').toBeTruthy();
       return;
     }
 
@@ -339,7 +338,7 @@ module.exports = defineCases({
 
     if (!env.NEWSLETTER_SOURCE) {
       const parentUrl = env.PARENT_API_URL || omega.getParentApiUrl();
-      assert.ok(parentUrl, 'PARENT_API_URL (env) or a resolved company.url must be set for the AI pipeline. Set TEST_EXTENDED_MODE=1 to run it, or omit TEST_EXTENDED_MODE for the fast fixture preview.');
+      expect(parentUrl, 'PARENT_API_URL (env) or a resolved company.url must be set for the AI pipeline. Set TEST_EXTENDED_MODE=1 to run it, or omit TEST_EXTENDED_MODE for the fast fixture preview.').toBeTruthy();
 
       // --- Peek mode (early return) ---
       if (env.NEWSLETTER_PEEK) {
@@ -362,7 +361,7 @@ module.exports = defineCases({
           console.log('');
         });
 
-        assert.ok(true, `Peeked ${peeked.length} sources`);
+        expect(true, `Peeked ${peeked.length} sources`).toBeTruthy();
         return;
       }
 
@@ -470,10 +469,10 @@ module.exports = defineCases({
       }
     );
 
-    assert.ok(result, 'Generator returned a result');
-    assert.ok(result.contentHtml, 'Generator returned contentHtml');
-    assert.ok(result.contentMarkdown, 'Generator returned contentMarkdown');
-    assert.ok(result.structure?.sections?.length >= 2, 'Has at least 2 sections');
+    expect(result, 'Generator returned a result').toBeTruthy();
+    expect(result.contentHtml, 'Generator returned contentHtml').toBeTruthy();
+    expect(result.contentMarkdown, 'Generator returned contentMarkdown').toBeTruthy();
+    expect(result.structure?.sections?.length >= 2, 'Has at least 2 sections').toBeTruthy();
 
     // Regression guard: with NEWSLETTER_CREATE_ARTICLE=1 the linked article
     // must actually PUBLISH (commit to the website repo) and the CTA must be
@@ -481,10 +480,8 @@ module.exports = defineCases({
     // (e.g. the v5.11.0 `sources` scope bug that silently failed every
     // production publish inside buildLinkedArticle's try/catch).
     if (env.NEWSLETTER_CREATE_ARTICLE && result.article) {
-      assert.ok(result.article.published === true,
-        `Linked article must be published when NEWSLETTER_CREATE_ARTICLE=1 (url: ${result.article.url})`);
-      assert.ok(result.structure.sections[0]?.cta?.url === result.article.url,
-        'Lead section CTA must point at the published article');
+      expect(result.article.published === true, `Linked article must be published when NEWSLETTER_CREATE_ARTICLE=1 (url: ${result.article.url})`).toBeTruthy();
+      expect(result.structure.sections[0]?.cta?.url === result.article.url, 'Lead section CTA must point at the published article').toBeTruthy();
     }
 
     // --- Write outputs ---

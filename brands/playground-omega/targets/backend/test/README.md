@@ -28,7 +28,7 @@ Name every test file `<concern>.test.js`: the suffix is how the runner finds it,
 | `test/fixtures/` | Static test data (JSON, sample docs) |
 | `test/_init/` | Per-suite setup (Firestore seed data, user accounts) |
 
-Tests run inside the Firebase emulator. Use what every test's `run()` receives (the real `omega` instance, a real `ctx`, `firestore`, `http`, `accounts`) instead of mocking: `npx omega emulator` boots the same environment the tests run against.
+Tests run inside the Firebase emulator. Use what every test's `run()` receives (the real `omega` instance, a real `ctx`, `firestore`, `http`, `accounts`, and `expect` to assert with) instead of mocking: `npx omega emulator` boots the same environment the tests run against.
 
 ## Extended mode (real external APIs)
 
@@ -60,14 +60,18 @@ module.exports = defineCases({
     {
       name: 'answers-ok',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/hello');
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
       },
     },
   ],
 });
 ```
+
+Every check is an `expect(...)` matcher: `toBe`, `toEqual`, `toBeTruthy`, `toBeSuccess()`, `toBeError(status)`, `toHaveProperty(path, value?)`, `toContain`, `toBeTypeOf`, `expect.fail(message)` and the rest of devkit's set. A helper outside a case body takes the same `expect` from `@omega.js/backend/test`.
+
+`test/_init.js` (shipped beside this file) is a factory, `({ projectRoot, config, omega, ctx }) => ({ accounts, setup })`: it declares extra test accounts and seeds fixtures after the pre-run flush. If it fails to load or throws, the run stops before any case and names the file.
 
 ## See also
 

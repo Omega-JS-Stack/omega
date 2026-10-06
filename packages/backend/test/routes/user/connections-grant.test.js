@@ -181,81 +181,81 @@ module.exports = defineCases({
     {
       name: 'the-pkce-pair-is-the-rfc-7636-one',
 
-      async run({ assert }) {
-        assert.equal(pkceChallenge(RFC_VERIFIER), RFC_CHALLENGE, 'S256 of the published verifier is the published challenge');
+      async run({ expect }) {
+        expect(pkceChallenge(RFC_VERIFIER), 'S256 of the published verifier is the published challenge').toBe(RFC_CHALLENGE);
 
         const pair = generatePkcePair();
 
-        assert.equal(pair.verifier.length, 43, `32 random bytes base64url is 43 chars: ${pair.verifier.length}`);
-        assert.match(pair.verifier, /^[A-Za-z0-9_-]+$/, 'the verifier is base64url — no +, / or = to be re-encoded in a query');
-        assert.match(pair.challenge, /^[A-Za-z0-9_-]+$/, 'and so is the challenge');
-        assert.equal(pair.challenge, pkceChallenge(pair.verifier), 'the pair is a real pair');
-        assert.notEqual(pair.verifier, generatePkcePair().verifier, 'every authorize mints its own');
+        expect(pair.verifier.length, `32 random bytes base64url is 43 chars: ${pair.verifier.length}`).toBe(43);
+        expect(pair.verifier, 'the verifier is base64url — no +, / or = to be re-encoded in a query').toMatch(/^[A-Za-z0-9_-]+$/);
+        expect(pair.challenge, 'and so is the challenge').toMatch(/^[A-Za-z0-9_-]+$/);
+        expect(pair.challenge, 'the pair is a real pair').toBe(pkceChallenge(pair.verifier));
+        expect(pair.verifier, 'every authorize mints its own').not.toBe(generatePkcePair().verifier);
       },
     },
 
     {
       name: 'the-authorize-url-carries-the-challenge-only-for-a-pkce-provider',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const pkce = generatePkcePair();
 
         const withPkce = new URL(defaultAuthorize(stepContext(PKCE_PROVIDER, { pkce }).context));
 
-        assert.equal(withPkce.searchParams.get('code_challenge'), pkce.challenge, 'the challenge rides the URL');
-        assert.equal(withPkce.searchParams.get('code_challenge_method'), 'S256', 'and names its method');
-        assert.equal(withPkce.searchParams.get('code_verifier'), null, 'the VERIFIER never leaves the server on this leg');
+        expect(withPkce.searchParams.get('code_challenge'), 'the challenge rides the URL').toBe(pkce.challenge);
+        expect(withPkce.searchParams.get('code_challenge_method'), 'and names its method').toBe('S256');
+        expect(withPkce.searchParams.get('code_verifier'), 'the VERIFIER never leaves the server on this leg').toBe(null);
 
         // The rest of the URL is what it always was
-        assert.equal(withPkce.searchParams.get('client_id'), 'client-id-771', 'the client id');
-        assert.equal(withPkce.searchParams.get('redirect_uri'), 'https://brand.test/connections/callback', 'the redirect uri');
-        assert.equal(withPkce.searchParams.get('response_type'), 'code', 'the response type');
-        assert.equal(withPkce.searchParams.get('state'), 'encrypted-state-771', 'the encrypted state');
-        assert.equal(withPkce.searchParams.get('scope'), 'identify', 'the resolved scope, space-joined');
-        assert.equal(withPkce.searchParams.get('prompt'), 'consent', "the provider's own `params`");
+        expect(withPkce.searchParams.get('client_id'), 'the client id').toBe('client-id-771');
+        expect(withPkce.searchParams.get('redirect_uri'), 'the redirect uri').toBe('https://brand.test/connections/callback');
+        expect(withPkce.searchParams.get('response_type'), 'the response type').toBe('code');
+        expect(withPkce.searchParams.get('state'), 'the encrypted state').toBe('encrypted-state-771');
+        expect(withPkce.searchParams.get('scope'), 'the resolved scope, space-joined').toBe('identify');
+        expect(withPkce.searchParams.get('prompt'), "the provider's own `params`").toBe('consent');
 
         const withoutPkce = new URL(defaultAuthorize(stepContext(PLAIN_PROVIDER).context));
 
-        assert.equal(withoutPkce.searchParams.get('code_challenge'), null, 'a provider that declares no PKCE sends none');
-        assert.equal(withoutPkce.searchParams.get('code_challenge_method'), null, 'and no method either');
+        expect(withoutPkce.searchParams.get('code_challenge'), 'a provider that declares no PKCE sends none').toBe(null);
+        expect(withoutPkce.searchParams.get('code_challenge_method'), 'and no method either').toBe(null);
       },
     },
 
     {
       name: 'the-exchange-body-carries-the-code-verifier-only-for-a-pkce-provider',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const pkce = generatePkcePair();
         const withPkce = stepContext(PKCE_PROVIDER, { pkce, code: 'auth-code-771' });
 
         const response = await defaultExchange.call(PKCE_PROVIDER, withPkce.context);
 
-        assert.equal(response.access_token, 'access-771', "the step answers the token endpoint's response");
-        assert.equal(withPkce.calls.length, 1, 'one call to the token endpoint');
-        assert.equal(withPkce.calls[0].url, 'https://provider.test/token', "the provider's ONE token url");
-        assert.equal(withPkce.calls[0].options.timeout, 60000, 'the exchange keeps its 60s — it holds no lease');
+        expect(response.access_token, "the step answers the token endpoint's response").toBe('access-771');
+        expect(withPkce.calls.length, 'one call to the token endpoint').toBe(1);
+        expect(withPkce.calls[0].url, "the provider's ONE token url").toBe('https://provider.test/token');
+        expect(withPkce.calls[0].options.timeout, 'the exchange keeps its 60s — it holds no lease').toBe(60000);
 
         const body = postedBody(withPkce.calls[0]);
 
-        assert.equal(body.code_verifier, pkce.verifier, 'the verifier proves the challenge');
-        assert.equal(body.grant_type, 'authorization_code', 'the grant type');
-        assert.equal(body.code, 'auth-code-771', 'the code');
-        assert.equal(body.client_id, 'client-id-771', 'the client id');
-        assert.equal(body.client_secret, 'client-secret-771', 'the client secret');
-        assert.equal(body.redirect_uri, 'https://brand.test/connections/callback', 'the redirect uri');
+        expect(body.code_verifier, 'the verifier proves the challenge').toBe(pkce.verifier);
+        expect(body.grant_type, 'the grant type').toBe('authorization_code');
+        expect(body.code, 'the code').toBe('auth-code-771');
+        expect(body.client_id, 'the client id').toBe('client-id-771');
+        expect(body.client_secret, 'the client secret').toBe('client-secret-771');
+        expect(body.redirect_uri, 'the redirect uri').toBe('https://brand.test/connections/callback');
 
         const withoutPkce = stepContext(PLAIN_PROVIDER, { code: 'auth-code-771' });
 
         await defaultExchange.call(PLAIN_PROVIDER, withoutPkce.context);
 
-        assert.equal(postedBody(withoutPkce.calls[0]).code_verifier, undefined, 'a provider that declares no PKCE sends none');
+        expect(postedBody(withoutPkce.calls[0]).code_verifier, 'a provider that declares no PKCE sends none').toBe(undefined);
       },
     },
 
     {
       name: 'the-default-refresh-posts-the-stored-refresh-token-to-the-same-url',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { context, calls } = stepContext(PLAIN_PROVIDER, {
           token: { access_token: 'old-access', refresh_token: 'stored-refresh-771' },
         });
@@ -264,11 +264,11 @@ module.exports = defineCases({
 
         const body = postedBody(calls[0]);
 
-        assert.equal(calls[0].url, 'https://provider.test/token', 'the exchange and the refresh are ONE endpoint (#793)');
-        assert.equal(calls[0].options.timeout, 20000, 'and 20s to answer in: a refresh runs while holding the 30s lease ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)), so it may not outlive it');
-        assert.equal(body.grant_type, 'refresh_token', 'the grant type');
-        assert.equal(body.refresh_token, 'stored-refresh-771', 'the token the record holds');
-        assert.equal(body.code_verifier, undefined, 'a refresh has no verifier to send');
+        expect(calls[0].url, 'the exchange and the refresh are ONE endpoint (#793)').toBe('https://provider.test/token');
+        expect(calls[0].options.timeout, 'and 20s to answer in: a refresh runs while holding the 30s lease ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)), so it may not outlive it').toBe(20000);
+        expect(body.grant_type, 'the grant type').toBe('refresh_token');
+        expect(body.refresh_token, 'the token the record holds').toBe('stored-refresh-771');
+        expect(body.code_verifier, 'a refresh has no verifier to send').toBe(undefined);
       },
     },
 
@@ -277,44 +277,44 @@ module.exports = defineCases({
       // signature; it is a step with a default now, and the default is the RFC
       name: 'the-default-revoke-is-the-rfc-7009-post',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { context, calls } = stepContext(PLAIN_PROVIDER, {
           token: { access_token: 'access-793', refresh_token: 'refresh-793' },
         });
 
         const answer = await defaultRevoke.call(PLAIN_PROVIDER, context);
 
-        assert.equal(answer, undefined, 'a revoke that worked answers nothing');
-        assert.equal(calls[0].url, 'https://provider.test/revoke', "the provider's revoke url");
-        assert.equal(calls[0].options.method, 'POST', 'as a POST');
+        expect(answer, 'a revoke that worked answers nothing').toBe(undefined);
+        expect(calls[0].url, "the provider's revoke url").toBe('https://provider.test/revoke');
+        expect(calls[0].options.method, 'as a POST').toBe('POST');
 
         const body = postedBody(calls[0]);
 
-        assert.equal(body.token, 'access-793', 'carrying the access token');
-        assert.equal(body.client_id, 'client-id-771', 'and the client the provider knows this app by');
-        assert.equal(body.client_secret, 'client-secret-771', 'with its secret when there is one');
+        expect(body.token, 'carrying the access token').toBe('access-793');
+        expect(body.client_id, 'and the client the provider knows this app by').toBe('client-id-771');
+        expect(body.client_secret, 'with its secret when there is one').toBe('client-secret-771');
 
         // A public client has none to send ([#785](https://github.com/Omega-JS-Stack/omega/issues/785))
         const publicClient = stepContext(PLAIN_PROVIDER, { clientSecret: '', token: { access_token: 'access-793' } });
 
         await defaultRevoke.call(PLAIN_PROVIDER, publicClient.context);
 
-        assert.equal('client_secret' in postedBody(publicClient.calls[0]), false, 'an empty secret is no secret here either');
+        expect('client_secret' in postedBody(publicClient.calls[0]), 'an empty secret is no secret here either').toBe(false);
       },
     },
 
     {
       name: 'a-provider-with-no-revoke-url-answers-unsupported-and-calls-nothing',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const noRevoke = { ...PLAIN_PROVIDER, urls: { authorize: 'https://provider.test/authorize', token: 'https://provider.test/token' } };
         const { context, calls } = stepContext(noRevoke, { token: { access_token: 'access-793' } });
 
         const answer = await defaultRevoke.call(noRevoke, context);
 
-        assert.equal(answer, REVOKE_UNSUPPORTED, 'the step says so rather than pretending it revoked');
-        assert.equal(calls.length, 0, 'and no request went out');
-        assert.equal(spotify.urls.revoke, undefined, 'Spotify is the packaged provider in exactly this position');
+        expect(answer, 'the step says so rather than pretending it revoked').toBe(REVOKE_UNSUPPORTED);
+        expect(calls.length, 'and no request went out').toBe(0);
+        expect(spotify.urls.revoke, 'Spotify is the packaged provider in exactly this position').toBe(undefined);
       },
     },
 
@@ -323,7 +323,7 @@ module.exports = defineCases({
       // disconnected, and a provider that cannot revoke does not get a veto
       name: 'the-delete-removes-the-record-even-when-the-revoke-cannot-run',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = brandDir({
           'unrevokable-793': [
             'module.exports = {',
@@ -366,14 +366,14 @@ module.exports = defineCases({
           data: { provider: 'unrevokable-793' },
         });
 
-        assert.equal(responses[0].message.success, true, 'the disconnect succeeds');
-        assert.ok(logged.some((line) => line.includes('unsupported')), `and the log says the provider could not be told: ${logged.join(' | ')}`);
+        expect(responses[0].message.success, 'the disconnect succeeds').toBe(true);
+        expect(logged.some((line) => line.includes('unsupported')), `and the log says the provider could not be told: ${logged.join(' | ')}`).toBeTruthy();
 
         const deleted = writes.find((write) => write.path === 'users/user-793');
         const removed = deleted && (deleted.payload.connections?.['unrevokable-793']?.x ?? deleted.payload['connections.unrevokable-793.x']);
 
-        assert.ok(deleted, 'the record is deleted');
-        assert.equal(removed?.methodName, 'FieldValue.delete', `and it is the one account's record that went: ${JSON.stringify(deleted?.payload)}`);
+        expect(deleted, 'the record is deleted').toBeTruthy();
+        expect(removed?.methodName, `and it is the one account's record that went: ${JSON.stringify(deleted?.payload)}`).toBe('FieldValue.delete');
       },
     },
 
@@ -384,7 +384,7 @@ module.exports = defineCases({
       // as a WRONG secret, not as no secret, and refuses the grant with it.
       name: 'a-public-client-sends-no-client_secret-key-at-all',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = brandDir({
           'public-fixture-785': "module.exports = { provider: 'public-fixture-785', name: 'Public Fixture', urls: { authorize: 'https://brand.test/a', token: 'https://brand.test/t' }, async identity() { return { id: 'x' }; } };",
         });
@@ -393,7 +393,7 @@ module.exports = defineCases({
         // CONNECTIONS_<PROVIDER>_CLIENT_SECRET is not in the brand's .env
         const resolved = loadProvider('public-fixture-785', omega);
 
-        assert.equal(resolved.clientSecret, undefined, 'an unset CONNECTIONS_<PROVIDER>_CLIENT_SECRET resolves to nothing');
+        expect(resolved.clientSecret, 'an unset CONNECTIONS_<PROVIDER>_CLIENT_SECRET resolves to nothing').toBe(undefined);
 
         const exchange = stepContext(PLAIN_PROVIDER, { code: 'auth-code-785', clientSecret: resolved.clientSecret });
 
@@ -401,15 +401,15 @@ module.exports = defineCases({
 
         const exchangeBody = postedBody(exchange.calls[0]);
 
-        assert.equal('client_secret' in exchangeBody, false, 'the KEY is absent from the exchange, not present and empty');
-        assert.equal(exchangeBody.client_id, 'client-id-771', 'the client id still rides — that is what a public client identifies with');
-        assert.equal(exchangeBody.code, 'auth-code-785', 'and the code');
+        expect('client_secret' in exchangeBody, 'the KEY is absent from the exchange, not present and empty').toBe(false);
+        expect(exchangeBody.client_id, 'the client id still rides — that is what a public client identifies with').toBe('client-id-771');
+        expect(exchangeBody.code, 'and the code').toBe('auth-code-785');
 
         const refresh = stepContext(PLAIN_PROVIDER, { clientSecret: resolved.clientSecret, token: { refresh_token: 'stored-refresh-785' } });
 
         await defaultRefresh.call(PLAIN_PROVIDER, refresh.context);
 
-        assert.equal('client_secret' in postedBody(refresh.calls[0]), false, 'and absent from the refresh too — the same client, the same registration');
+        expect('client_secret' in postedBody(refresh.calls[0]), 'and absent from the refresh too — the same client, the same registration').toBe(false);
 
         // A brand's `.env` writes an empty value as KEY="", which is the same
         // "no secret" as the key never being there
@@ -417,7 +417,7 @@ module.exports = defineCases({
 
         await defaultExchange.call(PLAIN_PROVIDER, empty.context);
 
-        assert.equal('client_secret' in postedBody(empty.calls[0]), false, 'an empty secret is no secret');
+        expect('client_secret' in postedBody(empty.calls[0]), 'an empty secret is no secret').toBe(false);
       },
     },
 
@@ -428,7 +428,7 @@ module.exports = defineCases({
       // [#785](https://github.com/Omega-JS-Stack/omega/issues/785)).
       name: 'a-public-pkce-client-proves-the-exchange-with-the-verifier',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const pkce = generatePkcePair();
         const { context, calls } = stepContext(PKCE_PROVIDER, { pkce, code: 'auth-code-785', clientSecret: undefined });
 
@@ -436,10 +436,10 @@ module.exports = defineCases({
 
         const body = postedBody(calls[0]);
 
-        assert.equal('client_secret' in body, false, 'no secret rides — the brand has none');
-        assert.equal(body.code_verifier, pkce.verifier, 'and the verifier does, which is what stands in for it');
-        assert.equal(body.client_id, 'client-id-771', 'beside the client id');
-        assert.equal(body.grant_type, 'authorization_code', 'on the same grant as any other client');
+        expect('client_secret' in body, 'no secret rides — the brand has none').toBe(false);
+        expect(body.code_verifier, 'and the verifier does, which is what stands in for it').toBe(pkce.verifier);
+        expect(body.client_id, 'beside the client id').toBe('client-id-771');
+        expect(body.grant_type, 'on the same grant as any other client').toBe('authorization_code');
       },
     },
 
@@ -449,33 +449,25 @@ module.exports = defineCases({
       // bodies today.
       name: 'a-confidential-clients-bodies-are-unchanged',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const exchange = stepContext(PLAIN_PROVIDER, { code: 'auth-code-785' });
 
         await defaultExchange.call(PLAIN_PROVIDER, exchange.context);
 
-        assert.equal(
-          exchange.calls[0].options.body.toString(),
-          'client_id=client-id-771&client_secret=client-secret-771&grant_type=authorization_code&redirect_uri=https%3A%2F%2Fbrand.test%2Fconnections%2Fcallback&code=auth-code-785',
-          'the exchange body, field for field and in order',
-        );
+        expect(exchange.calls[0].options.body.toString(), 'the exchange body, field for field and in order').toBe('client_id=client-id-771&client_secret=client-secret-771&grant_type=authorization_code&redirect_uri=https%3A%2F%2Fbrand.test%2Fconnections%2Fcallback&code=auth-code-785');
 
         const refresh = stepContext(PLAIN_PROVIDER, { token: { refresh_token: 'stored-refresh-785' } });
 
         await defaultRefresh.call(PLAIN_PROVIDER, refresh.context);
 
-        assert.equal(
-          refresh.calls[0].options.body.toString(),
-          'client_id=client-id-771&client_secret=client-secret-771&grant_type=refresh_token&refresh_token=stored-refresh-785',
-          'and the refresh body',
-        );
+        expect(refresh.calls[0].options.body.toString(), 'and the refresh body').toBe('client_id=client-id-771&client_secret=client-secret-771&grant_type=refresh_token&refresh_token=stored-refresh-785');
       },
     },
 
     {
       name: 'an-override-runs-as-a-method-and-its-answer-is-the-one-used',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const seen = {};
 
         const provider = {
@@ -508,30 +500,30 @@ module.exports = defineCases({
 
         await runStep(provider, 'revoke', context);
 
-        assert.equal(url, 'https://provider.test/authorize?custom=1', "the override's URL is the one used");
-        assert.equal(exchanged.access_token, 'from-the-override', "the override's token response is the one used");
-        assert.equal(refreshed.access_token, 'refreshed-by-the-override', "the override's refresh is the one used");
-        assert.equal(calls.length, 0, 'and no default ran behind it');
+        expect(url, "the override's URL is the one used").toBe('https://provider.test/authorize?custom=1');
+        expect(exchanged.access_token, "the override's token response is the one used").toBe('from-the-override');
+        expect(refreshed.access_token, "the override's refresh is the one used").toBe('refreshed-by-the-override');
+        expect(calls.length, 'and no default ran behind it').toBe(0);
 
-        assert.equal(seen.authorizeThis, provider, '`this` is the provider module, so this.urls.* works');
-        assert.equal(seen.exchangeThis, provider, 'the exchange too');
-        assert.equal(seen.refreshThis, provider, 'the refresh');
-        assert.equal(seen.revokeThis, provider, 'and the revoke');
-        assert.equal(seen.authorizeContext.provider, provider, 'the context carries the module, so an override never needs `this`');
-        assert.equal(seen.authorizeContext.providerName, 'override-fixture', 'and the name it was loaded by');
-        assert.equal(seen.authorizeContext.uid, 'user-793', 'and the user the connect is for (#793)');
+        expect(seen.authorizeThis, '`this` is the provider module, so this.urls.* works').toBe(provider);
+        expect(seen.exchangeThis, 'the exchange too').toBe(provider);
+        expect(seen.refreshThis, 'the refresh').toBe(provider);
+        expect(seen.revokeThis, 'and the revoke').toBe(provider);
+        expect(seen.authorizeContext.provider, 'the context carries the module, so an override never needs `this`').toBe(provider);
+        expect(seen.authorizeContext.providerName, 'and the name it was loaded by').toBe('override-fixture');
+        expect(seen.authorizeContext.uid, 'and the user the connect is for (#793)').toBe('user-793');
 
         // A provider that overrides nothing runs the defaults through the SAME call
         const url2 = await runStep(PLAIN_PROVIDER, 'authorize', stepContext(PLAIN_PROVIDER).context);
 
-        assert.match(url2, /^https:\/\/provider\.test\/authorize\?/, 'no override means the default step');
+        expect(url2, 'no override means the default step').toMatch(/^https:\/\/provider\.test\/authorize\?/);
       },
     },
 
     {
       name: 'a-brand-provider-file-wins-over-the-package-one',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const shape = "urls: { authorize: 'https://brand.test/a', token: 'https://brand.test/t' }, async identity() { return { id: 'x' }; }";
 
         const omega = brandDir({
@@ -541,43 +533,43 @@ module.exports = defineCases({
 
         const shadowed = loadProvider('google', omega);
 
-        assert.equal(shadowed.connectionProvider.name, 'Brand Google', "the brand's own file wins for a name the package also ships");
+        expect(shadowed.connectionProvider.name, "the brand's own file wins for a name the package also ships").toBe('Brand Google');
 
         const brandOnly = loadProvider('house-provider', omega);
 
-        assert.equal(brandOnly.connectionProvider.name, 'House', 'a provider only the brand has loads');
+        expect(brandOnly.connectionProvider.name, 'a provider only the brand has loads').toBe('House');
 
         const packaged = loadProvider('google', { cwd: jetpack.tmpDir({ prefix: 'omega-connections-771-empty' }).path() });
 
-        assert.equal(packaged.connectionProvider.name, 'Google', 'with no brand file, the package provider still loads');
+        expect(packaged.connectionProvider.name, 'with no brand file, the package provider still loads').toBe('Google');
 
         const noBrand = loadProvider('discord', null);
 
-        assert.equal(noBrand.connectionProvider.provider, 'discord', 'and a caller with no omega reads the package dir alone');
+        expect(noBrand.connectionProvider.provider, 'and a caller with no omega reads the package dir alone').toBe('discord');
       },
     },
 
     {
       name: 'an-unknown-provider-is-still-the-same-400',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = brandDir({});
 
         const unknown = loadProvider('not-a-provider', omega);
 
-        assert.equal(unknown.error.code, 400, 'the code the route answers');
-        assert.equal(unknown.error.message, 'Unknown connection provider: not-a-provider', 'and the message it has always answered');
+        expect(unknown.error.code, 'the code the route answers').toBe(400);
+        expect(unknown.error.message, 'and the message it has always answered').toBe('Unknown connection provider: not-a-provider');
 
         const traversal = loadProvider('../../../../etc/passwd', omega);
 
-        assert.equal(traversal.error.code, 400, 'a name that could escape the directory is just unknown');
+        expect(traversal.error.code, 'a name that could escape the directory is just unknown').toBe(400);
       },
     },
 
     {
       name: 'a-provider-file-missing-its-shape-fails-loudly-at-load',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const identity = "async identity() { return { id: 'x' }; }";
 
         const omega = brandDir({
@@ -603,10 +595,10 @@ module.exports = defineCases({
             thrown = e;
           }
 
-          assert.ok(thrown, `${name} is a broken provider, not an unknown one — it throws`);
-          assert.equal(thrown.message.includes(`${name}.js`), true, `the message names the file: ${thrown.message}`);
-          assert.equal(thrown.message.includes(missing), true, `and the missing field: ${thrown.message}`);
-          assert.equal(thrown.message.includes(omega.cwd), false, `never the deployed path, which is not a caller's to see: ${thrown.message}`);
+          expect(thrown, `${name} is a broken provider, not an unknown one — it throws`).toBeTruthy();
+          expect(thrown.message.includes(`${name}.js`), `the message names the file: ${thrown.message}`).toBe(true);
+          expect(thrown.message.includes(missing), `and the missing field: ${thrown.message}`).toBe(true);
+          expect(thrown.message.includes(omega.cwd), `never the deployed path, which is not a caller's to see: ${thrown.message}`).toBe(false);
         }
       },
     },
@@ -618,7 +610,7 @@ module.exports = defineCases({
       // `usage/<uid>` to be replayed with the same code.
       name: 'a-failing-exchange-still-clears-the-one-time-session',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const uid = 'user-771';
         const providerName = 'failing-exchange';
         const omega = brandDir({
@@ -660,26 +652,26 @@ module.exports = defineCases({
 
         await postRoute({ ctx, user: {}, data: { action: 'tokenize', code: 'auth-code-771', encryptedState } });
 
-        assert.equal(responses[0].options.code, 500, 'the exchange failure is still reported');
-        assert.equal(responses[0].message.includes('Token exchange failed'), true, `with its own message: ${responses[0].message}`);
+        expect(responses[0].options.code, 'the exchange failure is still reported').toBe(500);
+        expect(responses[0].message.includes('Token exchange failed'), `with its own message: ${responses[0].message}`).toBe(true);
 
         const sessionDelete = writes.find((write) => write.path === `usage/${uid}` && write.verb === 'update');
 
-        assert.ok(sessionDelete, 'the one-time session was cleared even though the exchange failed');
-        assert.equal(`connections.${providerName}` in sessionDelete.payload, true, 'and it is the provider entry that was deleted');
-        assert.equal(writes.some((write) => write.path.startsWith('users/')), false, 'nothing was recorded on the user — there was no token to record');
+        expect(sessionDelete, 'the one-time session was cleared even though the exchange failed').toBeTruthy();
+        expect(`connections.${providerName}` in sessionDelete.payload, 'and it is the provider entry that was deleted').toBe(true);
+        expect(writes.some((write) => write.path.startsWith('users/')), 'nothing was recorded on the user — there was no token to record').toBe(false);
       },
     },
 
     {
       name: 'twitch-identifies-against-helix-with-the-client-id-from-the-context',
 
-      async run({ assert }) {
+      async run({ expect }) {
         identityCalls.length = 0;
         identityResponse = { data: [{ id: 'twitch-1', login: 'ianwieds', email: 'buyer@example.com' }] };
 
-        assert.equal(twitch.pkce, undefined, 'Twitch is a plain authorization-code provider');
-        assert.equal(typeof twitch.urls.authorize, 'string', 'it declares an authorize url');
+        expect(twitch.pkce, 'Twitch is a plain authorization-code provider').toBe(undefined);
+        expect(typeof twitch.urls.authorize, 'it declares an authorize url').toBe('string');
 
         // The env read is GONE ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)):
         // the credentials ride the context, resolved once by the lane. A stale
@@ -705,22 +697,22 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(identity.id, 'twitch-1', "the helix payload's user is the identity, not the envelope");
-        assert.equal(identity.login, 'ianwieds', 'with its fields intact');
-        assert.equal(identityCalls[0].url, 'https://api.twitch.tv/helix/users', 'the users endpoint');
-        assert.equal(identityCalls[0].options.headers['Client-Id'], 'twitch-client-771', "Twitch requires the app id beside the token, and it is the CONTEXT's");
-        assert.equal(identityCalls[0].options.headers.authorization, 'Bearer access-771', 'and the bearer token');
+        expect(identity.id, "the helix payload's user is the identity, not the envelope").toBe('twitch-1');
+        expect(identity.login, 'with its fields intact').toBe('ianwieds');
+        expect(identityCalls[0].url, 'the users endpoint').toBe('https://api.twitch.tv/helix/users');
+        expect(identityCalls[0].options.headers['Client-Id'], "Twitch requires the app id beside the token, and it is the CONTEXT's").toBe('twitch-client-771');
+        expect(identityCalls[0].options.headers.authorization, 'and the bearer token').toBe('Bearer access-771');
       },
     },
 
     {
       name: 'kick-revokes-at-its-own-endpoint-and-stringifies-its-user-id',
 
-      async run({ assert }) {
+      async run({ expect }) {
         identityCalls.length = 0;
         identityResponse = {};
 
-        assert.equal(kick.pkce, 'S256', 'Kick is OAuth 2.1 — PKCE is not optional there');
+        expect(kick.pkce, 'Kick is OAuth 2.1 — PKCE is not optional there').toBe('S256');
 
         await kick.revoke({
           ctx: { log() {} },
@@ -730,13 +722,13 @@ module.exports = defineCases({
           fetch: require('wonderful-fetch'),
         });
 
-        assert.equal(identityCalls[0].url, kick.urls.revoke, "the provider's own revoke url");
-        assert.equal(identityCalls[0].options.method, 'POST', 'as a POST');
+        expect(identityCalls[0].url, "the provider's own revoke url").toBe(kick.urls.revoke);
+        expect(identityCalls[0].options.method, 'as a POST').toBe('POST');
 
         const body = Object.fromEntries(new URLSearchParams(identityCalls[0].options.body));
 
-        assert.equal(body.token, 'access-771', 'carrying the token');
-        assert.equal(body.token_hint_type, 'access_token', 'and the hint Kick wants beside it');
+        expect(body.token, 'carrying the token').toBe('access-771');
+        expect(body.token_hint_type, 'and the hint Kick wants beside it').toBe('access_token');
 
         // Kick's public API answers `user_id` as a NUMBER, and the route matches
         // on a string id
@@ -750,10 +742,10 @@ module.exports = defineCases({
           fetch: require('wonderful-fetch'),
         });
 
-        assert.equal(identity.id, '8675309', 'the id is the stringified user_id');
-        assert.equal(identity.user_id, 8675309, "and Kick's own field is stored as it answered it");
-        assert.equal(identityCalls[0].url, 'https://api.kick.com/public/v1/users', 'the users endpoint');
-        assert.equal(identityCalls[0].options.headers.authorization, 'Bearer access-771', 'with the bearer token');
+        expect(identity.id, 'the id is the stringified user_id').toBe('8675309');
+        expect(identity.user_id, "and Kick's own field is stored as it answered it").toBe(8675309);
+        expect(identityCalls[0].url, 'the users endpoint').toBe('https://api.kick.com/public/v1/users');
+        expect(identityCalls[0].options.headers.authorization, 'with the bearer token').toBe('Bearer access-771');
       },
     },
   ],

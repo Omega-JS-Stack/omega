@@ -27,7 +27,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refund-linkage-trust
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
@@ -278,12 +278,12 @@ module.exports = defineCases({
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.refusal?.reason, 'refund-not-linked', 'the record the provider answered with is about another order');
-        assert.equal(event.refusal?.resourceId, STRIPE_SUBSCRIPTION_ID, 'the stamp names the resource the event claimed');
-        assert.equal(event.refusal?.linkedTo, 'sub_someone_else', 'and the one the refund record actually belongs to');
-        assert.equal(event.status, 'completed', 'no retry can relate two unrelated records — the decision is terminal');
-        assert.ok(!store.get(`users/${UID}`), 'nothing is written for an event that imported another order\'s numbers');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'no order either');
+        expect(event.refusal?.reason, 'the record the provider answered with is about another order').toBe('refund-not-linked');
+        expect(event.refusal?.resourceId, 'the stamp names the resource the event claimed').toBe(STRIPE_SUBSCRIPTION_ID);
+        expect(event.refusal?.linkedTo, 'and the one the refund record actually belongs to').toBe('sub_someone_else');
+        expect(event.status, 'no retry can relate two unrelated records — the decision is terminal').toBe('completed');
+        expect(!store.get(`users/${UID}`), 'nothing is written for an event that imported another order\'s numbers').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'no order either').toBeTruthy();
       },
     },
 
@@ -297,9 +297,9 @@ module.exports = defineCases({
           charge: stripeCharge({ subscription: null, uid: OTHER_UID }),
         });
 
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason, 'refund-not-linked', 'a refund made under another uid is another customer\'s refund');
-        assert.match(logs.join('\n'), /REFUND NOT LINKED/, 'the refusal is loud');
-        assert.ok(!store.get(`users/${UID}`), 'and writes nothing');
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason, 'a refund made under another uid is another customer\'s refund').toBe('refund-not-linked');
+        expect(logs.join('\n'), 'the refusal is loud').toMatch(/REFUND NOT LINKED/);
+        expect(!store.get(`users/${UID}`), 'and writes nothing').toBeTruthy();
       },
     },
 
@@ -313,9 +313,9 @@ module.exports = defineCases({
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.ok(!event.refusal, 'a record that links back is processed exactly as before');
-        assert.equal(event.status, 'completed', 'the event completes');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'and the order is written');
+        expect(!event.refusal, 'a record that links back is processed exactly as before').toBeTruthy();
+        expect(event.status, 'the event completes').toBe('completed');
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'and the order is written').toBe(UID);
       },
     },
 
@@ -330,10 +330,10 @@ module.exports = defineCases({
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.equal(event.refusal?.reason, 'refund-not-linked', 'the refund PayPal answered with reversed another sale');
-        assert.equal(event.refusal?.linkedTo, 'SALE-SOMEONE-ELSE', 'the stamp names the sale it really belongs to');
-        assert.equal(order.unified.status, 'completed', 'the purchase this event named is left exactly as it was');
-        assert.ok(!order.unified.payment?.refund, 'with no refund on it');
+        expect(event.refusal?.reason, 'the refund PayPal answered with reversed another sale').toBe('refund-not-linked');
+        expect(event.refusal?.linkedTo, 'the stamp names the sale it really belongs to').toBe('SALE-SOMEONE-ELSE');
+        expect(order.unified.status, 'the purchase this event named is left exactly as it was').toBe('completed');
+        expect(!order.unified.payment?.refund, 'with no refund on it').toBeTruthy();
       },
     },
 
@@ -347,9 +347,9 @@ module.exports = defineCases({
 
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a refund that names this sale is this sale\'s refund');
-        assert.equal(order.unified.status, 'refunded', 'the purchase reads as refunded');
-        assert.equal(order.unified.payment.refund.amount, '42.00', 'with PayPal\'s own amount');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a refund that names this sale is this sale\'s refund').toBeTruthy();
+        expect(order.unified.status, 'the purchase reads as refunded').toBe('refunded');
+        expect(order.unified.payment.refund.amount, 'with PayPal\'s own amount').toBe('42.00');
       },
     },
 
@@ -360,9 +360,9 @@ module.exports = defineCases({
         const { store } = await runPayPalCaptureRefund({ refund: paypalV2Refund('CAPTURE-SOMEONE-ELSE') });
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.refusal?.reason, 'refund-not-linked', 'the `up` link is the v2 back-pointer, and it names another capture');
-        assert.equal(event.refusal?.linkedTo, 'CAPTURE-SOMEONE-ELSE', 'which the stamp names');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`).unified.status, 'completed', 'the purchase is untouched');
+        expect(event.refusal?.reason, 'the `up` link is the v2 back-pointer, and it names another capture').toBe('refund-not-linked');
+        expect(event.refusal?.linkedTo, 'which the stamp names').toBe('CAPTURE-SOMEONE-ELSE');
+        expect(store.get(`payments-orders/${ORDER_ID}`).unified.status, 'the purchase is untouched').toBe('completed');
       },
     },
 
@@ -372,8 +372,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runPayPalCaptureRefund({ refund: paypalV2Refund(PAYPAL_CAPTURE_ID) });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'the refund links back to the capture the event named');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`).unified.payment.refund.amount, '42.00', 'so its amount is recorded');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'the refund links back to the capture the event named').toBeTruthy();
+        expect(store.get(`payments-orders/${ORDER_ID}`).unified.payment.refund.amount, 'so its amount is recorded').toBe('42.00');
       },
     },
 
@@ -384,9 +384,9 @@ module.exports = defineCases({
         const { store } = await runChargebeeRefund({ creditNote: chargebeeCreditNote('cb_sub_someone_else') });
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.refusal?.reason, 'refund-not-linked', 'the credit note Chargebee answered with belongs to another subscription');
-        assert.equal(event.refusal?.linkedTo, 'cb_sub_someone_else', 'the stamp names which');
-        assert.ok(!store.get(`users/${UID}`), 'and nothing is written');
+        expect(event.refusal?.reason, 'the credit note Chargebee answered with belongs to another subscription').toBe('refund-not-linked');
+        expect(event.refusal?.linkedTo, 'the stamp names which').toBe('cb_sub_someone_else');
+        expect(!store.get(`users/${UID}`), 'and nothing is written').toBeTruthy();
       },
     },
 
@@ -396,8 +396,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runChargebeeRefund({ creditNote: chargebeeCreditNote(CHARGEBEE_SUBSCRIPTION_ID) });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a credit note that names this subscription is this subscription\'s');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'and the order is written');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a credit note that names this subscription is this subscription\'s').toBeTruthy();
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'and the order is written').toBe(UID);
       },
     },
   ],

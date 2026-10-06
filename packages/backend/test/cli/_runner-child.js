@@ -42,7 +42,7 @@ function runRunnerChild(projectDir, env = {}) {
   delete baseEnv.OMEGA_TEST_LANE;
   const result = spawnSync('sh', ['-c', command], { cwd: projectDir, env: { ...baseEnv, ...env }, encoding: 'utf8', timeout: 60000 });
 
-  return { status: result.status, output: `${result.stdout}${result.stderr}` };
+  return { status: result.status, stderr: result.stderr, output: `${result.stdout}${result.stderr}` };
 }
 
 module.exports = { stageProject, runRunnerChild };

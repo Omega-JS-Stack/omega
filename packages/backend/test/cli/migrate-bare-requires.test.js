@@ -44,7 +44,7 @@ module.exports = defineCases({
       name: 'a-ported-route-requiring-an-undeclared-package-is-reported-by-file-and-line',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget({
           name: 'legacy-backend',
           dependencies: { 'node-powertools': '^3.0.0' },
@@ -52,13 +52,13 @@ module.exports = defineCases({
 
         const result = migrateTarget(targetPath);
 
-        assert.equal(result.due.length, 1, `only what this target does not declare: a built-in resolves everywhere, a relative path is not a package, and node-powertools IS declared: ${result.due.join(' | ')}`);
-        assert.deepEqual(result.changed, [], 'a report writes nothing');
-        assert.deepEqual(result.errors, []);
+        expect(result.due.length, `only what this target does not declare: a built-in resolves everywhere, a relative path is not a package, and node-powertools IS declared: ${result.due.join(' | ')}`).toBe(1);
+        expect(result.changed, 'a report writes nothing').toEqual([]);
+        expect(result.errors).toEqual([]);
 
         const [line] = result.due;
-        assert.ok(line.startsWith(`${path.join('src', 'routes', 'marketing', 'contact', 'post.js')}:4: \`fs-jetpack\``), `the line names the route, the line (the require is lazy, the route only 500s when it runs) and the package: ${line}`);
-        assert.ok(/npm install fs-jetpack/.test(line), 'and the fix is the dependency, never an auto-install');
+        expect(line.startsWith(`${path.join('src', 'routes', 'marketing', 'contact', 'post.js')}:4: \`fs-jetpack\``), `the line names the route, the line (the require is lazy, the route only 500s when it runs) and the package: ${line}`).toBeTruthy();
+        expect(/npm install fs-jetpack/.test(line), 'and the fix is the dependency, never an auto-install').toBeTruthy();
       },
     },
 
@@ -66,7 +66,7 @@ module.exports = defineCases({
       name: 'the-scan-reports-only-and-never-touches-the-manifest',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget({
           name: 'legacy-backend',
           dependencies: { 'node-powertools': '^3.0.0' },
@@ -75,10 +75,9 @@ module.exports = defineCases({
 
         const result = migrateTarget(targetPath, { execute: true });
 
-        assert.equal(jetpack.read(path.join(targetPath, 'package.json')), before,
-          'which package version a brand wants is the brand\'s call, so even --execute reports and stops');
-        assert.deepEqual(result.changed, [], 'nothing was written');
-        assert.match(result.due[result.due.length - 1], /--execute installs nothing/, 'and the report says so in one line');
+        expect(jetpack.read(path.join(targetPath, 'package.json')), 'which package version a brand wants is the brand\'s call, so even --execute reports and stops').toBe(before);
+        expect(result.changed, 'nothing was written').toEqual([]);
+        expect(result.due[result.due.length - 1], 'and the report says so in one line').toMatch(/--execute installs nothing/);
       },
     },
 
@@ -86,13 +85,13 @@ module.exports = defineCases({
       name: 'a-target-declaring-everything-it-requires-is-reported-clean',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget({
           name: 'converged-backend',
           dependencies: { 'node-powertools': '^3.0.0', 'fs-jetpack': '^5.1.0' },
         });
 
-        assert.deepEqual(migrateTarget(targetPath, { execute: true }), { due: [], changed: [], errors: [] }, 'nothing left to declare, and nothing to say about --execute');
+        expect(migrateTarget(targetPath, { execute: true }), 'nothing left to declare, and nothing to say about --execute').toEqual({ due: [], changed: [], errors: [] });
       },
     },
 
@@ -100,12 +99,11 @@ module.exports = defineCases({
       name: 'a-target-with-no-manifest-to-judge-against-reports-nothing',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget({ name: 'x' });
         jetpack.remove(path.join(targetPath, 'package.json'));
 
-        assert.deepEqual(migrateTarget(targetPath).due, [],
-          'with no manifest there is no "undeclared": guessing would name every package the route uses');
+        expect(migrateTarget(targetPath).due, 'with no manifest there is no "undeclared": guessing would name every package the route uses').toEqual([]);
       },
     },
   ],

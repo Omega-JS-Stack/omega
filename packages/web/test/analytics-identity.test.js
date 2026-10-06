@@ -18,8 +18,7 @@
  * The real module through esbuild, the real client analytics module under it —
  * the convention analytics-blocked.test.js sets.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -111,105 +110,128 @@ async function boot() {
   return { analytics: require(BUNDLE), calls };
 }
 
-test('#328: identify() leaves GA4 user_id to @omega.js/client and still sets the user properties', async () => {
-  const { analytics, calls } = await boot();
+module.exports = defineCases({
+  type: 'group',
+  description: 'analytics-identity',
+  tests: [
+    {
+      name: '#328: identify() leaves GA4 user_id to @omega.js/client and still sets the user properties',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  await analytics.identify(USER);
+        await analytics.identify(USER);
 
-  const sets = calls.gtag.filter(([command]) => command === 'set');
+        const sets = calls.gtag.filter(([command]) => command === 'set');
 
-  assert.strictEqual(sets.length, 1, 'identity is one `set` call');
-  assert.deepStrictEqual(sets[0][1], {
-    user_properties: { email_domain: 'example.com' },
-  }, 'the properties survive; `user_id` is the client\'s to send, and sending the RAW uid here would clobber the derived one');
-});
+        ctx.expect(sets.length, 'identity is one `set` call').toBe(1);
+        ctx.expect(sets[0][1], 'the properties survive; `user_id` is the client\'s to send, and sending the RAW uid here would clobber the derived one').toEqual({
+          user_properties: { email_domain: 'example.com' },
+        });
+      },
+    },
 
-test('#328: reset() leaves GA4 alone too — the client clears the id it set', async () => {
-  const { analytics, calls } = await boot();
+    {
+      name: '#328: reset() leaves GA4 alone too — the client clears the id it set',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  analytics.reset();
+        analytics.reset();
 
-  assert.deepStrictEqual(
-    calls.gtag.filter(([command]) => command === 'set'),
-    [],
-    'a `user_id: null` here would race the client\'s own null on sign-out, for no gain',
-  );
-});
+        ctx.expect(calls.gtag.filter(([command]) => command === 'set'), 'a `user_id: null` here would race the client\'s own null on sign-out, for no gain').toEqual([]);
+      },
+    },
 
-test('#328: Meta takes the raw uid, TikTok the hashed one — each spec\'s own external_id', async () => {
-  const { analytics, calls } = await boot();
+    {
+      name: '#328: Meta takes the raw uid, TikTok the hashed one — each spec\'s own external_id',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  await analytics.identify(USER);
+        await analytics.identify(USER);
 
-  assert.deepStrictEqual(calls.fbq, [[
-    'init',
-    PIXEL_ID,
-    { external_id: USER.uid, em: EMAIL_HASH },
-  ]], 'advanced matching is re-init-ed with the raw uid and a HASHED email');
+        ctx.expect(calls.fbq, 'advanced matching is re-init-ed with the raw uid and a HASHED email').toEqual([[
+          'init',
+          PIXEL_ID,
+          { external_id: USER.uid, em: EMAIL_HASH },
+        ]]);
 
-  assert.deepStrictEqual(calls.ttq, [[
-    { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH },
-  ]], '#410: TikTok requires the digest on its Events API half, so the pixel half sends the same one');
-});
+        ctx.expect(calls.ttq, '#410: TikTok requires the digest on its Events API half, so the pixel half sends the same one').toEqual([[
+          { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH },
+        ]]);
+      },
+    },
 
-test('#328: an account with a phone gets each platform\'s OWN normalization', async () => {
-  const { analytics, calls } = await boot();
+    {
+      name: '#328: an account with a phone gets each platform\'s OWN normalization',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  await analytics.identify(USER_WITH_PHONE);
+        await analytics.identify(USER_WITH_PHONE);
 
-  // The same number, two different digests: Meta's spec is bare digits, TikTok's
-  // is E.164. Sending either one's key to the other matches nobody.
-  assert.deepStrictEqual(calls.fbq, [[
-    'init',
-    PIXEL_ID,
-    { external_id: USER.uid, em: EMAIL_HASH, ph: META_PHONE_HASH },
-  ]]);
+        // The same number, two different digests: Meta's spec is bare digits, TikTok's
+        // is E.164. Sending either one's key to the other matches nobody.
+        ctx.expect(calls.fbq).toEqual([[
+          'init',
+          PIXEL_ID,
+          { external_id: USER.uid, em: EMAIL_HASH, ph: META_PHONE_HASH },
+        ]]);
 
-  assert.deepStrictEqual(calls.ttq, [[
-    { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH, phone_number: TIKTOK_PHONE_HASH },
-  ]]);
-});
+        ctx.expect(calls.ttq).toEqual([[
+          { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH, phone_number: TIKTOK_PHONE_HASH },
+        ]]);
+      },
+    },
 
-test('#328: no phone on the account sends no phone key at all', async () => {
-  const { analytics, calls } = await boot();
+    {
+      name: '#328: no phone on the account sends no phone key at all',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  await analytics.identify(USER);
+        await analytics.identify(USER);
 
-  assert.strictEqual('ph' in calls.fbq[0][2], false, 'a `ph: null` reads as a key we tried and failed to send');
-  assert.strictEqual('phone_number' in calls.ttq[0][0], false);
-});
+        ctx.expect('ph' in calls.fbq[0][2], 'a `ph: null` reads as a key we tried and failed to send').toBe(false);
+        ctx.expect('phone_number' in calls.ttq[0][0]).toBe(false);
+      },
+    },
 
-test('#328: a digest that fails still identifies — external_id falls back to the raw uid', async () => {
-  const { analytics, calls } = await boot();
-  const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    {
+      name: '#328: a digest that fails still identifies — external_id falls back to the raw uid',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
+        const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
-  // A page whose digest is gone or refuses: the HASHED keys are what is lost,
-  // never the identity itself. Meta's `external_id` is the raw uid and needs
-  // nothing computed; TikTok's pixel documents the field as "Unhashed or hashed
-  // SHA-256", so it takes the raw uid too rather than nothing at all (#410).
-  // The platforms match on it — the same call the server's match data makes
-  // when it has nothing else.
-  Object.defineProperty(globalThis, 'crypto', {
-    configurable: true,
-    value: { subtle: { digest: () => Promise.reject(new Error('no digest on this origin')) } },
-  });
+        // A page whose digest is gone or refuses: the HASHED keys are what is lost,
+        // never the identity itself. Meta's `external_id` is the raw uid and needs
+        // nothing computed; TikTok's pixel documents the field as "Unhashed or hashed
+        // SHA-256", so it takes the raw uid too rather than nothing at all (#410).
+        // The platforms match on it — the same call the server's match data makes
+        // when it has nothing else.
+        Object.defineProperty(globalThis, 'crypto', {
+          configurable: true,
+          value: { subtle: { digest: () => Promise.reject(new Error('no digest on this origin')) } },
+        });
 
-  try {
-    await analytics.identify(USER_WITH_PHONE);
-  } finally {
-    Object.defineProperty(globalThis, 'crypto', real);
-  }
+        try {
+          await analytics.identify(USER_WITH_PHONE);
+        } finally {
+          Object.defineProperty(globalThis, 'crypto', real);
+        }
 
-  assert.deepStrictEqual(calls.fbq, [['init', PIXEL_ID, { external_id: USER.uid }]], 'Meta still learns who this is');
-  assert.deepStrictEqual(calls.ttq, [[{ external_id: USER.uid }]], 'and so does TikTok');
-});
+        ctx.expect(calls.fbq, 'Meta still learns who this is').toEqual([['init', PIXEL_ID, { external_id: USER.uid }]]);
+        ctx.expect(calls.ttq, 'and so does TikTok').toEqual([[{ external_id: USER.uid }]]);
+      },
+    },
 
-test('#328: identify(null) is a reset — nothing is attributed to a signed-out visitor', async () => {
-  const { analytics, calls } = await boot();
+    {
+      name: '#328: identify(null) is a reset — nothing is attributed to a signed-out visitor',
+      run: async (ctx) => {
+        const { analytics, calls } = await boot();
 
-  await analytics.identify(null);
+        await analytics.identify(null);
 
-  assert.deepStrictEqual(calls.gtag.filter(([command]) => command === 'set'), []);
-  assert.deepStrictEqual(calls.fbq, [['init', PIXEL_ID, {}]], 'the pixel is re-init-ed with no match keys');
-  assert.deepStrictEqual(calls.ttq, [[{}]]);
+        ctx.expect(calls.gtag.filter(([command]) => command === 'set')).toEqual([]);
+        ctx.expect(calls.fbq, 'the pixel is re-init-ed with no match keys').toEqual([['init', PIXEL_ID, {}]]);
+        ctx.expect(calls.ttq).toEqual([[{}]]);
+      },
+    },
+  ],
 });

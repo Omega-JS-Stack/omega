@@ -4,10 +4,9 @@
  * is a DELIBERATE act: list the path below with why it is open, or the suite goes
  * red. Reads the rules FILES; a file this target does not carry skips its case.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { defineCases } = require('@omega.js/backend/test');
+const { defineCases, expect } = require('@omega.js/backend/test');
 
 const APP_DIR = path.join(__dirname, '..', '..');
 
@@ -54,11 +53,7 @@ module.exports = defineCases({
           // The scope opener every rules file carries, not a rule.
           .filter((rulePath) => !rulePath.startsWith('/databases/'));
 
-        assert.deepEqual(
-          authored,
-          AUTHORED_FIRESTORE_PATHS,
-          'firestore.rules opens a path this suite does not declare: add it to AUTHORED_FIRESTORE_PATHS with the reason, or take the rule out',
-        );
+        expect(authored, 'firestore.rules opens a path this suite does not declare: add it to AUTHORED_FIRESTORE_PATHS with the reason, or take the rule out').toEqual(AUTHORED_FIRESTORE_PATHS);
       },
     },
 
@@ -68,19 +63,12 @@ module.exports = defineCases({
       run({ skip }) {
         const storage = read('storage.rules', skip);
 
-        assert.ok(
-          /match \/\{allPaths=\*\*\} \{\s*\n\s*allow read, write: if false;/.test(storage),
-          'the storage deny-all default is gone: every path without its own rule is now open',
-        );
+        expect(/match \/\{allPaths=\*\*\} \{\s*\n\s*allow read, write: if false;/.test(storage), 'the storage deny-all default is gone: every path without its own rule is now open').toBeTruthy();
 
         const exposed = rulePaths(storage)
           .filter((rulePath) => !rulePath.startsWith('/b/') && rulePath !== '/{allPaths=**}');
 
-        assert.deepEqual(
-          exposed,
-          EXPOSED_STORAGE_PATHS,
-          'storage.rules exposes a path this suite does not declare: add it to EXPOSED_STORAGE_PATHS with the reason, or take the rule out',
-        );
+        expect(exposed, 'storage.rules exposes a path this suite does not declare: add it to EXPOSED_STORAGE_PATHS with the reason, or take the rule out').toEqual(EXPOSED_STORAGE_PATHS);
       },
     },
 
@@ -93,13 +81,9 @@ module.exports = defineCases({
         // `firestore.rules` here is source: on its own it carries none of the
         // framework's gating. Pointed at directly, a deploy would ship whatever this
         // file alone says, which for a fresh brand is nothing at all.
-        assert.equal(
-          firebase.firestore.rules,
-          'dist/firestore.rules',
-          'firestore rules no longer read the compiled artifact: the framework half is not being deployed',
-        );
-        assert.equal(firebase.database.rules, 'database.rules.json', 'the Realtime Database rules file moved');
-        assert.equal(firebase.storage.rules, 'storage.rules', 'the Storage rules file moved');
+        expect(firebase.firestore.rules, 'firestore rules no longer read the compiled artifact: the framework half is not being deployed').toBe('dist/firestore.rules');
+        expect(firebase.database.rules, 'the Realtime Database rules file moved').toBe('database.rules.json');
+        expect(firebase.storage.rules, 'the Storage rules file moved').toBe('storage.rules');
       },
     },
   ],

@@ -14,8 +14,7 @@
  * one (@omega.js/client's Storage), so a nested path behaves as it does in a
  * browser. The assertion is the payload the intent route would have received.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -111,27 +110,45 @@ async function createIntent({ development, search = '' }) {
   return { payload: client.requests.at(-1).options.body, removals: client.removals };
 }
 
-test('decline simulation: the applied param arms the intent, and stays armed after it', async () => {
-  const { payload, removals } = await createIntent({ development: true, search: '?product=premium&_dev_decline=true' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-decline',
+  tests: [
+    {
+      name: 'decline simulation: the applied param arms the intent, and stays armed after it',
+      run: async (ctx) => {
+        const { payload, removals } = await createIntent({ development: true, search: '?product=premium&_dev_decline=true' });
 
-  assert.strictEqual(payload.simulate, 'decline', 'the armed checkout should ask the intent route to simulate a decline');
-  assert.deepStrictEqual(removals, [], 'the param is the whole state — nothing is consumed, so a retry declines too');
-});
+        ctx.expect(payload.simulate, 'the armed checkout should ask the intent route to simulate a decline').toBe('decline');
+        ctx.expect(removals, 'the param is the whole state — nothing is consumed, so a retry declines too').toEqual([]);
+      },
+    },
 
-test('decline simulation: the bare param is an arm', async () => {
-  const { payload } = await createIntent({ development: true, search: '?_dev_decline' });
+    {
+      name: 'decline simulation: the bare param is an arm',
+      run: async (ctx) => {
+        const { payload } = await createIntent({ development: true, search: '?_dev_decline' });
 
-  assert.strictEqual(payload.simulate, 'decline', 'presence is the arm — a hand-typed param needs no value');
-});
+        ctx.expect(payload.simulate, 'presence is the arm — a hand-typed param needs no value').toBe('decline');
+      },
+    },
 
-test('decline simulation: an unarmed dev checkout sends no simulate', async () => {
-  const { payload } = await createIntent({ development: true, search: '?product=premium' });
+    {
+      name: 'decline simulation: an unarmed dev checkout sends no simulate',
+      run: async (ctx) => {
+        const { payload } = await createIntent({ development: true, search: '?product=premium' });
 
-  assert.strictEqual(Object.hasOwn(payload, 'simulate'), false, 'dev alone must not simulate anything');
-});
+        ctx.expect(Object.hasOwn(payload, 'simulate'), 'dev alone must not simulate anything').toBe(false);
+      },
+    },
 
-test('decline simulation: production never reads the param', async () => {
-  const { payload } = await createIntent({ development: false, search: '?_dev_decline=true' });
+    {
+      name: 'decline simulation: production never reads the param',
+      run: async (ctx) => {
+        const { payload } = await createIntent({ development: false, search: '?_dev_decline=true' });
 
-  assert.strictEqual(Object.hasOwn(payload, 'simulate'), false, 'a param a real user landed on can never decline their checkout');
+        ctx.expect(Object.hasOwn(payload, 'simulate'), 'a param a real user landed on can never decline their checkout').toBe(false);
+      },
+    },
+  ],
 });

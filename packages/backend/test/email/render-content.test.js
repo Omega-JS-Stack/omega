@@ -10,7 +10,7 @@
  *
  * Plain-node unit test (no emulator, no network).
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const { renderContent } = require('../../dist/omega/libraries/email/prepare.js');
 const { escapeHtml } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -65,8 +65,8 @@ module.exports = defineCases({
       run() {
         const out = renderContent({ content: 'Hello <script>alert("xss")</script> there' });
 
-        assert.ok(!/<script/i.test(out), `live <script> survived: ${out}`);
-        assert.ok(out.includes('&lt;script&gt;'), `payload was not escaped: ${out}`);
+        expect(!/<script/i.test(out), `live <script> survived: ${out}`).toBeTruthy();
+        expect(out.includes('&lt;script&gt;'), `payload was not escaped: ${out}`).toBeTruthy();
       },
     },
 
@@ -76,8 +76,8 @@ module.exports = defineCases({
       run() {
         const out = renderContent({ content: '<img src=x onerror="alert(1)">' });
 
-        assert.ok(!/<img/i.test(out), `live <img> survived: ${out}`);
-        assert.ok(out.includes('&lt;img'), `payload was not escaped: ${out}`);
+        expect(!/<img/i.test(out), `live <img> survived: ${out}`).toBeTruthy();
+        expect(out.includes('&lt;img'), `payload was not escaped: ${out}`).toBeTruthy();
       },
     },
 
@@ -88,7 +88,7 @@ module.exports = defineCases({
         // The security property is the default, not an opt-in.
         const out = renderContent({ content: '<iframe src="evil"></iframe>' });
 
-        assert.ok(!/<iframe/i.test(out), `live <iframe> survived: ${out}`);
+        expect(!/<iframe/i.test(out), `live <iframe> survived: ${out}`).toBeTruthy();
       },
     },
 
@@ -98,8 +98,8 @@ module.exports = defineCases({
       run() {
         const out = renderContent({ content: '<a href="#" onclick="steal()">click</a>' });
 
-        assert.ok(!/onclick/i.test(out) || out.includes('&lt;a'), `live handler survived: ${out}`);
-        assert.ok(out.includes('&lt;a'), `anchor was not escaped: ${out}`);
+        expect(!/onclick/i.test(out) || out.includes('&lt;a'), `live handler survived: ${out}`).toBeTruthy();
+        expect(out.includes('&lt;a'), `anchor was not escaped: ${out}`).toBeTruthy();
       },
     },
 
@@ -110,8 +110,8 @@ module.exports = defineCases({
         // Escaping raw HTML must not cost us markdown — bold/links/lists still work.
         const out = renderContent({ content: '**bold** and [link](https://example.com)' });
 
-        assert.ok(out.includes('<strong>bold</strong>'), `markdown bold lost: ${out}`);
-        assert.ok(out.includes('<a href="https://example.com">link</a>'), `markdown link lost: ${out}`);
+        expect(out.includes('<strong>bold</strong>'), `markdown bold lost: ${out}`).toBeTruthy();
+        expect(out.includes('<a href="https://example.com">link</a>'), `markdown link lost: ${out}`).toBeTruthy();
       },
     },
 
@@ -124,8 +124,8 @@ module.exports = defineCases({
         const markup = '<strong>Alert Details:</strong>\n<ul>\n<li>Amount: $5</li>\n</ul>';
         const out = renderContent({ content: markup, trusted: true });
 
-        assert.ok(out.includes('<strong>Alert Details:</strong>'), `markup was escaped: ${out}`);
-        assert.ok(out.includes('<ul>') && out.includes('<li>'), `list markup lost: ${out}`);
+        expect(out.includes('<strong>Alert Details:</strong>'), `markup was escaped: ${out}`).toBeTruthy();
+        expect(out.includes('<ul>') && out.includes('<li>'), `list markup lost: ${out}`).toBeTruthy();
       },
     },
 
@@ -140,9 +140,9 @@ module.exports = defineCases({
           trusted: true,
         });
 
-        assert.ok(out.includes('<li>'), `first-party markup lost: ${out}`);
-        assert.ok(!/<script/i.test(out), `escaped value still injected: ${out}`);
-        assert.ok(out.includes('&lt;script&gt;'), `value was not escaped: ${out}`);
+        expect(out.includes('<li>'), `first-party markup lost: ${out}`).toBeTruthy();
+        expect(!/<script/i.test(out), `escaped value still injected: ${out}`).toBeTruthy();
+        expect(out.includes('&lt;script&gt;'), `value was not escaped: ${out}`).toBeTruthy();
       },
     },
 
@@ -154,7 +154,7 @@ module.exports = defineCases({
       run() {
         const out = renderContent({ content: '**ignored**', html: '<p>first-party <b>html</b></p>' });
 
-        assert.equal(out, '<p>first-party <b>html</b></p>');
+        expect(out).toBe('<p>first-party <b>html</b></p>');
       },
     },
 
@@ -169,8 +169,8 @@ module.exports = defineCases({
           { brandUrl: 'https://example.com', brandId: 'testbrand', campaign: 'welcome', type: 'transactional' },
         );
 
-        assert.ok(out.includes('utm_source=testbrand'), `UTM not applied: ${out}`);
-        assert.ok(out.includes('utm_campaign=welcome'), `UTM campaign missing: ${out}`);
+        expect(out.includes('utm_source=testbrand'), `UTM not applied: ${out}`).toBeTruthy();
+        expect(out.includes('utm_campaign=welcome'), `UTM campaign missing: ${out}`).toBeTruthy();
       },
     },
 
@@ -183,7 +183,7 @@ module.exports = defineCases({
           { brandUrl: 'https://example.com', brandId: 'testbrand', campaign: 'alert', type: 'transactional' },
         );
 
-        assert.ok(out.includes('utm_source=testbrand'), `UTM not applied: ${out}`);
+        expect(out.includes('utm_source=testbrand'), `UTM not applied: ${out}`).toBeTruthy();
       },
     },
 
@@ -193,8 +193,8 @@ module.exports = defineCases({
       name: 'empty content returns empty string',
 
       run() {
-        assert.equal(renderContent({}), '');
-        assert.equal(renderContent({ content: '' }), '');
+        expect(renderContent({})).toBe('');
+        expect(renderContent({ content: '' })).toBe('');
       },
     },
 
@@ -204,7 +204,7 @@ module.exports = defineCases({
       name: 'escapeHtml neutralizes the injection characters',
 
       run() {
-        assert.equal(escapeHtml('<b>&"'), '&lt;b&gt;&amp;&quot;');
+        expect(escapeHtml('<b>&"')).toBe('&lt;b&gt;&amp;&quot;');
       },
     },
 
@@ -213,10 +213,10 @@ module.exports = defineCases({
 
       run() {
         // Amounts and flags land in alert emails — a falsy value must still print.
-        assert.equal(escapeHtml(0), '0');
-        assert.equal(escapeHtml(false), 'false');
-        assert.equal(escapeHtml(null), '');
-        assert.equal(escapeHtml(undefined), '');
+        expect(escapeHtml(0)).toBe('0');
+        expect(escapeHtml(false)).toBe('false');
+        expect(escapeHtml(null)).toBe('');
+        expect(escapeHtml(undefined)).toBe('');
       },
     },
 
@@ -228,8 +228,8 @@ module.exports = defineCases({
       async run() {
         const untrusted = await buildUntrusted();
 
-        assert.ok(!/<script/i.test(untrusted), 'live <script> reached the SendGrid payload');
-        assert.ok(untrusted.includes('&lt;script&gt;'), 'payload was not escaped in the final HTML');
+        expect(!/<script/i.test(untrusted), 'live <script> reached the SendGrid payload').toBeTruthy();
+        expect(untrusted.includes('&lt;script&gt;'), 'payload was not escaped in the final HTML').toBeTruthy();
       },
     },
 
@@ -239,8 +239,8 @@ module.exports = defineCases({
       async run() {
         const trusted = await buildTrusted();
 
-        assert.ok(trusted.includes('<strong>Details:</strong>'), 'first-party markup was escaped');
-        assert.ok(/<ul>/i.test(trusted), 'first-party list markup was lost');
+        expect(trusted.includes('<strong>Details:</strong>'), 'first-party markup was escaped').toBeTruthy();
+        expect(/<ul>/i.test(trusted), 'first-party list markup was lost').toBeTruthy();
       },
     },
   ],

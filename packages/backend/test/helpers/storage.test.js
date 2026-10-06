@@ -52,111 +52,111 @@ module.exports = defineCases({
   tests: [
     {
       name: 'set-and-get-simple',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('simple');
         storage.set('key', 'value').write();
         const result = storage.get('key').value();
-        assert.equal(result, 'value', 'Should get what was set');
+        expect(result, 'Should get what was set').toBe('value');
       },
     },
 
     {
       name: 'get-returns-default-for-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('defaults');
         const result = storage.get('nonexistent', 'fallback').value();
-        assert.equal(result, 'fallback', 'Should return default for missing key');
+        expect(result, 'Should return default for missing key').toBe('fallback');
       },
     },
 
     {
       name: 'get-returns-undefined-without-default',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('nodefault');
         const result = storage.get('nonexistent').value();
-        assert.equal(result, undefined, 'Should return undefined without default');
+        expect(result, 'Should return undefined without default').toBe(undefined);
       },
     },
 
     {
       name: 'set-nested-path',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('nested');
         storage.set('a.b.c', 42).write();
         const result = storage.get('a.b.c').value();
-        assert.equal(result, 42, 'Should handle nested paths');
+        expect(result, 'Should handle nested paths').toBe(42);
       },
     },
 
     {
       name: 'set-preserves-existing-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('preserve');
         storage.set('first', 1).write();
         storage.set('second', 2).write();
-        assert.equal(storage.get('first').value(), 1, 'First key should still exist');
-        assert.equal(storage.get('second').value(), 2, 'Second key should exist');
+        expect(storage.get('first').value(), 'First key should still exist').toBe(1);
+        expect(storage.get('second').value(), 'Second key should exist').toBe(2);
       },
     },
 
     {
       name: 'set-chaining',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('chain');
         storage.set('a', 1).set('b', 2).write();
-        assert.equal(storage.get('a').value(), 1, 'First chained set');
-        assert.equal(storage.get('b').value(), 2, 'Second chained set');
+        expect(storage.get('a').value(), 'First chained set').toBe(1);
+        expect(storage.get('b').value(), 'Second chained set').toBe(2);
       },
     },
 
     {
       name: 'set-object-value',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('object');
         storage.set('user.usage', { daily: 5, monthly: 10 }).write();
         const usage = storage.get('user.usage', {}).value();
-        assert.equal(usage.daily, 5, 'Should store object values');
-        assert.equal(usage.monthly, 10, 'Should store nested object values');
+        expect(usage.daily, 'Should store object values').toBe(5);
+        expect(usage.monthly, 'Should store nested object values').toBe(10);
       },
     },
 
     {
       name: 'getState-returns-all-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('getstate');
         storage.set('x', 1).set('y', 2).write();
         const state = storage.getState();
-        assert.equal(state.x, 1, 'getState should include x');
-        assert.equal(state.y, 2, 'getState should include y');
+        expect(state.x, 'getState should include x').toBe(1);
+        expect(state.y, 'getState should include y').toBe(2);
       },
     },
 
     {
       name: 'setState-replaces-all-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('setstate');
         storage.set('old', 'data').write();
         storage.setState({}).write();
         const result = storage.get('old').value();
-        assert.equal(result, undefined, 'setState({}) should clear all data');
+        expect(result, 'setState({}) should clear all data').toBe(undefined);
       },
     },
 
     {
       name: 'write-persists-to-disk',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('persist');
         storage.set('persisted', true).write();
 
         // Read the file directly to verify
         const raw = JSON.parse(jetpack.read(storage._location));
-        assert.equal(raw.persisted, true, 'Data should be written to disk');
+        expect(raw.persisted, 'Data should be written to disk').toBe(true);
       },
     },
 
     {
       name: 'data-survives-re-read',
-      async run({ assert }) {
+      async run({ expect }) {
         const _ = require('lodash');
         const { LowSync } = require('lowdb');
         const { JSONFileSync } = require('lowdb/node');
@@ -169,18 +169,18 @@ module.exports = defineCases({
         const db2 = new LowSync(new JSONFileSync(storage1._location), {});
         db2.read();
         const result = _.get(db2.data, 'survivor');
-        assert.equal(result, 'yes', 'Data should survive a fresh read');
+        expect(result, 'Data should survive a fresh read').toBe('yes');
       },
     },
 
     {
       name: 'get-default-object-for-usage-pattern',
-      async run({ assert }) {
+      async run({ expect }) {
         const storage = createStorage('usage-pattern');
         // Mimics usage.js: storage.get(`${path}.usage`, {}).value()
         const usage = storage.get('nonexistent-user.usage', {}).value();
-        assert.ok(typeof usage === 'object', 'Should return empty object default');
-        assert.equal(Object.keys(usage).length, 0, 'Default object should be empty');
+        expect(typeof usage === 'object', 'Should return empty object default').toBeTruthy();
+        expect(Object.keys(usage).length, 'Default object should be empty').toBe(0);
       },
     },
 

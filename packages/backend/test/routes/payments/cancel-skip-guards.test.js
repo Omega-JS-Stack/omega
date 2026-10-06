@@ -65,48 +65,48 @@ module.exports = defineCases({
     {
       name: 'skip-guards-is-ignored-for-an-ordinary-caller',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = youngSubscriber(omega, { uid: '_test-skip-guards-plain', admin: false });
 
         const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(omega, user));
 
-        assert.equal(sent.code, 400, `An ordinary caller's skipGuards must not waive the age guard, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /still being set up/i, 'The age guard should be the rejection');
+        expect(sent.code, `An ordinary caller's skipGuards must not waive the age guard, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The age guard should be the rejection').toMatch(/still being set up/i);
       },
     },
 
     {
       name: 'skip-guards-is-honored-for-an-admin',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = youngSubscriber(omega, { uid: '_test-skip-guards-admin', admin: true });
 
         const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(omega, user));
 
-        assert.equal(sent.code, 400, `An admin should reach the provider lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown provider/i, 'An admin should get PAST the age guard');
+        expect(sent.code, `An admin should reach the provider lookup, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'An admin should get PAST the age guard').toMatch(/Unknown provider/i);
       },
     },
 
     {
       name: 'skip-guards-is-honored-outside-production',
       auth: 'none',
-      async run({ assert, omega, ctx }) {
-        assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
+      async run({ expect, omega, ctx }) {
+        expect(ctx.isProduction(), 'the suite must run outside production for this test').toBe(false);
 
         const user = youngSubscriber(omega, { uid: '_test-skip-guards-nonprod', admin: false });
 
         const sent = await cancel(omega, user);
 
-        assert.equal(sent.code, 400, `A non-production run should reach the provider lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown provider/i, 'A non-production run should get PAST the age guard');
+        expect(sent.code, `A non-production run should reach the provider lookup, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'A non-production run should get PAST the age guard').toMatch(/Unknown provider/i);
       },
     },
 
     {
       name: 'the-age-guard-still-runs-without-skip-guards',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = youngSubscriber(omega, { uid: '_test-skip-guards-absent', admin: true });
 
         // An admin who never asked to bypass gets the guard like anybody else
@@ -118,8 +118,8 @@ module.exports = defineCases({
           data: { confirmed: true, skipGuards: false, reason: null, feedback: null },
         });
 
-        assert.equal(sent.code, 400, `The age guard should reject, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /still being set up/i, 'The age guard should be the rejection');
+        expect(sent.code, `The age guard should reject, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The age guard should be the rejection').toMatch(/still being set up/i);
       },
     },
   ],

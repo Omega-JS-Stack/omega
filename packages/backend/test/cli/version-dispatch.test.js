@@ -22,17 +22,17 @@ module.exports = defineCases({
       name: 'double-dash-version-dispatches',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(Boolean(matchCommand(versionEntry, { '--version': true })), true, '`omega --version` resolves to the version command, like every sibling CLI');
+      async run({ expect }) {
+        expect(Boolean(matchCommand(versionEntry, { '--version': true })), '`omega --version` resolves to the version command, like every sibling CLI').toBe(true);
       },
     },
     {
       name: 'short-forms-still-dispatch',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(Boolean(matchCommand(versionEntry, { '-v': true })), true, '`omega -v` still resolves');
-        assert.equal(Boolean(matchCommand(versionEntry, { v: true })), true, '`omega v` still resolves');
+      async run({ expect }) {
+        expect(Boolean(matchCommand(versionEntry, { '-v': true })), '`omega -v` still resolves').toBe(true);
+        expect(Boolean(matchCommand(versionEntry, { v: true })), '`omega v` still resolves').toBe(true);
       },
     },
   ],

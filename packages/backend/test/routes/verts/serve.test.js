@@ -73,31 +73,31 @@ module.exports = defineCases({
     {
       name: 'serves-self-contained-html-unit',
       timeout: 30000,
-      async run({ assert, firestore, config }) {
+      async run({ expect, firestore, config }) {
         await seedAds(firestore);
 
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&brand=site-brand&vertId=serve-open`);
         const body = await response.text();
 
-        assert.equal(response.status, 200, 'Serve should return 200');
-        assert.match(response.headers.get('content-type') || '', /text\/html/, 'Response should be HTML');
-        assert.ok(body.includes('Open Vert'), 'Unit should render the vert title');
-        assert.ok(body.includes('Learn more'), 'Unit should render the button');
-        assert.ok(body.includes('Sponsored by Open Shop'), 'Unit should render the footer');
-        assert.ok(body.includes('omega-vert:set-dimensions'), 'Unit should report dimensions via postMessage');
-        assert.ok(body.includes('omega-vert:click'), 'Unit should forward clicks via postMessage');
-        assert.ok(body.includes('/omega/verts/redirect?id=serve-open'), 'Click link should point at the redirect route');
-        assert.ok(body.includes('brand=site-brand'), 'The redirect URL should carry the host brand id (the click utm_source)');
-        assert.ok(body.includes('https://site.example'), 'postMessage should target the parent origin (origin-checked)');
-        assert.ok(!body.includes('setInterval') && !body.includes('setTimeout'), 'Unit must have NO self-refresh timers (host owns lifecycle)');
-        assert.ok(!body.includes('<script src') && !body.includes('<link'), 'Unit must be self-contained (no external scripts/styles)');
+        expect(response.status, 'Serve should return 200').toBe(200);
+        expect(response.headers.get('content-type') || '', 'Response should be HTML').toMatch(/text\/html/);
+        expect(body.includes('Open Vert'), 'Unit should render the vert title').toBeTruthy();
+        expect(body.includes('Learn more'), 'Unit should render the button').toBeTruthy();
+        expect(body.includes('Sponsored by Open Shop'), 'Unit should render the footer').toBeTruthy();
+        expect(body.includes('omega-vert:set-dimensions'), 'Unit should report dimensions via postMessage').toBeTruthy();
+        expect(body.includes('omega-vert:click'), 'Unit should forward clicks via postMessage').toBeTruthy();
+        expect(body.includes('/omega/verts/redirect?id=serve-open'), 'Click link should point at the redirect route').toBeTruthy();
+        expect(body.includes('brand=site-brand'), 'The redirect URL should carry the host brand id (the click utm_source)').toBeTruthy();
+        expect(body.includes('https://site.example'), 'postMessage should target the parent origin (origin-checked)').toBeTruthy();
+        expect(!body.includes('setInterval') && !body.includes('setTimeout'), 'Unit must have NO self-refresh timers (host owns lifecycle)').toBeTruthy();
+        expect(!body.includes('<script src') && !body.includes('<link'), 'Unit must be self-contained (no external scripts/styles)').toBeTruthy();
       },
     },
 
     {
       name: 'postmessage-target-preserves-dev-port',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         // A dev site's parent host carries a port (localhost:4100). The unit's
         // postMessage target origin must keep it — a portless 'http://localhost'
         // origin makes the browser silently DROP every dimension report, so
@@ -106,23 +106,23 @@ module.exports = defineCases({
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=localhost:4100&vertId=serve-open`);
         const body = await response.text();
 
-        assert.equal(response.status, 200, 'Serve should return 200');
-        assert.ok(body.includes('"http://localhost:4100"'), 'postMessage target origin should preserve the dev port');
-        assert.ok(!body.includes('"http://localhost"'), 'portless localhost origin must not appear as the target');
+        expect(response.status, 'Serve should return 200').toBe(200);
+        expect(body.includes('"http://localhost:4100"'), 'postMessage target origin should preserve the dev port').toBeTruthy();
+        expect(!body.includes('"http://localhost"'), 'portless localhost origin must not appear as the target').toBeTruthy();
       },
     },
 
     {
       name: 'tag-matching-serves-top-scorer',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         // serve-target is the only vert scoring > 0 for these tags — deterministic
         for (let i = 0; i < 5; i++) {
           const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&tags=music,audio`);
           const body = await response.text();
 
-          assert.equal(response.status, 200, 'Serve should return 200');
-          assert.ok(body.includes('id=serve-target'), 'Top-scoring targeted vert should always win');
+          expect(response.status, 'Serve should return 200').toBe(200);
+          expect(body.includes('id=serve-target'), 'Top-scoring targeted vert should always win').toBeTruthy();
         }
       },
     },
@@ -130,55 +130,55 @@ module.exports = defineCases({
     {
       name: 'never-serves-an-vert-on-its-own-host',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         // Pin the self-linked vert while requesting from its own link host —
         // the pin is ineligible so another vert (or none) must serve
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=self-test.example&vertId=serve-self`);
         const body = response.status === 200 ? await response.text() : '';
 
-        assert.ok(!body.includes('id=serve-self'), 'A vert must never serve on its own link host');
+        expect(!body.includes('id=serve-self'), 'A vert must never serve on its own link host').toBeTruthy();
       },
     },
 
     {
       name: 'no-eligible-verts-returns-204',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         // Every seeded vert blacklists nofill.example
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=nofill.example`);
 
-        assert.equal(response.status, 204, 'No fill should return 204');
+        expect(response.status, 'No fill should return 204').toBe(204);
       },
     },
 
     {
       name: 'vert-content-is-escaped',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&vertId=serve-xss`);
         const body = await response.text();
 
-        assert.equal(response.status, 200, 'Serve should return 200');
-        assert.ok(!body.includes('<script>alert'), 'Vert title must not inject raw script tags');
-        assert.ok(!body.includes('<img src=x'), 'Vert description must not inject raw elements');
-        assert.ok(body.includes('&lt;script&gt;'), 'Vert title should render escaped');
-        assert.ok(body.includes('&lt;img src=x'), 'Vert description should render escaped');
+        expect(response.status, 'Serve should return 200').toBe(200);
+        expect(!body.includes('<script>alert'), 'Vert title must not inject raw script tags').toBeTruthy();
+        expect(!body.includes('<img src=x'), 'Vert description must not inject raw elements').toBeTruthy();
+        expect(body.includes('&lt;script&gt;'), 'Vert title should render escaped').toBeTruthy();
+        expect(body.includes('&lt;img src=x'), 'Vert description should render escaped').toBeTruthy();
       },
     },
 
     {
       name: 'theme-and-size-params-are-accepted',
       timeout: 30000,
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&vertId=serve-open&width=300&height=250&theme=dark`);
         const body = await response.text();
 
-        assert.equal(response.status, 200, 'Serve should return 200');
-        assert.ok(body.includes('data-theme="dark"'), 'Theme pin should render on the page');
-        assert.ok(body.includes('max-width: 300px'), 'Width hint should apply');
+        expect(response.status, 'Serve should return 200').toBe(200);
+        expect(body.includes('data-theme="dark"'), 'Theme pin should render on the page').toBeTruthy();
+        expect(body.includes('max-width: 300px'), 'Width hint should apply').toBeTruthy();
         // Content-sized contract: the card carries NO baked height (the HOST
         // clamps to the preset); height feeds only the compact/stacked branches
-        assert.equal(body.includes('max-height'), false, 'The card is content-sized, never height-capped in the document');
+        expect(body.includes('max-height'), 'The card is content-sized, never height-capped in the document').toBe(false);
       },
     },
   ],

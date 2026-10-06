@@ -18,13 +18,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });
 
-        assert.isSuccess(response, 'Validate settings should succeed for authenticated user');
+        expect(response, 'Validate settings should succeed for authenticated user').toBeSuccess();
       },
     },
 
@@ -34,7 +34,7 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/settings/validate', {
           existingSettings: {
             theme: 'dark',
@@ -45,7 +45,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Validate settings with data should succeed');
+        expect(response, 'Validate settings with data should succeed').toBeSuccess();
       },
     },
 
@@ -55,13 +55,13 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });
 
-        assert.isSuccess(response, 'Validate settings should succeed for premium user');
+        expect(response, 'Validate settings should succeed for premium user').toBeSuccess();
       },
     },
 
@@ -71,13 +71,13 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });
 
-        assert.isError(response, 401, 'Validate settings should fail without authentication');
+        expect(response, 'Validate settings should fail without authentication').toBeError(401);
       },
     },
   ],

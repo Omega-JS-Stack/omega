@@ -9,8 +9,7 @@
  * security-session-devices.test.js established); only the Firebase SDK calls
  * under the wrapper are answered in memory.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -88,9 +87,18 @@ async function makeFetch(docs) {
   return page.fetchFullUser;
 }
 
-test('#950: a missing user resolves to null, not a bare { id }', async () => {
-  const fetchFullUser = await makeFetch({ 'users/u1': { auth: { email: 'a@x.test' } } });
+module.exports = defineCases({
+  type: 'group',
+  description: 'admin-users',
+  tests: [
+    {
+      name: '#950: a missing user resolves to null, not a bare { id }',
+      run: async (ctx) => {
+        const fetchFullUser = await makeFetch({ 'users/u1': { auth: { email: 'a@x.test' } } });
 
-  assert.strictEqual(await fetchFullUser('ghost'), null);
-  assert.deepStrictEqual(await fetchFullUser('u1'), { id: 'u1', auth: { email: 'a@x.test' } }, 'a present user still reads in full');
+        ctx.expect(await fetchFullUser('ghost')).toBe(null);
+        ctx.expect(await fetchFullUser('u1'), 'a present user still reads in full').toEqual({ id: 'u1', auth: { email: 'a@x.test' } });
+      },
+    },
+  ],
 });

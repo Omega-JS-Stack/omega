@@ -12,13 +12,16 @@
  * has no personas" for the whole process lifetime.
  *
  * PURE: `loadSeedAccounts` is file reads against a seeded temp project — no
- * emulator, no ctx.
+ * emulator, no ctx. It reads through devkit's `loadInitHooks`, the one loader
+ * the run itself uses: a factory gets `{ projectRoot, config, omega }`, and a
+ * broken file is an `InitHookError` naming it, which the palette serves as `{}`.
  *
  * Run: npx omega test backend:helpers/seed-accounts-load
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { loadSeedAccounts } = require('../../dist/test/seed.js');
+const { loadInitHooks, InitHookError } = require('../../dist/vendor/devkit/test/init-hooks.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A project persona exactly as the extension point documents one: a palette
@@ -30,6 +33,9 @@ const WILL_NOT_PARSE = 'module.exports = (\n';
 const THROWS_WHEN_CALLED = 'module.exports = () => { throw new Error(\'_init.js blew up\'); };\n';
 // The arrow-body typo: a labelled block, so the factory returns undefined.
 const RETURNS_NOTHING = 'module.exports = (ctx) => { accounts: [] };\n';
+// A persona that carries back what its factory was handed.
+const ECHOES_ARGS = 'module.exports = ({ projectRoot, config }) => ({ accounts: [{ id: \'echo\', projectRoot, brandId: config.brand.id }] });\n';
+const THROWS_ON_LOAD = 'throw new Error(\'_init.js will not load\');\n';
 
 // A temp project root: `test/_init.js` under it, and nothing else a project has.
 function seedProject(initSource) {
@@ -51,26 +57,24 @@ module.exports = defineCases({
     // and a projectDir one level off is the silence #712 shipped with.
     {
       name: 'project-personas-load-from-the-project-dir',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectDir = seedProject(DECLARES_PERSONA);
 
         try {
           const accounts = loadSeedAccounts({ projectDir });
 
-          assert.deepEqual(
+          expect(
             accounts['shop-owner'],
-            PERSONA,
             'The project\'s own persona must be loaded, keyed by its id',
-          );
+          ).toEqual(PERSONA);
 
           // One directory off — `<projectDir>/test` rather than `<projectDir>`,
           // the exact miss #712 was — reads nothing, and the framework declares
           // no `test/_init.js` of its own, so the whole answer is empty.
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir: path.join(projectDir, 'test') }),
-            {},
             'A projectDir that holds no test/_init.js yields no accounts',
-          );
+          ).toEqual({});
         } finally {
           jetpack.remove(projectDir);
         }
@@ -82,23 +86,21 @@ module.exports = defineCases({
     // unread and the palette kept serving a roster without the project's half.
     {
       name: 'a-broken-init-is-re-read-once-it-is-fixed',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectDir = seedProject(WILL_NOT_PARSE);
 
         try {
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir }),
-            {},
             'A test/_init.js that will not parse loads no personas',
-          );
+          ).toEqual({});
 
           jetpack.write(path.join(projectDir, 'test', '_init.js'), DECLARES_PERSONA);
 
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir })['shop-owner'],
-            PERSONA,
             'The next call re-reads the file the developer just fixed',
-          );
+          ).toEqual(PERSONA);
         } finally {
           jetpack.remove(projectDir);
         }
@@ -110,23 +112,21 @@ module.exports = defineCases({
     // the seed cache alone would keep serving the same broken module forever.
     {
       name: 'a-hook-that-threw-is-forgotten-by-require-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectDir = seedProject(THROWS_WHEN_CALLED);
 
         try {
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir }),
-            {},
             'A test/_init.js whose hook throws loads no personas',
-          );
+          ).toEqual({});
 
           jetpack.write(path.join(projectDir, 'test', '_init.js'), DECLARES_PERSONA);
 
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir })['shop-owner'],
-            PERSONA,
             'The retry reads the fixed FILE, not the broken module require kept',
-          );
+          ).toEqual(PERSONA);
         } finally {
           jetpack.remove(projectDir);
         }
@@ -137,23 +137,58 @@ module.exports = defineCases({
     // Cached as "declares none" it would stick exactly like the parse failure.
     {
       name: 'a-factory-that-returns-nothing-is-a-failed-load-not-an-answer',
-      async run({ assert }) {
+      async run({ expect }) {
         const projectDir = seedProject(RETURNS_NOTHING);
 
         try {
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir }),
-            {},
             'A hook factory that returns no object loads no personas',
-          );
+          ).toEqual({});
 
           jetpack.write(path.join(projectDir, 'test', '_init.js'), DECLARES_PERSONA);
 
-          assert.deepEqual(
+          expect(
             loadSeedAccounts({ projectDir })['shop-owner'],
-            PERSONA,
             'The next call re-reads the fixed file instead of the remembered nothing',
-          );
+          ).toEqual(PERSONA);
+        } finally {
+          jetpack.remove(projectDir);
+        }
+      },
+    },
+
+    {
+      name: 'case-120-the-factory-gets-the-project-root-and-the-brand-config',
+      async run({ expect }) {
+        const projectDir = seedProject(ECHOES_ARGS);
+
+        try {
+          const echo = loadSeedAccounts({ projectDir, config: { brand: { id: 'seed-brand' } } }).echo;
+
+          expect(echo, 'The factory\'s persona is loaded').toBeTruthy();
+          expect(echo.projectRoot, 'The factory is handed the project root').toBe(projectDir);
+          expect(echo.brandId, 'and the brand config').toBe('seed-brand');
+        } finally {
+          jetpack.remove(projectDir);
+        }
+      },
+    },
+
+    {
+      name: 'case-120-an-init-that-throws-on-load-is-an-InitHookError-naming-the-file',
+      async run({ expect }) {
+        const projectDir = seedProject(THROWS_ON_LOAD);
+        const file = path.join(projectDir, 'test', '_init.js');
+        const roots = [{ dir: path.join(projectDir, 'test'), label: 'project' }];
+
+        try {
+          expect(
+            () => loadInitHooks(roots, { projectRoot: projectDir, factoryArgs: { config: {}, omega: null, ctx: null } }),
+            'The run\'s loader refuses the file by name',
+          ).toThrow({ name: 'InitHookError', file });
+          expect(() => loadInitHooks(roots, { projectRoot: projectDir })).toThrow(InitHookError);
+          expect(loadSeedAccounts({ projectDir }), 'The palette serves no personas for it').toEqual({});
         } finally {
           jetpack.remove(projectDir);
         }

@@ -17,8 +17,7 @@
  * dev-palette.test.js set. A fresh require IS a fresh page load: the module
  * re-reads the same storage object the previous one wrote.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -85,134 +84,159 @@ async function pageLoad({ timeZone, storage = {} } = {}) {
 
 const ORIGINAL_TZ = process.env.TZ;
 
-test.after(() => { process.env.TZ = ORIGINAL_TZ; });
+module.exports = defineCases({
+  type: 'group',
+  description: 'tracking-consent',
+  cleanup: () => { process.env.TZ = ORIGINAL_TZ; },
+  tests: [
+    {
+      name: 'no decision, opt-out region: both categories granted, and it is not a decision',
+      run: async (ctx) => {
+        const { module } = await pageLoad({ timeZone: 'America/New_York' });
 
-test('no decision, opt-out region: both categories granted, and it is not a decision', async () => {
-  const { module } = await pageLoad({ timeZone: 'America/New_York' });
-
-  assert.strictEqual(module.hasTrackingDecision(), false, 'nobody has answered — the banner still shows');
-  assert.deepStrictEqual(module.getTrackingConsent(), {
-    analytics: true,
-    marketing: true,
-    region: 'opt-out',
-    timestamp: null,
-    version: 1,
-  });
-});
-
-test('no decision, opt-in region: nothing is granted', async () => {
-  const { module } = await pageLoad({ timeZone: 'Europe/Berlin' });
-
-  assert.strictEqual(module.hasTrackingDecision(), false);
-  assert.deepStrictEqual(module.getTrackingConsent(), {
-    analytics: false,
-    marketing: false,
-    region: 'opt-in',
-    timestamp: null,
-    version: 1,
-  });
-});
-
-test('a saved answer is stored whole and honored on the next load', async () => {
-  const first = await pageLoad({ timeZone: 'Europe/Berlin' });
-
-  const written = first.module.setTrackingConsent({ analytics: true, marketing: false });
-
-  assert.strictEqual(written.analytics, true);
-  assert.strictEqual(written.marketing, false);
-  assert.strictEqual(written.region, 'opt-in', 'the record remembers where it was made');
-  assert.strictEqual(written.version, 1);
-  assert.match(written.timestamp, /^\d{4}-\d{2}-\d{2}T/, 'an ISO timestamp, not a Date object');
-
-  // Stored under `trackingConsent`, which is the path other packages read.
-  assert.deepStrictEqual(first.storage.trackingConsent, written);
-
-  // The next page load reads it back instead of re-applying the region default,
-  // which in an opt-in region would silently revoke what was just granted.
-  const second = await pageLoad({ timeZone: 'Europe/Berlin', storage: first.storage });
-
-  assert.strictEqual(second.module.hasTrackingDecision(), true);
-  assert.deepStrictEqual(second.module.getTrackingConsent(), written);
-});
-
-test('an answer survives a region the visitor is no longer in', async () => {
-  const first = await pageLoad({ timeZone: 'Europe/Berlin' });
-  first.module.setTrackingConsent({ analytics: false, marketing: false });
-
-  // Travelling does not re-grant anything: the ANSWER wins over the default.
-  const second = await pageLoad({ timeZone: 'America/New_York', storage: first.storage });
-
-  assert.strictEqual(second.module.hasTrackingDecision(), true);
-  assert.strictEqual(second.module.getTrackingConsent().analytics, false);
-  assert.strictEqual(second.module.getTrackingConsent().marketing, false);
-});
-
-test('a record from an older version is no decision at all', async () => {
-  const storage = {
-    trackingConsent: { analytics: true, marketing: true, region: 'opt-in', timestamp: '2026-01-01T00:00:00.000Z', version: 0 },
-  };
-
-  const { module } = await pageLoad({ timeZone: 'Europe/Berlin', storage });
-
-  assert.strictEqual(module.hasTrackingDecision(), false, 'a version bump re-prompts');
-  assert.strictEqual(module.getTrackingConsent().analytics, false, 'and grants nothing until it is answered again');
-});
-
-test('clearing the decision puts the region default back', async () => {
-  const { module, storage } = await pageLoad({ timeZone: 'Europe/Berlin' });
-  module.setTrackingConsent({ analytics: true, marketing: true });
-
-  const now = module.clearTrackingDecision();
-
-  assert.strictEqual(module.hasTrackingDecision(), false, 'reopening the banner is a fresh question');
-  assert.strictEqual(now.analytics, false);
-  assert.strictEqual(storage.trackingConsent, undefined);
-});
-
-test('listeners are told what is in effect, and one throwing never costs the others', async () => {
-  const { module } = await pageLoad({ timeZone: 'Europe/Berlin' });
-
-  const seen = [];
-  module.onTrackingConsentChange(() => { throw new Error('a listener with a bug'); });
-  module.onTrackingConsentChange((record) => seen.push(record));
-  const unsubscribe = module.onTrackingConsentChange((record) => seen.push({ second: record.analytics }));
-
-  module.setTrackingConsent({ analytics: true, marketing: false });
-
-  assert.strictEqual(seen.length, 2, 'the throw did not stop the notification');
-  assert.strictEqual(seen[0].analytics, true);
-  assert.strictEqual(seen[0].marketing, false);
-  assert.deepStrictEqual(seen[1], { second: true });
-
-  unsubscribe();
-  module.setTrackingConsent({ analytics: false, marketing: false });
-
-  assert.strictEqual(seen.length, 3, 'an unsubscribed listener stops hearing');
-  assert.strictEqual(seen[2].analytics, false);
-});
-
-test('the signup form\'s legal `consent` key is never touched', async () => {
-  // The collision that made this key `trackingConsent`: captureSignupConsent
-  // (libs/auth/forms.js) writes `consent: { legal, marketing }` and the backend
-  // signup route interprets THAT shape. A tracking record written over it would
-  // read as a revoked terms agreement.
-  const storage = {
-    consent: {
-      legal: { granted: true, text: 'I agree to the Terms' },
-      marketing: { granted: false, text: 'Send me email' },
+        ctx.expect(module.hasTrackingDecision(), 'nobody has answered — the banner still shows').toBe(false);
+        ctx.expect(module.getTrackingConsent()).toEqual({
+          analytics: true,
+          marketing: true,
+          region: 'opt-out',
+          timestamp: null,
+          version: 1,
+        });
+      },
     },
-  };
 
-  const { module } = await pageLoad({ timeZone: 'Europe/Berlin', storage });
+    {
+      name: 'no decision, opt-in region: nothing is granted',
+      run: async (ctx) => {
+        const { module } = await pageLoad({ timeZone: 'Europe/Berlin' });
 
-  assert.strictEqual(module.hasTrackingDecision(), false, 'a legal consent is not a tracking decision');
+        ctx.expect(module.hasTrackingDecision()).toBe(false);
+        ctx.expect(module.getTrackingConsent()).toEqual({
+          analytics: false,
+          marketing: false,
+          region: 'opt-in',
+          timestamp: null,
+          version: 1,
+        });
+      },
+    },
 
-  module.setTrackingConsent({ analytics: true, marketing: true });
-  module.clearTrackingDecision();
+    {
+      name: 'a saved answer is stored whole and honored on the next load',
+      run: async (ctx) => {
+        const first = await pageLoad({ timeZone: 'Europe/Berlin' });
 
-  assert.deepStrictEqual(
-    storage.consent,
-    { legal: { granted: true, text: 'I agree to the Terms' }, marketing: { granted: false, text: 'Send me email' } },
-    'writing AND clearing the tracking record leave the legal one exactly as it was',
-  );
+        const written = first.module.setTrackingConsent({ analytics: true, marketing: false });
+
+        ctx.expect(written.analytics).toBe(true);
+        ctx.expect(written.marketing).toBe(false);
+        ctx.expect(written.region, 'the record remembers where it was made').toBe('opt-in');
+        ctx.expect(written.version).toBe(1);
+        ctx.expect(written.timestamp, 'an ISO timestamp, not a Date object').toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+        // Stored under `trackingConsent`, which is the path other packages read.
+        ctx.expect(first.storage.trackingConsent).toEqual(written);
+
+        // The next page load reads it back instead of re-applying the region default,
+        // which in an opt-in region would silently revoke what was just granted.
+        const second = await pageLoad({ timeZone: 'Europe/Berlin', storage: first.storage });
+
+        ctx.expect(second.module.hasTrackingDecision()).toBe(true);
+        ctx.expect(second.module.getTrackingConsent()).toEqual(written);
+      },
+    },
+
+    {
+      name: 'an answer survives a region the visitor is no longer in',
+      run: async (ctx) => {
+        const first = await pageLoad({ timeZone: 'Europe/Berlin' });
+        first.module.setTrackingConsent({ analytics: false, marketing: false });
+
+        // Travelling does not re-grant anything: the ANSWER wins over the default.
+        const second = await pageLoad({ timeZone: 'America/New_York', storage: first.storage });
+
+        ctx.expect(second.module.hasTrackingDecision()).toBe(true);
+        ctx.expect(second.module.getTrackingConsent().analytics).toBe(false);
+        ctx.expect(second.module.getTrackingConsent().marketing).toBe(false);
+      },
+    },
+
+    {
+      name: 'a record from an older version is no decision at all',
+      run: async (ctx) => {
+        const storage = {
+          trackingConsent: { analytics: true, marketing: true, region: 'opt-in', timestamp: '2026-01-01T00:00:00.000Z', version: 0 },
+        };
+
+        const { module } = await pageLoad({ timeZone: 'Europe/Berlin', storage });
+
+        ctx.expect(module.hasTrackingDecision(), 'a version bump re-prompts').toBe(false);
+        ctx.expect(module.getTrackingConsent().analytics, 'and grants nothing until it is answered again').toBe(false);
+      },
+    },
+
+    {
+      name: 'clearing the decision puts the region default back',
+      run: async (ctx) => {
+        const { module, storage } = await pageLoad({ timeZone: 'Europe/Berlin' });
+        module.setTrackingConsent({ analytics: true, marketing: true });
+
+        const now = module.clearTrackingDecision();
+
+        ctx.expect(module.hasTrackingDecision(), 'reopening the banner is a fresh question').toBe(false);
+        ctx.expect(now.analytics).toBe(false);
+        ctx.expect(storage.trackingConsent).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'listeners are told what is in effect, and one throwing never costs the others',
+      run: async (ctx) => {
+        const { module } = await pageLoad({ timeZone: 'Europe/Berlin' });
+
+        const seen = [];
+        module.onTrackingConsentChange(() => { throw new Error('a listener with a bug'); });
+        module.onTrackingConsentChange((record) => seen.push(record));
+        const unsubscribe = module.onTrackingConsentChange((record) => seen.push({ second: record.analytics }));
+
+        module.setTrackingConsent({ analytics: true, marketing: false });
+
+        ctx.expect(seen.length, 'the throw did not stop the notification').toBe(2);
+        ctx.expect(seen[0].analytics).toBe(true);
+        ctx.expect(seen[0].marketing).toBe(false);
+        ctx.expect(seen[1]).toEqual({ second: true });
+
+        unsubscribe();
+        module.setTrackingConsent({ analytics: false, marketing: false });
+
+        ctx.expect(seen.length, 'an unsubscribed listener stops hearing').toBe(3);
+        ctx.expect(seen[2].analytics).toBe(false);
+      },
+    },
+
+    {
+      name: 'the signup form\'s legal `consent` key is never touched',
+      run: async (ctx) => {
+        // The collision that made this key `trackingConsent`: captureSignupConsent
+        // (libs/auth/forms.js) writes `consent: { legal, marketing }` and the backend
+        // signup route interprets THAT shape. A tracking record written over it would
+        // read as a revoked terms agreement.
+        const storage = {
+          consent: {
+            legal: { granted: true, text: 'I agree to the Terms' },
+            marketing: { granted: false, text: 'Send me email' },
+          },
+        };
+
+        const { module } = await pageLoad({ timeZone: 'Europe/Berlin', storage });
+
+        ctx.expect(module.hasTrackingDecision(), 'a legal consent is not a tracking decision').toBe(false);
+
+        module.setTrackingConsent({ analytics: true, marketing: true });
+        module.clearTrackingDecision();
+
+        ctx.expect(storage.consent, 'writing AND clearing the tracking record leave the legal one exactly as it was').toEqual({ legal: { granted: true, text: 'I agree to the Terms' }, marketing: { granted: false, text: 'Send me email' } });
+      },
+    },
+  ],
 });

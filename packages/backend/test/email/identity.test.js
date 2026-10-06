@@ -10,7 +10,7 @@
  *
  * Plain-node unit test (no emulator, no network).
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const { resolvePerson, resolveSignoff } = require('../../dist/omega/libraries/email/prepare.js');
 const { footer } = require('../../dist/omega/libraries/email/generators/lib/templates/base.js');
 const feedbackTemplate = require('../../dist/omega/libraries/email/generators/lib/templates/feedback.js');
@@ -102,10 +102,10 @@ module.exports = defineCases({
       run() {
         const out = resolveSignoff({ type: 'personal' }, brandWithPerson);
 
-        assert.equal(out.name, 'Jane Doe, CEO');
-        assert.equal(out.image, 'https://acme.example/jane.jpg');
-        assert.equal(out.url, 'https://jane.example');
-        assert.equal(out.urlText, '@janedoe');
+        expect(out.name).toBe('Jane Doe, CEO');
+        expect(out.image).toBe('https://acme.example/jane.jpg');
+        expect(out.url).toBe('https://jane.example');
+        expect(out.urlText).toBe('@janedoe');
       },
     },
 
@@ -115,9 +115,9 @@ module.exports = defineCases({
       run() {
         const out = resolveSignoff({ type: 'personal', name: 'Sam Smith, CTO' }, brandWithPerson);
 
-        assert.equal(out.name, 'Sam Smith, CTO');
+        expect(out.name).toBe('Sam Smith, CTO');
         // Unspecified fields still come from config.
-        assert.equal(out.url, 'https://jane.example');
+        expect(out.url).toBe('https://jane.example');
       },
     },
 
@@ -125,7 +125,7 @@ module.exports = defineCases({
       name: 'firstName is derived from the brand OWN configured name',
 
       run() {
-        assert.equal(resolvePerson(brandWithPerson).firstName, 'Jane');
+        expect(resolvePerson(brandWithPerson).firstName).toBe('Jane');
       },
     },
 
@@ -135,7 +135,7 @@ module.exports = defineCases({
       run() {
         const brand = { contact: { person: { name: 'Jonathan Doe, CEO', firstName: 'Jon' } } };
 
-        assert.equal(resolvePerson(brand).firstName, 'Jon');
+        expect(resolvePerson(brand).firstName).toBe('Jon');
       },
     },
 
@@ -146,9 +146,9 @@ module.exports = defineCases({
         const brand = { contact: { person: { name: 'Jane Doe' } } };
         const out = resolveSignoff({ type: 'personal' }, brand);
 
-        assert.equal(out.image, null, 'a missing headshot must be null, not a stand-in face');
-        assert.equal(out.url, null);
-        assert.equal(out.urlText, null);
+        expect(out.image, 'a missing headshot must be null, not a stand-in face').toBe(null);
+        expect(out.url).toBe(null);
+        expect(out.urlText).toBe(null);
       },
     },
 
@@ -158,11 +158,7 @@ module.exports = defineCases({
       name: 'personal signoff with NO configured person throws',
 
       run() {
-        assert.throws(
-          () => resolveSignoff({ type: 'personal' }, brandWithoutPerson),
-          (error) => error.code === 400 && /brand\.contact\.person\.name/.test(error.message),
-          'a missing person must fail loudly',
-        );
+        expect(() => resolveSignoff({ type: 'personal' }, brandWithoutPerson), 'a missing person must fail loudly').toThrow((error) => error.code === 400 && /brand\.contact\.person\.name/.test(error.message));
       },
     },
 
@@ -170,7 +166,7 @@ module.exports = defineCases({
       name: 'personal signoff with no brand at all throws',
 
       run() {
-        assert.throws(() => resolveSignoff({ type: 'personal' }, undefined), (error) => error.code === 400);
+        expect(() => resolveSignoff({ type: 'personal' }, undefined)).toThrow((error) => error.code === 400);
       },
     },
 
@@ -186,8 +182,8 @@ module.exports = defineCases({
           thrown = error;
         }
 
-        assert.ok(thrown, 'expected a throw');
-        assert.ok(!FRAMEWORK_IDENTITY.test(thrown.message), `error message leaked an identity: ${thrown.message}`);
+        expect(thrown, 'expected a throw').toBeTruthy();
+        expect(!FRAMEWORK_IDENTITY.test(thrown.message), `error message leaked an identity: ${thrown.message}`).toBeTruthy();
       },
     },
 
@@ -197,8 +193,8 @@ module.exports = defineCases({
       run() {
         const out = resolveSignoff({}, brandWithoutPerson);
 
-        assert.equal(out.type, 'team');
-        assert.equal(out.name, undefined);
+        expect(out.type).toBe('team');
+        expect(out.name).toBe(undefined);
       },
     },
 
@@ -210,9 +206,9 @@ module.exports = defineCases({
       run() {
         const out = footer(brandWithPerson, {}, COMPANY);
 
-        assert.ok(out.includes('Acme Holdings Inc'), `company name missing: ${out}`);
-        assert.ok(out.includes('https://acme.example/holdings-wordmark.png'), 'company wordmark missing');
-        assert.ok(!FRAMEWORK_IDENTITY.test(out), 'footer leaked the framework identity');
+        expect(out.includes('Acme Holdings Inc'), `company name missing: ${out}`).toBeTruthy();
+        expect(out.includes('https://acme.example/holdings-wordmark.png'), 'company wordmark missing').toBeTruthy();
+        expect(!FRAMEWORK_IDENTITY.test(out), 'footer leaked the framework identity').toBeTruthy();
       },
     },
 
@@ -222,8 +218,8 @@ module.exports = defineCases({
       run() {
         const out = footer({ name: 'Acme', url: 'https://acme.example' }, {}, {});
 
-        assert.ok(out.includes('&copy;') && out.includes('Acme'), `copyright name missing: ${out}`);
-        assert.ok(!FRAMEWORK_IDENTITY.test(out), 'footer leaked the framework identity');
+        expect(out.includes('&copy;') && out.includes('Acme'), `copyright name missing: ${out}`).toBeTruthy();
+        expect(!FRAMEWORK_IDENTITY.test(out), 'footer leaked the framework identity').toBeTruthy();
       },
     },
 
@@ -233,7 +229,7 @@ module.exports = defineCases({
       run() {
         const out = footer({ name: 'Acme', url: 'https://acme.example' }, {}, {});
 
-        assert.ok(!out.includes('<mj-image'), `rendered a wordmark with nothing configured: ${out}`);
+        expect(!out.includes('<mj-image'), `rendered a wordmark with nothing configured: ${out}`).toBeTruthy();
       },
     },
 
@@ -248,8 +244,8 @@ module.exports = defineCases({
           theme: {},
         });
 
-        assert.ok(!FRAMEWORK_IDENTITY.test(out), 'feedback template leaked the framework identity');
-        assert.ok(!/<img/.test(out), `feedback template still loads a hosted image: ${out}`);
+        expect(!FRAMEWORK_IDENTITY.test(out), 'feedback template leaked the framework identity').toBeTruthy();
+        expect(!/<img/.test(out), `feedback template still loads a hosted image: ${out}`).toBeTruthy();
       },
     },
 
@@ -264,11 +260,11 @@ module.exports = defineCases({
 
         // The glyphs that replaced the hosted PNGs — dislike/neutral/like/love.
         for (const face of ['&#128542;', '&#128528;', '&#128578;', '&#128525;']) {
-          assert.ok(out.includes(face), `missing rating face ${face}`);
+          expect(out.includes(face), `missing rating face ${face}`).toBeTruthy();
         }
 
         for (const rating of ['dislike', 'neutral', 'like', 'love']) {
-          assert.ok(out.includes(`rating=${rating}`), `missing rating link for ${rating}`);
+          expect(out.includes(`rating=${rating}`), `missing rating link for ${rating}`).toBeTruthy();
         }
       },
     },
@@ -282,10 +278,10 @@ module.exports = defineCases({
         const configured = await buildConfigured();
         const emails = configured.bcc.map((entry) => entry.email);
 
-        assert.deepEqual(emails, ['audit@acme.example', 'archive@acme.example']);
-        assert.equal(configured.bcc[0].name, 'Acme Audit');
+        expect(emails).toEqual(['audit@acme.example', 'archive@acme.example']);
+        expect(configured.bcc[0].name).toBe('Acme Audit');
         // A nameless entry falls back to the company name, not a framework one.
-        assert.equal(configured.bcc[1].name, 'Acme Holdings Inc');
+        expect(configured.bcc[1].name).toBe('Acme Holdings Inc');
       },
     },
 
@@ -295,8 +291,8 @@ module.exports = defineCases({
       async run() {
         const unconfigured = await buildUnconfigured();
 
-        assert.deepEqual(unconfigured.bcc, [], `unexpected bcc: ${JSON.stringify(unconfigured.bcc)}`);
-        assert.ok(!FRAMEWORK_IDENTITY.test(JSON.stringify(unconfigured)), 'built email leaked the framework identity');
+        expect(unconfigured.bcc, `unexpected bcc: ${JSON.stringify(unconfigured.bcc)}`).toEqual([]);
+        expect(!FRAMEWORK_IDENTITY.test(JSON.stringify(unconfigured)), 'built email leaked the framework identity').toBeTruthy();
       },
     },
 
@@ -306,7 +302,7 @@ module.exports = defineCases({
       async run() {
         const unconfigured = await buildUnconfigured();
 
-        assert.equal(unconfigured.cc[0].email, 'support@acme.example');
+        expect(unconfigured.cc[0].email).toBe('support@acme.example');
       },
     },
 
@@ -316,9 +312,9 @@ module.exports = defineCases({
       async run() {
         const malformed = await buildMalformed();
 
-        assert.ok(malformed instanceof Error, 'expected a throw');
-        assert.equal(malformed.code, 400);
-        assert.ok(/carbonCopy/.test(malformed.message), `unhelpful message: ${malformed.message}`);
+        expect(malformed instanceof Error, 'expected a throw').toBeTruthy();
+        expect(malformed.code).toBe(400);
+        expect(/carbonCopy/.test(malformed.message), `unhelpful message: ${malformed.message}`).toBeTruthy();
       },
     },
   ],

@@ -14,7 +14,7 @@ const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const { findBrandRoot, readPortsFile, pagesHost, targetNameFromDir } = require('@omega.js/config');
-const { setEnvironment } = require('@omega.js/config/environment');
+const { setEnvironment, ENVIRONMENT_VAR } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -61,7 +61,18 @@ function liveDevPort(root) {
   return (ports && ports.website) || null;
 }
 
+// A caller running the build in process (the test verb) gets its own environment back, success or throw.
 module.exports = async function (options) {
+  const found = process.env[ENVIRONMENT_VAR];
+  try {
+    return await build(options);
+  } finally {
+    if (found === undefined) delete process.env[ENVIRONMENT_VAR];
+    else process.env[ENVIRONMENT_VAR] = found;
+  }
+};
+
+async function build(options) {
   options = options || {};
 
   // The verb names the environment for the whole process
@@ -214,6 +225,6 @@ module.exports = async function (options) {
   }
 
   return result;
-};
+}
 
 module.exports.catalogWarning = catalogWarning;

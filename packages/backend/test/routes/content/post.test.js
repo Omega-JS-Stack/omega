@@ -16,10 +16,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/content/post', {});
 
-        assert.isError(response, 400, 'Missing URL should return 400');
+        expect(response, 'Missing URL should return 400').toBeError(400);
       },
     },
 
@@ -32,12 +32,12 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN not set (content/post searches live GitHub)' : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/content/post', {
           url: 'https://example.com/blog/this-post-definitely-does-not-exist-12345',
         });
 
-        assert.isError(response, 404, 'Non-existent post should return 404');
+        expect(response, 'Non-existent post should return 404').toBeError(404);
       },
     },
 
@@ -48,12 +48,12 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN not set (content/post searches live GitHub)' : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/content/post', {
           url: 'https://example.com/blog/nonexistent-test-post-12345',
         });
 
-        assert.isError(response, 404, 'Non-existent post should return 404');
+        expect(response, 'Non-existent post should return 404').toBeError(404);
       },
     },
   ],

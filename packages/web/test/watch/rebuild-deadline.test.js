@@ -14,14 +14,14 @@
  * thing that fails when the machine is busy. Everything else is real: the real
  * derivation, the real poll loop, the real assertion.
  */
-const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const {
   BASE_REBUILD_DEADLINE_MS,
   MAX_LOAD_FACTOR,
   SCALE_VAR,
   buildRecorder,
+  caseTimeoutMs,
   deadlineScale,
   loadFactor,
   rebuildDeadlineMs,
@@ -64,174 +64,197 @@ function stubRebuild(clock, landsAtMs) {
   return () => (landsAtMs !== null && clock.now() >= landsAtMs ? 'data-layout="AFTER"' : 'data-layout="BEFORE"');
 }
 
-test('a rebuild slower than the old fixed ceiling lands, because the machine is measurably busy', async () => {
-  const clock = virtualClock();
+module.exports = defineCases({
+  type: 'group',
+  description: 'rebuild-deadline',
+  timeout: caseTimeoutMs(),
+  tests: [
+    {
+      name: 'a rebuild slower than the old fixed ceiling lands, because the machine is measurably busy',
+      run: async (ctx) => {
+        const clock = virtualClock();
 
-  await waitForRebuild({
-    read: stubRebuild(clock, SLOW_REBUILD_MS),
-    pattern: /data-layout="AFTER"/,
-    message: 'the rebuild serves the edit',
-    ...LOADED,
-    now: clock.now,
-    sleep: clock.sleep,
-  });
+        await waitForRebuild({
+          read: stubRebuild(clock, SLOW_REBUILD_MS),
+          pattern: /data-layout="AFTER"/,
+          message: 'the rebuild serves the edit',
+          ...LOADED,
+          now: clock.now,
+          sleep: clock.sleep,
+        });
 
-  assert.ok(clock.now() >= SLOW_REBUILD_MS, 'the wait really did run past the old ceiling');
-  assert.equal(rebuildDeadlineMs(LOADED), 5 * BASE_REBUILD_DEADLINE_MS, 'a 5×-oversubscribed machine buys the watcher 5× the room');
-});
+        ctx.expect(clock.now() >= SLOW_REBUILD_MS, 'the wait really did run past the old ceiling').toBeTruthy();
+        ctx.expect(rebuildDeadlineMs(LOADED), 'a 5×-oversubscribed machine buys the watcher 5× the room').toBe(5 * BASE_REBUILD_DEADLINE_MS);
+      },
+    },
 
-test('the same rebuild fails on an idle machine — the fixed ceiling WAS the flake', async () => {
-  const clock = virtualClock();
+    {
+      name: 'the same rebuild fails on an idle machine — the fixed ceiling WAS the flake',
+      run: async (ctx) => {
+        const clock = virtualClock();
 
-  // An idle machine is the old behavior exactly: the floor, and nothing else.
-  await assert.rejects(
-    () => waitForRebuild({
-      read: stubRebuild(clock, SLOW_REBUILD_MS),
-      pattern: /data-layout="AFTER"/,
-      message: 'the rebuild serves the edit',
-      load: 1,
-      cpus: 10,
-      now: clock.now,
-      sleep: clock.sleep,
-    }),
-    /no rebuild carried it in 30000ms/,
-    'a 45s rebuild against a 30s ceiling is exactly what the lane kept reporting as a failure',
-  );
+        // An idle machine is the old behavior exactly: the floor, and nothing else.
+        await ctx.expect((() => waitForRebuild({
+            read: stubRebuild(clock, SLOW_REBUILD_MS),
+            pattern: /data-layout="AFTER"/,
+            message: 'the rebuild serves the edit',
+            load: 1,
+            cpus: 10,
+            now: clock.now,
+            sleep: clock.sleep,
+          }))(), 'a 45s rebuild against a 30s ceiling is exactly what the lane kept reporting as a failure').rejects.toThrow(/no rebuild carried it in 30000ms/);
 
-  assert.ok(clock.now() < SLOW_REBUILD_MS, 'it gave up before the rebuild it was waiting for landed');
-});
+        ctx.expect(clock.now() < SLOW_REBUILD_MS, 'it gave up before the rebuild it was waiting for landed').toBeTruthy();
+      },
+    },
 
-test('a genuine hang still fails, naming the elapsed time and the last rebuild event', async () => {
-  const clock = virtualClock();
-  const builds = buildRecorder();
+    {
+      name: 'a genuine hang still fails, naming the elapsed time and the last rebuild event',
+      run: async (ctx) => {
+        const clock = virtualClock();
+        const builds = buildRecorder();
 
-  // The watcher woke, built twice, and then stopped producing the edit — the
-  // failure has to be able to say that.
-  builds.onStart();
-  builds.onFinish();
-  builds.onStart();
-  builds.onFinish();
-
-  const failure = await waitForRebuild({
-    read: stubRebuild(clock, null),
-    pattern: /data-layout="AFTER"/,
-    message: 'the rebuild serves the edit',
-    builds,
-    ...LOADED,
-    now: clock.now,
-    sleep: clock.sleep,
-  }).then(() => null, (error) => error);
-
-  assert.ok(failure, 'a rebuild that never lands must still fail — a derived deadline is not an absent one');
-  assert.match(failure.message, /no rebuild carried it in 150000ms/, 'the failure names the elapsed time');
-  assert.match(failure.message, /deadline 150000ms = 30000ms floor × 5\.00 load factor × 1 lane scale/, 'and how that deadline was derived');
-  assert.match(failure.message, /last rebuild event: build #2 finished/, 'and the last rebuild event seen, which says the watcher was alive but never produced the edit');
-});
-
-test('a watcher that never woke reads differently from one that kept rebuilding', async () => {
-  const clock = virtualClock();
-
-  const failure = await waitForRebuild({
-    read: stubRebuild(clock, null),
-    pattern: /data-layout="AFTER"/,
-    message: 'the rebuild serves the edit',
-    builds: buildRecorder(),
-    ...LOADED,
-    now: clock.now,
-    sleep: clock.sleep,
-  }).then(() => null, (error) => error);
-
-  assert.match(failure.message, /no build event was seen at all — the watcher never woke/,
-    'the two failures a flake investigation has to tell apart must not print the same line');
-});
-
-test('the deadline is the floor on an idle machine, capped on a wedged one, and the lane knob still multiplies', () => {
-  assert.equal(rebuildDeadlineMs({ load: 0.5, cpus: 10 }), BASE_REBUILD_DEADLINE_MS, 'an idle machine is the solo floor — an unchanged solo run');
-  assert.equal(rebuildDeadlineMs({ load: 10, cpus: 10 }), BASE_REBUILD_DEADLINE_MS, 'a fully-but-not-over-subscribed machine buys nothing either');
-  assert.equal(loadFactor({ load: 500, cpus: 10 }), MAX_LOAD_FACTOR, 'a wedged machine is capped — a hang must still reach a verdict');
-
-  // The #211 knob is unchanged: the lane runner's multiplier applies on top.
-  assert.equal(rebuildDeadlineMs({ load: 50, cpus: 10, env: { [SCALE_VAR]: '3' } }), 15 * BASE_REBUILD_DEADLINE_MS);
-  assert.equal(deadlineScale({ [SCALE_VAR]: '' }), 1, 'an empty knob is an unset knob');
-  assert.throws(() => rebuildDeadlineMs({ env: { [SCALE_VAR]: 'fast' } }), /positive number/, 'a mistyped knob is loud, never silently unscaled');
-});
-
-test('the real machine is measured, not assumed', () => {
-  // No injection: the defaults must read this machine, and the floor holds
-  // whatever it says.
-  assert.ok(loadFactor() >= 1 && loadFactor() <= MAX_LOAD_FACTOR, 'the live factor is inside its own bounds');
-  assert.ok(rebuildDeadlineMs() >= BASE_REBUILD_DEADLINE_MS, 'and never buys less than the solo floor');
-});
-
-// ─── The first-edit nudge (#688) ─────────────────────────────────────────────
-// A freshly created watch root's FSEvents stream can still be initializing
-// when the first edit lands — the one save falls before the stream's start
-// and is never replayed, so the wait times out with "1 started, 1 finished".
-// The nudge re-fires the SAME save until the watcher shows life, and stops
-// the moment a build starts: a rebuild that woke but served stale content
-// still fails, which is the staleness regression (#49) these suites exist for.
-
-test('a lost first edit is re-fired until the watcher wakes, then the nudging stops', async () => {
-  const clock = virtualClock();
-  const builds = buildRecorder();
-  let nudges = 0;
-  let content = 'BEFORE';
-
-  await waitForRebuild({
-    read: () => content,
-    pattern: /AFTER/,
-    message: 'the re-fired edit lands',
-    builds,
-    nudge: () => {
-      nudges += 1;
-      // The second re-save is finally heard: the watcher wakes and rebuilds
-      if (nudges === 2) {
+        // The watcher woke, built twice, and then stopped producing the edit — the
+        // failure has to be able to say that.
         builds.onStart();
         builds.onFinish();
-        content = 'AFTER';
-      }
-    },
-    nudgeMs: 2000,
-    load: 0,
-    cpus: 8,
-    env: {},
-    now: clock.now,
-    sleep: clock.sleep,
-  });
+        builds.onStart();
+        builds.onFinish();
 
-  assert.equal(nudges, 2, 'the edit was re-fired until delivery, never after');
-});
+        const failure = await waitForRebuild({
+          read: stubRebuild(clock, null),
+          pattern: /data-layout="AFTER"/,
+          message: 'the rebuild serves the edit',
+          builds,
+          ...LOADED,
+          now: clock.now,
+          sleep: clock.sleep,
+        }).then(() => null, (error) => error);
 
-test('a rebuild that woke but served stale content is never nudged — it fails as the staleness it is', async () => {
-  const clock = virtualClock();
-  const builds = buildRecorder();
-  let nudges = 0;
-  let woken = false;
-
-  await assert.rejects(
-    () => waitForRebuild({
-      read: () => 'BEFORE',
-      pattern: /AFTER/,
-      message: 'a stale rebuild must fail',
-      builds,
-      nudge: () => { nudges += 1; },
-      nudgeMs: 2000,
-      load: 0,
-      cpus: 8,
-      env: {},
-      now: clock.now,
-      sleep: async (ms) => {
-        // The watcher woke on its own right away — and served stale bytes
-        if (!woken) {
-          woken = true;
-          builds.onStart();
-          builds.onFinish();
-        }
-        await clock.sleep(ms);
+        ctx.expect(failure, 'a rebuild that never lands must still fail — a derived deadline is not an absent one').toBeTruthy();
+        ctx.expect(failure.message, 'the failure names the elapsed time').toMatch(/no rebuild carried it in 150000ms/);
+        ctx.expect(failure.message, 'and how that deadline was derived').toMatch(/deadline 150000ms = 30000ms floor × 5\.00 load factor × 1 lane scale/);
+        ctx.expect(failure.message, 'and the last rebuild event seen, which says the watcher was alive but never produced the edit').toMatch(/last rebuild event: build #2 finished/);
       },
-    }),
-    /a stale rebuild must fail/,
-  );
+    },
 
-  assert.equal(nudges, 0, 'a woken watcher is never re-nudged — the failure stays a staleness failure');
+    {
+      name: 'a watcher that never woke reads differently from one that kept rebuilding',
+      run: async (ctx) => {
+        const clock = virtualClock();
+
+        const failure = await waitForRebuild({
+          read: stubRebuild(clock, null),
+          pattern: /data-layout="AFTER"/,
+          message: 'the rebuild serves the edit',
+          builds: buildRecorder(),
+          ...LOADED,
+          now: clock.now,
+          sleep: clock.sleep,
+        }).then(() => null, (error) => error);
+
+        ctx.expect(failure.message, 'the two failures a flake investigation has to tell apart must not print the same line').toMatch(/no build event was seen at all — the watcher never woke/);
+      },
+    },
+
+    {
+      name: 'the deadline is the floor on an idle machine, capped on a wedged one, and the lane knob still multiplies',
+      run: (ctx) => {
+        ctx.expect(rebuildDeadlineMs({ load: 0.5, cpus: 10 }), 'an idle machine is the solo floor — an unchanged solo run').toBe(BASE_REBUILD_DEADLINE_MS);
+        ctx.expect(rebuildDeadlineMs({ load: 10, cpus: 10 }), 'a fully-but-not-over-subscribed machine buys nothing either').toBe(BASE_REBUILD_DEADLINE_MS);
+        ctx.expect(loadFactor({ load: 500, cpus: 10 }), 'a wedged machine is capped — a hang must still reach a verdict').toBe(MAX_LOAD_FACTOR);
+
+        // The #211 knob is unchanged: the lane runner's multiplier applies on top.
+        ctx.expect(rebuildDeadlineMs({ load: 50, cpus: 10, env: { [SCALE_VAR]: '3' } })).toBe(15 * BASE_REBUILD_DEADLINE_MS);
+        ctx.expect(deadlineScale({ [SCALE_VAR]: '' }), 'an empty knob is an unset knob').toBe(1);
+        ctx.expect(() => rebuildDeadlineMs({ env: { [SCALE_VAR]: 'fast' } }), 'a mistyped knob is loud, never silently unscaled').toThrow(/positive number/);
+      },
+    },
+
+    {
+      name: 'the real machine is measured, not assumed',
+      run: (ctx) => {
+        // No injection: the defaults must read this machine, and the floor holds
+        // whatever it says.
+        ctx.expect(loadFactor() >= 1 && loadFactor() <= MAX_LOAD_FACTOR, 'the live factor is inside its own bounds').toBeTruthy();
+        ctx.expect(rebuildDeadlineMs() >= BASE_REBUILD_DEADLINE_MS, 'and never buys less than the solo floor').toBeTruthy();
+      },
+    },
+
+    // ─── The first-edit nudge (#688) ─────────────────────────────────────────────
+    // A freshly created watch root's FSEvents stream can still be initializing
+    // when the first edit lands — the one save falls before the stream's start
+    // and is never replayed, so the wait times out with "1 started, 1 finished".
+    // The nudge re-fires the SAME save until the watcher shows life, and stops
+    // the moment a build starts: a rebuild that woke but served stale content
+    // still fails, which is the staleness regression (#49) these suites exist for.
+
+    {
+      name: 'a lost first edit is re-fired until the watcher wakes, then the nudging stops',
+      run: async (ctx) => {
+        const clock = virtualClock();
+        const builds = buildRecorder();
+        let nudges = 0;
+        let content = 'BEFORE';
+
+        await waitForRebuild({
+          read: () => content,
+          pattern: /AFTER/,
+          message: 'the re-fired edit lands',
+          builds,
+          nudge: () => {
+            nudges += 1;
+            // The second re-save is finally heard: the watcher wakes and rebuilds
+            if (nudges === 2) {
+              builds.onStart();
+              builds.onFinish();
+              content = 'AFTER';
+            }
+          },
+          nudgeMs: 2000,
+          load: 0,
+          cpus: 8,
+          env: {},
+          now: clock.now,
+          sleep: clock.sleep,
+        });
+
+        ctx.expect(nudges, 'the edit was re-fired until delivery, never after').toBe(2);
+      },
+    },
+
+    {
+      name: 'a rebuild that woke but served stale content is never nudged — it fails as the staleness it is',
+      run: async (ctx) => {
+        const clock = virtualClock();
+        const builds = buildRecorder();
+        let nudges = 0;
+        let woken = false;
+
+        await ctx.expect((() => waitForRebuild({
+            read: () => 'BEFORE',
+            pattern: /AFTER/,
+            message: 'a stale rebuild must fail',
+            builds,
+            nudge: () => { nudges += 1; },
+            nudgeMs: 2000,
+            load: 0,
+            cpus: 8,
+            env: {},
+            now: clock.now,
+            sleep: async (ms) => {
+              // The watcher woke on its own right away — and served stale bytes
+              if (!woken) {
+                woken = true;
+                builds.onStart();
+                builds.onFinish();
+              }
+              await clock.sleep(ms);
+            },
+          }))()).rejects.toThrow(/a stale rebuild must fail/);
+
+        ctx.expect(nudges, 'a woken watcher is never re-nudged — the failure stays a staleness failure').toBe(0);
+      },
+    },
+  ],
 });

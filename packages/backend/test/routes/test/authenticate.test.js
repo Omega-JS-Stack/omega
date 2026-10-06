@@ -12,11 +12,11 @@ module.exports = defineCases({
     {
       name: 'no-auth',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/test/authenticate');
 
-        assert.isSuccess(response, 'Should succeed without auth');
-        assert.equal(response.data.authenticated, false, 'User should not be authenticated');
+        expect(response, 'Should succeed without auth').toBeSuccess();
+        expect(response.data.authenticated, 'User should not be authenticated').toBe(false);
       },
     },
 
@@ -24,12 +24,12 @@ module.exports = defineCases({
     {
       name: 'private-key',
       auth: 'basic',
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.as('basic').get('omega/test/authenticate');
 
-        assert.isSuccess(response, 'Should succeed with privateKey');
-        assert.equal(response.data.authenticated, true, 'User should be authenticated');
-        assert.equal(response.data.user.auth.uid, accounts.basic.uid, 'UID should match');
+        expect(response, 'Should succeed with privateKey').toBeSuccess();
+        expect(response.data.authenticated, 'User should be authenticated').toBe(true);
+        expect(response.data.user.auth.uid, 'UID should match').toBe(accounts.basic.uid);
       },
     },
 
@@ -37,11 +37,11 @@ module.exports = defineCases({
     {
       name: 'invalid-private-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.withPrivateKey('invalid-key-12345').get('omega/test/authenticate');
 
-        assert.isSuccess(response, 'Should succeed but not authenticate');
-        assert.equal(response.data.authenticated, false, 'Invalid key should not authenticate');
+        expect(response, 'Should succeed but not authenticate').toBeSuccess();
+        expect(response.data.authenticated, 'Invalid key should not authenticate').toBe(false);
       },
     },
 
@@ -49,12 +49,12 @@ module.exports = defineCases({
     {
       name: 'admin-key-header',
       auth: 'admin',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('admin').get('omega/test/authenticate');
 
-        assert.isSuccess(response, 'Should succeed with admin key');
-        assert.equal(response.data.authenticated, true, 'User should be authenticated');
-        assert.equal(response.data.user.roles?.admin, true, 'Should have admin role');
+        expect(response, 'Should succeed with admin key').toBeSuccess();
+        expect(response.data.authenticated, 'User should be authenticated').toBe(true);
+        expect(response.data.user.roles?.admin, 'Should have admin role').toBe(true);
       },
     },
 
@@ -65,14 +65,14 @@ module.exports = defineCases({
     {
       name: 'legacy-key-field-dead',
       auth: 'none',
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const viaQuery = await http.as('none').get('omega/test/authenticate', {
           backendManagerKey: config.adminKey,
         });
 
-        assert.isSuccess(viaQuery, 'Request itself should succeed');
-        assert.equal(viaQuery.data.authenticated, false, 'Legacy backendManagerKey param must NOT authenticate');
-        assert.equal(viaQuery.data.user.roles?.admin ?? false, false, 'Legacy backendManagerKey param must NOT grant admin');
+        expect(viaQuery, 'Request itself should succeed').toBeSuccess();
+        expect(viaQuery.data.authenticated, 'Legacy backendManagerKey param must NOT authenticate').toBe(false);
+        expect(viaQuery.data.user.roles?.admin ?? false, 'Legacy backendManagerKey param must NOT grant admin').toBe(false);
       },
     },
   ],

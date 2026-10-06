@@ -16,8 +16,7 @@
  * Storage module runs against a Map-backed `window.localStorage`, so what a test
  * reads back is what a browser would actually have persisted.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -141,140 +140,167 @@ async function makeBrowser(seedAttribution) {
   return { visit, read };
 }
 
-test('attribution capture: a tagged landing records every utm param, every click id, and the landing context', async () => {
-  const { visit } = await makeBrowser();
+module.exports = defineCases({
+  type: 'group',
+  description: 'attribution-capture',
+  tests: [
+    {
+      name: 'attribution capture: a tagged landing records every utm param, every click id, and the landing context',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser();
 
-  const attribution = await visit({
-    url: 'https://brand.test/pricing?utm_source=meta&utm_medium=cpc&utm_campaign=launch&utm_term=omega&utm_content=hero'
-      + '&fbclid=FB1&gclid=G1&gbraid=GB1&wbraid=WB1&ttclid=TT1&msclkid=MS1&twclid=TW1',
-    referrer: 'https://facebook.com/',
-  });
+        const attribution = await visit({
+          url: 'https://brand.test/pricing?utm_source=meta&utm_medium=cpc&utm_campaign=launch&utm_term=omega&utm_content=hero'
+            + '&fbclid=FB1&gclid=G1&gbraid=GB1&wbraid=WB1&ttclid=TT1&msclkid=MS1&twclid=TW1',
+          referrer: 'https://facebook.com/',
+        });
 
-  assert.deepStrictEqual(attribution.first.tags, {
-    utm_source: 'meta',
-    utm_medium: 'cpc',
-    utm_campaign: 'launch',
-    utm_term: 'omega',
-    utm_content: 'hero',
-  });
+        ctx.expect(attribution.first.tags).toEqual({
+          utm_source: 'meta',
+          utm_medium: 'cpc',
+          utm_campaign: 'launch',
+          utm_term: 'omega',
+          utm_content: 'hero',
+        });
 
-  assert.deepStrictEqual(attribution.first.clickIds, {
-    fbclid: 'FB1',
-    gclid: 'G1',
-    gbraid: 'GB1',
-    wbraid: 'WB1',
-    ttclid: 'TT1',
-    msclkid: 'MS1',
-    twclid: 'TW1',
-  });
+        ctx.expect(attribution.first.clickIds).toEqual({
+          fbclid: 'FB1',
+          gclid: 'G1',
+          gbraid: 'GB1',
+          wbraid: 'WB1',
+          ttclid: 'TT1',
+          msclkid: 'MS1',
+          twclid: 'TW1',
+        });
 
-  assert.strictEqual(attribution.first.referrer, 'https://facebook.com/');
-  assert.strictEqual(attribution.first.page, '/pricing');
-  assert.ok(attribution.first.url.startsWith('https://brand.test/pricing?utm_source=meta'));
-  assert.ok(Date.parse(attribution.first.timestamp) > 0, 'first touch carries an ISO timestamp');
+        ctx.expect(attribution.first.referrer).toBe('https://facebook.com/');
+        ctx.expect(attribution.first.page).toBe('/pricing');
+        ctx.expect(attribution.first.url.startsWith('https://brand.test/pricing?utm_source=meta')).toBeTruthy();
+        ctx.expect(Date.parse(attribution.first.timestamp) > 0, 'first touch carries an ISO timestamp').toBeTruthy();
 
-  // A tagged first visit is both touches.
-  assert.deepStrictEqual(attribution.last, attribution.first);
-});
-
-test('attribution capture: an untagged first visit still writes first touch, and leaves last unset', async () => {
-  const { visit } = await makeBrowser();
-
-  const attribution = await visit({
-    url: 'https://brand.test/',
-    referrer: 'https://news.ycombinator.com/',
-  });
-
-  assert.ok(attribution.first, 'an organic landing is still the first touch');
-  assert.strictEqual(attribution.first.referrer, 'https://news.ycombinator.com/');
-  assert.strictEqual(attribution.first.url, 'https://brand.test/');
-  assert.strictEqual(attribution.first.page, '/');
-  assert.strictEqual(attribution.first.tags, undefined, 'no tags on an untagged visit');
-  assert.strictEqual(attribution.first.clickIds, undefined, 'no click ids on an untagged visit');
-  assert.strictEqual(attribution.last, undefined, 'an untagged visit never sets last touch');
-});
-
-test('attribution capture: first touch is written once; last touch moves with every later tagged visit', async () => {
-  const { visit } = await makeBrowser();
-
-  const afterFirst = await visit({ url: 'https://brand.test/?utm_source=meta', referrer: 'https://facebook.com/' });
-  const firstTouch = afterFirst.first;
-
-  const afterSecond = await visit({ url: 'https://brand.test/blog?gclid=G2', referrer: 'https://google.com/' });
-
-  assert.deepStrictEqual(afterSecond.first, firstTouch, 'first touch is never overwritten');
-  assert.deepStrictEqual(afterSecond.last.clickIds, { gclid: 'G2' });
-  assert.strictEqual(afterSecond.last.tags, undefined, 'the newest tagged visit replaces last outright');
-  assert.strictEqual(afterSecond.last.page, '/blog');
-  assert.strictEqual(afterSecond.last.referrer, 'https://google.com/');
-});
-
-test('attribution capture: an untagged visit after a tagged one touches neither first nor last', async () => {
-  const { visit } = await makeBrowser();
-
-  const afterTagged = await visit({ url: 'https://brand.test/?utm_source=meta&ttclid=TT9' });
-  const afterUntagged = await visit({ url: 'https://brand.test/docs', referrer: 'https://brand.test/' });
-
-  assert.deepStrictEqual(afterUntagged.first, afterTagged.first);
-  assert.deepStrictEqual(afterUntagged.last, afterTagged.last);
-});
-
-test('attribution capture: aff/ref keeps its own top-level block and is replaced by the newest referral', async () => {
-  const { visit } = await makeBrowser();
-
-  const afterAff = await visit({ url: 'https://brand.test/?aff=IAN7' });
-
-  assert.strictEqual(afterAff.affiliate.code, 'IAN7');
-  assert.strictEqual(afterAff.affiliate.page, '/');
-  assert.strictEqual(afterAff.affiliate.url, 'https://brand.test/?aff=IAN7');
-  assert.ok(Date.parse(afterAff.affiliate.timestamp) > 0);
-
-  const afterRef = await visit({ url: 'https://brand.test/pricing?ref=SARA2' });
-
-  assert.strictEqual(afterRef.affiliate.code, 'SARA2', 'ref is the same concern as aff');
-  assert.deepStrictEqual(afterRef.first, afterAff.first, 'a referral visit is untagged — first touch stands');
-});
-
-test('attribution capture: the legacy utm blob folds into first and last, preserving its original context', async () => {
-  const { visit } = await makeBrowser({
-    utm: {
-      tags: { utm_source: 'newsletter', utm_medium: 'email' },
-      timestamp: '2025-06-01T00:00:00.000Z',
-      url: 'https://brand.test/old?utm_source=newsletter',
-      page: '/old',
+        // A tagged first visit is both touches.
+        ctx.expect(attribution.last).toEqual(attribution.first);
+      },
     },
-    affiliate: { code: 'LEGACY1', timestamp: '2025-06-01T00:00:00.000Z', url: 'https://brand.test/old', page: '/old' },
-  });
 
-  const attribution = await visit({ url: 'https://brand.test/' });
+    {
+      name: 'attribution capture: an untagged first visit still writes first touch, and leaves last unset',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser();
 
-  assert.strictEqual(attribution.utm, undefined, 'the legacy key is dropped');
-  assert.deepStrictEqual(attribution.first, {
-    tags: { utm_source: 'newsletter', utm_medium: 'email' },
-    referrer: null,
-    url: 'https://brand.test/old?utm_source=newsletter',
-    page: '/old',
-    timestamp: '2025-06-01T00:00:00.000Z',
-  });
-  assert.deepStrictEqual(attribution.last, attribution.first, 'the legacy touch seeds both touches');
-  assert.strictEqual(attribution.affiliate.code, 'LEGACY1', 'affiliate carries over untouched');
-});
+        const attribution = await visit({
+          url: 'https://brand.test/',
+          referrer: 'https://news.ycombinator.com/',
+        });
 
-test('attribution capture: the legacy migration is idempotent and never re-runs over a newer touch', async () => {
-  const { visit } = await makeBrowser({
-    utm: {
-      tags: { utm_source: 'newsletter' },
-      timestamp: '2025-06-01T00:00:00.000Z',
-      url: 'https://brand.test/old',
-      page: '/old',
+        ctx.expect(attribution.first, 'an organic landing is still the first touch').toBeTruthy();
+        ctx.expect(attribution.first.referrer).toBe('https://news.ycombinator.com/');
+        ctx.expect(attribution.first.url).toBe('https://brand.test/');
+        ctx.expect(attribution.first.page).toBe('/');
+        ctx.expect(attribution.first.tags, 'no tags on an untagged visit').toBe(undefined);
+        ctx.expect(attribution.first.clickIds, 'no click ids on an untagged visit').toBe(undefined);
+        ctx.expect(attribution.last, 'an untagged visit never sets last touch').toBe(undefined);
+      },
     },
-  });
 
-  const afterMigration = await visit({ url: 'https://brand.test/' });
-  const afterTagged = await visit({ url: 'https://brand.test/pricing?utm_source=meta' });
-  const afterReplay = await visit({ url: 'https://brand.test/docs' });
+    {
+      name: 'attribution capture: first touch is written once; last touch moves with every later tagged visit',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser();
 
-  assert.deepStrictEqual(afterReplay.first, afterMigration.first, 'the migrated first touch stands');
-  assert.deepStrictEqual(afterReplay.last, afterTagged.last, 'the migration never re-seeds last');
-  assert.strictEqual(afterReplay.utm, undefined);
+        const afterFirst = await visit({ url: 'https://brand.test/?utm_source=meta', referrer: 'https://facebook.com/' });
+        const firstTouch = afterFirst.first;
+
+        const afterSecond = await visit({ url: 'https://brand.test/blog?gclid=G2', referrer: 'https://google.com/' });
+
+        ctx.expect(afterSecond.first, 'first touch is never overwritten').toEqual(firstTouch);
+        ctx.expect(afterSecond.last.clickIds).toEqual({ gclid: 'G2' });
+        ctx.expect(afterSecond.last.tags, 'the newest tagged visit replaces last outright').toBe(undefined);
+        ctx.expect(afterSecond.last.page).toBe('/blog');
+        ctx.expect(afterSecond.last.referrer).toBe('https://google.com/');
+      },
+    },
+
+    {
+      name: 'attribution capture: an untagged visit after a tagged one touches neither first nor last',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser();
+
+        const afterTagged = await visit({ url: 'https://brand.test/?utm_source=meta&ttclid=TT9' });
+        const afterUntagged = await visit({ url: 'https://brand.test/docs', referrer: 'https://brand.test/' });
+
+        ctx.expect(afterUntagged.first).toEqual(afterTagged.first);
+        ctx.expect(afterUntagged.last).toEqual(afterTagged.last);
+      },
+    },
+
+    {
+      name: 'attribution capture: aff/ref keeps its own top-level block and is replaced by the newest referral',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser();
+
+        const afterAff = await visit({ url: 'https://brand.test/?aff=IAN7' });
+
+        ctx.expect(afterAff.affiliate.code).toBe('IAN7');
+        ctx.expect(afterAff.affiliate.page).toBe('/');
+        ctx.expect(afterAff.affiliate.url).toBe('https://brand.test/?aff=IAN7');
+        ctx.expect(Date.parse(afterAff.affiliate.timestamp) > 0).toBeTruthy();
+
+        const afterRef = await visit({ url: 'https://brand.test/pricing?ref=SARA2' });
+
+        ctx.expect(afterRef.affiliate.code, 'ref is the same concern as aff').toBe('SARA2');
+        ctx.expect(afterRef.first, 'a referral visit is untagged — first touch stands').toEqual(afterAff.first);
+      },
+    },
+
+    {
+      name: 'attribution capture: the legacy utm blob folds into first and last, preserving its original context',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser({
+          utm: {
+            tags: { utm_source: 'newsletter', utm_medium: 'email' },
+            timestamp: '2025-06-01T00:00:00.000Z',
+            url: 'https://brand.test/old?utm_source=newsletter',
+            page: '/old',
+          },
+          affiliate: { code: 'LEGACY1', timestamp: '2025-06-01T00:00:00.000Z', url: 'https://brand.test/old', page: '/old' },
+        });
+
+        const attribution = await visit({ url: 'https://brand.test/' });
+
+        ctx.expect(attribution.utm, 'the legacy key is dropped').toBe(undefined);
+        ctx.expect(attribution.first).toEqual({
+          tags: { utm_source: 'newsletter', utm_medium: 'email' },
+          referrer: null,
+          url: 'https://brand.test/old?utm_source=newsletter',
+          page: '/old',
+          timestamp: '2025-06-01T00:00:00.000Z',
+        });
+        ctx.expect(attribution.last, 'the legacy touch seeds both touches').toEqual(attribution.first);
+        ctx.expect(attribution.affiliate.code, 'affiliate carries over untouched').toBe('LEGACY1');
+      },
+    },
+
+    {
+      name: 'attribution capture: the legacy migration is idempotent and never re-runs over a newer touch',
+      run: async (ctx) => {
+        const { visit } = await makeBrowser({
+          utm: {
+            tags: { utm_source: 'newsletter' },
+            timestamp: '2025-06-01T00:00:00.000Z',
+            url: 'https://brand.test/old',
+            page: '/old',
+          },
+        });
+
+        const afterMigration = await visit({ url: 'https://brand.test/' });
+        const afterTagged = await visit({ url: 'https://brand.test/pricing?utm_source=meta' });
+        const afterReplay = await visit({ url: 'https://brand.test/docs' });
+
+        ctx.expect(afterReplay.first, 'the migrated first touch stands').toEqual(afterMigration.first);
+        ctx.expect(afterReplay.last, 'the migration never re-seeds last').toEqual(afterTagged.last);
+        ctx.expect(afterReplay.utm).toBe(undefined);
+      },
+    },
+  ],
 });

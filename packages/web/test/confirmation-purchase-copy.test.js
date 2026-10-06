@@ -18,8 +18,7 @@
  * esbuild — the convention confirmation-verify.test.js sets — with the client
  * stubbed. The layout assertions run against the real build.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -98,76 +97,77 @@ function confirmationPage() {
   return builtPage;
 }
 
-test('#282: a one-time purchase is never told it has a subscription', async () => {
-  const bound = await bindingsFor({ frequency: 'once' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'confirmation-purchase-copy',
+  tests: [
+    {
+      name: '#282: a one-time purchase is never told it has a subscription',
+      run: async (ctx) => {
+        const bound = await bindingsFor({ frequency: 'once' });
 
-  assert.strictEqual(bound.subscription.show, false, 'no subscription note on a one-time buy');
-  assert.strictEqual(bound.subscription.infoText, '', 'and the subscription sentence is never even built');
-  assert.strictEqual(bound.purchase.show, true, 'the purchase note is what a one-time buy gets');
-  assert.match(bound.purchase.infoText, /one-time/i, 'the note names what was actually bought');
-  assert.doesNotMatch(bound.purchase.infoText, /subscription|you'?ll be charged/i, 'and claims no recurring billing');
+        ctx.expect(bound.subscription.show, 'no subscription note on a one-time buy').toBe(false);
+        ctx.expect(bound.subscription.infoText, 'and the subscription sentence is never even built').toBe('');
+        ctx.expect(bound.purchase.show, 'the purchase note is what a one-time buy gets').toBe(true);
+        ctx.expect(bound.purchase.infoText, 'the note names what was actually bought').toMatch(/one-time/i);
+        ctx.expect(bound.purchase.infoText, 'and claims no recurring billing').not.toMatch(/subscription|you'?ll be charged/i);
 
-  // The receipt's own label: a one-time buy bought an item, not a plan.
-  assert.strictEqual(bound.order.itemLabel, 'Item', 'the receipt names what was bought, not a plan');
-});
+        // The receipt's own label: a one-time buy bought an item, not a plan.
+        ctx.expect(bound.order.itemLabel, 'the receipt names what was bought, not a plan').toBe('Item');
+      },
+    },
 
-test('#282: a subscription keeps its copy exactly as it was', async () => {
-  const annual = await bindingsFor({ frequency: 'annually' });
+    {
+      name: '#282: a subscription keeps its copy exactly as it was',
+      run: async (ctx) => {
+        const annual = await bindingsFor({ frequency: 'annually' });
 
-  assert.strictEqual(annual.subscription.show, true, 'a real cadence still shows the subscription note');
-  assert.strictEqual(annual.subscription.billingCycle, 'annually', 'with its cycle');
-  assert.strictEqual(
-    annual.subscription.infoText,
-    "Your annual subscription is now active. You'll be charged automatically each year.",
-    'the subscription sentence reads as grammar, not a raw cadence key',
-  );
-  assert.strictEqual(annual.purchase.show, false, 'and no purchase note beside it');
-  assert.strictEqual(annual.order.itemLabel, 'Plan', 'a subscription bought a plan');
+        ctx.expect(annual.subscription.show, 'a real cadence still shows the subscription note').toBe(true);
+        ctx.expect(annual.subscription.billingCycle, 'with its cycle').toBe('annually');
+        ctx.expect(annual.subscription.infoText, 'the subscription sentence reads as grammar, not a raw cadence key').toBe("Your annual subscription is now active. You'll be charged automatically each year.");
+        ctx.expect(annual.purchase.show, 'and no purchase note beside it').toBe(false);
+        ctx.expect(annual.order.itemLabel, 'a subscription bought a plan').toBe('Plan');
 
-  const trial = await bindingsFor({ frequency: 'monthly', hasFreeTrial: true });
+        const trial = await bindingsFor({ frequency: 'monthly', hasFreeTrial: true });
 
-  assert.strictEqual(
-    trial.subscription.infoText,
-    "Free Trial Active! Your trial period has begun. You'll be charged monthly after the trial ends.",
-    'the trial sentence is unchanged too',
-  );
-});
+        ctx.expect(trial.subscription.infoText, 'the trial sentence is unchanged too').toBe("Free Trial Active! Your trial period has begun. You'll be charged monthly after the trial ends.");
+      },
+    },
 
-test('#282: no receipt note ever renders with an empty slot', async () => {
-  // The live symptom was the sentence itself: slots the state could not fill
-  // reached the customer as gaps. Whatever branch a frequency lands in, the
-  // sentence it produces has to read as a sentence.
-  for (const frequency of ['once', 'daily', 'weekly', 'monthly', 'annually']) {
-    const bound = await bindingsFor({ frequency });
-    const note = bound.subscription.infoText || bound.purchase.infoText;
+    {
+      name: '#282: no receipt note ever renders with an empty slot',
+      run: async (ctx) => {
+        // The live symptom was the sentence itself: slots the state could not fill
+        // reached the customer as gaps. Whatever branch a frequency lands in, the
+        // sentence it produces has to read as a sentence.
+        for (const frequency of ['once', 'daily', 'weekly', 'monthly', 'annually']) {
+          const bound = await bindingsFor({ frequency });
+          const note = bound.subscription.infoText || bound.purchase.infoText;
 
-    assert.ok(note, `${frequency}: the receipt says something about the billing`);
-    assert.doesNotMatch(note, / {2}| \.|undefined/, `${frequency}: no empty slot survives into the copy`);
-    assert.doesNotMatch(note, /—/, `${frequency}: product copy carries no em dash`);
-  }
+          ctx.expect(note, `${frequency}: the receipt says something about the billing`).toBeTruthy();
+          ctx.expect(note, `${frequency}: no empty slot survives into the copy`).not.toMatch(/ {2}| \.|undefined/);
+          ctx.expect(note, `${frequency}: product copy carries no em dash`).not.toMatch(/—/);
+        }
 
-  // A redirect with no frequency at all claims nothing either way.
-  const unknown = await bindingsFor({ frequency: '' });
-  assert.strictEqual(unknown.subscription.show, false, 'an unknown frequency is not a subscription');
-  assert.strictEqual(unknown.purchase.show, false, 'and is not claimed as a one-time buy either');
-});
+        // A redirect with no frequency at all claims nothing either way.
+        const unknown = await bindingsFor({ frequency: '' });
+        ctx.expect(unknown.subscription.show, 'an unknown frequency is not a subscription').toBe(false);
+        ctx.expect(unknown.purchase.show, 'and is not claimed as a one-time buy either').toBe(false);
+      },
+    },
 
-test('#282: the built page renders the purchase note and the bound item label', async () => {
-  // The state module can only refuse to build subscription copy — the PAGE is
-  // what renders the branch, so both bindings have to survive into the markup.
-  const page = await confirmationPage();
-  assert.ok(page, 'confirmation page built');
+    {
+      name: '#282: the built page renders the purchase note and the bound item label',
+      run: async (ctx) => {
+        // The state module can only refuse to build subscription copy — the PAGE is
+        // what renders the branch, so both bindings have to survive into the markup.
+        const page = await confirmationPage();
+        ctx.expect(page, 'confirmation page built').toBeTruthy();
 
-  assert.ok(
-    page.includes('data-omega-bind="@show confirmation.purchase.show"'),
-    'the purchase note has its own gate',
-  );
-  assert.ok(
-    page.includes('data-omega-bind="@text confirmation.purchase.infoText"'),
-    'and renders the purchase sentence',
-  );
-  assert.ok(
-    page.includes('data-omega-bind="@text confirmation.order.itemLabel"'),
-    'the receipt label is bound, not hard-coded to "Plan"',
-  );
+        ctx.expect(page.includes('data-omega-bind="@show confirmation.purchase.show"'), 'the purchase note has its own gate').toBeTruthy();
+        ctx.expect(page.includes('data-omega-bind="@text confirmation.purchase.infoText"'), 'and renders the purchase sentence').toBeTruthy();
+        ctx.expect(page.includes('data-omega-bind="@text confirmation.order.itemLabel"'), 'the receipt label is bound, not hard-coded to "Plan"').toBeTruthy();
+      },
+    },
+  ],
 });

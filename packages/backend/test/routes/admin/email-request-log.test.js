@@ -57,29 +57,29 @@ module.exports = defineCases({
   tests: [
     {
       name: 'request-log-omits-recipient-addresses-and-body',
-      async run({ assert }) {
+      async run({ expect }) {
         const lines = await logLinesFor(SETTINGS);
         const joined = lines.join('\n');
 
-        assert.equal(joined.includes('first@private.dev'), false, `A recipient address reached the log: ${joined}`);
-        assert.equal(joined.includes('second@private.dev'), false, `A recipient address reached the log: ${joined}`);
-        assert.equal(joined.includes('third@private.dev'), false, `A bcc address reached the log: ${joined}`);
-        assert.equal(joined.includes('4111'), false, `The body content reached the log: ${joined}`);
+        expect(joined.includes('first@private.dev'), `A recipient address reached the log: ${joined}`).toBe(false);
+        expect(joined.includes('second@private.dev'), `A recipient address reached the log: ${joined}`).toBe(false);
+        expect(joined.includes('third@private.dev'), `A bcc address reached the log: ${joined}`).toBe(false);
+        expect(joined.includes('4111'), `The body content reached the log: ${joined}`).toBe(false);
       },
     },
 
     {
       name: 'request-log-keeps-the-metadata',
-      async run({ assert }) {
+      async run({ expect }) {
         const lines = await logLinesFor(SETTINGS);
         const request = lines.find((line) => line.startsWith('Request:'));
 
-        assert.ok(request, `No request log line was emitted: ${lines.join('\n')}`);
+        expect(request, `No request log line was emitted: ${lines.join('\n')}`).toBeTruthy();
 
         // Three recipients across to (2) and bcc (1) — the count, never the addresses.
-        assert.ok(request.includes('recipients=3'), `Recipient count missing or wrong: ${request}`);
-        assert.ok(request.includes('template=card'), `Template id missing: ${request}`);
-        assert.ok(request.includes('subject=Your receipt'), `Subject missing: ${request}`);
+        expect(request.includes('recipients=3'), `Recipient count missing or wrong: ${request}`).toBeTruthy();
+        expect(request.includes('template=card'), `Template id missing: ${request}`).toBeTruthy();
+        expect(request.includes('subject=Your receipt'), `Subject missing: ${request}`).toBeTruthy();
       },
     },
   ],

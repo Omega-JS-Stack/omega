@@ -11,7 +11,7 @@
  * reaches SendGrid, so the send is allowed to reject at that seam and the assertions
  * read the captured ctx output.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -62,10 +62,10 @@ module.exports = defineCases({
         const captured = await sendWithUserDoc();
         const line = captured.find((l) => l.includes('Email.send():'));
 
-        assert.ok(line, `no Email.send() line was logged: ${JSON.stringify(captured)}`);
-        assert.ok(line.includes('recipient@test.dev'), `line does not name the recipient: ${line}`);
-        assert.ok(line.includes('subject=Your order'), `line lost the subject: ${line}`);
-        assert.ok(line.includes('template=order'), `line lost the template: ${line}`);
+        expect(line, `no Email.send() line was logged: ${JSON.stringify(captured)}`).toBeTruthy();
+        expect(line.includes('recipient@test.dev'), `line does not name the recipient: ${line}`).toBeTruthy();
+        expect(line.includes('subject=Your order'), `line lost the subject: ${line}`).toBeTruthy();
+        expect(line.includes('template=order'), `line lost the template: ${line}`).toBeTruthy();
       },
     },
 
@@ -76,8 +76,8 @@ module.exports = defineCases({
         const captured = await sendWithUserDoc();
         const line = captured.find((l) => l.includes('Email.send():'));
 
-        assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
-        assert.ok(!line.includes(LEAKED_KEY), `private key written to the log line: ${line}`);
+        expect(!line.includes('privateKey'), `user document serialized into the log line: ${line}`).toBeTruthy();
+        expect(!line.includes(LEAKED_KEY), `private key written to the log line: ${line}`).toBeTruthy();
       },
     },
 
@@ -88,7 +88,7 @@ module.exports = defineCases({
         const captured = await sendWithUserDoc();
         const leaking = captured.filter((l) => l.includes(LEAKED_KEY) || l.includes('privateKey'));
 
-        assert.deepEqual(leaking, [], `private key reached the log: ${JSON.stringify(leaking)}`);
+        expect(leaking, `private key reached the log: ${JSON.stringify(leaking)}`).toEqual([]);
       },
     },
 
@@ -99,7 +99,7 @@ module.exports = defineCases({
         const captured = await captureSend('user-632');
         const line = captured.find((l) => l.includes('Email.send():'));
 
-        assert.ok(line.includes('uid:user-632'), `line does not name the uid: ${line}`);
+        expect(line.includes('uid:user-632'), `line does not name the uid: ${line}`).toBeTruthy();
       },
     },
   ],

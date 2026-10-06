@@ -5,11 +5,10 @@
  * over-broad removal is unrecoverable work. Driven against a real temp
  * consumer tree with the real command.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const clean = require('../src/commands/clean.js');
 
@@ -46,33 +45,48 @@ async function runIn(t, root, options = {}) {
   process.chdir(previous);
 }
 
-test('dist/ and .omega/ are removed; the source tree is untouched', async (t) => {
-  const root = consumer(t);
+module.exports = defineCases({
+  type: 'group',
+  description: 'commands-clean',
+  tests: [
+    {
+      name: 'dist/ and .omega/ are removed; the source tree is untouched',
+      run: async (ctx) => {
+        const root = consumer(ctx);
 
-  await runIn(t, root);
+        await runIn(ctx, root);
 
-  assert.strictEqual(fs.existsSync(path.join(root, 'dist')), false);
-  assert.strictEqual(fs.existsSync(path.join(root, '.omega')), false);
-  assert.strictEqual(fs.existsSync(path.join(root, 'src', 'index.md')), true);
-  assert.strictEqual(fs.existsSync(path.join(root, 'config', 'omega.json5')), true);
-  assert.strictEqual(fs.existsSync(path.join(root, 'package.json')), true);
-});
+        ctx.expect(fs.existsSync(path.join(root, 'dist'))).toBe(false);
+        ctx.expect(fs.existsSync(path.join(root, '.omega'))).toBe(false);
+        ctx.expect(fs.existsSync(path.join(root, 'src', 'index.md'))).toBe(true);
+        ctx.expect(fs.existsSync(path.join(root, 'config', 'omega.json5'))).toBe(true);
+        ctx.expect(fs.existsSync(path.join(root, 'package.json'))).toBe(true);
+      },
+    },
 
-test('clean is idempotent — a second run on an already-clean tree is a no-op', async (t) => {
-  const root = consumer(t);
+    {
+      name: 'clean is idempotent — a second run on an already-clean tree is a no-op',
+      run: async (ctx) => {
+        const root = consumer(ctx);
 
-  await runIn(t, root);
-  await runIn(t, root);
+        await runIn(ctx, root);
+        await runIn(ctx, root);
 
-  assert.deepStrictEqual(fs.readdirSync(root).sort(), ['config', 'package.json', 'src']);
-});
+        ctx.expect(fs.readdirSync(root).sort()).toEqual(['config', 'package.json', 'src']);
+      },
+    },
 
-test('a tree that never built cleans without error', async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-clean-fresh-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(root, 'package.json'), '{}');
+    {
+      name: 'a tree that never built cleans without error',
+      run: async (ctx) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-clean-fresh-'));
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+        fs.writeFileSync(path.join(root, 'package.json'), '{}');
 
-  await runIn(t, root);
+        await runIn(ctx, root);
 
-  assert.deepStrictEqual(fs.readdirSync(root), ['package.json']);
+        ctx.expect(fs.readdirSync(root)).toEqual(['package.json']);
+      },
+    },
+  ],
 });

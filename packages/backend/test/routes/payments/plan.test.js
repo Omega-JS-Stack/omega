@@ -111,37 +111,37 @@ module.exports = defineCases({
 
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/plan', {
           productId: 'premium',
           frequency: 'monthly',
           confirmed: true,
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-missing-confirmed',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/plan', {
           productId: 'premium',
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject a request that never confirmed');
+        expect(response, 'Should reject a request that never confirmed').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-product-id',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/plan', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject a switch with no target product');
+        expect(response, 'Should reject a switch with no target product').toBeError(400);
       },
     },
 
@@ -150,61 +150,61 @@ module.exports = defineCases({
     {
       name: 'rejects-unconfirmed',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { from, to } = paidPair(config, skip);
         const user = subscriber(omega, { uid: '_test-plan-unconfirmed', product: from, frequency: frequencyOf(from) });
 
         const sent = await switchPlan(omega, user, { confirmed: false, productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `An unconfirmed switch must be refused, got ${sent.code}`);
+        expect(sent.code, `An unconfirmed switch must be refused, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-basic-user',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { to } = paidPair(config, skip);
         const user = subscriber(omega, { uid: '_test-plan-basic', product: { id: 'basic', name: 'Basic' }, frequency: null });
 
         const sent = await switchPlan(omega, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `A free user has no subscription to move, got ${sent.code}`);
+        expect(sent.code, `A free user has no subscription to move, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-a-product-the-brand-does-not-sell',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { from } = paidPair(config, skip);
         const user = subscriber(omega, { uid: '_test-plan-unknown-product', product: from, frequency: frequencyOf(from) });
 
         const sent = await switchPlan(omega, user, { productId: '_not-a-configured-product', frequency: 'monthly' });
 
-        assert.equal(sent.code, 400, `An unconfigured product must be refused, got ${sent.code}`);
+        expect(sent.code, `An unconfigured product must be refused, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-the-plan-the-user-is-already-on',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { from } = paidPair(config, skip);
         const frequency = frequencyOf(from);
         const user = subscriber(omega, { uid: '_test-plan-same', product: from, frequency });
 
         const sent = await switchPlan(omega, user, { productId: from.id, frequency });
 
-        assert.equal(sent.code, 400, `Switching to the current plan is a no-op, got ${sent.code}`);
-        assert.match(`${sent.body}`, /already on/i, `Expected the same-plan message, got: ${sent.body}`);
+        expect(sent.code, `Switching to the current plan is a no-op, got ${sent.code}`).toBe(400);
+        expect(`${sent.body}`, `Expected the same-plan message, got: ${sent.body}`).toMatch(/already on/i);
       },
     },
 
     {
       name: 'rejects-the-current-plan-at-EVERY-cadence-it-is-sold-at',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // The no-op is "this product at THIS frequency", whichever frequency the
         // account happens to sit on — a subscriber on the annual price must be
         // refused an annual "switch" exactly as a monthly one is.
@@ -215,8 +215,8 @@ module.exports = defineCases({
 
           const sent = await switchPlan(omega, user, { productId: from.id, frequency });
 
-          assert.equal(sent.code, 400, `Switching to the current plan (${frequency}) is a no-op, got ${sent.code}`);
-          assert.match(`${sent.body}`, /already on/i, `Expected the same-plan message at ${frequency}, got: ${sent.body}`);
+          expect(sent.code, `Switching to the current plan (${frequency}) is a no-op, got ${sent.code}`).toBe(400);
+          expect(`${sent.body}`, `Expected the same-plan message at ${frequency}, got: ${sent.body}`).toMatch(/already on/i);
         }
       },
     },
@@ -224,7 +224,7 @@ module.exports = defineCases({
     {
       name: 'rejects-the-current-product-when-no-frequency-is-recorded',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // The QA repro's actual state: `payment.frequency` never got recorded,
         // so a pair comparison alone ('monthly' === undefined) let the no-op
         // through to a real provider call. With nothing to compare, the product
@@ -237,8 +237,8 @@ module.exports = defineCases({
 
           const { sent, properties } = await switchPlanReadingProperties(omega, user, { productId: from.id, frequency });
 
-          assert.equal(sent.code, 400, `An unrecorded frequency must refuse the current product at ${frequency}, got ${sent.code}`);
-          assert.equal(properties?.additional?.code, 'already-on-plan', `Expected already-on-plan at ${frequency}, got: ${JSON.stringify(properties?.additional)}`);
+          expect(sent.code, `An unrecorded frequency must refuse the current product at ${frequency}, got ${sent.code}`).toBe(400);
+          expect(properties?.additional?.code, `Expected already-on-plan at ${frequency}, got: ${JSON.stringify(properties?.additional)}`).toBe('already-on-plan');
         }
       },
     },
@@ -246,7 +246,7 @@ module.exports = defineCases({
     {
       name: 'still-lets-ANOTHER-product-through-when-no-frequency-is-recorded',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // The conservative branch keys on the PRODUCT — it must not become a
         // blanket refusal for an account whose frequency was never written.
         const { from, to } = paidPair(config, skip);
@@ -254,15 +254,15 @@ module.exports = defineCases({
 
         const sent = await switchPlan(omega, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `Expected the unknown-provider gate, got ${sent.code}`);
-        assert.ok(!/already on/i.test(`${sent.body}`), `A different product must clear the same-plan guard, got: ${sent.body}`);
+        expect(sent.code, `Expected the unknown-provider gate, got ${sent.code}`).toBe(400);
+        expect(!/already on/i.test(`${sent.body}`), `A different product must clear the same-plan guard, got: ${sent.body}`).toBeTruthy();
       },
     },
 
     {
       name: 'the-same-plan-guard-carries-a-structured-code',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // The client branches on the code, not on the sentence — the same
         // contract the capability gate ships under.
         const { from } = paidPair(config, skip);
@@ -271,15 +271,15 @@ module.exports = defineCases({
 
         const { sent, properties } = await switchPlanReadingProperties(omega, user, { productId: from.id, frequency });
 
-        assert.equal(sent.code, 400, `Expected the same-plan guard, got ${sent.code}`);
-        assert.equal(properties?.additional?.code, 'already-on-plan', `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`);
+        expect(sent.code, `Expected the same-plan guard, got ${sent.code}`).toBe(400);
+        expect(properties?.additional?.code, `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`).toBe('already-on-plan');
       },
     },
 
     {
       name: 'rejects-a-switch-while-a-cancellation-is-pending',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // Swapping the price under a scheduled cancellation would land the user
         // on a NEW plan still set to end at period end, silently. Undo the
         // cancellation first — the provider is deliberately unknown here, so a
@@ -295,16 +295,16 @@ module.exports = defineCases({
 
         const { sent, properties } = await switchPlanReadingProperties(omega, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `A pending cancellation must refuse the switch, got ${sent.code}`);
-        assert.equal(properties?.additional?.code, 'cancellation-pending', `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`);
-        assert.match(`${sent.body}`, /cancel/i, `The refusal should name the cancellation, got: ${sent.body}`);
+        expect(sent.code, `A pending cancellation must refuse the switch, got ${sent.code}`).toBe(400);
+        expect(properties?.additional?.code, `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`).toBe('cancellation-pending');
+        expect(`${sent.body}`, `The refusal should name the cancellation, got: ${sent.body}`).toMatch(/cancel/i);
       },
     },
 
     {
       name: 'lets-a-frequency-change-on-the-same-product-through',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // Monthly → annually on ONE product is a real switch: the same-plan guard
         // keys on product AND frequency, never on product alone. The provider is
         // deliberately unknown, so the route stops at the NEXT gate — reaching it
@@ -320,34 +320,34 @@ module.exports = defineCases({
 
         const sent = await switchPlan(omega, user, { productId: from.id, frequency: frequencies[1] });
 
-        assert.equal(sent.code, 400, `Expected the unknown-provider gate, got ${sent.code}`);
-        assert.ok(!/already on/i.test(`${sent.body}`), `A frequency change must clear the same-plan guard, got: ${sent.body}`);
+        expect(sent.code, `Expected the unknown-provider gate, got ${sent.code}`).toBe(400);
+        expect(!/already on/i.test(`${sent.body}`), `A frequency change must clear the same-plan guard, got: ${sent.body}`).toBeTruthy();
       },
     },
 
     {
       name: 'rejects-missing-payment-details',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { from, to } = paidPair(config, skip);
         const user = subscriber(omega, { uid: '_test-plan-no-provider', product: from, frequency: frequencyOf(from), provider: null, resourceId: null });
 
         const sent = await switchPlan(omega, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `Without a provider there is nothing to call, got ${sent.code}`);
+        expect(sent.code, `Without a provider there is nothing to call, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const { from, to } = paidPair(config, skip);
         const user = subscriber(omega, { uid: '_test-plan-unknown-provider', product: from, frequency: frequencyOf(from), provider: 'unknown-provider' });
 
         const sent = await switchPlan(omega, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `An unknown provider must be refused, got ${sent.code}`);
+        expect(sent.code, `An unknown provider must be refused, got ${sent.code}`).toBe(400);
       },
     },
 
@@ -356,11 +356,11 @@ module.exports = defineCases({
     {
       name: 'every-provider-supports-plan-switch',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // Unlike uncancel, every provider here can move a live subscription:
         // Stripe updates the item, Chargebee updates for items, PayPal revises.
         PROVIDERS.forEach((name) => {
-          assert.equal(typeof providerModule(name).switchPlan, 'function', `${name} should export switchPlan()`);
+          expect(typeof providerModule(name).switchPlan, `${name} should export switchPlan()`).toBe('function');
         });
       },
     },

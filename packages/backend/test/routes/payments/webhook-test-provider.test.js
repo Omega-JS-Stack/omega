@@ -99,20 +99,20 @@ module.exports = defineCases({
   tests: [
     {
       name: 'test-provider-is-blocked-in-production',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
           omega,
           query: { provider: 'test', key: VALID_KEY() },
           body: { id: '_test-evt-prod-guard', type: 'customer.subscription.updated', data: { object: { id: 'sub_guard' } } },
         }));
 
-        assert.equal(sent.code, 403, `Test provider should be forbidden in production, got ${sent.code}`);
+        expect(sent.code, `Test provider should be forbidden in production, got ${sent.code}`).toBe(403);
       },
     },
 
     {
       name: 'real-providers-are-untouched-in-production',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
           omega,
           query: { provider: 'stripe', key: VALID_KEY() },
@@ -120,15 +120,15 @@ module.exports = defineCases({
           body: { id: '_test-evt-prod-stripe', type: 'ping.unsupported', data: { object: {} } },
         }));
 
-        assert.equal(sent.code, 200, `Stripe should still be accepted in production, got ${sent.code}`);
-        assert.equal(sent.body.ignored, true, 'Unsupported event should be ignored');
+        expect(sent.code, `Stripe should still be accepted in production, got ${sent.code}`).toBe(200);
+        expect(sent.body.ignored, 'Unsupported event should be ignored').toBe(true);
       },
     },
 
     {
       name: 'test-provider-is-allowed-outside-production',
-      async run({ assert, omega, ctx }) {
-        assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
+      async run({ expect, omega, ctx }) {
+        expect(ctx.isProduction(), 'the suite must run outside production for this test').toBe(false);
 
         const sent = await callWebhook({
           omega,
@@ -137,21 +137,21 @@ module.exports = defineCases({
           body: { id: '_test-evt-nonprod-guard', type: 'ping.unsupported', data: { object: {} } },
         });
 
-        assert.equal(sent.code, 200, `Test provider should be accepted outside production, got ${sent.code}`);
-        assert.equal(sent.body.ignored, true, 'Unsupported event should be ignored');
+        expect(sent.code, `Test provider should be accepted outside production, got ${sent.code}`).toBe(200);
+        expect(sent.body.ignored, 'Unsupported event should be ignored').toBe(true);
       },
     },
 
     {
       name: 'the-key-still-gates-before-the-provider-guard',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
           omega,
           query: { provider: 'test', key: 'wrong-key' },
           body: { id: '_test-evt-prod-badkey', type: 'customer.subscription.updated', data: { object: { id: 'sub_guard' } } },
         }));
 
-        assert.equal(sent.code, 401, `A wrong key should still be the first rejection, got ${sent.code}`);
+        expect(sent.code, `A wrong key should still be the first rejection, got ${sent.code}`).toBe(401);
       },
     },
   ],

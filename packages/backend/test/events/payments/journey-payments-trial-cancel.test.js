@@ -18,13 +18,13 @@ module.exports = defineCases({
   tests: [
     {
       name: 'verify-starts-as-basic',
-      async run({ accounts, firestore, assert, state, config, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, skip, payments }) {
         const uid = accounts['journey-payments-trial-cancel'].uid;
         const userDoc = await firestore.get(`users/${uid}`);
 
-        assert.ok(userDoc, 'User doc should exist');
-        assert.equal(userDoc.subscription?.product?.id, 'basic', 'Should start as basic');
-        assert.equal(userDoc.subscription?.trial?.claimed, false, 'Trial should not be claimed');
+        expect(userDoc, 'User doc should exist').toBeTruthy();
+        expect(userDoc.subscription?.product?.id, 'Should start as basic').toBe('basic');
+        expect(userDoc.subscription?.trial?.claimed, 'Trial should not be claimed').toBe(false);
 
         // Resolve first paid product with trial from config. If the brand has none
         // configured, skip the entire journey — this is a config-gap, not a code failure.
@@ -42,7 +42,7 @@ module.exports = defineCases({
 
     {
       name: 'create-trial-intent',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('journey-payments-trial-cancel').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
@@ -50,9 +50,9 @@ module.exports = defineCases({
           trial: true,
         });
 
-        assert.isSuccess(response, 'Intent should succeed');
-        assert.ok(response.data.id, 'Should return intent ID');
-        assert.ok(response.data.orderId, 'Should return orderId');
+        expect(response, 'Intent should succeed').toBeSuccess();
+        expect(response.data.id, 'Should return intent ID').toBeTruthy();
+        expect(response.data.orderId, 'Should return orderId').toBeTruthy();
 
         state.intentId = response.data.id;
         state.orderId = response.data.orderId;
@@ -62,7 +62,7 @@ module.exports = defineCases({
 
     {
       name: 'trial-activated',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.trial?.claimed === true;
@@ -70,10 +70,10 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
-        assert.equal(userDoc.subscription.trial.claimed, true, 'Trial should be claimed');
-        assert.equal(userDoc.subscription.trial.expires.timestampUNIX, userDoc.subscription.expires.timestampUNIX, 'Trial expires should match subscription expires (still in trial period)');
+        expect(userDoc.subscription.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
+        expect(userDoc.subscription.status, 'Status should be active').toBe('active');
+        expect(userDoc.subscription.trial.claimed, 'Trial should be claimed').toBe(true);
+        expect(userDoc.subscription.trial.expires.timestampUNIX, 'Trial expires should match subscription expires (still in trial period)').toBe(userDoc.subscription.expires.timestampUNIX);
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
       },
@@ -81,7 +81,7 @@ module.exports = defineCases({
 
     {
       name: 'cancel-during-trial',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Cancel via endpoint — test provider should detect trial and simulate immediate cancel.
         // skipGuards bypasses the 24-hour subscription-age guard.
         const response = await http.as('journey-payments-trial-cancel').post('omega/payments/cancel', {
@@ -91,14 +91,14 @@ module.exports = defineCases({
           skipGuards: true,
         });
 
-        assert.isSuccess(response, 'Cancel endpoint should succeed');
-        assert.equal(response.data.success, true, 'Should return { success: true }');
+        expect(response, 'Cancel endpoint should succeed').toBeSuccess();
+        expect(response.data.success, 'Should return { success: true }').toBe(true);
       },
     },
 
     {
       name: 'verify-immediate-cancellation',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Poll until subscription is cancelled (NOT just pending)
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
@@ -108,24 +108,24 @@ module.exports = defineCases({
         const userDoc = await firestore.get(`users/${state.uid}`);
 
         // During trial cancel: subscription should be immediately cancelled, not pending
-        assert.equal(userDoc.subscription.status, 'cancelled', 'Status should be cancelled (not active with pending)');
-        assert.equal(userDoc.subscription.cancellation.pending, false, 'Should NOT be pending — should be fully cancelled');
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should still be ${state.paidProductId}`);
+        expect(userDoc.subscription.status, 'Status should be cancelled (not active with pending)').toBe('cancelled');
+        expect(userDoc.subscription.cancellation.pending, 'Should NOT be pending — should be fully cancelled').toBe(false);
+        expect(userDoc.subscription.product.id, `Product should still be ${state.paidProductId}`).toBe(state.paidProductId);
       },
     },
 
     {
       name: 'cancellation-request-stored',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.ok(orderDoc.requests, 'requests field should exist');
-        assert.ok(orderDoc.requests.cancellation, 'requests.cancellation should be populated');
-        assert.equal(orderDoc.requests.cancellation.reason, 'Changed my mind during trial', 'Cancellation reason should match');
-        assert.equal(orderDoc.requests.cancellation.feedback, 'Testing trial cancellation', 'Cancellation feedback should match');
-        assert.ok(orderDoc.requests.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should still be null');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.requests, 'requests field should exist').toBeTruthy();
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should be populated').toBeTruthy();
+        expect(orderDoc.requests.cancellation.reason, 'Cancellation reason should match').toBe('Changed my mind during trial');
+        expect(orderDoc.requests.cancellation.feedback, 'Cancellation feedback should match').toBe('Testing trial cancellation');
+        expect(orderDoc.requests.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set').toBeTruthy();
+        expect(orderDoc.requests.refund, 'requests.refund should still be null').toBe(null);
       },
     },
   ],

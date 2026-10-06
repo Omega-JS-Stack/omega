@@ -10,11 +10,10 @@
  * second lock to keep in sync. A crash leaves that file behind with a dead pid:
  * that one is ignored, because a stale lock must never wedge a build.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const build = require('../src/commands/build.js');
 
@@ -62,37 +61,41 @@ function publishPorts(root, pid) {
   );
 }
 
-test('#617: a build refuses while this target\'s dev server is serving dist/', async (t) => {
-  const root = consumer(t);
-  publishPorts(root, process.pid); // live — this very process stands in for the dev run
+module.exports = defineCases({
+  type: 'group',
+  description: 'build-dev-lock',
+  tests: [
+    {
+      name: '#617: a build refuses while this target\'s dev server is serving dist/',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        publishPorts(root, process.pid); // live — this very process stands in for the dev run
 
-  const previous = process.cwd();
-  process.chdir(root);
-  t.after(() => process.chdir(previous));
+        const previous = process.cwd();
+        process.chdir(root);
+        ctx.after(() => process.chdir(previous));
 
-  await assert.rejects(
-    build({ logFile: false }),
-    /omega dev is serving this target on :4300/,
-    'the refusal names the running dev server, in one line',
-  );
+        await ctx.expect(build({ logFile: false }), 'the refusal names the running dev server, in one line').rejects.toThrow(/omega dev is serving this target on :4300/);
 
-  assert.strictEqual(fs.existsSync(path.join(root, 'dist')), false, 'a refused build writes nothing into the served folder');
-  assert.strictEqual(fs.existsSync(path.join(root, 'logs', 'build.log')), false, 'refusing costs the target nothing — not even a truncated log');
-});
+        ctx.expect(fs.existsSync(path.join(root, 'dist')), 'a refused build writes nothing into the served folder').toBe(false);
+        ctx.expect(fs.existsSync(path.join(root, 'logs', 'build.log')), 'refusing costs the target nothing — not even a truncated log').toBe(false);
+      },
+    },
 
-test('#617: a crash-stale ports file never wedges a build — the dead pid is ignored', async (t) => {
-  const root = consumer(t);
-  publishPorts(root, DEAD_PID); // the leftover of a dev server that crashed
+    {
+      name: '#617: a crash-stale ports file never wedges a build — the dead pid is ignored',
+      run: async (ctx) => {
+        const root = consumer(ctx);
+        publishPorts(root, DEAD_PID); // the leftover of a dev server that crashed
 
-  const previous = process.cwd();
-  process.chdir(root);
-  t.after(() => process.chdir(previous));
+        const previous = process.cwd();
+        process.chdir(root);
+        ctx.after(() => process.chdir(previous));
 
-  // Past the guard, into the real work: this fixture's config is fatal, so the
-  // build fails on THAT — the proof it never stopped at the stale lock.
-  await assert.rejects(
-    build({ logFile: false }),
-    /payment\.processors\.stripe is not a key the schema declares/,
-    'the build proceeded; the only thing that stopped it is the config',
-  );
+        // Past the guard, into the real work: this fixture's config is fatal, so the
+        // build fails on THAT — the proof it never stopped at the stale lock.
+        await ctx.expect(build({ logFile: false }), 'the build proceeded; the only thing that stopped it is the config').rejects.toThrow(/payment\.processors\.stripe is not a key the schema declares/);
+      },
+    },
+  ],
 });

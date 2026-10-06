@@ -22,7 +22,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: 'Raw HTML probe',
           to: [{ email: `_test-receiver@${config.domain}` }],
@@ -30,7 +30,7 @@ module.exports = defineCases({
           data: { content: { html: '<img src=x onerror="alert(1)">' } },
         });
 
-        assert.isError(response, 400, 'data.content.html should be rejected with a 400');
+        expect(response, 'data.content.html should be rejected with a 400').toBeError(400);
       },
     },
 
@@ -39,7 +39,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: 'Raw HTML probe',
           to: [{ email: `_test-receiver@${config.domain}` }],
@@ -47,11 +47,11 @@ module.exports = defineCases({
           data: { content: { html: '<p>x</p>' } },
         });
 
-        assert.isError(response, 400, 'data.content.html should be rejected with a 400');
+        expect(response, 'data.content.html should be rejected with a 400').toBeError(400);
 
         const message = String(response.error || '');
 
-        assert.ok(message.includes('data.content.html'), `Rejection should name the field, got: ${message}`);
+        expect(message.includes('data.content.html'), `Rejection should name the field, got: ${message}`).toBeTruthy();
       },
     },
   ],

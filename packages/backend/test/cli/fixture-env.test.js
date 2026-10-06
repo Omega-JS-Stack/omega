@@ -35,13 +35,13 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-required-key-set-in-a-quote-wrapped-form-is-not-duplicated',
-      run({ assert }) {
+      run({ expect }) {
         // dotenv reads `""wrapped""` as `"wrapped"`; util.parseEnv reads it empty
         const { fixture, envPath } = seed('OMEGA_ADMIN_KEY=""wrapped""\n');
         try {
           const content = jetpack.read(envPath);
-          assert.equal(content.match(/^\s*(?:export\s+)?OMEGA_ADMIN_KEY\s*=/gm).length, 1);
-          assert.equal(dotenv.parse(content).OMEGA_ADMIN_KEY, '"wrapped"');
+          expect(content.match(/^\s*(?:export\s+)?OMEGA_ADMIN_KEY\s*=/gm).length).toBe(1);
+          expect(dotenv.parse(content).OMEGA_ADMIN_KEY).toBe('"wrapped"');
         } finally {
           jetpack.remove(fixture);
         }
@@ -50,12 +50,12 @@ module.exports = defineCases({
 
     {
       name: 'every-required-key-reads-back-through-dotenv-after-the-run',
-      run({ assert }) {
+      run({ expect }) {
         const { fixture, envPath } = seed(null);
         try {
           const read = dotenv.parse(jetpack.read(envPath));
           for (const { key } of baseMissingKeys({}, { target: 'backend', verb: 'start' })) {
-            assert.ok(read[key], `${key} is not set after the run`);
+            expect(read[key], `${key} is not set after the run`).toBeTruthy();
           }
         } finally {
           jetpack.remove(fixture);
@@ -65,12 +65,12 @@ module.exports = defineCases({
 
     {
       name: 'a-second-run-changes-nothing',
-      run({ assert }) {
+      run({ expect }) {
         const { fixture, envPath } = seed('MINE="keep"\n');
         try {
           const first = jetpack.read(envPath);
           new TestCommand({ firebaseProjectPath: fixture, argv: {}, options: {} }).ensureFixtureEnv(fixture);
-          assert.equal(jetpack.read(envPath), first);
+          expect(jetpack.read(envPath)).toBe(first);
         } finally {
           jetpack.remove(fixture);
         }

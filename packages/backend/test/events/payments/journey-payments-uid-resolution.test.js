@@ -23,7 +23,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const uid = accounts['journey-payments-uid-resolution'].uid;
 
         // Resolve a paid product with a monthly price. If the brand has none configured,
@@ -42,7 +42,7 @@ module.exports = defineCases({
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
-        assert.isSuccess(response, 'Intent should succeed');
+        expect(response, 'Intent should succeed').toBeSuccess();
         state.orderId = response.data.orderId;
 
         // Wait for subscription to activate
@@ -55,13 +55,13 @@ module.exports = defineCases({
         const userDoc = await firestore.get(`users/${uid}`);
         state.subscriptionId = userDoc.subscription.payment.resourceId;
 
-        assert.ok(state.subscriptionId, 'Subscription resource ID should exist');
+        expect(state.subscriptionId, 'Subscription resource ID should exist').toBeTruthy();
       },
     },
 
     {
       name: 'send-webhook-without-uid',
-      async run({ http, assert, state, config, payments }) {
+      async run({ http, expect, state, config, payments }) {
         // Send a subscription update webhook WITHOUT uid in metadata
         // The test provider's fetchResource() will look up payments-orders by resourceId
         // and reconstruct a Stripe-shaped subscription that includes metadata.uid
@@ -94,13 +94,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted (even without uid)');
+        expect(response, 'Webhook should be accepted (even without uid)').toBeSuccess();
       },
     },
 
     {
       name: 'uid-resolved-and-webhook-completed',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Wait for the webhook to be processed
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.noUidEventId}`);
@@ -110,24 +110,24 @@ module.exports = defineCases({
         const webhookDoc = await firestore.get(`payments-webhooks/${state.noUidEventId}`);
 
         // Core assertions: UID was resolved from the fetched resource
-        assert.equal(webhookDoc.status, 'completed', 'Webhook should complete (not fail due to missing UID)');
-        assert.equal(webhookDoc.owner, state.uid, 'Owner should be resolved to the correct UID');
-        assert.equal(webhookDoc.orderId, state.orderId, 'Order ID should match');
+        expect(webhookDoc.status, 'Webhook should complete (not fail due to missing UID)').toBe('completed');
+        expect(webhookDoc.owner, 'Owner should be resolved to the correct UID').toBe(state.uid);
+        expect(webhookDoc.orderId, 'Order ID should match').toBe(state.orderId);
 
         // Transition should be cancellation-requested (we sent cancel_at_period_end: true)
-        assert.equal(webhookDoc.transition, 'cancellation-requested', 'Transition should be cancellation-requested');
+        expect(webhookDoc.transition, 'Transition should be cancellation-requested').toBe('cancellation-requested');
       },
     },
 
     {
       name: 'subscription-updated-correctly',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const userDoc = await firestore.get(`users/${state.uid}`);
 
         // The webhook should have updated the user doc even though uid wasn't in the webhook metadata
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.cancellation.pending, true, 'Cancellation should be pending');
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Cancellation should be pending').toBe(true);
+        expect(userDoc.subscription.product.id, `Product should be ${state.paidProductId}`).toBe(state.paidProductId);
       },
     },
   ],

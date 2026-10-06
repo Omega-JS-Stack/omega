@@ -16,18 +16,17 @@
  * real watcher, real esbuild output — the assertion reads the BUILT bundle for
  * bytes only the client could have contributed, polled to a deadline.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildAssets } = require('../../src/assets.js');
 const { watchAssetSources } = require('../../src/commands/dev.js');
 
 // The rebuild deadline scales with the lane's load knob (#211) and with this
 // machine's measured contention (#615).
-const { buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
+const { buildRecorder, caseTimeoutMs, waitForRebuild } = require('../lib/deadlines.js');
 // A recursive watcher is not listening the instant it is created (the rescan
 // lane pays the same settle window in live-decisions.test.js).
 const SETTLE_MS = 500;
@@ -149,35 +148,48 @@ async function startWatch(t, fixture) {
   };
 }
 
-test('a file changed INSIDE the client dist rebuilds the site bundle', async (t) => {
-  const fixture = app(t);
-  const site = await startWatch(t, fixture);
+module.exports = defineCases({
+  type: 'group',
+  description: 'client-dist-watch',
+  timeout: caseTimeoutMs(),
+  tests: [
+    {
+      name: 'a file changed INSIDE the client dist rebuilds the site bundle',
+      run: async (ctx) => {
+        const fixture = app(ctx);
+        const site = await startWatch(ctx, fixture);
 
-  assert.match(site.bundle(), /CLIENT-BEFORE/, 'the first build bundles the client as it stands');
+        ctx.expect(site.bundle(), 'the first build bundles the client as it stands').toMatch(/CLIENT-BEFORE/);
 
-  // The incremental shape: the client's own prepare:watch copies one changed
-  // file into the existing dist.
-  fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-EDIT'));
-  await site.bundleBecomes(/CLIENT-AFTER-EDIT/, 'the client dist is a watched asset source — its change rebuilds the site');
-});
+        // The incremental shape: the client's own prepare:watch copies one changed
+        // file into the existing dist.
+        fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-EDIT'));
+        await site.bundleBecomes(/CLIENT-AFTER-EDIT/, 'the client dist is a watched asset source — its change rebuilds the site');
+      },
+    },
 
-test('a client dist DELETED and rewritten whole rebuilds the site bundle', async (t) => {
-  const fixture = app(t);
-  const site = await startWatch(t, fixture);
+    {
+      name: 'a client dist DELETED and rewritten whole rebuilds the site bundle',
+      run: async (ctx) => {
+        const fixture = app(ctx);
+        const site = await startWatch(ctx, fixture);
 
-  assert.match(site.bundle(), /CLIENT-BEFORE/, 'the first build bundles the client as it stands');
+        ctx.expect(site.bundle(), 'the first build bundles the client as it stands').toMatch(/CLIENT-BEFORE/);
 
-  // The prepare shape: `npm run prepare` in the client wipes dist/ and writes
-  // it again, so the watched root itself goes away for a stretch.
-  fs.rmSync(fixture.clientDist, { recursive: true, force: true });
-  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-  fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-PREPARE'));
-  fixture.writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
+        // The prepare shape: `npm run prepare` in the client wipes dist/ and writes
+        // it again, so the watched root itself goes away for a stretch.
+        fs.rmSync(fixture.clientDist, { recursive: true, force: true });
+        await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+        fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-PREPARE'));
+        fixture.writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
 
-  await site.bundleBecomes(/CLIENT-AFTER-PREPARE/, 'a replaced dist rebuilds the site — the watch re-arms onto the new directory');
+        await site.bundleBecomes(/CLIENT-AFTER-PREPARE/, 'a replaced dist rebuilds the site — the watch re-arms onto the new directory');
 
-  // The half a surviving-but-dead handle fails silently: the replace landed,
-  // and then nothing ever again.
-  fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-REARM'));
-  await site.bundleBecomes(/CLIENT-AFTER-REARM/, 'every later client edit lands too — the re-armed watch stayed live');
+        // The half a surviving-but-dead handle fails silently: the replace landed,
+        // and then nothing ever again.
+        fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-REARM'));
+        await site.bundleBecomes(/CLIENT-AFTER-REARM/, 'every later client edit lands too — the re-armed watch stayed live');
+      },
+    },
+  ],
 });

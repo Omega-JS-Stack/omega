@@ -17,12 +17,12 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated requests');
+        expect(response, 'Should reject unauthenticated requests').toBeError(401);
       },
     },
 
@@ -31,12 +31,12 @@ module.exports = defineCases({
       auth: 'user',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
-        assert.isError(response, 403, 'Should reject non-admin users');
+        expect(response, 'Should reject non-admin users').toBeError(403);
       },
     },
 
@@ -50,22 +50,22 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (skipping inference test)'
         : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
-        assert.isSuccess(response, 'Should succeed for admin');
-        assert.hasProperty(response, 'data.results', 'Should have results array');
-        assert.equal(response.data.results.length, 1, 'Should have 1 result');
+        expect(response, 'Should succeed for admin').toBeSuccess();
+        expect(response, 'Should have results array').toHaveProperty('data.results');
+        expect(response.data.results.length, 'Should have 1 result').toBe(1);
 
         const result = response.data.results[0];
-        assert.equal(result.email, 'john.smith@gmail.com', 'Should include email');
-        assert.hasProperty(result, 'firstName', 'Should have firstName field');
-        assert.hasProperty(result, 'lastName', 'Should have lastName field');
-        assert.hasProperty(result, 'method', 'Should include method');
-        assert.hasProperty(result, 'confidence', 'Should include confidence');
-        assert.equal(result.method, 'ai', 'Should use AI method');
+        expect(result.email, 'Should include email').toBe('john.smith@gmail.com');
+        expect(result, 'Should have firstName field').toHaveProperty('firstName');
+        expect(result, 'Should have lastName field').toHaveProperty('lastName');
+        expect(result, 'Should include method').toHaveProperty('method');
+        expect(result, 'Should include confidence').toHaveProperty('confidence');
+        expect(result.method, 'Should use AI method').toBe('ai');
       },
     },
 
@@ -76,7 +76,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 60000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const emails = [
           'sarah.connor@skynet.io',
           'bob-jones@hotmail.com',
@@ -85,12 +85,12 @@ module.exports = defineCases({
 
         const response = await http.post('omega/admin/infer-contact', { emails });
 
-        assert.isSuccess(response, 'Should succeed for batch');
-        assert.equal(response.data.results.length, 3, 'Should have 3 results');
+        expect(response, 'Should succeed for batch').toBeSuccess();
+        expect(response.data.results.length, 'Should have 3 results').toBe(3);
 
         // Verify each email is in results
         for (let i = 0; i < emails.length; i++) {
-          assert.equal(response.data.results[i].email, emails[i], `Result ${i} should match input email`);
+          expect(response.data.results[i].email, `Result ${i} should match input email`).toBe(emails[i]);
         }
       },
     },
@@ -105,7 +105,7 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (skipping inference test)'
         : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Use a name unlikely to trigger the "fictional/brand" rejection in the AI prompt.
         // The infer-contact prompt rejects placeholder + fictional names (e.g. alice.wonderland,
         // john.doe). Use a generic-but-realistic name to exercise dot-separated parsing.
@@ -113,11 +113,11 @@ module.exports = defineCases({
           email: 'sarah.martinez@example.com',
         });
 
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
         const result = response.data.results[0];
 
-        assert.equal(result.firstName, 'Sarah', 'Should parse first name');
-        assert.equal(result.lastName, 'Martinez', 'Should parse last name');
+        expect(result.firstName, 'Should parse first name').toBe('Sarah');
+        expect(result.lastName, 'Should parse last name').toBe('Martinez');
       },
     },
 
@@ -129,14 +129,14 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (skipping inference test)'
         : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           email: 'ceo@my-startup.com',
         });
 
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
         const result = response.data.results[0];
-        assert.ok(result.company, 'Should infer company from custom domain');
+        expect(result.company, 'Should infer company from custom domain').toBeTruthy();
       },
     },
 
@@ -148,14 +148,14 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (skipping inference test)'
         : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           email: 'someone@gmail.com',
         });
 
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
         const result = response.data.results[0];
-        assert.equal(result.company, '', 'Should not infer company from gmail');
+        expect(result.company, 'Should not infer company from gmail').toBe('');
       },
     },
 
@@ -169,7 +169,7 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (skipping AI inference test)'
         : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           emails: [
             'john.smith@microsoft.com',
@@ -178,22 +178,22 @@ module.exports = defineCases({
           ],
         });
 
-        assert.isSuccess(response, 'AI inference should succeed');
+        expect(response, 'AI inference should succeed').toBeSuccess();
 
         const results = response.data.results;
-        assert.equal(results.length, 3, 'Should have 3 results');
+        expect(results.length, 'Should have 3 results').toBe(3);
 
         // Verify structure — AI may return empty names but shape must be correct
         for (const r of results) {
-          assert.hasProperty(r, 'firstName', `${r.email}: should have firstName`);
-          assert.hasProperty(r, 'lastName', `${r.email}: should have lastName`);
-          assert.hasProperty(r, 'method', `${r.email}: should have method`);
-          assert.hasProperty(r, 'confidence', `${r.email}: should have confidence`);
+          expect(r, `${r.email}: should have firstName`).toHaveProperty('firstName');
+          expect(r, `${r.email}: should have lastName`).toHaveProperty('lastName');
+          expect(r, `${r.email}: should have method`).toHaveProperty('method');
+          expect(r, `${r.email}: should have confidence`).toHaveProperty('confidence');
         }
 
         // john.smith@microsoft.com — AI should parse this but may flake
         const john = results.find(r => r.email === 'john.smith@microsoft.com');
-        assert.equal(john.method, 'ai', 'Should use AI method');
+        expect(john.method, 'Should use AI method').toBe('ai');
         if (!john.firstName) {
           console.warn('AI flake: john.smith@microsoft.com returned empty firstName (non-fatal)');
         }
@@ -207,13 +207,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/infer-contact', {
           emails: [],
         });
 
-        assert.isSuccess(response);
-        assert.equal(response.data.results.length, 0, 'Empty input should return empty results');
+        expect(response).toBeSuccess();
+        expect(response.data.results.length, 'Empty input should return empty results').toBe(0);
       },
     },
   ],

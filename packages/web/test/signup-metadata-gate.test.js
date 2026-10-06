@@ -20,8 +20,7 @@
  * Same harness as signup-metadata-cookies.test.js: the module is browser code
  * behind two bundler aliases, so esbuild drives the REAL file.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -135,71 +134,98 @@ async function pageLoad({ user, stored = {}, requestError = null } = {}) {
 const UNPROCESSED = new User({ flags: { signupProcessed: false } }, { uid: UID });
 const PROCESSED = new User({ flags: { signupProcessed: true } }, { uid: UID });
 
-test('signup gate: an unprocessed doc with no marker posts, and marks the post in flight', async () => {
-  const { requests, marker } = await pageLoad({ user: UNPROCESSED });
+module.exports = defineCases({
+  type: 'group',
+  description: 'signup-metadata-gate',
+  tests: [
+    {
+      name: 'signup gate: an unprocessed doc with no marker posts, and marks the post in flight',
+      run: async (ctx) => {
+        const { requests, marker } = await pageLoad({ user: UNPROCESSED });
 
-  assert.strictEqual(requests.length, 1, 'the first page load after signup still posts');
-  assert.strictEqual(requests[0].url, '/omega/user/signup');
-  assert.ok(marker, 'the in-flight marker is keyed by uid');
-});
+        ctx.expect(requests.length, 'the first page load after signup still posts').toBe(1);
+        ctx.expect(requests[0].url).toBe('/omega/user/signup');
+        ctx.expect(marker, 'the in-flight marker is keyed by uid').toBeTruthy();
+      },
+    },
 
-test('signup gate: an unprocessed doc posts nothing while the marker is fresh', async () => {
-  const { requests, marker } = await pageLoad({
-    user: UNPROCESSED,
-    stored: { [MARKER_PATH]: Date.now() },
-  });
+    {
+      name: 'signup gate: an unprocessed doc posts nothing while the marker is fresh',
+      run: async (ctx) => {
+        const { requests, marker } = await pageLoad({
+          user: UNPROCESSED,
+          stored: { [MARKER_PATH]: Date.now() },
+        });
 
-  assert.deepStrictEqual(requests, [], 'the doc has not caught up yet — the marker holds the gate');
-  assert.ok(marker, 'and the marker stays until a page load sees the flag');
-});
+        ctx.expect(requests, 'the doc has not caught up yet — the marker holds the gate').toEqual([]);
+        ctx.expect(marker, 'and the marker stays until a page load sees the flag').toBeTruthy();
+      },
+    },
 
-test('signup gate: a marker older than the TTL reads as absent — the post goes out again', async () => {
-  const expired = Date.now() - (SIGNUP_MARKER_TTL_MS + 1000);
-  const { requests, marker } = await pageLoad({
-    user: UNPROCESSED,
-    stored: { [MARKER_PATH]: expired },
-  });
+    {
+      name: 'signup gate: a marker older than the TTL reads as absent — the post goes out again',
+      run: async (ctx) => {
+        const expired = Date.now() - (SIGNUP_MARKER_TTL_MS + 1000);
+        const { requests, marker } = await pageLoad({
+          user: UNPROCESSED,
+          stored: { [MARKER_PATH]: expired },
+        });
 
-  assert.strictEqual(requests.length, 1, 'a tab that died mid-POST must not gate the account for good');
-  assert.ok(marker > expired, 'and this post marks itself in flight with a fresh timestamp');
-});
+        ctx.expect(requests.length, 'a tab that died mid-POST must not gate the account for good').toBe(1);
+        ctx.expect(marker > expired, 'and this post marks itself in flight with a fresh timestamp').toBeTruthy();
+      },
+    },
 
-test('signup gate: another user in the same browser is not blocked by the marker', async () => {
-  const { requests } = await pageLoad({
-    user: new User({ flags: { signupProcessed: false } }, { uid: 'someone-else' }),
-    stored: { [MARKER_PATH]: Date.now() },
-  });
+    {
+      name: 'signup gate: another user in the same browser is not blocked by the marker',
+      run: async (ctx) => {
+        const { requests } = await pageLoad({
+          user: new User({ flags: { signupProcessed: false } }, { uid: 'someone-else' }),
+          stored: { [MARKER_PATH]: Date.now() },
+        });
 
-  assert.strictEqual(requests.length, 1, 'the marker is per uid, not per browser');
-});
+        ctx.expect(requests.length, 'the marker is per uid, not per browser').toBe(1);
+      },
+    },
 
-test('signup gate: a post that never landed clears the marker — the retry is not blocked', async () => {
-  const network = await pageLoad({ user: UNPROCESSED, requestError: new Error('Failed to fetch') });
-  assert.strictEqual(network.requests.length, 1);
-  assert.strictEqual(network.marker, undefined, 'a dead network leaves no gate behind');
+    {
+      name: 'signup gate: a post that never landed clears the marker — the retry is not blocked',
+      run: async (ctx) => {
+        const network = await pageLoad({ user: UNPROCESSED, requestError: new Error('Failed to fetch') });
+        ctx.expect(network.requests.length).toBe(1);
+        ctx.expect(network.marker, 'a dead network leaves no gate behind').toBe(undefined);
 
-  const serverFault = new Error('Request failed with status 500');
-  serverFault.code = 500;
-  const failed = await pageLoad({ user: UNPROCESSED, requestError: serverFault });
-  assert.strictEqual(failed.marker, undefined, 'a 500 leaves no gate behind either');
-});
+        const serverFault = new Error('Request failed with status 500');
+        serverFault.code = 500;
+        const failed = await pageLoad({ user: UNPROCESSED, requestError: serverFault });
+        ctx.expect(failed.marker, 'a 500 leaves no gate behind either').toBe(undefined);
+      },
+    },
 
-test('signup gate: the server\'s "already processed" 400 KEEPS the marker — the doc is about to show the flag', async () => {
-  const alreadyProcessed = new Error('Signup has already been processed');
-  alreadyProcessed.code = 400;
+    {
+      name: 'signup gate: the server\'s "already processed" 400 KEEPS the marker — the doc is about to show the flag',
+      run: async (ctx) => {
+        const alreadyProcessed = new Error('Signup has already been processed');
+        alreadyProcessed.code = 400;
 
-  const { requests, marker } = await pageLoad({ user: UNPROCESSED, requestError: alreadyProcessed });
+        const { requests, marker } = await pageLoad({ user: UNPROCESSED, requestError: alreadyProcessed });
 
-  assert.strictEqual(requests.length, 1);
-  assert.ok(marker, 'the work is done — re-posting would only collect the same 400');
-});
+        ctx.expect(requests.length).toBe(1);
+        ctx.expect(marker, 'the work is done — re-posting would only collect the same 400').toBeTruthy();
+      },
+    },
 
-test('signup gate: a processed doc posts nothing and clears the marker', async () => {
-  const { requests, marker } = await pageLoad({
-    user: PROCESSED,
-    stored: { [MARKER_PATH]: Date.now() },
-  });
+    {
+      name: 'signup gate: a processed doc posts nothing and clears the marker',
+      run: async (ctx) => {
+        const { requests, marker } = await pageLoad({
+          user: PROCESSED,
+          stored: { [MARKER_PATH]: Date.now() },
+        });
 
-  assert.deepStrictEqual(requests, [], 'a processed account never posts again');
-  assert.strictEqual(marker, undefined, 'the doc caught up, so the marker is done');
+        ctx.expect(requests, 'a processed account never posts again').toEqual([]);
+        ctx.expect(marker, 'the doc caught up, so the marker is done').toBe(undefined);
+      },
+    },
+  ],
 });

@@ -117,7 +117,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'dispatch: the ref is the DEPLOY branch, never the default one',
-      async run({ assert }) {
+      async run({ expect }) {
         const requests = [];
         const said = [];
         const { octokit } = octokitDouble();
@@ -129,15 +129,15 @@ module.exports = defineCases({
           async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return { status: 204, text: async () => '' }; },
         );
 
-        assert.equal(settings.deployDispatched, true, `the dispatch should have been sent: ${said.join(' | ')}`);
-        assert.equal(requests.length, 1, 'exactly one dispatch');
-        assert.equal(requests[0].body.ref, SNAPSHOT_REF, `the dispatch runs the branch CI builds, got ${requests[0].body.ref}`);
+        expect(settings.deployDispatched, `the dispatch should have been sent: ${said.join(' | ')}`).toBe(true);
+        expect(requests.length, 'exactly one dispatch').toBe(1);
+        expect(requests[0].body.ref, `the dispatch runs the branch CI builds, got ${requests[0].body.ref}`).toBe(SNAPSHOT_REF);
       },
     },
 
     {
       name: 'dispatch: no deploy branch yet is a LOUD failure, never a build of main',
-      async run({ assert }) {
+      async run({ expect }) {
         const requests = [];
         const said = [];
         const { octokit } = octokitDouble({ deployBranch: false });
@@ -149,15 +149,15 @@ module.exports = defineCases({
           async (url) => { requests.push(url); return { status: 204, text: async () => '' }; },
         );
 
-        assert.equal(settings.deployDispatched, false, 'the publish says the deploy did not happen');
-        assert.equal(requests.length, 0, 'and nothing was dispatched: no fallback to building the default branch');
-        assert.ok(said.join(' | ').includes('no deploy branch yet: run omega deploy once from the brand'), `the message names the fix, got: ${said.join(' | ')}`);
+        expect(settings.deployDispatched, 'the publish says the deploy did not happen').toBe(false);
+        expect(requests.length, 'and nothing was dispatched: no fallback to building the default branch').toBe(0);
+        expect(said.join(' | ').includes('no deploy branch yet: run omega deploy once from the brand'), `the message names the fix, got: ${said.join(' | ')}`).toBeTruthy();
       },
     },
 
     {
       name: 'the POST write lands on the default branch AND the deploy branch',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, writes } = octokitDouble({ held: { [`${SNAPSHOT_REF}:web/src/_posts/2026/post.md`]: 'sha-on-deploy' } });
         const settings = { githubUser: 'acme', githubRepo: 'acme-omega', body: 'The body.' };
@@ -168,21 +168,21 @@ module.exports = defineCases({
           frontmatter: 'title: Post',
         });
 
-        assert.equal(writes.length, 2, `both branches were written, got ${writes.length}`);
-        assert.equal(writes[0].branch, 'default', 'the record first');
-        assert.equal(writes[0].sha, 'sha-on-default');
-        assert.equal(writes[1].branch, SNAPSHOT_REF, 'then the branch CI builds');
+        expect(writes.length, `both branches were written, got ${writes.length}`).toBe(2);
+        expect(writes[0].branch, 'the record first').toBe('default');
+        expect(writes[0].sha).toBe('sha-on-default');
+        expect(writes[1].branch, 'then the branch CI builds').toBe(SNAPSHOT_REF);
         // The two branches hold different commits, so the file's sha is read
         // from the branch being written, never carried over from the other.
-        assert.equal(writes[1].sha, 'sha-on-deploy', 'with THAT branch\'s own sha');
-        assert.equal(writes[1].content, writes[0].content, 'and the same bytes');
-        assert.equal(settings.deployBranch, true, 'the response says the deploy branch has it');
+        expect(writes[1].sha, 'with THAT branch\'s own sha').toBe('sha-on-deploy');
+        expect(writes[1].content, 'and the same bytes').toBe(writes[0].content);
+        expect(settings.deployBranch, 'the response says the deploy branch has it').toBe(true);
       },
     },
 
     {
       name: 'the CONTENT write lands on the default branch AND the deploy branch',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, writes } = octokitDouble();
         const settings = {
@@ -191,11 +191,11 @@ module.exports = defineCases({
 
         await uploadContent(recordingCtx(said), octokit, settings);
 
-        assert.equal(writes.length, 2, `both branches were written, got ${writes.length}`);
-        assert.equal(writes[0].branch, 'default');
-        assert.equal(writes[1].branch, SNAPSHOT_REF);
-        assert.equal(writes[1].sha, undefined, 'a file neither branch holds yet is created on both');
-        assert.equal(settings.deployBranch, true);
+        expect(writes.length, `both branches were written, got ${writes.length}`).toBe(2);
+        expect(writes[0].branch).toBe('default');
+        expect(writes[1].branch).toBe(SNAPSHOT_REF);
+        expect(writes[1].sha, 'a file neither branch holds yet is created on both').toBe(undefined);
+        expect(settings.deployBranch).toBe(true);
       },
     },
 
@@ -203,7 +203,7 @@ module.exports = defineCases({
       // The CREATE route commits the article AND its images in ONE Git Trees
       // commit, so it reaches the deploy branch as a tree, not a file write.
       name: 'the CREATE commit lands on the default branch AND the deploy branch, reusing its blobs',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, git } = octokitDouble();
         const settings = { githubUser: 'acme', githubRepo: 'acme-omega' };
@@ -214,25 +214,25 @@ module.exports = defineCases({
 
         await commitAll(recordingCtx(said), octokit, settings, files);
 
-        assert.equal(git.blobs.length, 2, `one blob per file, uploaded ONCE for both branches, got ${git.blobs.length}`);
-        assert.equal(git.refs.length, 2, 'two refs moved');
-        assert.equal(git.refs[0].ref, 'heads/main', 'the record first');
-        assert.equal(git.refs[1].ref, `heads/${SNAPSHOT_REF}`, 'then the branch CI builds');
+        expect(git.blobs.length, `one blob per file, uploaded ONCE for both branches, got ${git.blobs.length}`).toBe(2);
+        expect(git.refs.length, 'two refs moved').toBe(2);
+        expect(git.refs[0].ref, 'the record first').toBe('heads/main');
+        expect(git.refs[1].ref, 'then the branch CI builds').toBe(`heads/${SNAPSHOT_REF}`);
 
         // The deploy branch's commit is built on ITS head, never on the default
         // branch's: the two hold different history, and a tree off the wrong
         // base would deploy the other branch's files away.
-        assert.equal(git.trees[1].base, 'tree-of-head-deploy', `the deploy tree sits on the deploy branch's own tree, got ${git.trees[1].base}`);
-        assert.deepEqual(git.commits[1].parents, ['head-deploy'], 'and its commit is parented on that head');
-        assert.deepEqual(git.trees[1].shas, git.trees[0].shas, 'the same blobs ride both trees');
-        assert.equal(git.commits[1].message, git.commits[0].message, 'and the same commit message');
-        assert.equal(settings.deployBranch, true, 'the response says the deploy branch has it');
+        expect(git.trees[1].base, `the deploy tree sits on the deploy branch's own tree, got ${git.trees[1].base}`).toBe('tree-of-head-deploy');
+        expect(git.commits[1].parents, 'and its commit is parented on that head').toEqual(['head-deploy']);
+        expect(git.trees[1].shas, 'the same blobs ride both trees').toEqual(git.trees[0].shas);
+        expect(git.commits[1].message, 'and the same commit message').toBe(git.commits[0].message);
+        expect(settings.deployBranch, 'the response says the deploy branch has it').toBe(true);
       },
     },
 
     {
       name: 'no deploy branch: the CREATE commit stays on the default branch and says so',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, git } = octokitDouble({ deployBranch: false });
         const settings = { githubUser: 'acme', githubRepo: 'acme-omega' };
@@ -241,11 +241,11 @@ module.exports = defineCases({
           { path: 'web/src/_posts/2026/2026-09-14-post.md', content: 'cG9zdA==', encoding: 'base64' },
         ]);
 
-        assert.equal(git.refs.length, 1, 'the post is still committed: the record never depends on the deploy branch');
-        assert.equal(git.refs[0].ref, 'heads/main');
-        assert.equal(git.commits.length, 1, 'and nothing was built for a branch that is not there');
-        assert.equal(settings.deployBranch, false);
-        assert.ok(said.join(' | ').includes('omega deploy'), `the warning names the fix, got: ${said.join(' | ')}`);
+        expect(git.refs.length, 'the post is still committed: the record never depends on the deploy branch').toBe(1);
+        expect(git.refs[0].ref).toBe('heads/main');
+        expect(git.commits.length, 'and nothing was built for a branch that is not there').toBe(1);
+        expect(settings.deployBranch).toBe(false);
+        expect(said.join(' | ').includes('omega deploy'), `the warning names the fix, got: ${said.join(' | ')}`).toBeTruthy();
       },
     },
 
@@ -254,7 +254,7 @@ module.exports = defineCases({
       // answers 401, and swallowing that would land the post on the default
       // branch alone with a warning naming the wrong fix.
       name: 'a 401 on the deploy-branch read PROPAGATES, never reads as no branch',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, writes } = octokitDouble({ deployBranch: false, refStatus: 401 });
         const settings = { githubUser: 'acme', githubRepo: 'acme-omega', body: 'The body.' };
@@ -268,16 +268,16 @@ module.exports = defineCases({
           thrown = error;
         }
 
-        assert.ok(thrown, `the publish should have failed loudly, said: ${said.join(' | ')}`);
-        assert.equal(thrown.status, 401, 'with the octokit failure itself');
-        assert.equal(writes.length, 1, 'the default branch still has the record');
-        assert.equal('deployBranch' in settings, false, 'and nothing claimed the deploy branch simply is not there');
+        expect(thrown, `the publish should have failed loudly, said: ${said.join(' | ')}`).toBeTruthy();
+        expect(thrown.status, 'with the octokit failure itself').toBe(401);
+        expect(writes.length, 'the default branch still has the record').toBe(1);
+        expect('deployBranch' in settings, 'and nothing claimed the deploy branch simply is not there').toBe(false);
       },
     },
 
     {
       name: 'no deploy branch: the write lands on the default branch alone and says so',
-      async run({ assert }) {
+      async run({ expect }) {
         const said = [];
         const { octokit, writes } = octokitDouble({ deployBranch: false });
         const settings = { githubUser: 'acme', githubRepo: 'acme-omega', body: 'The body.' };
@@ -286,10 +286,10 @@ module.exports = defineCases({
           path: 'web/src/_posts/2026/post.md', sha: 'sha-on-default', frontmatter: 'title: Post',
         });
 
-        assert.equal(writes.length, 1, 'the post is still committed: the record never depends on the deploy branch');
-        assert.equal(writes[0].branch, 'default');
-        assert.equal(settings.deployBranch, false, 'and the response says the deploy branch missed it');
-        assert.ok(said.join(' | ').includes('omega deploy'), `the warning names the fix, got: ${said.join(' | ')}`);
+        expect(writes.length, 'the post is still committed: the record never depends on the deploy branch').toBe(1);
+        expect(writes[0].branch).toBe('default');
+        expect(settings.deployBranch, 'and the response says the deploy branch missed it').toBe(false);
+        expect(said.join(' | ').includes('omega deploy'), `the warning names the fix, got: ${said.join(' | ')}`).toBeTruthy();
       },
     },
   ],

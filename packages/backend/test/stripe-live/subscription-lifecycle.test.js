@@ -39,7 +39,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-lane-is-really-open',
-      async run({ assert, skip }) {
+      async run({ expect, skip }) {
         // The gate already answered before the runner booted; this is the child's
         // half of it, so a suite that somehow got discovered without the lane
         // skips rather than firing real API calls.
@@ -47,13 +47,13 @@ module.exports = defineCases({
           skip('the stripe-live lane is not open');
         }
 
-        assert.ok(process.env.STRIPE_CLI_PATH, 'the lane hands down the Stripe CLI it found, which is what fires the triggers');
+        expect(process.env.STRIPE_CLI_PATH, 'the lane hands down the Stripe CLI it found, which is what fires the triggers').toBeTruthy();
       },
     },
 
     {
       name: 'every-configured-price-resolves-in-the-stripe-account',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (process.env.OMEGA_TEST_LANE !== 'stripe-live') {
           skip('the stripe-live lane is not open');
         }
@@ -65,7 +65,7 @@ module.exports = defineCases({
         const StripeLib = require('../../dist/omega/libraries/payment/providers/stripe.js');
         const products = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.prices && !p.archived);
 
-        assert.ok(products.length > 0, 'the brand configures at least one paid product to resolve');
+        expect(products.length > 0, 'the brand configures at least one paid product to resolve').toBeTruthy();
 
         for (const product of products) {
           const type = product.type || 'subscription';
@@ -73,10 +73,7 @@ module.exports = defineCases({
           for (const frequency of Object.keys(product.prices)) {
             const priceId = await StripeLib.resolvePriceId(product, type, frequency);
 
-            assert.ok(
-              `${priceId}`.startsWith('price_'),
-              `${product.id}/${frequency} should resolve to a Stripe price, got ${priceId}`,
-            );
+            expect(`${priceId}`.startsWith('price_'), `${product.id}/${frequency} should resolve to a Stripe price, got ${priceId}`).toBeTruthy();
           }
         }
       },
@@ -84,7 +81,7 @@ module.exports = defineCases({
 
     {
       name: 'a-real-signed-delivery-is-accepted-and-processed',
-      async run({ assert, accounts, firestore, waitFor, skip }) {
+      async run({ expect, accounts, firestore, waitFor, skip }) {
         if (process.env.OMEGA_TEST_LANE !== 'stripe-live') {
           skip('the stripe-live lane is not open');
         }
@@ -111,15 +108,15 @@ module.exports = defineCases({
           return snapshot.docs.map((d) => d.data()).find((d) => !seen.has(d.id) && d.provider === 'stripe') || null;
         }, 90000, 1000);
 
-        assert.equal(stored.provider, 'stripe', 'the delivery came from the real provider, not the test one');
-        assert.equal(stored.event.category, 'subscription', 'and it was categorized as a subscription event');
-        assert.ok(stored.raw?.id?.startsWith('evt_'), `the stored payload is Stripe's own event, got ${stored.raw?.id}`);
+        expect(stored.provider, 'the delivery came from the real provider, not the test one').toBe('stripe');
+        expect(stored.event.category, 'and it was categorized as a subscription event').toBe('subscription');
+        expect(stored.raw?.id?.startsWith('evt_'), `the stored payload is Stripe's own event, got ${stored.raw?.id}`).toBeTruthy();
       },
     },
 
     {
       name: 'a-forged-signature-is-refused-at-the-door',
-      async run({ assert, http, config, skip }) {
+      async run({ expect, http, config, skip }) {
         if (process.env.OMEGA_TEST_LANE !== 'stripe-live') {
           skip('the stripe-live lane is not open');
         }
@@ -134,7 +131,7 @@ module.exports = defineCases({
           data: { object: { id: 'sub_forged', object: 'subscription', status: 'canceled' } },
         });
 
-        assert.equal(response.code, 401, `an unsigned delivery must be refused, got ${response.code}`);
+        expect(response.code, `an unsigned delivery must be refused, got ${response.code}`).toBe(401);
       },
     },
   ],

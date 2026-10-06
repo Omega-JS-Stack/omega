@@ -107,22 +107,22 @@ module.exports = defineCases({
   tests: [
     {
       name: 'no-connection-token-or-private-key-reaches-the-response-line',
-      async run({ assert }) {
+      async run({ expect }) {
         const logged = serialize(redactResponseForLog(userRecord()));
 
         for (const secret of [TWITCH_ACCESS, TWITCH_REFRESH, YOUTUBE_ACCESS, KICK_TOKEN, PRIVATE_KEY]) {
-          assert.equal(logged.includes(secret), false, `a credential leaked into the response line: ${logged}`);
+          expect(logged.includes(secret), `a credential leaked into the response line: ${logged}`).toBe(false);
         }
 
-        assert.equal(logged.includes(DISPLAY_NAME), true, `the connection profile was dropped: ${logged}`);
-        assert.equal(logged.includes(EMAIL), true, `the caller identity was dropped: ${logged}`);
-        assert.equal(logged.includes('***'), true, `nothing was rendered as redacted: ${logged}`);
+        expect(logged.includes(DISPLAY_NAME), `the connection profile was dropped: ${logged}`).toBe(true);
+        expect(logged.includes(EMAIL), `the caller identity was dropped: ${logged}`).toBe(true);
+        expect(logged.includes('***'), `nothing was rendered as redacted: ${logged}`).toBe(true);
       },
     },
 
     {
       name: 'redaction-never-mutates-the-response',
-      async run({ assert }) {
+      async run({ expect }) {
         // The response object is what res.json sends next, so a redaction that
         // wrote through would ship redacted tokens to the caller.
         const response = userRecord();
@@ -130,43 +130,43 @@ module.exports = defineCases({
 
         redactResponseForLog(response);
 
-        assert.deepEqual(response, before, 'the response object was mutated');
-        assert.equal(response.connections.twitch['796796'].token.access_token, TWITCH_ACCESS, 'a connection token was rewritten');
-        assert.equal(response.connections.kick['kick-796'].token, KICK_TOKEN, 'a string connection token was rewritten');
-        assert.equal(response.api.privateKey, PRIVATE_KEY, 'the private key was rewritten');
+        expect(response, 'the response object was mutated').toEqual(before);
+        expect(response.connections.twitch['796796'].token.access_token, 'a connection token was rewritten').toBe(TWITCH_ACCESS);
+        expect(response.connections.kick['kick-796'].token, 'a string connection token was rewritten').toBe(KICK_TOKEN);
+        expect(response.api.privateKey, 'the private key was rewritten').toBe(PRIVATE_KEY);
       },
     },
 
     {
       name: 'a-non-object-response-passes-through',
-      async run({ assert }) {
+      async run({ expect }) {
         // The error path stringifies a message string, and a route may answer
         // nothing at all. One line shape means both route through here.
-        assert.equal(redactResponseForLog('Not found (omega/404)'), 'Not found (omega/404)');
-        assert.equal(redactResponseForLog(null), null);
-        assert.equal(redactResponseForLog(undefined), undefined);
-        assert.equal(redactResponseForLog(204), 204);
+        expect(redactResponseForLog('Not found (omega/404)')).toBe('Not found (omega/404)');
+        expect(redactResponseForLog(null)).toBe(null);
+        expect(redactResponseForLog(undefined)).toBe(undefined);
+        expect(redactResponseForLog(204)).toBe(204);
       },
     },
 
     {
       name: 'an-array-response-is-walked',
-      async run({ assert }) {
+      async run({ expect }) {
         // A list route answers records, so the walk cannot stop at the root.
         const logged = serialize(redactResponseForLog([
           userRecord({ id: 'uid-796-a' }),
           { id: 'uid-796-b', api: { privateKey: PRIVATE_KEY } },
         ]));
 
-        assert.equal(logged.includes(TWITCH_ACCESS), false, `a credential leaked from an array item: ${logged}`);
-        assert.equal(logged.includes(PRIVATE_KEY), false, `a credential leaked from an array item: ${logged}`);
-        assert.equal(logged.includes('uid-796-b'), true, `an array item was dropped: ${logged}`);
+        expect(logged.includes(TWITCH_ACCESS), `a credential leaked from an array item: ${logged}`).toBe(false);
+        expect(logged.includes(PRIVATE_KEY), `a credential leaked from an array item: ${logged}`).toBe(false);
+        expect(logged.includes('uid-796-b'), `an array item was dropped: ${logged}`).toBe(true);
       },
     },
 
     {
       name: 'a-credential-key-matches-whatever-its-case-or-separators',
-      async run({ assert }) {
+      async run({ expect }) {
         // A key is matched lower-cased with `-` and `_` stripped, so the camel
         // and snake spellings of one field are one key. `signInToken` is the
         // admin custom token `POST /special/electron-client` answers with.
@@ -184,45 +184,45 @@ module.exports = defineCases({
         const logged = serialize(redacted);
 
         for (const [key, value] of Object.entries(secrets)) {
-          assert.equal(logged.includes(value), false, `${key} leaked: ${logged}`);
+          expect(logged.includes(value), `${key} leaked: ${logged}`).toBe(false);
         }
 
-        assert.equal(redacted.message, 'ok', `a non-credential field was dropped: ${logged}`);
-        assert.equal(redacted.webhook_secret, '***alue (23 chars)', logged);
+        expect(redacted.message, `a non-credential field was dropped: ${logged}`).toBe('ok');
+        expect(redacted.webhook_secret, logged).toBe('***alue (23 chars)');
       },
     },
 
     {
       name: 'an-empty-credential-still-reads-as-empty',
-      async run({ assert }) {
+      async run({ expect }) {
         // "No token stored" is the diagnostic the line exists for, so a null or
         // a missing credential says so instead of claiming a redacted object.
         const redacted = redactResponseForLog({ token: null, refreshToken: undefined, hasPassword: true, tokenCount: 3 });
 
-        assert.equal(redacted.token, null, serialize(redacted));
-        assert.equal(redacted.refreshToken, undefined, serialize(redacted));
+        expect(redacted.token, serialize(redacted)).toBe(null);
+        expect(redacted.refreshToken, serialize(redacted)).toBe(undefined);
         // A flag or a count under a credential-shaped name is not a secret.
-        assert.equal(serialize(redacted), '{"token":null,"hasPassword":true,"tokenCount":3}', serialize(redacted));
+        expect(serialize(redacted), serialize(redacted)).toBe('{"token":null,"hasPassword":true,"tokenCount":3}');
       },
     },
 
     {
       name: 'a-value-that-serializes-itself-keeps-its-json-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         // The copy walks own properties, and a Date has none, so a walked Date
         // logged as `{}`. Anything carrying `toJSON` is walked through it, which
         // is what JSON.stringify would have shown anyway.
         const created = new Date('2026-09-04T12:00:00.000Z');
         const redacted = redactResponseForLog({ metadata: { created }, buffer: Buffer.from('796') });
 
-        assert.equal(redacted.metadata.created, '2026-09-04T12:00:00.000Z', serialize(redacted));
-        assert.equal(redacted.buffer.type, 'Buffer', serialize(redacted));
+        expect(redacted.metadata.created, serialize(redacted)).toBe('2026-09-04T12:00:00.000Z');
+        expect(redacted.buffer.type, serialize(redacted)).toBe('Buffer');
       },
     },
 
     {
       name: 'the-real-respond-logs-a-redacted-line-and-sends-the-original',
-      async run({ assert }) {
+      async run({ expect }) {
         // The wiring: the REAL respond() with a recording res. The line is
         // redacted and the body on the wire is untouched, which is the whole
         // point of copying rather than rewriting.
@@ -234,18 +234,18 @@ module.exports = defineCases({
         const line = responseLine(logs);
 
         for (const secret of [TWITCH_ACCESS, TWITCH_REFRESH, YOUTUBE_ACCESS, KICK_TOKEN, PRIVATE_KEY]) {
-          assert.equal(line.includes(secret), false, `a credential leaked into the response line: ${line}`);
+          expect(line.includes(secret), `a credential leaked into the response line: ${line}`).toBe(false);
         }
 
-        assert.equal(line.includes(EMAIL), true, `the line lost its trace value: ${line}`);
-        assert.deepEqual(sent.json[0], userRecord(), 'res.json received a rewritten body');
-        assert.equal(sent.json[0].connections.twitch['796796'].token.access_token, TWITCH_ACCESS, 'the token on the wire was redacted');
+        expect(line.includes(EMAIL), `the line lost its trace value: ${line}`).toBe(true);
+        expect(sent.json[0], 'res.json received a rewritten body').toEqual(userRecord());
+        expect(sent.json[0].connections.twitch['796796'].token.access_token, 'the token on the wire was redacted').toBe(TWITCH_ACCESS);
       },
     },
 
     {
       name: 'the-real-respond-error-path-logs-and-sends-the-same-string',
-      async run({ assert }) {
+      async run({ expect }) {
         // The error path stringifies a message, so the same call runs a string
         // through the same function: string in, string out, one line shape.
         const { ctx, logs, sent } = mockContext();
@@ -254,8 +254,8 @@ module.exports = defineCases({
 
         const line = responseLine(logs);
 
-        assert.equal(line.includes('Connection refresh failed'), true, `the error line lost its message: ${line}`);
-        assert.equal(sent.send[0], 'Connection refresh failed', `res.send received a rewritten body: ${sent.send[0]}`);
+        expect(line.includes('Connection refresh failed'), `the error line lost its message: ${line}`).toBe(true);
+        expect(sent.send[0], `res.send received a rewritten body: ${sent.send[0]}`).toBe('Connection refresh failed');
       },
     },
   ],

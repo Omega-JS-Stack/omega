@@ -39,13 +39,13 @@ module.exports = defineCases({
       name: 'storage-rules-template-denies-by-default',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const rules = readTemplate('storage.rules');
         const allows = rules.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('allow '));
 
-        assert.equal(allows.length, 1, `the template must carry exactly one allow rule (found ${allows.length})`);
-        assert.match(allows[0], /^allow read, write:\s*if false;$/, `the shipped default must deny everything (found "${allows[0]}")`);
-        assert.equal(rules.includes('request.auth'), false, 'the scaffold default must not grant on authentication alone');
+        expect(allows.length, `the template must carry exactly one allow rule (found ${allows.length})`).toBe(1);
+        expect(allows[0], `the shipped default must deny everything (found "${allows[0]}")`).toMatch(/^allow read, write:\s*if false;$/);
+        expect(rules.includes('request.auth'), 'the scaffold default must not grant on authentication alone').toBe(false);
       },
     },
 
@@ -53,13 +53,13 @@ module.exports = defineCases({
       name: 'welcome-page-template-titles-itself',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const index = readTemplate('public', 'index.html');
         const notFound = readTemplate('public', '404.html');
 
-        assert.equal(readTitle(index), 'Welcome', 'index.html must title itself, not carry 404.html\'s title');
-        assert.equal(index.includes('Welcome!'), true, 'index.html is still the internal welcome page');
-        assert.equal(readTitle(notFound), '404 Error Page', '404.html keeps its own title');
+        expect(readTitle(index), 'index.html must title itself, not carry 404.html\'s title').toBe('Welcome');
+        expect(index.includes('Welcome!'), 'index.html is still the internal welcome page').toBe(true);
+        expect(readTitle(notFound), '404.html keeps its own title').toBe('404 Error Page');
       },
     },
   ],

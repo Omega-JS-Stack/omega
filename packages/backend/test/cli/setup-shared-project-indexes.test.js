@@ -131,13 +131,13 @@ module.exports = defineCases({
       name: 'a-shared-project-is-never-read',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget(true);
         const test = buildIndexesTest(FirestoreIndexesSyncedTest, targetPath, 'shared-project');
 
         await withSpawnTrap(async (spawned) => {
-          assert.equal(await test.run(), true, 'a shared project has no drift of this brand\'s to report');
-          assert.deepEqual(spawned, [], 'no live index read may spawn for a shared project');
+          expect(await test.run(), 'a shared project has no drift of this brand\'s to report').toBe(true);
+          expect(spawned, 'no live index read may spawn for a shared project').toEqual([]);
         });
 
         jetpack.remove(targetPath);
@@ -148,7 +148,7 @@ module.exports = defineCases({
       name: 'a-shared-project-leaves-the-authored-file-untouched',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Belt for a direct caller: run() passes, so the runner never reaches
         // fix() — and if something does, the merge-and-write stays off.
         const targetPath = seedTarget(true);
@@ -157,10 +157,10 @@ module.exports = defineCases({
         await withSpawnTrap(async (spawned) => {
           await test.fix();
 
-          assert.deepEqual(spawned, [], 'fix() must spawn nothing for a shared project');
+          expect(spawned, 'fix() must spawn nothing for a shared project').toEqual([]);
         });
 
-        assert.deepEqual(readIndexes(targetPath), LOCAL_INDEXES, 'the consumer\'s index file stays exactly as authored');
+        expect(readIndexes(targetPath), 'the consumer\'s index file stays exactly as authored').toEqual(LOCAL_INDEXES);
 
         jetpack.remove(targetPath);
       },
@@ -170,19 +170,15 @@ module.exports = defineCases({
       name: 'a-brands-own-project-still-syncs',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The gate is the shared flag, not a blanket skip: a project this brand
         // owns still gets its drift read and reported.
         const targetPath = seedTarget(false);
         const test = buildIndexesTest(FirestoreIndexesSyncedTest, targetPath, 'own-project');
 
         await withSpawnTrap(async (spawned) => {
-          assert.equal(await test.run(), false, 'drift on the brand\'s own project must still fail');
-          assert.equal(
-            spawned.some((c) => c.startsWith('firebase firestore:indexes')),
-            true,
-            'the brand\'s own project is still read',
-          );
+          expect(await test.run(), 'drift on the brand\'s own project must still fail').toBe(false);
+          expect(spawned.some((c) => c.startsWith('firebase firestore:indexes')), 'the brand\'s own project is still read').toBe(true);
         }, liveIndexRead);
 
         jetpack.remove(targetPath);
@@ -193,21 +189,21 @@ module.exports = defineCases({
       name: 'a-shared-project-seeds-the-template-instead-of-pulling',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The earlier check: with no file to read, the fix used to create one
         // from the live pull — the tenant set, written in whole.
         const targetPath = seedTarget(true, { indexes: false });
         const test = buildIndexesTest(FirestoreIndexesFileTest, targetPath, 'shared-project');
 
-        assert.equal(await test.run(), false, 'a missing indexes file still needs writing');
+        expect(await test.run(), 'a missing indexes file still needs writing').toBe(false);
 
         await withSpawnTrap(async (spawned) => {
           await test.fix();
 
-          assert.deepEqual(spawned, [], 'no live index pull may spawn for a shared project');
+          expect(spawned, 'no live index pull may spawn for a shared project').toEqual([]);
         }, liveIndexRead);
 
-        assert.deepEqual(readIndexes(targetPath), TEMPLATE_INDEXES, 'the template\'s empty shape is seeded, not the tenant set');
+        expect(readIndexes(targetPath), 'the template\'s empty shape is seeded, not the tenant set').toEqual(TEMPLATE_INDEXES);
 
         jetpack.remove(targetPath);
       },
@@ -217,21 +213,21 @@ module.exports = defineCases({
       name: 'a-shared-project-rewrites-a-poisoned-file-from-the-template',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The other way in: a file poisoned by an earlier failed pull is
         // treated as missing, and that rewrite pulled the tenant set too.
         const targetPath = seedTarget(true, { indexes: 'poisoned' });
         const test = buildIndexesTest(FirestoreIndexesFileTest, targetPath, 'shared-project');
 
-        assert.equal(await test.run(), false, 'a poisoned file is treated as missing');
+        expect(await test.run(), 'a poisoned file is treated as missing').toBe(false);
 
         await withSpawnTrap(async (spawned) => {
           await test.fix();
 
-          assert.deepEqual(spawned, [], 'no live index pull may spawn for a shared project');
+          expect(spawned, 'no live index pull may spawn for a shared project').toEqual([]);
         }, liveIndexRead);
 
-        assert.deepEqual(readIndexes(targetPath), TEMPLATE_INDEXES, 'the poisoned file is replaced by the template, not the tenant set');
+        expect(readIndexes(targetPath), 'the poisoned file is replaced by the template, not the tenant set').toEqual(TEMPLATE_INDEXES);
 
         jetpack.remove(targetPath);
       },
@@ -241,7 +237,7 @@ module.exports = defineCases({
       name: 'a-demo-project-still-seeds-the-template',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Control: widening the gate must not change what a demo-* project
         // already did — same seed, same silence.
         const targetPath = seedTarget(false, { indexes: false });
@@ -250,10 +246,10 @@ module.exports = defineCases({
         await withSpawnTrap(async (spawned) => {
           await test.fix();
 
-          assert.deepEqual(spawned, [], 'a demo project has no live project to pull from');
+          expect(spawned, 'a demo project has no live project to pull from').toEqual([]);
         }, liveIndexRead);
 
-        assert.deepEqual(readIndexes(targetPath), TEMPLATE_INDEXES, 'the template\'s empty shape is seeded');
+        expect(readIndexes(targetPath), 'the template\'s empty shape is seeded').toEqual(TEMPLATE_INDEXES);
 
         jetpack.remove(targetPath);
       },

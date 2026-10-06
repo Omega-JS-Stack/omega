@@ -18,8 +18,7 @@
  * the convention checkout-attribution-cookies.test.js set. The assertion is the
  * payload the `/user/signup` route would have received.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -122,61 +121,82 @@ async function sendMetadata({ cookie = '', attribution = STORED_ATTRIBUTION } = 
   return { request: requests.at(-1), payload: requests.at(-1)?.options?.body, storage: storage };
 }
 
-test('signup metadata: every present platform cookie rides the post-auth request', async () => {
-  const { request, payload } = await sendMetadata({
-    cookie: '_ga=GA1.1.123; _fbc=fb.1.1754006400000.FB-CLICK; _fbp=fb.1.1754006400000.987654321; _ttp=TTP-COOKIE; session=abc',
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'signup-metadata-cookies',
+  tests: [
+    {
+      name: 'signup metadata: every present platform cookie rides the post-auth request',
+      run: async (ctx) => {
+        const { request, payload } = await sendMetadata({
+          cookie: '_ga=GA1.1.123; _fbc=fb.1.1754006400000.FB-CLICK; _fbp=fb.1.1754006400000.987654321; _ttp=TTP-COOKIE; session=abc',
+        });
 
-  assert.strictEqual(request.url, '/omega/user/signup', 'the one request the browser already makes after auth');
-  assert.deepStrictEqual(payload.attribution.cookies, {
-    fbc: 'fb.1.1754006400000.FB-CLICK',
-    fbp: 'fb.1.1754006400000.987654321',
-    ttp: 'TTP-COOKIE',
-  });
+        ctx.expect(request.url, 'the one request the browser already makes after auth').toBe('/omega/user/signup');
+        ctx.expect(payload.attribution.cookies).toEqual({
+          fbc: 'fb.1.1754006400000.FB-CLICK',
+          fbp: 'fb.1.1754006400000.987654321',
+          ttp: 'TTP-COOKIE',
+        });
 
-  assert.deepStrictEqual(payload.attribution.first, STORED_ATTRIBUTION.first, 'the captured touches ride unchanged');
-  assert.deepStrictEqual(payload.attribution.last, STORED_ATTRIBUTION.last);
-});
+        ctx.expect(payload.attribution.first, 'the captured touches ride unchanged').toEqual(STORED_ATTRIBUTION.first);
+        ctx.expect(payload.attribution.last).toEqual(STORED_ATTRIBUTION.last);
+      },
+    },
 
-test('signup metadata: only the cookies that exist are sent', async () => {
-  const { payload } = await sendMetadata({ cookie: '_fbp=fb.1.1754006400000.987654321' });
+    {
+      name: 'signup metadata: only the cookies that exist are sent',
+      run: async (ctx) => {
+        const { payload } = await sendMetadata({ cookie: '_fbp=fb.1.1754006400000.987654321' });
 
-  assert.deepStrictEqual(payload.attribution.cookies, { fbp: 'fb.1.1754006400000.987654321' });
-});
+        ctx.expect(payload.attribution.cookies).toEqual({ fbp: 'fb.1.1754006400000.987654321' });
+      },
+    },
 
-test('signup metadata: an empty jar sends no cookies key at all', async () => {
-  const { payload } = await sendMetadata({ cookie: '' });
+    {
+      name: 'signup metadata: an empty jar sends no cookies key at all',
+      run: async (ctx) => {
+        const { payload } = await sendMetadata({ cookie: '' });
 
-  assert.strictEqual(Object.hasOwn(payload.attribution, 'cookies'), false, 'no husk when the pixels wrote nothing');
-  assert.deepStrictEqual(payload.attribution, STORED_ATTRIBUTION, 'the stored attribution rides exactly as captured');
-});
+        ctx.expect(Object.hasOwn(payload.attribution, 'cookies'), 'no husk when the pixels wrote nothing').toBe(false);
+        ctx.expect(payload.attribution, 'the stored attribution rides exactly as captured').toEqual(STORED_ATTRIBUTION);
+      },
+    },
 
-test('signup metadata: the read is fresh and never persisted', async () => {
-  const { payload, storage } = await sendMetadata({ cookie: '_fbc=fb.1.1754006400000.FB-CLICK' });
+    {
+      name: 'signup metadata: the read is fresh and never persisted',
+      run: async (ctx) => {
+        const { payload, storage } = await sendMetadata({ cookie: '_fbc=fb.1.1754006400000.FB-CLICK' });
 
-  assert.strictEqual(payload.attribution.cookies.fbc, 'fb.1.1754006400000.FB-CLICK');
-  assert.strictEqual(Object.hasOwn(storage.attribution, 'cookies'), false, 'a stale cookie in storage would match the wrong click next time');
-});
+        ctx.expect(payload.attribution.cookies.fbc).toBe('fb.1.1754006400000.FB-CLICK');
+        ctx.expect(Object.hasOwn(storage.attribution, 'cookies'), 'a stale cookie in storage would match the wrong click next time').toBe(false);
+      },
+    },
 
-test('signup metadata: an already-processed account posts nothing', async () => {
-  await bundleOnce();
-  const { request } = await sendMetadata({ cookie: '_ttp=TTP-COOKIE' });
+    {
+      name: 'signup metadata: an already-processed account posts nothing',
+      run: async (ctx) => {
+        await bundleOnce();
+        const { request } = await sendMetadata({ cookie: '_ttp=TTP-COOKIE' });
 
-  assert.ok(request, 'precondition: an unprocessed account does post');
+        ctx.expect(request, 'precondition: an unprocessed account does post').toBeTruthy();
 
-  // The doc's flag is the single source of truth, and the server half of
-  // sign_up fires from this request — a second post would be a second
-  // registration.
-  globalThis.document.cookie = '_ttp=TTP-COOKIE';
-  const requests = [];
-  globalThis.__omegaClient.request = async (url, options) => {
-    requests.push({ url, options });
-    return {};
-  };
+        // The doc's flag is the single source of truth, and the server half of
+        // sign_up fires from this request — a second post would be a second
+        // registration.
+        globalThis.document.cookie = '_ttp=TTP-COOKIE';
+        const requests = [];
+        globalThis.__omegaClient.request = async (url, options) => {
+          requests.push({ url, options });
+          return {};
+        };
 
-  delete require.cache[require.resolve(BUNDLE)];
-  const auth = require(BUNDLE);
-  await auth.sendUserSignupMetadata(globalThis.__omegaClient, new User({ flags: { signupProcessed: true } }));
+        delete require.cache[require.resolve(BUNDLE)];
+        const auth = require(BUNDLE);
+        await auth.sendUserSignupMetadata(globalThis.__omegaClient, new User({ flags: { signupProcessed: true } }));
 
-  assert.deepStrictEqual(requests, [], 'a processed account never posts again');
+        ctx.expect(requests, 'a processed account never posts again').toEqual([]);
+      },
+    },
+  ],
 });

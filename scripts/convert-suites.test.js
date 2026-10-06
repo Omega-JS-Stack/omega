@@ -1,6 +1,7 @@
 /**
  * Contract cases for scripts/convert-suites.js, the converter that rewrites a
- * plain node:test file into a defineCases group. Each case stages a fixture from
+ * plain node:test file into a defineCases group, and a backend suite's assert
+ * calls into expect. Each case stages a fixture from
  * convert-fixtures/ in a temp dir, runs the converter as a child, and checks the
  * written file against the hand-written expectation beside the fixture.
  */
@@ -9,6 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { findTestFiles } = require('@omega.js/devkit/test/discovery');
 
 const ROOT = path.join(__dirname, '..');
 const CONVERTER = path.join(__dirname, 'convert-suites.js');
@@ -17,6 +19,12 @@ const INSPECT = path.join(FIXTURES, 'inspect-spec.js');
 const CLI = path.join(ROOT, 'packages', 'devkit', 'src', 'test', 'cli.js');
 const MONITORING = path.join(ROOT, 'packages', 'monitoring');
 const MONITORING_COPY = path.join(ROOT, '.temp', 'convert-case-113');
+const WEB_HARNESS = '@omega.js/web/test';
+const WEB_SUITE_DIRS = [
+  path.join(ROOT, 'packages', 'web', 'test'),
+  path.join(ROOT, 'packages', 'web', 'test', 'watch'),
+  path.join(ROOT, 'brands', 'playground-omega', 'targets', 'web', 'test'),
+];
 const SPAWN_TIMEOUT = 60000;
 
 // The run source's parameter list is exactly `ctx`, in arrow, function or method form.
@@ -70,6 +78,11 @@ function occurrences(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
+// The parameter list of a run source, in arrow, function or method form.
+function paramsOf(run) {
+  return run.match(/^(?:async\s*)?(?:function\b)?[^(]*\(([^)]*)\)/)[1];
+}
+
 // The spec a converted file exports, read in a child so its cases never register here.
 function inspect(ctx, file) {
   const result = node([INSPECT, file]);
@@ -81,7 +94,9 @@ function checkCase(ctx, got, want) {
   const label = `case "${want.name}"`;
   ctx.expect(got.nested, `${label} is a case, not a nested group`).toBe(false);
   ctx.expect(got.run, `${label} has a run function`).toBeTypeOf('string');
-  ctx.expect(got.run, `${label} takes ctx`).toMatch(CTX_PARAM);
+  if ('params' in want) ctx.expect(squash(paramsOf(got.run)), `${label} params`).toBe(squash(want.params));
+  else ctx.expect(got.run, `${label} takes ctx`).toMatch(CTX_PARAM);
+  for (const key of want.keys || []) ctx.expect(got.keys, `${label} keys`).toContain(key);
   const body = squash(got.run);
   for (const snippet of want.has || []) ctx.expect(body, label).toContain(squash(snippet));
   for (const [snippet, count] of Object.entries(want.count || {})) {
@@ -93,20 +108,24 @@ function checkCase(ctx, got, want) {
 }
 
 /**
- * Convert case-<id>.input.js and check it against case-<id>.expected.json: one
- * group named for the file, its cases in order, each body's snippets, its keys,
- * and the imports and asserts the file text must not hold.
+ * Convert case-<id>.input.js (or the `input` fixture) with the extra converter
+ * `args` and check it against case-<id>.expected.json: one group named for the
+ * file, its cases in order, each body's snippets, its keys, and the imports and
+ * asserts the file text must not hold.
  */
-function convertAndCheck(ctx, id) {
+function convertAndCheck(ctx, id, { input = `case-${id}.input.js`, args = [], stager = stage } = {}) {
   const expected = JSON.parse(readFixture(`case-${id}.expected.json`));
-  const { dir, file } = stage(ctx, `case-${id}.input.js`, `case-${id}.test.js`);
-  const result = convert([file]);
+  const { dir, file } = stager(ctx, input, `case-${id}.test.js`);
+  const result = convert([...args, file]);
   ctx.expect(result.status, `converter output:\n${result.output}`).toBe(0);
 
   const text = fs.readFileSync(file, 'utf8');
   ctx.expect(text).toMatch(/\bdefineCases\(/);
   for (const pattern of expected.fileLacks || []) ctx.expect(text, 'file text').not.toMatch(new RegExp(pattern));
   for (const snippet of expected.fileHas || []) ctx.expect(squash(text), 'file text').toContain(squash(snippet));
+  for (const [snippet, count] of Object.entries(expected.fileCount || {})) {
+    ctx.expect(occurrences(squash(text), squash(snippet)), `file text: ${snippet}`).toBe(count);
+  }
 
   const spec = inspect(ctx, file);
   ctx.expect(spec.type).toBe('group');
@@ -116,6 +135,78 @@ function convertAndCheck(ctx, id) {
   if (expected.setup) ctx.expect(spec.setup, 'setup').toBeTypeOf('string');
   if (expected.cleanup) ctx.expect(spec.cleanup, 'cleanup').toBeTypeOf('string');
   return { dir, file, expected };
+}
+
+// One-line module at <dir>/<parts> that re-exports the real file.
+function reexport(dir, parts, real) {
+  const file = path.join(dir, ...parts);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `module.exports = require(${JSON.stringify(real)});\n`);
+}
+
+// A fixture staged as stage() does, with <temp>/node_modules/@omega.js/web/test
+// serving the { defineCases, expect } shape a --harness output requires.
+function stageWebHarness(ctx, fixture, as) {
+  const staged = stage(ctx, fixture, as);
+  const devkitTest = path.join(ROOT, 'packages', 'devkit', 'src', 'test');
+  const harness = path.join(staged.dir, 'node_modules', '@omega.js', 'web', 'test', 'index.js');
+  fs.mkdirSync(path.dirname(harness), { recursive: true });
+  fs.writeFileSync(harness, [
+    `const defineCases = require(${JSON.stringify(path.join(devkitTest, 'define-cases.js'))});`,
+    `const expect = require(${JSON.stringify(path.join(devkitTest, 'expect.js'))});`,
+    'module.exports = { defineCases, expect };',
+    '',
+  ].join('\n'));
+  return staged;
+}
+
+// Run the suites under <dir>/test through cli.js; the json report once it exits 0.
+function runSuites(ctx, dir, env) {
+  const result = node([CLI, '--reporter=json', `--log=${path.join(dir, 'test.log')}`], { cwd: dir, env });
+  ctx.expect(result.status, `runner output:\n${result.output}`).toBe(0);
+  return JSON.parse(result.stdout);
+}
+
+// A backend suite sits at <temp>/test/backend/<as>: its `../../dist/vendor/devkit`
+// require lands on <temp>/dist/vendor/devkit, and `@omega.js/backend/test` on
+// <temp>/node_modules, both re-exporting the source, never a possibly stale dist.
+function stageBackend(ctx, fixture, as) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-convert-'));
+  ctx.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  for (const name of ['define-cases.js', 'expect.js']) {
+    reexport(dir, ['dist', 'vendor', 'devkit', 'test', name], path.join(ROOT, 'packages', 'devkit', 'src', 'test', name));
+  }
+  reexport(dir, ['node_modules', '@omega.js', 'backend', 'test', 'index.js'], path.join(ROOT, 'packages', 'backend', 'src', 'test', 'index.js'));
+  const file = path.join(dir, 'test', 'backend', as);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.copyFileSync(path.join(FIXTURES, fixture), file);
+  return { dir, file };
+}
+
+/**
+ * Convert a backend-style case-<id>.input.js in place and check it against
+ * case-<id>.expected.json: the suite keeps its own description, type and keys,
+ * each case its parameter list as the expectation spells it.
+ */
+function convertBackendAndCheck(ctx, id) {
+  const expected = JSON.parse(readFixture(`case-${id}.expected.json`));
+  const { file } = stageBackend(ctx, `case-${id}.input.js`, `case-${id}.test.js`);
+  const result = convert([file]);
+  ctx.expect(result.status, `converter output:\n${result.output}`).toBe(0);
+
+  const text = fs.readFileSync(file, 'utf8');
+  for (const pattern of expected.fileLacks || []) ctx.expect(text, 'file text').not.toMatch(new RegExp(pattern));
+  for (const snippet of expected.fileHas || []) ctx.expect(squash(text), 'file text').toContain(squash(snippet));
+  for (const [snippet, count] of Object.entries(expected.fileCount || {})) {
+    ctx.expect(occurrences(squash(text), squash(snippet)), `file text: ${snippet}`).toBe(count);
+  }
+
+  const spec = inspect(ctx, file);
+  ctx.expect(spec.type).toBe(expected.type);
+  ctx.expect(spec.description).toBe(expected.description);
+  ctx.expect(spec.tests.map((t) => t.name)).toEqual(expected.tests.map((t) => t.name));
+  expected.tests.forEach((want, index) => checkCase(ctx, spec.tests[index], want));
+  return { file };
 }
 
 // The counts a `node --test` tap run prints in its closing comment block.
@@ -169,12 +260,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const { dir, expected } = convertAndCheck(ctx, '107');
         const eventsFile = path.join(dir, 'events.json');
-        const result = node([CLI, '--reporter=json', `--log=${path.join(dir, 'test.log')}`], {
-          cwd: dir,
-          env: { CONVERT_EVENTS_FILE: eventsFile },
-        });
-        ctx.expect(result.status, `runner output:\n${result.output}`).toBe(0);
-        const report = JSON.parse(result.stdout);
+        const report = runSuites(ctx, dir, { CONVERT_EVENTS_FILE: eventsFile });
         ctx.expect(report.passed).toBe(2);
         ctx.expect(report.failed).toBe(0);
         ctx.expect(JSON.parse(fs.readFileSync(eventsFile, 'utf8'))).toEqual(expected.events);
@@ -272,6 +358,121 @@ module.exports = defineCases({
         ctx.expect(report.failed).toBe(0);
         ctx.expect(report.tests.length).toBe(counts.tests);
         ctx.expect(report.skipped).toBe(counts.skipped);
+      },
+    },
+
+    {
+      name: 'case-122 a backend suite destructures expect for assert and each backend call becomes its matcher',
+      run: (ctx) => {
+        convertBackendAndCheck(ctx, '122');
+      },
+    },
+
+    {
+      name: 'case-122 a literal null or undefined isError code is dropped, a real code kept',
+      run: (ctx) => {
+        convertBackendAndCheck(ctx, '122-null-code');
+      },
+    },
+
+    {
+      name: 'case-122 a plain-spec backend suite takes { expect } and keeps its object shape',
+      run: (ctx) => {
+        convertBackendAndCheck(ctx, '122-plain');
+      },
+    },
+
+    {
+      name: 'case-123 a file-level node:assert require becomes the vendored expect require, in the case and the helper',
+      run: (ctx) => {
+        convertBackendAndCheck(ctx, '123');
+      },
+    },
+
+    {
+      name: 'case-123 a brand suite on @omega.js/backend/test takes its expect from that module, no devkit path',
+      run: (ctx) => {
+        convertBackendAndCheck(ctx, '123-brand');
+      },
+    },
+
+    {
+      name: 'case-124 a converted backend suite is left byte-identical and --check exits 0',
+      run: (ctx) => {
+        const { file } = stageBackend(ctx, 'case-122.input.js', 'case-124.test.js');
+        const first = convert([file]);
+        ctx.expect(first.status, `converter output:\n${first.output}`).toBe(0);
+        const converted = fs.readFileSync(file, 'utf8');
+        ctx.expect(converted).not.toBe(readFixture('case-122.input.js'));
+
+        const second = convert([file]);
+        ctx.expect(second.status, `converter output:\n${second.output}`).toBe(0);
+        ctx.expect(fs.readFileSync(file, 'utf8')).toBe(converted);
+        const check = convert(['--check', file]);
+        ctx.expect(check.status, `--check output:\n${check.output}`).toBe(0);
+      },
+    },
+
+    {
+      name: 'case-125 assert.statusCode is refused by name and the file is left unchanged',
+      run: (ctx) => {
+        const { file } = stageBackend(ctx, 'case-125.input.js', 'case-125.test.js');
+        const result = convert([file]);
+        ctx.expect(result.status, `converter output:\n${result.output}`).not.toBe(0);
+        ctx.expect(result.output).toContain('case-125.test.js');
+        ctx.expect(result.output).toContain('statusCode');
+        ctx.expect(fs.readFileSync(file, 'utf8')).toBe(readFixture('case-125.input.js'));
+      },
+    },
+
+    {
+      name: 'case-144 a module-scope assert helper takes one file-level expect require while the case keeps ctx.expect',
+      timeout: 60000,
+      run: (ctx) => {
+        const { dir } = convertAndCheck(ctx, '144');
+        const report = runSuites(ctx, dir);
+        ctx.expect(report.passed).toBe(1);
+        ctx.expect(report.failed).toBe(0);
+      },
+    },
+
+    {
+      name: 'case-145 --harness puts defineCases, and expect when a helper needs it, on the one harness require',
+      timeout: 60000,
+      run: (ctx) => {
+        const args = [`--harness=${WEB_HARNESS}`];
+        const plain = convertAndCheck(ctx, '145', { input: 'case-103.input.js', args, stager: stageWebHarness });
+        ctx.expect(runSuites(ctx, plain.dir).passed).toBe(1);
+
+        const helper = convertAndCheck(ctx, '145-helper', { input: 'case-144.input.js', args, stager: stageWebHarness });
+        const report = runSuites(ctx, helper.dir);
+        ctx.expect(report.passed).toBe(1);
+        ctx.expect(report.failed).toBe(0);
+      },
+    },
+
+    {
+      name: 'case-146 new assert.AssertionError is refused by name and the file is left unchanged',
+      run: (ctx) => {
+        const { file } = stage(ctx, 'case-146.input.js', 'case-146.test.js');
+        const result = convert([file]);
+        ctx.expect(result.status, `converter output:\n${result.output}`).not.toBe(0);
+        ctx.expect(result.output).toContain('case-146.test.js');
+        ctx.expect(result.output).toContain('new assert.AssertionError');
+        ctx.expect(fs.readFileSync(file, 'utf8')).toBe(readFixture('case-146.input.js'));
+      },
+    },
+
+    {
+      name: 'case-147 --check over the three converted web suite folders exits 0',
+      timeout: 120000,
+      run: (ctx) => {
+        for (const dir of WEB_SUITE_DIRS) ctx.expect(findTestFiles(dir).length, `suites under ${dir}`).toBeGreaterThan(0);
+        // The folders themselves, so the walk runs and test/watch, inside test, counts once.
+        const total = new Set(WEB_SUITE_DIRS.flatMap((dir) => findTestFiles(dir))).size;
+        const check = convert(['--check', ...WEB_SUITE_DIRS]);
+        ctx.expect(check.status, `--check output:\n${check.output}`).toBe(0);
+        ctx.expect(check.stdout).toContain(`convert-suites: 0 would change, ${total} unchanged, 0 refused`);
       },
     },
   ],

@@ -9,10 +9,9 @@
  * inherits the chip and any theme still overrides it (the icon-CSS ruling:
  * presentation SSOT in the shared sheet).
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
@@ -33,55 +32,67 @@ function compileMain(themeRoot) {
   }).css;
 }
 
-test('#242: the core component sheet carries the chip, painted only through tokens', () => {
-  const warnings = [];
-  const css = sass.compile(COMPONENTS_SHEET, {
-    logger: { warn: (message) => warnings.push(message), debug: () => {} },
-  }).css;
+module.exports = defineCases({
+  type: 'group',
+  description: 'chips',
+  tests: [
+    {
+      name: '#242: the core component sheet carries the chip, painted only through tokens',
+      run: (ctx) => {
+        const warnings = [];
+        const css = sass.compile(COMPONENTS_SHEET, {
+          logger: { warn: (message) => warnings.push(message), debug: () => {} },
+        }).css;
 
-  assert.deepEqual(warnings, [], 'new core css never warns — the #16 bar');
+        ctx.expect(warnings, 'new core css never warns — the #16 bar').toEqual([]);
 
-  const chip = css.match(/\.omega-chip \{[^}]*\}/);
-  assert.ok(chip, 'the structural chip rule lives here');
-  assert.match(chip[0], /display: inline-flex/, 'the micro-pill is a flex row');
-  assert.match(chip[0], /text-transform: uppercase/);
-  assert.match(chip[0], /white-space: nowrap/);
-  assert.match(chip[0], /border-radius: var\(--omega-radius-pill/, 'shape from the token contract');
-  assert.match(chip[0], /color: var\(--omega-ink-muted\)/, 'ink from the token contract');
-  assert.match(chip[0], /background: var\(--omega-surface-2\)/, 'the second surface tier — chips are a well');
-  assert.match(chip[0], /border: 1px solid var\(--omega-line\)/);
+        const chip = css.match(/\.omega-chip \{[^}]*\}/);
+        ctx.expect(chip, 'the structural chip rule lives here').toBeTruthy();
+        ctx.expect(chip[0], 'the micro-pill is a flex row').toMatch(/display: inline-flex/);
+        ctx.expect(chip[0]).toMatch(/text-transform: uppercase/);
+        ctx.expect(chip[0]).toMatch(/white-space: nowrap/);
+        ctx.expect(chip[0], 'shape from the token contract').toMatch(/border-radius: var\(--omega-radius-pill/);
+        ctx.expect(chip[0], 'ink from the token contract').toMatch(/color: var\(--omega-ink-muted\)/);
+        ctx.expect(chip[0], 'the second surface tier — chips are a well').toMatch(/background: var\(--omega-surface-2\)/);
+        ctx.expect(chip[0]).toMatch(/border: 1px solid var\(--omega-line\)/);
 
-  for (const modifier of ['.omega-chip--accent', '.omega-chip--ink']) {
-    const rule = css.match(new RegExp(`\\${modifier} \\{[^}]*\\}`));
-    assert.ok(rule, `${modifier} rides along — a base surface uses it too`);
-  }
+        for (const modifier of ['.omega-chip--accent', '.omega-chip--ink']) {
+          const rule = css.match(new RegExp(`\\${modifier} \\{[^}]*\\}`));
+          ctx.expect(rule, `${modifier} rides along — a base surface uses it too`).toBeTruthy();
+        }
 
-  assert.ok(!/#[0-9a-fA-F]{3,6}\b/.test(css), 'zero hardcoded hex — a skin re-values the tokens');
-});
+        ctx.expect(!/#[0-9a-fA-F]{3,6}\b/.test(css), 'zero hardcoded hex — a skin re-values the tokens').toBeTruthy();
+      },
+    },
 
-test('#242: main.scss wires the component vocabulary after tokens and before the theme', () => {
-  const main = fs.readFileSync(path.join(PKG, 'core', 'css', 'main.scss'), 'utf8');
-  const tokensAt = main.indexOf("@use 'tokens/index'");
-  const componentsAt = main.indexOf("@use 'components/index'");
-  const themeAt = main.indexOf("@use 'omega:theme'");
+    {
+      name: '#242: main.scss wires the component vocabulary after tokens and before the theme',
+      run: (ctx) => {
+        const main = fs.readFileSync(path.join(PKG, 'core', 'css', 'main.scss'), 'utf8');
+        const tokensAt = main.indexOf("@use 'tokens/index'");
+        const componentsAt = main.indexOf("@use 'components/index'");
+        const themeAt = main.indexOf("@use 'omega:theme'");
 
-  assert.ok(componentsAt !== -1, 'the component sheet is used');
-  assert.ok(tokensAt < componentsAt, 'tokens emit first (the sheet consumes them)');
-  assert.ok(componentsAt < themeAt, 'the vocabulary emits before the theme, so a skin overrides it');
-});
+        ctx.expect(componentsAt !== -1, 'the component sheet is used').toBeTruthy();
+        ctx.expect(tokensAt < componentsAt, 'tokens emit first (the sheet consumes them)').toBeTruthy();
+        ctx.expect(componentsAt < themeAt, 'the vocabulary emits before the theme, so a skin overrides it').toBeTruthy();
+      },
+    },
 
-test('#242: a theme that inherits NEITHER classy lane still gets the chip', () => {
-  // The floorless fixture is a full sibling theme with its own Bootstrap and
-  // none of classy's floor partials — exactly the newsflash/neobrutalism
-  // shape the bug was reported on, minus the floor import that hid it.
-  const css = compileMain(path.join(THEMING, 'floorless-theme'));
+    {
+      name: '#242: a theme that inherits NEITHER classy lane still gets the chip',
+      run: (ctx) => {
+        // The floorless fixture is a full sibling theme with its own Bootstrap and
+        // none of classy's floor partials — exactly the newsflash/neobrutalism
+        // shape the bug was reported on, minus the floor import that hid it.
+        const css = compileMain(path.join(THEMING, 'floorless-theme'));
 
-  const definitions = [...css.matchAll(/(?:^|\n)\.omega-chip \{[^}]*\}/g)];
-  assert.strictEqual(definitions.length, 1, 'exactly ONE structural definition in the bundle — presentation SSOT');
-  assert.match(definitions[0][0], /background: var\(--omega-surface-2\)/, 'and it is the token-painted one');
+        const definitions = [...css.matchAll(/(?:^|\n)\.omega-chip \{[^}]*\}/g)];
+        ctx.expect(definitions.length, 'exactly ONE structural definition in the bundle — presentation SSOT').toBe(1);
+        ctx.expect(definitions[0][0], 'and it is the token-painted one').toMatch(/background: var\(--omega-surface-2\)/);
 
-  assert.ok(
-    css.indexOf('--omega-surface-2') < css.indexOf('.omega-chip'),
-    'tokens land ahead of the chip in the bundle',
-  );
+        ctx.expect(css.indexOf('--omega-surface-2') < css.indexOf('.omega-chip'), 'tokens land ahead of the chip in the bundle').toBeTruthy();
+      },
+    },
+  ],
 });

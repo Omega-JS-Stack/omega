@@ -94,7 +94,7 @@ module.exports = defineCases({
       name: 'no-log-true-alongside-a-secret-header',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const offenders = [];
 
         for (const dir of SOURCE_DIRS) {
@@ -116,7 +116,7 @@ module.exports = defineCases({
         }
 
         if (offenders.length > 0) {
-          assert.fail(`Options object logs a secret header — drop \`log: true\`: ${offenders.join(', ')}`);
+          expect.fail(`Options object logs a secret header — drop \`log: true\`: ${offenders.join(', ')}`);
         }
       },
     },

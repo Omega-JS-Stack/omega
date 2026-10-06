@@ -105,7 +105,7 @@ const PRIVATE_REFERENCE = new RegExp(
 // Matches relative requires/imports — used to walk package-internal dependencies.
 // Group 2 = the relative path in every pattern.
 const RELATIVE_PATTERNS = [
-  /require\(\s*(['"])(\.{1,2}\/[^'"]+)\1/g,
+  /require(?:\.resolve)?\(\s*(['"])(\.{1,2}\/[^'"]+)\1/g,
   /from\s+(['"])(\.{1,2}\/[^'"]+)\1/g,
   /import\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1/g,
   /import\s+(['"])(\.{1,2}\/[^'"]+)\1/g,

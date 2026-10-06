@@ -276,52 +276,52 @@ module.exports = defineCases({
       // the exact race the lease exists to stop.
       name: 'the-lease-outlives-the-refresh-call-it-protects',
 
-      async run({ assert }) {
-        assert.equal(LEASE_TTL_SECONDS * 1000 > REFRESH_TIMEOUT_MS, true, `the ${LEASE_TTL_SECONDS}s lease must outlast the ${REFRESH_TIMEOUT_MS}ms refresh timeout`);
-        assert.equal(REFRESH_TIMEOUT_MS, 20000, 'the refresh step is the shorter call (the exchange keeps its 60s — it holds no lease)');
+      async run({ expect }) {
+        expect(LEASE_TTL_SECONDS * 1000 > REFRESH_TIMEOUT_MS, `the ${LEASE_TTL_SECONDS}s lease must outlast the ${REFRESH_TIMEOUT_MS}ms refresh timeout`).toBe(true);
+        expect(REFRESH_TIMEOUT_MS, 'the refresh step is the shorter call (the exchange keeps its 60s — it holds no lease)').toBe(20000);
 
         // The relationship is enforced at LOAD, not just here: the module refuses
         // to boot rather than run with a lease that can expire under a refresh
         const source = jetpack.read(path.join(__dirname, '../../../dist/omega/routes/user/connections/_lease.js'));
 
-        assert.match(source, /LEASE_TTL_SECONDS \* 1000 <= REFRESH_TIMEOUT_MS/, 'the guard reads the one home of the timeout, so the two cannot drift');
-        assert.match(source, /throw new Error/, 'and it throws — a programmer error, not a warning');
+        expect(source, 'the guard reads the one home of the timeout, so the two cannot drift').toMatch(/LEASE_TTL_SECONDS \* 1000 <= REFRESH_TIMEOUT_MS/);
+        expect(source, 'and it throws — a programmer error, not a warning').toMatch(/throw new Error/);
       },
     },
 
     {
       name: 'a-record-with-no-lease-is-won-and-the-note-is-written',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, docs, writes } = leaseFirestore({
           [`users/${USER_UID}`]: storedRecord({ updated: { timestamp: 'then', timestampUNIX: 1700000000 } }),
         });
 
         const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
-        assert.equal(lease.won, true, 'nobody holds the record, so this caller refreshes');
-        assert.equal(lease.updatedUNIX, 1700000000, 'and it carries the updated stamp seen at entry, for a loser to watch');
-        assert.equal(lease.token.refresh_token, 'refresh-783', 'plus the stored token AS THE TRANSACTION SAW IT — the one the winner spends');
+        expect(lease.won, 'nobody holds the record, so this caller refreshes').toBe(true);
+        expect(lease.updatedUNIX, 'and it carries the updated stamp seen at entry, for a loser to watch').toBe(1700000000);
+        expect(lease.token.refresh_token, 'plus the stored token AS THE TRANSACTION SAW IT — the one the winner spends').toBe('refresh-783');
 
-        assert.equal(writes.length, 1, 'one write, and it is the transaction\'s');
-        assert.equal(writes[0].verb, 'transaction.set', 'taken IN the transaction — two instances reading the same absent lease cannot both write one');
-        assert.equal(writes[0].path, `users/${USER_UID}`, 'on the user document');
+        expect(writes.length, 'one write, and it is the transaction\'s').toBe(1);
+        expect(writes[0].verb, 'taken IN the transaction — two instances reading the same absent lease cannot both write one').toBe('transaction.set');
+        expect(writes[0].path, 'on the user document').toBe(`users/${USER_UID}`);
 
         const note = recordIn(docs).refreshing;
 
-        assert.ok(note, 'the note is on the record');
-        assert.equal(note.instance, INSTANCE_ID, 'naming this process');
-        assert.equal(note.instance, lease.lease.instance, 'the same id the caller was handed');
-        assert.equal(typeof note.timestampUNIX, 'number', 'with the seconds stamp the expiry is measured on');
-        assert.equal(Math.floor(new Date(note.timestamp).getTime() / 1000), note.timestampUNIX, 'and the ISO twin every stamp in this codebase carries, of the same instant');
-        assert.equal(recordIn(docs).token.access_token, 'access-old', 'and nothing else on the record moved');
+        expect(note, 'the note is on the record').toBeTruthy();
+        expect(note.instance, 'naming this process').toBe(INSTANCE_ID);
+        expect(note.instance, 'the same id the caller was handed').toBe(lease.lease.instance);
+        expect(typeof note.timestampUNIX, 'with the seconds stamp the expiry is measured on').toBe('number');
+        expect(Math.floor(new Date(note.timestamp).getTime() / 1000), 'and the ISO twin every stamp in this codebase carries, of the same instant').toBe(note.timestampUNIX);
+        expect(recordIn(docs).token.access_token, 'and nothing else on the record moved').toBe('access-old');
       },
     },
 
     {
       name: 'a-lease-older-than-the-expiry-is-taken-over',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const stale = heldLease(LEASE_TTL_SECONDS + 5);
 
         const { admin, docs } = leaseFirestore({
@@ -330,16 +330,16 @@ module.exports = defineCases({
 
         const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
-        assert.equal(lease.won, true, `a lease older than ${LEASE_TTL_SECONDS}s is stale — the instance holding it died, and the record cannot stay locked forever`);
-        assert.equal(recordIn(docs).refreshing.instance, INSTANCE_ID, 'and the note is now this process\'s');
-        assert.notEqual(recordIn(docs).refreshing.timestampUNIX, stale.timestampUNIX, 'stamped now, so the next caller measures against THIS refresh');
+        expect(lease.won, `a lease older than ${LEASE_TTL_SECONDS}s is stale — the instance holding it died, and the record cannot stay locked forever`).toBe(true);
+        expect(recordIn(docs).refreshing.instance, 'and the note is now this process\'s').toBe(INSTANCE_ID);
+        expect(recordIn(docs).refreshing.timestampUNIX, 'stamped now, so the next caller measures against THIS refresh').not.toBe(stale.timestampUNIX);
       },
     },
 
     {
       name: 'a-fresh-lease-is-lost-and-nothing-is-written',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const held = heldLease(5);
 
         const { admin, docs, writes } = leaseFirestore({
@@ -348,34 +348,34 @@ module.exports = defineCases({
 
         const lease = await acquireRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
-        assert.equal(lease.won, false, 'another instance is spending the refresh token right now');
-        assert.equal(lease.lease.instance, held.instance, 'and the loser is told which one');
-        assert.equal(lease.updatedUNIX, 1700000000, 'plus the stamp to watch for movement past');
-        assert.equal(writes.length, 0, 'a loser writes nothing — not even its own note');
-        assert.equal(recordIn(docs).refreshing.instance, held.instance, "the holder's note is untouched");
+        expect(lease.won, 'another instance is spending the refresh token right now').toBe(false);
+        expect(lease.lease.instance, 'and the loser is told which one').toBe(held.instance);
+        expect(lease.updatedUNIX, 'plus the stamp to watch for movement past').toBe(1700000000);
+        expect(writes.length, 'a loser writes nothing — not even its own note').toBe(0);
+        expect(recordIn(docs).refreshing.instance, "the holder's note is untouched").toBe(held.instance);
       },
     },
 
     {
       name: 'clearing-the-lease-removes-the-note-and-nothing-else',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, docs } = leaseFirestore({
           [`users/${USER_UID}`]: storedRecord({ refreshing: heldLease(1, INSTANCE_ID) }),
         });
 
         await clearRefreshLease({ admin, uid: USER_UID, provider: PROVIDER_ID, id: IDENTITY_ID });
 
-        assert.equal('refreshing' in recordIn(docs), false, 'the note is gone, so the next caller wins immediately');
-        assert.equal(recordIn(docs).token.refresh_token, 'refresh-783', 'and the token it was taken over is still stored');
-        assert.equal(recordIn(docs).type, 'oauth2', 'as is the kind of connection this is');
+        expect('refreshing' in recordIn(docs), 'the note is gone, so the next caller wins immediately').toBe(false);
+        expect(recordIn(docs).token.refresh_token, 'and the token it was taken over is still stored').toBe('refresh-783');
+        expect(recordIn(docs).type, 'as is the kind of connection this is').toBe('oauth2');
       },
     },
 
     {
       name: 'a-waiting-loser-gives-up-when-the-refresh-never-settles',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, reads } = leaseFirestore({
           [`users/${USER_UID}`]: storedRecord({ refreshing: heldLease(1), updated: { timestamp: 'then', timestampUNIX: 1700000000 } }),
         });
@@ -392,16 +392,16 @@ module.exports = defineCases({
           timeoutMs: 50,
         });
 
-        assert.equal(waited.outcome, 'timeout', 'the lease never cleared and the stamp never moved, so the wait gives up');
-        assert.equal(waited.token, null, 'with no token to answer');
-        assert.equal(reads.length > 1, true, `and it re-read the record rather than deciding once: ${reads.length} reads`);
+        expect(waited.outcome, 'the lease never cleared and the stamp never moved, so the wait gives up').toBe('timeout');
+        expect(waited.token, 'with no token to answer').toBe(null);
+        expect(reads.length > 1, `and it re-read the record rather than deciding once: ${reads.length} reads`).toBe(true);
       },
     },
 
     {
       name: 'the-winner-stores-the-token-clears-the-lease-and-answers-it',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const { ctx, docs, writes, responses } = lane({ docs: { [`users/${USER_UID}`]: storedRecord() } });
@@ -414,23 +414,23 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `the refresh succeeded: ${JSON.stringify(response.message)}`);
-        assert.equal(response.message.success, true, 'reporting success');
-        assert.equal(response.message.token.access_token, 'refreshed-783', 'and the answer CARRIES the token, so a trusted service refreshes and reads in one call');
-        assert.equal(response.message.token.refresh_token, 'rotated-783', 'the rotated refresh token included');
-        assert.equal(refreshCalls(), 1, 'the provider ran once');
+        expect(response.options.code, `the refresh succeeded: ${JSON.stringify(response.message)}`).toBe(undefined);
+        expect(response.message.success, 'reporting success').toBe(true);
+        expect(response.message.token.access_token, 'and the answer CARRIES the token, so a trusted service refreshes and reads in one call').toBe('refreshed-783');
+        expect(response.message.token.refresh_token, 'the rotated refresh token included').toBe('rotated-783');
+        expect(refreshCalls(), 'the provider ran once').toBe(1);
 
         const record = recordIn(docs);
 
-        assert.equal(record.token.access_token, 'refreshed-783', 'the stored token is the new one');
-        assert.equal(record.updated.timestampUNIX, ctx.meta.startTime.timestampUNIX, 'stamped with the request');
-        assert.equal('refreshing' in record, false, 'and the lease is gone');
+        expect(record.token.access_token, 'the stored token is the new one').toBe('refreshed-783');
+        expect(record.updated.timestampUNIX, 'stamped with the request').toBe(ctx.meta.startTime.timestampUNIX);
+        expect('refreshing' in record, 'and the lease is gone').toBe(false);
 
         const storeWrite = writes.find((entry) => entry.verb === 'set');
 
-        assert.ok(storeWrite, 'the token landed in a plain merge write');
-        assert.equal(storeWrite.payload.connections[PROVIDER_ID][IDENTITY_ID].refreshing, DELETE, 'which removes the lease in the SAME write — the record is never one write away from consistent');
-        assert.equal(writes.filter((entry) => entry.verb === 'set').length, 1, 'and there is no second write to clear it');
+        expect(storeWrite, 'the token landed in a plain merge write').toBeTruthy();
+        expect(storeWrite.payload.connections[PROVIDER_ID][IDENTITY_ID].refreshing, 'which removes the lease in the SAME write — the record is never one write away from consistent').toBe(DELETE);
+        expect(writes.filter((entry) => entry.verb === 'set').length, 'and there is no second write to clear it').toBe(1);
       },
     },
 
@@ -441,7 +441,7 @@ module.exports = defineCases({
       // about, so the winner uses what the transaction saw.
       name: 'the-winner-spends-the-token-the-transaction-saw',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         // Firestore holds a rotated token; the caller's own (pre-lease) record
@@ -458,9 +458,9 @@ module.exports = defineCases({
           data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
-        assert.equal(answered(responses).options.code, undefined, 'the refresh succeeded');
-        assert.deepEqual(refreshTokensSpent(), ['rotated-elsewhere-783'], "the provider was handed the record's CURRENT refresh token, never the pre-lease one");
-        assert.equal(recordIn(docs).token.access_token, 'refreshed-783', 'and the new token landed');
+        expect(answered(responses).options.code, 'the refresh succeeded').toBe(undefined);
+        expect(refreshTokensSpent(), "the provider was handed the record's CURRENT refresh token, never the pre-lease one").toEqual(['rotated-elsewhere-783']);
+        expect(recordIn(docs).token.access_token, 'and the new token landed').toBe('refreshed-783');
       },
     },
 
@@ -471,7 +471,7 @@ module.exports = defineCases({
       // 400.
       name: 'a-record-that-vanished-under-the-lease-is-the-same-400',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const { ctx, docs, responses } = lane({ docs: {} });
@@ -484,17 +484,17 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 400, `the same 400 the pre-lease check answers: ${response.message}`);
-        assert.equal(response.message, 'No refresh token found', 'with the same message');
-        assert.equal(refreshCalls(), 0, 'the provider was never called');
-        assert.equal('refreshing' in recordIn(docs), false, 'and the lease it took on the way in is gone');
+        expect(response.options.code, `the same 400 the pre-lease check answers: ${response.message}`).toBe(400);
+        expect(response.message, 'with the same message').toBe('No refresh token found');
+        expect(refreshCalls(), 'the provider was never called').toBe(0);
+        expect('refreshing' in recordIn(docs), 'and the lease it took on the way in is gone').toBe(false);
       },
     },
 
     {
       name: 'a-winner-whose-provider-fails-still-clears-the-lease',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const { ctx, docs, writes, responses } = lane({
@@ -510,22 +510,22 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 500, `the provider failure is still reported: ${response.message}`);
-        assert.match(response.message, /Token refresh failed/, 'with its own message');
+        expect(response.options.code, `the provider failure is still reported: ${response.message}`).toBe(500);
+        expect(response.message, 'with its own message').toMatch(/Token refresh failed/);
 
         const record = recordIn(docs);
 
-        assert.equal(writes.some((entry) => entry.verb === 'transaction.set'), true, 'the lease WAS taken — this caller ran the provider');
-        assert.equal('refreshing' in record, false, 'and it is gone, so a crash never wedges the record for the whole expiry');
-        assert.equal(writes.some((entry) => entry.verb === 'set'), true, 'the clear is its own write on the failure path (the success path folds it into the token write)');
-        assert.equal(record.token.access_token, 'access-old', 'the stored token is untouched — there was no new one');
+        expect(writes.some((entry) => entry.verb === 'transaction.set'), 'the lease WAS taken — this caller ran the provider').toBe(true);
+        expect('refreshing' in record, 'and it is gone, so a crash never wedges the record for the whole expiry').toBe(false);
+        expect(writes.some((entry) => entry.verb === 'set'), 'the clear is its own write on the failure path (the success path folds it into the token write)').toBe(true);
+        expect(record.token.access_token, 'the stored token is untouched — there was no new one').toBe('access-old');
       },
     },
 
     {
       name: 'a-loser-answers-the-stored-token-once-the-record-moves',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const held = heldLease(1);
@@ -554,10 +554,10 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, undefined, `the loser answers success, not an error: ${JSON.stringify(response.message)}`);
-        assert.equal(response.message.token.access_token, 'refreshed-elsewhere-783', "and the token is the WINNER's, read back from the record");
-        assert.equal(refreshCalls(), 0, 'the loser never touched the provider — the refresh token is one-time and the winner is spending it');
-        assert.equal(writes.length, 0, 'and it wrote nothing at all');
+        expect(response.options.code, `the loser answers success, not an error: ${JSON.stringify(response.message)}`).toBe(undefined);
+        expect(response.message.token.access_token, "and the token is the WINNER's, read back from the record").toBe('refreshed-elsewhere-783');
+        expect(refreshCalls(), 'the loser never touched the provider — the refresh token is one-time and the winner is spending it').toBe(0);
+        expect(writes.length, 'and it wrote nothing at all').toBe(0);
       },
     },
 
@@ -568,7 +568,7 @@ module.exports = defineCases({
       // would hand back a dead credential.
       name: 'a-loser-answers-409-when-the-winners-refresh-never-completed',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const since = Math.floor(Date.now() / 1000) - 60;
@@ -593,17 +593,17 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 409, `an abandoned refresh is a conflict, not a token: ${response.message}`);
-        assert.equal(response.message, `The refresh of ${PROVIDER_ID} started by another instance did not complete. Try again.`, 'and the message says the refresh never completed, not that it stalled');
-        assert.equal(refreshCalls(), 0, 'this caller still never touched the provider');
-        assert.equal(writes.length, 0, 'and wrote nothing — a retry wins the lease outright');
+        expect(response.options.code, `an abandoned refresh is a conflict, not a token: ${response.message}`).toBe(409);
+        expect(response.message, 'and the message says the refresh never completed, not that it stalled').toBe(`The refresh of ${PROVIDER_ID} started by another instance did not complete. Try again.`);
+        expect(refreshCalls(), 'this caller still never touched the provider').toBe(0);
+        expect(writes.length, 'and wrote nothing — a retry wins the lease outright').toBe(0);
       },
     },
 
     {
       name: 'a-winner-and-a-loser-at-once-spend-the-refresh-token-once',
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const docs = { [`users/${USER_UID}`]: storedRecord() };
@@ -652,18 +652,18 @@ module.exports = defineCases({
 
         await Promise.all([first, second]);
 
-        assert.equal(refreshCalls(), 1, 'the provider was called ONCE across the pair — the whole point: a rotating refresh token spent twice leaves a dead token stored');
+        expect(refreshCalls(), 'the provider was called ONCE across the pair — the whole point: a rotating refresh token spent twice leaves a dead token stored').toBe(1);
 
         const answers = callers.map((caller) => answered(caller.responses));
 
         for (const answer of answers) {
-          assert.equal(answer.options.code, undefined, `both callers get a token, not an error: ${JSON.stringify(answer.message)}`);
-          assert.equal(answer.message.success, true, 'both report success');
-          assert.equal(answer.message.token.access_token, 'refreshed-783', 'and both answer the same stored token');
+          expect(answer.options.code, `both callers get a token, not an error: ${JSON.stringify(answer.message)}`).toBe(undefined);
+          expect(answer.message.success, 'both report success').toBe(true);
+          expect(answer.message.token.access_token, 'and both answer the same stored token').toBe('refreshed-783');
         }
 
-        assert.equal('refreshing' in recordIn(docs), false, 'the lease is gone when the pair is done');
-        assert.equal(store.writes.filter((entry) => entry.verb === 'transaction.set').length, 1, 'only one caller ever wrote a lease note');
+        expect('refreshing' in recordIn(docs), 'the lease is gone when the pair is done').toBe(false);
+        expect(store.writes.filter((entry) => entry.verb === 'transaction.set').length, 'only one caller ever wrote a lease note').toBe(1);
       },
     },
 
@@ -673,7 +673,7 @@ module.exports = defineCases({
       name: 'a-loser-times-out-with-a-409-naming-the-stalled-refresh',
       timeout: 30000,
 
-      async run({ assert }) {
+      async run({ expect }) {
         resetRefreshCalls();
 
         const held = heldLease(1);
@@ -692,11 +692,11 @@ module.exports = defineCases({
 
         const response = answered(responses);
 
-        assert.equal(response.options.code, 409, `a refresh that never settles is a conflict, not a success: ${response.message}`);
-        assert.match(response.message, new RegExp(held.instance), `and the message names the stalled refresh: ${response.message}`);
-        assert.match(response.message, new RegExp(PROVIDER_ID), 'and the provider it is stuck on');
-        assert.equal(refreshCalls(), 0, 'the provider was never called');
-        assert.equal(writes.length, 0, 'and nothing was written — no token, no lease, no stamp');
+        expect(response.options.code, `a refresh that never settles is a conflict, not a success: ${response.message}`).toBe(409);
+        expect(response.message, `and the message names the stalled refresh: ${response.message}`).toMatch(new RegExp(held.instance));
+        expect(response.message, 'and the provider it is stuck on').toMatch(new RegExp(PROVIDER_ID));
+        expect(refreshCalls(), 'the provider was never called').toBe(0);
+        expect(writes.length, 'and nothing was written — no token, no lease, no stamp').toBe(0);
       },
     },
   ],

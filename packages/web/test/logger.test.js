@@ -5,8 +5,7 @@
  * [HH:MM:SS]). Mirrors @omega.js/client's `createLogger` API on purpose, but
  * with web's own package segment ([#12]).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { createLogger } = require('../core/js/libs/logger.js');
 
@@ -22,31 +21,6 @@ function capture(method, fn) {
   }
   return captured;
 }
-
-test('logger: prefixes exactly [@omega.js/web:<module>] with no timestamp', () => {
-  const args = capture('log', () => createLogger('auth').log('policy:', { required: true }));
-  assert.strictEqual(args[0], '[@omega.js/web:auth]');
-  assert.strictEqual(args[1], 'policy:');
-  assert.deepStrictEqual(args[2], { required: true });
-});
-
-test('logger: sub-module segments ride verbatim', () => {
-  const args = capture('warn', () => createLogger('account:security').warn('no user'));
-  assert.strictEqual(args[0], '[@omega.js/web:account:security]');
-});
-
-test('logger: log/info/warn/error/debug each route to their own console method', () => {
-  const logger = createLogger('redirect');
-  for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
-    const args = capture(method, () => logger[method]('m'));
-    assert.strictEqual(args[0], '[@omega.js/web:redirect]', `${method} carries the tag`);
-    assert.strictEqual(args[1], 'm');
-  }
-});
-
-test('logger: exposes the tag itself (console.group and %c lines embed it)', () => {
-  assert.strictEqual(createLogger('checkout').tag, '[@omega.js/web:checkout]');
-});
 
 /**
  * The BUILD-TIME half of the same contract (`@omega.js/devkit/logger`): a CLI
@@ -80,21 +54,70 @@ function sourceFiles(dir) {
   return found;
 }
 
-test('logger: a build-time Logger renders [HH:MM:SS] [@omega.js/web:<module>]', () => {
-  const args = capture('log', () => new Logger('build').log('starting'));
-  assert.match(plain(args[0]), /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/web:build\]$/);
-  assert.strictEqual(plain(args[1]), 'starting');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'logger',
+  tests: [
+    {
+      name: 'logger: prefixes exactly [@omega.js/web:<module>] with no timestamp',
+      run: (ctx) => {
+        const args = capture('log', () => createLogger('auth').log('policy:', { required: true }));
+        ctx.expect(args[0]).toBe('[@omega.js/web:auth]');
+        ctx.expect(args[1]).toBe('policy:');
+        ctx.expect(args[2]).toEqual({ required: true });
+      },
+    },
 
-test('logger: no src file prefixes its module segment with the package or omega:', () => {
-  const offenders = [];
-  for (const file of sourceFiles(SRC_DIR)) {
-    for (const match of fs.readFileSync(file, 'utf8').matchAll(/new Logger\(\s*(['"`])([^'"`]*)\1/g)) {
-      const module = match[2];
-      if (module.startsWith('omega:') || module.startsWith('@omega.js/') || module.startsWith('web:')) {
-        offenders.push(`${path.relative(SRC_DIR, file)}: new Logger('${module}')`);
-      }
-    }
-  }
-  assert.deepStrictEqual(offenders, [], `doubled tags:\n${offenders.join('\n')}`);
+    {
+      name: 'logger: sub-module segments ride verbatim',
+      run: (ctx) => {
+        const args = capture('warn', () => createLogger('account:security').warn('no user'));
+        ctx.expect(args[0]).toBe('[@omega.js/web:account:security]');
+      },
+    },
+
+    {
+      name: 'logger: log/info/warn/error/debug each route to their own console method',
+      run: (ctx) => {
+        const logger = createLogger('redirect');
+        for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
+          const args = capture(method, () => logger[method]('m'));
+          ctx.expect(args[0], `${method} carries the tag`).toBe('[@omega.js/web:redirect]');
+          ctx.expect(args[1]).toBe('m');
+        }
+      },
+    },
+
+    {
+      name: 'logger: exposes the tag itself (console.group and %c lines embed it)',
+      run: (ctx) => {
+        ctx.expect(createLogger('checkout').tag).toBe('[@omega.js/web:checkout]');
+      },
+    },
+
+    {
+      name: 'logger: a build-time Logger renders [HH:MM:SS] [@omega.js/web:<module>]',
+      run: (ctx) => {
+        const args = capture('log', () => new Logger('build').log('starting'));
+        ctx.expect(plain(args[0])).toMatch(/^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/web:build\]$/);
+        ctx.expect(plain(args[1])).toBe('starting');
+      },
+    },
+
+    {
+      name: 'logger: no src file prefixes its module segment with the package or omega:',
+      run: (ctx) => {
+        const offenders = [];
+        for (const file of sourceFiles(SRC_DIR)) {
+          for (const match of fs.readFileSync(file, 'utf8').matchAll(/new Logger\(\s*(['"`])([^'"`]*)\1/g)) {
+            const module = match[2];
+            if (module.startsWith('omega:') || module.startsWith('@omega.js/') || module.startsWith('web:')) {
+              offenders.push(`${path.relative(SRC_DIR, file)}: new Logger('${module}')`);
+            }
+          }
+        }
+        ctx.expect(offenders, `doubled tags:\n${offenders.join('\n')}`).toEqual([]);
+      },
+    },
+  ],
 });

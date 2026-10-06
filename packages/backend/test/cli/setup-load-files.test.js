@@ -49,14 +49,14 @@ module.exports = defineCases({
       name: 'remoteconfig-template-loads-from-the-target-root',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const targetPath = seedTarget();
 
         try {
           const main = loadFiles(targetPath);
 
-          assert.deepEqual(main.remoteconfigJSON, REMOTECONFIG, 'the target-root remoteconfig.template.json must be loaded, not an empty object');
-          assert.equal(main.package.name, 'seeded-app', 'the target manifest still loads from the same root');
+          expect(main.remoteconfigJSON, 'the target-root remoteconfig.template.json must be loaded, not an empty object').toEqual(REMOTECONFIG);
+          expect(main.package.name, 'the target manifest still loads from the same root').toBe('seeded-app');
         } finally {
           jetpack.remove(targetPath);
         }

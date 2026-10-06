@@ -7,11 +7,10 @@
  * nothing in the cascade defines fails the build loudly instead of caching an
  * empty render.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -52,39 +51,6 @@ function makeConsumer(metaTitle, extraMeta = []) {
   return { tmp, consumerDir };
 }
 
-test('#544: a meta ref rooted at the page\'s pagination alias defers and renders per page', async () => {
-  const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review');
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-defer');
-
-    const alpha = pages.get('/brands/alpha');
-    const beta = pages.get('/brands/beta');
-    assert.ok(alpha && beta, 'both generated pages built');
-
-    assert.ok(alpha.includes('<h1>Alpha review</h1>'), 'the first page names its own document');
-    assert.ok(beta.includes('<h1>Beta review</h1>'), 'and the second is not the first, cached');
-    assert.ok(!alpha.includes('<h1> review</h1>'), 'nothing ships the nameless title');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('#544: an alias-titled page carries that title into the meta files too', async () => {
-  const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review');
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-metafiles');
-    const pagesJson = pages.get('/pages.json');
-    assert.ok(pagesJson, 'the search index built');
-    // A paginated template puts only its FIRST page in collections (Eleventy's
-    // own default), so the index carries Alpha — and it carries the rendered
-    // name, not the raw ref and not an empty title.
-    assert.ok(pagesJson.includes('"title": "Alpha review"'), 'omega_rendered renders the alias ref for the item it reads');
-    assert.ok(!pagesJson.includes('brand_doc'), 'no raw Liquid ships into the search index');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
 // Eleventy wraps a template error in its own; the message that matters is at
 // the bottom of the originalError/cause chain.
 const flatten = (error) => {
@@ -93,35 +59,83 @@ const flatten = (error) => {
   return parts.join(' :: ');
 };
 
-test('#544: a meta ref with an UNDEFINED root fails the build, naming the file and the ref', async () => {
-  const { tmp, consumerDir } = makeConsumer('{{ brand_dcoument.name }} review');
-  try {
-    await assert.rejects(
-      () => buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-undefined'),
-      (error) => {
-        const message = flatten(error);
-        assert.match(message, /brand\.html/, 'the failure names the file');
-        assert.match(message, /brand_dcoument/, 'and the ref that has no data');
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'meta-pagination-alias',
+  tests: [
+    {
+      name: '#544: a meta ref rooted at the page\'s pagination alias defers and renders per page',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review');
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-defer');
 
-test('#544: legit empty optional values still pass', async () => {
-  // `resolved.meta.keywords` is simply unset on the bare brand — an empty
-  // OPTIONAL value, not an undefined root, and the build must not care.
-  const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review', [
-    '  description: "{{ resolved.meta.keywords }}"',
-  ]);
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-optional');
-    const alpha = pages.get('/brands/alpha');
-    assert.ok(alpha, 'the page built');
-    assert.ok(alpha.includes('<p id="desc"></p>'), 'the optional value renders empty, and that is fine');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+          const alpha = pages.get('/brands/alpha');
+          const beta = pages.get('/brands/beta');
+          ctx.expect(alpha && beta, 'both generated pages built').toBeTruthy();
+
+          ctx.expect(alpha.includes('<h1>Alpha review</h1>'), 'the first page names its own document').toBeTruthy();
+          ctx.expect(beta.includes('<h1>Beta review</h1>'), 'and the second is not the first, cached').toBeTruthy();
+          ctx.expect(!alpha.includes('<h1> review</h1>'), 'nothing ships the nameless title').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#544: an alias-titled page carries that title into the meta files too',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review');
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-metafiles');
+          const pagesJson = pages.get('/pages.json');
+          ctx.expect(pagesJson, 'the search index built').toBeTruthy();
+          // A paginated template puts only its FIRST page in collections (Eleventy's
+          // own default), so the index carries Alpha — and it carries the rendered
+          // name, not the raw ref and not an empty title.
+          ctx.expect(pagesJson.includes('"title": "Alpha review"'), 'omega_rendered renders the alias ref for the item it reads').toBeTruthy();
+          ctx.expect(!pagesJson.includes('brand_doc'), 'no raw Liquid ships into the search index').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#544: a meta ref with an UNDEFINED root fails the build, naming the file and the ref',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer('{{ brand_dcoument.name }} review');
+        try {
+          await ctx.expect((() => buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-undefined'))()).rejects.toThrow((error) => {
+              const message = flatten(error);
+              ctx.expect(message, 'the failure names the file').toMatch(/brand\.html/);
+              ctx.expect(message, 'and the ref that has no data').toMatch(/brand_dcoument/);
+              return true;
+            });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: '#544: legit empty optional values still pass',
+      run: async (ctx) => {
+        // `resolved.meta.keywords` is simply unset on the bare brand — an empty
+        // OPTIONAL value, not an undefined root, and the build must not care.
+        const { tmp, consumerDir } = makeConsumer('{{ brand_doc.name }} review', [
+          '  description: "{{ resolved.meta.keywords }}"',
+        ]);
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'meta-alias-optional');
+          const alpha = pages.get('/brands/alpha');
+          ctx.expect(alpha, 'the page built').toBeTruthy();
+          ctx.expect(alpha.includes('<p id="desc"></p>'), 'the optional value renders empty, and that is fine').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

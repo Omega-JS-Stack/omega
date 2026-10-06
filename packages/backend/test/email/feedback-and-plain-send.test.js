@@ -13,7 +13,7 @@ module.exports = defineCases({
       name: 'feedback-template',
       auth: 'admin',
       timeout: 30000,
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '[TEST] Feedback template',
           to: `_test-email-send@${config.domain}`,
@@ -23,15 +23,15 @@ module.exports = defineCases({
           data: { signoff: { type: 'personal' } },
         });
 
-        assert.isSuccess(response, 'Should send feedback email');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send feedback email').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
     {
       name: 'plain-template-with-markdown',
       auth: 'admin',
       timeout: 30000,
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '[TEST] Plain template with markdown',
           to: `_test-email-send@${config.domain}`,
@@ -46,8 +46,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Should send plain email');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Should send plain email').toBeSuccess();
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
   ],

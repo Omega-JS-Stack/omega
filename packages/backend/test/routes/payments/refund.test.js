@@ -16,105 +16,105 @@ module.exports = defineCases({
   tests: [
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-missing-confirmed',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/refund', {
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject missing confirmed field');
+        expect(response, 'Should reject missing confirmed field').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-reason',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/refund', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject missing reason field');
+        expect(response, 'Should reject missing reason field').toBeError(400);
       },
     },
 
     {
       name: 'rejects-basic-user',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject basic user with no paid subscription');
+        expect(response, 'Should reject basic user with no paid subscription').toBeError(400);
       },
     },
 
     {
       name: 'rejects-active-subscription-without-cancellation',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // refund-active-no-cancel has an active subscription without pending cancellation
         const response = await http.as('refund-active-no-cancel').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject active subscription that is not cancelled or pending cancellation');
+        expect(response, 'Should reject active subscription that is not cancelled or pending cancellation').toBeError(400);
       },
     },
 
     {
       name: 'rejects-payment-older-than-6-months',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // refund-expired-payment has a cancelled subscription with a payment older than 6 months
         const response = await http.as('refund-expired-payment').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject payment older than 6 months');
+        expect(response, 'Should reject payment older than 6 months').toBeError(400);
       },
     },
 
     {
       name: 'rejects-no-provider-or-resource-id',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // refund-no-provider has a cancelled subscription but no provider
         const response = await http.as('refund-no-provider').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject when no provider or resourceId is set');
+        expect(response, 'Should reject when no provider or resourceId is set').toBeError(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // refund-unknown-provider has a cancelled subscription with unknown provider
         const response = await http.as('refund-unknown-provider').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'succeeds-with-test-provider',
-      async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
+      async run({ http, expect, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['route-refund-success'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
         if (!paidProduct) {
@@ -128,7 +128,7 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isSuccess(intentResponse, 'Intent should succeed');
+        expect(intentResponse, 'Intent should succeed').toBeSuccess();
 
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
@@ -146,7 +146,7 @@ module.exports = defineCases({
           skipGuards: true,
         });
 
-        assert.isSuccess(cancelResponse, 'Cancel should succeed');
+        expect(cancelResponse, 'Cancel should succeed').toBeSuccess();
 
         // Wait for cancellation.pending to be set via the webhook pipeline
         await waitFor(async () => {
@@ -161,11 +161,11 @@ module.exports = defineCases({
           feedback: 'Testing refund flow',
         });
 
-        assert.isSuccess(refundResponse, 'Refund should succeed');
-        assert.ok(refundResponse.data.success, 'Should return success: true');
-        assert.ok(refundResponse.data.refund, 'Should return refund details');
-        assert.isType(refundResponse.data.refund.amount, 'number', 'Refund amount should be a number');
-        assert.equal(refundResponse.data.refund.full, true, 'Should be a full refund (test provider)');
+        expect(refundResponse, 'Refund should succeed').toBeSuccess();
+        expect(refundResponse.data.success, 'Should return success: true').toBeTruthy();
+        expect(refundResponse.data.refund, 'Should return refund details').toBeTruthy();
+        expect(refundResponse.data.refund.amount, 'Refund amount should be a number').toBeTypeOf('number');
+        expect(refundResponse.data.refund.full, 'Should be a full refund (test provider)').toBe(true);
 
         // Step 4: Verify subscription is cancelled via the webhook pipeline
         await waitFor(async () => {
@@ -174,7 +174,7 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc?.subscription?.status, 'cancelled', 'Subscription should be cancelled after refund');
+        expect(userDoc?.subscription?.status, 'Subscription should be cancelled after refund').toBe('cancelled');
       },
     },
   ],

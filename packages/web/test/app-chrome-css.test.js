@@ -10,10 +10,9 @@
  * promotion as the chip (#242): structure in the core component sheet, painted
  * only through tokens, emitted before the theme so a skin still overrides it.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
@@ -34,63 +33,75 @@ function compileMain(themeRoot) {
   }).css;
 }
 
-test('#303: the core component sheet carries the icon button and the search pill', () => {
-  const warnings = [];
-  const css = sass.compile(COMPONENTS_SHEET, {
-    logger: { warn: (message) => warnings.push(message), debug: () => {} },
-  }).css;
+module.exports = defineCases({
+  type: 'group',
+  description: 'app-chrome-css',
+  tests: [
+    {
+      name: '#303: the core component sheet carries the icon button and the search pill',
+      run: (ctx) => {
+        const warnings = [];
+        const css = sass.compile(COMPONENTS_SHEET, {
+          logger: { warn: (message) => warnings.push(message), debug: () => {} },
+        }).css;
 
-  assert.deepEqual(warnings, [], 'new core css never warns — the #16 bar');
+        ctx.expect(warnings, 'new core css never warns — the #16 bar').toEqual([]);
 
-  const button = css.match(/\.btn-icon \{[^}]*\}/);
-  assert.ok(button, 'the icon button is structural, not a classy component');
-  assert.match(button[0], /display: inline-flex/, 'a square ghost centers its glyph');
-  assert.match(button[0], /background: transparent/, 'flat at rest — no UA button chrome');
-  assert.match(button[0], /border: 1px solid transparent/, 'the hover frame never shifts geometry');
-  assert.match(button[0], /color: var\(--omega-ink-muted\)/, 'ink from the token contract');
+        const button = css.match(/\.btn-icon \{[^}]*\}/);
+        ctx.expect(button, 'the icon button is structural, not a classy component').toBeTruthy();
+        ctx.expect(button[0], 'a square ghost centers its glyph').toMatch(/display: inline-flex/);
+        ctx.expect(button[0], 'flat at rest — no UA button chrome').toMatch(/background: transparent/);
+        ctx.expect(button[0], 'the hover frame never shifts geometry').toMatch(/border: 1px solid transparent/);
+        ctx.expect(button[0], 'ink from the token contract').toMatch(/color: var\(--omega-ink-muted\)/);
 
-  const search = css.match(/\.omega-search \{[^}]*\}/);
-  assert.ok(search, 'the ⌘K field is structural too');
-  assert.match(search[0], /background: var\(--omega-surface-2\)/, 'the second surface tier — the field is a well');
-  assert.match(search[0], /border: 1px solid var\(--omega-line\)/);
-  assert.match(search[0], /border-radius: var\(--omega-radius-m\)/, 'shape from the token contract');
+        const search = css.match(/\.omega-search \{[^}]*\}/);
+        ctx.expect(search, 'the ⌘K field is structural too').toBeTruthy();
+        ctx.expect(search[0], 'the second surface tier — the field is a well').toMatch(/background: var\(--omega-surface-2\)/);
+        ctx.expect(search[0]).toMatch(/border: 1px solid var\(--omega-line\)/);
+        ctx.expect(search[0], 'shape from the token contract').toMatch(/border-radius: var\(--omega-radius-m\)/);
 
-  const input = css.match(/\.omega-search input \{[^}]*\}/);
-  assert.ok(input, 'the input sheds its native chrome inside the pill');
-  assert.match(input[0], /background: transparent/);
-  assert.match(input[0], /border: 0/);
+        const input = css.match(/\.omega-search input \{[^}]*\}/);
+        ctx.expect(input, 'the input sheds its native chrome inside the pill').toBeTruthy();
+        ctx.expect(input[0]).toMatch(/background: transparent/);
+        ctx.expect(input[0]).toMatch(/border: 0/);
 
-  const badge = css.match(/\.omega-search kbd \{[^}]*\}/);
-  assert.ok(badge, 'the shortcut badge is skinned here, not left to reboot');
-  assert.match(badge[0], /color: var\(--omega-ink-muted\)/, 'ink on a surface — never reboot inverted fill');
-  assert.match(badge[0], /background: var\(--omega-surface\)/);
+        const badge = css.match(/\.omega-search kbd \{[^}]*\}/);
+        ctx.expect(badge, 'the shortcut badge is skinned here, not left to reboot').toBeTruthy();
+        ctx.expect(badge[0], 'ink on a surface — never reboot inverted fill').toMatch(/color: var\(--omega-ink-muted\)/);
+        ctx.expect(badge[0]).toMatch(/background: var\(--omega-surface\)/);
 
-  assert.ok(!/#[0-9a-fA-F]{3,6}\b/.test(css), 'zero hardcoded hex — a skin re-values the tokens');
-});
+        ctx.expect(!/#[0-9a-fA-F]{3,6}\b/.test(css), 'zero hardcoded hex — a skin re-values the tokens').toBeTruthy();
+      },
+    },
 
-test('#303: a theme that inherits NEITHER classy lane still gets both surfaces', () => {
-  // The floorless fixture is a full sibling theme with its own Bootstrap and
-  // none of classy's floor partials — exactly the newsflash/neobrutalism shape
-  // the bug was reported on.
-  const css = compileMain(path.join(THEMING, 'floorless-theme'));
+    {
+      name: '#303: a theme that inherits NEITHER classy lane still gets both surfaces',
+      run: (ctx) => {
+        // The floorless fixture is a full sibling theme with its own Bootstrap and
+        // none of classy's floor partials — exactly the newsflash/neobrutalism shape
+        // the bug was reported on.
+        const css = compileMain(path.join(THEMING, 'floorless-theme'));
 
-  for (const selector of ['.btn-icon', '.omega-search']) {
-    const definitions = [...css.matchAll(new RegExp(`(?:^|\\n)\\${selector} \\{[^}]*\\}`, 'g'))];
-    assert.strictEqual(definitions.length, 1, `exactly ONE structural ${selector} in the bundle — presentation SSOT`);
-  }
+        for (const selector of ['.btn-icon', '.omega-search']) {
+          const definitions = [...css.matchAll(new RegExp(`(?:^|\\n)\\${selector} \\{[^}]*\\}`, 'g'))];
+          ctx.expect(definitions.length, `exactly ONE structural ${selector} in the bundle — presentation SSOT`).toBe(1);
+        }
 
-  const badge = css.match(/\.omega-search kbd \{[^}]*\}/);
-  assert.ok(badge, 'and the ⌘K badge is skinned on a floorless theme');
-  assert.ok(
-    css.indexOf('--omega-surface-2') < css.indexOf('.omega-search'),
-    'tokens land ahead of the pill in the bundle',
-  );
-});
+        const badge = css.match(/\.omega-search kbd \{[^}]*\}/);
+        ctx.expect(badge, 'and the ⌘K badge is skinned on a floorless theme').toBeTruthy();
+        ctx.expect(css.indexOf('--omega-surface-2') < css.indexOf('.omega-search'), 'tokens land ahead of the pill in the bundle').toBeTruthy();
+      },
+    },
 
-test('#303: classy no longer owns a second copy of either rule', () => {
-  const buttons = fs.readFileSync(path.join(PKG, 'themes', 'classy', 'css', 'components', '_buttons.scss'), 'utf8');
-  const forms = fs.readFileSync(path.join(PKG, 'themes', 'classy', 'css', 'components', '_forms.scss'), 'utf8');
+    {
+      name: '#303: classy no longer owns a second copy of either rule',
+      run: (ctx) => {
+        const buttons = fs.readFileSync(path.join(PKG, 'themes', 'classy', 'css', 'components', '_buttons.scss'), 'utf8');
+        const forms = fs.readFileSync(path.join(PKG, 'themes', 'classy', 'css', 'components', '_forms.scss'), 'utf8');
 
-  assert.ok(!/^\.btn-icon \{/m.test(buttons), 'the icon button moved to the core sheet');
-  assert.ok(!/^\.omega-search \{/m.test(forms), 'the search pill moved to the core sheet');
+        ctx.expect(!/^\.btn-icon \{/m.test(buttons), 'the icon button moved to the core sheet').toBeTruthy();
+        ctx.expect(!/^\.omega-search \{/m.test(forms), 'the search pill moved to the core sheet').toBeTruthy();
+      },
+    },
+  ],
 });

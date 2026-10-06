@@ -20,8 +20,8 @@
  * cell kinds this file walks are a perk string, a counted number, the `-1`
  * unlimited sentinel, a bare `true`, and a feature a tier does not name.
  */
-const assert = require('node:assert');
-const { test, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
@@ -63,45 +63,62 @@ const CATALOG = {
  */
 function row(html, name) {
   const at = html.indexOf(name, html.indexOf('<caption>Compare features</caption>'));
-  assert.ok(at > -1, `${name} has a row in the matrix`);
+  expect(at > -1, `${name} has a row in the matrix`).toBeTruthy();
   const start = html.lastIndexOf('<tr', at);
   return html.slice(start, html.indexOf('</tr>', at));
 }
 
 let page;
-before(async () => {
-  page = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG }).then((pages) => pages.get('/pricing'));
-});
 
-test('#562: a string cell is a YES with a label — check icon plus the value', () => {
-  const exports = row(page, 'Exports');
+module.exports = defineCases({
+  type: 'group',
+  description: 'pricing-matrix-cells',
+  setup: async () => {
+    page = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG }).then((pages) => pages.get('/pricing'));
+  },
+  tests: [
+    {
+      name: '#562: a string cell is a YES with a label — check icon plus the value',
+      run: (ctx) => {
+        const exports = row(page, 'Exports');
 
-  assert.strictEqual((exports.match(/omega-compare__yes/g) || []).length, 2, 'both plans draw the check');
-  assert.strictEqual((exports.match(/omega-compare__no/g) || []).length, 0, 'and neither draws the x');
-  assert.strictEqual((exports.match(/<span class="omega-compare__label">Included<\/span>/g) || []).length, 2,
-    'the catalog word rides the check as its label, the way the plan cards render it');
-});
+        ctx.expect((exports.match(/omega-compare__yes/g) || []).length, 'both plans draw the check').toBe(2);
+        ctx.expect((exports.match(/omega-compare__no/g) || []).length, 'and neither draws the x').toBe(0);
+        ctx.expect((exports.match(/<span class="omega-compare__label">Included<\/span>/g) || []).length, 'the catalog word rides the check as its label, the way the plan cards render it').toBe(2);
+      },
+    },
 
-test('#562: a number cell keeps its formatting, and the unlimited sentinel keeps its word', () => {
-  const seats = row(page, 'Seats');
+    {
+      name: '#562: a number cell keeps its formatting, and the unlimited sentinel keeps its word',
+      run: (ctx) => {
+        const seats = row(page, 'Seats');
 
-  assert.ok(seats.includes('<span class="omega-compare__label">1,000</span>'), 'omega_commaify still formats the number');
-  assert.ok(seats.includes('<span class="omega-compare__label">Unlimited</span>'), 'and -1 renders as the Unlimited label, a value like any other');
-  assert.strictEqual((seats.match(/omega-compare__yes/g) || []).length, 2, 'both cells are a yes');
-});
+        ctx.expect(seats.includes('<span class="omega-compare__label">1,000</span>'), 'omega_commaify still formats the number').toBeTruthy();
+        ctx.expect(seats.includes('<span class="omega-compare__label">Unlimited</span>'), 'and -1 renders as the Unlimited label, a value like any other').toBeTruthy();
+        ctx.expect((seats.match(/omega-compare__yes/g) || []).length, 'both cells are a yes').toBe(2);
+      },
+    },
 
-test('#562: `true` stays icon-only and a missing feature stays the x icon', () => {
-  const support = row(page, 'Priority support');
+    {
+      name: '#562: `true` stays icon-only and a missing feature stays the x icon',
+      run: (ctx) => {
+        const support = row(page, 'Priority support');
 
-  assert.strictEqual((support.match(/omega-compare__yes/g) || []).length, 1, 'premium declares it');
-  assert.strictEqual((support.match(/omega-compare__no/g) || []).length, 1, 'basic genuinely lacks it');
-  assert.ok(!support.includes('omega-compare__label'), 'a bare true carries no label — the icon says it');
-});
+        ctx.expect((support.match(/omega-compare__yes/g) || []).length, 'premium declares it').toBe(1);
+        ctx.expect((support.match(/omega-compare__no/g) || []).length, 'basic genuinely lacks it').toBe(1);
+        ctx.expect(!support.includes('omega-compare__label'), 'a bare true carries no label — the icon says it').toBeTruthy();
+      },
+    },
 
-test('#562: the two surfaces now agree on one catalog value', () => {
-  // The whole point: the cards print "Included" beside their check and so does
-  // the matrix, off the same value — one definition in the catalog, one value
-  // per product, no second key.
-  assert.ok(page.includes('omega-price-card__features'), 'the plan cards rendered');
-  assert.ok((page.match(/Included/g) || []).length >= 4, 'the word lands on both surfaces, per plan');
+    {
+      name: '#562: the two surfaces now agree on one catalog value',
+      run: (ctx) => {
+        // The whole point: the cards print "Included" beside their check and so does
+        // the matrix, off the same value — one definition in the catalog, one value
+        // per product, no second key.
+        ctx.expect(page.includes('omega-price-card__features'), 'the plan cards rendered').toBeTruthy();
+        ctx.expect((page.match(/Included/g) || []).length >= 4, 'the word lands on both surfaces, per plan').toBeTruthy();
+      },
+    },
+  ],
 });

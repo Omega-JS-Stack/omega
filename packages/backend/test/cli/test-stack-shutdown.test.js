@@ -51,16 +51,16 @@ EmulatorCommand.prototype.startEmulators = async () => ({
 
 const command = new TestCommand({ firebaseProjectPath: projectDir, argv: {}, options: {} });
 
-// 'Logs saving to' is the last line the run prints before it settles into
-// waiting on its test child — and it prints AFTER the stop handlers are
-// registered, which is what the parent must not race. 'Shutting down' is the
-// handler's own first line, so the state file counts how many times the
-// teardown was ENTERED, not just whether it finished.
+// 'UI: http://' is the last line the run prints before it spawns its test
+// child, and it prints AFTER the stop handlers are registered, which is what
+// the parent must not race. 'Shutting down' is the handler's own first line,
+// so the state file counts how many times the teardown was ENTERED, not just
+// whether it finished.
 command.log = (message) => {
   const text = String(message);
 
   if (/Shutting down emulator/.test(text)) fs.appendFileSync(statePath, 'teardown\\n');
-  if (/Logs saving to/.test(text)) fs.writeFileSync(readyPath, 'ready');
+  if (/UI: http:\\/\\//.test(text)) fs.writeFileSync(readyPath, 'ready');
 };
 command.logError = () => {};
 command.logWarning = () => {};
@@ -183,27 +183,27 @@ async function bootedRun() {
 /**
  * Boot the run, signal it, and prove it took its teardown instead of dying.
  * The only process signalled is the one this case spawned.
- * @param {object} assert - The case assertions.
+ * @param {Function} expect - The case's expect.
  * @param {string} signal - The stop signal under test.
  */
-async function tearsDownOn(assert, signal) {
+async function tearsDownOn(expect, signal) {
   const run = await bootedRun();
 
   try {
-    assert.equal(run.ready, true, `the run must come up before it can be stopped: ${run.output()}`);
-    assert.equal(typeof run.runnerPid, 'number', `the run must reach its test runner before it is stopped: ${run.output()}`);
+    expect(run.ready, `the run must come up before it can be stopped: ${run.output()}`).toBe(true);
+    expect(typeof run.runnerPid, `the run must reach its test runner before it is stopped: ${run.output()}`).toBe('number');
 
     process.kill(run.child.pid, signal);
 
-    assert.equal(await waitUntil(() => run.exit() !== null, 30000), true, `the run must exit on ${signal}: ${run.output()}`);
-    assert.equal(run.state().includes('shutdown'), true, `${signal} must run the emulator teardown, not Node's default action`);
-    assert.equal(run.exit().code, 130, `a signalled run exits 130 on ${signal}, got ${JSON.stringify(run.exit())}`);
+    expect(await waitUntil(() => run.exit() !== null, 30000), `the run must exit on ${signal}: ${run.output()}`).toBe(true);
+    expect(run.state().includes('shutdown'), `${signal} must run the emulator teardown, not Node's default action`).toBe(true);
+    expect(run.exit().code, `a signalled run exits 130 on ${signal}, got ${JSON.stringify(run.exit())}`).toBe(130);
 
     // The signal is DIRECTED at the CLI pid, so it never reaches the test
     // runner: unless the teardown takes the child down itself, the suites keep
     // running orphaned to PID 1 long after the run that owns them is gone.
     const runnerGone = await waitUntil(() => !commandOf(run.runnerPid), 10000);
-    assert.equal(runnerGone, true, `${signal} must take the test runner down too — pid ${run.runnerPid} still running ${JSON.stringify(commandOf(run.runnerPid))}`);
+    expect(runnerGone, `${signal} must take the test runner down too — pid ${run.runnerPid} still running ${JSON.stringify(commandOf(run.runnerPid))}`).toBe(true);
   } finally {
     run.cleanup();
   }
@@ -218,54 +218,54 @@ module.exports = defineCases({
     {
       name: 'ctrl-c-tears-the-auto-started-stack-down',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // The one signal this path always handled — it must survive the trio.
-        await tearsDownOn(assert, 'SIGINT');
+        await tearsDownOn(expect, 'SIGINT');
       },
     },
 
     {
       name: 'a-programmatic-stop-tears-the-auto-started-stack-down',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // SIGTERM is how anything but a terminal stops a run: a supervisor, a
         // harness, `kill` with no flag. It killed the CLI outright and left the
         // emulator it had spawned behind.
-        await tearsDownOn(assert, 'SIGTERM');
+        await tearsDownOn(expect, 'SIGTERM');
       },
     },
 
     {
       name: 'a-closed-terminal-tears-the-auto-started-stack-down',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // Closing the window on a running `omega test` sends SIGHUP, and it
         // orphaned the same tree onto PID 1.
-        await tearsDownOn(assert, 'SIGHUP');
+        await tearsDownOn(expect, 'SIGHUP');
       },
     },
 
     {
       name: 'a-second-stop-signal-does-not-start-a-second-teardown',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // Impatient Ctrl+C, and a supervisor's escalation, both send a second
         // signal while the first teardown is still running. Unguarded, the
         // handler runs again underneath it and tears the same stack down twice.
         const run = await bootedRun();
 
         try {
-          assert.equal(run.ready, true, `the run must come up before it can be stopped: ${run.output()}`);
+          expect(run.ready, `the run must come up before it can be stopped: ${run.output()}`).toBe(true);
 
           process.kill(run.child.pid, 'SIGINT');
           await powertools.wait(100);
 
-          assert.equal(run.exit(), null, 'the second signal must land while the first teardown is still running');
+          expect(run.exit(), 'the second signal must land while the first teardown is still running').toBe(null);
           try { process.kill(run.child.pid, 'SIGINT'); } catch (e) { /* raced the exit */ }
 
-          assert.equal(await waitUntil(() => run.exit() !== null, 30000), true, `the run must exit: ${run.output()}`);
-          assert.equal(run.state().split('teardown').length - 1, 1, `the teardown is ENTERED once, got ${JSON.stringify(run.state())}`);
-          assert.equal(run.state().includes('shutdown'), true, `the one teardown still runs to completion, got ${JSON.stringify(run.state())}`);
+          expect(await waitUntil(() => run.exit() !== null, 30000), `the run must exit: ${run.output()}`).toBe(true);
+          expect(run.state().split('teardown').length - 1, `the teardown is ENTERED once, got ${JSON.stringify(run.state())}`).toBe(1);
+          expect(run.state().includes('shutdown'), `the one teardown still runs to completion, got ${JSON.stringify(run.state())}`).toBe(true);
         } finally {
           run.cleanup();
         }

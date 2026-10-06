@@ -11,7 +11,7 @@ module.exports = defineCases({
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
   timeout: 60000,
 
-  async run({ http, assert }) {
+  async run({ http, expect }) {
     const response = await http.post('omega/marketing/campaign', {
       name: '[TEST] Summer Sale — Free Users',
       subject: 'Summer Sale — {discount.percent}% Off Your First Month!',
@@ -35,13 +35,13 @@ module.exports = defineCases({
       sendAt: 'now',
     });
 
-    assert.isSuccess(response, 'Should create and schedule campaign');
-    assert.ok(response.data.id, 'Should have campaign ID');
+    expect(response, 'Should create and schedule campaign').toBeSuccess();
+    expect(response.data.id, 'Should have campaign ID').toBeTruthy();
 
     const sg = response.data?.providers?.campaigns;
-    assert.ok(sg, 'Should have campaigns result');
-    assert.equal(sg.success, true, 'Campaigns (SendGrid) should succeed');
-    assert.ok(sg.id, 'Should have Single Send ID');
-    assert.equal(sg.scheduled, true, 'Should be scheduled');
+    expect(sg, 'Should have campaigns result').toBeTruthy();
+    expect(sg.success, 'Campaigns (SendGrid) should succeed').toBe(true);
+    expect(sg.id, 'Should have Single Send ID').toBeTruthy();
+    expect(sg.scheduled, 'Should be scheduled').toBe(true);
   },
 });

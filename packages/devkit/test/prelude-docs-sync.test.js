@@ -78,6 +78,29 @@ module.exports = defineCases({
     },
 
     {
+      name: 'docs-sync: with no injected log, the sync line goes to stderr, never stdout',
+      run: (ctx) => {
+        const { brand } = linkedBrand();
+        const out = [];
+        const err = [];
+        const original = { log: console.log, error: console.error };
+        console.log = (line) => out.push(line);
+        console.error = (line) => err.push(line);
+
+        try {
+          docsSync.run({ brandRoot: brand });
+        } finally {
+          console.log = original.log;
+          console.error = original.error;
+        }
+
+        ctx.expect(out, 'a verb\'s stdout carries none of the prelude').toEqual([]);
+        ctx.expect(err.length).toBe(1);
+        ctx.expect(err[0]).toMatch(/synced the linked manager's docs/);
+      },
+    },
+
+    {
       name: 'docs-sync: a published manager and a run outside a brand are left alone',
       run: (ctx) => {
         const brand = tmpdir();

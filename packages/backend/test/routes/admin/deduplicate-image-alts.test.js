@@ -25,7 +25,7 @@ module.exports = defineCases({
 
     {
       name: 'distinct-alts-are-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         const images = [
           { src: 'https://a.com/1.jpg', alt: 'Cat', header: false },
           { src: 'https://a.com/2.jpg', alt: 'Dog', header: false },
@@ -33,9 +33,9 @@ module.exports = defineCases({
         const body = '![Cat](https://a.com/1.jpg)\n\n![Dog](https://a.com/2.jpg)';
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, 'Cat', 'First image alt unchanged');
-        assert.equal(result.images[1].alt, 'Dog', 'Second image alt unchanged');
-        assert.equal(result.body, body, 'Body is unchanged when no collisions');
+        expect(result.images[0].alt, 'First image alt unchanged').toBe('Cat');
+        expect(result.images[1].alt, 'Second image alt unchanged').toBe('Dog');
+        expect(result.body, 'Body is unchanged when no collisions').toBe(body);
       },
     },
 
@@ -43,7 +43,7 @@ module.exports = defineCases({
 
     {
       name: 'same-alt-different-urls-suffixes-second',
-      async run({ assert }) {
+      async run({ expect }) {
         const sharedAlt = '62f9b399-92c2-40c2-8ec4-e05b54077aaa';
         const images = [
           { src: 'https://a.com/1.jpg', alt: sharedAlt, header: false },
@@ -52,22 +52,16 @@ module.exports = defineCases({
         const body = `![${sharedAlt}](https://a.com/1.jpg)\n\nsome text\n\n![${sharedAlt}](https://a.com/2.jpg)`;
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, sharedAlt, 'First image keeps original alt');
-        assert.equal(result.images[1].alt, `${sharedAlt} (2)`, 'Second image alt is suffixed with " (2)"');
-        assert.ok(
-          result.body.includes(`![${sharedAlt}](https://a.com/1.jpg)`),
-          'Body still contains the first image with original alt',
-        );
-        assert.ok(
-          result.body.includes(`![${sharedAlt} (2)](https://a.com/2.jpg)`),
-          'Body contains the second image with suffixed alt',
-        );
+        expect(result.images[0].alt, 'First image keeps original alt').toBe(sharedAlt);
+        expect(result.images[1].alt, 'Second image alt is suffixed with " (2)"').toBe(`${sharedAlt} (2)`);
+        expect(result.body.includes(`![${sharedAlt}](https://a.com/1.jpg)`), 'Body still contains the first image with original alt').toBeTruthy();
+        expect(result.body.includes(`![${sharedAlt} (2)](https://a.com/2.jpg)`), 'Body contains the second image with suffixed alt').toBeTruthy();
       },
     },
 
     {
       name: 'three-images-same-alt-different-urls-counts-up',
-      async run({ assert }) {
+      async run({ expect }) {
         const sharedAlt = 'Logo';
         const images = [
           { src: 'https://a.com/1.jpg', alt: sharedAlt, header: false },
@@ -77,12 +71,12 @@ module.exports = defineCases({
         const body = `![${sharedAlt}](https://a.com/1.jpg)\n![${sharedAlt}](https://a.com/2.jpg)\n![${sharedAlt}](https://a.com/3.jpg)`;
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, 'Logo');
-        assert.equal(result.images[1].alt, 'Logo (2)');
-        assert.equal(result.images[2].alt, 'Logo (3)');
-        assert.ok(result.body.includes('![Logo](https://a.com/1.jpg)'));
-        assert.ok(result.body.includes('![Logo (2)](https://a.com/2.jpg)'));
-        assert.ok(result.body.includes('![Logo (3)](https://a.com/3.jpg)'));
+        expect(result.images[0].alt).toBe('Logo');
+        expect(result.images[1].alt).toBe('Logo (2)');
+        expect(result.images[2].alt).toBe('Logo (3)');
+        expect(result.body.includes('![Logo](https://a.com/1.jpg)')).toBeTruthy();
+        expect(result.body.includes('![Logo (2)](https://a.com/2.jpg)')).toBeTruthy();
+        expect(result.body.includes('![Logo (3)](https://a.com/3.jpg)')).toBeTruthy();
       },
     },
 
@@ -90,7 +84,7 @@ module.exports = defineCases({
 
     {
       name: 'same-alt-same-url-is-not-a-collision',
-      async run({ assert }) {
+      async run({ expect }) {
         const sharedAlt = 'Logo';
         const sharedUrl = 'https://a.com/logo.jpg';
         const images = [
@@ -100,9 +94,9 @@ module.exports = defineCases({
         const body = `![${sharedAlt}](${sharedUrl})\n\n![${sharedAlt}](${sharedUrl})`;
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, sharedAlt, 'First image alt unchanged');
-        assert.equal(result.images[1].alt, sharedAlt, 'Second image alt unchanged (same URL)');
-        assert.equal(result.body, body, 'Body unchanged when URLs match');
+        expect(result.images[0].alt, 'First image alt unchanged').toBe(sharedAlt);
+        expect(result.images[1].alt, 'Second image alt unchanged (same URL)').toBe(sharedAlt);
+        expect(result.body, 'Body unchanged when URLs match').toBe(body);
       },
     },
 
@@ -110,7 +104,7 @@ module.exports = defineCases({
 
     {
       name: 'header-image-with-shared-alt-is-not-modified',
-      async run({ assert }) {
+      async run({ expect }) {
         const sharedAlt = 'banner';
         const images = [
           { src: 'https://a.com/header.jpg', alt: sharedAlt, header: true },
@@ -119,13 +113,9 @@ module.exports = defineCases({
         const body = `![${sharedAlt}](https://a.com/body.jpg)`;
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, sharedAlt, 'Header image alt unchanged');
-        assert.equal(
-          result.images[1].alt,
-          sharedAlt,
-          'Body image alt unchanged because header is excluded from collision tracking',
-        );
-        assert.equal(result.body, body, 'Body unchanged');
+        expect(result.images[0].alt, 'Header image alt unchanged').toBe(sharedAlt);
+        expect(result.images[1].alt, 'Body image alt unchanged because header is excluded from collision tracking').toBe(sharedAlt);
+        expect(result.body, 'Body unchanged').toBe(body);
       },
     },
 
@@ -133,7 +123,7 @@ module.exports = defineCases({
 
     {
       name: 'mixed-A-B-A-C-only-C-collides-with-A-once',
-      async run({ assert }) {
+      async run({ expect }) {
         // Pattern: A, B, A (same URL as first A), C (different URL, same alt as A)
         // Expected: A and A reuse, C gets " (2)" suffix because its alt collides with A.
         const altA = 'Shared';
@@ -151,11 +141,11 @@ module.exports = defineCases({
         const body = `![${altA}](${urlA})\n![${altB}](${urlB})\n![${altA}](${urlA})\n![${altA}](${urlC})`;
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, altA, 'Image 1 unchanged');
-        assert.equal(result.images[1].alt, altB, 'Image 2 (different alt) unchanged');
-        assert.equal(result.images[2].alt, altA, 'Image 3 (same URL as 1) unchanged');
-        assert.equal(result.images[3].alt, `${altA} (2)`, 'Image 4 (different URL, same alt) gets " (2)"');
-        assert.ok(result.body.includes(`![${altA} (2)](${urlC})`), 'Body has the C image with suffixed alt');
+        expect(result.images[0].alt, 'Image 1 unchanged').toBe(altA);
+        expect(result.images[1].alt, 'Image 2 (different alt) unchanged').toBe(altB);
+        expect(result.images[2].alt, 'Image 3 (same URL as 1) unchanged').toBe(altA);
+        expect(result.images[3].alt, 'Image 4 (different URL, same alt) gets " (2)"').toBe(`${altA} (2)`);
+        expect(result.body.includes(`![${altA} (2)](${urlC})`), 'Body has the C image with suffixed alt').toBeTruthy();
       },
     },
 
@@ -163,16 +153,16 @@ module.exports = defineCases({
 
     {
       name: 'empty-images-array-returns-empty',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = deduplicateImageAlts([], 'some body');
-        assert.deepEqual(result.images, [], 'images is empty');
-        assert.equal(result.body, 'some body', 'body unchanged');
+        expect(result.images, 'images is empty').toEqual([]);
+        expect(result.body, 'body unchanged').toBe('some body');
       },
     },
 
     {
       name: 'no-collisions-among-different-alts',
-      async run({ assert }) {
+      async run({ expect }) {
         const images = [
           { src: 'https://a.com/1.jpg', alt: 'A', header: false },
           { src: 'https://a.com/2.jpg', alt: 'B', header: false },
@@ -181,10 +171,10 @@ module.exports = defineCases({
         const body = '![A](https://a.com/1.jpg)\n![B](https://a.com/2.jpg)\n![C](https://a.com/3.jpg)';
         const result = deduplicateImageAlts(images, body);
 
-        assert.equal(result.images[0].alt, 'A');
-        assert.equal(result.images[1].alt, 'B');
-        assert.equal(result.images[2].alt, 'C');
-        assert.equal(result.body, body, 'Body unchanged');
+        expect(result.images[0].alt).toBe('A');
+        expect(result.images[1].alt).toBe('B');
+        expect(result.images[2].alt).toBe('C');
+        expect(result.body, 'Body unchanged').toBe(body);
       },
     },
   ],

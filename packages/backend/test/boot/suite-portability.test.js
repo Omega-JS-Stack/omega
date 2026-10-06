@@ -149,18 +149,18 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-suite-and-its-targets-are-listed-in-files',
-      async run({ assert }) {
+      async run({ expect }) {
         // Everything below reads `files` as the shipped set; these two entries
         // are what make the suite runnable from an install at all.
         for (const entry of ['test/', 'dist/']) {
-          assert.equal((MANIFEST.files || []).includes(entry), true, `package.json files must list ${entry}`);
+          expect((MANIFEST.files || []).includes(entry), `package.json files must list ${entry}`).toBe(true);
         }
       },
     },
 
     {
       name: 'relative-requires-resolve-inside-the-published-package',
-      async run({ assert }) {
+      async run({ expect }) {
         const failures = [];
 
         for (const file of testFiles()) {
@@ -189,13 +189,13 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(failures.length, 0, `Requires that break in a consumer install:\n  ${failures.join('\n  ')}`);
+        expect(failures.length, `Requires that break in a consumer install:\n  ${failures.join('\n  ')}`).toBe(0);
       },
     },
 
     {
       name: 'bare-requires-are-builtins-or-runtime-dependencies',
-      async run({ assert }) {
+      async run({ expect }) {
         const failures = [];
 
         for (const file of testFiles()) {
@@ -212,13 +212,13 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(failures.length, 0, `Requires that break in a consumer install:\n  ${failures.join('\n  ')}`);
+        expect(failures.length, `Requires that break in a consumer install:\n  ${failures.join('\n  ')}`).toBe(0);
       },
     },
 
     {
       name: 'package-relative-path-literals-point-at-shipped-files',
-      async run({ assert }) {
+      async run({ expect }) {
         const failures = [];
 
         for (const file of testFiles()) {
@@ -244,13 +244,13 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(failures.length, 0, `Paths that break in a consumer install:\n  ${failures.join('\n  ')}`);
+        expect(failures.length, `Paths that break in a consumer install:\n  ${failures.join('\n  ')}`).toBe(0);
       },
     },
 
     {
       name: 'no-string-literal-names-the-source-tree',
-      async run({ assert }) {
+      async run({ expect }) {
         const failures = [];
 
         for (const file of testFiles()) {
@@ -271,7 +271,7 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(failures.length, 0, `Paths that break in a consumer install:\n  ${failures.join('\n  ')}`);
+        expect(failures.length, `Paths that break in a consumer install:\n  ${failures.join('\n  ')}`).toBe(0);
       },
     },
   ],

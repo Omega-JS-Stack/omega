@@ -7,7 +7,7 @@
  */
 const { validate } = require('../../dist/omega/libraries/email/validation.js');
 const { parseResult } = require('../../dist/omega/libraries/email/validation-provider-neverbounce.js');
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const FREE_CHECKS = ['format', 'disposable', 'corporate', 'localPart', 'typo', 'dns'];
@@ -117,8 +117,8 @@ module.exports = defineCases({
       run() {
         const parsed = parseResult(result);
 
-        assert.strictEqual(parsed.valid, expectValid, `Expected valid=${expectValid}, got ${parsed.valid}`);
-        assert.strictEqual(parsed.status, expectStatus, `Expected status=${expectStatus}, got ${parsed.status}`);
+        expect(parsed.valid, `Expected valid=${expectValid}, got ${parsed.valid}`).toBe(expectValid);
+        expect(parsed.status, `Expected status=${expectStatus}, got ${parsed.status}`).toBe(expectStatus);
       },
     })),
 
@@ -136,15 +136,11 @@ module.exports = defineCases({
         const result = await validate(email, { checks: FREE_CHECKS });
         const failedCheck = Object.entries(result.checks).find(([, v]) => v && !v.valid);
 
-        assert.equal(
-          result.valid,
-          expected === 'pass',
-          `Expected: ${expected}, Got: ${result.valid ? 'pass' : 'fail'}${failedCheck ? ` (${failedCheck[0]})` : ''}`,
-        );
+        expect(result.valid, `Expected: ${expected}, Got: ${result.valid ? 'pass' : 'fail'}${failedCheck ? ` (${failedCheck[0]})` : ''}`).toBe(expected === 'pass');
 
         // A failing case must fail on the check it was written for.
         if (expectedCheck && !result.valid && failedCheck) {
-          assert.strictEqual(failedCheck[0], expectedCheck, `Expected to fail on: ${expectedCheck}, actually failed on: ${failedCheck[0]}`);
+          expect(failedCheck[0], `Expected to fail on: ${expectedCheck}, actually failed on: ${failedCheck[0]}`).toBe(expectedCheck);
         }
       },
     })),

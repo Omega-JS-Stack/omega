@@ -17,8 +17,7 @@
  * touches (node has no DOM and web pulls in no jsdom) — the convention
  * dev-palette.test.js set.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -140,13 +139,6 @@ function flatten(node) {
 
 const ORIGINAL_TZ = process.env.TZ;
 
-test.after(() => {
-  process.env.TZ = ORIGINAL_TZ;
-  delete globalThis.window;
-  delete globalThis.document;
-  for (const name of ['gtag', 'fbq', 'ttq']) delete globalThis[name];
-});
-
 /** Boot the real banner over one document, one storage, one region. */
 async function boot({ timeZone = 'Europe/Berlin', storage = {} } = {}) {
   await bundleOnce();
@@ -209,301 +201,350 @@ async function boot({ timeZone = 'Europe/Berlin', storage = {} } = {}) {
 /** Let the dismiss animation finish so the reopen tab has been built. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 350));
 
-
-test('the banner mounts with one big Accept and one small Customize, and nothing else', async () => {
-  const page = await boot();
-
-  const banner = page.banner();
-  assert.ok(banner, 'the panel mounts on a page with no decision');
-  assert.strictEqual(banner.getAttribute('role'), 'dialog');
-  assert.strictEqual(banner.getAttribute('aria-label'), 'Cookie consent');
-  assert.ok(banner.classList.contains('omega-consent--bottom-left'), 'placement comes off the config');
-
-  const buttons = page.all().filter((element) => element.tagName === 'button');
-  assert.deepStrictEqual(
-    buttons.map((element) => element.textContent),
-    ['Accept all', 'Accept none', 'Accept', 'Customize'],
-    'the two controls, plus the pair that lives inside the hidden options panel — and no Save (#391)',
-  );
-  // Real <button type="button">s, never a div with a click handler.
-  buttons.forEach((element) => assert.strictEqual(element.type, 'button', `${element.textContent} is a real button`));
-
-  assert.strictEqual(page.find('omega-consent__options').hidden, true, 'the per-category switches start closed');
-  assert.deepStrictEqual(page.events(), [], 'nothing is counted in an opt-in region before the answer — not even the banner itself (#328: the gate is asked for every fire, and the providers are not loaded there anyway)');
-});
-
-test('the cookie icon lives on the tab, not the open banner', async () => {
-  const page = await boot({ timeZone: 'America/New_York' });
-
-  const icon = page.find('omega-consent__icon');
-  assert.ok(icon, 'the tab has the icon');
-  assert.strictEqual(icon.parent, page.tab(), 'and it sits inside the tab button');
-  assert.strictEqual(icon.tagName, 'i', 'a real <i> the shared renderer swaps for an inline SVG');
-  // fa-cookie-bite is a FREE glyph — framework markup may never name a Pro-only
-  // icon, because a consumer without Pro cannot fix it (docs/shared/icons.md).
-  assert.ok(icon.classList.contains('fa-solid'), 'the free solid family');
-  assert.ok(icon.classList.contains('fa-cookie-bite'));
-  assert.strictEqual(icon.getAttribute('aria-hidden'), 'true', 'decorative — the button text is the name');
-  assert.strictEqual(page.tab().textContent, 'Cookies Settings', 'the tab says settings, because that is what it opens');
-
-  page.tab().click();
-  const bannerIcons = page.all().filter((element) => element.classList.contains('omega-consent__icon') && element.parent !== null && page.banner() && element.parent === page.banner());
-  assert.deepStrictEqual(bannerIcons, [], 'the open banner carries no icon — it only shoved the message over');
-});
-
-test('an opt-out region is never interrupted: the tab, and no banner at all', async () => {
-  // Everything is granted there by default, so there is no gate to hold and
-  // nothing worth interrupting a first visit for (#391). The banner used to
-  // mount informationally and count itself.
-  const page = await boot({ timeZone: 'America/New_York' });
-
-  assert.strictEqual(page.banner(), undefined, 'no banner on a first visit');
-  assert.ok(page.tab(), 'the small policy tab is the whole surface');
-  assert.deepStrictEqual(page.events(), [], 'and cookie_banner_show is not fired for a banner nobody saw');
-  assert.strictEqual(page.storage.trackingConsent, undefined, 'nothing is stored either — the region default is not a decision');
-});
-
-test('the opt-out tab still reopens the full banner', async () => {
-  const page = await boot({ timeZone: 'America/New_York' });
-
-  page.tab().click();
-
-  assert.ok(page.banner(), 'the way to turn things off is still one click away');
-  assert.strictEqual(page.tab(), undefined, 'and the tab steps aside');
-  assert.ok(page.events().includes('cookie_policy_reopen'));
-});
-
-test('the auto-accept-on-scroll behavior is GONE', async () => {
-  const page = await boot();
-
-  // The old banner listened for scroll and for any click outside itself, then
-  // stored consent on the visitor's behalf. No consent regime survives that.
-  assert.deepStrictEqual(Object.keys(page.windowListeners), [], 'the banner registers no window listeners at all');
-  assert.strictEqual(page.storage.trackingConsent, undefined, 'and nothing is stored until a control is pressed');
-});
-
-test('Accept grants both categories', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__accept').click();
-
-  assert.strictEqual(page.storage.trackingConsent.analytics, true);
-  assert.strictEqual(page.storage.trackingConsent.marketing, true);
-  assert.strictEqual(page.storage.trackingConsent.region, 'opt-in');
-  assert.strictEqual(page.storage.trackingConsent.version, 1);
-  assert.ok(page.events().includes('cookie_consent_accept'));
-
-  await settle();
-  assert.strictEqual(page.banner(), undefined, 'the panel leaves');
-  assert.ok(page.tab(), 'and the small policy tab takes its place');
-});
-
-test('a double-click on Accept answers once', async () => {
-  const page = await boot();
-
-  const accept = page.find('omega-consent__accept');
-  accept.click();
-  // The hide animation keeps the button on screen for a beat — the latch is
-  // what makes this second click a no-op instead of a double-count.
-  accept.click();
-
-  const accepts = page.events().filter((name) => name === 'cookie_consent_accept');
-  assert.strictEqual(accepts.length, 1, 'one answer, one event');
-
-  await settle();
-  assert.ok(page.tab(), 'and the one dismissal still lands the tab');
-});
-
-test('Customize opens the panel and takes the whole Accept row with it', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__customize').click();
-
-  const options = page.find('omega-consent__options');
-  assert.strictEqual(options.hidden, false, 'the panel opens in place');
-  // Accept all inside the panel IS the big Accept, at the same one click, so
-  // the row that carried it steps aside rather than offering it twice (#391).
-  const actions = page.find('omega-consent__actions');
-  assert.strictEqual(actions.hidden, true, 'the original Accept row hides');
-  assert.ok(
-    actions.children.includes(page.find('omega-consent__accept')),
-    'and the big Accept is what went with it',
-  );
-  assert.ok(
-    actions.children.includes(page.find('omega-consent__customize')),
-    'the control that opened the panel hides with the row it lives in',
-  );
-
-  const necessary = page.checkbox('omega-consent-necessary');
-  assert.strictEqual(necessary.checked, true, 'Necessary is shown');
-  assert.strictEqual(necessary.disabled, true, 'and locked on');
-
-  const analytics = page.checkbox('omega-consent-analytics');
-  const marketing = page.checkbox('omega-consent-marketing');
-  assert.strictEqual(analytics.checked, false, 'an opt-in region starts with nothing granted');
-  assert.strictEqual(marketing.checked, false);
-  assert.strictEqual(analytics.focused, true, 'the keyboard follows the panel that just appeared');
-
-  // Every switch is a REAL checkbox with a label bound to it — an unnamed
-  // checkbox is unusable by voice or screen reader, and a div wearing a pill
-  // has no keyboard at all.
-  for (const id of ['omega-consent-necessary', 'omega-consent-analytics', 'omega-consent-marketing']) {
-    const input = page.checkbox(id);
-    assert.strictEqual(input.type, 'checkbox', `${id} is a real checkbox`);
-    assert.ok(input.classList.contains('omega-consent__switch'), `${id} is styled as a switch, not replaced by one`);
-    assert.ok(page.all().some((element) => element.tagName === 'label' && element.htmlFor === id), `${id} has a label`);
-  }
-});
-
-test('the panel intro carries the legal copy and links both policies', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__customize').click();
-
-  const intro = page.find('omega-consent__intro');
-  assert.ok(intro, 'the disclosure sits above the categories');
-  assert.ok(intro.innerHTML.includes('href="/cookies"'), 'the {cookies} placeholder becomes a real link');
-  assert.ok(intro.innerHTML.includes('href="/terms"'), 'and {terms} still does too');
-});
-
-test('flipping a switch saves on the spot, and the panel stays open', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__customize').click();
-  page.checkbox('omega-consent-analytics').click();
-
-  // No Save to press: the flip IS the answer (#391).
-  assert.strictEqual(page.storage.trackingConsent.analytics, true, 'exactly the switch that was flipped');
-  assert.strictEqual(page.storage.trackingConsent.marketing, false, 'and exactly the one that was not');
-  assert.ok(page.events().includes('cookie_consent_accept'), 'a save that grants something is an accept');
-
-  assert.ok(page.banner(), 'the banner stays open so the next flip is one click away');
-  assert.strictEqual(page.find('omega-consent__options').hidden, false, 'and so does the panel');
-  assert.strictEqual(page.tab(), undefined, 'nothing collapsed');
-
-  // Flipping it back is the same instant write, in the other direction.
-  page.checkbox('omega-consent-analytics').click();
-
-  assert.strictEqual(page.storage.trackingConsent.analytics, false, 'the withdrawal is stored as immediately as the grant');
-  assert.ok(page.banner(), 'and the panel is still there');
-});
-
-test('a panel flipped to nothing is the denial', async () => {
-  // An opt-out visitor arrives with both granted, so turning them off one at a
-  // time is what walks an accept into a denial.
-  const page = await boot({ timeZone: 'America/New_York' });
-
-  page.tab().click();
-  page.find('omega-consent__customize').click();
-
-  page.checkbox('omega-consent-analytics').click();
-
-  assert.strictEqual(page.storage.trackingConsent.analytics, false, 'the flip is stored on the spot');
-  assert.strictEqual(page.storage.trackingConsent.marketing, true, 'the switch beside it is untouched');
-  assert.strictEqual(page.metaEvents().pop(), 'CookieConsentAccept', 'a partial grant is still an accept');
-
-  page.checkbox('omega-consent-marketing').click();
-
-  assert.strictEqual(page.storage.trackingConsent.marketing, false, 'the last switch off is the refusal');
-  // The denial is recorded in STORAGE and counted nowhere: the fire is made
-  // after the record is written, so the gate the visitor just closed is the one
-  // it is asked about. Honoring the answer beats counting it (#328).
-  assert.ok(!page.events().includes('cookie_consent_deny'), 'a denied visitor is counted by nobody, the denial included');
-  assert.ok(!page.metaEvents().includes('CookieConsentDeny'));
-  assert.strictEqual(page.metaEvents().pop(), 'CookieConsentAccept', 'and no second accept was counted on the way out');
-});
-
-test('the locked Necessary switch cannot be pressed into an answer', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__customize').click();
-  page.checkbox('omega-consent-necessary').click();
-
-  assert.strictEqual(page.checkbox('omega-consent-necessary').checked, true, 'it stays on');
-  assert.strictEqual(page.storage.trackingConsent, undefined, 'and pressing it never wrote an answer');
-});
-
-test('Accept all flips every switch, saves, and collapses to the tab', async () => {
-  const page = await boot();
-
-  page.find('omega-consent__customize').click();
-  page.find('omega-consent__accept-all').click();
-
-  assert.strictEqual(page.checkbox('omega-consent-analytics').checked, true, 'the switches match what was pressed');
-  assert.strictEqual(page.checkbox('omega-consent-marketing').checked, true);
-  assert.strictEqual(page.storage.trackingConsent.analytics, true);
-  assert.strictEqual(page.storage.trackingConsent.marketing, true);
-  assert.strictEqual(page.events().pop(), 'cookie_consent_accept');
-
-  await settle();
-  assert.strictEqual(page.banner(), undefined, 'the panel leaves');
-  assert.ok(page.tab(), 'and the tab takes its place');
-});
-
-test('Accept none is the same one click, in the other direction', async () => {
-  // The refusal is never a longer path than the grant — the EU equal-ease rule,
-  // and the reason the pair sits side by side.
-  const page = await boot({ timeZone: 'America/New_York' });
-
-  page.tab().click();
-  page.find('omega-consent__customize').click();
-
-  assert.strictEqual(page.checkbox('omega-consent-analytics').checked, true, 'an opt-out region opens already granted');
-  assert.strictEqual(page.checkbox('omega-consent-marketing').checked, true);
-
-  page.find('omega-consent__accept-none').click();
-
-  assert.strictEqual(page.checkbox('omega-consent-analytics').checked, false, 'every switch flips to match');
-  assert.strictEqual(page.checkbox('omega-consent-marketing').checked, false);
-  assert.strictEqual(page.storage.trackingConsent.analytics, false);
-  assert.strictEqual(page.storage.trackingConsent.marketing, false);
-  // A refusal is a deny whatever button carried it — and a deny reaches nobody,
-  // because it is fired after the record that blocks it (#328).
-  assert.ok(!page.events().includes('cookie_consent_accept'), 'Accept none never counts as an accept');
-  assert.ok(!page.metaEvents().includes('CookieConsentAccept'));
-  assert.deepStrictEqual(page.metaEvents(), ['CookiePolicyReopen'], 'the reopen that started this is the only thing counted');
-
-  await settle();
-  assert.ok(page.tab(), 'a refusal settles the banner exactly like a grant does');
-});
-
-test('a settled visitor gets the tab, and reopening it asks again', async () => {
-  const storage = {
-    trackingConsent: { analytics: true, marketing: true, region: 'opt-out', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
-  };
-
-  const page = await boot({ timeZone: 'America/New_York', storage });
-
-  assert.strictEqual(page.banner(), undefined, 'an answered visitor is not asked again');
-  const tab = page.tab();
-  assert.ok(tab, 'the policy tab is the way back in');
-  assert.strictEqual(tab.getAttribute('aria-label'), 'Cookies Settings');
-
-  tab.click();
-
-  assert.ok(page.banner(), 'the panel comes back');
-  assert.strictEqual(page.tab(), undefined, 'and the tab steps aside');
-  assert.strictEqual(storage.trackingConsent, undefined, 'the old answer is cleared — this is a fresh question');
-  assert.ok(page.events().includes('cookie_policy_reopen'));
-  assert.ok(!page.events().includes('cookie_banner_show'), 'a reopen is counted as a reopen, never as a second impression');
-});
-
-test('an opt-in visitor who has answered is not asked again either', async () => {
-  const storage = {
-    trackingConsent: { analytics: false, marketing: false, region: 'opt-in', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
-  };
-
-  const page = await boot({ storage });
-
-  assert.strictEqual(page.banner(), undefined, 'the stored decision wins over the region');
-  assert.ok(page.tab(), 'and the tab is the way back in');
-});
-
-test('the message links the terms page instead of naming it', async () => {
-  const page = await boot();
-
-  assert.ok(
-    page.find('omega-consent__message').innerHTML.includes('href="/terms"'),
-    'the {terms} placeholder becomes a real link',
-  );
+module.exports = defineCases({
+  type: 'group',
+  description: 'consent-banner',
+  cleanup: () => {
+    process.env.TZ = ORIGINAL_TZ;
+    delete globalThis.window;
+    delete globalThis.document;
+    for (const name of ['gtag', 'fbq', 'ttq']) delete globalThis[name];
+  },
+  tests: [
+    {
+      name: 'the banner mounts with one big Accept and one small Customize, and nothing else',
+      run: async (ctx) => {
+        const page = await boot();
+
+        const banner = page.banner();
+        ctx.expect(banner, 'the panel mounts on a page with no decision').toBeTruthy();
+        ctx.expect(banner.getAttribute('role')).toBe('dialog');
+        ctx.expect(banner.getAttribute('aria-label')).toBe('Cookie consent');
+        ctx.expect(banner.classList.contains('omega-consent--bottom-left'), 'placement comes off the config').toBeTruthy();
+
+        const buttons = page.all().filter((element) => element.tagName === 'button');
+        ctx.expect(buttons.map((element) => element.textContent), 'the two controls, plus the pair that lives inside the hidden options panel — and no Save (#391)').toEqual(['Accept all', 'Accept none', 'Accept', 'Customize']);
+        // Real <button type="button">s, never a div with a click handler.
+        buttons.forEach((element) => ctx.expect(element.type, `${element.textContent} is a real button`).toBe('button'));
+
+        ctx.expect(page.find('omega-consent__options').hidden, 'the per-category switches start closed').toBe(true);
+        ctx.expect(page.events(), 'nothing is counted in an opt-in region before the answer — not even the banner itself (#328: the gate is asked for every fire, and the providers are not loaded there anyway)').toEqual([]);
+      },
+    },
+
+    {
+      name: 'the cookie icon lives on the tab, not the open banner',
+      run: async (ctx) => {
+        const page = await boot({ timeZone: 'America/New_York' });
+
+        const icon = page.find('omega-consent__icon');
+        ctx.expect(icon, 'the tab has the icon').toBeTruthy();
+        ctx.expect(icon.parent, 'and it sits inside the tab button').toBe(page.tab());
+        ctx.expect(icon.tagName, 'a real <i> the shared renderer swaps for an inline SVG').toBe('i');
+        // fa-cookie-bite is a FREE glyph — framework markup may never name a Pro-only
+        // icon, because a consumer without Pro cannot fix it (docs/shared/icons.md).
+        ctx.expect(icon.classList.contains('fa-solid'), 'the free solid family').toBeTruthy();
+        ctx.expect(icon.classList.contains('fa-cookie-bite')).toBeTruthy();
+        ctx.expect(icon.getAttribute('aria-hidden'), 'decorative — the button text is the name').toBe('true');
+        ctx.expect(page.tab().textContent, 'the tab says settings, because that is what it opens').toBe('Cookies Settings');
+
+        page.tab().click();
+        const bannerIcons = page.all().filter((element) => element.classList.contains('omega-consent__icon') && element.parent !== null && page.banner() && element.parent === page.banner());
+        ctx.expect(bannerIcons, 'the open banner carries no icon — it only shoved the message over').toEqual([]);
+      },
+    },
+
+    {
+      name: 'an opt-out region is never interrupted: the tab, and no banner at all',
+      run: async (ctx) => {
+        // Everything is granted there by default, so there is no gate to hold and
+        // nothing worth interrupting a first visit for (#391). The banner used to
+        // mount informationally and count itself.
+        const page = await boot({ timeZone: 'America/New_York' });
+
+        ctx.expect(page.banner(), 'no banner on a first visit').toBe(undefined);
+        ctx.expect(page.tab(), 'the small policy tab is the whole surface').toBeTruthy();
+        ctx.expect(page.events(), 'and cookie_banner_show is not fired for a banner nobody saw').toEqual([]);
+        ctx.expect(page.storage.trackingConsent, 'nothing is stored either — the region default is not a decision').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'the opt-out tab still reopens the full banner',
+      run: async (ctx) => {
+        const page = await boot({ timeZone: 'America/New_York' });
+
+        page.tab().click();
+
+        ctx.expect(page.banner(), 'the way to turn things off is still one click away').toBeTruthy();
+        ctx.expect(page.tab(), 'and the tab steps aside').toBe(undefined);
+        ctx.expect(page.events().includes('cookie_policy_reopen')).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'the auto-accept-on-scroll behavior is GONE',
+      run: async (ctx) => {
+        const page = await boot();
+
+        // The old banner listened for scroll and for any click outside itself, then
+        // stored consent on the visitor's behalf. No consent regime survives that.
+        ctx.expect(Object.keys(page.windowListeners), 'the banner registers no window listeners at all').toEqual([]);
+        ctx.expect(page.storage.trackingConsent, 'and nothing is stored until a control is pressed').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'Accept grants both categories',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__accept').click();
+
+        ctx.expect(page.storage.trackingConsent.analytics).toBe(true);
+        ctx.expect(page.storage.trackingConsent.marketing).toBe(true);
+        ctx.expect(page.storage.trackingConsent.region).toBe('opt-in');
+        ctx.expect(page.storage.trackingConsent.version).toBe(1);
+        ctx.expect(page.events().includes('cookie_consent_accept')).toBeTruthy();
+
+        await settle();
+        ctx.expect(page.banner(), 'the panel leaves').toBe(undefined);
+        ctx.expect(page.tab(), 'and the small policy tab takes its place').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a double-click on Accept answers once',
+      run: async (ctx) => {
+        const page = await boot();
+
+        const accept = page.find('omega-consent__accept');
+        accept.click();
+        // The hide animation keeps the button on screen for a beat — the latch is
+        // what makes this second click a no-op instead of a double-count.
+        accept.click();
+
+        const accepts = page.events().filter((name) => name === 'cookie_consent_accept');
+        ctx.expect(accepts.length, 'one answer, one event').toBe(1);
+
+        await settle();
+        ctx.expect(page.tab(), 'and the one dismissal still lands the tab').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'Customize opens the panel and takes the whole Accept row with it',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__customize').click();
+
+        const options = page.find('omega-consent__options');
+        ctx.expect(options.hidden, 'the panel opens in place').toBe(false);
+        // Accept all inside the panel IS the big Accept, at the same one click, so
+        // the row that carried it steps aside rather than offering it twice (#391).
+        const actions = page.find('omega-consent__actions');
+        ctx.expect(actions.hidden, 'the original Accept row hides').toBe(true);
+        ctx.expect(actions.children.includes(page.find('omega-consent__accept')), 'and the big Accept is what went with it').toBeTruthy();
+        ctx.expect(actions.children.includes(page.find('omega-consent__customize')), 'the control that opened the panel hides with the row it lives in').toBeTruthy();
+
+        const necessary = page.checkbox('omega-consent-necessary');
+        ctx.expect(necessary.checked, 'Necessary is shown').toBe(true);
+        ctx.expect(necessary.disabled, 'and locked on').toBe(true);
+
+        const analytics = page.checkbox('omega-consent-analytics');
+        const marketing = page.checkbox('omega-consent-marketing');
+        ctx.expect(analytics.checked, 'an opt-in region starts with nothing granted').toBe(false);
+        ctx.expect(marketing.checked).toBe(false);
+        ctx.expect(analytics.focused, 'the keyboard follows the panel that just appeared').toBe(true);
+
+        // Every switch is a REAL checkbox with a label bound to it — an unnamed
+        // checkbox is unusable by voice or screen reader, and a div wearing a pill
+        // has no keyboard at all.
+        for (const id of ['omega-consent-necessary', 'omega-consent-analytics', 'omega-consent-marketing']) {
+          const input = page.checkbox(id);
+          ctx.expect(input.type, `${id} is a real checkbox`).toBe('checkbox');
+          ctx.expect(input.classList.contains('omega-consent__switch'), `${id} is styled as a switch, not replaced by one`).toBeTruthy();
+          ctx.expect(page.all().some((element) => element.tagName === 'label' && element.htmlFor === id), `${id} has a label`).toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'the panel intro carries the legal copy and links both policies',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__customize').click();
+
+        const intro = page.find('omega-consent__intro');
+        ctx.expect(intro, 'the disclosure sits above the categories').toBeTruthy();
+        ctx.expect(intro.innerHTML.includes('href="/cookies"'), 'the {cookies} placeholder becomes a real link').toBeTruthy();
+        ctx.expect(intro.innerHTML.includes('href="/terms"'), 'and {terms} still does too').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'flipping a switch saves on the spot, and the panel stays open',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__customize').click();
+        page.checkbox('omega-consent-analytics').click();
+
+        // No Save to press: the flip IS the answer (#391).
+        ctx.expect(page.storage.trackingConsent.analytics, 'exactly the switch that was flipped').toBe(true);
+        ctx.expect(page.storage.trackingConsent.marketing, 'and exactly the one that was not').toBe(false);
+        ctx.expect(page.events().includes('cookie_consent_accept'), 'a save that grants something is an accept').toBeTruthy();
+
+        ctx.expect(page.banner(), 'the banner stays open so the next flip is one click away').toBeTruthy();
+        ctx.expect(page.find('omega-consent__options').hidden, 'and so does the panel').toBe(false);
+        ctx.expect(page.tab(), 'nothing collapsed').toBe(undefined);
+
+        // Flipping it back is the same instant write, in the other direction.
+        page.checkbox('omega-consent-analytics').click();
+
+        ctx.expect(page.storage.trackingConsent.analytics, 'the withdrawal is stored as immediately as the grant').toBe(false);
+        ctx.expect(page.banner(), 'and the panel is still there').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a panel flipped to nothing is the denial',
+      run: async (ctx) => {
+        // An opt-out visitor arrives with both granted, so turning them off one at a
+        // time is what walks an accept into a denial.
+        const page = await boot({ timeZone: 'America/New_York' });
+
+        page.tab().click();
+        page.find('omega-consent__customize').click();
+
+        page.checkbox('omega-consent-analytics').click();
+
+        ctx.expect(page.storage.trackingConsent.analytics, 'the flip is stored on the spot').toBe(false);
+        ctx.expect(page.storage.trackingConsent.marketing, 'the switch beside it is untouched').toBe(true);
+        ctx.expect(page.metaEvents().pop(), 'a partial grant is still an accept').toBe('CookieConsentAccept');
+
+        page.checkbox('omega-consent-marketing').click();
+
+        ctx.expect(page.storage.trackingConsent.marketing, 'the last switch off is the refusal').toBe(false);
+        // The denial is recorded in STORAGE and counted nowhere: the fire is made
+        // after the record is written, so the gate the visitor just closed is the one
+        // it is asked about. Honoring the answer beats counting it (#328).
+        ctx.expect(!page.events().includes('cookie_consent_deny'), 'a denied visitor is counted by nobody, the denial included').toBeTruthy();
+        ctx.expect(!page.metaEvents().includes('CookieConsentDeny')).toBeTruthy();
+        ctx.expect(page.metaEvents().pop(), 'and no second accept was counted on the way out').toBe('CookieConsentAccept');
+      },
+    },
+
+    {
+      name: 'the locked Necessary switch cannot be pressed into an answer',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__customize').click();
+        page.checkbox('omega-consent-necessary').click();
+
+        ctx.expect(page.checkbox('omega-consent-necessary').checked, 'it stays on').toBe(true);
+        ctx.expect(page.storage.trackingConsent, 'and pressing it never wrote an answer').toBe(undefined);
+      },
+    },
+
+    {
+      name: 'Accept all flips every switch, saves, and collapses to the tab',
+      run: async (ctx) => {
+        const page = await boot();
+
+        page.find('omega-consent__customize').click();
+        page.find('omega-consent__accept-all').click();
+
+        ctx.expect(page.checkbox('omega-consent-analytics').checked, 'the switches match what was pressed').toBe(true);
+        ctx.expect(page.checkbox('omega-consent-marketing').checked).toBe(true);
+        ctx.expect(page.storage.trackingConsent.analytics).toBe(true);
+        ctx.expect(page.storage.trackingConsent.marketing).toBe(true);
+        ctx.expect(page.events().pop()).toBe('cookie_consent_accept');
+
+        await settle();
+        ctx.expect(page.banner(), 'the panel leaves').toBe(undefined);
+        ctx.expect(page.tab(), 'and the tab takes its place').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'Accept none is the same one click, in the other direction',
+      run: async (ctx) => {
+        // The refusal is never a longer path than the grant — the EU equal-ease rule,
+        // and the reason the pair sits side by side.
+        const page = await boot({ timeZone: 'America/New_York' });
+
+        page.tab().click();
+        page.find('omega-consent__customize').click();
+
+        ctx.expect(page.checkbox('omega-consent-analytics').checked, 'an opt-out region opens already granted').toBe(true);
+        ctx.expect(page.checkbox('omega-consent-marketing').checked).toBe(true);
+
+        page.find('omega-consent__accept-none').click();
+
+        ctx.expect(page.checkbox('omega-consent-analytics').checked, 'every switch flips to match').toBe(false);
+        ctx.expect(page.checkbox('omega-consent-marketing').checked).toBe(false);
+        ctx.expect(page.storage.trackingConsent.analytics).toBe(false);
+        ctx.expect(page.storage.trackingConsent.marketing).toBe(false);
+        // A refusal is a deny whatever button carried it — and a deny reaches nobody,
+        // because it is fired after the record that blocks it (#328).
+        ctx.expect(!page.events().includes('cookie_consent_accept'), 'Accept none never counts as an accept').toBeTruthy();
+        ctx.expect(!page.metaEvents().includes('CookieConsentAccept')).toBeTruthy();
+        ctx.expect(page.metaEvents(), 'the reopen that started this is the only thing counted').toEqual(['CookiePolicyReopen']);
+
+        await settle();
+        ctx.expect(page.tab(), 'a refusal settles the banner exactly like a grant does').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a settled visitor gets the tab, and reopening it asks again',
+      run: async (ctx) => {
+        const storage = {
+          trackingConsent: { analytics: true, marketing: true, region: 'opt-out', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
+        };
+
+        const page = await boot({ timeZone: 'America/New_York', storage });
+
+        ctx.expect(page.banner(), 'an answered visitor is not asked again').toBe(undefined);
+        const tab = page.tab();
+        ctx.expect(tab, 'the policy tab is the way back in').toBeTruthy();
+        ctx.expect(tab.getAttribute('aria-label')).toBe('Cookies Settings');
+
+        tab.click();
+
+        ctx.expect(page.banner(), 'the panel comes back').toBeTruthy();
+        ctx.expect(page.tab(), 'and the tab steps aside').toBe(undefined);
+        ctx.expect(storage.trackingConsent, 'the old answer is cleared — this is a fresh question').toBe(undefined);
+        ctx.expect(page.events().includes('cookie_policy_reopen')).toBeTruthy();
+        ctx.expect(!page.events().includes('cookie_banner_show'), 'a reopen is counted as a reopen, never as a second impression').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'an opt-in visitor who has answered is not asked again either',
+      run: async (ctx) => {
+        const storage = {
+          trackingConsent: { analytics: false, marketing: false, region: 'opt-in', timestamp: '2026-08-19T00:00:00.000Z', version: 1 },
+        };
+
+        const page = await boot({ storage });
+
+        ctx.expect(page.banner(), 'the stored decision wins over the region').toBe(undefined);
+        ctx.expect(page.tab(), 'and the tab is the way back in').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'the message links the terms page instead of naming it',
+      run: async (ctx) => {
+        const page = await boot();
+
+        ctx.expect(page.find('omega-consent__message').innerHTML.includes('href="/terms"'), 'the {terms} placeholder becomes a real link').toBeTruthy();
+      },
+    },
+  ],
 });

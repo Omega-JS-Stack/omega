@@ -181,8 +181,14 @@ class Auth {
     return this._buildState(firebaseUser);
   }
 
-  /** Re-read the account for the current Firebase user and land it as a new state: resolves with the newest landed `{ user, denied }`. */
+  /** Wait for Firebase's session restore, re-read the account for the current Firebase user and land it as a new state: resolves with the newest landed `{ user, denied }`. */
   async reload() {
+    // Right after a page load Firebase has not restored the saved session yet,
+    // so wait for its first settled state before reading the current user
+    if (this.omega.firebaseAuth) {
+      await this.omega.firebaseAuth.authStateReady();
+    }
+
     let landed = await this._buildState(this.omega.firebaseAuth?.currentUser || null);
 
     // Superseded mid-fetch: follow the newest build until one lands. Never

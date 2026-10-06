@@ -42,7 +42,7 @@ const { user } = omega.auth;
 - **`once` listeners** (`listen({ once: true }, cb)`): wait for `auth.settled` (the first landed state), then receive the newest landed state. No cleanup needed.
 - **Persistent listeners** (`listen({}, cb)`): receive every landed state. One registered after a state already landed catches up with it once, on the next microtask.
 - Every consumer of one change holds the SAME `User` instance, which is also `auth.user`.
-- **`reload()`**: re-reads the account for the current Firebase user, lands it as a new state, and resolves with it (following a newer build when one superseded it mid-fetch).
+- **`reload()`**: first waits for Firebase to restore the saved session (`authStateReady()`), then re-reads the account for the current Firebase user, lands it as a new state, and resolves with it (following a newer build when one superseded it mid-fetch).
 
 ## Bindings (`bindings.js`)
 

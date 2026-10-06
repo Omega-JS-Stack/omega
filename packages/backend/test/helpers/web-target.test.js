@@ -41,13 +41,11 @@ module.exports = defineCases({
       name: 'one-web-target-needs-no-parameter',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const config = brandConfig(ONE_WEBSITE);
 
-        assert.deepEqual(resolveWebTarget(config, undefined), { name: 'web', path: 'targets/web' },
-          'the brand\'s only website is the default');
-        assert.deepEqual(resolveWebTarget(config, ''), { name: 'web', path: 'targets/web' },
-          'an empty parameter is the same as none');
+        expect(resolveWebTarget(config, undefined), 'the brand\'s only website is the default').toEqual({ name: 'web', path: 'targets/web' });
+        expect(resolveWebTarget(config, ''), 'an empty parameter is the same as none').toEqual({ name: 'web', path: 'targets/web' });
       },
     },
 
@@ -55,8 +53,8 @@ module.exports = defineCases({
       name: 'naming-the-only-web-target-is-allowed',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.deepEqual(resolveWebTarget(brandConfig(ONE_WEBSITE), 'web'), { name: 'web', path: 'targets/web' });
+      async run({ expect }) {
+        expect(resolveWebTarget(brandConfig(ONE_WEBSITE), 'web')).toEqual({ name: 'web', path: 'targets/web' });
       },
     },
 
@@ -64,13 +62,13 @@ module.exports = defineCases({
       name: 'several-web-targets-require-the-name',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const error = refusal(brandConfig(TWO_WEBSITES), undefined);
 
-        assert.ok(error, 'two websites and no name must never resolve to a guess');
-        assert.equal(error.code, 400, 'the refusal is the caller\'s fault, so it answers 400');
-        assert.match(error.message, /Missing required parameter: target/);
-        assert.match(error.message, /\[web, community\]/, 'the message lists every declared web target');
+        expect(error, 'two websites and no name must never resolve to a guess').toBeTruthy();
+        expect(error.code, 'the refusal is the caller\'s fault, so it answers 400').toBe(400);
+        expect(error.message).toMatch(/Missing required parameter: target/);
+        expect(error.message, 'the message lists every declared web target').toMatch(/\[web, community\]/);
       },
     },
 
@@ -78,8 +76,8 @@ module.exports = defineCases({
       name: 'the-named-target-wins-when-several-exist',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.deepEqual(resolveWebTarget(brandConfig(TWO_WEBSITES), 'community'), { name: 'community', path: 'targets/community' });
+      async run({ expect }) {
+        expect(resolveWebTarget(brandConfig(TWO_WEBSITES), 'community')).toEqual({ name: 'community', path: 'targets/community' });
       },
     },
 
@@ -87,13 +85,13 @@ module.exports = defineCases({
       name: 'an-unknown-name-fails-with-the-list',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const error = refusal(brandConfig(TWO_WEBSITES), 'blog');
 
-        assert.ok(error, 'a name nobody declared must not resolve');
-        assert.equal(error.code, 400);
-        assert.match(error.message, /Unknown target "blog"/);
-        assert.match(error.message, /\[web, community\]/);
+        expect(error, 'a name nobody declared must not resolve').toBeTruthy();
+        expect(error.code).toBe(400);
+        expect(error.message).toMatch(/Unknown target "blog"/);
+        expect(error.message).toMatch(/\[web, community\]/);
       },
     },
 
@@ -101,12 +99,12 @@ module.exports = defineCases({
       name: 'a-non-web-target-is-never-a-candidate',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The backend is a target too, and it is not a place content lands.
         const error = refusal(brandConfig(ONE_WEBSITE), 'backend');
 
-        assert.ok(error, 'only web targets are addressable here');
-        assert.match(error.message, /Unknown target "backend"/);
+        expect(error, 'only web targets are addressable here').toBeTruthy();
+        expect(error.message).toMatch(/Unknown target "backend"/);
       },
     },
 
@@ -117,12 +115,11 @@ module.exports = defineCases({
       name: 'cms-context-answers-the-source-repo-and-the-target',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { source, target } = cmsContext(brandConfig(ONE_WEBSITE), undefined);
 
-        assert.deepEqual(source, { owner: 'Acme-Org', name: 'acme-omega', slug: 'Acme-Org/acme-omega' },
-          'the content repo is <brand.id>-omega under repo.owner');
-        assert.deepEqual(target, { name: 'web', path: 'targets/web' });
+        expect(source, 'the content repo is <brand.id>-omega under repo.owner').toEqual({ owner: 'Acme-Org', name: 'acme-omega', slug: 'Acme-Org/acme-omega' });
+        expect(target).toEqual({ name: 'web', path: 'targets/web' });
       },
     },
 
@@ -130,7 +127,7 @@ module.exports = defineCases({
       name: 'cms-context-with-no-repo-block-is-a-500-naming-the-key',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // A brand that declares no `repo` block: the BACKEND is misconfigured,
         // not the caller, so this is a 500 and not one of the 400s a bad
         // `target` earns.
@@ -144,14 +141,11 @@ module.exports = defineCases({
           error = e;
         }
 
-        assert.ok(error, 'half an address commits nowhere');
-        assert.equal(error.code, 500, 'the route answers with e.code, with no `|| 400` to fall back on');
-        assert.match(error.message, /GitHub repo not configured/);
-        assert.match(error.message, /repo\.owner/, 'and it names the key to set');
-        assert.ok(
-          error.message.includes('Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.'),
-          'the content repo IS the source repo, so the shared line names the source role',
-        );
+        expect(error, 'half an address commits nowhere').toBeTruthy();
+        expect(error.code, 'the route answers with e.code, with no `|| 400` to fall back on').toBe(500);
+        expect(error.message).toMatch(/GitHub repo not configured/);
+        expect(error.message, 'and it names the key to set').toMatch(/repo\.owner/);
+        expect(error.message.includes('Set repo.owner and brand.id in config/omega.json5: the source repo is <brand.id>-omega under that owner.'), 'the content repo IS the source repo, so the shared line names the source role').toBeTruthy();
       },
     },
 
@@ -159,7 +153,7 @@ module.exports = defineCases({
       name: 'cms-context-passes-the-target-400-through',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         let error = null;
         try {
           cmsContext(brandConfig(TWO_WEBSITES), undefined);
@@ -167,9 +161,9 @@ module.exports = defineCases({
           error = e;
         }
 
-        assert.ok(error, 'several websites, no name: nothing is guessed');
-        assert.equal(error.code, 400, 'a request problem stays a request problem');
-        assert.match(error.message, /Missing required parameter: target/);
+        expect(error, 'several websites, no name: nothing is guessed').toBeTruthy();
+        expect(error.code, 'a request problem stays a request problem').toBe(400);
+        expect(error.message).toMatch(/Missing required parameter: target/);
       },
     },
 
@@ -177,12 +171,12 @@ module.exports = defineCases({
       name: 'no-web-target-at-all-fails-loudly',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const error = refusal(brandConfig({ backend: { type: 'backend' } }), undefined);
 
-        assert.ok(error, 'content cannot land in a brand that runs no website');
-        assert.equal(error.code, 400);
-        assert.match(error.message, /declares no web target/);
+        expect(error, 'content cannot land in a brand that runs no website').toBeTruthy();
+        expect(error.code).toBe(400);
+        expect(error.message).toMatch(/declares no web target/);
       },
     },
   ],

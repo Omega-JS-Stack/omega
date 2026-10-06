@@ -68,35 +68,31 @@ module.exports = defineCases({
       name: 'get-next-future-occurrence-pure',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const now = Math.round(Date.now() / 1000);
         const weekly = { pattern: 'weekly', hour: 10, minute: 0, day: 1 };
 
         // Near-past sendAt: single-step advance already lands in the future
         const recent = now - 600;
-        assert.equal(
-          getNextFutureOccurrence(recent, weekly, now),
-          getNextOccurrence(recent, weekly),
-          'Single-step advance is preserved when it lands in the future',
-        );
+        expect(getNextFutureOccurrence(recent, weekly, now), 'Single-step advance is preserved when it lands in the future').toBe(getNextOccurrence(recent, weekly));
 
         // Stalled 3 weeks: all missed occurrences are skipped
         const stale = now - (3 * WEEK) - 600;
         const next = getNextFutureOccurrence(stale, weekly, now);
-        assert.ok(next > now, `Advance from a 3-week-stale anchor must be in the future (got ${next}, now ${now})`);
+        expect(next > now, `Advance from a 3-week-stale anchor must be in the future (got ${next}, now ${now})`).toBeTruthy();
 
         let manual = stale;
         for (let i = 0; i < 4; i++) {
           manual = getNextOccurrence(manual, weekly);
         }
-        assert.equal(next, manual, 'Skips exactly the missed occurrences (4 weekly steps)');
+        expect(next, 'Skips exactly the missed occurrences (4 weekly steps)').toBe(manual);
 
         // Daily pattern stalled 5 days: lands within the next 24h
         const daily = { pattern: 'daily', hour: 0, minute: 0 };
         const staleDaily = now - (5 * 86400) - 60;
         const nextDaily = getNextFutureOccurrence(staleDaily, daily, now);
-        assert.ok(nextDaily > now, 'Daily advance is in the future');
-        assert.ok(nextDaily <= now + 86400, 'Daily advance lands within one period of now');
+        expect(nextDaily > now, 'Daily advance is in the future').toBeTruthy();
+        expect(nextDaily <= now + 86400, 'Daily advance lands within one period of now').toBeTruthy();
       },
     },
 
@@ -277,15 +273,12 @@ module.exports = defineCases({
       name: 'oneoff-campaign-processed',
       auth: 'none',
 
-      async run({ firestore, assert }) {
+      async run({ firestore, expect }) {
         const doc = await firestore.get('marketing-campaigns/_test-oneoff');
 
-        assert.ok(doc, 'One-off campaign doc should exist');
-        assert.ok(
-          doc.status === 'sent' || doc.status === 'failed',
-          `One-off campaign status should be sent or failed, got: ${doc.status}`,
-        );
-        assert.ok(doc.metadata?.updated, 'Should have updated metadata');
+        expect(doc, 'One-off campaign doc should exist').toBeTruthy();
+        expect(doc.status === 'sent' || doc.status === 'failed', `One-off campaign status should be sent or failed, got: ${doc.status}`).toBeTruthy();
+        expect(doc.metadata?.updated, 'Should have updated metadata').toBeTruthy();
       },
     },
 
@@ -293,11 +286,11 @@ module.exports = defineCases({
       name: 'recurring-campaign-advanced',
       auth: 'none',
 
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const doc = await firestore.get('marketing-campaigns/_test-recurring');
 
-        assert.ok(doc, 'Recurring campaign doc should exist');
-        assert.equal(doc.status, 'pending', 'Recurring campaign status returns to pending');
+        expect(doc, 'Recurring campaign doc should exist').toBeTruthy();
+        expect(doc.status, 'Recurring campaign status returns to pending').toBe('pending');
 
         const expectedNext = getNextFutureOccurrence(state.pastSendAt, {
           pattern: 'weekly',
@@ -305,7 +298,7 @@ module.exports = defineCases({
           minute: 0,
           day: 1,
         }, state.now);
-        assert.equal(doc.sendAt, expectedNext, 'sendAt should advance to next occurrence');
+        expect(doc.sendAt, 'sendAt should advance to next occurrence').toBe(expectedNext);
       },
     },
 
@@ -313,20 +306,17 @@ module.exports = defineCases({
       name: 'recurring-campaign-has-history',
       auth: 'none',
 
-      async run({ firestore, assert }) {
+      async run({ firestore, expect }) {
         const snapshot = await firestore.collection('marketing-campaigns')
           .where('recurringId', '==', '_test-recurring')
           .limit(1)
           .get();
 
-        assert.ok(!snapshot.empty, 'Should have a history doc from the recurring campaign');
+        expect(!snapshot.empty, 'Should have a history doc from the recurring campaign').toBeTruthy();
 
         const history = snapshot.docs[0].data();
-        assert.ok(
-          history.status === 'sent' || history.status === 'failed',
-          'History doc status should be sent or failed',
-        );
-        assert.equal(history.recurringId, '_test-recurring', 'Should reference the recurring campaign');
+        expect(history.status === 'sent' || history.status === 'failed', 'History doc status should be sent or failed').toBeTruthy();
+        expect(history.recurringId, 'Should reference the recurring campaign').toBe('_test-recurring');
       },
     },
 
@@ -334,15 +324,12 @@ module.exports = defineCases({
       name: 'stalled-recurring-skips-to-future-occurrence',
       auth: 'none',
 
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const doc = await firestore.get('marketing-campaigns/_test-recurring-stale');
 
-        assert.ok(doc, 'Stale recurring campaign doc should exist');
-        assert.equal(doc.status, 'pending', 'Status returns to pending');
-        assert.ok(
-          doc.sendAt > state.now,
-          `sendAt must land in the FUTURE (no catch-up burst) — got ${doc.sendAt}, now ${state.now}`,
-        );
+        expect(doc, 'Stale recurring campaign doc should exist').toBeTruthy();
+        expect(doc.status, 'Status returns to pending').toBe('pending');
+        expect(doc.sendAt > state.now, `sendAt must land in the FUTURE (no catch-up burst) — got ${doc.sendAt}, now ${state.now}`).toBeTruthy();
 
         const expectedNext = getNextFutureOccurrence(state.staleSendAt, {
           pattern: 'weekly',
@@ -350,7 +337,7 @@ module.exports = defineCases({
           minute: 0,
           day: 1,
         }, state.now);
-        assert.equal(doc.sendAt, expectedNext, 'Skips all missed occurrences in one advance');
+        expect(doc.sendAt, 'Skips all missed occurrences in one advance').toBe(expectedNext);
       },
     },
 
@@ -358,14 +345,11 @@ module.exports = defineCases({
       name: 'stale-processing-lease-reclaimed-and-processed',
       auth: 'none',
 
-      async run({ firestore, assert }) {
+      async run({ firestore, expect }) {
         const doc = await firestore.get('marketing-campaigns/_test-stale-processing');
 
-        assert.ok(doc, 'Stale-processing campaign doc should exist');
-        assert.ok(
-          doc.status === 'sent' || doc.status === 'failed',
-          `Reclaimed campaign should be processed to sent/failed, got: ${doc.status}`,
-        );
+        expect(doc, 'Stale-processing campaign doc should exist').toBeTruthy();
+        expect(doc.status === 'sent' || doc.status === 'failed', `Reclaimed campaign should be processed to sent/failed, got: ${doc.status}`).toBeTruthy();
       },
     },
 
@@ -373,12 +357,12 @@ module.exports = defineCases({
       name: 'fresh-processing-lease-untouched',
       auth: 'none',
 
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const doc = await firestore.get('marketing-campaigns/_test-fresh-processing');
 
-        assert.ok(doc, 'Fresh-processing campaign doc should exist');
-        assert.equal(doc.status, 'processing', 'A fresh lease is honored — no reclaim, no double-send');
-        assert.equal(doc.processingStartedAt, state.now - 60, 'processingStartedAt is untouched');
+        expect(doc, 'Fresh-processing campaign doc should exist').toBeTruthy();
+        expect(doc.status, 'A fresh lease is honored — no reclaim, no double-send').toBe('processing');
+        expect(doc.processingStartedAt, 'processingStartedAt is untouched').toBe(state.now - 60);
       },
     },
 
@@ -386,14 +370,14 @@ module.exports = defineCases({
       name: 'unknown-generator-and-type-marked-failed',
       auth: 'none',
 
-      async run({ firestore, assert }) {
+      async run({ firestore, expect }) {
         const unknownGenerator = await firestore.get('marketing-campaigns/_test-unknown-generator');
         const unknownType = await firestore.get('marketing-campaigns/_test-unknown-type');
 
-        assert.equal(unknownGenerator?.status, 'failed', 'Unknown generator is marked failed (not retried forever)');
-        assert.ok(/doesnotexist/.test(unknownGenerator?.error || ''), 'Error names the unknown generator');
-        assert.equal(unknownType?.status, 'failed', 'Unknown type is marked failed (not retried forever)');
-        assert.ok(/carrier-pigeon/.test(unknownType?.error || ''), 'Error names the unknown type');
+        expect(unknownGenerator?.status, 'Unknown generator is marked failed (not retried forever)').toBe('failed');
+        expect(/doesnotexist/.test(unknownGenerator?.error || ''), 'Error names the unknown generator').toBeTruthy();
+        expect(unknownType?.status, 'Unknown type is marked failed (not retried forever)').toBe('failed');
+        expect(/carrier-pigeon/.test(unknownType?.error || ''), 'Error names the unknown type').toBeTruthy();
       },
     },
 
@@ -402,7 +386,7 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 600000,
 
-      async run({ firestore, assert, state, config, waitFor }) {
+      async run({ firestore, expect, state, config, waitFor }) {
         const newsletterEnabled = config.marketing?.newsletter?.enabled;
 
         if (newsletterEnabled && process.env.TEST_EXTENDED_MODE) {
@@ -425,21 +409,18 @@ module.exports = defineCases({
             minute: 30,
             day: 2,
           }, state.now);
-          assert.equal(doc.sendAt, expectedNext, 'Generator campaign sendAt should advance');
-          assert.equal(doc.status, 'pending', 'Recurring generator returns to pending');
+          expect(doc.sendAt, 'Generator campaign sendAt should advance').toBe(expectedNext);
+          expect(doc.status, 'Recurring generator returns to pending').toBe('pending');
 
           const histSnapshot = await firestore.collection('marketing-campaigns')
             .where('generatedFrom', '==', '_test-generator')
             .limit(1)
             .get();
-          assert.ok(!histSnapshot.empty, 'Should have a history doc from the generator');
+          expect(!histSnapshot.empty, 'Should have a history doc from the generator').toBeTruthy();
           const histDoc = histSnapshot.docs[0].data();
-          assert.ok(
-            histDoc.status === 'sent' || histDoc.status === 'failed',
-            'History doc status should be sent or failed',
-          );
-          assert.ok(!histDoc.generator, 'History doc should NOT have a generator field');
-          assert.ok(!histDoc.settings?.article, 'History settings should NOT carry the full article payload');
+          expect(histDoc.status === 'sent' || histDoc.status === 'failed', 'History doc status should be sent or failed').toBeTruthy();
+          expect(!histDoc.generator, 'History doc should NOT have a generator field').toBeTruthy();
+          expect(!histDoc.settings?.article, 'History settings should NOT carry the full article payload').toBeTruthy();
         } else {
           // Default mode: the generator is gated by TEST_EXTENDED_MODE and
           // returns null instantly. The campaign must be ATTEMPTED (claimed,
@@ -455,9 +436,9 @@ module.exports = defineCases({
           );
 
           const doc = await firestore.get('marketing-campaigns/_test-generator');
-          assert.equal(doc.status, 'pending', 'Status returns to pending when generator returns null');
-          assert.equal(doc.sendAt, state.pastSendAt, 'sendAt stays unchanged for retry when generator returns null');
-          assert.equal(doc.generatorAttempts, 1, 'generatorAttempts is incremented for the retry cap');
+          expect(doc.status, 'Status returns to pending when generator returns null').toBe('pending');
+          expect(doc.sendAt, 'sendAt stays unchanged for retry when generator returns null').toBe(state.pastSendAt);
+          expect(doc.generatorAttempts, 'generatorAttempts is incremented for the retry cap').toBe(1);
         }
       },
     },
@@ -466,7 +447,7 @@ module.exports = defineCases({
       name: 'generator-retry-cap-fails-oneoff-and-skips-recurring',
       auth: 'none',
 
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Default-mode only: extended mode would run the real pipeline for
         // these seeds, so they are not created there.
         if (process.env.TEST_EXTENDED_MODE) {
@@ -484,13 +465,13 @@ module.exports = defineCases({
         );
 
         const oneoff = await firestore.get('marketing-campaigns/_test-gen-cap-oneoff');
-        assert.equal(oneoff.status, 'failed', 'One-off generator at the cap is marked failed');
-        assert.ok(/attempts/.test(oneoff.error || ''), 'Error explains the attempts cap');
+        expect(oneoff.status, 'One-off generator at the cap is marked failed').toBe('failed');
+        expect(/attempts/.test(oneoff.error || ''), 'Error explains the attempts cap').toBeTruthy();
 
         const recurring = await firestore.get('marketing-campaigns/_test-gen-cap-recurring');
-        assert.equal(recurring.status, 'pending', 'Recurring generator at the cap stays pending');
-        assert.ok(recurring.sendAt > state.now, 'Recurring generator at the cap skips to a FUTURE occurrence');
-        assert.ok(!recurring.generatorAttempts, 'Attempts counter resets after skipping the occurrence');
+        expect(recurring.status, 'Recurring generator at the cap stays pending').toBe('pending');
+        expect(recurring.sendAt > state.now, 'Recurring generator at the cap skips to a FUTURE occurrence').toBeTruthy();
+        expect(!recurring.generatorAttempts, 'Attempts counter resets after skipping the occurrence').toBeTruthy();
       },
     },
 

@@ -126,7 +126,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'both runtime accounts carry the grant: the step reads both policies and says so',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand();
         const recorder = shellRecorder({
           [APPSPOT_SA]: [`serviceAccount:${CLIENT_EMAIL}`],
@@ -138,12 +138,12 @@ module.exports = defineCases({
         try {
           await verifyDeployRoles({ targetDir, logger });
 
-          assert.equal(recorder.commands.length, 3, `the describe plus one policy read per account (ran: ${recorder.commands.join(' | ')})`);
-          assert.ok(recorder.commands[0].includes(`gcloud projects describe ${PROJECT}`), 'the project number is what names the compute account');
-          assert.ok(recorder.commands.some((command) => command.includes(`get-iam-policy ${APPSPOT_SA}`)), 'the App Engine account is read');
-          assert.ok(recorder.commands.some((command) => command.includes(`get-iam-policy ${COMPUTE_SA}`)), 'the compute account is read');
-          assert.ok(logger.logged.join('\n').includes('Deploy roles verified'), `one verified line (got: ${logger.logged.join(' | ')})`);
-          assert.deepEqual(logger.warned, [], 'and nothing to warn about');
+          expect(recorder.commands.length, `the describe plus one policy read per account (ran: ${recorder.commands.join(' | ')})`).toBe(3);
+          expect(recorder.commands[0].includes(`gcloud projects describe ${PROJECT}`), 'the project number is what names the compute account').toBeTruthy();
+          expect(recorder.commands.some((command) => command.includes(`get-iam-policy ${APPSPOT_SA}`)), 'the App Engine account is read').toBeTruthy();
+          expect(recorder.commands.some((command) => command.includes(`get-iam-policy ${COMPUTE_SA}`)), 'the compute account is read').toBeTruthy();
+          expect(logger.logged.join('\n').includes('Deploy roles verified'), `one verified line (got: ${logger.logged.join(' | ')})`).toBeTruthy();
+          expect(logger.warned, 'and nothing to warn about').toEqual([]);
         } finally {
           restore();
           jetpack.remove(root);
@@ -153,7 +153,7 @@ module.exports = defineCases({
 
     {
       name: 'a grant missing on the App Engine account THROWS with the exact gcloud command',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand();
         const recorder = shellRecorder({
           [APPSPOT_SA]: [],
@@ -170,15 +170,12 @@ module.exports = defineCases({
             thrown = error;
           }
 
-          assert.ok(thrown, 'a missing grant is a finding, not a log line');
-          assert.ok(thrown.message.includes(ACT_AS_ROLE), 'the message names the role');
-          assert.ok(thrown.message.includes(APPSPOT_SA), 'and the account it is missing on');
-          assert.ok(thrown.message.includes('omega manage'), 'and the walk that grants it');
-          assert.ok(
-            thrown.message.includes(`gcloud iam service-accounts add-iam-policy-binding ${APPSPOT_SA} --project ${PROJECT} --member="serviceAccount:${CLIENT_EMAIL}" --role="${ACT_AS_ROLE}"`),
-            `the by-hand command is exact (got: ${thrown.message})`,
-          );
-          assert.ok(!thrown.message.includes(`add-iam-policy-binding ${COMPUTE_SA}`), 'the account that already carries it is not named as a fix');
+          expect(thrown, 'a missing grant is a finding, not a log line').toBeTruthy();
+          expect(thrown.message.includes(ACT_AS_ROLE), 'the message names the role').toBeTruthy();
+          expect(thrown.message.includes(APPSPOT_SA), 'and the account it is missing on').toBeTruthy();
+          expect(thrown.message.includes('omega manage'), 'and the walk that grants it').toBeTruthy();
+          expect(thrown.message.includes(`gcloud iam service-accounts add-iam-policy-binding ${APPSPOT_SA} --project ${PROJECT} --member="serviceAccount:${CLIENT_EMAIL}" --role="${ACT_AS_ROLE}"`), `the by-hand command is exact (got: ${thrown.message})`).toBeTruthy();
+          expect(!thrown.message.includes(`add-iam-policy-binding ${COMPUTE_SA}`), 'the account that already carries it is not named as a fix').toBeTruthy();
         } finally {
           restore();
           jetpack.remove(root);
@@ -188,7 +185,7 @@ module.exports = defineCases({
 
     {
       name: 'a gcloud that cannot answer is an ordinary laptop, so it warns and returns',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand();
         const recorder = shellRecorder({}, new Error('gcloud: command not found'));
         const restore = recorder.install();
@@ -197,9 +194,9 @@ module.exports = defineCases({
         try {
           await verifyDeployRoles({ targetDir, logger });
 
-          assert.equal(logger.warned.length, 1, `one warn line (got: ${logger.warned.join(' | ')})`);
-          assert.ok(logger.warned[0].includes('Could not verify the deploy roles'), 'named as an unverified check, never as a finding');
-          assert.ok(logger.warned[0].includes('gcloud: command not found'), 'carrying what gcloud said');
+          expect(logger.warned.length, `one warn line (got: ${logger.warned.join(' | ')})`).toBe(1);
+          expect(logger.warned[0].includes('Could not verify the deploy roles'), 'named as an unverified check, never as a finding').toBeTruthy();
+          expect(logger.warned[0].includes('gcloud: command not found'), 'carrying what gcloud said').toBeTruthy();
         } finally {
           restore();
           jetpack.remove(root);
@@ -209,7 +206,7 @@ module.exports = defineCases({
 
     {
       name: 'no service-account key: the check skips out loud and shells out for nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand({ key: false });
         const recorder = shellRecorder({});
         const restore = recorder.install();
@@ -218,9 +215,9 @@ module.exports = defineCases({
         try {
           await verifyDeployRoles({ targetDir, logger });
 
-          assert.deepEqual(recorder.commands, [], 'there is no identity to check, so nothing is asked');
-          assert.equal(logger.logged.length, 1, `one skip line (got: ${logger.logged.join(' | ')})`);
-          assert.ok(logger.logged[0].includes('service-account key'), 'which says what is missing');
+          expect(recorder.commands, 'there is no identity to check, so nothing is asked').toEqual([]);
+          expect(logger.logged.length, `one skip line (got: ${logger.logged.join(' | ')})`).toBe(1);
+          expect(logger.logged[0].includes('service-account key'), 'which says what is missing').toBeTruthy();
         } finally {
           restore();
           jetpack.remove(root);
@@ -230,7 +227,7 @@ module.exports = defineCases({
 
     {
       name: 'through the real precheck runner a missing grant is a WARNING, and the deploy proceeds',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand();
         const recorder = shellRecorder({ [APPSPOT_SA]: [], [COMPUTE_SA]: [] });
         const restore = recorder.install();
@@ -239,14 +236,14 @@ module.exports = defineCases({
         try {
           // Only this step: push-secrets calls `gh`, which a unit run never does.
           const steps = STEPS.filter((step) => step.name === 'verify-deploy-roles');
-          assert.equal(steps.length, 1, 'the step is in the real list');
+          expect(steps.length, 'the step is in the real list').toBe(1);
 
           const result = await deployPrecheck({ projectDir: targetDir, options: {}, logger, steps });
 
-          assert.deepEqual(result.ran, [], 'a step that threw did not finish');
-          assert.ok(logger.warned.join('\n').includes('verify-deploy-roles failed during the deploy precheck (non-fatal)'), 'the runner reports it softly');
-          assert.ok(logger.warned.join('\n').includes(`add-iam-policy-binding ${APPSPOT_SA}`), 'and the fix reaches the operator');
-          assert.deepEqual(STEPS.map((step) => step.name), ['verify-deploy-roles', 'push-secrets'], 'the cheap read runs before the publish');
+          expect(result.ran, 'a step that threw did not finish').toEqual([]);
+          expect(logger.warned.join('\n').includes('verify-deploy-roles failed during the deploy precheck (non-fatal)'), 'the runner reports it softly').toBeTruthy();
+          expect(logger.warned.join('\n').includes(`add-iam-policy-binding ${APPSPOT_SA}`), 'and the fix reaches the operator').toBeTruthy();
+          expect(STEPS.map((step) => step.name), 'the cheap read runs before the publish').toEqual(['verify-deploy-roles', 'push-secrets']);
         } finally {
           restore();
           jetpack.remove(root);

@@ -21,8 +21,7 @@
  * faithfully because the gates exist to beat it. The document here carries ALL
  * THREE dialogs, because this is the ordering suite and it reads the whole page.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -295,113 +294,139 @@ function dialogsOwed(state) {
   ];
 }
 
-test('#341: a paid cancel with a save offer is pitched the offer, and only the offer', async () => {
-  const { opened, clickTrigger, state } = await wireCancelFlow(paidAccount());
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-cancel-retention',
+  tests: [
+    {
+      name: '#341: a paid cancel with a save offer is pitched the offer, and only the offer',
+      run: async (ctx) => {
+        const { opened, clickTrigger, state } = await wireCancelFlow(paidAccount());
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.deepStrictEqual(dialogsOwed(state()), ['winback'], 'the offer outranks both warnings');
-  assert.deepStrictEqual(opened, ['modal:cancel-winback-modal'], 'and it is the one dialog that opened');
-});
+        ctx.expect(dialogsOwed(state()), 'the offer outranks both warnings').toEqual(['winback']);
+        ctx.expect(opened, 'and it is the one dialog that opened').toEqual(['modal:cancel-winback-modal']);
+      },
+    },
 
-test('#341: a trial cancel is warned about the trial, and only about the trial', async () => {
-  const { opened, clickTrigger, state } = await wireCancelFlow(trialingAccount());
+    {
+      name: '#341: a trial cancel is warned about the trial, and only about the trial',
+      run: async (ctx) => {
+        const { opened, clickTrigger, state } = await wireCancelFlow(trialingAccount());
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.deepStrictEqual(dialogsOwed(state()), ['trial'], 'the trial warning outranks the retention warning');
-  assert.deepStrictEqual(opened, ['modal:cancel-trial-warning-modal'], 'and it is the one dialog that opened');
-});
+        ctx.expect(dialogsOwed(state()), 'the trial warning outranks the retention warning').toEqual(['trial']);
+        ctx.expect(opened, 'and it is the one dialog that opened').toEqual(['modal:cancel-trial-warning-modal']);
+      },
+    },
 
-test('#341: a cancel neither of them speaks to gets the retention warning', async () => {
-  // The two states that used to walk into the questionnaire in silence: a brand
-  // that turned the offer off, and a subscription the apply route cannot reach.
-  const disabled = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+    {
+      name: '#341: a cancel neither of them speaks to gets the retention warning',
+      run: async (ctx) => {
+        // The two states that used to walk into the questionnaire in silence: a brand
+        // that turned the offer off, and a subscription the apply route cannot reach.
+        const disabled = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
 
-  const event = disabled.clickTrigger();
+        const event = disabled.clickTrigger();
 
-  assert.deepStrictEqual(dialogsOwed(disabled.state()), ['retention'], 'the fallback is what is owed');
-  assert.deepStrictEqual(disabled.opened, ['modal:cancel-retention-modal'], 'and it is the one dialog that opened');
-  assert.strictEqual(event.propagationStopped, true, 'the declarative collapse never gets the click');
-  assert.strictEqual(event.defaultPrevented, true, 'and the default action is cancelled');
-  assert.strictEqual(disabled.isAccordionOpen(), false, 'the questionnaire waits behind it');
-  assert.strictEqual(disabled.attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'a gated trigger is not a Bootstrap toggle at all');
+        ctx.expect(dialogsOwed(disabled.state()), 'the fallback is what is owed').toEqual(['retention']);
+        ctx.expect(disabled.opened, 'and it is the one dialog that opened').toEqual(['modal:cancel-retention-modal']);
+        ctx.expect(event.propagationStopped, 'the declarative collapse never gets the click').toBe(true);
+        ctx.expect(event.defaultPrevented, 'and the default action is cancelled').toBe(true);
+        ctx.expect(disabled.isAccordionOpen(), 'the questionnaire waits behind it').toBe(false);
+        ctx.expect(disabled.attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'a gated trigger is not a Bootstrap toggle at all').toBe(undefined);
 
-  const unreachable = await wireCancelFlow(unreachableAccount());
+        const unreachable = await wireCancelFlow(unreachableAccount());
 
-  unreachable.clickTrigger();
+        unreachable.clickTrigger();
 
-  assert.deepStrictEqual(dialogsOwed(unreachable.state()), ['retention'], 'an unreachable subscription is owed it too');
-  assert.deepStrictEqual(unreachable.opened, ['modal:cancel-retention-modal'], 'and gets exactly the one dialog');
-});
+        ctx.expect(dialogsOwed(unreachable.state()), 'an unreachable subscription is owed it too').toEqual(['retention']);
+        ctx.expect(unreachable.opened, 'and gets exactly the one dialog').toEqual(['modal:cancel-retention-modal']);
+      },
+    },
 
-test('#341: "Cancel anyway" carries on to the questionnaire', async () => {
-  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+    {
+      name: '#341: "Cancel anyway" carries on to the questionnaire',
+      run: async (ctx) => {
+        const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
 
-  clickTrigger();
-  await clickById('cancel-retention-continue-btn');
+        clickTrigger();
+        await clickById('cancel-retention-continue-btn');
 
-  assert.ok(opened.includes('modal-hide:cancel-retention-modal'), 'the warning closes behind the answer');
-  assert.ok(opened.includes('collapse:cancel-subscription-accordion'), 'and the questionnaire opens');
-  assert.strictEqual(isAccordionOpen(), true, 'the cancel flow carries on exactly as it did before the dialog existed');
-});
+        ctx.expect(opened.includes('modal-hide:cancel-retention-modal'), 'the warning closes behind the answer').toBeTruthy();
+        ctx.expect(opened.includes('collapse:cancel-subscription-accordion'), 'and the questionnaire opens').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'the cancel flow carries on exactly as it did before the dialog existed').toBe(true);
+      },
+    },
 
-test('#341: an open questionnaire closes on the next click, with no second warning', async () => {
-  // The half of a toggle every gate here owes ([#267], [#268]): the gate holds
-  // the trigger's clicks for good, so with the questionnaire already open the
-  // next click must simply SHUT it. A gate that never asks whether the thing it
-  // guards is open re-opens its dialog on the way down instead.
-  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+    {
+      name: '#341: an open questionnaire closes on the next click, with no second warning',
+      run: async (ctx) => {
+        // The half of a toggle every gate here owes ([#267], [#268]): the gate holds
+        // the trigger's clicks for good, so with the questionnaire already open the
+        // next click must simply SHUT it. A gate that never asks whether the thing it
+        // guards is open re-opens its dialog on the way down instead.
+        const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
 
-  clickTrigger();
-  await clickById('cancel-retention-continue-btn');
+        clickTrigger();
+        await clickById('cancel-retention-continue-btn');
 
-  assert.strictEqual(isAccordionOpen(), true, 'carrying on opened the questionnaire');
+        ctx.expect(isAccordionOpen(), 'carrying on opened the questionnaire').toBe(true);
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.strictEqual(isAccordionOpen(), false, 'the next click closes it');
-  assert.strictEqual(
-    opened.filter((entry) => entry === 'modal:cancel-retention-modal').length,
-    1,
-    'closing never re-opens the warning',
-  );
-});
+        ctx.expect(isAccordionOpen(), 'the next click closes it').toBe(false);
+        ctx.expect(opened.filter((entry) => entry === 'modal:cancel-retention-modal').length, 'closing never re-opens the warning').toBe(1);
+      },
+    },
 
-test('#341: "Keep my account" cancels nothing', async () => {
-  const { opened, requests, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+    {
+      name: '#341: "Keep my account" cancels nothing',
+      run: async (ctx) => {
+        const { opened, requests, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
 
-  clickTrigger();
-  await clickById('cancel-retention-keep-btn');
+        clickTrigger();
+        await clickById('cancel-retention-keep-btn');
 
-  assert.deepStrictEqual(requests, [], 'keeping the account calls no route at all');
-  assert.ok(!opened.some((entry) => entry.startsWith('collapse:')), 'nothing asked the questionnaire to open');
-  assert.strictEqual(isAccordionOpen(), false, 'the questionnaire never opened');
-});
+        ctx.expect(requests, 'keeping the account calls no route at all').toEqual([]);
+        ctx.expect(!opened.some((entry) => entry.startsWith('collapse:')), 'nothing asked the questionnaire to open').toBeTruthy();
+        ctx.expect(isAccordionOpen(), 'the questionnaire never opened').toBe(false);
+      },
+    },
 
-test('#341: a page missing the fallback dialog falls back to the questionnaire, never to a dead button', async () => {
-  // Same guard the other two carry ([#324]): the gate works by taking the
-  // trigger's declarative toggle away, so a layout that dropped this dialog (a
-  // consumer override, a trimmed template) must still be able to cancel.
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), {
-    winback: { enabled: false },
-    without: ['cancel-retention-modal'],
-  });
+    {
+      name: '#341: a page missing the fallback dialog falls back to the questionnaire, never to a dead button',
+      run: async (ctx) => {
+        // Same guard the other two carry ([#324]): the gate works by taking the
+        // trigger's declarative toggle away, so a layout that dropped this dialog (a
+        // consumer override, a trimmed template) must still be able to cancel.
+        const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), {
+          winback: { enabled: false },
+          without: ['cancel-retention-modal'],
+        });
 
-  const event = clickTrigger();
+        const event = clickTrigger();
 
-  assert.deepStrictEqual(opened, [], 'no dialog opened, there is none to open');
-  assert.strictEqual(event.propagationStopped, false, 'so the declarative collapse keeps the click');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger stays a Bootstrap toggle');
-  assert.strictEqual(isAccordionOpen(), true, 'and the questionnaire opens on the first click');
-});
+        ctx.expect(opened, 'no dialog opened, there is none to open').toEqual([]);
+        ctx.expect(event.propagationStopped, 'so the declarative collapse keeps the click').toBe(false);
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'the trigger stays a Bootstrap toggle').toBe('collapse');
+        ctx.expect(isAccordionOpen(), 'and the questionnaire opens on the first click').toBe(true);
+      },
+    },
 
-test('#341: a state that cannot cancel is never warned about anything', async () => {
-  const free = await wireCancelFlow(new User({ subscription: { product: { id: 'basic' }, status: 'active' } }, { uid: 'u1' }));
+    {
+      name: '#341: a state that cannot cancel is never warned about anything',
+      run: async (ctx) => {
+        const free = await wireCancelFlow(new User({ subscription: { product: { id: 'basic' }, status: 'active' } }, { uid: 'u1' }));
 
-  assert.deepStrictEqual(dialogsOwed(free.state()), [], 'a free account has no cancel to warn about');
+        ctx.expect(dialogsOwed(free.state()), 'a free account has no cancel to warn about').toEqual([]);
 
-  const cancelling = await wireCancelFlow(paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }));
+        const cancelling = await wireCancelFlow(paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }));
 
-  assert.deepStrictEqual(dialogsOwed(cancelling.state()), [], 'and neither has one already scheduled to end');
+        ctx.expect(dialogsOwed(cancelling.state()), 'and neither has one already scheduled to end').toEqual([]);
+      },
+    },
+  ],
 });

@@ -20,7 +20,7 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE not set (real provider send)'
         : false,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.post('omega/marketing/campaign', {
           name: '@omega.js/backend Test Campaign',
           subject: 'Test Marketing Email',
@@ -36,9 +36,9 @@ module.exports = defineCases({
           sendAt: 'now',
         });
 
-        assert.isSuccess(response, 'Campaign creation should succeed');
-        assert.hasProperty(response, 'data.id', 'Response should contain campaign ID');
-        assert.hasProperty(response, 'data.providers', 'Response should contain provider results');
+        expect(response, 'Campaign creation should succeed').toBeSuccess();
+        expect(response, 'Response should contain campaign ID').toHaveProperty('data.id');
+        expect(response, 'Response should contain provider results').toHaveProperty('data.providers');
 
         const providers = response.data.providers || {};
 
@@ -47,14 +47,11 @@ module.exports = defineCases({
         if (providers.campaigns) {
           state.sendgridId = providers.campaigns.id;
 
-          assert.propertyEquals(
-            response, 'data.providers.campaigns.success', true,
-            `SendGrid should succeed. Error: ${providers.campaigns.error || 'none'}`,
-          );
+          expect(response, `SendGrid should succeed. Error: ${providers.campaigns.error || 'none'}`).toHaveProperty('data.providers.campaigns.success', true);
         }
 
         if (providers.newsletter) {
-          assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
+          expect(response, 'Should have Beehiiv result').toHaveProperty('data.providers.newsletter');
         }
 
         state.campaignId = response.data.id;
@@ -75,7 +72,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         // Future sendAt → campaign is saved as 'pending' for cron pickup, not sent immediately
         const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -87,15 +84,15 @@ module.exports = defineCases({
           sendAt: futureDate,
         });
 
-        assert.isSuccess(response, 'Future campaign creation should succeed');
-        assert.hasProperty(response, 'data.id', 'Response should contain campaign ID');
-        assert.propertyEquals(response, 'data.status', 'pending', 'Future campaign should be pending');
+        expect(response, 'Future campaign creation should succeed').toBeSuccess();
+        expect(response, 'Response should contain campaign ID').toHaveProperty('data.id');
+        expect(response, 'Future campaign should be pending').toHaveProperty('data.status', 'pending');
 
         const doc = await firestore.get(`marketing-campaigns/${response.data.id}`);
-        assert.ok(doc, 'Campaign doc should exist in Firestore');
-        assert.equal(doc.status, 'pending', 'Firestore doc status should be pending');
-        assert.equal(doc.settings.name, 'Future Campaign', 'Name should match input');
-        assert.propertyEquals(response, 'data.providers', null, 'Future campaign should not have provider results');
+        expect(doc, 'Campaign doc should exist in Firestore').toBeTruthy();
+        expect(doc.status, 'Firestore doc status should be pending').toBe('pending');
+        expect(doc.settings.name, 'Name should match input').toBe('Future Campaign');
+        expect(response, 'Future campaign should not have provider results').toHaveProperty('data.providers', null);
       },
     },
 
@@ -104,7 +101,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // The raw-HTML passthrough is internal-caller only — an admin (or the MCP
         // create_campaign tool it fronts) must not bypass the escaped lane (#90).
         const response = await http.post('omega/marketing/campaign', {
@@ -114,7 +111,7 @@ module.exports = defineCases({
           data: { content: { html: '<img src=x onerror="alert(1)">' } },
         });
 
-        assert.isError(response, 400, 'data.content.html should be rejected with a 400');
+        expect(response, 'data.content.html should be rejected with a 400').toBeError(400);
       },
     },
 
@@ -123,7 +120,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         // The stored doc is what the cron sender reads later, and the marketing library
         // reads contentHtml / data.content.html AHEAD of the escaped renderer — so
         // neither may ever land in it from a caller. Two layers stop this: the schema
@@ -139,13 +136,13 @@ module.exports = defineCases({
           sendAt: futureDate,
         });
 
-        assert.isSuccess(response, 'A campaign carrying only the stripped field should still create');
+        expect(response, 'A campaign carrying only the stripped field should still create').toBeSuccess();
 
         const doc = await firestore.get(`marketing-campaigns/${response.data.id}`);
 
-        assert.ok(doc, 'Campaign doc should exist in Firestore');
-        assert.equal(doc.settings.contentHtml, undefined, 'Caller-supplied contentHtml persisted into the stored campaign doc');
-        assert.ok(!JSON.stringify(doc).includes('onerror'), 'Raw HTML payload persisted into the stored campaign doc');
+        expect(doc, 'Campaign doc should exist in Firestore').toBeTruthy();
+        expect(doc.settings.contentHtml, 'Caller-supplied contentHtml persisted into the stored campaign doc').toBe(undefined);
+        expect(!JSON.stringify(doc).includes('onerror'), 'Raw HTML payload persisted into the stored campaign doc').toBeTruthy();
       },
     },
 
@@ -154,14 +151,14 @@ module.exports = defineCases({
       auth: 'user',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/campaign', {
           name: 'Unauthorized Campaign',
           subject: 'Should fail',
           content: 'Should fail',
         });
 
-        assert.isError(response, 403, 'Non-admin should get 403');
+        expect(response, 'Non-admin should get 403').toBeError(403);
       },
     },
 
@@ -170,14 +167,14 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/campaign', {
           name: 'Unauthenticated Campaign',
           subject: 'Should fail',
           content: 'Should fail',
         });
 
-        assert.isError(response, 401, 'Unauthenticated should get 401');
+        expect(response, 'Unauthenticated should get 401').toBeError(401);
       },
     },
   ],

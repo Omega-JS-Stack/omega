@@ -23,7 +23,7 @@
  * configured, so the emulator suite (campaign-cron-pipeline) cannot produce a
  * config hole at all; it stays the integration surface for the happy paths.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const cron = require('../../dist/omega/events/cron/frequent/marketing-campaigns.js');
 const newsletter = require('../../dist/omega/libraries/email/generators/newsletter.js');
 const Marketing = require('../../dist/omega/libraries/email/marketing/index.js');
@@ -186,9 +186,9 @@ module.exports = defineCases({
         const { store } = await runCron({ '_fault-oneoff': pushCampaign(now) });
         const doc = store.get('_fault-oneoff');
 
-        assert.equal(doc.status, 'failed', 'a config hole must be finalized, not left for the lease reclaim');
-        assert.match(doc.error, /brand\.url/, 'the error names the missing config key');
-        assert.ok(doc.metadata?.updated, 'the finalize stamps metadata.updated');
+        expect(doc.status, 'a config hole must be finalized, not left for the lease reclaim').toBe('failed');
+        expect(doc.error, 'the error names the missing config key').toMatch(/brand\.url/);
+        expect(doc.metadata?.updated, 'the finalize stamps metadata.updated').toBeTruthy();
       },
     },
 
@@ -203,9 +203,9 @@ module.exports = defineCases({
         });
         const doc = store.get('_fault-recurring');
 
-        assert.equal(doc.status, 'failed', 'the recurring doc fails rather than returning to pending');
-        assert.equal(doc.sendAt, sendAt, 'sendAt is NOT advanced — the next occurrence meets the same hole');
-        assert.match(doc.error, /brand\.url/, 'the error names the missing config key');
+        expect(doc.status, 'the recurring doc fails rather than returning to pending').toBe('failed');
+        expect(doc.sendAt, 'sendAt is NOT advanced — the next occurrence meets the same hole').toBe(sendAt);
+        expect(doc.error, 'the error names the missing config key').toMatch(/brand\.url/);
       },
     },
 
@@ -221,10 +221,10 @@ module.exports = defineCases({
         });
         const doc = store.get('_transient');
 
-        assert.equal(doc.status, 'processing', 'a code-less failure keeps the stale-lease retry path');
-        assert.ok(!doc.error, 'no terminal error field is written');
-        assert.equal(errors.length, 1, 'the rejection is still reported once');
-        assert.match(errors[0], /title and body are required/, 'the reported reason is the real throw');
+        expect(doc.status, 'a code-less failure keeps the stale-lease retry path').toBe('processing');
+        expect(!doc.error, 'no terminal error field is written').toBeTruthy();
+        expect(errors.length, 'the rejection is still reported once').toBe(1);
+        expect(errors[0], 'the reported reason is the real throw').toMatch(/title and body are required/);
       },
     },
 
@@ -243,7 +243,7 @@ module.exports = defineCases({
 
         // Reclaimed → pending, then picked up by the same pass's due query and
         // finalized by the config fault. The reclaim itself is untouched.
-        assert.equal(doc.status, 'failed', 'the reclaimed campaign is processed in the same pass');
+        expect(doc.status, 'the reclaimed campaign is processed in the same pass').toBe('failed');
       },
     },
 
@@ -255,13 +255,13 @@ module.exports = defineCases({
       run() {
         const coded = Marketing.providerFailure(codedError(EMAIL_CONFIG_HOLE, 400));
 
-        assert.equal(coded.success, false, 'still the failure shape callers read');
-        assert.equal(coded.error, EMAIL_CONFIG_HOLE, 'still carries the message');
-        assert.equal(coded.code, 400, 'the config-fault code survives the conversion');
+        expect(coded.success, 'still the failure shape callers read').toBe(false);
+        expect(coded.error, 'still carries the message').toBe(EMAIL_CONFIG_HOLE);
+        expect(coded.code, 'the config-fault code survives the conversion').toBe(400);
 
         const plain = Marketing.providerFailure(new Error('SendGrid 503'));
 
-        assert.ok(!('code' in plain), 'no code key at all — Firestore rejects undefined field values');
+        expect(!('code' in plain), 'no code key at all — Firestore rejects undefined field values').toBeTruthy();
       },
     },
 
@@ -276,8 +276,8 @@ module.exports = defineCases({
         );
         const doc = store.get('_email-oneoff');
 
-        assert.equal(doc.status, 'failed', 'a carried config fault finalizes the campaign');
-        assert.equal(doc.error, EMAIL_CONFIG_HOLE, 'the provider message lands in error');
+        expect(doc.status, 'a carried config fault finalizes the campaign').toBe('failed');
+        expect(doc.error, 'the provider message lands in error').toBe(EMAIL_CONFIG_HOLE);
       },
     },
 
@@ -293,9 +293,9 @@ module.exports = defineCases({
         );
         const doc = store.get('_email-recurring');
 
-        assert.equal(doc.status, 'failed', 'the recurring doc must not return to pending');
-        assert.equal(doc.sendAt, sendAt, 'sendAt is NOT advanced into the identical failure');
-        assert.equal(store.size, 1, 'no history doc for a campaign that never sent');
+        expect(doc.status, 'the recurring doc must not return to pending').toBe('failed');
+        expect(doc.sendAt, 'sendAt is NOT advanced into the identical failure').toBe(sendAt);
+        expect(store.size, 'no history doc for a campaign that never sent').toBe(1);
       },
     },
 
@@ -313,12 +313,12 @@ module.exports = defineCases({
 
         // Pinned as found: a transient provider failure still writes a 'failed'
         // history doc and re-pends the recurring template at its next occurrence.
-        assert.equal(doc.status, 'pending', 'the recurring template returns to pending');
-        assert.equal(doc.sendAt, getNextFutureOccurrence(sendAt, WEEKLY, now), 'sendAt advances');
-        assert.equal(store.size, 2, 'the history doc is still written');
+        expect(doc.status, 'the recurring template returns to pending').toBe('pending');
+        expect(doc.sendAt, 'sendAt advances').toBe(getNextFutureOccurrence(sendAt, WEEKLY, now));
+        expect(store.size, 'the history doc is still written').toBe(2);
 
         const history = [...store.values()].find(d => d.recurringId === '_email-transient');
-        assert.equal(history.status, 'failed', 'the history doc records the failed send');
+        expect(history.status, 'the history doc records the failed send').toBe('failed');
       },
     },
 
@@ -333,8 +333,8 @@ module.exports = defineCases({
         );
         const doc = store.get('_email-thrown');
 
-        assert.equal(doc.status, 'failed', 'the dispatch catch covers the email path, not just push');
-        assert.equal(doc.error, EMAIL_CONFIG_HOLE, 'the thrown message lands in error');
+        expect(doc.status, 'the dispatch catch covers the email path, not just push').toBe('failed');
+        expect(doc.error, 'the thrown message lands in error').toBe(EMAIL_CONFIG_HOLE);
       },
     },
 
@@ -351,9 +351,9 @@ module.exports = defineCases({
         );
         const doc = store.get('_gen-fault');
 
-        assert.equal(doc.status, 'failed', 'a permanent AI fault is finalized, not reclaimed forever');
-        assert.match(doc.error, /Error loading prompt/, 'the pipeline message lands in error');
-        assert.ok(!doc.generatorAttempts, 'the empty-generation ladder never counted a throw');
+        expect(doc.status, 'a permanent AI fault is finalized, not reclaimed forever').toBe('failed');
+        expect(doc.error, 'the pipeline message lands in error').toMatch(/Error loading prompt/);
+        expect(!doc.generatorAttempts, 'the empty-generation ladder never counted a throw').toBeTruthy();
       },
     },
 
@@ -368,9 +368,9 @@ module.exports = defineCases({
         );
         const doc = store.get('_gen-transient');
 
-        assert.equal(doc.status, 'processing', 'a transient AI fault keeps the stale-lease retry path');
-        assert.ok(!doc.error, 'no terminal error field is written');
-        assert.match(errors[0], /rate limit/, 'the reported reason is the real throw');
+        expect(doc.status, 'a transient AI fault keeps the stale-lease retry path').toBe('processing');
+        expect(!doc.error, 'no terminal error field is written').toBeTruthy();
+        expect(errors[0], 'the reported reason is the real throw').toMatch(/rate limit/);
       },
     },
   ],

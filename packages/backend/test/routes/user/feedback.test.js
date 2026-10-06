@@ -16,16 +16,16 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000, // Longer timeout due to external API call
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Great app! Works well.',
           dislike: '',
         });
 
-        assert.isSuccess(response, 'Submit feedback should succeed for authenticated user');
-        assert.hasProperty(response, 'data.review', 'Response should contain review decision');
-        assert.hasProperty(response, 'data.originalRequest', 'Response should contain original request');
+        expect(response, 'Submit feedback should succeed for authenticated user').toBeSuccess();
+        expect(response, 'Response should contain review decision').toHaveProperty('data.review');
+        expect(response, 'Response should contain original request').toHaveProperty('data.originalRequest');
       },
     },
 
@@ -35,19 +35,16 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/feedback', {
           rating: 'love',
           like: 'Absolutely love this app! Best thing ever! Highly recommend!',
           dislike: '',
         });
 
-        assert.isSuccess(response, 'Submit feedback with love rating should succeed');
-        assert.hasProperty(response, 'data.review.promptReview', 'Response should have promptReview flag');
-        assert.ok(
-          typeof response.data.review.promptReview === 'boolean',
-          'promptReview should be a boolean'
-        );
+        expect(response, 'Submit feedback with love rating should succeed').toBeSuccess();
+        expect(response, 'Response should have promptReview flag').toHaveProperty('data.review.promptReview');
+        expect(typeof response.data.review.promptReview === 'boolean', 'promptReview should be a boolean').toBeTruthy();
       },
     },
 
@@ -57,15 +54,15 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/feedback', {
           rating: 'dislike',
           like: '',
           dislike: 'Could use some improvements in the UI',
         });
 
-        assert.isSuccess(response, 'Submit negative feedback should succeed');
-        assert.hasProperty(response, 'data.review', 'Response should contain review decision');
+        expect(response, 'Submit negative feedback should succeed').toBeSuccess();
+        expect(response, 'Response should contain review decision').toHaveProperty('data.review');
       },
     },
 
@@ -75,14 +72,14 @@ module.exports = defineCases({
       auth: 'premium-active',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Premium features are great!',
           dislike: '',
         });
 
-        assert.isSuccess(response, 'Submit feedback should succeed for premium user');
+        expect(response, 'Submit feedback should succeed for premium user').toBeSuccess();
       },
     },
 
@@ -92,14 +89,14 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Test',
           dislike: '',
         });
 
-        assert.isError(response, 401, 'Submit feedback should fail without authentication');
+        expect(response, 'Submit feedback should fail without authentication').toBeError(401);
       },
     },
   ],

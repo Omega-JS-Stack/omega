@@ -39,7 +39,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-cancelled-subscriber',
-      async run({ accounts, firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, expect, state, config, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -86,14 +86,14 @@ module.exports = defineCases({
         }, { merge: true });
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'cancelled', 'Should start cancelled');
-        assert.equal(userDoc.subscription.product.id, state.productId, 'Should still carry the paid product id');
+        expect(userDoc.subscription.status, 'Should start cancelled').toBe('cancelled');
+        expect(userDoc.subscription.product.id, 'Should still carry the paid product id').toBe(state.productId);
       },
     },
 
     {
       name: 'resubscribe-through-checkout',
-      async run({ assert, omega, state }) {
+      async run({ expect, omega, state }) {
         const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
@@ -122,8 +122,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(sent.code, 200, `A cancelled subscriber should be allowed to check out again, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(sent.body?.orderId, `Checkout should return an orderId, got ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `A cancelled subscriber should be allowed to check out again, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(sent.body?.orderId, `Checkout should return an orderId, got ${JSON.stringify(sent.body)}`).toBeTruthy();
 
         state.orderId = sent.body.orderId;
       },
@@ -131,22 +131,22 @@ module.exports = defineCases({
 
     {
       name: 'subscription-is-active-again',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.status === 'active';
         }, 20000, 500);
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active again');
-        assert.equal(userDoc.subscription.product.id, state.productId, `Product should be ${state.productId}`);
-        assert.equal(userDoc.subscription.cancellation.pending, false, 'The new subscription should carry no pending cancellation');
+        expect(userDoc.subscription.status, 'Status should be active again').toBe('active');
+        expect(userDoc.subscription.product.id, `Product should be ${state.productId}`).toBe(state.productId);
+        expect(userDoc.subscription.cancellation.pending, 'The new subscription should carry no pending cancellation').toBe(false);
       },
     },
 
     {
       name: 'win-back-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
             .where('owner', '==', state.uid)
@@ -164,8 +164,8 @@ module.exports = defineCases({
 
         const webhookDoc = snapshot.docs[0].data();
 
-        assert.equal(webhookDoc.status, 'completed', 'The win-back webhook should process cleanly');
-        assert.equal(webhookDoc.transition, 'subscription-winback', 'Transition should be subscription-winback');
+        expect(webhookDoc.status, 'The win-back webhook should process cleanly').toBe('completed');
+        expect(webhookDoc.transition, 'Transition should be subscription-winback').toBe('subscription-winback');
 
         state.eventType = webhookDoc.event.type;
         state.transition = webhookDoc.transition;
@@ -174,21 +174,21 @@ module.exports = defineCases({
 
     {
       name: 'win-back-tracks-as-a-purchase',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         // The order doc the pipeline just wrote IS what trackPayment resolved its
         // event from — run the resolver over it to prove the win-back reports a
         // purchase and not the renewal it used to report.
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
 
         const resolved = analytics.resolvePaymentEvent('subscription', state.transition, state.eventType, orderDoc.unified, orderDoc);
 
-        assert.ok(resolved, 'A win-back should resolve to a trackable analytics event');
-        assert.equal(resolved.reason, 'winback-purchase', 'Reason should be winback-purchase');
-        assert.equal(resolved.isRecurring, false, 'A win-back is a purchase, not recurring revenue');
-        assert.equal(resolved.productId, state.productId, 'The tracked product should be the resubscribed product');
+        expect(resolved, 'A win-back should resolve to a trackable analytics event').toBeTruthy();
+        expect(resolved.reason, 'Reason should be winback-purchase').toBe('winback-purchase');
+        expect(resolved.isRecurring, 'A win-back is a purchase, not recurring revenue').toBe(false);
+        expect(resolved.productId, 'The tracked product should be the resubscribed product').toBe(state.productId);
       },
     },
   ],

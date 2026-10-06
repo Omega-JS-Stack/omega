@@ -23,7 +23,7 @@
  *
  * Run: npx omega test backend:events/payments/test-processor-doc-shape
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 
 const cancelProcessor = require('../../../dist/omega/routes/payments/cancel/providers/test.js');
@@ -121,21 +121,17 @@ module.exports = defineCases({
         for (const [name, act] of PROCESSORS) {
           const docs = await synthesize(act);
 
-          assert.equal(docs.length, 1, `the ${name} processor should write exactly one pipeline doc, got ${docs.length}`);
+          expect(docs.length, `the ${name} processor should write exactly one pipeline doc, got ${docs.length}`).toBe(1);
 
           const [doc] = docs;
 
-          assert.equal(
-            typeof doc.metadata?.created?.timestampUNIX,
-            'number',
-            `the ${name} processor must stamp metadata.created.timestampUNIX — it is the number the pipeline's staleness guard compares against the order`,
-          );
-          assert.equal(typeof doc.metadata?.created?.timestamp, 'string', `the ${name} processor must stamp metadata.created.timestamp beside it`);
-          assert.ok('completed' in (doc.metadata || {}), `the ${name} processor must open metadata.completed, the slot the pipeline closes out`);
-          assert.equal(doc.metadata.completed.timestampUNIX, null, `the ${name} processor must leave metadata.completed empty — nothing has processed yet`);
+          expect(typeof doc.metadata?.created?.timestampUNIX, `the ${name} processor must stamp metadata.created.timestampUNIX — it is the number the pipeline's staleness guard compares against the order`).toBe('number');
+          expect(typeof doc.metadata?.created?.timestamp, `the ${name} processor must stamp metadata.created.timestamp beside it`).toBe('string');
+          expect('completed' in (doc.metadata || {}), `the ${name} processor must open metadata.completed, the slot the pipeline closes out`).toBeTruthy();
+          expect(doc.metadata.completed.timestampUNIX, `the ${name} processor must leave metadata.completed empty — nothing has processed yet`).toBe(null);
 
-          assert.equal(doc.metadata.received, undefined, `the ${name} processor must not spell the arrival stamp 'received' — the route calls it 'created' and the pipeline only reads that one`);
-          assert.equal(doc.metadata.processed, undefined, `the ${name} processor must not spell the completion stamp 'processed' — the route calls it 'completed'`);
+          expect(doc.metadata.received, `the ${name} processor must not spell the arrival stamp 'received' — the route calls it 'created' and the pipeline only reads that one`).toBe(undefined);
+          expect(doc.metadata.processed, `the ${name} processor must not spell the completion stamp 'processed' — the route calls it 'completed'`).toBe(undefined);
         }
       },
     },
@@ -147,14 +143,14 @@ module.exports = defineCases({
         for (const [name, act] of PROCESSORS) {
           const [doc] = await synthesize(act);
 
-          assert.equal(doc.provider, 'test', `the ${name} processor's doc names the provider whose library the pipeline loads`);
-          assert.equal(doc.status, 'pending', `the ${name} processor's doc must be pending — the trigger short-circuits on anything else`);
-          assert.equal(doc.owner, UID, `the ${name} processor's doc carries the owner the event is about`);
-          assert.equal(doc.error, null, `the ${name} processor's doc opens with no error`);
-          assert.ok(doc.event?.type, `the ${name} processor's doc names an event type`);
-          assert.ok(doc.event?.category, `the ${name} processor's doc names a category — the pipeline throws without one`);
-          assert.ok(doc.event?.resourceId, `the ${name} processor's doc names the resource the event is about`);
-          assert.equal(doc.raw?.type, doc.event.type, `the ${name} processor's envelope and its parsed event must name the same event`);
+          expect(doc.provider, `the ${name} processor's doc names the provider whose library the pipeline loads`).toBe('test');
+          expect(doc.status, `the ${name} processor's doc must be pending — the trigger short-circuits on anything else`).toBe('pending');
+          expect(doc.owner, `the ${name} processor's doc carries the owner the event is about`).toBe(UID);
+          expect(doc.error, `the ${name} processor's doc opens with no error`).toBe(null);
+          expect(doc.event?.type, `the ${name} processor's doc names an event type`).toBeTruthy();
+          expect(doc.event?.category, `the ${name} processor's doc names a category — the pipeline throws without one`).toBeTruthy();
+          expect(doc.event?.resourceId, `the ${name} processor's doc names the resource the event is about`).toBeTruthy();
+          expect(doc.raw?.type, `the ${name} processor's envelope and its parsed event must name the same event`).toBe(doc.event.type);
         }
       },
     },

@@ -14,8 +14,7 @@
  * only what the sections touch (node has no DOM and web pulls in no jsdom). The
  * one seam is the backend: `GET /user/orders` answers whatever the case needs.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -186,199 +185,238 @@ async function renderSections(drive, { orders = [] } = {}) {
 
 const FREE_ACCOUNT = new User({ subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active' } }, { uid: 'u1' });
 
-test('#672: the orders list renders the purchases the route hands back', async () => {
-  const orders = [
-    orderSummary('1111-2222-3333', { name: '100 Credits', amount: 9.99 }),
-    orderSummary('4444-5555-6666', { name: 'Launch Kit', amount: 49.99, ago: 40 * DAY, status: 'refunded', refundable: false }),
-  ];
+module.exports = defineCases({
+  type: 'group',
+  description: 'account-orders',
+  tests: [
+    {
+      name: '#672: the orders list renders the purchases the route hands back',
+      run: async (ctx) => {
+        const orders = [
+          orderSummary('1111-2222-3333', { name: '100 Credits', amount: 9.99 }),
+          orderSummary('4444-5555-6666', { name: 'Launch Kit', amount: 49.99, ago: 40 * DAY, status: 'refunded', refundable: false }),
+        ];
 
-  const elements = await renderSections(async (bundle) => {
-    await bundle.orders.loadData();
-  }, { orders });
+        const elements = await renderSections(async (bundle) => {
+          await bundle.orders.loadData();
+        }, { orders });
 
-  const list = elements.get('orders-list').innerHTML;
+        const list = elements.get('orders-list').innerHTML;
 
-  assert.ok(list.includes('100 Credits'), 'the purchase is named');
-  assert.ok(list.includes('1111-2222-3333'), 'with its order number');
-  assert.ok(list.includes('$9.99'), 'and what was paid');
-  assert.ok(list.includes('Launch Kit'), 'every purchase is listed, not just the refundable ones');
-  assert.ok(list.includes('Refunded'), 'and a refunded purchase says so');
-  assert.equal(elements.get('orders-badge').textContent, '2', 'the badge counts them');
-  assert.ok(!/NaN|undefined|Invalid Date/.test(list), `every row reads as a real purchase: ${list}`);
-});
+        ctx.expect(list.includes('100 Credits'), 'the purchase is named').toBeTruthy();
+        ctx.expect(list.includes('1111-2222-3333'), 'with its order number').toBeTruthy();
+        ctx.expect(list.includes('$9.99'), 'and what was paid').toBeTruthy();
+        ctx.expect(list.includes('Launch Kit'), 'every purchase is listed, not just the refundable ones').toBeTruthy();
+        ctx.expect(list.includes('Refunded'), 'and a refunded purchase says so').toBeTruthy();
+        ctx.expect(elements.get('orders-badge').textContent, 'the badge counts them').toBe('2');
+        ctx.expect(!/NaN|undefined|Invalid Date/.test(list), `every row reads as a real purchase: ${list}`).toBeTruthy();
+      },
+    },
 
-test('#672: an account with no purchases is told so, not left on the loading copy', async () => {
-  const elements = await renderSections(async (bundle) => {
-    await bundle.orders.loadData();
-  }, { orders: [] });
+    {
+      name: '#672: an account with no purchases is told so, not left on the loading copy',
+      run: async (ctx) => {
+        const elements = await renderSections(async (bundle) => {
+          await bundle.orders.loadData();
+        }, { orders: [] });
 
-  assert.match(elements.get('orders-list').innerHTML, /not made any purchases/i, 'the empty state replaces the loading line');
-  assert.equal(elements.get('orders-badge').textContent, '0', 'and the badge agrees');
-});
+        ctx.expect(elements.get('orders-list').innerHTML, 'the empty state replaces the loading line').toMatch(/not made any purchases/i);
+        ctx.expect(elements.get('orders-badge').textContent, 'and the badge agrees').toBe('0');
+      },
+    },
 
-test('#672: only an order the BACKEND calls refundable is offered the button', async () => {
-  const orders = [
-    orderSummary('1111-1111-1111', { refundable: true }),
-    orderSummary('2222-2222-2222', { refundable: false, status: 'refunded' }),
-  ];
+    {
+      name: '#672: only an order the BACKEND calls refundable is offered the button',
+      run: async (ctx) => {
+        const orders = [
+          orderSummary('1111-1111-1111', { refundable: true }),
+          orderSummary('2222-2222-2222', { refundable: false, status: 'refunded' }),
+        ];
 
-  const elements = await renderSections(async (bundle) => {
-    await bundle.orders.loadData();
-  }, { orders });
+        const elements = await renderSections(async (bundle) => {
+          await bundle.orders.loadData();
+        }, { orders });
 
-  const list = elements.get('orders-list').innerHTML;
-  const offered = [...list.matchAll(/data-order-id="([^"]+)"/g)].map((match) => match[1]);
+        const list = elements.get('orders-list').innerHTML;
+        const offered = [...list.matchAll(/data-order-id="([^"]+)"/g)].map((match) => match[1]);
 
-  assert.deepStrictEqual(offered, ['1111-1111-1111'], 'the refunded purchase is never offered a second refund');
-});
+        ctx.expect(offered, 'the refunded purchase is never offered a second refund').toEqual(['1111-1111-1111']);
+      },
+    },
 
-test('#672: a purchase that never completed reads as unpaid, not as Unknown', async () => {
-  // The status is the provider's own word passed straight through
-  // (libraries/payment/providers/stripe.js:485), so a checkout that was opened
-  // and abandoned lands as `open` — a pill with no entry read "Unknown", which
-  // tells the customer nothing about a payment that simply did not happen.
-  const elements = await renderSections(async (bundle) => {
-    await bundle.orders.loadData();
-  }, { orders: [orderSummary('7070-7070-7070', { status: 'open', refundable: false })] });
+    {
+      name: '#672: a purchase that never completed reads as unpaid, not as Unknown',
+      run: async (ctx) => {
+        // The status is the provider's own word passed straight through
+        // (libraries/payment/providers/stripe.js:485), so a checkout that was opened
+        // and abandoned lands as `open` — a pill with no entry read "Unknown", which
+        // tells the customer nothing about a payment that simply did not happen.
+        const elements = await renderSections(async (bundle) => {
+          await bundle.orders.loadData();
+        }, { orders: [orderSummary('7070-7070-7070', { status: 'open', refundable: false })] });
 
-  const list = elements.get('orders-list').innerHTML;
+        const list = elements.get('orders-list').innerHTML;
 
-  assert.ok(list.includes('Unpaid'), `an incomplete purchase says so: ${list}`);
-  assert.ok(!list.includes('Unknown'), 'and never falls through to the unknown pill');
-});
+        ctx.expect(list.includes('Unpaid'), `an incomplete purchase says so: ${list}`).toBeTruthy();
+        ctx.expect(!list.includes('Unknown'), 'and never falls through to the unknown pill').toBeTruthy();
+      },
+    },
 
-test('#672: a one-time purchase alone makes the refund section eligible', async () => {
-  // The bug in one line: a Basic account with a refundable purchase used to be
-  // told it was not eligible for anything, because eligibility read the
-  // subscription and a one-time purchase never touches it.
-  const elements = await renderSections(async (bundle) => {
-    await bundle.refund.loadData(FREE_ACCOUNT);
-  }, { orders: [orderSummary('3333-3333-3333')] });
+    {
+      name: '#672: a one-time purchase alone makes the refund section eligible',
+      run: async (ctx) => {
+        // The bug in one line: a Basic account with a refundable purchase used to be
+        // told it was not eligible for anything, because eligibility read the
+        // subscription and a one-time purchase never touches it.
+        const elements = await renderSections(async (bundle) => {
+          await bundle.refund.loadData(FREE_ACCOUNT);
+        }, { orders: [orderSummary('3333-3333-3333')] });
 
-  assert.ok(!elements.get('refund-eligible').classList.contains('d-none'), 'the form is offered');
-  assert.ok(elements.get('refund-ineligible').classList.contains('d-none'), 'and the "not eligible" notice is gone');
-});
+        ctx.expect(!elements.get('refund-eligible').classList.contains('d-none'), 'the form is offered').toBeTruthy();
+        ctx.expect(elements.get('refund-ineligible').classList.contains('d-none'), 'and the "not eligible" notice is gone').toBeTruthy();
+      },
+    },
 
-test('#672: with nothing refundable at all, the section still says no', async () => {
-  const elements = await renderSections(async (bundle) => {
-    await bundle.refund.loadData(FREE_ACCOUNT);
-  }, { orders: [orderSummary('4444-4444-4444', { refundable: false })] });
+    {
+      name: '#672: with nothing refundable at all, the section still says no',
+      run: async (ctx) => {
+        const elements = await renderSections(async (bundle) => {
+          await bundle.refund.loadData(FREE_ACCOUNT);
+        }, { orders: [orderSummary('4444-4444-4444', { refundable: false })] });
 
-  assert.ok(elements.get('refund-eligible').classList.contains('d-none'), 'no form for an account with nothing to refund');
-  assert.ok(!elements.get('refund-ineligible').classList.contains('d-none'), 'the notice explains why');
-});
+        ctx.expect(elements.get('refund-eligible').classList.contains('d-none'), 'no form for an account with nothing to refund').toBeTruthy();
+        ctx.expect(!elements.get('refund-ineligible').classList.contains('d-none'), 'the notice explains why').toBeTruthy();
+      },
+    },
 
-test('#672: the subject picker names each refundable purchase, and the pick from the orders list is honoured', async () => {
-  const orders = [
-    orderSummary('5555-5555-5555', { name: '100 Credits' }),
-    orderSummary('6666-6666-6666', { name: 'Launch Kit', amount: 49.99 }),
-  ];
+    {
+      name: '#672: the subject picker names each refundable purchase, and the pick from the orders list is honoured',
+      run: async (ctx) => {
+        const orders = [
+          orderSummary('5555-5555-5555', { name: '100 Credits' }),
+          orderSummary('6666-6666-6666', { name: 'Launch Kit', amount: 49.99 }),
+        ];
 
-  const elements = await renderSections(async (bundle, els) => {
-    // init() is what the page calls before any data lands — it wires the
-    // list's delegated click, which is the handoff under test.
-    bundle.orders.init();
+        const elements = await renderSections(async (bundle, els) => {
+          // init() is what the page calls before any data lands — it wires the
+          // list's delegated click, which is the handoff under test.
+          bundle.orders.init();
 
-    await bundle.orders.loadData();
-    await bundle.refund.loadData(FREE_ACCOUNT);
+          await bundle.orders.loadData();
+          await bundle.refund.loadData(FREE_ACCOUNT);
 
-    // The click the list renders: it hands the pick to the shared module and
-    // sends the page to the refund section, which reads it when shown.
-    const [handler] = els.get('orders-list').listeners.click;
-    handler({ target: { closest: () => ({ dataset: { orderId: '6666-6666-6666' } }) } });
+          // The click the list renders: it hands the pick to the shared module and
+          // sends the page to the refund section, which reads it when shown.
+          const [handler] = els.get('orders-list').listeners.click;
+          handler({ target: { closest: () => ({ dataset: { orderId: '6666-6666-6666' } }) } });
 
-    bundle.refund.onShow();
-  }, { orders });
+          bundle.refund.onShow();
+        }, { orders });
 
-  const options = elements.get('refund-subject').innerHTML;
+        const options = elements.get('refund-subject').innerHTML;
 
-  assert.ok(options.includes('5555-5555-5555'), 'each refundable purchase is a subject');
-  assert.ok(options.includes('6666-6666-6666'), 'both of them');
-  assert.ok(options.includes('100 Credits') && options.includes('Launch Kit'), 'named by what was bought');
-  assert.ok(!elements.get('refund-subject-picker').classList.contains('d-none'), 'the picker shows when there is a choice');
-  assert.equal(elements.get('refund-subject').value, '6666-6666-6666', 'the order the customer pressed the button on is the one selected');
-});
+        ctx.expect(options.includes('5555-5555-5555'), 'each refundable purchase is a subject').toBeTruthy();
+        ctx.expect(options.includes('6666-6666-6666'), 'both of them').toBeTruthy();
+        ctx.expect(options.includes('100 Credits') && options.includes('Launch Kit'), 'named by what was bought').toBeTruthy();
+        ctx.expect(!elements.get('refund-subject-picker').classList.contains('d-none'), 'the picker shows when there is a choice').toBeTruthy();
+        ctx.expect(elements.get('refund-subject').value, 'the order the customer pressed the button on is the one selected').toBe('6666-6666-6666');
+      },
+    },
 
-test('#672: a refund on a picked purchase posts that order id', async () => {
-  // One endpoint, two subjects: the orderId is the ONLY thing that tells the
-  // route which one it is being asked for (payments/refund/post.js), and it is
-  // read off the picker at submit time — so nothing but running the handler sees it.
-  await renderSections(async (bundle, els) => {
-    bundle.orders.init();
-    bundle.refund.init();
+    {
+      name: '#672: a refund on a picked purchase posts that order id',
+      run: async (ctx) => {
+        // One endpoint, two subjects: the orderId is the ONLY thing that tells the
+        // route which one it is being asked for (payments/refund/post.js), and it is
+        // read off the picker at submit time — so nothing but running the handler sees it.
+        await renderSections(async (bundle, els) => {
+          bundle.orders.init();
+          bundle.refund.init();
 
-    await bundle.orders.loadData();
-    await bundle.refund.loadData(FREE_ACCOUNT);
+          await bundle.orders.loadData();
+          await bundle.refund.loadData(FREE_ACCOUNT);
 
-    const [handler] = els.get('orders-list').listeners.click;
-    handler({ target: { closest: () => ({ dataset: { orderId: '8888-8888-8888' } }) } });
-    bundle.refund.onShow();
+          const [handler] = els.get('orders-list').listeners.click;
+          handler({ target: { closest: () => ({ dataset: { orderId: '8888-8888-8888' } }) } });
+          bundle.refund.onShow();
 
-    await globalThis.__refundForm.submit({ data: { feedback: 'Bought the wrong one' } });
-  }, { orders: [orderSummary('8888-8888-8888')] });
+          await globalThis.__refundForm.submit({ data: { feedback: 'Bought the wrong one' } });
+        }, { orders: [orderSummary('8888-8888-8888')] });
 
-  const [refundRequest] = requests.filter((request) => request.url.includes('/payments/refund'));
+        const [refundRequest] = requests.filter((request) => request.url.includes('/payments/refund'));
 
-  assert.ok(refundRequest, `the form posts to the refund route, got: ${requests.map((request) => request.url).join(', ')}`);
-  assert.equal(refundRequest.options.method, 'POST', 'as a write');
-  assert.deepStrictEqual(refundRequest.options.body, {
-    confirmed: true,
-    reason: REFUND_REASON,
-    feedback: 'Bought the wrong one',
-    orderId: '8888-8888-8888',
-  }, 'the body names the purchase, the reason and the confirmation, and nothing else');
-});
+        ctx.expect(refundRequest, `the form posts to the refund route, got: ${requests.map((request) => request.url).join(', ')}`).toBeTruthy();
+        ctx.expect(refundRequest.options.method, 'as a write').toBe('POST');
+        ctx.expect(refundRequest.options.body, 'the body names the purchase, the reason and the confirmation, and nothing else').toEqual({
+          confirmed: true,
+          reason: REFUND_REASON,
+          feedback: 'Bought the wrong one',
+          orderId: '8888-8888-8888',
+        });
+      },
+    },
 
-test('#672: a subscription refund posts no order id at all', async () => {
-  // An ABSENT orderId is what the route reads as "the subscription" — an empty
-  // string would be a named order it could not find, so the key must not ride
-  const SUBSCRIBER = new User({ subscription: { product: { id: 'pro', name: 'Pro' }, status: 'cancelled' } }, { uid: 'u1' });
+    {
+      name: '#672: a subscription refund posts no order id at all',
+      run: async (ctx) => {
+        // An ABSENT orderId is what the route reads as "the subscription" — an empty
+        // string would be a named order it could not find, so the key must not ride
+        const SUBSCRIBER = new User({ subscription: { product: { id: 'pro', name: 'Pro' }, status: 'cancelled' } }, { uid: 'u1' });
 
-  await renderSections(async (bundle) => {
-    bundle.refund.init();
+        await renderSections(async (bundle) => {
+          bundle.refund.init();
 
-    await bundle.refund.loadData(SUBSCRIBER);
+          await bundle.refund.loadData(SUBSCRIBER);
 
-    await globalThis.__refundForm.submit({ data: {} });
-  }, { orders: [] });
+          await globalThis.__refundForm.submit({ data: {} });
+        }, { orders: [] });
 
-  const [refundRequest] = requests.filter((request) => request.url.includes('/payments/refund'));
+        const [refundRequest] = requests.filter((request) => request.url.includes('/payments/refund'));
 
-  assert.deepStrictEqual(refundRequest.options.body, {
-    confirmed: true,
-    reason: REFUND_REASON,
-    feedback: '',
-  }, 'the subscription subject is the ABSENCE of an orderId, never an empty one');
-  assert.ok(!('orderId' in refundRequest.options.body), 'the key is not there at all');
-});
+        ctx.expect(refundRequest.options.body, 'the subscription subject is the ABSENCE of an orderId, never an empty one').toEqual({
+          confirmed: true,
+          reason: REFUND_REASON,
+          feedback: '',
+        });
+        ctx.expect(!('orderId' in refundRequest.options.body), 'the key is not there at all').toBeTruthy();
+      },
+    },
 
-test('#672: one fetch serves both sections', async () => {
-  await renderSections(async (bundle) => {
-    await bundle.orders.loadData();
-    await bundle.refund.loadData(FREE_ACCOUNT);
-  }, { orders: [orderSummary('7777-7777-7777')] });
+    {
+      name: '#672: one fetch serves both sections',
+      run: async (ctx) => {
+        await renderSections(async (bundle) => {
+          await bundle.orders.loadData();
+          await bundle.refund.loadData(FREE_ACCOUNT);
+        }, { orders: [orderSummary('7777-7777-7777')] });
 
-  const orderRequests = requests.filter((request) => request.url.includes('/user/orders'));
+        const orderRequests = requests.filter((request) => request.url.includes('/user/orders'));
 
-  assert.equal(orderRequests.length, 1, `the history is asked for once, got ${orderRequests.length}`);
-  assert.equal(orderRequests[0].options.method, 'GET', 'through the read route');
-});
+        ctx.expect(orderRequests.length, `the history is asked for once, got ${orderRequests.length}`).toBe(1);
+        ctx.expect(orderRequests[0].options.method, 'through the read route').toBe('GET');
+      },
+    },
 
-test('#672: the account layout carries the orders section and the refund subject picker', async () => {
-  // The premise both modules are built on: a section that is not in the markup
-  // renders into nothing, and no assertion over the modules alone would see it.
-  const layout = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
+    {
+      name: '#672: the account layout carries the orders section and the refund subject picker',
+      run: async (ctx) => {
+        // The premise both modules are built on: a section that is not in the markup
+        // renders into nothing, and no assertion over the modules alone would see it.
+        const layout = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
 
-  assert.match(layout, /id="orders-section"/, 'the orders section exists');
-  assert.match(layout, /id="orders-list"/, 'with the container the rows render into');
-  assert.match(layout, /id="refund-subject"/, 'and the refund form carries its subject picker');
+        ctx.expect(layout, 'the orders section exists').toMatch(/id="orders-section"/);
+        ctx.expect(layout, 'with the container the rows render into').toMatch(/id="orders-list"/);
+        ctx.expect(layout, 'and the refund form carries its subject picker').toMatch(/id="refund-subject"/);
 
-  const picker = layout.match(/<div[^>]*id="refund-subject-picker"[^>]*>/);
+        const picker = layout.match(/<div[^>]*id="refund-subject-picker"[^>]*>/);
 
-  assert.ok(picker, 'the picker wrapper is there');
-  assert.match(picker[0], /class="[^"]*\bd-none\b/, 'and it ships hidden — a subscription-only account never sees it');
+        ctx.expect(picker, 'the picker wrapper is there').toBeTruthy();
+        ctx.expect(picker[0], 'and it ships hidden — a subscription-only account never sees it').toMatch(/class="[^"]*\bd-none\b/);
 
-  // The nav rail is built from the frontmatter list, so a section with no entry
-  // is a section nobody can click to.
-  assert.match(layout, /- id: "orders"/, 'the section is in the page\'s own nav list');
+        // The nav rail is built from the frontmatter list, so a section with no entry
+        // is a section nobody can click to.
+        ctx.expect(layout, 'the section is in the page\'s own nav list').toMatch(/- id: "orders"/);
+      },
+    },
+  ],
 });

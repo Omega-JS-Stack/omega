@@ -6,11 +6,11 @@
  * module's own source into it: these cases hold the rendered starter and the
  * module to one rule, and the head to carrying no hand-written copy.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildWith, miniData, PKG } = require('./lib/build.js');
 const { applyStagger } = require('@omega.js/client/modules/reveal-stagger.js');
@@ -80,46 +80,48 @@ function runStarter(starter, step) {
   onMutate([{ addedNodes: [band] }]);
   while (frames.length) frames.shift()();
 
-  assert.ok(children.every((child) => child.getAttribute('data-omega-inview') === 'true'),
-    'the starter stamped every reveal it collected');
+  expect(children.every((child) => child.getAttribute('data-omega-inview') === 'true'), 'the starter stamped every reveal it collected').toBeTruthy();
   return children.map((child) => child.props['--omega-reveal-delay']);
 }
 
-test('the rendered starter carries the motion module\'s stagger, and the head no copy of it', async () => {
-  const pages = await buildWith(miniData, {}, 'reveal-stagger-pin');
-  const home = pages.get('/');
-  assert.ok(home, 'the fixture home page builds');
+module.exports = defineCases({
+  type: 'group',
+  description: 'reveal-stagger-pin',
+  tests: [
+    {
+      name: 'the rendered starter carries the motion module\'s stagger, and the head no copy of it',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'reveal-stagger-pin');
+        const home = pages.get('/');
+        ctx.expect(home, 'the fixture home page builds').toBeTruthy();
 
-  const head = home.slice(0, home.indexOf('</head>'));
-  const starter = [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)]
-    .map((match) => match[1])
-    .find((body) => body.includes('data-omega-first-paint'));
-  assert.ok(starter, 'the head renders the inline first-paint starter');
+        const head = home.slice(0, home.indexOf('</head>'));
+        const starter = [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+          .map((match) => match[1])
+          .find((body) => body.includes('data-omega-first-paint'));
+        ctx.expect(starter, 'the head renders the inline first-paint starter').toBeTruthy();
 
-  assert.ok(starter.includes(String(applyStagger)),
-    'the starter runs the module\'s applyStagger, templated in from its own source');
+        ctx.expect(starter.includes(String(applyStagger)), 'the starter runs the module\'s applyStagger, templated in from its own source').toBeTruthy();
 
-  const source = fs.readFileSync(HEAD, 'utf8');
-  assert.ok(!source.includes('--omega-reveal-delay'),
-    'head.html writes no delay formula of its own: the module is the one home');
-  assert.ok(!/\|\|\s*60\b/.test(source), 'head.html writes no default step of its own');
+        const source = fs.readFileSync(HEAD, 'utf8');
+        ctx.expect(!source.includes('--omega-reveal-delay'), 'head.html writes no delay formula of its own: the module is the one home').toBeTruthy();
+        ctx.expect(!/\|\|\s*60\b/.test(source), 'head.html writes no default step of its own').toBeTruthy();
 
-  const motion = fs.readFileSync(MOTION, 'utf8');
-  assert.match(motion, /import \{ applyStagger \} from '\.\/reveal-stagger\.js';/,
-    'the motion engine imports the same applyStagger');
-  assert.ok(!motion.includes('--omega-reveal-delay'), 'and writes no delay formula of its own');
+        const motion = fs.readFileSync(MOTION, 'utf8');
+        ctx.expect(motion, 'the motion engine imports the same applyStagger').toMatch(/import \{ applyStagger \} from '\.\/reveal-stagger\.js';/);
+        ctx.expect(!motion.includes('--omega-reveal-delay'), 'and writes no delay formula of its own').toBeTruthy();
 
-  // Both runtimes write the same delays: 60ms a step by default, the authored
-  // step otherwise. Hard-coded on purpose, so a default moved anywhere fails.
-  assert.deepStrictEqual(runStarter(starter, ''), ['0ms', '60ms', '120ms'],
-    'the rendered starter staggers 60ms a step when the parent names none');
-  assert.deepStrictEqual(runStarter(starter, '40'), ['0ms', '40ms', '80ms'],
-    'and the authored step when it names one');
+        // Both runtimes write the same delays: 60ms a step by default, the authored
+        // step otherwise. Hard-coded on purpose, so a default moved anywhere fails.
+        ctx.expect(runStarter(starter, ''), 'the rendered starter staggers 60ms a step when the parent names none').toEqual(['0ms', '60ms', '120ms']);
+        ctx.expect(runStarter(starter, '40'), 'and the authored step when it names one').toEqual(['0ms', '40ms', '80ms']);
 
-  for (const [step, expected] of [['', ['0ms', '60ms', '120ms']], ['40', ['0ms', '40ms', '80ms']]]) {
-    const { parent, children } = staggerParent(step, 3);
-    applyStagger(parent);
-    assert.deepStrictEqual(children.map((child) => child.props['--omega-reveal-delay']), expected,
-      `the engine's applyStagger writes the same delays (step "${step}")`);
-  }
+        for (const [step, expected] of [['', ['0ms', '60ms', '120ms']], ['40', ['0ms', '40ms', '80ms']]]) {
+          const { parent, children } = staggerParent(step, 3);
+          applyStagger(parent);
+          ctx.expect(children.map((child) => child.props['--omega-reveal-delay']), `the engine's applyStagger writes the same delays (step "${step}")`).toEqual(expected);
+        }
+      },
+    },
+  ],
 });

@@ -45,53 +45,29 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-command-line-runs-through-the-hosts-own-shell',
-      async run({ assert }) {
-        assert.deepEqual(
-          shellInvocation('firebase emulators:start --only functions', 'darwin'),
-          ['sh', ['-c', 'firebase emulators:start --only functions']],
-          'unix composes sh -c',
-        );
-        assert.deepEqual(
-          shellInvocation('firebase emulators:start --only functions', 'linux'),
-          ['sh', ['-c', 'firebase emulators:start --only functions']],
-          'linux is the same unix branch',
-        );
-        assert.deepEqual(
-          shellInvocation('firebase emulators:start --only functions', 'win32'),
-          ['cmd.exe', ['/c', 'firebase emulators:start --only functions']],
-          'windows has no sh — cmd.exe /c, and never shell:true (DEP0190)',
-        );
+      async run({ expect }) {
+        expect(shellInvocation('firebase emulators:start --only functions', 'darwin'), 'unix composes sh -c').toEqual(['sh', ['-c', 'firebase emulators:start --only functions']]);
+        expect(shellInvocation('firebase emulators:start --only functions', 'linux'), 'linux is the same unix branch').toEqual(['sh', ['-c', 'firebase emulators:start --only functions']]);
+        expect(shellInvocation('firebase emulators:start --only functions', 'win32'), 'windows has no sh — cmd.exe /c, and never shell:true (DEP0190)').toEqual(['cmd.exe', ['/c', 'firebase emulators:start --only functions']]);
       },
     },
 
     {
       name: 'a-bare-name-is-resolved-by-the-host-never-by-us',
-      async run({ assert }) {
+      async run({ expect }) {
         // The whole point of the pair: `commandOnPath` says nodemon EXISTS, and
         // this says how to run it. On Windows that must go through cmd.exe, the
         // only thing that applies PATHEXT to a bare name and can execute the
         // `.cmd` shim npm installed.
-        assert.deepEqual(
-          pathInvocation('nodemon', ['--watch', '/src'], 'darwin'),
-          ['nodemon', ['--watch', '/src']],
-          'unix spawns the name directly — execvp searches PATH, and the child stays the real process',
-        );
-        assert.deepEqual(
-          pathInvocation('nodemon', ['--watch', 'C:\\src'], 'win32'),
-          ['cmd.exe', ['/c', 'nodemon', '--watch', 'C:\\src']],
-          'windows goes through cmd.exe with the args still separate (Node quotes each one)',
-        );
-        assert.deepEqual(
-          pathInvocation('stripe', [], 'win32'),
-          ['cmd.exe', ['/c', 'stripe']],
-          'no args is still the shell branch',
-        );
+        expect(pathInvocation('nodemon', ['--watch', '/src'], 'darwin'), 'unix spawns the name directly — execvp searches PATH, and the child stays the real process').toEqual(['nodemon', ['--watch', '/src']]);
+        expect(pathInvocation('nodemon', ['--watch', 'C:\\src'], 'win32'), 'windows goes through cmd.exe with the args still separate (Node quotes each one)').toEqual(['cmd.exe', ['/c', 'nodemon', '--watch', 'C:\\src']]);
+        expect(pathInvocation('stripe', [], 'win32'), 'no args is still the shell branch').toEqual(['cmd.exe', ['/c', 'stripe']]);
       },
     },
 
     {
       name: 'the-reload-trigger-script-survives-a-windows-path',
-      async run({ assert }) {
+      async run({ expect }) {
         const triggerFile = 'C:\\Users\\ian\\targets\\backend\\dist\\omega-reload-trigger.js';
         const resetPaths = ['C:\\Users\\ian\\.temp\\dev.log.reset'];
         const script = scriptOf(reloadTriggerExec({ triggerFile, resetPaths, message: '  x' }));
@@ -100,15 +76,15 @@ module.exports = defineCases({
         // parsed the path into a different one and the trigger silently missed.
         // eslint-disable-next-line no-new-func
         const readBack = new Function(`${script.slice(0, script.indexOf(',fs='))};return f;`)();
-        assert.equal(readBack, triggerFile, 'the path node parses must be the path we meant');
-        assert.equal(script.includes('C:\\\\Users\\\\ian'), true, 'backslashes are escaped in the literal, not lost');
-        assert.equal(script.includes(`'${resetPaths[0]}'`), false, 'the sentinel path is escaped too, not raw');
+        expect(readBack, 'the path node parses must be the path we meant').toBe(triggerFile);
+        expect(script.includes('C:\\\\Users\\\\ian'), 'backslashes are escaped in the literal, not lost').toBe(true);
+        expect(script.includes(`'${resetPaths[0]}'`), 'the sentinel path is escaped too, not raw').toBe(false);
       },
     },
 
     {
       name: 'the-reload-trigger-script-still-round-trips-a-unix-path',
-      async run({ assert }) {
+      async run({ expect }) {
         const triggerFile = '/Users/ian/targets/backend/dist/omega-reload-trigger.js';
         const line = reloadTriggerExec({
           triggerFile,
@@ -119,25 +95,25 @@ module.exports = defineCases({
 
         // eslint-disable-next-line no-new-func
         const readBack = new Function(`${script.slice(0, script.indexOf(',fs='))};return f;`)();
-        assert.equal(readBack, triggerFile, 'the unix path is unchanged by the escaping');
-        assert.equal(line.endsWith('&& echo "  [@omega.js/backend] Triggered hot reload"'), true, 'the lane keeps its own line');
-        assert.equal(line.includes('touch '), false, 'touch is gone — it bumps mtime, and Firebase reloads on content');
-        assert.equal(line.includes('sleep'), false, 'sleep is a Unix binary; the settle wait is in-process');
+        expect(readBack, 'the unix path is unchanged by the escaping').toBe(triggerFile);
+        expect(line.endsWith('&& echo "  [@omega.js/backend] Triggered hot reload"'), 'the lane keeps its own line').toBe(true);
+        expect(line.includes('touch '), 'touch is gone — it bumps mtime, and Firebase reloads on content').toBe(false);
+        expect(line.includes('sleep'), 'sleep is a Unix binary; the settle wait is in-process').toBe(false);
       },
     },
 
     {
       name: 'every-machine-tool-install-names-a-manager-the-host-actually-has',
-      async run({ assert }) {
+      async run({ expect }) {
         const java = MACHINE_TOOLS.backend.find((tool) => tool.name === 'java').install;
-        assert.equal(java.darwin, 'brew install openjdk');
-        assert.equal(java.win32.split('.')[0], 'winget install Microsoft', 'windows opens with winget');
-        assert.equal(java.linux, 'sudo apt install default-jdk');
-        assert.equal(/choco install openjdk/.test(java.win32), true, 'chocolatey is still named');
+        expect(java.darwin).toBe('brew install openjdk');
+        expect(java.win32.split('.')[0], 'windows opens with winget').toBe('winget install Microsoft');
+        expect(java.linux).toBe('sudo apt install default-jdk');
+        expect(/choco install openjdk/.test(java.win32), 'chocolatey is still named').toBe(true);
 
         for (const tool of Object.values(MACHINE_TOOLS).flat()) {
           for (const platform of ['win32', 'linux']) {
-            assert.equal(tool.install[platform].includes('brew install'), false, `${tool.name} on ${platform}: no Homebrew there`);
+            expect(tool.install[platform].includes('brew install'), `${tool.name} on ${platform}: no Homebrew there`).toBe(false);
           }
 
           // Same rule as the mkcert hint: the head of the line is pasteable, an
@@ -145,7 +121,7 @@ module.exports = defineCases({
           // is a command that does not run.
           for (const platform of ['darwin', 'win32', 'linux']) {
             const head = tool.install[platform].split('.')[0];
-            assert.equal(/\(or\b|\bor:/.test(head), false, `${tool.name} on ${platform} splices an alternative into the command`);
+            expect(/\(or\b|\bor:/.test(head), `${tool.name} on ${platform} splices an alternative into the command`).toBe(false);
           }
         }
       },
@@ -153,7 +129,7 @@ module.exports = defineCases({
 
     {
       name: 'the-port-diagnostic-is-unix-only-and-says-so',
-      async run({ assert }) {
+      async run({ expect }) {
         const command = new BaseCommand({ firebaseProjectPath: process.cwd(), argv: {}, options: {} });
 
         // lsof/ps do not exist on Windows. The enrichment answers "nobody to
@@ -163,8 +139,8 @@ module.exports = defineCases({
         // number: the run's own emulators bind dynamic ports, and a fixed
         // "free" port was found held by them.
         const port = await freePort();
-        assert.equal(command.getProcessesOnPort(port, { platform: 'win32' }), null, 'win32 short-circuits');
-        assert.equal(command.getProcessesOnPort(port, { platform: 'darwin' }), null, 'a free port is null on unix too');
+        expect(command.getProcessesOnPort(port, { platform: 'win32' }), 'win32 short-circuits').toBe(null);
+        expect(command.getProcessesOnPort(port, { platform: 'darwin' }), 'a free port is null on unix too').toBe(null);
       },
     },
   ],

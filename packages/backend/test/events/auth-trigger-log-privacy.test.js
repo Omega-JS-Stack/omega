@@ -152,31 +152,31 @@ async function runOnDeleteWithDoc() {
 }
 
 // The two claims every trigger makes, asserted the same way for each.
-function assertHeadlineIsUidAlone({ assert, calls, tag }) {
+function assertHeadlineIsUidAlone({ expect, calls, tag }) {
   const headline = calls.log[0];
 
-  assert.ok(headline, `${tag}: no headline line was logged`);
-  assert.equal(headline[0], `${tag}: ${UID}`, `${tag}: headline is not the uid alone: ${render(headline)}`);
-  assert.equal(headline.length, 1, `${tag}: the headline carries a payload: ${render(headline.slice(1))}`);
+  expect(headline, `${tag}: no headline line was logged`).toBeTruthy();
+  expect(headline[0], `${tag}: headline is not the uid alone: ${render(headline)}`).toBe(`${tag}: ${UID}`);
+  expect(headline.length, `${tag}: the headline carries a payload: ${render(headline.slice(1))}`).toBe(1);
 }
 
-function assertNothingPrivateRidesTheLog({ assert, calls, tag, context }) {
+function assertNothingPrivateRidesTheLog({ expect, calls, tag, context }) {
   const written = [...calls.log, ...calls.error];
 
   for (const args of written) {
     const line = render(args);
 
-    assert.equal(line.includes(EMAIL), false, `${tag}: email written to a log line: ${line}`);
-    assert.equal(line.includes(DISPLAY_NAME), false, `${tag}: display name written to a log line: ${line}`);
-    assert.equal(args.includes(USER), false, `${tag}: the user record rides a log line: ${line}`);
-    assert.equal(args.includes(context), false, `${tag}: the trigger context rides a log line: ${line}`);
+    expect(line.includes(EMAIL), `${tag}: email written to a log line: ${line}`).toBe(false);
+    expect(line.includes(DISPLAY_NAME), `${tag}: display name written to a log line: ${line}`).toBe(false);
+    expect(args.includes(USER), `${tag}: the user record rides a log line: ${line}`).toBe(false);
+    expect(args.includes(context), `${tag}: the trigger context rides a log line: ${line}`).toBe(false);
   }
 
   // Not deleted — moved behind the debug gate, which is dropped whole unless
   // OMEGA_DEBUG is set.
   const records = calls.debug.filter((args) => args.includes(USER) && args.includes(context));
 
-  assert.equal(records.length, 1, `${tag}: the full record should stay reachable at debug level`);
+  expect(records.length, `${tag}: the full record should stay reachable at debug level`).toBe(1);
 }
 
 module.exports = defineCases({
@@ -186,43 +186,43 @@ module.exports = defineCases({
   tests: [
     {
       name: 'before-create-headline-is-the-uid-alone',
-      async run({ assert }) {
-        assertHeadlineIsUidAlone({ assert: assert, calls: await runBeforeCreate(), tag: 'beforeCreate' });
+      async run({ expect }) {
+        assertHeadlineIsUidAlone({ expect: expect, calls: await runBeforeCreate(), tag: 'beforeCreate' });
       },
     },
 
     {
       name: 'before-create-never-logs-the-record-or-the-context',
-      async run({ assert }) {
-        assertNothingPrivateRidesTheLog({ assert: assert, calls: await runBeforeCreate(), tag: 'beforeCreate', context: AUTH_CONTEXT });
+      async run({ expect }) {
+        assertNothingPrivateRidesTheLog({ expect: expect, calls: await runBeforeCreate(), tag: 'beforeCreate', context: AUTH_CONTEXT });
       },
     },
 
     {
       name: 'before-signin-headline-is-the-uid-alone',
-      async run({ assert }) {
-        assertHeadlineIsUidAlone({ assert: assert, calls: await runBeforeSignIn(), tag: 'beforeSignIn' });
+      async run({ expect }) {
+        assertHeadlineIsUidAlone({ expect: expect, calls: await runBeforeSignIn(), tag: 'beforeSignIn' });
       },
     },
 
     {
       name: 'before-signin-never-logs-the-record-or-the-context',
-      async run({ assert }) {
-        assertNothingPrivateRidesTheLog({ assert: assert, calls: await runBeforeSignIn(), tag: 'beforeSignIn', context: AUTH_CONTEXT });
+      async run({ expect }) {
+        assertNothingPrivateRidesTheLog({ expect: expect, calls: await runBeforeSignIn(), tag: 'beforeSignIn', context: AUTH_CONTEXT });
       },
     },
 
     {
       name: 'on-delete-headline-is-the-uid-alone',
-      async run({ assert }) {
-        assertHeadlineIsUidAlone({ assert: assert, calls: await runOnDelete(), tag: 'onDelete' });
+      async run({ expect }) {
+        assertHeadlineIsUidAlone({ expect: expect, calls: await runOnDelete(), tag: 'onDelete' });
       },
     },
 
     {
       name: 'on-delete-never-logs-the-record-or-the-context',
-      async run({ assert }) {
-        assertNothingPrivateRidesTheLog({ assert: assert, calls: await runOnDelete(), tag: 'onDelete', context: EVENT_CONTEXT });
+      async run({ expect }) {
+        assertNothingPrivateRidesTheLog({ expect: expect, calls: await runOnDelete(), tag: 'onDelete', context: EVENT_CONTEXT });
       },
     },
 
@@ -230,30 +230,30 @@ module.exports = defineCases({
 
     {
       name: 'on-delete-marketing-remove-logs-the-uid-and-a-count',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await runOnDeleteWithDoc();
         const line = calls.log.find((args) => String(args[0]).includes('Marketing remove'));
 
-        assert.ok(line, `no marketing-remove line was logged: ${calls.log.map(render).join(' | ')}`);
-        assert.equal(line.length, 1, `the line carries the provider result: ${render(line.slice(1))}`);
-        assert.match(render(line), new RegExp(UID), 'the line should name the account the removal was for');
-        assert.match(render(line), /2/, 'the line should count the providers that answered');
+        expect(line, `no marketing-remove line was logged: ${calls.log.map(render).join(' | ')}`).toBeTruthy();
+        expect(line.length, `the line carries the provider result: ${render(line.slice(1))}`).toBe(1);
+        expect(render(line), 'the line should name the account the removal was for').toMatch(new RegExp(UID));
+        expect(render(line), 'the line should count the providers that answered').toMatch(/2/);
       },
     },
 
     {
       name: 'on-delete-marketing-remove-keeps-the-result-behind-the-debug-gate',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = await runOnDeleteWithDoc();
 
         for (const args of [...calls.log, ...calls.error]) {
-          assert.equal(args.includes(MARKETING_RESULT), false, `the provider result rides a log line: ${render(args)}`);
-          assert.equal(render(args).includes(EMAIL), false, `email written to a log line: ${render(args)}`);
+          expect(args.includes(MARKETING_RESULT), `the provider result rides a log line: ${render(args)}`).toBe(false);
+          expect(render(args).includes(EMAIL), `email written to a log line: ${render(args)}`).toBe(false);
         }
 
         const records = calls.debug.filter((args) => args.includes(MARKETING_RESULT));
 
-        assert.equal(records.length, 1, 'the provider result should stay reachable at debug level');
+        expect(records.length, 'the provider result should stay reachable at debug level').toBe(1);
       },
     },
   ],

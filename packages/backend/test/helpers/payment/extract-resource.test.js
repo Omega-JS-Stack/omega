@@ -13,7 +13,7 @@
  * What the envelope must NEVER do is drive state: that comes from the provider's own
  * lookup ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
@@ -39,7 +39,7 @@ module.exports = defineCases({
       async run() {
         const resource = Stripe.extractResource(stripeEvent);
 
-        assert.equal(resource.id, stripeCheckoutSession.id, 'Stripe nests its resource at data.object');
+        expect(resource.id, 'Stripe nests its resource at data.object').toBe(stripeCheckoutSession.id);
       },
     },
 
@@ -51,8 +51,8 @@ module.exports = defineCases({
         // which is the whole journey lane, since every journey runs on this provider
         const resource = Test.extractResource(stripeEvent);
 
-        assert.equal(resource.id, stripeCheckoutSession.id, 'The test provider speaks Stripe, envelope included');
-        assert.equal(Test.extractResource({ id: 'evt_empty' }), null, 'And answers nothing the same way Stripe does');
+        expect(resource.id, 'The test provider speaks Stripe, envelope included').toBe(stripeCheckoutSession.id);
+        expect(Test.extractResource({ id: 'evt_empty' }), 'And answers nothing the same way Stripe does').toBe(null);
       },
     },
 
@@ -62,7 +62,7 @@ module.exports = defineCases({
         const raw = { id: 'WH-TEST', event_type: 'BILLING.SUBSCRIPTION.ACTIVATED', resource: { id: 'I-TEST', status: 'ACTIVE' } };
         const resource = PayPal.extractResource(raw);
 
-        assert.equal(resource.id, 'I-TEST', 'PayPal carries its resource at the top-level resource key');
+        expect(resource.id, 'PayPal carries its resource at the top-level resource key').toBe('I-TEST');
       },
     },
 
@@ -74,8 +74,8 @@ module.exports = defineCases({
         // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642))
         const charge = Coinbase.extractResource(coinbaseChargeConfirmed);
 
-        assert.equal(charge.id, coinbaseChargeConfirmed.event.data.id, 'Coinbase carries its charge at event.data');
-        assert.equal(Coinbase.extractResource({ id: 'delivery_only' }), null, 'And answers nothing the same way its siblings do');
+        expect(charge.id, 'Coinbase carries its charge at event.data').toBe(coinbaseChargeConfirmed.event.data.id);
+        expect(Coinbase.extractResource({ id: 'delivery_only' }), 'And answers nothing the same way its siblings do').toBe(null);
       },
     },
 
@@ -84,8 +84,8 @@ module.exports = defineCases({
       async run() {
         const subscription = Chargebee.extractResource(chargebeeSubscriptionCreated);
 
-        assert.equal(subscription.id, chargebeeSubscriptionCreated.content.subscription.id, 'A subscription event resolves content.subscription');
-        assert.equal(subscription.object, 'subscription', 'The resolved resource is the subscription, not the invoice beside it');
+        expect(subscription.id, 'A subscription event resolves content.subscription').toBe(chargebeeSubscriptionCreated.content.subscription.id);
+        expect(subscription.object, 'The resolved resource is the subscription, not the invoice beside it').toBe('subscription');
       },
     },
 
@@ -97,16 +97,16 @@ module.exports = defineCases({
         const raw = { id: 'ev_cb_invoice_001', event_type: 'invoice_generated', content: { invoice: chargebeeInvoiceOneTime, customer: { id: 'cb_cust_001' } } };
         const resource = Chargebee.extractResource(raw);
 
-        assert.equal(resource.id, chargebeeInvoiceOneTime.id, 'An invoice-only event resolves content.invoice');
+        expect(resource.id, 'An invoice-only event resolves content.invoice').toBe(chargebeeInvoiceOneTime.id);
       },
     },
 
     {
       name: 'an-envelope-with-no-resource-extracts-nothing',
       async run() {
-        assert.equal(Chargebee.extractResource({ id: 'ev_empty', content: {} }), null, 'Chargebee: no content key, nothing to fall back to');
-        assert.equal(Stripe.extractResource({ id: 'evt_empty' }), null, 'Stripe: no data.object, nothing to fall back to');
-        assert.equal(PayPal.extractResource({ id: 'WH-empty' }), null, 'PayPal: no resource, nothing to fall back to');
+        expect(Chargebee.extractResource({ id: 'ev_empty', content: {} }), 'Chargebee: no content key, nothing to fall back to').toBe(null);
+        expect(Stripe.extractResource({ id: 'evt_empty' }), 'Stripe: no data.object, nothing to fall back to').toBe(null);
+        expect(PayPal.extractResource({ id: 'WH-empty' }), 'PayPal: no resource, nothing to fall back to').toBe(null);
       },
     },
   ],

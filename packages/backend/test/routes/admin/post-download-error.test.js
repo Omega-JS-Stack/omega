@@ -27,63 +27,43 @@ module.exports = defineCases({
   tests: [
     {
       name: 'strips-html-404-body',
-      async run({ assert }) {
+      async run({ expect }) {
         // The exact CDN response body from a real failed sponsorship publish
         const err = new Error('<html><body>404</body></html>');
 
-        assert.equal(
-          formatImageDownloadError(SRC, err),
-          `Could not download image (${SRC}): 404`,
-          'HTML tags are stripped, the status text and image URL survive',
-        );
+        expect(formatImageDownloadError(SRC, err), 'HTML tags are stripped, the status text and image URL survive').toBe(`Could not download image (${SRC}): 404`);
       },
     },
 
     {
       name: 'plain-message-passes-through',
-      async run({ assert }) {
-        assert.equal(
-          formatImageDownloadError(SRC, new Error('socket hang up')),
-          `Could not download image (${SRC}): socket hang up`,
-          'Plain reasons are included as-is',
-        );
+      async run({ expect }) {
+        expect(formatImageDownloadError(SRC, new Error('socket hang up')), 'Plain reasons are included as-is').toBe(`Could not download image (${SRC}): socket hang up`);
       },
     },
 
     {
       name: 'truncates-long-reasons',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = formatImageDownloadError(SRC, new Error('x'.repeat(500)));
 
-        assert.ok(result.endsWith('...'), 'Truncated reasons end with an ellipsis');
-        assert.ok(result.length < 300, 'Reason is capped well below the raw length');
+        expect(result.endsWith('...'), 'Truncated reasons end with an ellipsis').toBeTruthy();
+        expect(result.length < 300, 'Reason is capped well below the raw length').toBeTruthy();
       },
     },
 
     {
       name: 'empty-reason-falls-back',
-      async run({ assert }) {
-        assert.equal(
-          formatImageDownloadError(SRC, new Error('<html></html>')),
-          `Could not download image (${SRC}): unknown error`,
-          'Tag-only bodies fall back to a generic reason',
-        );
-        assert.equal(
-          formatImageDownloadError(SRC, new Error('')),
-          `Could not download image (${SRC}): unknown error`,
-          'Empty messages fall back to a generic reason (not the stringified "Error")',
-        );
+      async run({ expect }) {
+        expect(formatImageDownloadError(SRC, new Error('<html></html>')), 'Tag-only bodies fall back to a generic reason').toBe(`Could not download image (${SRC}): unknown error`);
+        expect(formatImageDownloadError(SRC, new Error('')), 'Empty messages fall back to a generic reason (not the stringified "Error")').toBe(`Could not download image (${SRC}): unknown error`);
       },
     },
 
     {
       name: 'handles-non-error-values',
-      async run({ assert }) {
-        assert.equal(
-          formatImageDownloadError(SRC, 'ECONNRESET'),
-          `Could not download image (${SRC}): ECONNRESET`,
-          'Plain string rejections are handled',
-        );
+      async run({ expect }) {
+        expect(formatImageDownloadError(SRC, 'ECONNRESET'), 'Plain string rejections are handled').toBe(`Could not download image (${SRC}): ECONNRESET`);
       },
     },
   ],

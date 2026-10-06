@@ -10,10 +10,9 @@
  * that build's own manifest. The expected chains are read off the built files,
  * never off the manifest's `js.imports` map the build writes.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { after, test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildAssets } = require('../src/assets.js');
 const { buildWith, miniData, PKG } = require('./lib/build.js');
@@ -21,8 +20,6 @@ const { buildWith, miniData, PKG } = require('./lib/build.js');
 const ROOT = path.resolve(PKG, '..', '..');
 const SITE_ASSETS = path.join(__dirname, 'fixtures', 'site-assets');
 const OUT = path.join(PKG, '.omega', `modulepreload-out-${process.pid}`);
-
-after(() => fs.rmSync(OUT, { recursive: true, force: true }));
 
 let built = null;
 
@@ -114,87 +111,103 @@ const manifestEntries = (manifest) => [
   ...Object.values(manifest.js.layouts).flat(),
 ];
 
-test('case 11: each module entry a page loads preloads every chunk in its static chain, once, and nothing else', async () => {
-  const { manifest, pages } = await fixture();
+module.exports = defineCases({
+  type: 'group',
+  description: 'modulepreload',
+  cleanup: () => fs.rmSync(OUT, { recursive: true, force: true }),
+  tests: [
+    {
+      name: 'case 11: each module entry a page loads preloads every chunk in its static chain, once, and nothing else',
+      run: async (ctx) => {
+        const { manifest, pages } = await fixture();
 
-  // The premise, on /signin: the main entry and the page entry share a chunk,
-  // and the page entry has a chunk of its own no other entry on the page reaches.
-  const signin = pages.get('/signin');
-  const signinEntry = manifest.js.pages['signin/index'][0];
-  const entries = moduleEntries(signin);
-  assert.ok(entries.includes(manifest.js.main), '/signin loads the main entry');
-  assert.ok(entries.includes(signinEntry), '/signin loads its page entry');
+        // The premise, on /signin: the main entry and the page entry share a chunk,
+        // and the page entry has a chunk of its own no other entry on the page reaches.
+        const signin = pages.get('/signin');
+        const signinEntry = manifest.js.pages['signin/index'][0];
+        const entries = moduleEntries(signin);
+        ctx.expect(entries.includes(manifest.js.main), '/signin loads the main entry').toBeTruthy();
+        ctx.expect(entries.includes(signinEntry), '/signin loads its page entry').toBeTruthy();
 
-  const mainChain = staticChain(manifest.js.main);
-  const pageChain = staticChain(signinEntry);
-  const others = new Set(entries.filter((url) => url !== signinEntry).flatMap((url) => [...staticChain(url)]));
-  assert.ok([...pageChain].some((url) => mainChain.has(url)), 'main and the signin entry share a static chunk');
-  assert.ok([...pageChain].some((url) => !others.has(url)), 'the signin entry has a static chunk of its own');
+        const mainChain = staticChain(manifest.js.main);
+        const pageChain = staticChain(signinEntry);
+        const others = new Set(entries.filter((url) => url !== signinEntry).flatMap((url) => [...staticChain(url)]));
+        ctx.expect([...pageChain].some((url) => mainChain.has(url)), 'main and the signin entry share a static chunk').toBeTruthy();
+        ctx.expect([...pageChain].some((url) => !others.has(url)), 'the signin entry has a static chunk of its own').toBeTruthy();
 
-  for (const [url, html] of htmlPages(pages)) {
-    const expected = new Set(moduleEntries(html).flatMap((entry) => [...staticChain(entry)]));
-    const links = preloads(html);
+        for (const [url, html] of htmlPages(pages)) {
+          const expected = new Set(moduleEntries(html).flatMap((entry) => [...staticChain(entry)]));
+          const links = preloads(html);
 
-    for (const chunk of expected) {
-      const count = links.filter((href) => href === chunk).length;
-      assert.equal(count, 1, `${url}: ${chunk} has exactly one modulepreload link (found ${count})`);
-    }
-    for (const href of links) {
-      assert.ok(expected.has(href), `${url}: modulepreload ${href} is outside the static chains of the page's entries`);
-    }
-  }
-});
+          for (const chunk of expected) {
+            const count = links.filter((href) => href === chunk).length;
+            ctx.expect(count, `${url}: ${chunk} has exactly one modulepreload link (found ${count})`).toBe(1);
+          }
+          for (const href of links) {
+            ctx.expect(expected.has(href), `${url}: modulepreload ${href} is outside the static chains of the page's entries`).toBeTruthy();
+          }
+        }
+      },
+    },
 
-test('case 12: a chunk reached only by a dynamic import is on disk and never preloaded', async () => {
-  const { manifest, pages } = await fixture();
+    {
+      name: 'case 12: a chunk reached only by a dynamic import is on disk and never preloaded',
+      run: async (ctx) => {
+        const { manifest, pages } = await fixture();
 
-  const staticAll = new Set(manifestEntries(manifest).flatMap((url) => [...staticChain(url)]));
-  const dynamicOnly = new Set();
-  for (const file of walkJs(path.join(OUT, 'assets', 'js'))) {
-    for (const match of fs.readFileSync(file, 'utf8').matchAll(DYNAMIC_IMPORT)) {
-      const url = toUrl(path.resolve(path.dirname(file), match[1]));
-      if (!staticAll.has(url)) dynamicOnly.add(url);
-    }
-  }
+        const staticAll = new Set(manifestEntries(manifest).flatMap((url) => [...staticChain(url)]));
+        const dynamicOnly = new Set();
+        for (const file of walkJs(path.join(OUT, 'assets', 'js'))) {
+          for (const match of fs.readFileSync(file, 'utf8').matchAll(DYNAMIC_IMPORT)) {
+            const url = toUrl(path.resolve(path.dirname(file), match[1]));
+            if (!staticAll.has(url)) dynamicOnly.add(url);
+          }
+        }
 
-  // The premise: the theme's `__theme__` import is the fixture's known
-  // dynamic-only chunk, and the pages preload something, so "none" is not vacuous.
-  assert.ok([...dynamicOnly].some((url) => /\/chunks\/_theme-[A-Z0-9]+\.js$/.test(url)), 'the theme chunk is reached only dynamically');
-  assert.ok(preloads(pages.get('/signin')).length > 0, '/signin carries modulepreload links');
+        // The premise: the theme's `__theme__` import is the fixture's known
+        // dynamic-only chunk, and the pages preload something, so "none" is not vacuous.
+        ctx.expect([...dynamicOnly].some((url) => /\/chunks\/_theme-[A-Z0-9]+\.js$/.test(url)), 'the theme chunk is reached only dynamically').toBeTruthy();
+        ctx.expect(preloads(pages.get('/signin')).length > 0, '/signin carries modulepreload links').toBeTruthy();
 
-  // The two the Contract names, found by content: the file stems (`index.esm-`,
-  // `prod-`) are shared by other Firebase modules and say nothing about Sentry.
-  const chunks = walkJs(path.join(OUT, 'assets', 'js', 'chunks'));
-  const sdks = {
-    firestore: chunks.filter((file) => fs.readFileSync(file, 'utf8').includes('firestore.googleapis.com')).map(toUrl),
-    sentry: chunks.filter((file) => fs.readFileSync(file, 'utf8').includes('sentry.javascript.browser')).map(toUrl),
-  };
-  for (const [sdk, urls] of Object.entries(sdks)) {
-    assert.ok(urls.length > 0, `the build has a ${sdk} SDK chunk`);
-    for (const url of urls) assert.ok(dynamicOnly.has(url), `the ${sdk} SDK chunk ${url} is reached only dynamically`);
-  }
-  const named = new Set(htmlPages(pages).flatMap(([, html]) => preloads(html)));
-  for (const url of [...sdks.firestore, ...sdks.sentry]) {
-    assert.ok(!named.has(url), `no page preloads the SDK chunk ${url}`);
-  }
+        // The two the Contract names, found by content: the file stems (`index.esm-`,
+        // `prod-`) are shared by other Firebase modules and say nothing about Sentry.
+        const chunks = walkJs(path.join(OUT, 'assets', 'js', 'chunks'));
+        const sdks = {
+          firestore: chunks.filter((file) => fs.readFileSync(file, 'utf8').includes('firestore.googleapis.com')).map(toUrl),
+          sentry: chunks.filter((file) => fs.readFileSync(file, 'utf8').includes('sentry.javascript.browser')).map(toUrl),
+        };
+        for (const [sdk, urls] of Object.entries(sdks)) {
+          ctx.expect(urls.length > 0, `the build has a ${sdk} SDK chunk`).toBeTruthy();
+          for (const url of urls) ctx.expect(dynamicOnly.has(url), `the ${sdk} SDK chunk ${url} is reached only dynamically`).toBeTruthy();
+        }
+        const named = new Set(htmlPages(pages).flatMap(([, html]) => preloads(html)));
+        for (const url of [...sdks.firestore, ...sdks.sentry]) {
+          ctx.expect(!named.has(url), `no page preloads the SDK chunk ${url}`).toBeTruthy();
+        }
 
-  for (const chunk of dynamicOnly) {
-    assert.ok(fs.existsSync(toFile(chunk)), `${chunk} is on disk`);
-  }
-  for (const [url, html] of htmlPages(pages)) {
-    for (const href of preloads(html)) {
-      assert.ok(!dynamicOnly.has(href), `${url}: modulepreload names the dynamic-only chunk ${href}`);
-    }
-  }
-});
+        for (const chunk of dynamicOnly) {
+          ctx.expect(fs.existsSync(toFile(chunk)), `${chunk} is on disk`).toBeTruthy();
+        }
+        for (const [url, html] of htmlPages(pages)) {
+          for (const href of preloads(html)) {
+            ctx.expect(!dynamicOnly.has(href), `${url}: modulepreload names the dynamic-only chunk ${href}`).toBeTruthy();
+          }
+        }
+      },
+    },
 
-test('the manifest maps every entry URL to its static chunks', async () => {
-  const { manifest } = await fixture();
-  const { imports } = manifest.js;
+    {
+      name: 'the manifest maps every entry URL to its static chunks',
+      run: async (ctx) => {
+        const { manifest } = await fixture();
+        const { imports } = manifest.js;
 
-  assert.ok(imports && typeof imports === 'object', 'the manifest carries js.imports');
-  for (const entry of manifestEntries(manifest)) {
-    assert.ok(Object.hasOwn(imports, entry), `js.imports has a key for ${entry}`);
-  }
-  assert.deepEqual([...imports[manifest.js.main]].sort(), [...staticChain(manifest.js.main)].sort(), 'the main entry maps to its static chain');
+        ctx.expect(imports && typeof imports === 'object', 'the manifest carries js.imports').toBeTruthy();
+        for (const entry of manifestEntries(manifest)) {
+          ctx.expect(Object.hasOwn(imports, entry), `js.imports has a key for ${entry}`).toBeTruthy();
+        }
+        ctx.expect([...imports[manifest.js.main]].sort(), 'the main entry maps to its static chain').toEqual([...staticChain(manifest.js.main)].sort());
+      },
+    },
+  ],
 });

@@ -79,7 +79,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'retrieves-the-sale',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = {
           [`/v1/payments/sale/${SALE_ID}`]: { ...FIXTURE_SALE_REFUNDED, custom_id: CUSTOM_ID },
@@ -89,16 +89,16 @@ module.exports = defineCases({
           return PayPal.fetchResource('sale', SALE_ID, {});
         });
 
-        assert.equal(resource.id, SALE_ID, 'The sale itself is the resource');
-        assert.equal(resource.state, 'refunded', 'The live sale state comes through');
-        assert.equal(calls.length, 1, 'The sale should be fetched once');
-        assert.equal(calls[0], `/v1/payments/sale/${SALE_ID}`, 'The fetch should name the sale');
+        expect(resource.id, 'The sale itself is the resource').toBe(SALE_ID);
+        expect(resource.state, 'The live sale state comes through').toBe('refunded');
+        expect(calls.length, 'The sale should be fetched once').toBe(1);
+        expect(calls[0], 'The fetch should name the sale').toBe(`/v1/payments/sale/${SALE_ID}`);
       },
     },
 
     {
       name: 'folds-the-parent-payment-custom-id-onto-the-sale',
-      async run({ assert }) {
+      async run({ expect }) {
         // The fixture is a real v1 sale: it carries no custom_id at all, so the
         // payment behind it is the only place uid/orderId/productId live
         const calls = [];
@@ -111,16 +111,16 @@ module.exports = defineCases({
           return PayPal.fetchResource('sale', SALE_ID, {});
         });
 
-        assert.equal(calls[1], `/v1/payments/payment/${PARENT_PAYMENT_ID}`, 'The parent payment should be fetched for the identifiers');
-        assert.equal(PayPal.getUid(resource), 'test-user-123', 'The uid should resolve from the parent payment');
-        assert.equal(PayPal.getOrderId(resource), 'ord-test-456', 'The orderId should resolve from the parent payment');
-        assert.equal(PayPal.toUnifiedOneTime(resource, {}).product.id, 'credits-100', 'The productId should resolve from the parent payment');
+        expect(calls[1], 'The parent payment should be fetched for the identifiers').toBe(`/v1/payments/payment/${PARENT_PAYMENT_ID}`);
+        expect(PayPal.getUid(resource), 'The uid should resolve from the parent payment').toBe('test-user-123');
+        expect(PayPal.getOrderId(resource), 'The orderId should resolve from the parent payment').toBe('ord-test-456');
+        expect(PayPal.toUnifiedOneTime(resource, {}).product.id, 'The productId should resolve from the parent payment').toBe('credits-100');
       },
     },
 
     {
       name: 'the-sale-own-custom-id-wins',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = {
           [`/v1/payments/sale/${SALE_ID}`]: { ...FIXTURE_SALE_REFUNDED, custom_id: CUSTOM_ID },
@@ -131,14 +131,14 @@ module.exports = defineCases({
           return PayPal.fetchResource('sale', SALE_ID, {});
         });
 
-        assert.equal(PayPal.getUid(resource), 'test-user-123', 'The sale is the newer record of the two');
-        assert.equal(calls.length, 1, 'A sale that names its own custom_id needs no second call');
+        expect(PayPal.getUid(resource), 'The sale is the newer record of the two').toBe('test-user-123');
+        expect(calls.length, 'A sale that names its own custom_id needs no second call').toBe(1);
       },
     },
 
     {
       name: 'an-unreadable-parent-payment-still-returns-the-live-sale',
-      async run({ assert }) {
+      async run({ expect }) {
         // The identifiers are best-effort: losing them must not throw away the
         // fresh sale and demote the whole event to the stale payload
         const calls = [];
@@ -150,15 +150,15 @@ module.exports = defineCases({
           return PayPal.fetchResource('sale', SALE_ID, {});
         });
 
-        assert.equal(resource.id, SALE_ID, 'The live sale still comes through');
-        assert.equal(PayPal.getUid(resource), null, 'No identifiers were folded, so the pipeline resolves them elsewhere');
-        assert.equal(calls.length, 2, 'The parent payment was attempted');
+        expect(resource.id, 'The live sale still comes through').toBe(SALE_ID);
+        expect(PayPal.getUid(resource), 'No identifiers were folded, so the pipeline resolves them elsewhere').toBe(null);
+        expect(calls.length, 'The parent payment was attempted').toBe(2);
       },
     },
 
     {
       name: 'a-failed-fetch-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // The sale the pipeline acts on is the one PayPal answered with. A fetch
         // that fails has no answer to give ([#506]).
         let threw = null;
@@ -174,9 +174,9 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed fetch must throw');
-        assert.equal(threw.notFound, false, 'An unreachable PayPal is transient, not a sale that does not exist');
-        assert.match(threw.message, /could not be reached/, 'The failure says the lookup never got an answer');
+        expect(threw, 'A failed fetch must throw').toBeTruthy();
+        expect(threw.notFound, 'An unreachable PayPal is transient, not a sale that does not exist').toBe(false);
+        expect(threw.message, 'The failure says the lookup never got an answer').toMatch(/could not be reached/);
       },
     },
   ],

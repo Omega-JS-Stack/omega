@@ -42,24 +42,24 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-command-exports-gcloud-project-from-the-resolved-config',
-      run({ assert }) {
-        assert.match(buildCommand(TEST_CONFIG), new RegExp(`GCLOUD_PROJECT='${PROJECT_ID}'`));
+      run({ expect }) {
+        expect(buildCommand(TEST_CONFIG)).toMatch(new RegExp(`GCLOUD_PROJECT='${PROJECT_ID}'`));
       },
     },
 
     {
       name: 'the-emulator-hosts-still-ride-along-with-it',
-      run({ assert }) {
+      run({ expect }) {
         const command = buildCommand(TEST_CONFIG);
 
-        assert.match(command, /FIRESTORE_EMULATOR_HOST='127\.0\.0\.1:8080'/);
-        assert.match(command, /FIREBASE_AUTH_EMULATOR_HOST='127\.0\.0\.1:9099'/);
+        expect(command).toMatch(/FIRESTORE_EMULATOR_HOST='127\.0\.0\.1:8080'/);
+        expect(command).toMatch(/FIREBASE_AUTH_EMULATOR_HOST='127\.0\.0\.1:9099'/);
       },
     },
 
     {
       name: 'bumped-ports-and-the-project-id-travel-together',
-      run({ assert }) {
+      run({ expect }) {
         // The auto-start path rebuilds the command from the RESOLVED ports after
         // boot; the project id is the same either way.
         const command = buildCommand({
@@ -67,8 +67,8 @@ module.exports = defineCases({
           emulatorPorts: { firestore: 8081, auth: 9100, hosting: 5003 },
         });
 
-        assert.match(command, new RegExp(`GCLOUD_PROJECT='${PROJECT_ID}'`));
-        assert.match(command, /FIREBASE_AUTH_EMULATOR_HOST='127\.0\.0\.1:9100'/);
+        expect(command).toMatch(new RegExp(`GCLOUD_PROJECT='${PROJECT_ID}'`));
+        expect(command).toMatch(/FIREBASE_AUTH_EMULATOR_HOST='127\.0\.0\.1:9100'/);
       },
     },
 
@@ -77,7 +77,7 @@ module.exports = defineCases({
 
     {
       name: 'the-resolved-port-map-rides-along-with-the-command',
-      run({ assert }) {
+      run({ expect }) {
         // Journey tests call route handlers IN-PROCESS, so the runner's omega
         // builds URLs from OMEGA_*_PORT exactly like a function worker does.
         // Unset, every getter fell back to the classic defaults and answered for
@@ -87,15 +87,15 @@ module.exports = defineCases({
           emulatorPorts: { firestore: 8081, auth: 9100, hosting: 5003, functions: 5004 },
         });
 
-        assert.match(command, /OMEGA_HOSTING_PORT='5003'/);
-        assert.match(command, /OMEGA_FUNCTIONS_PORT='5004'/);
-        assert.match(command, /OMEGA_FIRESTORE_PORT='8081'/);
+        expect(command).toMatch(/OMEGA_HOSTING_PORT='5003'/);
+        expect(command).toMatch(/OMEGA_FUNCTIONS_PORT='5004'/);
+        expect(command).toMatch(/OMEGA_FIRESTORE_PORT='8081'/);
       },
     },
 
     {
       name: 'the-https-front-is-never-handed-to-the-runner',
-      run({ assert }) {
+      run({ expect }) {
         // `omega emulator` defaults HTTPS on: hosting moves to an internal plain
         // port and the mkcert proxy takes the classic one. The runner has no CA
         // for that cert — handed the TLS port it would send the test provider's
@@ -107,8 +107,8 @@ module.exports = defineCases({
           emulatorPorts: { firestore: 8080, auth: 9099, hosting: 5443, https: 5002 },
         });
 
-        assert.match(command, /OMEGA_HOSTING_PORT='5443'/);
-        assert.notMatch(command, /OMEGA_HTTPS_PORT/);
+        expect(command).toMatch(/OMEGA_HOSTING_PORT='5443'/);
+        expect(command).not.toMatch(/OMEGA_HTTPS_PORT/);
       },
     },
   ],

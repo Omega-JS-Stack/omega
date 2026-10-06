@@ -52,15 +52,15 @@ module.exports = defineCases({
   tests: [
     {
       name: 'no-suite-hardcodes-a-lane-port',
-      async run({ assert }) {
+      async run({ expect }) {
         const files = suiteFiles();
-        assert.equal(files.length > 5, true, `live-lane suites found (${files.length} files)`);
+        expect(files.length > 5, `live-lane suites found (${files.length} files)`).toBe(true);
 
         for (const { relative, source } of files) {
           for (const port of LANE_PORTS) {
             const literal = new RegExp(`(?:localhost|127\\.0\\.0\\.1|\\[::1\\]):${port}\\b`);
 
-            assert.equal(literal.test(source), false, `${relative} hardcodes lane port ${port} — resolve it from config.apiUrl instead`);
+            expect(literal.test(source), `${relative} hardcodes lane port ${port} — resolve it from config.apiUrl instead`).toBe(false);
           }
         }
       },
@@ -68,22 +68,22 @@ module.exports = defineCases({
 
     {
       name: 'every-fetching-suite-resolves-its-url-from-the-lane-config',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const { relative, source } of suiteFiles()) {
           if (!source.includes('fetch(')) {
             continue;
           }
 
-          assert.equal(source.includes('config.apiUrl'), true, `${relative} fetches without reading config.apiUrl — it cannot follow a bumped lane`);
+          expect(source.includes('config.apiUrl'), `${relative} fetches without reading config.apiUrl — it cannot follow a bumped lane`).toBe(true);
         }
       },
     },
 
     {
       name: 'the-runner-hands-every-test-the-lane-url',
-      async run({ assert, config }) {
-        assert.ok(config.apiUrl, 'context config carries apiUrl');
-        assert.equal(new URL(config.apiUrl).port, String(config.emulatorPorts.hosting), 'apiUrl names the hosting port THIS lane resolved');
+      async run({ expect, config }) {
+        expect(config.apiUrl, 'context config carries apiUrl').toBeTruthy();
+        expect(new URL(config.apiUrl).port, 'apiUrl names the hosting port THIS lane resolved').toBe(String(config.emulatorPorts.hosting));
       },
     },
   ],

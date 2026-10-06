@@ -21,7 +21,6 @@ The child-only files, all in `<projectDir>/dist/` — the same lines the verb lo
 | `dev.log` | `npx omega serve` — @omega.js/backend's local dev server (Firebase serve) | Overwritten each run |
 | `deploy.log` | `npx omega deploy` — Firebase deployment output (function uploads, hosting deploys, errors) | Overwritten each run |
 | `emulator.log` | `npx omega emulator` — full emulator output (Firebase emulator + Cloud Functions logs); also `npx omega test` when it starts its own emulator | Overwritten each run |
-| `test.log` | `npx omega test` runner output when running against an already-running emulator | Overwritten each run |
 | `production.log` | `npx omega logs:read` / `npx omega logs:tail` — production Cloud Function logs from Google Cloud Logging (raw JSON for `read`, streaming text for `tail`) | Overwritten each run |
 
 The `dev`/`test` names match desktop, extension and web for cross-framework parity.
@@ -53,11 +52,11 @@ Every verb attaches it through `BaseCommand#attachVerbLog(verb)` for the `logs/`
 
 ## What gets captured
 
-When `npx omega test` starts its own emulator, logs go to `emulator.log` (it delegates to the emulator command). When running against an already-running emulator, logs go to `test.log`.
+`npx omega test` writes one test log, `logs/test.log`: the verb's own lines plus the runner child's whole output, which flows through the verb's streams. The runner child writes no `dist/` file of its own. When the run starts its own emulator, the emulator's traffic also lands in `dist/emulator.log` (it delegates to the emulator command).
 
 All files are gitignored (`logs/` as a directory, `dist/` output via `*.log`). Reset sentinels (`*.log.reset`), the watch trigger file, and `test-mode.json` live separately in `<projectDir>/.temp/` — they're transient internal signals with no debugging value.
 
 ## See also
 
 - [cli-logs.md](cli-logs.md) — `npx omega logs:read` / `logs:tail` flag reference (the commands that feed `production.log`)
-- [test-framework.md](test-framework.md) — the test runner that feeds `test.log` / `emulator.log`
+- [test-framework.md](test-framework.md): the test runner whose output `logs/test.log` holds

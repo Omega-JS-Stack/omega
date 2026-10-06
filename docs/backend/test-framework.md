@@ -51,12 +51,24 @@ npx omega test
 
 `npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../../packages/backend/src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → the fixture's `initialize()` wires `omega_api` → health returns 200). Mirrors the extension's `OMEGA_TEST_BOOT_PROJECT` and web's site-boot layer. Set `OMEGA_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer, [`brands/playground-omega/targets/backend`](../../brands/playground-omega/targets/backend)); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
 
+### The runner
+
+The verb stages the target, boots or adopts the emulator, then starts ONE child, [src/test/run-tests.js](../../packages/backend/src/test/run-tests.js), inside the emulator's environment (the run's config rides `OMEGA_TEST_CONFIG`). The child boots firebase-admin and the real instance as a runner host, `initialize({ runnerHost: true })` (no Firebase init, function wiring, server or Sentry), then runs devkit's one case runner (`createRunner`, [devkit/index.md](../devkit/index.md#the-case-runner)) as framework `backend`: every suite of both roots in that one process, on the backend's one layer, `emulator`.
+
+A suite file loads right before its cases run, and its suite `cleanup` runs before the next file loads, so a mock a file installs at load (a module swapped into `require.cache`) and restores in `cleanup` never reaches another file.
+
+The `emulator` layer's driver ([src/test/emulator-driver.js](../../packages/backend/src/test/emulator-driver.js)) runs the pre-flight once per run, up front, before any `test/_init.js` setup and the first case: the install check, the config check, the hosting health check, the project-mismatch check (the health endpoint's `projectId` against this project's, read alone), the persona seed, the rules context, then the connect trap. A pre-flight failure ends the run with one `Pre-flight <step>: …` error line (`Pre-flight health check: …`), the step's own `✗` lines printing above it, and the run exits 1: no case runs, so there is no failure per case. A custom-server backend skips the health check and the seed. Each case then takes its [ctx extras](#context-object) from the driver, its `http` signed in as the case's `auth`, else its suite's, else `none`.
+
+The flags ride to the child: `--filter=<text>` keeps a case whose name contains the text, or every case of a suite whose description contains it (for a suite with no description, its path relative to its test root, `routes/notes.test.js`); `--layer=emulator` names the one row; `--lane=<name>` opens an [opt-in lane](#opt-in-lanes---lane); `--extended` sets `TEST_EXTENDED_MODE`; `--reporter=json` makes the runner's report one JSON document (the run's result: counts and one entry per case) in place of the pretty output, and that document is the verb's whole stdout: every other line (the verb's own, the target checks', the emulator boot's, a boot prelude's note) goes to stderr. One exception: on a linked brand with a stale framework dist, the local freshness guard prints its rebuild lines on stdout first ([#1092](https://github.com/Omega-JS-Stack/omega/issues/1092)). The pretty output is a heading per suite, one line per case, then ONE Results block: passing, failing, skipped, and the total.
+
+A run-level error that is not a pre-flight failure prints its stack and exits 1; a pre-flight failure ends with its one `Pre-flight <step>: …` error line and no stack, the step's own `✗` lines above it, and no case runs. A case that calls `process.exit()` mid-run fails the run: the child exits non-zero and stderr says `The test run ended before its report was written`, the same guard devkit's own cli has ([devkit/index.md](../devkit/index.md#the-case-runner)).
+
 ### Filtering tests
 
 Pass a path (relative to `test/`) as a positional argument to run specific tests:
 
 ```bash
-# Run a single test file
+# Run every suite whose path contains email/transactional
 npx omega test email/transactional
 
 # Run all tests in a directory
@@ -73,7 +85,7 @@ npx omega test project:routes/custom
 npx omega test --extended routes/marketing/push-send
 ```
 
-The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, only the project's tests are searched; `full:` searches both.
+A path target selects every suite whose path, relative to its `test/` root, CONTAINS the text (devkit's shared rule, [devkit/index.md](../devkit/index.md#the-case-runner)), so `payments` selects `routes/payments/...` and `helpers/payments-meta...` alike: type a longer path to narrow. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, only the project's tests are searched; `full:` searches both.
 
 A target that names a path and matches NO file is a hard error: the run prints `No test file matches "<target>"` and exits 1 (before the config/health preflight, so a typo costs a second rather than a whole stack), so a typo'd path, or a suite renamed out from under a target, can never run silently green ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). A run that named no file (bare, or a bare source prefix) still exits 0 when there is nothing to run. Inside a brand-root fan-out the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and the same miss answers with exit 3 instead: a path another target carries is a no-op here, and the brand run fails only when EVERY target missed ([docs/shared/testing.md](../shared/testing.md#brand-root-cp94b)).
 
@@ -81,7 +93,7 @@ A target that names a path and matches NO file is a hard error: the run prints `
 
 The runner adopts an already-running emulator only when that emulator **proves** it belongs to this project. "Something is listening on the functions port" is not proof — reading it as one adopted another brand's stack on the classic ports and died on a health fetch against the wrong project ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
 
-Identity comes from firebase-tools' own **locator file**, not from the hub's HTTP API. A running hub writes `${os.tmpdir()}/hub-<projectId>.json` (`{version, origins, pid}`) for the life of the stack, and the file NAME is the project id. The hub's `GET /emulators` answers a map of emulator → listen info and has never carried a `projectId`, so the read that asked it for one always came back empty. A locator counts only when it claims this hub port (matched against its `origins`) **and** its `pid` is still alive — firebase-tools does not always remove the file, so a crashed run's leftover would otherwise name a hub that is long gone. Two live claims on one port mean one file is stale with a recycled pid, and nothing says which: ambiguous reads as unproven.
+Identity comes from firebase-tools' own **locator file**, not from the hub's HTTP API. A running hub writes `${os.tmpdir()}/hub-<projectId>.json` (`{version, origins, pid}`) for the life of the stack, and the file NAME is the project id. A locator counts only when it claims this hub port (matched against its `origins`) **and** its `pid` is still alive — firebase-tools does not always remove the file, so a crashed run's leftover would otherwise name a hub that is long gone. Two live claims on one port mean one file is stale with a recycled pid, and nothing says which: ambiguous reads as unproven.
 
 The decision (`decideEmulatorAdoption` in [src/cli/commands/test.js](../../packages/backend/src/cli/commands/test.js)):
 
@@ -92,7 +104,7 @@ The decision (`decideEmulatorAdoption` in [src/cli/commands/test.js](../../packa
 | Locator project id is **another** project's | `project-mismatch` |
 | No locator, dead pid, or two live claims | `unidentified` |
 
-Nothing in the CLI's adoption decision aborts. An unadopted port means the run boots **its own** emulator on free ports (the N7 bump path), relocating around the incumbent exactly as a second brand's boot does. (Separately, the test runner's own project-mismatch check — fed by the health endpoint's `projectId`, not the hub — still aborts a run pointed at the wrong project with "Stop the other emulator first".)
+Nothing in the CLI's adoption decision aborts. An unadopted port means the run boots **its own** emulator on free ports (the N7 bump path), relocating around the incumbent exactly as a second brand's boot does. (Separately, the test runner's own project-mismatch check reads the health endpoint's `projectId` alone, and aborts a run pointed at the wrong project with "Stop the other emulator first".)
 ```
   Port 5001 belongs to project "project-a", not "project-b" — booting this project's own emulator on free ports.
   Port 5001 is in use by a listener that does not identify itself — booting this project's own emulator on free ports.
@@ -117,7 +129,7 @@ This means:
 
 **Hard rule: all LOCAL cleanup happens BEFORE the suite runs, never after.** If a previous run was killed mid-execution (Ctrl-C, OOM, emulator crash), end-of-run cleanup would never fire and the next run would inherit polluted state — broken trial-eligibility checks, leftover dispute alerts, stale webhook docs, polluted marketing-provider lists. Pre-test cleanup makes every run idempotent regardless of how the last one died.
 
-What the runner wipes pre-test (in [src/test/test-accounts.js](../../packages/backend/src/test/test-accounts.js) `deleteTestUsers()` and [src/test/runner.js](../../packages/backend/src/test/runner.js) `setupAccounts()`):
+What the runner wipes pre-test (in [src/test/test-accounts.js](../../packages/backend/src/test/test-accounts.js) `deleteTestUsers()` and [src/test/seed.js](../../packages/backend/src/test/seed.js) `seed()`, which the `emulator` driver's pre-flight calls):
 
 1. **`meta/stats`** doc ensured (required for on-create batch writes).
 2. **The ENTIRE emulator Firestore** — every top-level collection, flushed recursively (`flushEmulatorFirestore()` → `listCollections()` + `recursiveDelete()`). The emulator DB is 100% test data, so a full flush is the simplest correct clean slate — no per-collection allowlist to maintain. **SAFETY: it only runs when `FIRESTORE_EMULATOR_HOST` is set** (which the test command always sets); if absent it is a no-op, so it can never wipe a real project.
@@ -152,12 +164,14 @@ The rule: **never put cleanup at the END of a test file or suite for the purpose
 
 ## `test/_init.js` — pre-test lifecycle hook
 
-The runner loads an optional `test/_init.js` from **both** test roots — @omega.js/backend core (`<backend>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
+The runner loads an optional `test/_init.js` from **both** test roots (@omega.js/backend core, `<backend>/test/_init.js`, and the consumer project, `<projectDir>/test/_init.js`) through devkit's one loader (`@omega.js/devkit/test/init-hooks`), and runs it before any case (it is NOT itself run as a test). Same contract for both roots, and the same one desktop, extension and web read, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare**: `_init.js` only declares accounts and reseeds fixtures.
 
-The module **must export a function**, `module.exports = (ctx) => ({ ... })`, called with `{ config, omega }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
+The module **must export a factory**, `module.exports = ({ projectRoot, config, omega, ctx }) => ({ accounts?, setup?(ctx) })`, called once with the project root, the resolved config, the real instance and a real `Context` on it, and returning the hook object. (The factory form lets a project compute its accounts/fixtures from config. Under `npx omega test` it receives all four; the emulator verb's boot seed passes `config` alone, and the dev palette's roster `config` and `omega`.) It may declare:
 
 - `accounts` — array of extra test accounts to create alongside the built-in ones (admin/basic/premium-*/journey-*), so this project has a user for each lifecycle it exercises. Each entry is `{ id, uid, email, palette, properties }` (email may use the `{domain}` placeholder, which resolves to the brand's HOST — `brand.url`'s hostname, the one derivation the dev palette signs in on; `properties` is merged into the user doc after `auth:on-create`). These accounts are created, fetched (privateKeys), and deleted on the same path as the built-ins, and show up in the `accounts` map that tests and `setup()` receive. A project account may override a built-in one by reusing its `id`. A `palette: '<Label>'` label offers the persona in the dev palette's account switcher, exactly like a built-in one — `GET /test/roster` reads both halves of the seed ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)); an account without a label is machinery and stays off the palette's roster. The functions process reads the file once and remembers what it got — a CHANGED persona has to be re-seeded to exist at all, which is an emulator restart — but a read that FAILED is never remembered ([#733](https://github.com/Omega-JS-Stack/omega/issues/733)): a broken `_init.js` logs its error, serves an empty project half, and is re-read (module cache and all) on the next roster request, so fixing the file is enough.
-- `async setup({ admin, config, accounts, omega, ctx })`: seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed: the whole DB is wiped each run).
+- `async setup({ projectRoot, admin, config, accounts, omega, ctx })`: seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed: the whole DB is wiped each run). Each root's `setup` runs once, framework root first. The context it receives is built once per run, before the first setup, whether or not any `_init.js` has a `setup`: that build is the [pre-flight](#the-runner) (health check, seed), so it runs once up front, and a failed pre-flight is one error line, not one failure per case. On a custom-server backend nothing is seeded and `setup` runs with `accounts: null`, so a setup that reads accounts guards on `null`.
+
+**A broken hook fails the run.** A file that throws on load, exports anything but a function, whose factory throws or returns a non-object, or whose `setup` throws, stops the run before any case: one failing entry names the file and carries the cause, and the run exits 1. The roster above is the one reader that serves an empty project half instead.
 
 An account without a `palette` label stays out of the palette's roster, but a suite can still reach it: `GET /test/roster?machinery=true` on a backend running as `testing` (every emulator run) offers every seeded account, which is how each sign-in lane finds its own persona ([docs/shared/testing.md](../shared/testing.md), [#904](https://github.com/Omega-JS-Stack/omega/issues/904)).
 
@@ -214,7 +228,7 @@ The emulator log shows each flip, e.g.:
 [test-mode] flip TEST_EXTENDED_MODE: true → (unset)            ← test (no flag) fired
 ```
 
-The test command also confirms the mode in its own output (`Test mode: extended (real external APIs)` pre-flight, `Mode: extended (real external APIs)` after the health check) and prints the `⚠️ WARNING: TEST_EXTENDED_MODE IS TRUE ⚠️` block when extended. The runner's old "TEST_EXTENDED_MODE mismatch" warning is gone — mismatch is impossible by construction.
+The test command also confirms the mode in its own output (`Test mode: extended (real external APIs)` pre-flight, `Mode: extended (real external APIs)` after the health check) and, when extended, prints the shared extended-mode headline (`⚠️ WARNING: TEST_EXTENDED_MODE IS TRUE ⚠️`) with backend's own detail lines under it (real emails, real external API calls). The runner's old "TEST_EXTENDED_MODE mismatch" warning is gone — mismatch is impossible by construction.
 
 **Allowlist.** Only env vars listed in `SYNCED_ENV_KEYS` (`src/test/utils/test-mode-file.js`) flow through. Today: `TEST_EXTENDED_MODE`. Add a key there to make a new env var live-syncable across terminals. The allowlist exists to prevent accidentally syncing process-specific vars (`FIRESTORE_EMULATOR_HOST`) or sensitive ones (API keys).
 
@@ -267,7 +281,7 @@ A handler that dispatches its send fire-and-forget (the payment transitions) nee
 
 ## Log Files
 
-Test runs tee output to `functions/test.log` (own-emulator runs go to `functions/emulator.log` instead, since the test command delegates to the emulator command). Full reference — file table, the `functions/` location exception, `production.log`: [logging.md](logging.md).
+The verb tees its whole run to `logs/test.log` at the target root: its setup lines, the port summary, the emulator boot, and the runner child's output, which flows through the verb's own streams. That is the one test log; the child writes none of its own. An emulator the run starts also keeps its own `dist/emulator.log`. Full reference (file table, the `dist/` location exception, `production.log`): [logging.md](logging.md).
 
 ## Filtering Tests
 
@@ -283,7 +297,7 @@ npx omega test user/ admin/       # Multiple paths
 
 A LANE is a suite that needs something the default run must never depend on: credentials, the network, an external CLI. It is off by default and stays off — `npx omega test --lane=<name>` is the only way in, and a lane that cannot satisfy its gate prints **one line** saying which condition failed and exits clean. A skipped lane is a normal outcome, not a failure.
 
-Lanes are unreachable by anything else. `test/<lane>/` is excluded from discovery unless that lane's gate opened it (the runner's `LANE_DIRECTORIES`), so no default run, no CI lane and no path filter can pull one in.
+Lanes are unreachable by anything else. `test/<lane>/` is excluded from discovery unless that lane's gate opened it (the lane list's one home is `declaredLanes()` in `src/utils/test-lanes.js`, read from the package's `omega.testLanes` and handed to the runner as its `lanes`), so no default run, no CI lane and no path filter can pull one in.
 
 **How a lane differs from `--extended`:** extended mode is a *mode* — it lets the SAME suites make real calls. A lane is a *set of suites* that exist only for the real thing, plus the gate deciding whether they may run at all.
 
@@ -321,17 +335,17 @@ Use `backend:` or `project:` prefix to filter by source. **Mirror the source pat
 
 ## Test Types
 
-> **The runner reads each file's `module.exports` object — it does NOT inject Mocha/Jest globals.** A test file that calls `describe`/`it`/`before`/`beforeEach`/`after` at top level throws `ReferenceError: beforeEach is not defined` and shows as `Failed to load`. There is no global `assert` either — use the `assert` passed into `run({ assert })`. Every test file MUST export one of the shapes below.
+> **The runner reads each file's `module.exports` spec; it does NOT inject Mocha/Jest globals.** A test file that calls `describe`/`it`/`before`/`beforeEach`/`after` at top level throws `ReferenceError: beforeEach is not defined` on load, and a discovered `.test.js` file that exports no `defineCases` spec fails the run naming the file. There is no global `assert` or `expect` either: use the `expect` passed into `run({ expect })`. Every test file MUST export one of the shapes below.
 >
-> **The only lifecycle hook is `cleanup`** (per-test and module-level). Exporting `before`/`after`/`beforeEach` properties on the module does NOT error — the runner silently ignores them, so setup they were supposed to do never happens (this bit `helpers/ai-schema-resolve`, which failed for weeks because its fixtures were written in a `before()` that never ran). Seed disk/DB fixtures inside the tests themselves via an idempotent helper, or in `test/_init.js`'s `setup()`.
+> **The lifecycle hooks are devkit's:** `cleanup` (per case and per suite), a suite-level `setup(ctx)` that runs once before the first case, and `ctx.after(fn)` inside a case ([devkit/index.md](../devkit/index.md#the-case-runner)). Exporting `before`/`after`/`beforeEach` properties on the module does NOT error: the runner silently ignores them, so setup they were supposed to do never happens. Seed disk/DB fixtures in a suite `setup`, inside the tests via an idempotent helper, or in `test/_init.js`'s `setup()`.
 
 | Type | Use When | Behavior |
 |------|----------|----------|
 | Standalone | Single logical test | Runs once |
-| Suite (`type: 'suite'`) | Sequential dependent tests | Shared state, stops on failure |
+| Suite (`type: 'suite'`) | Sequential dependent tests | Shared state; stops on failure (every later case skips with reason `suite stopped`), and a `ctx.skip(reason)` skips every later case with the same reason |
 | Group (`type: 'group'`) | Multiple independent tests | Continues on failure |
 
-Every shape exports through `defineCases`. A consumer's case file takes it from the public test API, `@omega.js/backend/test`; the framework's own suites require the vendored copy by relative path (`dist/vendor/devkit/test/define-cases.js`), since they run from a consumer install too ([index.md](index.md#test-framework)).
+Every shape exports through `defineCases`. A consumer's case file takes it from the public test API, `@omega.js/backend/test`, which also exports `expect` for a helper outside a case body (`const { defineCases, expect } = require('@omega.js/backend/test')`); the framework's own suites require the vendored copies by relative path (`dist/vendor/devkit/test/define-cases.js`, `dist/vendor/devkit/test/expect.js`), since they run from a consumer install too ([index.md](index.md#test-framework)).
 
 ### Standalone Test
 
@@ -342,7 +356,7 @@ module.exports = defineCases({
   description: 'Test name',
   auth: 'none',  // none, user, admin, premium-active, premium-expired
   timeout: 10000,
-  async run({ http, assert, accounts, firestore, state, waitFor }) { },
+  async run({ http, expect, accounts, firestore, state, waitFor }) { },
   async cleanup({ ... }) { },  // Optional
 });
 ```
@@ -371,8 +385,8 @@ module.exports = defineCases({
   description: 'Group name',
   type: 'group',
   tests: [
-    { name: 'test-1', auth: 'admin', async run({ http, assert }) { } },
-    { name: 'test-2', auth: 'none', async run({ http, assert }) { } },
+    { name: 'test-1', auth: 'admin', async run({ http, expect }) { } },
+    { name: 'test-2', auth: 'none', async run({ http, expect }) { } },
   ],
 });
 ```
@@ -381,8 +395,10 @@ module.exports = defineCases({
 
 | Property | Description |
 |----------|-------------|
-| `http` | HTTP client — sends requests to the hosting emulator as-is (see [HTTP Routing](#http-routing)) |
-| `assert` | Assertion helpers (see below) |
+| `http` | HTTP client: sends requests to the hosting emulator as-is (see [HTTP Routing](#http-routing)), signed in as the case's `auth` (see [Auth Levels](#auth-levels)) |
+| `expect` | devkit's one assertion library: `expect(actual, message?)` with `toBe`, `toEqual`, `toBeTruthy`, `toMatch`, `toContain`, `toHaveProperty`, `toBeTypeOf`, `toBeSuccess`, `toBeError(status?)`, `toThrow`, `.not`, `.rejects` and `expect.fail` (see [Expect Matchers](#expect-matchers); the full set: [devkit/index.md](../devkit/index.md#the-case-runner)) |
+| `skip` | `skip(reason)`: ends the case as skipped (in a `type: 'suite'`, every later case too) |
+| `after` | `after(fn)`: runs `fn` once the case settles, newest first |
 | `accounts` | Test accounts `{ basic, admin, premium-active, ... }` |
 | `firestore` | Direct admin DB access (`get`, `set`, `delete`, `exists`) — bypasses security rules |
 | `rules` | Firestore **rules** testing client — `rules.asAccount(id)` returns a DB scoped to that user's auth, `rules.expectSuccess(op)` / `rules.expectFailure(op)` assert rule outcomes (see [Rules Tests](#rules-tests)) |
@@ -390,8 +406,10 @@ module.exports = defineCases({
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
 | `config` | Test configuration — `config.apiUrl` is the base URL of the lane THIS run booted (the resolved hosting port, not a literal): a suite that fetches directly instead of through `http` builds its URL from it |
 | `omega` | The real booted @omega.js/backend instance (`omega.email`, `omega.utilities`, `omega.firebase.admin`) |
-| `ctx` | A real `Context` on that instance (`ctx.ai`, `ctx.email`) |
+| `ctx` | A real `Context` on that instance, built once by the runner host (`ctx.ai`, `ctx.email`, `ctx.getEnvironment()`) |
 | `admin` | The Firebase Admin SDK the runner initialized |
+| `pubsub` | `pubsub.trigger(functionName)`: fires a scheduled function on the run's Pub/Sub emulator |
+| `payments` | Product metadata resolved once from the brand config (`payments.products[id]`, `payments.stripeProductIds`) |
 
 ## HTTP Routing
 
@@ -411,27 +429,31 @@ http.as('none').post('webhooks', { event: 'reply', campaignId: '...' })
 
 @omega.js/backend routes live under `/omega/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
 
-## Assert Methods
+## Expect Matchers
 
 ```javascript
-assert.ok(value, message)                      // Truthy
-assert.equal(a, b, message)                    // Strict equality
-assert.notEqual(a, b, message)                 // Not equal
-assert.deepEqual(a, b, message)                // Deep equality
-assert.match(value, /regex/, message)          // Regex match
-assert.isSuccess(response, message)            // Response success
-assert.isError(response, code, message)        // Response error with code
-assert.hasProperty(obj, 'path.to.prop', msg)   // Property exists
-assert.propertyEquals(obj, 'path', value, msg) // Property value
-assert.isType(value, 'string', message)        // Type check
-assert.contains(array, value, message)         // Array includes
-assert.inRange(value, min, max, message)       // Number range
-assert.fail(message)                           // Explicit fail
+expect(value, message).toBeTruthy()            // Truthy
+expect(a, message).toBe(b)                     // Strict equality (Object.is)
+expect(a, message).not.toBe(b)                 // Not equal
+expect(a, message).toEqual(b)                  // Strict deep equality
+expect(value, message).toMatch(/regex/)        // Regex match (or substring)
+expect(response, message).toBeSuccess()        // Response success
+expect(response, message).toBeError(401)       // Response error, with its status when given
+expect(obj, msg).toHaveProperty('path.to.prop') // Property exists (dot path)
+expect(obj, msg).toHaveProperty('path', value) // Property value
+expect(value, message).toBeTypeOf('string')    // Type check ('array' too)
+expect(array, message).toContain(value)        // Array member (or substring)
+expect(n, message).toBeGreaterThanOrEqual(min) // Number range: two calls
+expect(n, message).toBeLessThanOrEqual(max)
+expect.fail(message)                           // Explicit fail
+await expect(promise).rejects.toThrow(/x/)     // Rejection
 ```
+
+A message, when given, prefixes the failure (`<message>: <the matcher's own text>`), and `.not` negates every matcher. The full set (`toBeNull`, `toBeInstanceOf`, `toThrow`'s matcher forms and the rest): [devkit/index.md](../devkit/index.md#the-case-runner).
 
 ## Auth Levels
 
-`none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`
+`none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`, or any seeded account id. A case's own `auth` wins; a suite or group may set `auth` once for every case that names none; with neither, `none`.
 
 ## Email Tests (`test/email/`)
 
@@ -539,9 +561,9 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 ```javascript
 {
   name: 'unauthenticated-rejected',
-  async run({ http, assert }) {
+  async run({ http, expect }) {
     const response = await http.as('none').post('user/signup', {});
-    assert.isError(response, 401, 'Should fail without authentication');
+    expect(response, 'Should fail without authentication').toBeError(401);
   },
 },
 ```
@@ -552,7 +574,7 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 {
   name: 'duplicate-rejected',
   timeout: 30000,
-  async run({ assert, config }) {
+  async run({ expect, config }) {
     const body = JSON.stringify({ name: 'Dupe' });
     const [a, b] = await Promise.all([
       fetch(url, { method: 'POST', body }),
@@ -560,7 +582,7 @@ const response = await http.as('journey-payments-intent-discount').post('payment
     ]);
     const successes = [a, b].filter(r => r.status === 'success');
     const failures = [a, b].filter(r => r.status === 'fail');
-    assert.ok(successes.length === 1 && failures.length === 1, 'One should succeed, one should fail');
+    expect(successes.length === 1 && failures.length === 1, 'One should succeed, one should fail').toBeTruthy();
   },
 },
 ```
@@ -583,9 +605,10 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 
 | File | Purpose |
 |------|---------|
-| `src/test/runner.js` | Test runner |
+| `src/test/run-tests.js` | The runner child: boots the runner host, builds devkit's `createRunner` |
+| `src/test/emulator-driver.js` | The `emulator` layer driver: the pre-flight and each case's ctx extras |
+| `src/utils/test-lanes.js` | `declaredLanes()`: the opt-in lane list |
 | `test/` | @omega.js/backend core tests |
-| `src/test/utils/assertions.js` | Assert helpers |
 | `src/test/utils/http-client.js` | HTTP client |
 | `src/test/utils/firestore-rules-client.js` | Rules testing client (`asAccount` / `expectSuccess` / `expectFailure`) |
 | `src/test/utils/email-capture.js` | Testing-mode email capture (`readCaptured` / `clearCaptured`) |

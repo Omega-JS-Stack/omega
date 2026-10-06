@@ -1,0 +1,9 @@
+{
+  "description": "case-144",
+  "fileLacks": ["node:test", "\\bassert\\b"],
+  "fileHas": ["function check(x) { expect(x).toBeTruthy(); }"],
+  "fileCount": { "require('@omega.js/devkit/test/expect')": 1 },
+  "tests": [
+    { "name": "helper and case", "has": ["check(a)", "ctx.expect(a).toBe(b)"], "runLacks": ["(?<!\\.)\\bexpect\\("] }
+  ]
+}

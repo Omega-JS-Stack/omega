@@ -13,11 +13,11 @@
  * added or dropped there fails here instead of quietly making the walkthrough
  * a lie.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildSite, BARE, PKG } = require('./lib/build.js');
 
@@ -35,7 +35,7 @@ function bareConsumer(prefix) {
 /** The walkthrough body between the rule lines — what a consumer copies out. */
 function walkthroughBody() {
   const parts = fs.readFileSync(EXAMPLE, 'utf8').split(/^─+$/m);
-  assert.strictEqual(parts.length, 3, 'the example carries exactly one ruled block');
+  expect(parts.length, 'the example carries exactly one ruled block').toBe(3);
   return parts[1].replace(/^\n/, '');
 }
 
@@ -50,79 +50,90 @@ function walkthroughBody() {
  */
 function setMembers(source, name) {
   const match = source.match(new RegExp(`const ${name} = new Set\\(\\[([\\s\\S]*?)\\]\\)`));
-  assert.ok(match, `${name} is still a Set literal in engine.js`);
+  expect(match, `${name} is still a Set literal in engine.js`).toBeTruthy();
   return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
-test('the documented frontmatter allow-list IS the engine\'s allow-list', () => {
-  const engine = fs.readFileSync(path.join(PKG, 'src', 'engine.js'), 'utf8');
+module.exports = defineCases({
+  type: 'group',
+  description: 'scaffold-example',
+  tests: [
+    {
+      name: 'the documented frontmatter allow-list IS the engine\'s allow-list',
+      run: (ctx) => {
+        const engine = fs.readFileSync(path.join(PKG, 'src', 'engine.js'), 'utf8');
 
-  // What the engine really permits on a page: the meta-only allow set, plus
-  // the plumbing keys the guard never inspects (they're filtered upstream by
-  // readOwnFrontmatter's RESOLVED_OMIT pass, so they're legal on any page).
-  const allowed = new Set(setMembers(engine, 'PAGE_FRONTMATTER_ALLOW'));
-  for (const plumbing of ['layout', 'permalink']) {
-    assert.ok(setMembers(engine, 'RESOLVED_OMIT').includes(plumbing), `${plumbing} is still engine plumbing`);
-    allowed.add(plumbing);
-  }
+        // What the engine really permits on a page: the meta-only allow set, plus
+        // the plumbing keys the guard never inspects (they're filtered upstream by
+        // readOwnFrontmatter's RESOLVED_OMIT pass, so they're legal on any page).
+        const allowed = new Set(setMembers(engine, 'PAGE_FRONTMATTER_ALLOW'));
+        for (const plumbing of ['layout', 'permalink']) {
+          ctx.expect(setMembers(engine, 'RESOLVED_OMIT').includes(plumbing), `${plumbing} is still engine plumbing`).toBeTruthy();
+          allowed.add(plumbing);
+        }
 
-  // What the walkthrough tells a consumer: the key column of its frontmatter
-  // comment table (`#   <key>   <description>`).
-  const documented = [...walkthroughBody().matchAll(/^#\s{3}(\w+)\s{2,}\S/gm)].map((m) => m[1]);
-  assert.ok(documented.length > 0, 'the walkthrough still documents the allow-list as a key table');
+        // What the walkthrough tells a consumer: the key column of its frontmatter
+        // comment table (`#   <key>   <description>`).
+        const documented = [...walkthroughBody().matchAll(/^#\s{3}(\w+)\s{2,}\S/gm)].map((m) => m[1]);
+        ctx.expect(documented.length > 0, 'the walkthrough still documents the allow-list as a key table').toBeTruthy();
 
-  assert.deepStrictEqual(
-    documented.slice().sort(),
-    [...allowed].sort(),
-    'the walkthrough documents exactly the keys the engine accepts — no more, no fewer',
-  );
-});
+        ctx.expect(documented.slice().sort(), 'the walkthrough documents exactly the keys the engine accepts — no more, no fewer').toEqual([...allowed].sort());
+      },
+    },
 
-test('the scaffolded example never becomes a page', async () => {
-  const { tmp, src } = bareConsumer('omega-example-inert-');
-  fs.copyFileSync(EXAMPLE, path.join(src, 'pages', 'example.md.txt'));
+    {
+      name: 'the scaffolded example never becomes a page',
+      run: async (ctx) => {
+        const { tmp, src } = bareConsumer('omega-example-inert-');
+        fs.copyFileSync(EXAMPLE, path.join(src, 'pages', 'example.md.txt'));
 
-  try {
-    const pages = await buildSite(src, bareData, {}, 'scaffold-example-inert');
-    assert.ok(pages.size > 0, 'the fixture still builds');
-    const leaked = [...pages.keys()].filter((url) => /example/i.test(url));
-    assert.deepStrictEqual(leaked, [], 'the walkthrough emits no URL');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+        try {
+          const pages = await buildSite(src, bareData, {}, 'scaffold-example-inert');
+          ctx.expect(pages.size > 0, 'the fixture still builds').toBeTruthy();
+          const leaked = [...pages.keys()].filter((url) => /example/i.test(url));
+          ctx.expect(leaked, 'the walkthrough emits no URL').toEqual([]);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('the walkthrough body renders exactly what it claims', async () => {
-  const { tmp, src } = bareConsumer('omega-example-live-');
-  fs.writeFileSync(path.join(src, 'pages', 'walkthrough.md'), walkthroughBody());
+    {
+      name: 'the walkthrough body renders exactly what it claims',
+      run: async (ctx) => {
+        const { tmp, src } = bareConsumer('omega-example-live-');
+        fs.writeFileSync(path.join(src, 'pages', 'walkthrough.md'), walkthroughBody());
 
-  try {
-    const pages = await buildSite(src, bareData, {}, 'scaffold-example-live');
-    const page = pages.get('/example');
-    assert.ok(page, 'the permalink the frontmatter names is the URL it serves');
+        try {
+          const pages = await buildSite(src, bareData, {}, 'scaffold-example-live');
+          const page = pages.get('/example');
+          ctx.expect(page, 'the permalink the frontmatter names is the URL it serves').toBeTruthy();
 
-    // Meta-only frontmatter reaches the <head>
-    assert.match(page, /<title>Example page<\/title>/, 'meta.title lands');
+          // Meta-only frontmatter reaches the <head>
+          ctx.expect(page, 'meta.title lands').toMatch(/<title>Example page<\/title>/);
 
-    // Inline form — args passed on the tag
-    assert.ok(page.includes('Everything you need'), 'inline hero headline renders');
+          // Inline form — args passed on the tag
+          ctx.expect(page.includes('Everything you need'), 'inline hero headline renders').toBeTruthy();
 
-    // No args — the section's own defaults fill the band
-    assert.ok(page.includes('50,000+'), 'the bare stats call renders its defaults');
+          // No args — the section's own defaults fill the band
+          ctx.expect(page.includes('50,000+'), 'the bare stats call renders its defaults').toBeTruthy();
 
-    // Block form — YAML args, including nested items
-    assert.ok(page.includes('Questions, answered'), 'block-form faq headline renders');
-    assert.ok(page.includes('Do I have to write every page?'), 'block-form nested items render');
+          // Block form — YAML args, including nested items
+          ctx.expect(page.includes('Questions, answered'), 'block-form faq headline renders').toBeTruthy();
+          ctx.expect(page.includes('Do I have to write every page?'), 'block-form nested items render').toBeTruthy();
 
-    // Slot — finished markup passed where a string will not do
-    assert.ok(page.includes('my-demo'), 'the demo_html slot reaches the section');
+          // Slot — finished markup passed where a string will not do
+          ctx.expect(page.includes('my-demo'), 'the demo_html slot reaches the section').toBeTruthy();
 
-    // The walkthrough's own notes are Liquid comments, which the render
-    // drops — an HTML comment would have been shipped bytes ([#92](https://github.com/Omega-JS-Stack/omega/issues/92)),
-    // publishing every explanatory aside to the live page.
-    assert.ok(!page.includes('stack of full-width bands'), 'commentary never reaches the rendered page');
-    assert.ok(!page.includes('Inline form'), 'per-call notes never reach the rendered page');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+          // The walkthrough's own notes are Liquid comments, which the render
+          // drops — an HTML comment would have been shipped bytes ([#92](https://github.com/Omega-JS-Stack/omega/issues/92)),
+          // publishing every explanatory aside to the live page.
+          ctx.expect(!page.includes('stack of full-width bands'), 'commentary never reaches the rendered page').toBeTruthy();
+          ctx.expect(!page.includes('Inline form'), 'per-call notes never reach the rendered page').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

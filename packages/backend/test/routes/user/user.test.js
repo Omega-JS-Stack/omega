@@ -17,10 +17,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/user', {});
 
-        assert.isError(response, 401, 'Resolve should fail without authentication');
+        expect(response, 'Resolve should fail without authentication').toBeError(401);
       },
     },
 
@@ -30,29 +30,29 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.get('omega/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed for basic user');
+        expect(response, 'Resolve should succeed for basic user').toBeSuccess();
 
         const user = response.data.user;
 
         // Verify auth properties
-        assert.equal(user.auth.uid, accounts.basic.uid, 'UID should match test account');
-        assert.equal(user.auth.email, accounts.basic.email, 'Email should match test account');
+        expect(user.auth.uid, 'UID should match test account').toBe(accounts.basic.uid);
+        expect(user.auth.email, 'Email should match test account').toBe(accounts.basic.email);
         // The 200 IS the verdict: the route answers 401 to a signed-out caller, and
         // the user rides the wire as its stored document (no computed getters)
 
         // Verify subscription properties - basic user should have basic subscription
-        assert.equal(user.subscription.product.id, 'basic', 'Subscription ID should be basic');
-        assert.equal(user.subscription.status, 'active', 'Subscription status should be active');
+        expect(user.subscription.product.id, 'Subscription ID should be basic').toBe('basic');
+        expect(user.subscription.status, 'Subscription status should be active').toBe('active');
 
         // Verify roles - basic user has no special roles
-        assert.equal(user.roles.admin, false, 'Basic user should not be admin');
+        expect(user.roles.admin, 'Basic user should not be admin').toBe(false);
 
         // Verify usage structure exists
-        assert.ok(user.usage !== undefined, 'Usage object should be present');
-        assert.ok(user.usage.requests !== undefined, 'Usage.requests should be present');
+        expect(user.usage !== undefined, 'Usage object should be present').toBeTruthy();
+        expect(user.usage.requests !== undefined, 'Usage.requests should be present').toBeTruthy();
       },
     },
 
@@ -62,23 +62,23 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         // Authenticate with the real admin test account's privateKey
         const response = await http.withPrivateKey(accounts.admin.privateKey).get('omega/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed for admin account');
+        expect(response, 'Resolve should succeed for admin account').toBeSuccess();
 
         const user = response.data.user;
 
         // Verify auth properties - should match the real admin account
-        assert.equal(user.auth.uid, accounts.admin.uid, 'UID should match admin test account');
-        assert.equal(user.auth.email, accounts.admin.email, 'Email should match admin test account');
+        expect(user.auth.uid, 'UID should match admin test account').toBe(accounts.admin.uid);
+        expect(user.auth.email, 'Email should match admin test account').toBe(accounts.admin.email);
 
         // Verify roles - admin account has roles.admin = true in Firestore
-        assert.equal(user.roles.admin, true, 'Admin account should have admin role');
+        expect(user.roles.admin, 'Admin account should have admin role').toBe(true);
 
         // Verify subscription - admin account is on basic subscription
-        assert.equal(user.subscription.product.id, 'basic', 'Admin subscription ID should be basic');
+        expect(user.subscription.product.id, 'Admin subscription ID should be basic').toBe('basic');
       },
     },
 
@@ -88,18 +88,18 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert, accounts }) {
+      async run({ http, expect, accounts }) {
         const response = await http.get('omega/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed with admin key');
+        expect(response, 'Resolve should succeed with admin key').toBeSuccess();
 
         const user = response.data.user;
 
         // Verify roles - admin key grants admin role
-        assert.equal(user.roles.admin, true, 'admin key should grant admin role');
+        expect(user.roles.admin, 'admin key should grant admin role').toBe(true);
 
         // Should NOT have the real admin account's UID (it's a shell account)
-        assert.notEqual(user.auth.uid, accounts.admin.uid, 'Should not be the real admin account');
+        expect(user.auth.uid, 'Should not be the real admin account').not.toBe(accounts.admin.uid);
       },
     },
 
@@ -109,25 +109,25 @@ module.exports = defineCases({
       auth: 'resolve-premium-active',
       timeout: 15000,
 
-      async run({ http, assert, accounts, config }) {
+      async run({ http, expect, accounts, config }) {
         const paidProduct = getFirstPaidProduct(config);
         const response = await http.get('omega/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed for premium user');
+        expect(response, 'Resolve should succeed for premium user').toBeSuccess();
 
         const user = response.data.user;
 
         // Verify auth properties
-        assert.equal(user.auth.uid, accounts['resolve-premium-active'].uid, 'UID should match premium test account');
+        expect(user.auth.uid, 'UID should match premium test account').toBe(accounts['resolve-premium-active'].uid);
 
         // Verify subscription - premium user should retain paid subscription
-        assert.equal(user.subscription.product.id, paidProduct.id, 'Subscription ID should match first paid product');
-        assert.equal(user.subscription.status, 'active', 'Subscription status should be active');
+        expect(user.subscription.product.id, 'Subscription ID should match first paid product').toBe(paidProduct.id);
+        expect(user.subscription.status, 'Subscription status should be active').toBe('active');
 
         // Verify expires is in the future
         const expiresTimestamp = user.subscription.expires?.timestampUNIX || 0;
         const now = Math.floor(Date.now() / 1000);
-        assert.ok(expiresTimestamp > now, 'Premium subscription expires should be in the future');
+        expect(expiresTimestamp > now, 'Premium subscription expires should be in the future').toBeTruthy();
       },
     },
 
@@ -137,20 +137,20 @@ module.exports = defineCases({
       auth: 'resolve-premium-expired',
       timeout: 15000,
 
-      async run({ http, assert, accounts, config }) {
+      async run({ http, expect, accounts, config }) {
         const paidProduct = getFirstPaidProduct(config);
         const response = await http.get('omega/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed for expired premium user');
+        expect(response, 'Resolve should succeed for expired premium user').toBeSuccess();
 
         const user = response.data.user;
 
         // Verify auth properties
-        assert.equal(user.auth.uid, accounts['resolve-premium-expired'].uid, 'UID should match expired premium test account');
+        expect(user.auth.uid, 'UID should match expired premium test account').toBe(accounts['resolve-premium-expired'].uid);
 
         // Verify subscription - product.id stays as paid product, status reflects cancellation
-        assert.equal(user.subscription.product.id, paidProduct.id, 'Product ID should remain paid product');
-        assert.equal(user.subscription.status, 'cancelled', 'Status should be cancelled');
+        expect(user.subscription.product.id, 'Product ID should remain paid product').toBe(paidProduct.id);
+        expect(user.subscription.status, 'Status should be cancelled').toBe('cancelled');
       },
     },
   ],

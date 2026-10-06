@@ -67,7 +67,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'monorepo-checkout-passes-whatever-the-manifest-pins',
-      async run({ assert }) {
+      async run({ expect }) {
         // A monorepo root the way devkit's isMonorepoRoot detects one: named
         // "omega" with a packages/devkit workspace
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-check-'));
@@ -82,7 +82,7 @@ module.exports = defineCases({
         const instance = makeInstance(targetDir, '0.51.0', '0.53.0');
         const result = await runGuarded(instance);
 
-        assert.equal(result, true, 'a resolved monorepo checkout passes even with the manifest pin and the checkout behind latest');
+        expect(result, 'a resolved monorepo checkout passes even with the manifest pin and the checkout behind latest').toBe(true);
 
         fs.rmSync(root, { recursive: true, force: true });
       },
@@ -90,20 +90,20 @@ module.exports = defineCases({
 
     {
       name: 'registry-copy-behind-latest-warns-and-never-installs',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = registryTree('0.51.0');
         const instance = makeInstance(targetDir, '^0.51.0', '0.52.0');
         const result = await runGuarded(instance);
 
-        assert.equal(result, 'warn', 'behind latest is a warn, never a fail that runs a fix');
+        expect(result, 'behind latest is a warn, never a fail that runs a fix').toBe('warn');
         const warning = instance.getWarning().join('\n');
-        assert.match(warning, /0\.51\.0/, 'the warning names the resolved version');
-        assert.match(warning, /0\.52\.0/, 'the warning names the latest');
-        assert.match(warning, /npx omega update/, 'the warning names the one updater');
-        // The harness assert carries no rejects(), so the rejection is caught by hand
+        expect(warning, 'the warning names the resolved version').toMatch(/0\.51\.0/);
+        expect(warning, 'the warning names the latest').toMatch(/0\.52\.0/);
+        expect(warning, 'the warning names the one updater').toMatch(/npx omega update/);
+        // The rejection, caught as a value so its message is matched below
         const fixError = await instance.fix().then(() => null, (error) => error);
-        assert.ok(fixError, 'the check carries no fix of its own');
-        assert.match(fixError.message, /No automatic fix/, 'fix() is the BaseTest default, never an install');
+        expect(fixError, 'the check carries no fix of its own').toBeTruthy();
+        expect(fixError.message, 'fix() is the BaseTest default, never an install').toMatch(/No automatic fix/);
 
         fs.rmSync(root, { recursive: true, force: true });
       },
@@ -111,13 +111,13 @@ module.exports = defineCases({
 
     {
       name: 'registry-copy-at-latest-passes',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = registryTree('0.52.0');
         // The manifest pin is stale on purpose: resolution answers, not the pin
         const instance = makeInstance(targetDir, '0.40.0', '0.52.0');
         const result = await runGuarded(instance);
 
-        assert.equal(result, true, 'the resolved copy at latest passes');
+        expect(result, 'the resolved copy at latest passes').toBe(true);
 
         fs.rmSync(root, { recursive: true, force: true });
       },
@@ -125,14 +125,14 @@ module.exports = defineCases({
 
     {
       name: 'unresolved-package-warns-naming-omega-update',
-      async run({ assert }) {
+      async run({ expect }) {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-check-'));
         const targetDir = path.join(root, 'targets', 'backend');
         const instance = makeInstance(targetDir, '^0.52.0', '0.52.0');
         const result = await runGuarded(instance);
 
-        assert.equal(result, 'warn', 'nothing resolved is a warn');
-        assert.match(instance.getWarning().join('\n'), /npx omega update/, 'the warning names the one updater');
+        expect(result, 'nothing resolved is a warn').toBe('warn');
+        expect(instance.getWarning().join('\n'), 'the warning names the one updater').toMatch(/npx omega update/);
 
         fs.rmSync(root, { recursive: true, force: true });
       },

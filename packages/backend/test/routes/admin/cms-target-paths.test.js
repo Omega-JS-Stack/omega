@@ -98,20 +98,18 @@ module.exports = defineCases({
       name: 'create-commits-the-post-and-its-images-under-the-target',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await createAgainst(brandConfig(ONE_WEBSITE));
 
-        assert.equal(run.sent.code, 200, `the create should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
+        expect(run.sent.code, `the create should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
 
         const paths = committedTree(run.calls).map((item) => item.path);
-        assert.equal(paths.length, 2, `one header image and one post, got ${JSON.stringify(paths)}`);
+        expect(paths.length, `one header image and one post, got ${JSON.stringify(paths)}`).toBe(2);
         // The date in the filename is the post's own (yesterday, local), so the
         // FOLDER is what this pins: the target, then the site-relative path.
-        assert.match(paths[1], /^targets\/web\/src\/_posts\/2026\/guest\/\d{4}-\d{2}-\d{2}-a-post\.md$/,
-          `the post lands in the target's own _posts folder, got ${paths[1]}`);
-        assert.match(paths[0], /^targets\/web\/src\/assets\/images\/blog\/post-1234\//,
-          'the header image lands in the target\'s own assets folder');
-        assert.equal(run.settings.target, 'web', 'the response records which website the post belongs to');
+        expect(paths[1], `the post lands in the target's own _posts folder, got ${paths[1]}`).toMatch(/^targets\/web\/src\/_posts\/2026\/guest\/\d{4}-\d{2}-\d{2}-a-post\.md$/);
+        expect(paths[0], 'the header image lands in the target\'s own assets folder').toMatch(/^targets\/web\/src\/assets\/images\/blog\/post-1234\//);
+        expect(run.settings.target, 'the response records which website the post belongs to').toBe('web');
       },
     },
 
@@ -119,16 +117,15 @@ module.exports = defineCases({
       name: 'create-publishes-the-target-own-workflow',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // D13: the dispatch has to name the target too, because a brand
         // monorepo composes one workflow per target (#265).
         const run = await createAgainst(brandConfig(ONE_WEBSITE));
         const dispatch = run.calls.find((call) => call.url.includes('/actions/workflows/'));
 
-        assert.ok(dispatch, 'a create dispatches the site build unless deploy: false');
-        assert.match(dispatch.url, /\/actions\/workflows\/web-build\.yml\/dispatches$/,
-          `the web target's composed workflow is the one dispatched, got ${dispatch && dispatch.url}`);
-        assert.equal(run.settings.deployDispatched, true);
+        expect(dispatch, 'a create dispatches the site build unless deploy: false').toBeTruthy();
+        expect(dispatch.url, `the web target's composed workflow is the one dispatched, got ${dispatch && dispatch.url}`).toMatch(/\/actions\/workflows\/web-build\.yml\/dispatches$/);
+        expect(run.settings.deployDispatched).toBe(true);
       },
     },
 
@@ -136,18 +133,17 @@ module.exports = defineCases({
       name: 'create-writes-into-the-named-target-when-the-brand-runs-several',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await createAgainst(brandConfig(TWO_WEBSITES), { target: 'community' });
 
-        assert.equal(run.sent.code, 200, `the create should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
+        expect(run.sent.code, `the create should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
 
         const paths = committedTree(run.calls).map((item) => item.path);
-        assert.match(paths[1], /^targets\/community\/src\/_posts\/2026\/guest\/\d{4}-\d{2}-\d{2}-a-post\.md$/);
-        assert.match(paths[0], /^targets\/community\/src\/assets\/images\/blog\/post-1234\//);
+        expect(paths[1]).toMatch(/^targets\/community\/src\/_posts\/2026\/guest\/\d{4}-\d{2}-\d{2}-a-post\.md$/);
+        expect(paths[0]).toMatch(/^targets\/community\/src\/assets\/images\/blog\/post-1234\//);
 
         const dispatch = run.calls.find((call) => call.url.includes('/actions/workflows/'));
-        assert.match(dispatch.url, /\/actions\/workflows\/community-build\.yml\/dispatches$/,
-          'the second website publishes through its own workflow');
+        expect(dispatch.url, 'the second website publishes through its own workflow').toMatch(/\/actions\/workflows\/community-build\.yml\/dispatches$/);
       },
     },
 
@@ -155,13 +151,13 @@ module.exports = defineCases({
       name: 'create-refuses-an-unnamed-target-when-the-brand-runs-several',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await createAgainst(brandConfig(TWO_WEBSITES));
 
-        assert.equal(run.sent.code, 400, 'two websites and no name is the caller\'s error');
-        assert.match(run.sent.body, /Missing required parameter: target/);
-        assert.match(run.sent.body, /\[web, community\]/, 'the refusal names the websites to choose from');
-        assert.equal(run.calls.length, 0, 'nothing may reach GitHub before the target is known');
+        expect(run.sent.code, 'two websites and no name is the caller\'s error').toBe(400);
+        expect(run.sent.body).toMatch(/Missing required parameter: target/);
+        expect(run.sent.body, 'the refusal names the websites to choose from').toMatch(/\[web, community\]/);
+        expect(run.calls.length, 'nothing may reach GitHub before the target is known').toBe(0);
       },
     },
 
@@ -169,14 +165,14 @@ module.exports = defineCases({
       name: 'repo-content-writes-the-site-relative-path-inside-the-target',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await writeAgainst(brandConfig(ONE_WEBSITE), { path: 'src/assets/data/authors.json', content: '{}' });
 
-        assert.equal(run.sent.code, 200, `the write should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
-        assert.equal(writtenPath(run.calls), 'targets/web/src/assets/data/authors.json');
-        assert.equal(run.settings.path, 'src/assets/data/authors.json', 'the caller\'s path stays site-relative');
-        assert.equal(run.settings.repoPath, 'targets/web/src/assets/data/authors.json', 'the response says where it landed');
-        assert.equal(run.settings.target, 'web');
+        expect(run.sent.code, `the write should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
+        expect(writtenPath(run.calls)).toBe('targets/web/src/assets/data/authors.json');
+        expect(run.settings.path, 'the caller\'s path stays site-relative').toBe('src/assets/data/authors.json');
+        expect(run.settings.repoPath, 'the response says where it landed').toBe('targets/web/src/assets/data/authors.json');
+        expect(run.settings.target).toBe('web');
       },
     },
 
@@ -184,12 +180,12 @@ module.exports = defineCases({
       name: 'repo-content-refuses-an-unnamed-target-when-the-brand-runs-several',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const run = await writeAgainst(brandConfig(TWO_WEBSITES), { path: 'src/assets/data/authors.json', content: '{}' });
 
-        assert.equal(run.sent.code, 400);
-        assert.match(run.sent.body, /\[web, community\]/);
-        assert.equal(run.calls.length, 0, 'nothing may reach GitHub before the target is known');
+        expect(run.sent.code).toBe(400);
+        expect(run.sent.body).toMatch(/\[web, community\]/);
+        expect(run.calls.length, 'nothing may reach GitHub before the target is known').toBe(0);
       },
     },
 
@@ -197,7 +193,7 @@ module.exports = defineCases({
       name: 'the-sandbox-brand-config-lands-under-targets-web',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The offline stand-in for the e2e the spec asks for: a sandbox brand
         // shaped like the monorepo's own (a brand layer naming both targets, a
         // backend LOCAL layer under targets/backend), resolved by the real
@@ -228,9 +224,8 @@ module.exports = defineCases({
         const config = { ...resolved, repo: { provider: 'github', owner: 'Demo-Org' } };
         const run = await writeAgainst(config, { path: 'src/_posts/2026/guest/2026-01-14-a-post.md', content: 'post' });
 
-        assert.equal(run.sent.code, 200, `the write should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
-        assert.match(writtenPath(run.calls), /^targets\/web\//,
-          `the sandbox brand's post must land inside its web target, got ${writtenPath(run.calls)}`);
+        expect(run.sent.code, `the write should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
+        expect(writtenPath(run.calls), `the sandbox brand's post must land inside its web target, got ${writtenPath(run.calls)}`).toMatch(/^targets\/web\//);
       },
     },
   ],

@@ -66,7 +66,7 @@ const GITHUB_READ_TIMEOUT_MS = 10000;
  */
 function run(context = {}) {
   const { brandRoot, execFn } = context;
-  const log = context.log || console.log;
+  const log = context.log || console.error;
   // Called through the module so the ONE network read has a seam a real CLI
   // boot can stub too (the integration test patches it here).
   const resolveRepo = context.resolveRepo || ((owner, name) => github.getRepo(owner, name, { timeout: GITHUB_READ_TIMEOUT_MS }));

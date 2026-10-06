@@ -21,7 +21,7 @@ const MANAGER = '@omega.js/manager';
  */
 function run(context = {}) {
   const { brandRoot } = context;
-  const log = context.log || console.log;
+  const log = context.log || console.error;
   if (!brandRoot) {
     return { synced: false, reason: 'no-brand' };
   }

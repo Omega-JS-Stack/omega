@@ -75,52 +75,52 @@ module.exports = defineCases({
 
     {
       name: 'tools/list returns tool definitions with schemas',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/list', {}, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(Array.isArray(response.result.tools), 'tools should be an array');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(Array.isArray(response.result.tools), 'tools should be an array').toBeTruthy();
 
         const tool = response.result.tools.find((t) => t.name === 'health_check');
-        assert.ok(tool, 'Should include health_check');
-        assert.ok(tool.description, 'Tool should have description');
-        assert.ok(tool.inputSchema, 'Tool should have inputSchema');
-        assert.equal(tool.inputSchema.type, 'object', 'Schema type should be object');
+        expect(tool, 'Should include health_check').toBeTruthy();
+        expect(tool.description, 'Tool should have description').toBeTruthy();
+        expect(tool.inputSchema, 'Tool should have inputSchema').toBeTruthy();
+        expect(tool.inputSchema.type, 'Schema type should be object').toBe('object');
       },
     },
 
     {
       name: 'tools/call health_check succeeds',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(!response.result.isError, 'Should not be an error');
-        assert.ok(response.result.content, 'Should have content');
-        assert.ok(response.result.content.length > 0, 'Content should not be empty');
-        assert.equal(response.result.content[0].type, 'text', 'Content type should be text');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(!response.result.isError, 'Should not be an error').toBeTruthy();
+        expect(response.result.content, 'Should have content').toBeTruthy();
+        expect(response.result.content.length > 0, 'Content should not be empty').toBeTruthy();
+        expect(response.result.content[0].type, 'Content type should be text').toBe('text');
       },
     },
 
     {
       name: 'tools/call generate_uuid returns valid response',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'generate_uuid',
           arguments: { version: '4' },
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(!response.result.isError, 'Should not be an error');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(!response.result.isError, 'Should not be an error').toBeTruthy();
 
         const text = response.result.content?.[0]?.text || '';
-        assert.ok(text.length > 0, 'Should return UUID text');
+        expect(text.length > 0, 'Should return UUID text').toBeTruthy();
       },
     },
 
@@ -128,22 +128,22 @@ module.exports = defineCases({
 
     {
       name: 'tools/call unknown tool returns error',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'nonexistent_tool',
           arguments: {},
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.equal(response.result.isError, true, 'Should be an error');
-        assert.ok(response.result.content?.[0]?.text?.includes('Unknown tool'), 'Error should mention unknown tool');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(response.result.isError, 'Should be an error').toBe(true);
+        expect(response.result.content?.[0]?.text?.includes('Unknown tool'), 'Error should mention unknown tool').toBeTruthy();
       },
     },
 
     {
       name: 'GET method returns 405',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
@@ -157,16 +157,16 @@ module.exports = defineCases({
             timeout: 10000,
           });
 
-          assert.ok(response?.error, 'Should return error for GET');
+          expect(response?.error, 'Should return error for GET').toBeTruthy();
         } catch (error) {
-          assert.ok(true, 'GET method rejected');
+          expect(true, 'GET method rejected').toBeTruthy();
         }
       },
     },
 
     {
       name: 'DELETE method returns 200 (session cleanup)',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
@@ -179,9 +179,9 @@ module.exports = defineCases({
             timeout: 10000,
           });
 
-          assert.ok(true, 'DELETE method accepted');
+          expect(true, 'DELETE method accepted').toBeTruthy();
         } catch (error) {
-          assert.ok(true, 'DELETE method handled');
+          expect(true, 'DELETE method handled').toBeTruthy();
         }
       },
     },
@@ -190,45 +190,45 @@ module.exports = defineCases({
 
     {
       name: 'tools/call with empty object arguments still works',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(!response.result.isError, 'Should not error with empty arguments');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(!response.result.isError, 'Should not error with empty arguments').toBeTruthy();
       },
     },
 
     {
       name: 'tools/call with missing arguments still works',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(!response.result.isError, 'Should not error with missing arguments');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(!response.result.isError, 'Should not error with missing arguments').toBeTruthy();
       },
     },
 
     {
       name: 'response preserves jsonrpc 2.0 envelope',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/list', {}, key, { id: 42 });
 
-        assert.equal(response?.jsonrpc, '2.0', 'Should have jsonrpc 2.0');
-        assert.equal(response?.id, 42, 'Should echo back the request id');
+        expect(response?.jsonrpc, 'Should have jsonrpc 2.0').toBe('2.0');
+        expect(response?.id, 'Should echo back the request id').toBe(42);
       },
     },
 
     {
       name: 'unauthenticated request returns 401 to trigger OAuth',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         try {
           const text = await fetch(mcpEndpoint(config), {
             method: 'POST',
@@ -241,37 +241,37 @@ module.exports = defineCases({
             timeout: 10000,
           });
           const parsed = JSON.parse(text);
-          assert.equal(parsed.error, 'Unauthorized', 'Should return Unauthorized');
+          expect(parsed.error, 'Should return Unauthorized').toBe('Unauthorized');
         } catch (error) {
-          assert.ok(true, '401 response thrown as error');
+          expect(true, '401 response thrown as error').toBeTruthy();
         }
       },
     },
 
     {
       name: 'tools include annotations with title and hints',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/list', {}, key);
 
         const tool = response.result.tools.find((t) => t.name === 'health_check');
-        assert.ok(tool.annotations, 'Should have annotations');
-        assert.ok(tool.annotations.title, 'Should have a title');
-        assert.equal(tool.annotations.readOnlyHint, true, 'health_check should be read-only');
+        expect(tool.annotations, 'Should have annotations').toBeTruthy();
+        expect(tool.annotations.title, 'Should have a title').toBeTruthy();
+        expect(tool.annotations.readOnlyHint, 'health_check should be read-only').toBe(true);
       },
     },
 
     {
       name: 'admin can call public-role tool (role escalation works upward)',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
 
-        assert.ok(response?.result, 'Should have result');
-        assert.ok(!response.result.isError, 'Admin should be able to call public tools');
+        expect(response?.result, 'Should have result').toBeTruthy();
+        expect(!response.result.isError, 'Admin should be able to call public tools').toBeTruthy();
       },
     },
   ],

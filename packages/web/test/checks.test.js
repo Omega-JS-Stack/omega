@@ -11,10 +11,9 @@
  * #10: the plan-feature check is a one-line-tall box so the glyph centers on
  * the FIRST line of its feature text instead of drifting off the baseline.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
@@ -33,49 +32,6 @@ function compileBundle(theme) {
     logger: { warn: () => {}, debug: () => {} },
   }).css;
 }
-
-test('#44: the check seam is gone, the ink is Bootstrap success bridged to --omega-ok', () => {
-  const css = compileBundle('classy');
-
-  assert.ok(!css.includes('--omega-check'), 'the check token is gone, no second slot for the success hue');
-  assert.ok(!css.includes('.omega-check'), 'the check utility is gone, no parallel class for text-success');
-
-  // The bridge is what makes a tick the theme's green in BOTH modes (#13).
-  assert.match(css, /--bs-success: var\(--omega-ok\)/, 'the root bridge points Bootstrap success at the token');
-  assert.match(css, /--bs-success-rgb: var\(--omega-ok-rgb\)/, 'the channel twin rides the token too');
-
-  // The two greens Ian caught side by side on /pricing: the plan check (now
-  // .text-success) and the money-back shield must resolve to the SAME hue.
-  const guarantee = css.match(/\.omega-guarantee-icon\s*\{[^}]*\}/)[0];
-  assert.match(guarantee, /color: var\(--omega-ok\)/, 'the guarantee shield reads the same success hue as a tick');
-});
-
-test('#11: no check site paints its own tick a local color', () => {
-  const css = compileBundle('classy');
-
-  assert.ok(!/\.omega-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green');
-  assert.match(css, /\.omega-auth__aside-row svg\s*\{(?:(?!color)[^}])*\}/, 'the signup benefit check dropped its local grey');
-  assert.ok(
-    !/\.omega-feature-check\s*\{[^}]*color:/.test(css),
-    'the plan-feature check dropped its local accent',
-  );
-});
-
-test('#10: the plan-feature check is a one-line box, not a magic margin — and one home', () => {
-  const css = compileBundle('classy');
-  const rule = css.match(/\.omega-feature-check\s*\{[^}]*\}/)[0];
-
-  assert.match(rule, /display: inline-flex/, 'the check is its own box');
-  assert.match(rule, /align-items: center/, 'the glyph centers inside it');
-  assert.match(rule, /height: 1\.5em/, 'the box is exactly one line of the feature list tall');
-  assert.ok(!/margin-top/.test(rule), 'the baseline nudge is gone');
-
-  // The rule shipped three times, declaration for declaration (plan card,
-  // enterprise band, the account page's change-plan modal). `.omega-feature-
-  // check` is the one home now, so a per-surface copy is a regression.
-  assert.ok(!css.includes('.omega-price-card__check'), 'the plan card keeps no private copy');
-  assert.ok(!css.includes('.omega-band__check'), 'the enterprise band keeps no private copy');
-});
 
 // A catalog with plan features + a comparison table (the check-heaviest page).
 // Each feature is defined ONCE in the top-level catalog and each product names
@@ -103,40 +59,101 @@ const CATALOG = {
   ],
 };
 
-test('#44: the check surfaces stamp text-success on plan features, comparison, signup', async () => {
-  const pages = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checks',
+  tests: [
+    {
+      name: '#44: the check seam is gone, the ink is Bootstrap success bridged to --omega-ok',
+      run: (ctx) => {
+        const css = compileBundle('classy');
 
-  const pricing = pages.get('/pricing');
-  assert.ok(pricing, '/pricing built');
-  assert.match(pricing, /omega-feature-check text-success/, 'plan-feature checks carry the success class');
-  assert.match(pricing, /omega-compare__yes text-success/, 'comparison yes-marks carry the success class');
-  assert.ok(!pricing.includes('omega-check'), 'no page still stamps the retired seam class');
+        ctx.expect(!css.includes('--omega-check'), 'the check token is gone, no second slot for the success hue').toBeTruthy();
+        ctx.expect(!css.includes('.omega-check'), 'the check utility is gone, no parallel class for text-success').toBeTruthy();
 
-  const signup = pages.get('/signup');
-  assert.ok(signup, '/signup built');
-  assert.match(signup, /class="fa-solid fa-check text-success fa-sm"/, 'signup benefit checks carry the success class');
-});
+        // The bridge is what makes a tick the theme's green in BOTH modes (#13).
+        ctx.expect(css, 'the root bridge points Bootstrap success at the token').toMatch(/--bs-success: var\(--omega-ok\)/);
+        ctx.expect(css, 'the channel twin rides the token too').toMatch(/--bs-success-rgb: var\(--omega-ok-rgb\)/);
 
-test('#44: every affirmation-check site wears text-success and nothing else', () => {
-  const affirmationSites = [
-    ['themes/base/_layouts/frontend/pages/pricing.html', 'check'],
-    ['themes/base/_layouts/frontend/pages/auth/signup.html', 'check'],
-    ['themes/base/_sections/marketing/hero/section.html', 'check'],
-    ['themes/base/_sections/marketing/product-demo/section.html', 'check'],
-    ['themes/base/_layouts/frontend/pages/alternatives/alternative.html', 'circle-check'],
-    // Neither partial theme forks a pricing layout (#177 phases 2 + 3);
-    // their /pricing renders the base page, already pinned above.
-  ];
+        // The two greens Ian caught side by side on /pricing: the plan check (now
+        // .text-success) and the money-back shield must resolve to the SAME hue.
+        const guarantee = css.match(/\.omega-guarantee-icon\s*\{[^}]*\}/)[0];
+        ctx.expect(guarantee, 'the guarantee shield reads the same success hue as a tick').toMatch(/color: var\(--omega-ok\)/);
+      },
+    },
 
-  for (const [rel, icon] of affirmationSites) {
-    const source = fs.readFileSync(path.join(PKG, rel), 'utf8');
-    assert.ok(!source.includes('omega-check'), `${rel} dropped the retired seam class`);
+    {
+      name: '#11: no check site paints its own tick a local color',
+      run: (ctx) => {
+        const css = compileBundle('classy');
 
-    const calls = source.split('\n').filter((line) => line.includes(`fa-${icon}`));
-    assert.ok(calls.length > 0, `${rel} still renders its ${icon}`);
-    for (const call of calls) {
-      assert.ok(call.includes('text-success'), `${rel} check takes its ink from the bridge: ${call.trim()}`);
-      assert.ok(!/text-primary|text-info|style="color/.test(call), `${rel} check keeps no local color: ${call.trim()}`);
-    }
-  }
+        ctx.expect(!/\.omega-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green').toBeTruthy();
+        ctx.expect(css, 'the signup benefit check dropped its local grey').toMatch(/\.omega-auth__aside-row svg\s*\{(?:(?!color)[^}])*\}/);
+        ctx.expect(!/\.omega-feature-check\s*\{[^}]*color:/.test(css), 'the plan-feature check dropped its local accent').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#10: the plan-feature check is a one-line box, not a magic margin — and one home',
+      run: (ctx) => {
+        const css = compileBundle('classy');
+        const rule = css.match(/\.omega-feature-check\s*\{[^}]*\}/)[0];
+
+        ctx.expect(rule, 'the check is its own box').toMatch(/display: inline-flex/);
+        ctx.expect(rule, 'the glyph centers inside it').toMatch(/align-items: center/);
+        ctx.expect(rule, 'the box is exactly one line of the feature list tall').toMatch(/height: 1\.5em/);
+        ctx.expect(!/margin-top/.test(rule), 'the baseline nudge is gone').toBeTruthy();
+
+        // The rule shipped three times, declaration for declaration (plan card,
+        // enterprise band, the account page's change-plan modal). `.omega-feature-
+        // check` is the one home now, so a per-surface copy is a regression.
+        ctx.expect(!css.includes('.omega-price-card__check'), 'the plan card keeps no private copy').toBeTruthy();
+        ctx.expect(!css.includes('.omega-band__check'), 'the enterprise band keeps no private copy').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#44: the check surfaces stamp text-success on plan features, comparison, signup',
+      run: async (ctx) => {
+        const pages = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG });
+
+        const pricing = pages.get('/pricing');
+        ctx.expect(pricing, '/pricing built').toBeTruthy();
+        ctx.expect(pricing, 'plan-feature checks carry the success class').toMatch(/omega-feature-check text-success/);
+        ctx.expect(pricing, 'comparison yes-marks carry the success class').toMatch(/omega-compare__yes text-success/);
+        ctx.expect(!pricing.includes('omega-check'), 'no page still stamps the retired seam class').toBeTruthy();
+
+        const signup = pages.get('/signup');
+        ctx.expect(signup, '/signup built').toBeTruthy();
+        ctx.expect(signup, 'signup benefit checks carry the success class').toMatch(/class="fa-solid fa-check text-success fa-sm"/);
+      },
+    },
+
+    {
+      name: '#44: every affirmation-check site wears text-success and nothing else',
+      run: (ctx) => {
+        const affirmationSites = [
+          ['themes/base/_layouts/frontend/pages/pricing.html', 'check'],
+          ['themes/base/_layouts/frontend/pages/auth/signup.html', 'check'],
+          ['themes/base/_sections/marketing/hero/section.html', 'check'],
+          ['themes/base/_sections/marketing/product-demo/section.html', 'check'],
+          ['themes/base/_layouts/frontend/pages/alternatives/alternative.html', 'circle-check'],
+          // Neither partial theme forks a pricing layout (#177 phases 2 + 3);
+          // their /pricing renders the base page, already pinned above.
+        ];
+
+        for (const [rel, icon] of affirmationSites) {
+          const source = fs.readFileSync(path.join(PKG, rel), 'utf8');
+          ctx.expect(!source.includes('omega-check'), `${rel} dropped the retired seam class`).toBeTruthy();
+
+          const calls = source.split('\n').filter((line) => line.includes(`fa-${icon}`));
+          ctx.expect(calls.length > 0, `${rel} still renders its ${icon}`).toBeTruthy();
+          for (const call of calls) {
+            ctx.expect(call.includes('text-success'), `${rel} check takes its ink from the bridge: ${call.trim()}`).toBeTruthy();
+            ctx.expect(!/text-primary|text-info|style="color/.test(call), `${rel} check keeps no local color: ${call.trim()}`).toBeTruthy();
+          }
+        }
+      },
+    },
+  ],
 });

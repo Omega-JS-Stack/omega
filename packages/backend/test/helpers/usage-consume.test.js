@@ -26,7 +26,7 @@
  * the only thing standing in for I/O is `write()` — recorded rather than sent,
  * which is what makes the payload assertable at all.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const Usage = require('../../dist/omega/services/usage.js');
 const { User } = require('../../dist/omega/helpers/account.js');
@@ -131,13 +131,13 @@ module.exports = defineCases({
       async run() {
         const { usage, ctx } = attach(account());
 
-        assert.equal(ctx.state.authenticated, 0, 'building the counter must cost no read');
-        assert.equal(usage.resolved, false);
+        expect(ctx.state.authenticated, 'building the counter must cost no read').toBe(0);
+        expect(usage.resolved).toBe(false);
 
         await usage.consume('saves');
         await usage.consume('saves');
 
-        assert.equal(ctx.state.authenticated, 1, 'the account resolves once, on first use');
+        expect(ctx.state.authenticated, 'the account resolves once, on first use').toBe(1);
       },
     },
 
@@ -151,8 +151,8 @@ module.exports = defineCases({
 
         await usage.read('saves');
 
-        assert.equal(ctx.state.authenticated, 1, 'no second token verification, no second user-doc read');
-        assert.equal(state.used, 7, 'and the counter reads the account authenticate() resolved');
+        expect(ctx.state.authenticated, 'no second token verification, no second user-doc read').toBe(1);
+        expect(state.used, 'and the counter reads the account authenticate() resolved').toBe(7);
       },
     },
 
@@ -169,9 +169,9 @@ module.exports = defineCases({
         const read = await usage.read('saves').catch((e) => e);
 
         for (const error of [consumed, read]) {
-          assert.ok(error instanceof Error, 'a signed-out caller must be refused');
-          assert.match(error.message, /no signed-in account to count against/i, error.message);
-          assert.match(error.message, /usage\.forKey/, 'and pointed at the explicit anonymous counter');
+          expect(error instanceof Error, 'a signed-out caller must be refused').toBeTruthy();
+          expect(error.message, error.message).toMatch(/no signed-in account to count against/i);
+          expect(error.message, 'and pointed at the explicit anonymous counter').toMatch(/usage\.forKey/);
         }
       },
     },
@@ -184,9 +184,9 @@ module.exports = defineCases({
 
         const left = await usage.consume('saves');
 
-        assert.deepEqual(left, { used: 31, left: 69, day: { used: 2, left: 2 } }, JSON.stringify(left));
-        assert.equal(writes.length, 1, 'one write per consume');
-        assert.equal(writes[0].patch.usage.saves.total, 501, 'total never resets and still moved');
+        expect(left, JSON.stringify(left)).toEqual({ used: 31, left: 69, day: { used: 2, left: 2 } });
+        expect(writes.length, 'one write per consume').toBe(1);
+        expect(writes[0].patch.usage.saves.total, 'total never resets and still moved').toBe(501);
       },
     },
 
@@ -200,7 +200,7 @@ module.exports = defineCases({
 
         await usage.consume('saves');
 
-        assert.deepEqual(Object.keys(writes[0].patch.usage), ['saves'], JSON.stringify(writes[0].patch));
+        expect(Object.keys(writes[0].patch.usage), JSON.stringify(writes[0].patch)).toEqual(['saves']);
       },
     },
 
@@ -213,9 +213,9 @@ module.exports = defineCases({
 
         const error = await usage.consume('saves').catch((e) => e);
 
-        assert.ok(error instanceof Error, 'over the day share must refuse');
-        assert.equal(error.code, 429);
-        assert.match(error.message, /try again tomorrow/i, error.message);
+        expect(error instanceof Error, 'over the day share must refuse').toBeTruthy();
+        expect(error.code).toBe(429);
+        expect(error.message, error.message).toMatch(/try again tomorrow/i);
       },
     },
 
@@ -228,9 +228,9 @@ module.exports = defineCases({
 
         const error = await usage.consume('saves').catch((e) => e);
 
-        assert.equal(error.code, 429);
-        assert.match(error.message, /upgrade/i, error.message);
-        assert.doesNotMatch(error.message, /tomorrow/i, error.message);
+        expect(error.code).toBe(429);
+        expect(error.message, error.message).toMatch(/upgrade/i);
+        expect(error.message, error.message).not.toMatch(/tomorrow/i);
       },
     },
 
@@ -242,8 +242,8 @@ module.exports = defineCases({
 
         await usage.consume('saves').catch(() => {});
 
-        assert.deepEqual(writes, [], 'a refused call must leave the counters alone');
-        assert.equal(usage.user.usage.saves.monthly, 100);
+        expect(writes, 'a refused call must leave the counters alone').toEqual([]);
+        expect(usage.user.usage.saves.monthly).toBe(100);
       },
     },
 
@@ -255,7 +255,7 @@ module.exports = defineCases({
 
         const error = await usage.consume('saves', 3).catch((e) => e);
 
-        assert.equal(error.code, 429, 'consuming 3 with 2 left must refuse, not overshoot');
+        expect(error.code, 'consuming 3 with 2 left must refuse, not overshoot').toBe(429);
       },
     },
 
@@ -267,7 +267,7 @@ module.exports = defineCases({
 
         const left = await usage.consume('exports');
 
-        assert.deepEqual(left.day, { used: 20, left: -1 }, JSON.stringify(left));
+        expect(left.day, JSON.stringify(left)).toEqual({ used: 20, left: -1 });
       },
     },
 
@@ -281,9 +281,9 @@ module.exports = defineCases({
 
         const left = await usage.consume('saves');
 
-        assert.equal(left.used, 101, 'the plan said 100 — the override says otherwise');
-        assert.equal(left.left, 199);
-        assert.equal(left.day.left, 9, 'ceil(300/31) = 10, one just spent');
+        expect(left.used, 'the plan said 100 — the override says otherwise').toBe(101);
+        expect(left.left).toBe(199);
+        expect(left.day.left, 'ceil(300/31) = 10, one just spent').toBe(9);
       },
     },
 
@@ -298,8 +298,8 @@ module.exports = defineCases({
 
         const left = await usage.consume('saves');
 
-        assert.equal(left.left, -1, 'unlimited stays unlimited');
-        assert.equal(left.used, 100000, 'and the record stays honest');
+        expect(left.left, 'unlimited stays unlimited').toBe(-1);
+        expect(left.used, 'and the record stays honest').toBe(100000);
       },
     },
 
@@ -320,8 +320,8 @@ module.exports = defineCases({
 
         const error = await usage.consume('saves').catch((e) => e);
 
-        assert.equal(error.code, 429, error.message);
-        assert.match(error.message, /all 0 of your Saves/i, error.message);
+        expect(error.code, error.message).toBe(429);
+        expect(error.message, error.message).toMatch(/all 0 of your Saves/i);
       },
     },
 
@@ -333,7 +333,7 @@ module.exports = defineCases({
 
         await usage.consume('saves');
 
-        assert.deepEqual(writes[0].paths, ['teams/team-a', 'teams/team-b'], JSON.stringify(writes[0].paths));
+        expect(writes[0].paths, JSON.stringify(writes[0].paths)).toEqual(['teams/team-a', 'teams/team-b']);
       },
     },
 
@@ -345,7 +345,7 @@ module.exports = defineCases({
 
         await usage.consume('exports');
 
-        assert.deepEqual(writes[0].paths, [], JSON.stringify(writes[0].paths));
+        expect(writes[0].paths, JSON.stringify(writes[0].paths)).toEqual([]);
       },
     },
 
@@ -357,9 +357,9 @@ module.exports = defineCases({
 
         const state = await usage.read('saves');
 
-        assert.equal(state.used, 30);
-        assert.equal(state.left, 70);
-        assert.deepEqual(writes, [], 'read must never write');
+        expect(state.used).toBe(30);
+        expect(state.left).toBe(70);
+        expect(writes, 'read must never write').toEqual([]);
       },
     },
 
@@ -371,10 +371,10 @@ module.exports = defineCases({
 
         const keyed = usage.forKey('203.0.113.7');
 
-        assert.notStrictEqual(keyed, usage, 'forKey returns its own counter');
-        assert.equal(keyed.key, '203.0.113.7');
-        assert.equal(usage.key, null, 'the original counter is untouched');
-        assert.deepEqual(keyed.mirrorPaths('saves'), [], 'an anonymous key owns nothing to mirror to');
+        expect(keyed, 'forKey returns its own counter').not.toBe(usage);
+        expect(keyed.key).toBe('203.0.113.7');
+        expect(usage.key, 'the original counter is untouched').toBe(null);
+        expect(keyed.mirrorPaths('saves'), 'an anonymous key owns nothing to mirror to').toEqual([]);
       },
     },
 
@@ -386,8 +386,8 @@ module.exports = defineCases({
 
         const error = await usage.consume('teleport').catch((e) => e);
 
-        assert.equal(error.code, 500, error.message);
-        assert.match(error.message, /features catalog/i, error.message);
+        expect(error.code, error.message).toBe(500);
+        expect(error.message, error.message).toMatch(/features catalog/i);
       },
     },
 
@@ -399,8 +399,8 @@ module.exports = defineCases({
 
         const error = await usage.consume('support').catch((e) => e);
 
-        assert.equal(error.code, 500, error.message);
-        assert.match(error.message, /perk/i, error.message);
+        expect(error.code, error.message).toBe(500);
+        expect(error.message, error.message).toMatch(/perk/i);
       },
     },
 
@@ -413,13 +413,13 @@ module.exports = defineCases({
 
         const left = await usage.consume('signups', 1, { limit: 2 });
 
-        assert.equal(left.used, 2);
-        assert.equal(left.left, 0);
-        assert.equal(writes.length, 1);
+        expect(left.used).toBe(2);
+        expect(left.left).toBe(0);
+        expect(writes.length).toBe(1);
 
         const error = await usage.consume('signups', 1, { limit: 2 }).catch((e) => e);
 
-        assert.equal(error.code, 429, error.message);
+        expect(error.code, error.message).toBe(429);
       },
     },
 
@@ -433,7 +433,7 @@ module.exports = defineCases({
 
         const left = await usage.consume('saves');
 
-        assert.equal(left.used, 101, 'the record stays honest even when the gate stands down');
+        expect(left.used, 'the record stays honest even when the gate stands down').toBe(101);
       },
     },
 
@@ -443,11 +443,11 @@ module.exports = defineCases({
       async run() {
         const { usage } = attach(account({ usage: { overrides: { saves: 250 } } }));
 
-        assert.deepEqual(usage.limits(), {}, 'nothing is known before the counter resolves');
+        expect(usage.limits(), 'nothing is known before the counter resolves').toEqual({});
 
         await usage.read('saves');
 
-        assert.deepEqual(usage.limits(), { saves: 250, exports: 20 }, JSON.stringify(usage.limits()));
+        expect(usage.limits(), JSON.stringify(usage.limits())).toEqual({ saves: 250, exports: 20 });
       },
     },
   ],

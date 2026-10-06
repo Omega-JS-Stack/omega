@@ -51,7 +51,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'attach-verb-log-tees-this-process-to-target-root-logs',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, command } = commandInTempApp();
 
         const logPath = withoutCiEnv(() => {
@@ -62,11 +62,11 @@ module.exports = defineCases({
           return resolved;
         });
 
-        assert.equal(logPath, path.join(root, 'logs', 'test.log'), 'the verb log lives at <targetRoot>/logs/');
+        expect(logPath, 'the verb log lives at <targetRoot>/logs/').toBe(path.join(root, 'logs', 'test.log'));
 
         const contents = fs.readFileSync(logPath, 'utf8');
-        assert.ok(contents.includes('verb log line'), 'the run lands in the file');
-        assert.equal(contents.includes('\x1B['), false, 'the file is ANSI-free');
+        expect(contents.includes('verb log line'), 'the run lands in the file').toBeTruthy();
+        expect(contents.includes('\x1B['), 'the file is ANSI-free').toBe(false);
 
         jetpack.remove(root);
       },
@@ -74,13 +74,13 @@ module.exports = defineCases({
 
     {
       name: 'verb-log-and-child-log-are-different-files',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, command } = commandInTempApp();
 
         // dist/dev.log is the firebase child's; logs/dev.log is ours. Confusing
         // them would have one truncate the other on every boot.
-        assert.equal(command.getLogsPath('dev.log'), path.join(root, 'dist', 'dev.log'));
-        assert.notEqual(command.getLogsPath('dev.log'), path.join(root, 'logs', 'dev.log'));
+        expect(command.getLogsPath('dev.log')).toBe(path.join(root, 'dist', 'dev.log'));
+        expect(command.getLogsPath('dev.log')).not.toBe(path.join(root, 'logs', 'dev.log'));
 
         jetpack.remove(root);
       },
@@ -88,10 +88,10 @@ module.exports = defineCases({
 
     {
       name: 'sweep-clears-our-stale-logs-and-sentinels-but-not-firebase-debug-logs',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, command } = commandInTempApp();
 
-        const ours = ['dev.log', 'deploy.log', 'emulator.log', 'test.log', 'production.log'];
+        const ours = ['dev.log', 'deploy.log', 'emulator.log', 'production.log'];
         const theirs = ['firestore-debug.log', 'firebase-debug.log', 'ui-debug.log'];
         for (const name of [...ours, ...theirs]) {
           jetpack.write(command.getLogsPath(name), 'stale line from the previous run\n');
@@ -103,13 +103,13 @@ module.exports = defineCases({
         command.sweepStaleLogs();
 
         for (const name of ours) {
-          assert.equal(jetpack.exists(command.getLogsPath(name)), false, `${name} must be swept`);
+          expect(jetpack.exists(command.getLogsPath(name)), `${name} must be swept`).toBe(false);
         }
         for (const name of theirs) {
-          assert.equal(jetpack.exists(command.getLogsPath(name)), 'file', `${name} is firebase-tools' — never swept`);
+          expect(jetpack.exists(command.getLogsPath(name)), `${name} is firebase-tools' — never swept`).toBe('file');
         }
         for (const name of ['dev.log.reset', 'emulator.log.reset']) {
-          assert.equal(jetpack.exists(command.getTempPath(name)), false, `${name} sentinel must be swept`);
+          expect(jetpack.exists(command.getTempPath(name)), `${name} sentinel must be swept`).toBe(false);
         }
 
         jetpack.remove(root);

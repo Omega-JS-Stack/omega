@@ -19,7 +19,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refund-transaction-fallback
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -145,10 +145,10 @@ module.exports = defineCases({
         const { store } = await runRefundWithoutCreditNote({ calls });
         const refund = store.get(`payments-orders/${ORDER_ID}`)?.unified?.payment?.refund;
 
-        assert.ok(calls.includes(`/transactions/${TRANSACTION_ID}`), 'the transaction is read back by the id the payload names — an identifier, nothing more');
-        assert.equal(refund.amount, '9.99', 'the amount is Chargebee\'s record of the transaction');
-        assert.notEqual(refund.amount, '999.99', 'and never the number the envelope carried');
-        assert.equal(refund.currency, 'USD', 'the currency comes off the same record');
+        expect(calls.includes(`/transactions/${TRANSACTION_ID}`), 'the transaction is read back by the id the payload names — an identifier, nothing more').toBeTruthy();
+        expect(refund.amount, 'the amount is Chargebee\'s record of the transaction').toBe('9.99');
+        expect(refund.amount, 'and never the number the envelope carried').not.toBe('999.99');
+        expect(refund.currency, 'the currency comes off the same record').toBe('USD');
       },
     },
 
@@ -159,9 +159,9 @@ module.exports = defineCases({
         const { store } = await runRefundWithoutCreditNote();
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.equal(order.unified.status, 'refunded', 'the refund lands on the purchase it reversed');
-        assert.equal(order.unified.product.id, 'premium', 'which keeps its product');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'completed', 'and the event completes');
+        expect(order.unified.status, 'the refund lands on the purchase it reversed').toBe('refunded');
+        expect(order.unified.product.id, 'which keeps its product').toBe('premium');
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'and the event completes').toBe('completed');
       },
     },
 
@@ -175,9 +175,9 @@ module.exports = defineCases({
         const { store, logs } = await runRefundWithoutCreditNote({ transaction: false, calls });
         const refund = store.get(`payments-orders/${ORDER_ID}`)?.unified?.payment?.refund;
 
-        assert.ok(!calls.some((call) => call.startsWith('/transactions/')), 'there is no id to ask about');
-        assert.equal(refund.amount, null, 'an unverifiable amount is not invented');
-        assert.match(logs.join('\n'), /no credit note/i, 'and the gap is named');
+        expect(!calls.some((call) => call.startsWith('/transactions/')), 'there is no id to ask about').toBeTruthy();
+        expect(refund.amount, 'an unverifiable amount is not invented').toBe(null);
+        expect(logs.join('\n'), 'and the gap is named').toMatch(/no credit note/i);
       },
     },
   ],

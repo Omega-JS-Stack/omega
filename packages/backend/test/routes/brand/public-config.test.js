@@ -38,8 +38,8 @@ module.exports = defineCases({
       name: 'the-payload-repo-is-provider-and-owner',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.deepEqual(buildPublicConfig(brandConfig()).repo, { provider: 'github', owner: 'Acme' });
+      async run({ expect }) {
+        expect(buildPublicConfig(brandConfig()).repo).toEqual({ provider: 'github', owner: 'Acme' });
       },
     },
   ],

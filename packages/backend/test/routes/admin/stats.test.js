@@ -15,14 +15,11 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/admin/stats', {});
 
-        assert.isSuccess(response, 'Get stats should succeed with admin auth');
-        assert.ok(
-          typeof response.data === 'object',
-          'Response data should be an object'
-        );
+        expect(response, 'Get stats should succeed with admin auth').toBeSuccess();
+        expect(typeof response.data === 'object', 'Response data should be an object').toBeTruthy();
       },
     },
 
@@ -32,16 +29,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/admin/stats', {});
 
-        assert.isSuccess(response, 'Get stats should succeed');
-        assert.hasProperty(response, 'data.users', 'Stats should contain users field');
-        assert.hasProperty(response, 'data.users.total', 'Users should have total field');
-        assert.ok(
-          typeof response.data.users.total === 'number',
-          'users.total should be a number'
-        );
+        expect(response, 'Get stats should succeed').toBeSuccess();
+        expect(response, 'Stats should contain users field').toHaveProperty('data.users');
+        expect(response, 'Users should have total field').toHaveProperty('data.users.total');
+        expect(typeof response.data.users.total === 'number', 'users.total should be a number').toBeTruthy();
       },
     },
 
@@ -51,17 +45,14 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 60000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/admin/stats', {
           update: { users: true },
         });
 
-        assert.isSuccess(response, 'Get stats with update should succeed');
-        assert.hasProperty(response, 'data.users.total', 'Updated stats should have users.total');
-        assert.ok(
-          response.data.users.total >= 0,
-          'users.total should be a non-negative number'
-        );
+        expect(response, 'Get stats with update should succeed').toBeSuccess();
+        expect(response, 'Updated stats should have users.total').toHaveProperty('data.users.total');
+        expect(response.data.users.total >= 0, 'users.total should be a non-negative number').toBeTruthy();
       },
     },
 
@@ -71,16 +62,16 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         await http.get('omega/admin/stats', {
           update: { users: true },
         });
 
         const response = await http.get('omega/admin/stats', {});
 
-        assert.isSuccess(response, 'Get stats should succeed');
+        expect(response, 'Get stats should succeed').toBeSuccess();
         if (response.data.metadata) {
-          assert.hasProperty(response, 'data.metadata.updated', 'Metadata should have updated timestamp');
+          expect(response, 'Metadata should have updated timestamp').toHaveProperty('data.metadata.updated');
         }
       },
     },
@@ -91,10 +82,10 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/admin/stats', {});
 
-        assert.isError(response, 401, 'Get stats should fail without authentication');
+        expect(response, 'Get stats should fail without authentication').toBeError(401);
       },
     },
 
@@ -104,10 +95,10 @@ module.exports = defineCases({
       auth: 'user',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/admin/stats', {});
 
-        assert.isError(response, 403, 'Get stats should fail for non-admin user');
+        expect(response, 'Get stats should fail for non-admin user').toBeError(403);
       },
     },
   ],

@@ -15,21 +15,16 @@
  * the inlined block and the deferred sheet agree, and no scss source has a
  * fallback family written into it.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { after, test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildAssets } = require('../src/assets.js');
 const { MINI, PKG } = require('./lib/build.js');
 
 // Own the css-lane out dir per process, per assets.test.js's #182 rule.
 const OUT = path.join(PKG, '.omega', `font-fallback-out-${process.pid}`);
-
-after(() => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-});
 
 /**
  * Build ONLY the css half over a real theme chain and hand back the manifest
@@ -59,110 +54,131 @@ async function buildCss(themeRoots, name, overrides = {}) {
 /** The packaged theme chain for a theme id. */
 const packagedChain = (id) => [path.join(PKG, 'themes', id), path.join(PKG, 'themes', 'base')];
 
-test('classy: one fallback face per vendored family, measured off the woff2 files', async () => {
-  const { css } = await buildCss(packagedChain('classy'), 'classy');
+module.exports = defineCases({
+  type: 'group',
+  description: 'font-fallback',
+  cleanup: () => {
+    fs.rmSync(OUT, { recursive: true, force: true });
+  },
+  tests: [
+    {
+      name: 'classy: one fallback face per vendored family, measured off the woff2 files',
+      run: async (ctx) => {
+        const { css } = await buildCss(packagedChain('classy'), 'classy');
 
-  // Inter over Helvetica Neue: the first family classy's own --omega-font-ui
-  // stack names that the built-in metrics table knows (-apple-system,
-  // blinkmacsystemfont, 'Segoe UI' and roboto are not measurable families).
-  // Arial rides along as a second local() source: Helvetica Neue is macOS-only,
-  // and a face with no resolvable source would hand the swap to an unadjusted
-  // tail entry on Windows. The overrides are computed against the first.
-  assert.ok(css.includes(
-    '@font-face{font-family:"Inter Fallback";src:local("Helvetica Neue"),local("Arial");'
-    + 'size-adjust:105.508%;ascent-override:91.818%;descent-override:22.862%;line-gap-override:0.000%}',
-  ), 'the Inter fallback face, with all four overrides');
+        // Inter over Helvetica Neue: the first family classy's own --omega-font-ui
+        // stack names that the built-in metrics table knows (-apple-system,
+        // blinkmacsystemfont, 'Segoe UI' and roboto are not measurable families).
+        // Arial rides along as a second local() source: Helvetica Neue is macOS-only,
+        // and a face with no resolvable source would hand the swap to an unadjusted
+        // tail entry on Windows. The overrides are computed against the first.
+        ctx.expect(css.includes(
+          '@font-face{font-family:"Inter Fallback";src:local("Helvetica Neue"),local("Arial");'
+          + 'size-adjust:105.508%;ascent-override:91.818%;descent-override:22.862%;line-gap-override:0.000%}',
+        ), 'the Inter fallback face, with all four overrides').toBeTruthy();
 
-  // Newsreader over Georgia, off --omega-font-serif.
-  assert.ok(css.includes(
-    '@font-face{font-family:"Newsreader Fallback";src:local("Georgia"),local("Times New Roman");'
-    + 'size-adjust:91.224%;ascent-override:80.571%;descent-override:29.049%;line-gap-override:0.000%}',
-  ), 'the Newsreader fallback face');
-});
+        // Newsreader over Georgia, off --omega-font-serif.
+        ctx.expect(css.includes(
+          '@font-face{font-family:"Newsreader Fallback";src:local("Georgia"),local("Times New Roman");'
+          + 'size-adjust:91.224%;ascent-override:80.571%;descent-override:29.049%;line-gap-override:0.000%}',
+        ), 'the Newsreader fallback face').toBeTruthy();
+      },
+    },
 
-test('classy: the token stacks name the fallback right after the web family', async () => {
-  const { css } = await buildCss(packagedChain('classy'), 'classy-tokens');
+    {
+      name: 'classy: the token stacks name the fallback right after the web family',
+      run: async (ctx) => {
+        const { css } = await buildCss(packagedChain('classy'), 'classy-tokens');
 
-  assert.ok(
-    css.includes('--omega-font-ui: \'Inter\', "Inter Fallback", -apple-system'),
-    'the fallback follows Inter, ahead of the system tail',
-  );
-  assert.ok(
-    css.includes('--omega-font-serif: \'Newsreader\', "Newsreader Fallback", ui-serif'),
-    'and follows Newsreader in the serif stack',
-  );
+        ctx.expect(css.includes('--omega-font-ui: \'Inter\', "Inter Fallback", -apple-system'), 'the fallback follows Inter, ahead of the system tail').toBeTruthy();
+        ctx.expect(css.includes('--omega-font-serif: \'Newsreader\', "Newsreader Fallback", ui-serif'), 'and follows Newsreader in the serif stack').toBeTruthy();
 
-  // The core token sheet's own system stacks name no web family, so nothing
-  // is inserted into them.
-  assert.ok(css.includes('--omega-font-mono: ui-monospace'), 'the mono stack is untouched');
-  assert.ok(!/--omega-font-mono:[^;}]*Fallback/.test(css), 'no fallback in a stack with no web family');
-});
+        // The core token sheet's own system stacks name no web family, so nothing
+        // is inserted into them.
+        ctx.expect(css.includes('--omega-font-mono: ui-monospace'), 'the mono stack is untouched').toBeTruthy();
+        ctx.expect(!/--omega-font-mono:[^;}]*Fallback/.test(css), 'no fallback in a stack with no web family').toBeTruthy();
+      },
+    },
 
-test('classy: a fallback face is never preloaded (it is a local(), not a file)', async () => {
-  const { manifest } = await buildCss(packagedChain('classy'), 'classy-preloads');
+    {
+      name: 'classy: a fallback face is never preloaded (it is a local(), not a file)',
+      run: async (ctx) => {
+        const { manifest } = await buildCss(packagedChain('classy'), 'classy-preloads');
 
-  assert.deepEqual(manifest.fontPreloads, [
-    '/assets/fonts/inter-italic-latin.woff2',
-    '/assets/fonts/inter-normal-latin.woff2',
-    '/assets/fonts/newsreader-italic-latin.woff2',
-    '/assets/fonts/newsreader-normal-latin.woff2',
-  ], 'the #765 list is exactly what it was');
-});
+        ctx.expect(manifest.fontPreloads, 'the #765 list is exactly what it was').toEqual([
+          '/assets/fonts/inter-italic-latin.woff2',
+          '/assets/fonts/inter-normal-latin.woff2',
+          '/assets/fonts/newsreader-italic-latin.woff2',
+          '/assets/fonts/newsreader-normal-latin.woff2',
+        ]);
+      },
+    },
 
-test('newsflash: its own two families get the same treatment', async () => {
-  const { css } = await buildCss(packagedChain('newsflash'), 'newsflash');
+    {
+      name: 'newsflash: its own two families get the same treatment',
+      run: async (ctx) => {
+        const { css } = await buildCss(packagedChain('newsflash'), 'newsflash');
 
-  assert.ok(css.includes(
-    '@font-face{font-family:"Schibsted Grotesk Fallback";src:local("Helvetica Neue"),local("Arial");'
-    + 'size-adjust:103.367%;ascent-override:94.475%;descent-override:24.941%;line-gap-override:0.000%}',
-  ), 'the Schibsted Grotesk fallback face');
-  assert.ok(css.includes(
-    '@font-face{font-family:"Fraunces Fallback";src:local("Georgia"),local("Times New Roman");'
-    + 'size-adjust:115.780%;ascent-override:84.471%;descent-override:22.025%;line-gap-override:0.000%}',
-  ), 'the Fraunces fallback face');
-  assert.ok(css.includes('--omega-font-ui: \'Schibsted Grotesk\', "Schibsted Grotesk Fallback", -apple-system'));
-  assert.ok(css.includes('--omega-font-serif: \'Fraunces\', "Fraunces Fallback", ui-serif'));
-});
+        ctx.expect(css.includes(
+          '@font-face{font-family:"Schibsted Grotesk Fallback";src:local("Helvetica Neue"),local("Arial");'
+          + 'size-adjust:103.367%;ascent-override:94.475%;descent-override:24.941%;line-gap-override:0.000%}',
+        ), 'the Schibsted Grotesk fallback face').toBeTruthy();
+        ctx.expect(css.includes(
+          '@font-face{font-family:"Fraunces Fallback";src:local("Georgia"),local("Times New Roman");'
+          + 'size-adjust:115.780%;ascent-override:84.471%;descent-override:22.025%;line-gap-override:0.000%}',
+        ), 'the Fraunces fallback face').toBeTruthy();
+        ctx.expect(css.includes('--omega-font-ui: \'Schibsted Grotesk\', "Schibsted Grotesk Fallback", -apple-system')).toBeTruthy();
+        ctx.expect(css.includes('--omega-font-serif: \'Fraunces\', "Fraunces Fallback", ui-serif')).toBeTruthy();
+      },
+    },
 
-test('a stack naming no known system family: one warning, no face, no throw', async () => {
-  const layer = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-font-fallback-')));
-  fs.mkdirSync(path.join(layer, 'css'), { recursive: true });
-  fs.mkdirSync(path.join(layer, 'fonts'), { recursive: true });
-  fs.copyFileSync(
-    path.join(PKG, 'themes', 'classy', 'fonts', 'inter-normal-latin.woff2'),
-    path.join(layer, 'fonts', 'brand.woff2'),
-  );
-  fs.writeFileSync(path.join(layer, 'css', 'main.scss'), [
-    '@font-face { font-family: Brandface; src: url(/assets/fonts/brand.woff2); }',
-    ':root { --omega-font-ui: Brandface, "Nonesuch Grotesk", sans-serif; }',
-  ].join('\n'));
+    {
+      name: 'a stack naming no known system family: one warning, no face, no throw',
+      run: async (ctx) => {
+        const layer = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-font-fallback-')));
+        fs.mkdirSync(path.join(layer, 'css'), { recursive: true });
+        fs.mkdirSync(path.join(layer, 'fonts'), { recursive: true });
+        fs.copyFileSync(
+          path.join(PKG, 'themes', 'classy', 'fonts', 'inter-normal-latin.woff2'),
+          path.join(layer, 'fonts', 'brand.woff2'),
+        );
+        fs.writeFileSync(path.join(layer, 'css', 'main.scss'), [
+          '@font-face { font-family: Brandface; src: url(/assets/fonts/brand.woff2); }',
+          ':root { --omega-font-ui: Brandface, "Nonesuch Grotesk", sans-serif; }',
+        ].join('\n'));
 
-  try {
-    const warnings = [];
-    const { css } = await buildCss([layer], 'unknown-fallback', { warn: (message) => warnings.push(message) });
+        try {
+          const warnings = [];
+          const { css } = await buildCss([layer], 'unknown-fallback', { warn: (message) => warnings.push(message) });
 
-    assert.ok(!css.includes('Brandface Fallback'), 'no face is generated from metrics it cannot have');
-    assert.ok(css.includes('--omega-font-ui: Brandface, "Nonesuch Grotesk", sans-serif'), 'the stack is left alone');
+          ctx.expect(!css.includes('Brandface Fallback'), 'no face is generated from metrics it cannot have').toBeTruthy();
+          ctx.expect(css.includes('--omega-font-ui: Brandface, "Nonesuch Grotesk", sans-serif'), 'the stack is left alone').toBeTruthy();
 
-    const named = warnings.filter((message) => message.includes('Brandface'));
-    assert.equal(named.length, 1, 'exactly one warning for the family');
-    assert.ok(named[0].includes('Nonesuch Grotesk'), 'it names the stack it could not match against');
-  } finally {
-    fs.rmSync(layer, { recursive: true, force: true });
-  }
-});
+          const named = warnings.filter((message) => message.includes('Brandface'));
+          ctx.expect(named.length, 'exactly one warning for the family').toBe(1);
+          ctx.expect(named[0].includes('Nonesuch Grotesk'), 'it names the stack it could not match against').toBeTruthy();
+        } finally {
+          fs.rmSync(layer, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('a theme that ships no font FILES gets no fallback faces and no noise (#177)', async () => {
-  // The inheritance hatch hands a partial theme the default skin's @font-face
-  // rules without its font files, so there is nothing to measure and nothing
-  // to generate, and that is not a problem to report.
-  const warnings = [];
-  const { css } = await buildCss(
-    [path.join(MINI, 'themes', 'toy'), path.join(PKG, 'themes', 'base')],
-    'toy',
-    { warn: (message) => warnings.push(message) },
-  );
+    {
+      name: 'a theme that ships no font FILES gets no fallback faces and no noise (#177)',
+      run: async (ctx) => {
+        // The inheritance hatch hands a partial theme the default skin's @font-face
+        // rules without its font files, so there is nothing to measure and nothing
+        // to generate, and that is not a problem to report.
+        const warnings = [];
+        const { css } = await buildCss(
+          [path.join(MINI, 'themes', 'toy'), path.join(PKG, 'themes', 'base')],
+          'toy',
+          { warn: (message) => warnings.push(message) },
+        );
 
-  assert.ok(!css.includes('Fallback'), 'no fallback face without a file to measure');
-  assert.deepEqual(warnings.filter((message) => message.includes('fallback')), [], 'and no warning about it');
+        ctx.expect(!css.includes('Fallback'), 'no fallback face without a file to measure').toBeTruthy();
+        ctx.expect(warnings.filter((message) => message.includes('fallback')), 'and no warning about it').toEqual([]);
+      },
+    },
+  ],
 });

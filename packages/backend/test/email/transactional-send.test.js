@@ -10,7 +10,7 @@ module.exports = defineCases({
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
   timeout: 30000,
 
-  async run({ http, assert, config }) {
+  async run({ http, expect, config }) {
     const response = await http.post('omega/admin/email', {
       subject: '[TEST] Transactional pipeline — card template',
       to: `_test-email-send@${config.domain}`,
@@ -26,11 +26,11 @@ module.exports = defineCases({
       },
     });
 
-    assert.isSuccess(response, 'Should send successfully');
-    assert.equal(response.data.status, 'sent', 'Status should be sent');
-    assert.ok(response.data.options.content?.[0]?.value?.includes('<html'), 'Should have rendered HTML');
-    assert.ok(response.data.options.content[0].value.includes('It works'), 'Markdown should be rendered');
-    assert.ok(response.data.options.asm, 'Should have ASM group');
-    assert.ok(response.data.options.headers['List-Unsubscribe'], 'Should have unsubscribe header');
+    expect(response, 'Should send successfully').toBeSuccess();
+    expect(response.data.status, 'Status should be sent').toBe('sent');
+    expect(response.data.options.content?.[0]?.value?.includes('<html'), 'Should have rendered HTML').toBeTruthy();
+    expect(response.data.options.content[0].value.includes('It works'), 'Markdown should be rendered').toBeTruthy();
+    expect(response.data.options.asm, 'Should have ASM group').toBeTruthy();
+    expect(response.data.options.headers['List-Unsubscribe'], 'Should have unsubscribe header').toBeTruthy();
   },
 });

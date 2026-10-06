@@ -17,8 +17,7 @@
  * the modules touch. The client's storage is the real lodash-path store, since
  * the marker's namespace clear is a lodash-path behavior.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -223,172 +222,191 @@ function makeFirebaseAuth({ uid = ORPHAN_UID, deleteFails = false } = {}) {
   };
 }
 
-test('orphan: a marked account is deleted on return, and the marker is dropped (#703)', async () => {
-  const storage = makeStorage(MARKED);
-  const firebaseAuth = makeFirebaseAuth();
-  const { client, navigations, fire } = await bootPolicy({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    storage,
-    firebaseAuth,
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'auth-orphan',
+  tests: [
+    {
+      name: 'orphan: a marked account is deleted on return, and the marker is dropped (#703)',
+      run: async (ctx) => {
+        const storage = makeStorage(MARKED);
+        const firebaseAuth = makeFirebaseAuth();
+        const { client, navigations, fire } = await bootPolicy({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          storage,
+          firebaseAuth,
+        });
 
-  await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
+        await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
 
-  assert.deepStrictEqual(firebaseAuth.deletes, [ORPHAN_UID], 'the reversal that failed is re-attempted');
-  assert.strictEqual(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), null, 'a cleaned-up orphan is not marked any more');
-  assert.deepStrictEqual(client.requests, [], 'an orphan must not post signup metadata');
-  assert.deepStrictEqual(navigations, [], 'the delete signs the user out — the state change owns the page from here');
-  assert.strictEqual(client.notificationsShown.length, 1, 'the user is told why they are not signed in');
-});
+        ctx.expect(firebaseAuth.deletes, 'the reversal that failed is re-attempted').toEqual([ORPHAN_UID]);
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'a cleaned-up orphan is not marked any more').toBe(null);
+        ctx.expect(client.requests, 'an orphan must not post signup metadata').toEqual([]);
+        ctx.expect(navigations, 'the delete signs the user out — the state change owns the page from here').toEqual([]);
+        ctx.expect(client.notificationsShown.length, 'the user is told why they are not signed in').toBe(1);
+      },
+    },
 
-test('orphan: a second delete failure signs the user out and reports it, marker held (#703)', async () => {
-  const storage = makeStorage(MARKED);
-  const firebaseAuth = makeFirebaseAuth({ deleteFails: true });
-  const { client, navigations, fire } = await bootPolicy({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    storage,
-    firebaseAuth,
-  });
+    {
+      name: 'orphan: a second delete failure signs the user out and reports it, marker held (#703)',
+      run: async (ctx) => {
+        const storage = makeStorage(MARKED);
+        const firebaseAuth = makeFirebaseAuth({ deleteFails: true });
+        const { client, navigations, fire } = await bootPolicy({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          storage,
+          firebaseAuth,
+        });
 
-  await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
+        await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
 
-  assert.deepStrictEqual(firebaseAuth.signOuts, [true], 'the old backstop\'s effect: the orphan does not stay signed in');
-  assert.strictEqual(client.sentryCaptures.length, 1, 'a delete that failed twice is worth a report');
-  assert.strictEqual(client.notificationsShown[0].options.type, 'danger');
-  assert.strictEqual(
-    storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null),
-    1756600000000,
-    'the marker holds — the next visit tries again'
-  );
-  assert.deepStrictEqual(client.requests, [], 'an orphan must not post signup metadata');
-  assert.deepStrictEqual(navigations, []);
-});
+        ctx.expect(firebaseAuth.signOuts, 'the old backstop\'s effect: the orphan does not stay signed in').toEqual([true]);
+        ctx.expect(client.sentryCaptures.length, 'a delete that failed twice is worth a report').toBe(1);
+        ctx.expect(client.notificationsShown[0].options.type).toBe('danger');
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'the marker holds — the next visit tries again').toBe(1756600000000);
+        ctx.expect(client.requests, 'an orphan must not post signup metadata').toEqual([]);
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
 
-test('orphan: an unmarked mid-signup user is never touched (#703)', async () => {
-  const storage = makeStorage();
-  const firebaseAuth = makeFirebaseAuth({ uid: 'fresh-uid' });
-  const { client, fire } = await bootPolicy({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    storage,
-    firebaseAuth,
-  });
+    {
+      name: 'orphan: an unmarked mid-signup user is never touched (#703)',
+      run: async (ctx) => {
+        const storage = makeStorage();
+        const firebaseAuth = makeFirebaseAuth({ uid: 'fresh-uid' });
+        const { client, fire } = await bootPolicy({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          storage,
+          firebaseAuth,
+        });
 
-  // The seconds after a legitimate signup: consent-less doc, post still to come.
-  await fire({ user: new User({ flags: { signupProcessed: false }, consent: {} }, { uid: 'fresh-uid' }), denied: false });
+        // The seconds after a legitimate signup: consent-less doc, post still to come.
+        await fire({ user: new User({ flags: { signupProcessed: false }, consent: {} }, { uid: 'fresh-uid' }), denied: false });
 
-  assert.deepStrictEqual(firebaseAuth.deletes, [], 'no marker, no delete — this is the normal post-signup state');
-  assert.deepStrictEqual(firebaseAuth.signOuts, []);
-  assert.deepStrictEqual(client.signOuts, []);
-  assert.deepStrictEqual(client.notificationsShown, []);
-  assert.strictEqual(client.requests.length, 1, 'the signup metadata post still goes out');
-});
+        ctx.expect(firebaseAuth.deletes, 'no marker, no delete — this is the normal post-signup state').toEqual([]);
+        ctx.expect(firebaseAuth.signOuts).toEqual([]);
+        ctx.expect(client.signOuts).toEqual([]);
+        ctx.expect(client.notificationsShown).toEqual([]);
+        ctx.expect(client.requests.length, 'the signup metadata post still goes out').toBe(1);
+      },
+    },
 
-test('orphan: a marked account that HAS legal consent is left alone and unmarked (#703)', async () => {
-  const storage = makeStorage(MARKED);
-  const firebaseAuth = makeFirebaseAuth();
-  const { client, fire } = await bootPolicy({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    storage,
-    firebaseAuth,
-  });
+    {
+      name: 'orphan: a marked account that HAS legal consent is left alone and unmarked (#703)',
+      run: async (ctx) => {
+        const storage = makeStorage(MARKED);
+        const firebaseAuth = makeFirebaseAuth();
+        const { client, fire } = await bootPolicy({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          storage,
+          firebaseAuth,
+        });
 
-  // Signed up for real since (on another device, say): consent on record wins
-  // over any marker this browser is holding.
-  await fire({
-    user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'granted' } } }, { uid: ORPHAN_UID }),
-    denied: false,
-  });
+        // Signed up for real since (on another device, say): consent on record wins
+        // over any marker this browser is holding.
+        await fire({
+          user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'granted' } } }, { uid: ORPHAN_UID }),
+          denied: false,
+        });
 
-  assert.deepStrictEqual(firebaseAuth.deletes, [], 'a consented account is somebody\'s real account');
-  assert.deepStrictEqual(client.signOuts, []);
-  assert.strictEqual(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), null, 'the stale marker is dropped');
-});
+        ctx.expect(firebaseAuth.deletes, 'a consented account is somebody\'s real account').toEqual([]);
+        ctx.expect(client.signOuts).toEqual([]);
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'the stale marker is dropped').toBe(null);
+      },
+    },
 
-test('orphan: a reversal whose delete fails marks the uid for the next visit (#703)', async () => {
-  await bundleOnce();
+    {
+      name: 'orphan: a reversal whose delete fails marks the uid for the next visit (#703)',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  const storage = makeStorage();
-  const client = makeClient({ storage });
-  makeBrowser({ href: 'https://brand.test/signin', pagePath: '/signin' });
+        const storage = makeStorage();
+        const client = makeClient({ storage });
+        makeBrowser({ href: 'https://brand.test/signin', pagePath: '/signin' });
 
-  globalThis.__omegaClient = client;
-  globalThis.__firebaseAuth = { getAuth: () => ({}), signOut: async () => {} };
-  delete require.cache[require.resolve(OAUTH_BUNDLE)];
+        globalThis.__omegaClient = client;
+        globalThis.__firebaseAuth = { getAuth: () => ({}), signOut: async () => {} };
+        delete require.cache[require.resolve(OAUTH_BUNDLE)];
 
-  const formManager = { showError: () => {}, ready: () => {} };
-  await require(OAUTH_BUNDLE).reverseAccidentalSignup({ formManager }, {
-    uid: ORPHAN_UID,
-    delete: async () => { throw new Error('network down'); },
-  });
+        const formManager = { showError: () => {}, ready: () => {} };
+        await require(OAUTH_BUNDLE).reverseAccidentalSignup({ formManager }, {
+          uid: ORPHAN_UID,
+          delete: async () => { throw new Error('network down'); },
+        });
 
-  assert.ok(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'the browser that failed the delete is the only thing that knows');
-  assert.strictEqual(client.sentryCaptures.length, 1, 'the failure is still reported');
-});
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'the browser that failed the delete is the only thing that knows').toBeTruthy();
+        ctx.expect(client.sentryCaptures.length, 'the failure is still reported').toBe(1);
+      },
+    },
 
-test('orphan: a reversal that deletes cleanly marks nothing (#703)', async () => {
-  await bundleOnce();
+    {
+      name: 'orphan: a reversal that deletes cleanly marks nothing (#703)',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  const storage = makeStorage();
-  const client = makeClient({ storage });
-  makeBrowser({ href: 'https://brand.test/signin', pagePath: '/signin' });
+        const storage = makeStorage();
+        const client = makeClient({ storage });
+        makeBrowser({ href: 'https://brand.test/signin', pagePath: '/signin' });
 
-  globalThis.__omegaClient = client;
-  globalThis.__firebaseAuth = { getAuth: () => ({}), signOut: async () => {} };
-  delete require.cache[require.resolve(OAUTH_BUNDLE)];
+        globalThis.__omegaClient = client;
+        globalThis.__firebaseAuth = { getAuth: () => ({}), signOut: async () => {} };
+        delete require.cache[require.resolve(OAUTH_BUNDLE)];
 
-  const formManager = { showError: () => {}, ready: () => {} };
-  await require(OAUTH_BUNDLE).reverseAccidentalSignup({ formManager }, {
-    uid: ORPHAN_UID,
-    delete: async () => {},
-  });
+        const formManager = { showError: () => {}, ready: () => {} };
+        await require(OAUTH_BUNDLE).reverseAccidentalSignup({ formManager }, {
+          uid: ORPHAN_UID,
+          delete: async () => {},
+        });
 
-  assert.strictEqual(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), null, 'nothing survived to clean up');
-});
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'nothing survived to clean up').toBe(null);
+      },
+    },
 
-test('orphan: a deliberate signup clears the markers before the account is touched (#703)', async () => {
-  await bundleOnce();
+    {
+      name: 'orphan: a deliberate signup clears the markers before the account is touched (#703)',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  const storage = makeStorage(MARKED);
-  const client = makeClient({ policy: 'unauthenticated', storage });
-  makeBrowser({ href: 'https://brand.test/signup', pagePath: '/signup' });
+        const storage = makeStorage(MARKED);
+        const client = makeClient({ policy: 'unauthenticated', storage });
+        makeBrowser({ href: 'https://brand.test/signup', pagePath: '/signup' });
 
-  const handlers = {};
-  const formManager = {
-    $form: { addEventListener: () => {}, querySelectorAll: () => [] },
-    on: (event, handler) => { handlers[event] = handler; },
-    ready: () => {},
-    _setDisabled: () => {},
-    showError: () => {},
-    showSuccess: () => {},
-  };
+        const handlers = {};
+        const formManager = {
+          $form: { addEventListener: () => {}, querySelectorAll: () => [] },
+          on: (event, handler) => { handlers[event] = handler; },
+          ready: () => {},
+          _setDisabled: () => {},
+          showError: () => {},
+          showSuccess: () => {},
+        };
 
-  globalThis.__omegaClient = client;
-  globalThis.__firebaseAuth = {
-    getAuth: () => ({}),
-    getRedirectResult: async () => null,
-    signInWithRedirect: async () => {},
-  };
-  globalThis.__makeFormManager = () => formManager;
-  delete require.cache[require.resolve(AUTH_PAGES_BUNDLE)];
-  require(AUTH_PAGES_BUNDLE).default();
+        globalThis.__omegaClient = client;
+        globalThis.__firebaseAuth = {
+          getAuth: () => ({}),
+          getRedirectResult: async () => null,
+          signInWithRedirect: async () => {},
+        };
+        globalThis.__makeFormManager = () => formManager;
+        delete require.cache[require.resolve(AUTH_PAGES_BUNDLE)];
+        require(AUTH_PAGES_BUNDLE).default();
 
-  // The boot is a promise chain off dom().ready() with nothing to await out here.
-  await new Promise((resolve) => setTimeout(resolve, 50));
+        // The boot is a promise chain off dom().ready() with nothing to await out here.
+        await new Promise((resolve) => setTimeout(resolve, 50));
 
-  // The signup submit: consent ticked, Google pressed.
-  await handlers.submit({
-    data: { consentLegal: true, consentMarketing: false },
-    $submitButton: { getAttribute: () => 'google.com' },
-  });
+        // The signup submit: consent ticked, Google pressed.
+        await handlers.submit({
+          data: { consentLegal: true, consentMarketing: false },
+          $submitButton: { getAttribute: () => 'google.com' },
+        });
 
-  assert.strictEqual(
-    storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null),
-    null,
-    'a user consenting to an account must never be deleted by the backstop'
-  );
-  assert.strictEqual(storage.get('consent.legal.granted', null), true, 'and the consent stash still happens');
+        ctx.expect(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), 'a user consenting to an account must never be deleted by the backstop').toBe(null);
+        ctx.expect(storage.get('consent.legal.granted', null), 'and the consent stash still happens').toBe(true);
+      },
+    },
+  ],
 });

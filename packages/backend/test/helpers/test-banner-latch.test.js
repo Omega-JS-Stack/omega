@@ -87,17 +87,17 @@ const BANNER = 'Running in TEST environment';
 const RESOLVED = 'test-mode resolved TEST_EXTENDED_MODE=';
 
 // Two boots of a freshly-required omega module, with the console recorded.
-function initTwice({ omega, assert, emulator }) {
+function initTwice({ omega, expect, emulator }) {
   const { Omega } = freshOmegaModule();
 
   return withConsoleRecorder(() => {
     withTestEnvironment({ emulator: emulator }, () => {
       const first = new Omega();
-      first.initialize({ cwd: omega.cwd });
+      first.initialize({ cwd: omega.cwd, runnerHost: true });
 
-      assert.equal(first.isTesting(), true, 'the test-environment branch was not reached');
+      expect(first.isTesting(), 'the test-environment branch was not reached').toBe(true);
 
-      new Omega().initialize({ cwd: omega.cwd });
+      new Omega().initialize({ cwd: omega.cwd, runnerHost: true });
     });
   });
 }
@@ -109,35 +109,35 @@ module.exports = defineCases({
   tests: [
     {
       name: 'deployed-two-inits-log-the-banner-once',
-      run: async ({ assert, omega }) => {
-        const calls = initTwice({ omega: omega, assert: assert, emulator: false });
+      run: async ({ expect, omega }) => {
+        const calls = initTwice({ omega: omega, expect: expect, emulator: false });
         const banners = calls.log.filter((args) => String(args[1]).includes(BANNER));
 
-        assert.equal(banners.length, 1, `the banner should log once per process, got ${banners.length}`);
+        expect(banners.length, `the banner should log once per process, got ${banners.length}`).toBe(1);
       },
     },
 
     {
       name: 'deployed-two-inits-log-the-resolved-test-mode-once',
-      run: async ({ assert, omega }) => {
+      run: async ({ expect, omega }) => {
         // The resolved-mode line rides the test-mode watcher, which installs
         // exactly once per process — this pins that it stays that way.
-        const calls = initTwice({ omega: omega, assert: assert, emulator: false });
+        const calls = initTwice({ omega: omega, expect: expect, emulator: false });
         const resolved = calls.log.filter((args) => String(args[1]).includes(RESOLVED));
 
-        assert.equal(resolved.length, 1, `the resolved test-mode line should log once per process, got ${resolved.length}`);
+        expect(resolved.length, `the resolved test-mode line should log once per process, got ${resolved.length}`).toBe(1);
       },
     },
 
     {
       name: 'under-the-emulator-neither-line-prints',
-      run: async ({ assert, omega }) => {
-        const calls = initTwice({ omega: omega, assert: assert, emulator: true });
+      run: async ({ expect, omega }) => {
+        const calls = initTwice({ omega: omega, expect: expect, emulator: true });
         const banners = calls.log.filter((args) => String(args[1]).includes(BANNER));
         const resolved = calls.log.filter((args) => String(args[1]).includes(RESOLVED));
 
-        assert.equal(banners.length, 0, `the emulator says it already — got ${banners.length} banner(s)`);
-        assert.equal(resolved.length, 0, `the resolved test-mode line should be quiet under the emulator, got ${resolved.length}`);
+        expect(banners.length, `the emulator says it already — got ${banners.length} banner(s)`).toBe(0);
+        expect(resolved.length, `the resolved test-mode line should be quiet under the emulator, got ${resolved.length}`).toBe(0);
       },
     },
   ],

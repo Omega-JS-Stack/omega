@@ -12,18 +12,17 @@
  * user's file event and Eleventy's own rebuild is the whole point, and a mock
  * would decide it for us.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { configureOmega } = require('../../src/index.js');
 const { registerTemplateWatchTargets, watchRescanTargets } = require('../../src/commands/dev.js');
 
 // The rebuild deadline scales with the lane's load knob (#211) and with this
 // machine's measured contention (#615).
-const { POLL_MS, buildRecorder, rebuildDeadlineMs, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, rebuildDeadlineMs, waitForRebuild } = require('../lib/deadlines.js');
 const DRAIN_QUIET_POLLS = 20;
 
 const ACTIVE_THEME = 'toy-theme';
@@ -34,89 +33,6 @@ const SITE_DATA = {
   meta: { title: 'LiveCo', description: 'Live decisions test brand' },
   theme: { id: ACTIVE_THEME },
 };
-
-test('the rescan watcher re-runs the affected capture when its dir changes', async (t) => {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
-  fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
-  fs.mkdirSync(path.join(root, '_team'), { recursive: true });
-  const runs = { pages: 0, team: 0 };
-  const watchers = watchRescanTargets([
-    { dir: path.join(root, 'pages'), kind: 'rescan', rerun: () => { runs.pages += 1; } },
-    { dir: path.join(root, '_team'), kind: 'rescan', rerun: () => { runs.team += 1; } },
-  ]);
-  t.after(() => {
-    watchers.forEach((watcher) => watcher.close());
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  // Arming a recursive watcher costs one platform event on macOS (a `change`
-  // on the dir itself), so the baseline is whatever the watchers have settled
-  // at — the DELTA is what the file edit caused.
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const baseline = { ...runs };
-
-  fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
-
-  const deadline = Date.now() + rebuildDeadlineMs();
-  while (runs.pages === baseline.pages && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-  }
-  assert.equal(runs.pages, baseline.pages + 1, 'the pages capture re-ran');
-  assert.equal(runs.team, baseline.team, 'only the AFFECTED scan re-runs — a rescan is not a rebuild of everything');
-});
-
-test('closing a watcher cancels the rescan it had queued', async (t) => {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
-  fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
-  const runs = { pages: 0 };
-  const watchers = watchRescanTargets([
-    { dir: path.join(root, 'pages'), kind: 'rescan', rerun: () => { runs.pages += 1; } },
-  ]);
-  t.after(() => {
-    watchers.forEach((watcher) => watcher.close());
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  // A bare probe over the same dir, armed AFTER the rescan watcher: one file
-  // event reaches every handle on the dir in arming order, so the probe firing
-  // says the rescan watcher has already queued its debounced re-run. Both are
-  // armed before the settle window — a recursive watcher is not listening the
-  // instant it is created.
-  let events = 0;
-  const probe = fs.watch(path.join(root, 'pages'), { recursive: true }, () => { events += 1; });
-  t.after(() => probe.close());
-
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const baseline = runs.pages;
-  const seen = events;
-
-  fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
-  const deadline = Date.now() + rebuildDeadlineMs();
-  while (events === seen && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 1));
-  }
-  assert.notEqual(events, seen, 'the write reached the watchers');
-
-  // The dev loop closes these on every config reset and reopens the new union
-  // (src/commands/dev.js). A queued re-run surviving the close would fire a
-  // capture belonging to a config build that no longer exists.
-  watchers.forEach((watcher) => watcher.close());
-
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  assert.equal(runs.pages, baseline, 'a closed watcher never re-runs an orphaned capture');
-});
-
-test('a missing rescan dir is skipped, not fatal', (t) => {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-
-  const watchers = watchRescanTargets([
-    { dir: path.join(root, '_posts'), kind: 'rescan', rerun: () => {} },
-  ]);
-
-  assert.deepEqual(watchers, [],
-    'a collection dir the brand has not authored yet arms nothing here — Eleventy sees it appear under its input dir and rebuilds');
-});
 
 // A content-less brand: the sample corpus renders, and pages/ + the collection
 // dirs are the rescan lane. The packaged tree sits OUTSIDE the target root and is
@@ -232,23 +148,122 @@ async function startWatch(t, fixture) {
   };
 }
 
-test('the first real post ends the samples on the next rebuild — no config reset', async (t) => {
-  const fixture = target();
-  const watch = await startWatch(t, fixture);
+module.exports = defineCases({
+  type: 'group',
+  description: 'live-decisions',
+  timeout: caseTimeoutMs(),
+  tests: [
+    {
+      name: 'the rescan watcher re-runs the affected capture when its dir changes',
+      run: async (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
+        fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
+        fs.mkdirSync(path.join(root, '_team'), { recursive: true });
+        const runs = { pages: 0, team: 0 };
+        const watchers = watchRescanTargets([
+          { dir: path.join(root, 'pages'), kind: 'rescan', rerun: () => { runs.pages += 1; } },
+          { dir: path.join(root, '_team'), kind: 'rescan', rerun: () => { runs.team += 1; } },
+        ]);
+        ctx.after(() => {
+          watchers.forEach((watcher) => watcher.close());
+          fs.rmSync(root, { recursive: true, force: true });
+        });
 
-  assert.match(watch.page(), /data-post="Sample Post"/, 'a content-less brand blogs the sample corpus');
-  const runsAfterFirstBuild = watch.configRuns.count;
+        // Arming a recursive watcher costs one platform event on macOS (a `change`
+        // on the dir itself), so the baseline is whatever the watchers have settled
+        // at — the DELTA is what the file edit caused.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const baseline = { ...runs };
 
-  // The first edit after the watch starts gets the re-save nudge (#688): the
-  // fresh root's FSEvents stream can still be initializing when this save
-  // lands, and a save that predates the stream is never replayed. The nudge
-  // stops on the first build event, so a woken-but-stale rebuild still fails.
-  const writePost = () => fixture.write('_posts/2026-07-20-first.md', '---\ntitle: My First Post\ntags: posts\n---\nreal words');
-  writePost();
-  await watch.pageBecomes(/data-post="My First Post"/, 'the real post lands', undefined, writePost);
+        fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
 
-  assert.doesNotMatch(watch.page(), /data-post="Sample Post"/,
-    'the sample corpus steps aside the moment the brand owns the collection — the gate is asked at render time');
-  assert.equal(watch.configRuns.count, runsAfterFirstBuild,
-    'the rescan lane NEVER resets the config — content edits stay on the incremental path');
+        const deadline = Date.now() + rebuildDeadlineMs();
+        while (runs.pages === baseline.pages && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+        }
+        ctx.expect(runs.pages, 'the pages capture re-ran').toBe(baseline.pages + 1);
+        ctx.expect(runs.team, 'only the AFFECTED scan re-runs — a rescan is not a rebuild of everything').toBe(baseline.team);
+      },
+    },
+
+    {
+      name: 'closing a watcher cancels the rescan it had queued',
+      run: async (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
+        fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
+        const runs = { pages: 0 };
+        const watchers = watchRescanTargets([
+          { dir: path.join(root, 'pages'), kind: 'rescan', rerun: () => { runs.pages += 1; } },
+        ]);
+        ctx.after(() => {
+          watchers.forEach((watcher) => watcher.close());
+          fs.rmSync(root, { recursive: true, force: true });
+        });
+
+        // A bare probe over the same dir, armed AFTER the rescan watcher: one file
+        // event reaches every handle on the dir in arming order, so the probe firing
+        // says the rescan watcher has already queued its debounced re-run. Both are
+        // armed before the settle window — a recursive watcher is not listening the
+        // instant it is created.
+        let events = 0;
+        const probe = fs.watch(path.join(root, 'pages'), { recursive: true }, () => { events += 1; });
+        ctx.after(() => probe.close());
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const baseline = runs.pages;
+        const seen = events;
+
+        fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
+        const deadline = Date.now() + rebuildDeadlineMs();
+        while (events === seen && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+        ctx.expect(events, 'the write reached the watchers').not.toBe(seen);
+
+        // The dev loop closes these on every config reset and reopens the new union
+        // (src/commands/dev.js). A queued re-run surviving the close would fire a
+        // capture belonging to a config build that no longer exists.
+        watchers.forEach((watcher) => watcher.close());
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        ctx.expect(runs.pages, 'a closed watcher never re-runs an orphaned capture').toBe(baseline);
+      },
+    },
+
+    {
+      name: 'a missing rescan dir is skipped, not fatal',
+      run: (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-rescan-')));
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+        const watchers = watchRescanTargets([
+          { dir: path.join(root, '_posts'), kind: 'rescan', rerun: () => {} },
+        ]);
+
+        ctx.expect(watchers, 'a collection dir the brand has not authored yet arms nothing here — Eleventy sees it appear under its input dir and rebuilds').toEqual([]);
+      },
+    },
+
+    {
+      name: 'the first real post ends the samples on the next rebuild — no config reset',
+      run: async (ctx) => {
+        const fixture = target();
+        const watch = await startWatch(ctx, fixture);
+
+        ctx.expect(watch.page(), 'a content-less brand blogs the sample corpus').toMatch(/data-post="Sample Post"/);
+        const runsAfterFirstBuild = watch.configRuns.count;
+
+        // The first edit after the watch starts gets the re-save nudge (#688): the
+        // fresh root's FSEvents stream can still be initializing when this save
+        // lands, and a save that predates the stream is never replayed. The nudge
+        // stops on the first build event, so a woken-but-stale rebuild still fails.
+        const writePost = () => fixture.write('_posts/2026-07-20-first.md', '---\ntitle: My First Post\ntags: posts\n---\nreal words');
+        writePost();
+        await watch.pageBecomes(/data-post="My First Post"/, 'the real post lands', undefined, writePost);
+
+        ctx.expect(watch.page(), 'the sample corpus steps aside the moment the brand owns the collection — the gate is asked at render time').not.toMatch(/data-post="Sample Post"/);
+        ctx.expect(watch.configRuns.count, 'the rescan lane NEVER resets the config — content edits stay on the incremental path').toBe(runsAfterFirstBuild);
+      },
+    },
+  ],
 });

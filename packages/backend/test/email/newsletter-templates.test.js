@@ -166,32 +166,29 @@ module.exports = defineCases({
   tests: [
     {
       name: 'every registered template renders without throwing',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const t = resolveTemplate(templateName);
-          assert.ok(t, `Template "${templateName}" should resolve`);
-          assert.ok(typeof t.build === 'function', `Template "${templateName}" should expose build()`);
-          assert.ok(t.meta && t.meta.name, `Template "${templateName}" should expose meta.name`);
+          expect(t, `Template "${templateName}" should resolve`).toBeTruthy();
+          expect(typeof t.build === 'function', `Template "${templateName}" should expose build()`).toBeTruthy();
+          expect(t.meta && t.meta.name, `Template "${templateName}" should expose meta.name`).toBeTruthy();
         }
 
         // Render the full fixture against every template
         for (const templateName of TEMPLATES) {
           const result = await render(templateName);
-          assert.ok(result.html.includes('<html'), `${templateName}: produces HTML`);
-          assert.equal(result.template, templateName, `${templateName}: reports correct template name`);
-          assert.equal(result.errors.length, 0, `${templateName}: no MJML errors`);
+          expect(result.html.includes('<html'), `${templateName}: produces HTML`).toBeTruthy();
+          expect(result.template, `${templateName}: reports correct template name`).toBe(templateName);
+          expect(result.errors.length, `${templateName}: no MJML errors`).toBe(0);
         }
       },
     },
     {
       name: 'shell always renders the CAN-SPAM address in the footer',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const result = await render(templateName);
-          assert.ok(
-            result.html.includes('123 Main St, Suite 100, Testville, TS 12345, United States'),
-            `${templateName}: renders the structured brand.address in the footer`
-          );
+          expect(result.html.includes('123 Main St, Suite 100, Testville, TS 12345, United States'), `${templateName}: renders the structured brand.address in the footer`).toBeTruthy();
         }
       },
     },
@@ -201,87 +198,82 @@ module.exports = defineCases({
       // send (with a working URL tied to the subscriber). Rendering our own
       // ${brandUrl}/unsubscribe would create a dead second link.
       name: 'footer renders brand link but NOT a hand-rolled unsubscribe link',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const result = await render(templateName);
-          assert.ok(result.html.includes('TestCo'), `${templateName}: brand name renders`);
-          assert.ok(result.html.includes('testco.example'), `${templateName}: brand URL renders`);
-          assert.ok(!result.html.toLowerCase().includes('unsubscribe'),
-            `${templateName}: should NOT include an "unsubscribe" link (sending platform appends its own)`);
-          assert.ok(!result.html.includes('/unsubscribe'),
-            `${templateName}: should NOT include a /unsubscribe URL`);
+          expect(result.html.includes('TestCo'), `${templateName}: brand name renders`).toBeTruthy();
+          expect(result.html.includes('testco.example'), `${templateName}: brand URL renders`).toBeTruthy();
+          expect(!result.html.toLowerCase().includes('unsubscribe'), `${templateName}: should NOT include an "unsubscribe" link (sending platform appends its own)`).toBeTruthy();
+          expect(!result.html.includes('/unsubscribe'), `${templateName}: should NOT include a /unsubscribe URL`).toBeTruthy();
         }
       },
     },
     {
       name: 'citations render when present, omit cleanly when missing',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           // With citations
           const withCites = await render(templateName);
-          assert.ok(withCites.html.toLowerCase().includes('sources'), `${templateName}: cites are rendered`);
-          assert.ok(withCites.html.includes('[1]'), `${templateName}: citation marker [1] is rendered`);
-          assert.ok(withCites.html.includes('Industry report, April 2026'), `${templateName}: citation source is rendered`);
+          expect(withCites.html.toLowerCase().includes('sources'), `${templateName}: cites are rendered`).toBeTruthy();
+          expect(withCites.html.includes('[1]'), `${templateName}: citation marker [1] is rendered`).toBeTruthy();
+          expect(withCites.html.includes('Industry report, April 2026'), `${templateName}: citation source is rendered`).toBeTruthy();
 
           // Without citations — shell must NOT render the "Sources & data" header
           const noCites = await render(templateName, { citations: [] });
-          assert.ok(
-            !noCites.html.toLowerCase().includes('sources &amp; data')
-            && !noCites.html.toLowerCase().includes('sources & data'),
-            `${templateName}: skips Sources section when citations is empty`
-          );
+          expect(!noCites.html.toLowerCase().includes('sources &amp; data')
+            && !noCites.html.toLowerCase().includes('sources & data'), `${templateName}: skips Sources section when citations is empty`).toBeTruthy();
         }
       },
     },
     {
       name: 'sponsorships render when present, omit cleanly when missing',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const withSponsors = await render(templateName, {}, { sponsorships: SPONSORSHIPS });
-          assert.ok(withSponsors.html.includes('Try TestCo'), `${templateName}: sponsor headline renders`);
-          assert.ok(withSponsors.html.includes('Start free'), `${templateName}: sponsor CTA renders`);
-          assert.ok(withSponsors.html.includes('testco.example/promo'), `${templateName}: sponsor URL renders`);
+          expect(withSponsors.html.includes('Try TestCo'), `${templateName}: sponsor headline renders`).toBeTruthy();
+          expect(withSponsors.html.includes('Start free'), `${templateName}: sponsor CTA renders`).toBeTruthy();
+          expect(withSponsors.html.includes('testco.example/promo'), `${templateName}: sponsor URL renders`).toBeTruthy();
 
           // No sponsorships — should NOT find the in-house promo content
           const noSponsors = await render(templateName, {}, { sponsorships: [] });
-          assert.ok(!noSponsors.html.includes('Try TestCo'), `${templateName}: omits sponsor content when none configured`);
+          expect(!noSponsors.html.includes('Try TestCo'), `${templateName}: omits sponsor content when none configured`).toBeTruthy();
         }
       },
     },
     {
       name: 'signoff renders without dramatic dark-block treatment',
-      async run({ assert }) {
+      async run({ expect }) {
         // Classic templates carry "Best,\nThe TestCo Team"; Field Report carries "— Stay sharp,\nThe TestCo Desk"
         for (const templateName of ['clean', 'editorial']) {
           const result = await render(templateName);
-          assert.ok(result.html.includes('Best,'),         `${templateName}: signoff first line`);
-          assert.ok(result.html.includes('The TestCo Team'), `${templateName}: signoff second line`);
-          assert.ok(!result.html.includes('— Signed —'),   `${templateName}: no "— Signed —" eyebrow`);
-          assert.ok(!result.html.includes('SIGNED'),       `${templateName}: no SIGNED label`);
+          expect(result.html.includes('Best,'), `${templateName}: signoff first line`).toBeTruthy();
+          expect(result.html.includes('The TestCo Team'), `${templateName}: signoff second line`).toBeTruthy();
+          expect(!result.html.includes('— Signed —'), `${templateName}: no "— Signed —" eyebrow`).toBeTruthy();
+          expect(!result.html.includes('SIGNED'), `${templateName}: no SIGNED label`).toBeTruthy();
         }
         const fr = await render('field-report');
-        assert.ok(fr.html.includes('Stay sharp'),       `field-report: correspondent signoff first line`);
-        assert.ok(fr.html.includes('The TestCo Desk'),  `field-report: correspondent signoff second line`);
+        expect(fr.html.includes('Stay sharp'), `field-report: correspondent signoff first line`).toBeTruthy();
+        expect(fr.html.includes('The TestCo Desk'), `field-report: correspondent signoff second line`).toBeTruthy();
       },
     },
     {
       name: 'images render when imagePaths provided, omit cleanly when missing',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const withImages = await render(templateName);
-          assert.ok(withImages.html.includes('https://example.com/img1.png'), `${templateName}: img1 renders`);
-          assert.ok(withImages.html.includes('https://example.com/img2.png'), `${templateName}: img2 renders`);
+          expect(withImages.html.includes('https://example.com/img1.png'), `${templateName}: img1 renders`).toBeTruthy();
+          expect(withImages.html.includes('https://example.com/img2.png'), `${templateName}: img2 renders`).toBeTruthy();
 
           // No images — the HTML should not contain those URLs but must still render
           const noImages = await render(templateName, {}, { imagePaths: [] });
-          assert.ok(noImages.html.includes('<html'), `${templateName}: still renders HTML with no images`);
-          assert.ok(!noImages.html.includes('example.com/img1.png'), `${templateName}: no image URL when imagePaths empty`);
+          expect(noImages.html.includes('<html'), `${templateName}: still renders HTML with no images`).toBeTruthy();
+          expect(!noImages.html.includes('example.com/img1.png'), `${templateName}: no image URL when imagePaths empty`).toBeTruthy();
         }
       },
     },
     {
       name: 'mj-button containers always have padding 0 horizontal (no 25px default leak)',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const result = await render(templateName);
           // mj-button compiles to a nested table whose container <td> sits
@@ -296,26 +288,24 @@ module.exports = defineCases({
               offenders.push(m[0].slice(0, 200));
             }
           }
-          assert.equal(offenders.length, 0,
-            `${templateName}: button-container TDs must not carry MJML's default 10px/25px padding (found ${offenders.length} offenders: ${offenders.slice(0, 2).join(' ; ')})`
-          );
+          expect(offenders.length, `${templateName}: button-container TDs must not carry MJML's default 10px/25px padding (found ${offenders.length} offenders: ${offenders.slice(0, 2).join(' ; ')})`).toBe(0);
         }
       },
     },
     {
       name: 'long subject does not blow up the template',
-      async run({ assert }) {
+      async run({ expect }) {
         const longSubject = 'A very long subject line that exceeds normal length expectations and should be rendered without breaking the layout, even when it spans multiple visual lines';
         for (const templateName of TEMPLATES) {
           const result = await render(templateName, { subject: longSubject });
-          assert.equal(result.errors.length, 0, `${templateName}: long subject produces no MJML errors`);
-          assert.ok(result.html.includes('A very long subject'), `${templateName}: long subject is rendered`);
+          expect(result.errors.length, `${templateName}: long subject produces no MJML errors`).toBe(0);
+          expect(result.html.includes('A very long subject'), `${templateName}: long subject is rendered`).toBeTruthy();
         }
       },
     },
     {
       name: 'minimum-viable structure renders cleanly (classic templates)',
-      async run({ assert }) {
+      async run({ expect }) {
         const minimal = {
           ...CLASSIC_STRUCTURE,
           sections: [
@@ -326,15 +316,15 @@ module.exports = defineCases({
 
         for (const templateName of ['clean', 'editorial']) {
           const result = await render(templateName, minimal, { sponsorships: [], imagePaths: [] });
-          assert.equal(result.errors.length, 0, `${templateName}: minimal structure has no MJML errors`);
-          assert.ok(result.html.includes('Only section'), `${templateName}: renders the single section title`);
-          assert.ok(result.html.includes('A very short body'), `${templateName}: renders the single section body`);
+          expect(result.errors.length, `${templateName}: minimal structure has no MJML errors`).toBe(0);
+          expect(result.html.includes('Only section'), `${templateName}: renders the single section title`).toBeTruthy();
+          expect(result.html.includes('A very short body'), `${templateName}: renders the single section body`).toBeTruthy();
         }
       },
     },
     {
       name: 'minimum-viable structure renders cleanly (field-report)',
-      async run({ assert }) {
+      async run({ expect }) {
         const minimal = {
           ...FIELD_REPORT_STRUCTURE,
           tldr: 'A terse one-line briefing.',
@@ -355,15 +345,15 @@ module.exports = defineCases({
         };
 
         const result = await render('field-report', minimal, { sponsorships: [], imagePaths: [] });
-        assert.equal(result.errors.length, 0, `field-report: minimal structure has no MJML errors`);
-        assert.ok(result.html.includes('Only dispatch'),       `field-report: renders single headline`);
-        assert.ok(result.html.includes('A very short dispatch'), `field-report: renders single dispatch body`);
-        assert.ok(result.html.includes('A terse one-line briefing'), `field-report: renders TLDR`);
+        expect(result.errors.length, `field-report: minimal structure has no MJML errors`).toBe(0);
+        expect(result.html.includes('Only dispatch'), `field-report: renders single headline`).toBeTruthy();
+        expect(result.html.includes('A very short dispatch'), `field-report: renders single dispatch body`).toBeTruthy();
+        expect(result.html.includes('A terse one-line briefing'), `field-report: renders TLDR`).toBeTruthy();
       },
     },
     {
       name: 'gracefully omits missing optional fields without breaking the template',
-      async run({ assert }) {
+      async run({ expect }) {
         // Classic templates — missing intro, missing one section body.
         for (const templateName of ['clean', 'editorial']) {
           const partial = {
@@ -376,10 +366,10 @@ module.exports = defineCases({
             ],
           };
           const result = await render(templateName, partial);
-          assert.equal(result.errors.length, 0, `${templateName}: partial sections produce no MJML errors`);
-          assert.ok(result.html.includes('Has body'), `${templateName}: section with body renders`);
-          assert.ok(result.html.includes('No body'),  `${templateName}: section with empty body renders title`);
-          assert.ok(result.html.includes('Has third'), `${templateName}: third section title renders`);
+          expect(result.errors.length, `${templateName}: partial sections produce no MJML errors`).toBe(0);
+          expect(result.html.includes('Has body'), `${templateName}: section with body renders`).toBeTruthy();
+          expect(result.html.includes('No body'), `${templateName}: section with empty body renders title`).toBeTruthy();
+          expect(result.html.includes('Has third'), `${templateName}: third section title renders`).toBeTruthy();
         }
 
         // Field Report — missing tldr, missing one dispatch body+lede, missing dataPoints.
@@ -396,16 +386,16 @@ module.exports = defineCases({
             },
           ],
         });
-        assert.equal(fr.errors.length, 0, `field-report: partial dispatches produce no MJML errors`);
-        assert.ok(fr.html.includes('Only headline + body'), `field-report: dispatch with body renders headline`);
-        assert.ok(fr.html.includes('Just data, no body'),   `field-report: dispatch with only dataPoints still renders headline`);
-        assert.ok(fr.html.includes('99%'),                  `field-report: dataPoints render as fallback when no body`);
-        assert.ok(!fr.html.includes('// THIS ISSUE //'),    `field-report: TLDR block hidden when tldr is empty`);
+        expect(fr.errors.length, `field-report: partial dispatches produce no MJML errors`).toBe(0);
+        expect(fr.html.includes('Only headline + body'), `field-report: dispatch with body renders headline`).toBeTruthy();
+        expect(fr.html.includes('Just data, no body'), `field-report: dispatch with only dataPoints still renders headline`).toBeTruthy();
+        expect(fr.html.includes('99%'), `field-report: dataPoints render as fallback when no body`).toBeTruthy();
+        expect(!fr.html.includes('// THIS ISSUE //'), `field-report: TLDR block hidden when tldr is empty`).toBeTruthy();
       },
     },
     {
       name: 'completely empty section/dispatch is dropped, not rendered as a hollow stub',
-      async run({ assert }) {
+      async run({ expect }) {
         // Classic templates: empty section between two real ones should be dropped.
         for (const templateName of ['clean', 'editorial']) {
           const result = await render(templateName, {
@@ -415,9 +405,9 @@ module.exports = defineCases({
               { title: 'Real two',   body: 'Real body 2.', cta: null, image_prompt: '' },
             ],
           });
-          assert.equal(result.errors.length, 0, `${templateName}: empty middle section produces no MJML errors`);
-          assert.ok(result.html.includes('Real one'),  `${templateName}: first section still renders`);
-          assert.ok(result.html.includes('Real two'),  `${templateName}: third section still renders`);
+          expect(result.errors.length, `${templateName}: empty middle section produces no MJML errors`).toBe(0);
+          expect(result.html.includes('Real one'), `${templateName}: first section still renders`).toBeTruthy();
+          expect(result.html.includes('Real two'), `${templateName}: third section still renders`).toBeTruthy();
         }
 
         // Field Report: empty dispatch dropped.
@@ -431,55 +421,55 @@ module.exports = defineCases({
               lede: 'Other lede.', dispatch: 'Other body.', dataPoints: [], cta: null, image_prompt: '' },
           ],
         });
-        assert.equal(fr.errors.length, 0, `field-report: empty middle dispatch produces no MJML errors`);
-        assert.ok(fr.html.includes('Real dispatch'),  `field-report: first dispatch renders`);
-        assert.ok(fr.html.includes('Other dispatch'), `field-report: third dispatch renders`);
+        expect(fr.errors.length, `field-report: empty middle dispatch produces no MJML errors`).toBe(0);
+        expect(fr.html.includes('Real dispatch'), `field-report: first dispatch renders`).toBeTruthy();
+        expect(fr.html.includes('Other dispatch'), `field-report: third dispatch renders`).toBeTruthy();
       },
     },
     {
       name: 'field-report renders its identity markers (kicker, dateline, terminal block, terminator)',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('field-report');
-        assert.ok(result.html.includes('LEAD DISPATCH'),    `field-report: kicker renders`);
-        assert.ok(result.html.includes('FIELD NOTES'),      `field-report: second kicker renders`);
-        assert.ok(result.html.includes('// THIS ISSUE //'), `field-report: TLDR terminal label renders`);
-        assert.ok(result.html.includes('// BY THE NUMBERS //'), `field-report: dataPoint terminal label renders (full-width strip)`);
-        assert.ok(result.html.includes('END DISPATCH'),     `field-report: dispatch terminator renders`);
-        assert.ok(result.html.includes('OAKLAND'),          `field-report: dispatch location renders`);
-        assert.ok(result.html.includes('VOL. '),            `field-report: issue volume strap renders`);
+        expect(result.html.includes('LEAD DISPATCH'), `field-report: kicker renders`).toBeTruthy();
+        expect(result.html.includes('FIELD NOTES'), `field-report: second kicker renders`).toBeTruthy();
+        expect(result.html.includes('// THIS ISSUE //'), `field-report: TLDR terminal label renders`).toBeTruthy();
+        expect(result.html.includes('// BY THE NUMBERS //'), `field-report: dataPoint terminal label renders (full-width strip)`).toBeTruthy();
+        expect(result.html.includes('END DISPATCH'), `field-report: dispatch terminator renders`).toBeTruthy();
+        expect(result.html.includes('OAKLAND'), `field-report: dispatch location renders`).toBeTruthy();
+        expect(result.html.includes('VOL. '), `field-report: issue volume strap renders`).toBeTruthy();
         // Body's first paragraph drop-cap rule should be present in CSS
-        assert.ok(result.html.includes('dispatch-body'),    `field-report: dispatch body class is present`);
+        expect(result.html.includes('dispatch-body'), `field-report: dispatch body class is present`).toBeTruthy();
       },
     },
     {
       name: 'template metadata is well-formed for every registered template',
-      async run({ assert }) {
+      async run({ expect }) {
         const all = listTemplates();
-        assert.ok(all.length >= 3, 'has at least 3 templates registered');
+        expect(all.length >= 3, 'has at least 3 templates registered').toBeTruthy();
 
         for (const meta of all) {
-          assert.ok(meta.name, `meta.name is set`);
-          assert.ok(meta.description, `meta.description is set for ${meta.name}`);
-          assert.ok(Array.isArray(meta.requires), `meta.requires is array for ${meta.name}`);
-          assert.ok(Array.isArray(meta.optional), `meta.optional is array for ${meta.name}`);
-          assert.ok(meta.supports, `meta.supports is set for ${meta.name}`);
+          expect(meta.name, `meta.name is set`).toBeTruthy();
+          expect(meta.description, `meta.description is set for ${meta.name}`).toBeTruthy();
+          expect(Array.isArray(meta.requires), `meta.requires is array for ${meta.name}`).toBeTruthy();
+          expect(Array.isArray(meta.optional), `meta.optional is array for ${meta.name}`).toBeTruthy();
+          expect(meta.supports, `meta.supports is set for ${meta.name}`).toBeTruthy();
         }
       },
     },
     {
       name: 'template-owned schemas are exported and merged correctly',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const templateName of TEMPLATES) {
           const t = resolveTemplate(templateName);
-          assert.ok(t.schema, `${templateName}: exports a schema`);
-          assert.ok(t.schema.required, `${templateName}: schema has required[]`);
-          assert.ok(t.schema.properties, `${templateName}: schema has properties{}`);
+          expect(t.schema, `${templateName}: exports a schema`).toBeTruthy();
+          expect(t.schema.required, `${templateName}: schema has required[]`).toBeTruthy();
+          expect(t.schema.properties, `${templateName}: schema has properties{}`).toBeTruthy();
         }
 
         // Field Report's schema must declare dispatches; classic templates must declare sections.
-        assert.ok(resolveTemplate('field-report').schema.properties.dispatches, 'field-report: has dispatches in schema');
-        assert.ok(resolveTemplate('clean').schema.properties.sections,           'clean: has sections in schema');
-        assert.ok(resolveTemplate('editorial').schema.properties.sections,       'editorial: has sections in schema');
+        expect(resolveTemplate('field-report').schema.properties.dispatches, 'field-report: has dispatches in schema').toBeTruthy();
+        expect(resolveTemplate('clean').schema.properties.sections, 'clean: has sections in schema').toBeTruthy();
+        expect(resolveTemplate('editorial').schema.properties.sections, 'editorial: has sections in schema').toBeTruthy();
       },
     },
   ],

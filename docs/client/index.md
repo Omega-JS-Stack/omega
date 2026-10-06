@@ -76,7 +76,7 @@ Each auth state change builds ONE state, `{ user, denied }`, before anything rea
 
 - `omega.auth.listen({ once: true }, (state) => { })` waits for the first landed state (`omega.auth.settled`), then fires once with the newest one.
 - `omega.auth.listen((state) => { })` fires on every landed state and returns the unsubscribe; registered after a state landed, it catches up with that state once.
-- `omega.auth.reload()` re-reads the account for the current Firebase user, lands it as a new state, and resolves with it.
+- `omega.auth.reload()` first waits for Firebase to restore the saved session, then re-reads the account for the current Firebase user, lands it as a new state, and resolves with it.
 - Bindings read the live `User`, so `auth.user.plan`, `auth.user.active` and `auth.user.authenticated` resolve through its getters, and `auth.user.profile.displayName` reads the sign-in's profile. The full path list: [docs/client/bindings.md](bindings.md).
 
 ### The init contract: one call, one blob, one mapping

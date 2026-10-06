@@ -16,6 +16,7 @@ const path = require('path');
 
 const { parseArgv } = require('../argv.js');
 const { createRunner } = require('./runner.js');
+const { exitFlushed, guardEarlyExit } = require('./exit.js');
 
 function flag(args, name) {
   return typeof args[name] === 'string' ? args[name] : undefined;
@@ -56,29 +57,12 @@ async function main(argv) {
   return results.failed > 0 || results.noMatch ? 1 : 0;
 }
 
-let reported = false;
-
-// The process ends itself once both streams flush, so a handle a suite left open cannot hold it.
-function exit(code) {
-  reported = true;
-  process.exitCode = code;
-  process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));
-}
-
-// A case that ends the process (process.exit) before the report is written never passes.
-function guardEarlyExit() {
-  process.on('exit', () => {
-    if (reported) return;
-    fs.writeSync(2, 'The test run ended before its report was written.\n');
-    process.exitCode = 1;
-  });
-}
-
 if (require.main === module) {
+  // A case that ends the process (process.exit) before the report is written never passes.
   guardEarlyExit();
-  main(process.argv.slice(2)).then(exit, (e) => {
+  main(process.argv.slice(2)).then(exitFlushed, (e) => {
     console.error(e && e.stack ? e.stack : e);
-    exit(1);
+    exitFlushed(1);
   });
 }
 

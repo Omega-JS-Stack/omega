@@ -67,46 +67,42 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-table-is-not-empty-so-this-suite-covers-something',
-      async run({ assert }) {
-        assert.ok(Object.keys(DISCOUNT_CODES).length > 1, 'Several codes should be seeded');
+      async run({ expect }) {
+        expect(Object.keys(DISCOUNT_CODES).length > 1, 'Several codes should be seeded').toBeTruthy();
       },
     },
 
     {
       name: 'every-code-validates-into-a-firestore-writable-object',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const code of Object.keys(DISCOUNT_CODES)) {
           const result = validate(code);
 
-          assert.equal(result.valid, true, `${code} should validate (eligibility is skipped with no user)`);
+          expect(result.valid, `${code} should validate (eligibility is skipped with no user)`).toBe(true);
 
           const refusal = refusedBy(result);
 
-          assert.equal(
-            refusal,
-            null,
-            `${code}: the intent route writes this object — Firestore refused it: ${refusal?.message?.split('\n')[0]}`
-          );
+          expect(refusal, `${code}: the intent route writes this object — Firestore refused it: ${refusal?.message?.split('\n')[0]}`).toBe(null);
         }
       },
     },
 
     {
       name: 'a-validated-code-carries-only-the-shape-it-has',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const [code, entry] of Object.entries(DISCOUNT_CODES)) {
           const result = validate(code);
 
           if (entry.percent !== undefined) {
-            assert.equal(result.percent, entry.percent, `${code} should report its percent`);
-            assert.equal('amount' in result, false, `${code} is percent-based — it must not carry an amount key at all`);
+            expect(result.percent, `${code} should report its percent`).toBe(entry.percent);
+            expect('amount' in result, `${code} is percent-based — it must not carry an amount key at all`).toBe(false);
           } else {
-            assert.equal(result.amount, entry.amount, `${code} should report its amount`);
-            assert.equal('percent' in result, false, `${code} is amount-based — it must not carry a percent key at all`);
+            expect(result.amount, `${code} should report its amount`).toBe(entry.amount);
+            expect('percent' in result, `${code} is amount-based — it must not carry a percent key at all`).toBe(false);
           }
 
           for (const [key, value] of Object.entries(result)) {
-            assert.notEqual(value, undefined, `${code}.${key} is undefined — Firestore refuses the whole document`);
+            expect(value, `${code}.${key} is undefined — Firestore refuses the whole document`).not.toBe(undefined);
           }
         }
       },
@@ -114,27 +110,27 @@ module.exports = defineCases({
 
     {
       name: 'every-table-entry-declares-exactly-one-shape',
-      async run({ assert }) {
+      async run({ expect }) {
         // The readers downstream branch on the shape (the providers' coupon
         // params, the order email's promo line) — a code carrying both, or
         // neither, has no defined meaning at any of them.
         for (const [code, entry] of Object.entries(DISCOUNT_CODES)) {
           const shapes = [entry.percent, entry.amount].filter((v) => v !== undefined);
 
-          assert.equal(shapes.length, 1, `${code} should declare exactly one of percent/amount, found ${shapes.length}`);
-          assert.ok(shapes[0] > 0, `${code}'s discount should be a positive number`);
+          expect(shapes.length, `${code} should declare exactly one of percent/amount, found ${shapes.length}`).toBe(1);
+          expect(shapes[0] > 0, `${code}'s discount should be a positive number`).toBeTruthy();
         }
       },
     },
 
     {
       name: 'a-refused-code-is-writable-too',
-      async run({ assert }) {
+      async run({ expect }) {
         // The route only persists a VALID result today, but the invalid shape is
         // one object away from the same write path
         const refusal = refusedBy(validate('NOT-A-REAL-CODE'));
 
-        assert.equal(refusal, null, `An invalid result should be writable too: ${refusal?.message?.split('\n')[0]}`);
+        expect(refusal, `An invalid result should be writable too: ${refusal?.message?.split('\n')[0]}`).toBe(null);
       },
     },
   ],

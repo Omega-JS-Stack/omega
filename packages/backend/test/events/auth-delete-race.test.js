@@ -18,7 +18,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'baseline-create-and-verify',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const admin = omega.firebase.admin;
         const testUid = '_test-race-baseline';
         const testEmail = '_test.race-baseline@test.com';
@@ -35,11 +35,11 @@ module.exports = defineCases({
         });
 
         const ready = await pollUntilReady(userRef);
-        assert.ok(ready, 'on-create should complete and write api keys');
+        expect(ready, 'on-create should complete and write api keys').toBeTruthy();
 
         const doc = await userRef.get();
-        assert.ok(doc.data()?.api?.clientId, 'doc should have api.clientId');
-        assert.ok(doc.data()?.api?.privateKey, 'doc should have api.privateKey');
+        expect(doc.data()?.api?.clientId, 'doc should have api.clientId').toBeTruthy();
+        expect(doc.data()?.api?.privateKey, 'doc should have api.privateKey').toBeTruthy();
 
         await admin.auth().deleteUser(testUid).catch(() => {});
         await pollUntilGone(userRef);
@@ -48,7 +48,7 @@ module.exports = defineCases({
 
     {
       name: 'no-wait-gets-clobbered',
-      async run({ omega, assert, skip }) {
+      async run({ omega, expect, skip }) {
         const admin = omega.firebase.admin;
         const testUid = '_test-race-no-wait';
         const testEmail = '_test.race-no-wait@test.com';
@@ -62,7 +62,7 @@ module.exports = defineCases({
           uid: testUid, email: testEmail,
           password: uuid.v4(), emailVerified: true,
         });
-        assert.ok(await pollUntilReady(userRef), 'First create should produce api keys');
+        expect(await pollUntilReady(userRef), 'First create should produce api keys').toBeTruthy();
 
         // Delete auth user — do NOT wait for doc to disappear — then recreate
         await admin.auth().deleteUser(testUid);
@@ -95,7 +95,7 @@ module.exports = defineCases({
 
     {
       name: 'wait-for-gone-survives',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const admin = omega.firebase.admin;
         const testUid = '_test-race-wait-gone';
         const testEmail = '_test.race-wait-gone@test.com';
@@ -108,7 +108,7 @@ module.exports = defineCases({
           uid: testUid, email: testEmail,
           password: uuid.v4(), emailVerified: true,
         });
-        assert.ok(await pollUntilReady(userRef), 'First create should produce api keys');
+        expect(await pollUntilReady(userRef), 'First create should produce api keys').toBeTruthy();
 
         // Delete and WAIT for doc to disappear before recreating
         await admin.auth().deleteUser(testUid);
@@ -118,13 +118,13 @@ module.exports = defineCases({
           uid: testUid, email: testEmail,
           password: uuid.v4(), emailVerified: true,
         });
-        assert.ok(await pollUntilReady(userRef), 'Second create should produce api keys');
+        expect(await pollUntilReady(userRef), 'Second create should produce api keys').toBeTruthy();
 
         await sleep(3000);
         const doc = await userRef.get();
         const survived = doc.exists && !!(doc.data()?.api?.clientId);
 
-        assert.ok(survived, 'Doc should survive when we wait for on-delete to settle first');
+        expect(survived, 'Doc should survive when we wait for on-delete to settle first').toBeTruthy();
 
         await admin.auth().deleteUser(testUid).catch(() => {});
         await pollUntilGone(userRef);
@@ -133,7 +133,7 @@ module.exports = defineCases({
 
     {
       name: 'force-delete-doc-survives',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const admin = omega.firebase.admin;
         const testUid = '_test-race-force-del';
         const testEmail = '_test.race-force-del@test.com';
@@ -146,7 +146,7 @@ module.exports = defineCases({
           uid: testUid, email: testEmail,
           password: uuid.v4(), emailVerified: true,
         });
-        assert.ok(await pollUntilReady(userRef), 'First create should produce api keys');
+        expect(await pollUntilReady(userRef), 'First create should produce api keys').toBeTruthy();
 
         // Delete auth user AND force-delete the Firestore doc, then pause
         await admin.auth().deleteUser(testUid);
@@ -157,13 +157,13 @@ module.exports = defineCases({
           uid: testUid, email: testEmail,
           password: uuid.v4(), emailVerified: true,
         });
-        assert.ok(await pollUntilReady(userRef), 'Second create should produce api keys');
+        expect(await pollUntilReady(userRef), 'Second create should produce api keys').toBeTruthy();
 
         await sleep(3000);
         const doc = await userRef.get();
         const survived = doc.exists && !!(doc.data()?.api?.clientId);
 
-        assert.ok(survived, 'Doc should survive when we force-delete the doc before recreating');
+        expect(survived, 'Doc should survive when we force-delete the doc before recreating').toBeTruthy();
 
         await admin.auth().deleteUser(testUid).catch(() => {});
         await pollUntilGone(userRef);

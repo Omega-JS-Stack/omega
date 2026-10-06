@@ -36,7 +36,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, expect, state, config, skip }) {
         const paidProducts = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (paidProducts.length < 2) {
@@ -95,14 +95,14 @@ module.exports = defineCases({
         }, { merge: true });
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.product.id, productA.id, `Should start as ${productA.id}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Should be active');
+        expect(userDoc.subscription.product.id, `Should start as ${productA.id}`).toBe(productA.id);
+        expect(userDoc.subscription.status, 'Should be active').toBe('active');
       },
     },
 
     {
       name: 'call-plan-endpoint',
-      async run({ assert, omega, state }) {
+      async run({ expect, omega, state }) {
         const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
@@ -121,14 +121,14 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(sent.code, 200, `Plan switch should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(sent.body?.success, true, `Should return { success: true }, got ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `Plan switch should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(sent.body?.success, `Should return { success: true }, got ${JSON.stringify(sent.body)}`).toBe(true);
       },
     },
 
     {
       name: 'plan-changed-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
             .where('owner', '==', state.uid)
@@ -140,42 +140,42 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const webhookDoc = snapshot.docs[0].data();
-        assert.equal(webhookDoc.transition, 'plan-changed', `Transition should be plan-changed, got ${webhookDoc.transition}`);
+        expect(webhookDoc.transition, `Transition should be plan-changed, got ${webhookDoc.transition}`).toBe('plan-changed');
       },
     },
 
     {
       name: 'subscription-updated-to-product-b',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.product?.id === state.productB.id;
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.product.id, state.productB.id, `Product should be ${state.productB.id}`);
-        assert.equal(userDoc.subscription.product.name, state.productB.name, `Product name should be ${state.productB.name}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.cancellation.pending, false, 'Switching plans must not schedule a cancellation');
-        assert.equal(userDoc.subscription.payment.provider, 'test', 'Provider should be test');
-        assert.equal(userDoc.subscription.payment.frequency, state.productB.frequency, `Frequency should be ${state.productB.frequency}`);
-        assert.equal(userDoc.subscription.payment.resourceId, RESOURCE_ID, 'Resource ID should be the same subscription');
+        expect(userDoc.subscription.product.id, `Product should be ${state.productB.id}`).toBe(state.productB.id);
+        expect(userDoc.subscription.product.name, `Product name should be ${state.productB.name}`).toBe(state.productB.name);
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Switching plans must not schedule a cancellation').toBe(false);
+        expect(userDoc.subscription.payment.provider, 'Provider should be test').toBe('test');
+        expect(userDoc.subscription.payment.frequency, `Frequency should be ${state.productB.frequency}`).toBe(state.productB.frequency);
+        expect(userDoc.subscription.payment.resourceId, 'Resource ID should be the same subscription').toBe(RESOURCE_ID);
       },
     },
 
     {
       name: 'order-doc-updated',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const orderDoc = await firestore.get(`payments-orders/${ORDER_ID}`);
           return orderDoc?.unified?.product?.id === state.productB.id;
         }, 15000, 500);
 
         const orderDoc = await firestore.get(`payments-orders/${ORDER_ID}`);
-        assert.equal(orderDoc.unified.product.id, state.productB.id, `Order product should be ${state.productB.id}`);
-        assert.equal(orderDoc.unified.status, 'active', 'Order status should be active');
-        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should still be null');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should still be null');
+        expect(orderDoc.unified.product.id, `Order product should be ${state.productB.id}`).toBe(state.productB.id);
+        expect(orderDoc.unified.status, 'Order status should be active').toBe('active');
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should still be null').toBe(null);
+        expect(orderDoc.requests.refund, 'requests.refund should still be null').toBe(null);
       },
     },
   ],

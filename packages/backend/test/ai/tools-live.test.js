@@ -62,7 +62,7 @@ module.exports = defineCases({
       timeout: 120000,
       skip: skipReason(['ANTHROPIC_API_KEY']),
 
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = new Anthropic(directAssistant());
 
         const base = [
@@ -78,14 +78,10 @@ module.exports = defineCases({
           tools: { list: [WEATHER_TOOL], choice: 'required' },
         });
 
-        assert.equal(first.stopReason, 'tool_use', 'first turn stops for tool use');
-        assert.equal(first.toolCalls.length >= 1, true, 'at least one tool call');
-        assert.equal(first.toolCalls[0].name, 'get_weather', 'called the weather tool');
-        assert.equal(
-          String(first.toolCalls[0].arguments.city || '').toLowerCase().includes('paris'),
-          true,
-          'extracted the city',
-        );
+        expect(first.stopReason, 'first turn stops for tool use').toBe('tool_use');
+        expect(first.toolCalls.length >= 1, 'at least one tool call').toBe(true);
+        expect(first.toolCalls[0].name, 'called the weather tool').toBe('get_weather');
+        expect(String(first.toolCalls[0].arguments.city || '').toLowerCase().includes('paris'), 'extracted the city').toBe(true);
 
         // Step 2 — replay the raw ctx blocks + tool result, get the answer
         const second = await provider.request({
@@ -99,16 +95,12 @@ module.exports = defineCases({
           tools: { list: [WEATHER_TOOL] },
         });
 
-        assert.equal(second.stopReason, 'end', 'second turn is final');
-        assert.equal(second.toolCalls.length, 0, 'no further tool calls');
+        expect(second.stopReason, 'second turn is final').toBe('end');
+        expect(second.toolCalls.length, 'no further tool calls').toBe(0);
 
         const answer = String(second.content).toLowerCase();
-        assert.equal(
-          answer.includes('21') || answer.includes('sunny'),
-          true,
-          `final answer uses the tool result (got: ${String(second.content).slice(0, 200)})`,
-        );
-        assert.equal(second.tokens.total.count > 0, true, 'tokens accounted');
+        expect(answer.includes('21') || answer.includes('sunny'), `final answer uses the tool result (got: ${String(second.content).slice(0, 200)})`).toBe(true);
+        expect(second.tokens.total.count > 0, 'tokens accounted').toBe(true);
       },
     },
 
@@ -117,7 +109,7 @@ module.exports = defineCases({
       timeout: 120000,
       skip: skipReason(['OPENAI_API_KEY']),
 
-      async run({ assert }) {
+      async run({ expect }) {
         const provider = new OpenAI(directAssistant());
 
         const base = [
@@ -134,14 +126,10 @@ module.exports = defineCases({
           tools: { list: [WEATHER_TOOL], choice: 'required' },
         });
 
-        assert.equal(first.stopReason, 'tool_use', 'first turn stops for tool use');
-        assert.equal(first.toolCalls.length >= 1, true, 'at least one tool call');
-        assert.equal(first.toolCalls[0].name, 'get_weather', 'called the weather tool');
-        assert.equal(
-          String(first.toolCalls[0].arguments.city || '').toLowerCase().includes('paris'),
-          true,
-          'extracted the city',
-        );
+        expect(first.stopReason, 'first turn stops for tool use').toBe('tool_use');
+        expect(first.toolCalls.length >= 1, 'at least one tool call').toBe(true);
+        expect(first.toolCalls[0].name, 'called the weather tool').toBe('get_weather');
+        expect(String(first.toolCalls[0].arguments.city || '').toLowerCase().includes('paris'), 'extracted the city').toBe(true);
 
         // Step 2 — replay normalized toolCalls + tool result, get the answer
         const second = await provider.request({
@@ -156,15 +144,11 @@ module.exports = defineCases({
           tools: { list: [WEATHER_TOOL] },
         });
 
-        assert.equal(second.stopReason, 'end', 'second turn is final');
-        assert.equal(second.toolCalls.length, 0, 'no further tool calls');
+        expect(second.stopReason, 'second turn is final').toBe('end');
+        expect(second.toolCalls.length, 'no further tool calls').toBe(0);
 
         const answer = String(second.content).toLowerCase();
-        assert.equal(
-          answer.includes('21') || answer.includes('sunny'),
-          true,
-          `final answer uses the tool result (got: ${String(second.content).slice(0, 200)})`,
-        );
+        expect(answer.includes('21') || answer.includes('sunny'), `final answer uses the tool result (got: ${String(second.content).slice(0, 200)})`).toBe(true);
       },
     },
   ],

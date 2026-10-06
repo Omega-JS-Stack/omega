@@ -42,7 +42,7 @@ module.exports = defineCases({
       // [#407](https://github.com/Omega-JS-Stack/omega/issues/407) the state was
       // corrected here and the analytics signal was never sent at all.
       name: 'the-sweep-reports-a-lapse-no-webhook-will-ever-announce',
-      async run({ assert }) {
+      async run({ expect }) {
         const nowUNIX = Math.floor(Date.now() / 1000);
         const trialEndUNIX = nowUNIX - 5 * DAY;
 
@@ -58,21 +58,17 @@ module.exports = defineCases({
 
         const conversion = sweep.resolveTrialOutcomeConversion(paypalTrial, 'lapsed', 'USD');
 
-        assert.ok(conversion, 'a lapse the sweep decided should be reported');
-        assert.equal(conversion.event, 'trial_lapse');
-        assert.equal(conversion.params.value, 9.99, 'the value is the subscription that never started paying');
-        assert.equal(conversion.params.is_trial, true);
-        assert.equal(conversion.params.is_recurring, false, 'nothing was ever charged');
-        assert.equal(
-          conversion.eventId,
-          'trial_lapse.I-PAYPAL-TRIAL',
-          'the dedupe id is keyed to the SUBSCRIPTION, which is the one thing this sweep and the payment webhook both know',
-        );
+        expect(conversion, 'a lapse the sweep decided should be reported').toBeTruthy();
+        expect(conversion.event).toBe('trial_lapse');
+        expect(conversion.params.value, 'the value is the subscription that never started paying').toBe(9.99);
+        expect(conversion.params.is_trial).toBe(true);
+        expect(conversion.params.is_recurring, 'nothing was ever charged').toBe(false);
+        expect(conversion.eventId, 'the dedupe id is keyed to the SUBSCRIPTION, which is the one thing this sweep and the payment webhook both know').toBe('trial_lapse.I-PAYPAL-TRIAL');
 
         const converted = sweep.resolveTrialOutcomeConversion({ ...paypalTrial }, 'converted', 'USD');
 
-        assert.equal(converted.event, 'trial_convert');
-        assert.equal(converted.eventId, 'trial_convert.I-PAYPAL-TRIAL');
+        expect(converted.event).toBe('trial_convert');
+        expect(converted.eventId).toBe('trial_convert.I-PAYPAL-TRIAL');
       },
     },
 
@@ -84,7 +80,7 @@ module.exports = defineCases({
       // path has no invoice to name, so the two reports would arrive under two
       // different ids ([#656]).
       name: 'the-sweep-never-reports-an-outcome-a-webhook-already-resolved',
-      async run({ assert }) {
+      async run({ expect }) {
         const nowUNIX = Math.floor(Date.now() / 1000);
         const trialEndUNIX = nowUNIX - 5 * DAY;
 
@@ -98,11 +94,7 @@ module.exports = defineCases({
           payment: { provider: 'stripe', resourceId: 'sub_stripe_converted', frequency: 'monthly', price: 9.99 },
         };
 
-        assert.equal(
-          sweep.resolveTrialOutcomeConversion(alreadyReported, 'converted', 'USD'),
-          null,
-          'the term has already moved past the trial, so a payment webhook reported this conversion',
-        );
+        expect(sweep.resolveTrialOutcomeConversion(alreadyReported, 'converted', 'USD'), 'the term has already moved past the trial, so a payment webhook reported this conversion').toBe(null);
       },
     },
 
@@ -113,7 +105,7 @@ module.exports = defineCases({
       // this compares the real output of both derivations for one subscription
       // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
       name: 'the-sweep-and-the-webhook-derive-the-same-trial-dedupe-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const nowUNIX = Math.floor(Date.now() / 1000);
         const trialEndUNIX = nowUNIX - 5 * DAY;
         const RESOURCE_ID = 'sub_shared_trial';
@@ -137,15 +129,15 @@ module.exports = defineCases({
           const webhookId = analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_whatever' } } } });
           const sweepId = sweep.resolveTrialOutcomeConversion(inTrial, outcome, 'USD').eventId;
 
-          assert.equal(webhookId, sweepId, `both paths must call a ${outcome} trial the same conversion`);
-          assert.equal(webhookId.endsWith(`.${RESOURCE_ID}`), true, 'and both must key it on the subscription');
+          expect(webhookId, `both paths must call a ${outcome} trial the same conversion`).toBe(sweepId);
+          expect(webhookId.endsWith(`.${RESOURCE_ID}`), 'and both must key it on the subscription').toBe(true);
         }
       },
     },
 
     {
       name: 'seed-expired-trials',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ firestore, expect, state, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -207,14 +199,14 @@ module.exports = defineCases({
         }));
 
         const seeded = await firestore.get(`users/${GONE_UID}`);
-        assert.equal(seeded.subscription.status, 'active', 'Every candidate starts active on a paid product');
+        expect(seeded.subscription.status, 'Every candidate starts active on a paid product').toBe('active');
       },
     },
 
     {
       name: 'the-sweep-lapses-what-the-provider-no-longer-has',
       timeout: 150000,
-      async run({ firestore, assert, waitFor, pubsub, state }) {
+      async run({ firestore, expect, waitFor, pubsub, state }) {
         await pubsub.trigger('omega_cronDaily');
 
         await waitFor(async () => {
@@ -224,11 +216,11 @@ module.exports = defineCases({
 
         const gone = await firestore.get(`users/${GONE_UID}`);
 
-        assert.equal(gone.subscription.trial.outcome, 'lapsed', 'The provider has no such subscription — the trial lapsed');
-        assert.equal(gone.subscription.status, 'cancelled', 'A lapsed trial ends cancelled');
-        assert.equal(gone.subscription.product.id, 'basic', 'A lapsed trial ends on basic');
-        assert.equal(gone.subscription.cancellation.pending, false, 'Nothing is left pending');
-        assert.equal(gone.subscription.trial.claimed, true, 'claimed still means "a trial happened" — the sweep never repurposes it');
+        expect(gone.subscription.trial.outcome, 'The provider has no such subscription — the trial lapsed').toBe('lapsed');
+        expect(gone.subscription.status, 'A lapsed trial ends cancelled').toBe('cancelled');
+        expect(gone.subscription.product.id, 'A lapsed trial ends on basic').toBe('basic');
+        expect(gone.subscription.cancellation.pending, 'Nothing is left pending').toBe(false);
+        expect(gone.subscription.trial.claimed, 'claimed still means "a trial happened" — the sweep never repurposes it').toBe(true);
 
         state.lapsedCancelledAtUNIX = gone.subscription.cancellation.date.timestampUNIX;
       },
@@ -237,7 +229,7 @@ module.exports = defineCases({
     {
       name: 'a-cancelled-subscription-lapses-the-same-way',
       timeout: 60000,
-      async run({ firestore, assert, waitFor }) {
+      async run({ firestore, expect, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`users/${CANCELLED_UID}`);
           return !!doc?.subscription?.trial?.outcome;
@@ -245,16 +237,16 @@ module.exports = defineCases({
 
         const cancelled = await firestore.get(`users/${CANCELLED_UID}`);
 
-        assert.equal(cancelled.subscription.trial.outcome, 'lapsed', 'The provider says cancelled — the trial lapsed');
-        assert.equal(cancelled.subscription.status, 'cancelled', 'A lapsed trial ends cancelled');
-        assert.equal(cancelled.subscription.product.id, 'basic', 'A lapsed trial ends on basic');
+        expect(cancelled.subscription.trial.outcome, 'The provider says cancelled — the trial lapsed').toBe('lapsed');
+        expect(cancelled.subscription.status, 'A lapsed trial ends cancelled').toBe('cancelled');
+        expect(cancelled.subscription.product.id, 'A lapsed trial ends on basic').toBe('basic');
       },
     },
 
     {
       name: 'a-converted-trial-is-stamped-and-otherwise-untouched',
       timeout: 60000,
-      async run({ firestore, assert, waitFor, state }) {
+      async run({ firestore, expect, waitFor, state }) {
         await waitFor(async () => {
           const doc = await firestore.get(`users/${CONVERTED_UID}`);
           return !!doc?.subscription?.trial?.outcome;
@@ -262,32 +254,32 @@ module.exports = defineCases({
 
         const converted = await firestore.get(`users/${CONVERTED_UID}`);
 
-        assert.equal(converted.subscription.trial.outcome, 'converted', 'The provider says active — the trial converted');
-        assert.equal(converted.subscription.status, 'active', 'A converted trial keeps its active subscription');
-        assert.equal(converted.subscription.product.id, state.paidProductId, 'A converted trial keeps its paid product');
-        assert.equal(converted.subscription.cancellation.pending, false, 'Nothing was cancelled');
+        expect(converted.subscription.trial.outcome, 'The provider says active — the trial converted').toBe('converted');
+        expect(converted.subscription.status, 'A converted trial keeps its active subscription').toBe('active');
+        expect(converted.subscription.product.id, 'A converted trial keeps its paid product').toBe(state.paidProductId);
+        expect(converted.subscription.cancellation.pending, 'Nothing was cancelled').toBe(false);
       },
     },
 
     {
       name: 'the-window-edges-are-left-alone',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const grace = await firestore.get(`users/${GRACE_UID}`);
         const aged = await firestore.get(`users/${AGED_UID}`);
 
-        assert.equal(grace.subscription.trial.outcome, undefined, 'A trial that ended 2h ago is inside the grace window — webhook lag gets its chance first');
-        assert.equal(grace.subscription.status, 'active', 'The grace candidate is untouched');
-        assert.equal(grace.subscription.product.id, state.paidProductId, 'The grace candidate keeps its product');
+        expect(grace.subscription.trial.outcome, 'A trial that ended 2h ago is inside the grace window — webhook lag gets its chance first').toBe(undefined);
+        expect(grace.subscription.status, 'The grace candidate is untouched').toBe('active');
+        expect(grace.subscription.product.id, 'The grace candidate keeps its product').toBe(state.paidProductId);
 
-        assert.equal(aged.subscription.trial.outcome, undefined, 'A trial that ended 40 days ago is below the floor — history is not the sweep\'s job');
-        assert.equal(aged.subscription.status, 'active', 'The aged candidate is untouched');
+        expect(aged.subscription.trial.outcome, 'A trial that ended 40 days ago is below the floor — history is not the sweep\'s job').toBe(undefined);
+        expect(aged.subscription.status, 'The aged candidate is untouched').toBe('active');
       },
     },
 
     {
       name: 'a-second-run-changes-nothing',
       timeout: 150000,
-      async run({ firestore, assert, waitFor, pubsub, state }) {
+      async run({ firestore, expect, waitFor, pubsub, state }) {
         // A run that skips every stamped candidate produces no signal of its own, so
         // the grace candidate becomes the marker: aged past the grace window, the
         // SECOND run must lapse it — and its stamp is proof the sweep ran to the end.
@@ -307,15 +299,11 @@ module.exports = defineCases({
         const gone = await firestore.get(`users/${GONE_UID}`);
         const converted = await firestore.get(`users/${CONVERTED_UID}`);
 
-        assert.equal(grace.subscription.trial.outcome, 'lapsed', 'The second run reached the sweep and lapsed the newly-eligible candidate');
-        assert.equal(gone.subscription.trial.outcome, 'lapsed', 'The already-lapsed candidate is still lapsed');
-        assert.equal(
-          gone.subscription.cancellation.date.timestampUNIX,
-          state.lapsedCancelledAtUNIX,
-          'The cancellation date is the FIRST run\'s — the second run skipped it instead of writing again',
-        );
-        assert.equal(converted.subscription.trial.outcome, 'converted', 'The converted candidate is still converted');
-        assert.equal(converted.subscription.status, 'active', 'The converted candidate is still active');
+        expect(grace.subscription.trial.outcome, 'The second run reached the sweep and lapsed the newly-eligible candidate').toBe('lapsed');
+        expect(gone.subscription.trial.outcome, 'The already-lapsed candidate is still lapsed').toBe('lapsed');
+        expect(gone.subscription.cancellation.date.timestampUNIX, 'The cancellation date is the FIRST run\'s — the second run skipped it instead of writing again').toBe(state.lapsedCancelledAtUNIX);
+        expect(converted.subscription.trial.outcome, 'The converted candidate is still converted').toBe('converted');
+        expect(converted.subscription.status, 'The converted candidate is still active').toBe('active');
       },
     },
 

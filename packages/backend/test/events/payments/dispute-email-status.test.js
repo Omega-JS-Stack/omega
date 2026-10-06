@@ -33,7 +33,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'reports-skipped-without-a-brand-contact-email',
-      async run({ ctx, omega, assert }) {
+      async run({ ctx, omega, expect }) {
         // The real config, with the real gap the brand would have. Restored below —
         // nothing else in the run may see a brand without a contact email.
         const contact = omega.config.brand?.contact || {};
@@ -43,7 +43,7 @@ module.exports = defineCases({
         try {
           const status = await sendDisputeEmail({ alert: ALERT, match: null, result: null, alertId: '_test-dispute-email-status', ctx });
 
-          assert.equal(status, 'skipped', 'A send that never happened must report skipped, never success');
+          expect(status, 'A send that never happened must report skipped, never success').toBe('skipped');
         } finally {
           if (original !== undefined) {
             contact.email = original;

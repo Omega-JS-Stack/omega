@@ -41,7 +41,7 @@ module.exports = defineCases({
   description: 'Generate a blog article (config check by default, full AI pipeline with TEST_EXTENDED_MODE)',
   auth: 'none',
   timeout: 300000,
-  async run({ assert, config, omega, ctx, skip }) {
+  async run({ expect, config, omega, ctx, skip }) {
     const env = process.env;
     const blogConfig = omega.config.blog;
     // Same tri-state read the auto-publisher uses: the enabled key under
@@ -50,16 +50,16 @@ module.exports = defineCases({
 
     // --- Default mode: config validation ---
     if (!env.TEST_EXTENDED_MODE) {
-      assert.ok(blogConfig, 'blog config exists');
-      assert.ok(blogConfig.providers?.ghostii, 'blog.providers.ghostii is set');
-      assert.equal(typeof blogConfig.enabled, 'boolean', 'blog.enabled is a boolean');
+      expect(blogConfig, 'blog config exists').toBeTruthy();
+      expect(blogConfig.providers?.ghostii, 'blog.providers.ghostii is set').toBeTruthy();
+      expect(typeof blogConfig.enabled, 'blog.enabled is a boolean').toBe('boolean');
 
       const contentArray = powertools.arrayify(blogConfig.content);
-      assert.ok(contentArray.length > 0, 'blog.content has at least one entry');
+      expect(contentArray.length > 0, 'blog.content has at least one entry').toBeTruthy();
 
       const entry = contentArray[0];
-      assert.ok(Array.isArray(entry.sources), 'first entry has sources array');
-      assert.ok(entry.sources.length > 0, 'first entry has at least one source');
+      expect(Array.isArray(entry.sources), 'first entry has sources array').toBeTruthy();
+      expect(entry.sources.length > 0, 'first entry has at least one source').toBeTruthy();
 
       // Verify source types are valid
       for (const source of entry.sources) {
@@ -68,12 +68,12 @@ module.exports = defineCases({
           || source.startsWith('$feed:')
           || source.startsWith('http')
           || typeof source === 'string';
-        assert.ok(validTypes, `source "${source}" is a valid type`);
+        expect(validTypes, `source "${source}" is a valid type`).toBeTruthy();
       }
 
       // Verify provider exists
       const providerPath = path.join(__dirname, '..', '..', 'dist', 'omega', 'libraries', 'content', `${providerName}.js`);
-      assert.ok(jetpack.exists(providerPath), `provider "${providerName}" exists at ${providerPath}`);
+      expect(jetpack.exists(providerPath), `provider "${providerName}" exists at ${providerPath}`).toBeTruthy();
 
       console.log(`\n[blog-generate] Config OK:`);
       console.log(`  provider: ${providerName}`);
@@ -96,7 +96,7 @@ module.exports = defineCases({
 
     // Get content entries
     const contentArray = powertools.arrayify(blogConfig.content);
-    assert.ok(contentArray.length > 0, 'blog.content has at least one entry');
+    expect(contentArray.length > 0, 'blog.content has at least one entry').toBeTruthy();
 
     // Clone and override for test
     const content = JSON.parse(JSON.stringify(contentArray));
@@ -158,6 +158,6 @@ module.exports = defineCases({
       try { execSync(`open "${outDir}"`); } catch (e) { /* no-op */ }
     }
 
-    assert.ok(true, 'Blog auto-publisher completed');
+    expect(true, 'Blog auto-publisher completed').toBeTruthy();
   },
 });

@@ -8,14 +8,13 @@
  * for real: every check resolves something against the files a build wrote, and
  * a mocked filesystem would prove nothing about the contract it enforces.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const jetpack = require('fs-jetpack');
 
 const { auditDist } = require('../src/dist-audit.js');
 const { loadExceptions, loadLinkExceptions, EXCEPTIONS_FILE } = require('../src/link-resolver.js');
-const { auditCheckFailures } = require('../src/commands/test.js');
+const { auditCheckFailures } = require('../src/test/smoke.js');
 
 /** A target root with a `dist/` written from `{ relativePath: contents }`. */
 function tmpTarget(dist) {
@@ -46,355 +45,430 @@ const CLEAN = {
   'sitemap.xml': sitemap('/', '/about'),
 };
 
-// ---- (a) meta title and description
+module.exports = defineCases({
+  type: 'group',
+  description: 'dist-audit',
+  tests: [
+    // ---- (a) meta title and description
 
-test('#468: a built page with no meta title or description fails the meta check', () => {
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'bare.html': '<html><head></head><body>no head at all</body></html>',
-    'sitemap.xml': sitemap('/', '/about', '/bare'),
-  });
+    {
+      name: '#468: a built page with no meta title or description fails the meta check',
+      run: (ctx) => {
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'bare.html': '<html><head></head><body>no head at all</body></html>',
+          'sitemap.xml': sitemap('/', '/about', '/bare'),
+        });
 
-  const audit = auditDist({ distDir: out });
+        const audit = auditDist({ distDir: out });
 
-  assert.deepStrictEqual(audit.meta.offenders, ['bare.html → description', 'bare.html → title']);
-  assert.deepStrictEqual(audit.meta.stale, []);
-});
+        ctx.expect(audit.meta.offenders).toEqual(['bare.html → description', 'bare.html → title']);
+        ctx.expect(audit.meta.stale).toEqual([]);
+      },
+    },
 
-test('#468: a title or description rendered EMPTY is a missing one', () => {
-  // The head always emits both tags, so presence proves nothing — a page whose
-  // `meta.description` resolved to nothing ships `content=""` and reads as
-  // described to any scan that only counts tags.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'blank.html': '<html><head><title>  </title><meta name="description" content=""/></head><body>x</body></html>',
-    'sitemap.xml': sitemap('/', '/about', '/blank'),
-  });
+    {
+      name: '#468: a title or description rendered EMPTY is a missing one',
+      run: (ctx) => {
+        // The head always emits both tags, so presence proves nothing — a page whose
+        // `meta.description` resolved to nothing ships `content=""` and reads as
+        // described to any scan that only counts tags.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'blank.html': '<html><head><title>  </title><meta name="description" content=""/></head><body>x</body></html>',
+          'sitemap.xml': sitemap('/', '/about', '/blank'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).meta.offenders, [
-    'blank.html → description',
-    'blank.html → title',
-  ]);
-});
+        ctx.expect(auditDist({ distDir: out }).meta.offenders).toEqual([
+          'blank.html → description',
+          'blank.html → title',
+        ]);
+      },
+    },
 
-test('#987: a raw `>` inside a quoted `content` does not end the meta tag', () => {
-  // The production minifier decodes `&lt;`/`&gt;` inside attribute values, so a
-  // description that mentions `<11th Floor>` ships the brackets raw.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'tower.html': '<html><head><title>Orbis Tower</title>'
-      + '<meta name="description" content="Orbis Tower <11th Floor> is a map."/></head><body>x</body></html>',
-    'sitemap.xml': sitemap('/', '/about', '/tower'),
-  });
+    {
+      name: '#987: a raw `>` inside a quoted `content` does not end the meta tag',
+      run: (ctx) => {
+        // The production minifier decodes `&lt;`/`&gt;` inside attribute values, so a
+        // description that mentions `<11th Floor>` ships the brackets raw.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'tower.html': '<html><head><title>Orbis Tower</title>'
+            + '<meta name="description" content="Orbis Tower <11th Floor> is a map."/></head><body>x</body></html>',
+          'sitemap.xml': sitemap('/', '/about', '/tower'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).meta.offenders, []);
-});
+        ctx.expect(auditDist({ distDir: out }).meta.offenders).toEqual([]);
+      },
+    },
 
-test('#468: a healthy build passes every check with ZERO exceptions', () => {
-  const audit = auditDist({ distDir: tmpTarget(CLEAN).out });
+    {
+      name: '#468: a healthy build passes every check with ZERO exceptions',
+      run: (ctx) => {
+        const audit = auditDist({ distDir: tmpTarget(CLEAN).out });
 
-  for (const check of ['meta', 'fragments', 'alt', 'sitemap']) {
-    assert.deepStrictEqual(audit[check].offenders, [], `${check}: a healthy build needs no exception list`);
-    assert.deepStrictEqual(audit[check].stale, [], `${check}: nothing declared, nothing stale`);
-  }
-  assert.strictEqual(audit.pageCount, 2, 'every html page was read — an empty walk would pass vacuously');
-});
+        for (const check of ['meta', 'fragments', 'alt', 'sitemap']) {
+          ctx.expect(audit[check].offenders, `${check}: a healthy build needs no exception list`).toEqual([]);
+          ctx.expect(audit[check].stale, `${check}: nothing declared, nothing stale`).toEqual([]);
+        }
+        ctx.expect(audit.pageCount, 'every html page was read — an empty walk would pass vacuously').toBe(2);
+      },
+    },
 
-// ---- (b) anchor fragments
+    // ---- (b) anchor fragments
 
-test('#468: an anchor fragment that matches no id on the linked page fails', () => {
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'index.html': page('Home', '<a href="/about#pricing">pricing</a><a href="#nowhere">self</a>'),
-  });
+    {
+      name: '#468: an anchor fragment that matches no id on the linked page fails',
+      run: (ctx) => {
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'index.html': page('Home', '<a href="/about#pricing">pricing</a><a href="#nowhere">self</a>'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).fragments.offenders, [
-    'about.html → #pricing (linked from index.html)',
-    'index.html → #nowhere (linked from index.html)',
-  ]);
-});
+        ctx.expect(auditDist({ distDir: out }).fragments.offenders).toEqual([
+          'about.html → #pricing (linked from index.html)',
+          'index.html → #nowhere (linked from index.html)',
+        ]);
+      },
+    },
 
-test("#468: a fragment on a page the build never wrote is the LINK check's business", () => {
-  // One failure per break: `/gone` is a dead link, and reporting it twice would
-  // make fixing one link look like fixing two things.
-  const { out } = tmpTarget({ ...CLEAN, 'index.html': page('Home', '<a href="/gone#anywhere">gone</a>') });
+    {
+      name: "#468: a fragment on a page the build never wrote is the LINK check's business",
+      run: (ctx) => {
+        // One failure per break: `/gone` is a dead link, and reporting it twice would
+        // make fixing one link look like fixing two things.
+        const { out } = tmpTarget({ ...CLEAN, 'index.html': page('Home', '<a href="/gone#anywhere">gone</a>') });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).fragments.offenders, []);
-});
+        ctx.expect(auditDist({ distDir: out }).fragments.offenders).toEqual([]);
+      },
+    },
 
-test("#468: a fragment that leaves the site is not this check's business", () => {
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'index.html': page('Home', '<a href="https://example.com/x#y">out</a><a href="#">top</a><a href="/about#team">in</a>'),
-  });
+    {
+      name: "#468: a fragment that leaves the site is not this check's business",
+      run: (ctx) => {
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'index.html': page('Home', '<a href="https://example.com/x#y">out</a><a href="#">top</a><a href="/about#team">in</a>'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).fragments.offenders, []);
-});
+        ctx.expect(auditDist({ distDir: out }).fragments.offenders).toEqual([]);
+      },
+    },
 
-test('#468: the fragment exception is declared on the page that OWNS the anchor', () => {
-  // Unlike a link exception (per SOURCE page), an anchor is a fact about the
-  // page carrying it: a hash the target routes in JS is right on every page
-  // that links it, and 190 nav pages must not each declare the same thing.
-  const { root, out } = tmpTarget({
-    ...CLEAN,
-    'index.html': page('Home', '<a href="/about#pricing">pricing</a>'),
-    'blog.html': page('Blog', '<a href="/about#pricing">pricing</a>'),
-    'sitemap.xml': sitemap('/', '/about', '/blog'),
-  });
+    {
+      name: '#468: the fragment exception is declared on the page that OWNS the anchor',
+      run: (ctx) => {
+        // Unlike a link exception (per SOURCE page), an anchor is a fact about the
+        // page carrying it: a hash the target routes in JS is right on every page
+        // that links it, and 190 nav pages must not each declare the same thing.
+        const { root, out } = tmpTarget({
+          ...CLEAN,
+          'index.html': page('Home', '<a href="/about#pricing">pricing</a>'),
+          'blog.html': page('Blog', '<a href="/about#pricing">pricing</a>'),
+          'sitemap.xml': sitemap('/', '/about', '/blog'),
+        });
 
-  const excused = auditDist({ distDir: out, exceptions: { 'about.html': { fragments: ['#pricing'] } } });
-  assert.deepStrictEqual(excused.fragments.offenders, []);
-  assert.deepStrictEqual(excused.fragments.stale, []);
+        const excused = auditDist({ distDir: out, exceptions: { 'about.html': { fragments: ['#pricing'] } } });
+        ctx.expect(excused.fragments.offenders).toEqual([]);
+        ctx.expect(excused.fragments.stale).toEqual([]);
 
-  // …and the declaration is itself checked: the id exists now, so the entry
-  // stands over a fixed anchor and masks the next break at it.
-  jetpack.write(path.join(out, 'about.html'), page('About', '<h2 id="team">Team</h2><h2 id="pricing">Pricing</h2>'));
-  const fixed = auditDist({ distDir: out, exceptions: { 'about.html': { fragments: ['#pricing'] } } });
-  assert.deepStrictEqual(fixed.fragments.stale, ['about.html → #pricing']);
+        // …and the declaration is itself checked: the id exists now, so the entry
+        // stands over a fixed anchor and masks the next break at it.
+        jetpack.write(path.join(out, 'about.html'), page('About', '<h2 id="team">Team</h2><h2 id="pricing">Pricing</h2>'));
+        const fixed = auditDist({ distDir: out, exceptions: { 'about.html': { fragments: ['#pricing'] } } });
+        ctx.expect(fixed.fragments.stale).toEqual(['about.html → #pricing']);
 
-  assert.deepStrictEqual(loadLinkExceptions(root), {}, 'a fragments-only entry declares no dead links');
-});
+        ctx.expect(loadLinkExceptions(root), 'a fragments-only entry declares no dead links').toEqual({});
+      },
+    },
 
-test("#468: the hashes @omega.js/web's OWN pages route in JS need no consumer exception", () => {
-  // The account page maps `#billing` onto its `billing-section` element in JS,
-  // and the nav links it from every page in the build — a framework-owned
-  // pattern no brand can fix, so no brand declares it (the #427 doctrine: the
-  // default pages are clean with zero exceptions).
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'index.html': page('Home', '<a href="/dashboard/account#billing">billing</a>'),
-    'dashboard/account.html': page('Account', '<div id="billing-section"></div>'),
-  });
+    {
+      name: "#468: the hashes @omega.js/web's OWN pages route in JS need no consumer exception",
+      run: (ctx) => {
+        // The account page maps `#billing` onto its `billing-section` element in JS,
+        // and the nav links it from every page in the build — a framework-owned
+        // pattern no brand can fix, so no brand declares it (the #427 doctrine: the
+        // default pages are clean with zero exceptions).
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'index.html': page('Home', '<a href="/dashboard/account#billing">billing</a>'),
+          'dashboard/account.html': page('Account', '<div id="billing-section"></div>'),
+        });
 
-  const audit = auditDist({ distDir: out });
-  assert.deepStrictEqual(audit.fragments.offenders, []);
-  assert.deepStrictEqual(audit.fragments.stale, [], 'a framework route is never stale — a brand may drop the page');
-});
+        const audit = auditDist({ distDir: out });
+        ctx.expect(audit.fragments.offenders).toEqual([]);
+        ctx.expect(audit.fragments.stale, 'a framework route is never stale — a brand may drop the page').toEqual([]);
+      },
+    },
 
-test('#468: a TRANSLATED copy of a framework page is the same page', () => {
-  // The translation lane writes `es/contact.html` — the same document under a
-  // language prefix, so what the framework routes in JS there is what it routes
-  // in English (and a brand that has no English copy still needs no exception).
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'es/index.html': page('Inicio', '<a href="/es/contact#chat">chat</a>'),
-    'es/contact.html': page('Contacto'),
-    'sitemap.xml': sitemap('/', '/about', '/es', '/es/contact'),
-  });
+    {
+      name: '#468: a TRANSLATED copy of a framework page is the same page',
+      run: (ctx) => {
+        // The translation lane writes `es/contact.html` — the same document under a
+        // language prefix, so what the framework routes in JS there is what it routes
+        // in English (and a brand that has no English copy still needs no exception).
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'es/index.html': page('Inicio', '<a href="/es/contact#chat">chat</a>'),
+          'es/contact.html': page('Contacto'),
+          'sitemap.xml': sitemap('/', '/about', '/es', '/es/contact'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).fragments.offenders, []);
-});
+        ctx.expect(auditDist({ distDir: out }).fragments.offenders).toEqual([]);
+      },
+    },
 
-// ---- (c) image alt
+    // ---- (c) image alt
 
-test('#468: an <img> with no alt attribute fails, and alt="" is a valid decorative image', () => {
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'gallery.html': page('Gallery', '<img src="/assets/a.png"/><img src="/assets/b.png" alt=""/><img alt="c" src="/assets/c.png"/>'),
-    'sitemap.xml': sitemap('/', '/about', '/gallery'),
-  });
+    {
+      name: '#468: an <img> with no alt attribute fails, and alt="" is a valid decorative image',
+      run: (ctx) => {
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'gallery.html': page('Gallery', '<img src="/assets/a.png"/><img src="/assets/b.png" alt=""/><img alt="c" src="/assets/c.png"/>'),
+          'sitemap.xml': sitemap('/', '/about', '/gallery'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['gallery.html → /assets/a.png']);
-});
+        ctx.expect(auditDist({ distDir: out }).alt.offenders).toEqual(['gallery.html → /assets/a.png']);
+      },
+    },
 
-test('#468: `alt` as the MINIFIER writes it — a valueless attribute — is an alt', () => {
-  // minify-html collapses `alt=""` to a bare `alt`, which is the shape almost
-  // every decorative image in a production build ships in: read as missing, the
-  // check reports a wall of images that are already declared decorative.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'lazy.html': page('Lazy', '<img data-lazy="@src /assets/a.jpg" src="/assets/blank.gif" alt>'
-      + '<img data-alt="not an alt" src="/assets/b.jpg">'),
-    'sitemap.xml': sitemap('/', '/about', '/lazy'),
-  });
+    {
+      name: '#468: `alt` as the MINIFIER writes it — a valueless attribute — is an alt',
+      run: (ctx) => {
+        // minify-html collapses `alt=""` to a bare `alt`, which is the shape almost
+        // every decorative image in a production build ships in: read as missing, the
+        // check reports a wall of images that are already declared decorative.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'lazy.html': page('Lazy', '<img data-lazy="@src /assets/a.jpg" src="/assets/blank.gif" alt>'
+            + '<img data-alt="not an alt" src="/assets/b.jpg">'),
+          'sitemap.xml': sitemap('/', '/about', '/lazy'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['lazy.html → /assets/b.jpg']);
-});
+        ctx.expect(auditDist({ distDir: out }).alt.offenders).toEqual(['lazy.html → /assets/b.jpg']);
+      },
+    },
 
-test('#987: a raw `>` inside a quoted attribute value does not end the img tag', () => {
-  // The `alt` sits AFTER the bracket, so a scan that stops at the first `>`
-  // never reaches it; the last image has none and is reported by its real src.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'compare.html': page('Compare', '<img title="a > b" alt="A" src="/assets/a.png">'
-      + "<img data-note='c > d' alt src=\"/assets/c.png\"><img title=\"e > f\" src=\"/assets/e.png\">"),
-    'sitemap.xml': sitemap('/', '/about', '/compare'),
-  });
+    {
+      name: '#987: a raw `>` inside a quoted attribute value does not end the img tag',
+      run: (ctx) => {
+        // The `alt` sits AFTER the bracket, so a scan that stops at the first `>`
+        // never reaches it; the last image has none and is reported by its real src.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'compare.html': page('Compare', '<img title="a > b" alt="A" src="/assets/a.png">'
+            + "<img data-note='c > d' alt src=\"/assets/c.png\"><img title=\"e > f\" src=\"/assets/e.png\">"),
+          'sitemap.xml': sitemap('/', '/about', '/compare'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['compare.html → /assets/e.png']);
-});
+        ctx.expect(auditDist({ distDir: out }).alt.offenders).toEqual(['compare.html → /assets/e.png']);
+      },
+    },
 
-test('#468: an <img> DISPLAYED as escaped code is not an image the page emits', () => {
-  // The same rule the link check learned in #521: a <pre> block prints source.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'docs.html': page('Docs', '<pre><code>&lt;img src="/assets/x.png"&gt;</code></pre><img src="/assets/real.png"/>'),
-    'sitemap.xml': sitemap('/', '/about', '/docs'),
-  });
+    {
+      name: '#468: an <img> DISPLAYED as escaped code is not an image the page emits',
+      run: (ctx) => {
+        // The same rule the link check learned in #521: a <pre> block prints source.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'docs.html': page('Docs', '<pre><code>&lt;img src="/assets/x.png"&gt;</code></pre><img src="/assets/real.png"/>'),
+          'sitemap.xml': sitemap('/', '/about', '/docs'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['docs.html → /assets/real.png']);
-});
+        ctx.expect(auditDist({ distDir: out }).alt.offenders).toEqual(['docs.html → /assets/real.png']);
+      },
+    },
 
-test('#468: an alt exception excuses its own page only, and a fixed one is reported', () => {
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'a.html': page('A', '<img src="/assets/logo.png"/>'),
-    'b.html': page('B', '<img src="/assets/logo.png"/>'),
-    'sitemap.xml': sitemap('/', '/about', '/a', '/b'),
-  });
+    {
+      name: '#468: an alt exception excuses its own page only, and a fixed one is reported',
+      run: (ctx) => {
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'a.html': page('A', '<img src="/assets/logo.png"/>'),
+          'b.html': page('B', '<img src="/assets/logo.png"/>'),
+          'sitemap.xml': sitemap('/', '/about', '/a', '/b'),
+        });
 
-  const declared = auditDist({ distDir: out, exceptions: { 'a.html': { alt: ['/assets/logo.png'] } } });
-  assert.deepStrictEqual(declared.alt.offenders, ['b.html → /assets/logo.png']);
-  assert.deepStrictEqual(declared.alt.stale, []);
+        const declared = auditDist({ distDir: out, exceptions: { 'a.html': { alt: ['/assets/logo.png'] } } });
+        ctx.expect(declared.alt.offenders).toEqual(['b.html → /assets/logo.png']);
+        ctx.expect(declared.alt.stale).toEqual([]);
 
-  const stale = auditDist({ distDir: out, exceptions: { 'about.html': { alt: ['/assets/team.png'] } } });
-  assert.deepStrictEqual(stale.alt.stale, ['about.html → /assets/team.png']);
-});
+        const stale = auditDist({ distDir: out, exceptions: { 'about.html': { alt: ['/assets/team.png'] } } });
+        ctx.expect(stale.alt.stale).toEqual(['about.html → /assets/team.png']);
+      },
+    },
 
-// ---- (d) sitemap orphans
+    // ---- (d) sitemap orphans
 
-test('#468: an indexable built page missing from sitemap.xml is an orphan', () => {
-  const { out } = tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing') });
+    {
+      name: '#468: an indexable built page missing from sitemap.xml is an orphan',
+      run: (ctx) => {
+        const { out } = tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing') });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).sitemap.offenders, ['pricing.html → /pricing']);
-});
+        ctx.expect(auditDist({ distDir: out }).sitemap.offenders).toEqual(['pricing.html → /pricing']);
+      },
+    },
 
-test("#468: the orphan check reads the ONE flag off the build, and keeps no URL list", () => {
-  // #564 made noindex and sitemap membership ONE decision and moved every
-  // automatic exclusion into the engine, so the dev surface, /admin/, drafts
-  // and redirect stubs all reach this check as the same rendered `noindex`.
-  // The check has no families of its own to know about.
-  const noindex = (title) => `<html><head><title>${title}</title>`
-    + '<meta name="description" content="x"/>'
-    + '<meta name="robots" content="noindex"/></head><body>x</body></html>';
+    {
+      name: "#468: the orphan check reads the ONE flag off the build, and keeps no URL list",
+      run: (ctx) => {
+        // #564 made noindex and sitemap membership ONE decision and moved every
+        // automatic exclusion into the engine, so the dev surface, /admin/, drafts
+        // and redirect stubs all reach this check as the same rendered `noindex`.
+        // The check has no families of its own to know about.
+        const noindex = (title) => `<html><head><title>${title}</title>`
+          + '<meta name="description" content="x"/>'
+          + '<meta name="robots" content="noindex"/></head><body>x</body></html>';
 
-  const { out } = tmpTarget({
-    ...CLEAN,
-    'account.html': noindex('Account'),
-    'test/styleguide.html': noindex('Styleguide'),
-    'admin/users.html': noindex('Users'),
-  });
+        const { out } = tmpTarget({
+          ...CLEAN,
+          'account.html': noindex('Account'),
+          'test/styleguide.html': noindex('Styleguide'),
+          'admin/users.html': noindex('Users'),
+        });
 
-  assert.deepStrictEqual(auditDist({ distDir: out }).sitemap.offenders, []);
+        ctx.expect(auditDist({ distDir: out }).sitemap.offenders).toEqual([]);
 
-  // And an INDEXABLE page the sitemap forgot is still the finding this check exists for.
-  const { out: leaky } = tmpTarget({ ...CLEAN, 'admin/users.html': page('Users') });
-  assert.deepStrictEqual(auditDist({ distDir: leaky }).sitemap.offenders, ['admin/users.html → /admin/users']);
-});
+        // And an INDEXABLE page the sitemap forgot is still the finding this check exists for.
+        const { out: leaky } = tmpTarget({ ...CLEAN, 'admin/users.html': page('Users') });
+        ctx.expect(auditDist({ distDir: leaky }).sitemap.offenders).toEqual(['admin/users.html → /admin/users']);
+      },
+    },
 
-test("#468: the pages a build COPIES from a vendor are not the brand's pages", () => {
-  // Firebase's self-hosted OAuth helpers land in dist verbatim (titleless,
-  // description-less, never in the sitemap) and no brand may edit them, so
-  // reporting them would be a permanent failure with no fix on either side.
-  const { out } = tmpTarget({
-    ...CLEAN,
-    '__/auth/handler.html': '<html><head></head><body><img src="/x.png"></body></html>',
-    '__/auth/iframe.html': '<html><head></head><body></body></html>',
-  });
+    {
+      name: "#468: the pages a build COPIES from a vendor are not the brand's pages",
+      run: (ctx) => {
+        // Firebase's self-hosted OAuth helpers land in dist verbatim (titleless,
+        // description-less, never in the sitemap) and no brand may edit them, so
+        // reporting them would be a permanent failure with no fix on either side.
+        const { out } = tmpTarget({
+          ...CLEAN,
+          '__/auth/handler.html': '<html><head></head><body><img src="/x.png"></body></html>',
+          '__/auth/iframe.html': '<html><head></head><body></body></html>',
+        });
 
-  const audit = auditDist({ distDir: out });
-  for (const check of ['meta', 'alt', 'sitemap']) {
-    assert.deepStrictEqual(audit[check].offenders, [], `${check}: vendor markup is not audited`);
-  }
-  assert.strictEqual(audit.pageCount, 2, 'and it is not counted as a page of the site');
-});
+        const audit = auditDist({ distDir: out });
+        for (const check of ['meta', 'alt', 'sitemap']) {
+          ctx.expect(audit[check].offenders, `${check}: vendor markup is not audited`).toEqual([]);
+        }
+        ctx.expect(audit.pageCount, 'and it is not counted as a page of the site').toBe(2);
+      },
+    },
 
-test('#468: a build with no sitemap.xml turns the orphan check off, not loud', () => {
-  // A brand can suppress the default page; nothing to compare against is not a
-  // wall of orphans.
-  const { 'sitemap.xml': dropped, ...noSitemap } = CLEAN;
-  const audit = auditDist({ distDir: tmpTarget(noSitemap).out });
+    {
+      name: '#468: a build with no sitemap.xml turns the orphan check off, not loud',
+      run: (ctx) => {
+        // A brand can suppress the default page; nothing to compare against is not a
+        // wall of orphans.
+        const { 'sitemap.xml': dropped, ...noSitemap } = CLEAN;
+        const audit = auditDist({ distDir: tmpTarget(noSitemap).out });
 
-  assert.ok(dropped, 'the clean fixture really did ship a sitemap');
-  assert.deepStrictEqual(audit.sitemap.offenders, []);
-  assert.strictEqual(audit.pageCount, 2, 'the other three checks still ran');
-});
+        ctx.expect(dropped, 'the clean fixture really did ship a sitemap').toBeTruthy();
+        ctx.expect(audit.sitemap.offenders).toEqual([]);
+        ctx.expect(audit.pageCount, 'the other three checks still ran').toBe(2);
+      },
+    },
 
-test('#468: a whole-check exception is `true`, and it fails once the page is listed', () => {
-  const { out } = tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing') });
+    {
+      name: '#468: a whole-check exception is `true`, and it fails once the page is listed',
+      run: (ctx) => {
+        const { out } = tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing') });
 
-  const excused = auditDist({ distDir: out, exceptions: { 'pricing.html': { sitemap: true } } });
-  assert.deepStrictEqual(excused.sitemap.offenders, []);
-  assert.deepStrictEqual(excused.sitemap.stale, []);
+        const excused = auditDist({ distDir: out, exceptions: { 'pricing.html': { sitemap: true } } });
+        ctx.expect(excused.sitemap.offenders).toEqual([]);
+        ctx.expect(excused.sitemap.stale).toEqual([]);
 
-  const listed = auditDist({
-    distDir: tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing'), 'sitemap.xml': sitemap('/', '/about', '/pricing') }).out,
-    exceptions: { 'pricing.html': { sitemap: true } },
-  });
-  assert.deepStrictEqual(listed.sitemap.stale, ['pricing.html'], 'the page is in the sitemap now — drop the entry');
-});
+        const listed = auditDist({
+          distDir: tmpTarget({ ...CLEAN, 'pricing.html': page('Pricing'), 'sitemap.xml': sitemap('/', '/about', '/pricing') }).out,
+          exceptions: { 'pricing.html': { sitemap: true } },
+        });
+        ctx.expect(listed.sitemap.stale, 'the page is in the sitemap now — drop the entry').toEqual(['pricing.html']);
+      },
+    },
 
-test('#468: a MOUNTED build reads its own base path, not a site of orphans', () => {
-  // A project site (brand.url carrying a path) ships every root-relative URL
-  // under the mount point, and the sitemap's absolute locs carry it too — while
-  // dist paths stay site-relative. Read raw, every page reads as an orphan and
-  // every fragment target goes missing.
-  const mount = (html) => html.replace('<html>', '<html data-omega-path-prefix="/repo">');
-  const { out } = tmpTarget({
-    'index.html': mount(page('Home', '<a href="/repo/about#team">the team</a>')),
-    'about.html': mount(page('About', '<h2 id="team">Team</h2>')),
-    'sitemap.xml': '<?xml version="1.0" encoding="UTF-8"?><urlset>'
-      + '<url><loc>https://example.com/repo</loc></url><url><loc>https://example.com/repo/about</loc></url>'
-      + '</urlset>',
-  });
+    {
+      name: '#468: a MOUNTED build reads its own base path, not a site of orphans',
+      run: (ctx) => {
+        // A project site (brand.url carrying a path) ships every root-relative URL
+        // under the mount point, and the sitemap's absolute locs carry it too — while
+        // dist paths stay site-relative. Read raw, every page reads as an orphan and
+        // every fragment target goes missing.
+        const mount = (html) => html.replace('<html>', '<html data-omega-path-prefix="/repo">');
+        const { out } = tmpTarget({
+          'index.html': mount(page('Home', '<a href="/repo/about#team">the team</a>')),
+          'about.html': mount(page('About', '<h2 id="team">Team</h2>')),
+          'sitemap.xml': '<?xml version="1.0" encoding="UTF-8"?><urlset>'
+            + '<url><loc>https://example.com/repo</loc></url><url><loc>https://example.com/repo/about</loc></url>'
+            + '</urlset>',
+        });
 
-  const audit = auditDist({ distDir: out });
-  assert.deepStrictEqual(audit.sitemap.offenders, []);
-  assert.deepStrictEqual(audit.fragments.offenders, []);
-});
+        const audit = auditDist({ distDir: out });
+        ctx.expect(audit.sitemap.offenders).toEqual([]);
+        ctx.expect(audit.fragments.offenders).toEqual([]);
+      },
+    },
 
-// ---- The exception file, and the smoke-check lines
+    // ---- The exception file, and the smoke-check lines
 
-test('#468: the exception file carries one list per check, and the old array is the link list', () => {
-  const { root } = tmpTarget(CLEAN);
+    {
+      name: '#468: the exception file carries one list per check, and the old array is the link list',
+      run: (ctx) => {
+        const { root } = tmpTarget(CLEAN);
 
-  jetpack.write(path.join(root, EXCEPTIONS_FILE), [
-    '{',
-    "  // #430: the old shape — an array is, and stays, the link check's list.",
-    "  \"blog/tags.html\": ['/blog/tags/a-and-r'],",
-    '  "legal/eula.html": {',
-    '    // #468: one list per check, on the page that owns the finding.',
-    "    meta: ['description'],",
-    "    alt: ['/assets/images/seal.png'],",
-    '    sitemap: true,',
-    '  },',
-    '}',
-  ].join('\n'));
+        jetpack.write(path.join(root, EXCEPTIONS_FILE), [
+          '{',
+          "  // #430: the old shape — an array is, and stays, the link check's list.",
+          "  \"blog/tags.html\": ['/blog/tags/a-and-r'],",
+          '  "legal/eula.html": {',
+          '    // #468: one list per check, on the page that owns the finding.',
+          "    meta: ['description'],",
+          "    alt: ['/assets/images/seal.png'],",
+          '    sitemap: true,',
+          '  },',
+          '}',
+        ].join('\n'));
 
-  assert.deepStrictEqual(loadExceptions(root), {
-    'blog/tags.html': { links: ['/blog/tags/a-and-r'] },
-    'legal/eula.html': { meta: ['description'], alt: ['/assets/images/seal.png'], sitemap: true },
-  });
-  assert.deepStrictEqual(loadLinkExceptions(root), { 'blog/tags.html': ['/blog/tags/a-and-r'] });
+        ctx.expect(loadExceptions(root)).toEqual({
+          'blog/tags.html': { links: ['/blog/tags/a-and-r'] },
+          'legal/eula.html': { meta: ['description'], alt: ['/assets/images/seal.png'], sitemap: true },
+        });
+        ctx.expect(loadLinkExceptions(root)).toEqual({ 'blog/tags.html': ['/blog/tags/a-and-r'] });
 
-  // A check nobody runs is a typo, and a typo that reads as "no exception"
-  // turns the declaration off silently.
-  jetpack.write(path.join(root, EXCEPTIONS_FILE), { 'legal/eula.html': { images: ['/assets/x.png'] } });
-  assert.throws(() => loadExceptions(root), /images/);
-});
+        // A check nobody runs is a typo, and a typo that reads as "no exception"
+        // turns the declaration off silently.
+        jetpack.write(path.join(root, EXCEPTIONS_FILE), { 'legal/eula.html': { images: ['/assets/x.png'] } });
+        ctx.expect(() => loadExceptions(root)).toThrow(/images/);
+      },
+    },
 
-test('#468: `omega test` surfaces all four checks as smoke-check failures', () => {
-  const { root, out } = tmpTarget({
-    ...CLEAN,
-    'index.html': page('Home', '<a href="/about#pricing">pricing</a><img src="/assets/hero.png"/>'),
-    'bare.html': '<html><head></head><body>x</body></html>',
-  });
+    {
+      name: '#468: `omega test` surfaces all four checks as smoke-check failures',
+      run: (ctx) => {
+        const { root, out } = tmpTarget({
+          ...CLEAN,
+          'index.html': page('Home', '<a href="/about#pricing">pricing</a><img src="/assets/hero.png"/>'),
+          'bare.html': '<html><head></head><body>x</body></html>',
+        });
 
-  assert.deepStrictEqual(auditCheckFailures({ distDir: out, targetRoot: root }), [
-    "missing page meta: bare.html → description — set it in the page's meta: frontmatter",
-    "missing page meta: bare.html → title — set it in the page's meta: frontmatter",
-    'dead anchor fragment: about.html → #pricing (linked from index.html) — add the id to the page or fix the link',
-    'image without alt: index.html → /assets/hero.png — add alt (alt="" for a decorative image)',
-    "page missing from sitemap.xml: bare.html → /bare — a page kept out of the sitemap must also be noindex (meta.index: false, one decision per #564), or declare 'sitemap: true' for it in config/link-exceptions.json5",
-  ]);
+        ctx.expect(auditCheckFailures({ distDir: out, targetRoot: root })).toEqual([
+          "missing page meta: bare.html → description; set it in the page's meta: frontmatter",
+          "missing page meta: bare.html → title; set it in the page's meta: frontmatter",
+          'dead anchor fragment: about.html → #pricing (linked from index.html); add the id to the page or fix the link',
+          'image without alt: index.html → /assets/hero.png; add alt (alt="" for a decorative image)',
+          "page missing from sitemap.xml: bare.html → /bare; a page kept out of the sitemap must also be noindex (meta.index: false, one decision per #564), or declare 'sitemap: true' for it in config/link-exceptions.json5",
+        ]);
 
-  // Declared, and every declaration is itself checked.
-  jetpack.write(path.join(root, EXCEPTIONS_FILE), {
-    'bare.html': { meta: ['title', 'description'], sitemap: true },
-    'about.html': { fragments: ['#pricing'] },
-    'index.html': { alt: ['/assets/hero.png', '/assets/gone.png'] },
-  });
-  assert.deepStrictEqual(auditCheckFailures({ distDir: out, targetRoot: root }), [
-    `stale alt exception in ${EXCEPTIONS_FILE}: index.html → /assets/gone.png passes now — drop it`,
-  ]);
+        // Declared, and every declaration is itself checked.
+        jetpack.write(path.join(root, EXCEPTIONS_FILE), {
+          'bare.html': { meta: ['title', 'description'], sitemap: true },
+          'about.html': { fragments: ['#pricing'] },
+          'index.html': { alt: ['/assets/hero.png', '/assets/gone.png'] },
+        });
+        ctx.expect(auditCheckFailures({ distDir: out, targetRoot: root })).toEqual([
+          `stale alt exception in ${EXCEPTIONS_FILE}: index.html → /assets/gone.png passes now; drop it`,
+        ]);
+      },
+    },
+  ],
 });

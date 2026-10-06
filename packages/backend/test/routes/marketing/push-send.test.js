@@ -15,7 +15,7 @@ module.exports = defineCases({
       : false,
   timeout: 30000,
 
-  async run({ http, assert, config }) {
+  async run({ http, expect, config }) {
     const response = await http.post('omega/marketing/campaign', {
       name: '[TEST] Push notification',
       subject: 'This is a test push notification from @omega.js/backend',
@@ -25,10 +25,10 @@ module.exports = defineCases({
       filters: { token: process.env.TEST_FCM_TOKEN },
     });
 
-    assert.isSuccess(response, 'Should create and send push campaign');
-    assert.ok(response.data.id, 'Should have campaign ID');
-    assert.equal(response.data.status, 'sent', 'Should be sent immediately');
-    assert.ok(response.data.providers?.push, 'Should have push result');
-    assert.equal(response.data.providers.push.sent, 1, 'Should have sent to 1 token');
+    expect(response, 'Should create and send push campaign').toBeSuccess();
+    expect(response.data.id, 'Should have campaign ID').toBeTruthy();
+    expect(response.data.status, 'Should be sent immediately').toBe('sent');
+    expect(response.data.providers?.push, 'Should have push result').toBeTruthy();
+    expect(response.data.providers.push.sent, 'Should have sent to 1 token').toBe(1);
   },
 });

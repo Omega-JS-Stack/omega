@@ -70,15 +70,15 @@ module.exports = defineCases({
       name: 'the-search-is-scoped-to-the-target-posts-folder',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const filePath = 'targets/web/src/_posts/2026/guest/2026-01-14-a-post.md';
         const github = githubDouble({ searchItems: [hit(filePath)], contents: { [filePath]: POST_BODY } });
         const run = await readAgainst(brandConfig(ONE_WEBSITE), { url: POST_URL }, github);
 
-        assert.equal(run.sent.code, 200, `the read should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
-        assert.match(searchQuery(run.calls), /path:targets\/web\/src\/_posts/, 'the query names the target\'s posts folder');
-        assert.equal(run.sent.body.path, filePath, 'the answer is the file inside the target');
-        assert.equal(run.sent.body.target, 'web', 'the answer says which website it came from');
+        expect(run.sent.code, `the read should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
+        expect(searchQuery(run.calls), 'the query names the target\'s posts folder').toMatch(/path:targets\/web\/src\/_posts/);
+        expect(run.sent.body.path, 'the answer is the file inside the target').toBe(filePath);
+        expect(run.sent.body.target, 'the answer says which website it came from').toBe('web');
       },
     },
 
@@ -86,16 +86,15 @@ module.exports = defineCases({
       name: 'a-hit-outside-the-target-is-not-the-answer',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // The other website's post, same slug: the folder is what decides.
         const stray = 'targets/community/src/_posts/2026/guest/2026-01-14-a-post.md';
         const github = githubDouble({ searchItems: [hit(stray)], contents: { [stray]: POST_BODY } });
         const run = await readAgainst(brandConfig(TWO_WEBSITES), { url: POST_URL, target: 'web' }, github);
 
-        assert.equal(run.sent.code, 404, `a stray hit must not answer, got ${run.sent.code}`);
-        assert.match(run.sent.body, /targets\/web\/src\/_posts/, 'the 404 names the folder that was searched');
-        assert.equal(run.calls.filter((call) => call.url.includes('/contents/')).length, 0,
-          'a file outside the target is never fetched');
+        expect(run.sent.code, `a stray hit must not answer, got ${run.sent.code}`).toBe(404);
+        expect(run.sent.body, 'the 404 names the folder that was searched').toMatch(/targets\/web\/src\/_posts/);
+        expect(run.calls.filter((call) => call.url.includes('/contents/')).length, 'a file outside the target is never fetched').toBe(0);
       },
     },
 
@@ -103,14 +102,14 @@ module.exports = defineCases({
       name: 'the-named-target-is-the-one-read',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const filePath = 'targets/community/src/_posts/2026/guest/2026-01-14-a-post.md';
         const github = githubDouble({ searchItems: [hit(filePath)], contents: { [filePath]: POST_BODY } });
         const run = await readAgainst(brandConfig(TWO_WEBSITES), { url: POST_URL, target: 'community' }, github);
 
-        assert.equal(run.sent.code, 200, `the read should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`);
-        assert.match(searchQuery(run.calls), /path:targets\/community\/src\/_posts/);
-        assert.equal(run.sent.body.target, 'community');
+        expect(run.sent.code, `the read should succeed, got ${run.sent.code}: ${JSON.stringify(run.sent.body)}`).toBe(200);
+        expect(searchQuery(run.calls)).toMatch(/path:targets\/community\/src\/_posts/);
+        expect(run.sent.body.target).toBe('community');
       },
     },
 
@@ -118,13 +117,13 @@ module.exports = defineCases({
       name: 'several-web-targets-require-the-name',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const github = githubDouble();
         const run = await readAgainst(brandConfig(TWO_WEBSITES), { url: POST_URL }, github);
 
-        assert.equal(run.sent.code, 400);
-        assert.match(run.sent.body, /\[web, community\]/);
-        assert.equal(run.calls.length, 0, 'nothing may reach GitHub before the target is known');
+        expect(run.sent.code).toBe(400);
+        expect(run.sent.body).toMatch(/\[web, community\]/);
+        expect(run.calls.length, 'nothing may reach GitHub before the target is known').toBe(0);
       },
     },
   ],

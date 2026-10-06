@@ -39,7 +39,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-handler-tool-receives-the-context-and-its-caller',
-      async run({ assert }) {
+      async run({ expect }) {
         const ctx = new Context(omega());
 
         // Where authenticate() stores the caller it resolved
@@ -58,35 +58,35 @@ module.exports = defineCases({
 
         const result = await callTool({ tool, ctx, user: ctx.user, omega: omega(), client, args: { a: 1 } });
 
-        assert.equal(seen.length, 1, 'the handler ran once');
-        assert.equal(seen[0].ctx, ctx, 'ctx is the request\'s Context');
-        assert.equal(seen[0].user.uid, 'u1', 'user is the caller the Context holds');
-        assert.equal(seen[0].user.authenticated, true, 'a signed-in caller');
-        assert.equal(seen[0].omega, omega(), 'omega is the instance');
-        assert.deepEqual(seen[0].params, { a: 1 }, 'params are the tool arguments');
-        assert.equal(client.calls.length, 0, 'a handler tool never goes over HTTP');
-        assert.deepEqual(JSON.parse(result.content[0].text), { uid: 'u1' }, 'the answer is the text content');
+        expect(seen.length, 'the handler ran once').toBe(1);
+        expect(seen[0].ctx, 'ctx is the request\'s Context').toBe(ctx);
+        expect(seen[0].user.uid, 'user is the caller the Context holds').toBe('u1');
+        expect(seen[0].user.authenticated, 'a signed-in caller').toBe(true);
+        expect(seen[0].omega, 'omega is the instance').toBe(omega());
+        expect(seen[0].params, 'params are the tool arguments').toEqual({ a: 1 });
+        expect(client.calls.length, 'a handler tool never goes over HTTP').toBe(0);
+        expect(JSON.parse(result.content[0].text), 'the answer is the text content').toEqual({ uid: 'u1' });
       },
     },
 
     {
       name: 'a-route-tool-goes-through-the-client',
-      async run({ assert }) {
+      async run({ expect }) {
         const ctx = new Context(omega());
         const client = recordingClient({ ok: true });
         const tool = { name: 'list_notes', _consumer: true, method: 'GET', path: '/notes' };
 
         const result = await callTool({ tool, ctx, user: ctx.user, omega: omega(), client, args: { limit: 5 } });
 
-        assert.deepEqual(client.calls, [{ method: 'GET', path: '/notes', params: { limit: 5 } }], 'one call, as declared');
-        assert.deepEqual(JSON.parse(result.content[0].text), { ok: true }, 'the answer is the text content');
-        assert.equal(result.isError, undefined, 'not an error');
+        expect(client.calls, 'one call, as declared').toEqual([{ method: 'GET', path: '/notes', params: { limit: 5 } }]);
+        expect(JSON.parse(result.content[0].text), 'the answer is the text content').toEqual({ ok: true });
+        expect(result.isError, 'not an error').toBe(undefined);
       },
     },
 
     {
       name: 'a-throw-becomes-an-error-result-naming-the-tool',
-      async run({ assert }) {
+      async run({ expect }) {
         const ctx = new Context(omega());
         const tool = {
           name: 'boom',
@@ -98,8 +98,8 @@ module.exports = defineCases({
 
         const result = await callTool({ tool, ctx, user: ctx.user, omega: omega(), client: recordingClient({}), args: {} });
 
-        assert.equal(result.isError, true, 'flagged as an error');
-        assert.equal(result.content[0].text, 'Error calling boom: it broke', 'naming the tool and the message');
+        expect(result.isError, 'flagged as an error').toBe(true);
+        expect(result.content[0].text, 'naming the tool and the message').toBe('Error calling boom: it broke');
       },
     },
   ],

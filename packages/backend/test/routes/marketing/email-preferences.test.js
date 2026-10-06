@@ -31,7 +31,7 @@ module.exports = defineCases({
       name: 'anon-unsubscribe-valid-sig-succeeds',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const sig = generateSig(TEST_EMAIL);
         const response = await http.post('omega/marketing/email-preferences', {
           email: TEST_EMAIL,
@@ -39,8 +39,8 @@ module.exports = defineCases({
           action: 'unsubscribe',
           sig,
         });
-        assert.isSuccess(response, 'Unsubscribe with valid sig should succeed');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Unsubscribe with valid sig should succeed').toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
       },
     },
 
@@ -48,7 +48,7 @@ module.exports = defineCases({
       name: 'anon-subscribe-valid-sig-succeeds',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const sig = generateSig(TEST_EMAIL);
         const response = await http.post('omega/marketing/email-preferences', {
           email: TEST_EMAIL,
@@ -56,8 +56,8 @@ module.exports = defineCases({
           action: 'subscribe',
           sig,
         });
-        assert.isSuccess(response, 'Subscribe with valid sig should succeed');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Subscribe with valid sig should succeed').toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
       },
     },
 
@@ -65,7 +65,7 @@ module.exports = defineCases({
       name: 'anon-resubscribe-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Old 'resubscribe' action is no longer accepted — must use 'subscribe'
         const sig = generateSig(TEST_EMAIL);
         const response = await http.post('omega/marketing/email-preferences', {
@@ -74,7 +74,7 @@ module.exports = defineCases({
           action: 'resubscribe',
           sig,
         });
-        assert.isError(response, 400, 'Old "resubscribe" action should be rejected');
+        expect(response, 'Old "resubscribe" action should be rejected').toBeError(400);
       },
     },
 
@@ -82,14 +82,14 @@ module.exports = defineCases({
       name: 'anon-invalid-sig-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/email-preferences', {
           email: TEST_EMAIL,
           asmId: TEST_ASM_ID,
           action: 'unsubscribe',
           sig: 'invalid-signature-value',
         });
-        assert.isError(response, 403, 'Invalid sig should return 403');
+        expect(response, 'Invalid sig should return 403').toBeError(403);
       },
     },
 
@@ -97,13 +97,13 @@ module.exports = defineCases({
       name: 'anon-missing-email-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/email-preferences', {
           asmId: TEST_ASM_ID,
           action: 'unsubscribe',
           sig: 'anything',
         });
-        assert.isError(response, 400, 'Missing email should return 400');
+        expect(response, 'Missing email should return 400').toBeError(400);
       },
     },
 
@@ -111,7 +111,7 @@ module.exports = defineCases({
       name: 'anon-invalid-email-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const sig = generateSig('not-an-email');
         const response = await http.post('omega/marketing/email-preferences', {
           email: 'not-an-email',
@@ -119,7 +119,7 @@ module.exports = defineCases({
           action: 'unsubscribe',
           sig,
         });
-        assert.isError(response, 400, 'Invalid email format should return 400');
+        expect(response, 'Invalid email format should return 400').toBeError(400);
       },
     },
 
@@ -127,14 +127,14 @@ module.exports = defineCases({
       name: 'anon-missing-asmid-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const sig = generateSig(TEST_EMAIL);
         const response = await http.post('omega/marketing/email-preferences', {
           email: TEST_EMAIL,
           action: 'unsubscribe',
           sig,
         });
-        assert.isError(response, 400, 'Missing asmId should return 400');
+        expect(response, 'Missing asmId should return 400').toBeError(400);
       },
     },
 
@@ -142,7 +142,7 @@ module.exports = defineCases({
       name: 'anon-invalid-action-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const sig = generateSig(TEST_EMAIL);
         const response = await http.post('omega/marketing/email-preferences', {
           email: TEST_EMAIL,
@@ -150,7 +150,7 @@ module.exports = defineCases({
           action: 'delete',
           sig,
         });
-        assert.isError(response, 400, 'Invalid action should return 400');
+        expect(response, 'Invalid action should return 400').toBeError(400);
       },
     },
 
@@ -158,7 +158,7 @@ module.exports = defineCases({
       name: 'anon-wrong-email-sig-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // sig generated for a different email — must not validate against TEST_EMAIL
         const sig = generateSig('someone-else@gmail.com');
         const response = await http.post('omega/marketing/email-preferences', {
@@ -167,7 +167,7 @@ module.exports = defineCases({
           action: 'unsubscribe',
           sig,
         });
-        assert.isError(response, 403, 'Sig for different email should return 403');
+        expect(response, 'Sig for different email should return 403').toBeError(403);
       },
     },
 
@@ -177,7 +177,7 @@ module.exports = defineCases({
       name: 'auth-unsubscribe-writes-consent-and-records-source-account',
       auth: 'basic',
       timeout: 15000,
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts.basic.uid;
 
         const beforeMs = Date.now();
@@ -186,16 +186,16 @@ module.exports = defineCases({
         });
         const afterMs = Date.now();
 
-        assert.isSuccess(response, `Authenticated unsubscribe should succeed: ${JSON.stringify(response, null, 2)}`);
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
-        assert.propertyEquals(response, 'data.action', 'unsubscribe', 'action echoed in response');
+        expect(response, `Authenticated unsubscribe should succeed: ${JSON.stringify(response, null, 2)}`).toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
+        expect(response, 'action echoed in response').toHaveProperty('data.action', 'unsubscribe');
 
         const userDoc = await firestore.get(`users/${uid}`);
 
-        assert.equal(userDoc?.consent?.marketing?.status, 'revoked', 'consent.marketing.status should be revoked');
-        assert.equal(userDoc?.consent?.marketing?.revokedAt?.source, 'account', 'revokedAt.source should be account');
-        assert.ok(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'revokedAt.timestamp should be set');
-        assert.equal(typeof userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, 'number', 'revokedAt.timestampUNIX should be number');
+        expect(userDoc?.consent?.marketing?.status, 'consent.marketing.status should be revoked').toBe('revoked');
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'revokedAt.source should be account').toBe('account');
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'revokedAt.timestamp should be set').toBeTruthy();
+        expect(typeof userDoc?.consent?.marketing?.revokedAt?.timestampUNIX, 'revokedAt.timestampUNIX should be number').toBe('number');
 
         // Server time used (defense against clock manipulation).
         // Server uses Math.round, so the stamped value can be 1 second past Math.floor(afterMs/1000)
@@ -203,10 +203,7 @@ module.exports = defineCases({
         const revokedUNIX = userDoc.consent.marketing.revokedAt.timestampUNIX;
         const beforeUNIX = Math.floor(beforeMs / 1000);
         const afterUNIX = Math.round(afterMs / 1000) + 1;
-        assert.ok(
-          revokedUNIX >= beforeUNIX && revokedUNIX <= afterUNIX,
-          `revokedAt.timestampUNIX (${revokedUNIX}) should be server time, between ${beforeUNIX} and ${afterUNIX}`
-        );
+        expect(revokedUNIX >= beforeUNIX && revokedUNIX <= afterUNIX, `revokedAt.timestampUNIX (${revokedUNIX}) should be server time, between ${beforeUNIX} and ${afterUNIX}`).toBeTruthy();
       },
     },
 
@@ -214,40 +211,32 @@ module.exports = defineCases({
       name: 'auth-subscribe-after-unsubscribe-flips-status-keeps-prior-revokedAt',
       auth: 'basic',
       timeout: 15000,
-      async run({ http, firestore, assert, accounts }) {
+      async run({ http, firestore, expect, accounts }) {
         const uid = accounts.basic.uid;
 
         // Capture revokedAt from the previous test
         const beforeDoc = await firestore.get(`users/${uid}`);
         const priorRevokedAt = beforeDoc?.consent?.marketing?.revokedAt;
-        assert.ok(priorRevokedAt?.timestamp, 'Prior test should have left a revokedAt timestamp');
+        expect(priorRevokedAt?.timestamp, 'Prior test should have left a revokedAt timestamp').toBeTruthy();
 
         const response = await http.as('basic').post('omega/marketing/email-preferences', {
           action: 'subscribe',
         });
 
-        assert.isSuccess(response, `Authenticated subscribe should succeed: ${JSON.stringify(response, null, 2)}`);
+        expect(response, `Authenticated subscribe should succeed: ${JSON.stringify(response, null, 2)}`).toBeSuccess();
 
         const userDoc = await firestore.get(`users/${uid}`);
 
         // status flips
-        assert.equal(userDoc?.consent?.marketing?.status, 'granted', 'status should flip to granted');
+        expect(userDoc?.consent?.marketing?.status, 'status should flip to granted').toBe('granted');
 
         // grantedAt populated with new server time + source=account
-        assert.equal(userDoc?.consent?.marketing?.grantedAt?.source, 'account', 'grantedAt.source should be account');
-        assert.ok(userDoc?.consent?.marketing?.grantedAt?.timestamp, 'grantedAt.timestamp should be set');
+        expect(userDoc?.consent?.marketing?.grantedAt?.source, 'grantedAt.source should be account').toBe('account');
+        expect(userDoc?.consent?.marketing?.grantedAt?.timestamp, 'grantedAt.timestamp should be set').toBeTruthy();
 
         // revokedAt UNTOUCHED — still reflects the most recent revoke
-        assert.equal(
-          userDoc?.consent?.marketing?.revokedAt?.timestamp,
-          priorRevokedAt.timestamp,
-          'revokedAt.timestamp should be preserved from prior revoke'
-        );
-        assert.equal(
-          userDoc?.consent?.marketing?.revokedAt?.source,
-          priorRevokedAt.source,
-          'revokedAt.source should be preserved from prior revoke'
-        );
+        expect(userDoc?.consent?.marketing?.revokedAt?.timestamp, 'revokedAt.timestamp should be preserved from prior revoke').toBe(priorRevokedAt.timestamp);
+        expect(userDoc?.consent?.marketing?.revokedAt?.source, 'revokedAt.source should be preserved from prior revoke').toBe(priorRevokedAt.source);
       },
     },
 
@@ -255,11 +244,11 @@ module.exports = defineCases({
       name: 'auth-invalid-action-rejected',
       auth: 'basic',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/marketing/email-preferences', {
           action: 'delete',
         });
-        assert.isError(response, 400, 'Invalid action should return 400');
+        expect(response, 'Invalid action should return 400').toBeError(400);
       },
     },
 
@@ -267,12 +256,12 @@ module.exports = defineCases({
       name: 'auth-opt-in-old-name-rejected',
       auth: 'basic',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Old proposed 'opt-in' is NOT accepted — must use 'subscribe'
         const response = await http.as('basic').post('omega/marketing/email-preferences', {
           action: 'opt-in',
         });
-        assert.isError(response, 400, 'Old "opt-in" name should be rejected (use "subscribe")');
+        expect(response, 'Old "opt-in" name should be rejected (use "subscribe")').toBeError(400);
       },
     },
 
@@ -280,13 +269,13 @@ module.exports = defineCases({
       name: 'unauthenticated-without-sig-rejected',
       auth: 'none',
       timeout: 15000,
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Unauthenticated + no sig → email field is required for HMAC path → 400.
         // (No auth means we hit the anonymous path; no email/asmId means missing-required.)
         const response = await http.post('omega/marketing/email-preferences', {
           action: 'unsubscribe',
         });
-        assert.isError(response, 400, 'Unauthenticated request without HMAC fields should 400');
+        expect(response, 'Unauthenticated request without HMAC fields should 400').toBeError(400);
       },
     },
   ],

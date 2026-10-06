@@ -16,7 +16,7 @@
  * ctx it is handed, so the document under test is the one this file supplies and the
  * assertions read the captured log output.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const Usage = require('../../dist/omega/services/usage.js');
 const { User } = require('../../dist/omega/helpers/account.js');
@@ -87,10 +87,10 @@ module.exports = defineCases({
         const { captured } = await usageRun();
         const line = captured.find((l) => l.includes('Usage.resolve(): Resolved'));
 
-        assert.ok(line, `no Usage.resolve() line was logged: ${JSON.stringify(captured)}`);
-        assert.ok(line.includes(UID), `line does not name the user: ${line}`);
-        assert.ok(line.includes('"monthly":4'), `line lost the usage it is about: ${line}`);
-        assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
+        expect(line, `no Usage.resolve() line was logged: ${JSON.stringify(captured)}`).toBeTruthy();
+        expect(line.includes(UID), `line does not name the user: ${line}`).toBeTruthy();
+        expect(line.includes('"monthly":4'), `line lost the usage it is about: ${line}`).toBeTruthy();
+        expect(!line.includes('privateKey'), `user document serialized into the log line: ${line}`).toBeTruthy();
       },
     },
 
@@ -101,9 +101,9 @@ module.exports = defineCases({
         const { captured } = await usageRun();
         const line = captured.find((l) => l.includes('Counted 1 requests'));
 
-        assert.ok(line, `no count line was logged: ${JSON.stringify(captured)}`);
-        assert.ok(line.includes('"monthly":5'), `line lost the counted value: ${line}`);
-        assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
+        expect(line, `no count line was logged: ${JSON.stringify(captured)}`).toBeTruthy();
+        expect(line.includes('"monthly":5'), `line lost the counted value: ${line}`).toBeTruthy();
+        expect(!line.includes('privateKey'), `user document serialized into the log line: ${line}`).toBeTruthy();
       },
     },
 
@@ -114,7 +114,7 @@ module.exports = defineCases({
         const { captured } = await usageRun();
         const leaking = captured.filter((l) => l.includes(LEAKED_KEY) || l.includes('privateKey'));
 
-        assert.deepEqual(leaking, [], `private key reached the log: ${JSON.stringify(leaking)}`);
+        expect(leaking, `private key reached the log: ${JSON.stringify(leaking)}`).toEqual([]);
       },
     },
   ],

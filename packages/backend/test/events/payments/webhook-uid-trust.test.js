@@ -25,7 +25,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-uid-trust
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -97,9 +97,9 @@ module.exports = defineCases({
       async run() {
         const { store } = await runForgedEvent();
 
-        assert.ok(!store.get(`users/${FORGED_UID}`), 'the uid the caller chose must never receive a subscription it did not buy');
-        assert.ok(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'nor the order behind it');
-        assert.ok(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'nor an intent closed out for it');
+        expect(!store.get(`users/${FORGED_UID}`), 'the uid the caller chose must never receive a subscription it did not buy').toBeTruthy();
+        expect(!store.get(`payments-orders/${FORGED_ORDER_ID}`), 'nor the order behind it').toBeTruthy();
+        expect(!store.get(`payments-intents/${FORGED_ORDER_ID}`), 'nor an intent closed out for it').toBeTruthy();
       },
     },
 
@@ -109,8 +109,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runForgedEvent();
 
-        assert.ok(!store.get(`users/${OWNER_UID}`), 'a mismatch is refused, not redirected: nothing about this event is trustworthy enough to act on');
-        assert.ok(!store.get(`payments-orders/${OWNER_ORDER_ID}`), 'and no order is written under the real owner');
+        expect(!store.get(`users/${OWNER_UID}`), 'a mismatch is refused, not redirected: nothing about this event is trustworthy enough to act on').toBeTruthy();
+        expect(!store.get(`payments-orders/${OWNER_ORDER_ID}`), 'and no order is written under the real owner').toBeTruthy();
       },
     },
 
@@ -121,12 +121,12 @@ module.exports = defineCases({
         const { store } = await runForgedEvent();
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'completed', 'no retry can make the payload agree with the provider — the event must not be redelivered forever');
-        assert.equal(event.refusal?.reason, 'uid-mismatch', 'the stamp names what is wrong');
-        assert.equal(event.refusal?.payloadUid, FORGED_UID, 'the stamp names the uid the payload claimed');
-        assert.equal(event.refusal?.providerUid, OWNER_UID, 'and the uid the provider\'s record actually carries');
-        assert.equal(event.transition, null, 'nothing happened to a subscription, so the trail must not say it did');
-        assert.ok(!event.retryCount, 'a terminal decision never burns the retry ladder');
+        expect(event.status, 'no retry can make the payload agree with the provider — the event must not be redelivered forever').toBe('completed');
+        expect(event.refusal?.reason, 'the stamp names what is wrong').toBe('uid-mismatch');
+        expect(event.refusal?.payloadUid, 'the stamp names the uid the payload claimed').toBe(FORGED_UID);
+        expect(event.refusal?.providerUid, 'and the uid the provider\'s record actually carries').toBe(OWNER_UID);
+        expect(event.transition, 'nothing happened to a subscription, so the trail must not say it did').toBe(null);
+        expect(!event.retryCount, 'a terminal decision never burns the retry ladder').toBeTruthy();
       },
     },
 
@@ -137,11 +137,11 @@ module.exports = defineCases({
         const { logs } = await runForgedEvent();
         const output = logs.join('\n');
 
-        assert.match(output, /UID MISMATCH/, 'the refusal is loud');
-        assert.match(output, /stripe/, 'the log names the provider that was asked');
-        assert.match(output, new RegExp(`subscription ${RESOURCE_ID}`), 'the log names the resource the event claimed');
-        assert.match(output, new RegExp(FORGED_UID), 'the log names the claimed uid');
-        assert.match(output, new RegExp(OWNER_UID), 'and the uid the provider answered with');
+        expect(output, 'the refusal is loud').toMatch(/UID MISMATCH/);
+        expect(output, 'the log names the provider that was asked').toMatch(/stripe/);
+        expect(output, 'the log names the resource the event claimed').toMatch(new RegExp(`subscription ${RESOURCE_ID}`));
+        expect(output, 'the log names the claimed uid').toMatch(new RegExp(FORGED_UID));
+        expect(output, 'and the uid the provider answered with').toMatch(new RegExp(OWNER_UID));
       },
     },
 
@@ -155,9 +155,9 @@ module.exports = defineCases({
           recordMetadata: { uid: OWNER_UID, orderId: OWNER_ORDER_ID },
         });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'an event whose claim matches the record is refused nothing');
-        assert.equal(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'active', 'the subscription lands on the owner\'s doc');
-        assert.equal(store.get(`payments-orders/${OWNER_ORDER_ID}`)?.owner, OWNER_UID, 'the order is written as before');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'an event whose claim matches the record is refused nothing').toBeTruthy();
+        expect(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'the subscription lands on the owner\'s doc').toBe('active');
+        expect(store.get(`payments-orders/${OWNER_ORDER_ID}`)?.owner, 'the order is written as before').toBe(OWNER_UID);
       },
     },
 
@@ -174,9 +174,9 @@ module.exports = defineCases({
           recordMetadata: { orderId: FORGED_ORDER_ID },
         });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'with no provider uid to disagree with, there is no mismatch to refuse');
-        assert.equal(store.get(`users/${FORGED_UID}`)?.subscription?.status, 'active', 'the payload uid steers the write');
-        assert.match(logs.join('\n'), /UID FALLBACK/, 'the fallback is named out loud — this write was never cross-checked');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'with no provider uid to disagree with, there is no mismatch to refuse').toBeTruthy();
+        expect(store.get(`users/${FORGED_UID}`)?.subscription?.status, 'the payload uid steers the write').toBe('active');
+        expect(logs.join('\n'), 'the fallback is named out loud — this write was never cross-checked').toMatch(/UID FALLBACK/);
       },
     },
 
@@ -194,9 +194,9 @@ module.exports = defineCases({
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.ok(!event.refusal, 'a payload that claims nothing contradicts nothing');
-        assert.equal(event.owner, OWNER_UID, 'the resolved uid is persisted on the event doc');
-        assert.equal(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'active', 'the subscription lands on the uid the provider named');
+        expect(!event.refusal, 'a payload that claims nothing contradicts nothing').toBeTruthy();
+        expect(event.owner, 'the resolved uid is persisted on the event doc').toBe(OWNER_UID);
+        expect(store.get(`users/${OWNER_UID}`)?.subscription?.status, 'the subscription lands on the uid the provider named').toBe('active');
       },
     },
   ],

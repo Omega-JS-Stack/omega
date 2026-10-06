@@ -41,7 +41,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'demo-to-real-swap-refreshes-self-projectid',
-      async run({ assert }) {
+      async run({ expect }) {
         const tmp = stage('real-project-abc', 'demo-stale');
         const self = {
           firebaseProjectPath: tmp,
@@ -51,21 +51,21 @@ module.exports = defineCases({
         };
 
         const check = new ProjectIdConsistencyTest({ main: self });
-        assert.equal(await check.run(), false, 'mismatch detected');
+        expect(await check.run(), 'mismatch detected').toBe(false);
 
         await check.fix();
 
         // The derived artifact follows config…
         const firebaserc = JSON.parse(jetpack.read(path.join(tmp, '.firebaserc')));
-        assert.equal(firebaserc.projects.default, 'real-project-abc', '.firebaserc rewritten from config');
+        expect(firebaserc.projects.default, '.firebaserc rewritten from config').toBe('real-project-abc');
 
         // …and the SHARED context follows too — later checks must see truth
-        assert.equal(self.projectId, 'real-project-abc', 'self.projectId refreshed');
-        assert.equal(self.firebaseRC.projects.default, 'real-project-abc', 'self.firebaseRC refreshed');
-        assert.ok(self.projectUrl.includes('real-project-abc'), 'self.projectUrl refreshed');
-        assert.equal(check.isDemoProject, false, 'demo gate now reads the real id');
+        expect(self.projectId, 'self.projectId refreshed').toBe('real-project-abc');
+        expect(self.firebaseRC.projects.default, 'self.firebaseRC refreshed').toBe('real-project-abc');
+        expect(self.projectUrl.includes('real-project-abc'), 'self.projectUrl refreshed').toBeTruthy();
+        expect(check.isDemoProject, 'demo gate now reads the real id').toBe(false);
 
-        assert.equal(await check.run(), true, 'idempotent: rerun passes');
+        expect(await check.run(), 'idempotent: rerun passes').toBe(true);
         jetpack.remove(tmp);
       },
     },

@@ -28,7 +28,7 @@ module.exports = defineCases({
     {
       name: 'the-handler-bumps-the-owners-counter',
 
-      async run({ omega, firestore, assert }) {
+      async run({ omega, firestore, expect }) {
         for (const id of ['direct-1', 'direct-2']) {
           await omega.events.run('notes/on-create', {
             snapshot: noteSnapshot(id, { id, owner: DIRECT_OWNER, text: 'Counted' }),
@@ -38,15 +38,15 @@ module.exports = defineCases({
 
         const stats = await firestore.get(`notes-stats/${DIRECT_OWNER}`);
 
-        assert.equal(stats.created, 2, 'one count per note');
-        assert.equal(stats.owner, DIRECT_OWNER, 'on the owner\'s own stats doc');
+        expect(stats.created, 'one count per note').toBe(2);
+        expect(stats.owner, 'on the owner\'s own stats doc').toBe(DIRECT_OWNER);
       },
     },
 
     {
       name: 'a-note-without-an-owner-fails-loudly',
 
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         let error = null;
 
         try {
@@ -58,15 +58,15 @@ module.exports = defineCases({
           error = e;
         }
 
-        assert.ok(error, 'an ownerless note rejects instead of counting nowhere');
-        assert.match(error.message, /has no owner/, 'and says why');
+        expect(error, 'an ownerless note rejects instead of counting nowhere').toBeTruthy();
+        expect(error.message, 'and says why').toMatch(/has no owner/);
       },
     },
 
     {
       name: 'the-deployed-trigger-runs-the-handler',
 
-      async run({ firestore, assert, waitFor }) {
+      async run({ firestore, expect, waitFor }) {
         await firestore.set('notes/trigger-1', {
           id: 'trigger-1',
           owner: TRIGGER_OWNER,
@@ -79,7 +79,7 @@ module.exports = defineCases({
           return doc?.created === 1 ? doc : null;
         }, 20000, 500);
 
-        assert.ok(stats, 'the notesOnCreate trigger counted the write');
+        expect(stats, 'the notesOnCreate trigger counted the write').toBeTruthy();
       },
     },
   ],

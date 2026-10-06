@@ -12,10 +12,9 @@
  * elsewhere may still name the hosts (the admin editor's URL input
  * placeholder, cachebreak's external-URL unit fixture) — those load nothing.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const PKG = path.resolve(__dirname, '..');
 const SCAN_ROOTS = [path.join(PKG, 'themes'), path.join(PKG, 'defaults')];
@@ -44,33 +43,42 @@ function walk(dir) {
   return files;
 }
 
-test('#154: no packaged theme or default hotlinks an image host', () => {
-  const sightings = [];
+module.exports = defineCases({
+  type: 'group',
+  description: 'external-images',
+  tests: [
+    {
+      name: '#154: no packaged theme or default hotlinks an image host',
+      run: (ctx) => {
+        const sightings = [];
 
-  for (const file of SCAN_ROOTS.flatMap(walk)) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const pattern of BANNED) {
-      if (!pattern.test(text)) continue;
-      const line = text.split('\n').findIndex((each) => pattern.test(each)) + 1;
-      sightings.push(`${path.relative(PKG, file)}:${line} — ${pattern}`);
-    }
-  }
+        for (const file of SCAN_ROOTS.flatMap(walk)) {
+          const text = fs.readFileSync(file, 'utf8');
+          for (const pattern of BANNED) {
+            if (!pattern.test(text)) continue;
+            const line = text.split('\n').findIndex((each) => pattern.test(each)) + 1;
+            sightings.push(`${path.relative(PKG, file)}:${line} — ${pattern}`);
+          }
+        }
 
-  assert.deepStrictEqual(sightings, [], `packaged imagery is hotlinked again:\n${sightings.join('\n')}`);
-});
+        ctx.expect(sightings, `packaged imagery is hotlinked again:\n${sightings.join('\n')}`).toEqual([]);
+      },
+    },
 
-test('#154: the placeholder imagery the defaults point at ships with the package', () => {
-  const referenced = [];
-  for (const file of SCAN_ROOTS.flatMap(walk)) {
-    const text = fs.readFileSync(file, 'utf8');
-    referenced.push(...[...text.matchAll(/\/assets\/images\/core\/(\S+?\.jpg)/g)].map((match) => match[1]));
-  }
+    {
+      name: '#154: the placeholder imagery the defaults point at ships with the package',
+      run: (ctx) => {
+        const referenced = [];
+        for (const file of SCAN_ROOTS.flatMap(walk)) {
+          const text = fs.readFileSync(file, 'utf8');
+          referenced.push(...[...text.matchAll(/\/assets\/images\/core\/(\S+?\.jpg)/g)].map((match) => match[1]));
+        }
 
-  assert.ok(referenced.length >= 3, 'the theme defaults ride the shipped pictures');
-  for (const rel of new Set(referenced)) {
-    assert.ok(
-      fs.existsSync(path.join(PKG, 'core', 'images', ...rel.split('/'))),
-      `core/images/${rel} ships with the package`,
-    );
-  }
+        ctx.expect(referenced.length >= 3, 'the theme defaults ride the shipped pictures').toBeTruthy();
+        for (const rel of new Set(referenced)) {
+          ctx.expect(fs.existsSync(path.join(PKG, 'core', 'images', ...rel.split('/'))), `core/images/${rel} ships with the package`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

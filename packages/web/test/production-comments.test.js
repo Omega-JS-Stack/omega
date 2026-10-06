@@ -19,10 +19,9 @@
  * There is no config knob either way — a production build has no legitimate
  * reason to carry framework internals, and dev has no reason to hide them.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { after, test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildAssets } = require('../src/assets.js');
 const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
@@ -31,8 +30,6 @@ const ROOT = path.resolve(PKG, '..', '..');
 // Per-process out dir (#182): a second suite run must never wipe this one's
 // assets mid-flight.
 const JS_OUT = path.join(PKG, '.omega', `comments-js-${process.pid}`);
-
-after(() => fs.rmSync(JS_OUT, { recursive: true, force: true }));
 
 // The head's own developer notes — the comments the em-dash sweep found on
 // built pages (#330). If head.html is reworded, pick another line from it.
@@ -61,39 +58,52 @@ async function buildProductionJs() {
     .map((entry) => fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8'));
 }
 
-test('production HTML carries no framework comments; dev carries them all', async () => {
-  const prod = await sharedBuildWith(miniData, { environment: 'production' }, 'comments-prod');
-  const dev = await sharedBuildWith(miniData, {}, 'comments-dev');
+module.exports = defineCases({
+  type: 'group',
+  description: 'production-comments',
+  cleanup: () => fs.rmSync(JS_OUT, { recursive: true, force: true }),
+  tests: [
+    {
+      name: 'production HTML carries no framework comments; dev carries them all',
+      run: async (ctx) => {
+        const prod = await sharedBuildWith(miniData, { environment: 'production' }, 'comments-prod');
+        const dev = await sharedBuildWith(miniData, {}, 'comments-dev');
 
-  const devHome = dev.get('/');
-  for (const note of HEAD_COMMENTS) {
-    assert.ok(devHome.includes(note), `dev keeps the head's "${note}" note`);
-  }
+        const devHome = dev.get('/');
+        for (const note of HEAD_COMMENTS) {
+          ctx.expect(devHome.includes(note), `dev keeps the head's "${note}" note`).toBeTruthy();
+        }
 
-  // Every .html the production build wrote, not just the home page: one
-  // template rendering outside the transform's reach is the whole leak.
-  for (const [url, page] of prod) {
-    if (!url.endsWith('/') && !url.endsWith('.html')) continue; // meta files ship as rendered (cp139)
-    // IE conditionals are restored verbatim and are the ONE surviving class
-    const comments = page.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/g, '').match(/<!--[\s\S]*?-->/g) || [];
-    assert.deepStrictEqual(comments, [], `${url} ships no HTML comments`);
-  }
-  assert.ok(prod.get('/').includes('<!--[if lte IE 11]>'), 'the head IE conditional still survives production');
-});
+        // Every .html the production build wrote, not just the home page: one
+        // template rendering outside the transform's reach is the whole leak.
+        for (const [url, page] of prod) {
+          if (!url.endsWith('/') && !url.endsWith('.html')) continue; // meta files ship as rendered (cp139)
+          // IE conditionals are restored verbatim and are the ONE surviving class
+          const comments = page.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/g, '').match(/<!--[\s\S]*?-->/g) || [];
+          ctx.expect(comments, `${url} ships no HTML comments`).toEqual([]);
+        }
+        ctx.expect(prod.get('/').includes('<!--[if lte IE 11]>'), 'the head IE conditional still survives production').toBeTruthy();
+      },
+    },
 
-test('production JS bundles carry no developer comments; third-party licenses still ship', async () => {
-  const prod = await buildProductionJs();
+    {
+      name: 'production JS bundles carry no developer comments; third-party licenses still ship',
+      run: async (ctx) => {
+        const prod = await buildProductionJs();
 
-  // The site-assets fixture's page module leads with a block comment naming
-  // itself — the shape of every framework module's header
-  assert.ok(!prod.some((code) => code.includes('SITE-layer index page module')), 'source comments never reach the bundle');
-  // esbuild's own unminified file banners (`// <path>`) name framework paths
-  assert.ok(!prod.some((code) => code.includes('// core/js/')), 'no esbuild path banners either');
+        // The site-assets fixture's page module leads with a block comment naming
+        // itself — the shape of every framework module's header
+        ctx.expect(!prod.some((code) => code.includes('SITE-layer index page module')), 'source comments never reach the bundle').toBeTruthy();
+        // esbuild's own unminified file banners (`// <path>`) name framework paths
+        ctx.expect(!prod.some((code) => code.includes('// core/js/')), 'no esbuild path banners either').toBeTruthy();
 
-  // Those two ARE the guarantee: minified output has no newline outside a
-  // string, so a `// …` line standing alone in a production bundle can only
-  // be a comment inside a generated document string (the client's vert
-  // srcdoc) — the accepted call's "where the bundler can". Scanning for such
-  // lines would pin nothing; losing minification is what these two catch.
-  assert.ok(prod.some((code) => code.includes('/*! Bundled license information')), 'third-party licenses still ship');
+        // Those two ARE the guarantee: minified output has no newline outside a
+        // string, so a `// …` line standing alone in a production bundle can only
+        // be a comment inside a generated document string (the client's vert
+        // srcdoc) — the accepted call's "where the bundler can". Scanning for such
+        // lines would pin nothing; losing minification is what these two catch.
+        ctx.expect(prod.some((code) => code.includes('/*! Bundled license information')), 'third-party licenses still ship').toBeTruthy();
+      },
+    },
+  ],
 });

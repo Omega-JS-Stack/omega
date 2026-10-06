@@ -69,61 +69,61 @@ module.exports = defineCases({
     {
       name: 'maps-a-one-time-charge-refund-as-one-time',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-one-time-refund-parse', oneTimeRefundedCharge()) });
 
-        assert.equal(parsed.category, 'one-time', 'A charge with no subscription and no invoice is a one-time refund');
-        assert.equal(parsed.resourceType, 'charge', 'The charge is the only resource the event carries');
-        assert.equal(parsed.resourceId, 'ch_test_one_time_refund', 'The charge id is the resource');
-        assert.equal(parsed.uid, '_test-one-time-refund-uid', 'The uid comes off the charge metadata');
+        expect(parsed.category, 'A charge with no subscription and no invoice is a one-time refund').toBe('one-time');
+        expect(parsed.resourceType, 'The charge is the only resource the event carries').toBe('charge');
+        expect(parsed.resourceId, 'The charge id is the resource').toBe('ch_test_one_time_refund');
+        expect(parsed.uid, 'The uid comes off the charge metadata').toBe('_test-one-time-refund-uid');
       },
     },
 
     {
       name: 'keeps-a-subscription-charge-refund-on-the-subscription-path',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const charge = { ...oneTimeRefundedCharge(), subscription: 'sub_test_refund' };
 
         const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-sub-refund-parse', charge) });
 
-        assert.equal(parsed.category, 'subscription', 'A charge naming a subscription stays a subscription refund');
-        assert.equal(parsed.resourceType, 'subscription', 'The pipeline must re-fetch the subscription');
-        assert.equal(parsed.resourceId, 'sub_test_refund', 'The subscription id is the resource');
+        expect(parsed.category, 'A charge naming a subscription stays a subscription refund').toBe('subscription');
+        expect(parsed.resourceType, 'The pipeline must re-fetch the subscription').toBe('subscription');
+        expect(parsed.resourceId, 'The subscription id is the resource').toBe('sub_test_refund');
       },
     },
 
     {
       name: 'keeps-an-invoiced-charge-refund-on-the-subscription-path',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const charge = { ...oneTimeRefundedCharge(), invoice: 'in_test_refund' };
 
         const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-invoice-refund-parse', charge) });
 
-        assert.equal(parsed.category, 'subscription', 'A charge carrying an invoice stays on the subscription path');
-        assert.equal(parsed.resourceType, 'invoice', 'The invoice resolves the subscription downstream');
-        assert.equal(parsed.resourceId, 'in_test_refund', 'The invoice id is the resource');
+        expect(parsed.category, 'A charge carrying an invoice stays on the subscription path').toBe('subscription');
+        expect(parsed.resourceType, 'The invoice resolves the subscription downstream').toBe('invoice');
+        expect(parsed.resourceId, 'The invoice id is the resource').toBe('in_test_refund');
       },
     },
 
     {
       name: 'a-one-time-refund-delivery-lands-a-pipeline-doc',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const eventId = '_test-evt-one-time-refund-ingest';
 
         const sent = await deliver(omega, refundEvent(eventId, oneTimeRefundedCharge()));
 
-        assert.equal(sent.code, 200, `A one-time refund should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(!sent.body?.ignored, 'A one-time refund must not be ignored as an uncategorized event');
+        expect(sent.code, `A one-time refund should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(!sent.body?.ignored, 'A one-time refund must not be ignored as an uncategorized event').toBeTruthy();
 
         const doc = await firestore.get(`payments-webhooks/${eventId}`);
 
-        assert.ok(doc, 'The refund should land a pipeline doc');
-        assert.equal(doc.event.type, 'charge.refunded', 'The pipeline doc should carry the refund event type');
-        assert.equal(doc.event.category, 'one-time', 'The pipeline doc should be categorized one-time');
-        assert.equal(doc.event.resourceId, 'ch_test_one_time_refund', 'The pipeline doc should point at the charge');
+        expect(doc, 'The refund should land a pipeline doc').toBeTruthy();
+        expect(doc.event.type, 'The pipeline doc should carry the refund event type').toBe('charge.refunded');
+        expect(doc.event.category, 'The pipeline doc should be categorized one-time').toBe('one-time');
+        expect(doc.event.resourceId, 'The pipeline doc should point at the charge').toBe('ch_test_one_time_refund');
       },
     },
   ],

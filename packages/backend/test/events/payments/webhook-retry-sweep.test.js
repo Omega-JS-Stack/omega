@@ -53,7 +53,7 @@ module.exports = defineCases({
 
     {
       name: 'process-a-subscription-webhook',
-      async run({ http, firestore, assert, waitFor, state, config, payments, skip }) {
+      async run({ http, firestore, expect, waitFor, state, config, payments, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
 
         if (!paidProduct) {
@@ -78,7 +78,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted');
+        expect(response, 'Webhook should be accepted').toBeSuccess();
 
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.eventId}`);
@@ -89,10 +89,10 @@ module.exports = defineCases({
         const userDoc = await firestore.get(`users/${state.uid}`);
         const orderDoc = await firestore.get(`payments-orders/${ORDER_ID}`);
 
-        assert.equal(webhookDoc.transition, 'new-subscription', 'The first pass is the one that emails the customer');
-        assert.equal(userDoc.subscription.status, 'active', 'The subscription is active');
-        assert.equal(userDoc.subscription.product.id, paidProduct.id, `The subscription is ${paidProduct.id}`);
-        assert.equal(orderDoc.owner, state.uid, 'The order was written');
+        expect(webhookDoc.transition, 'The first pass is the one that emails the customer').toBe('new-subscription');
+        expect(userDoc.subscription.status, 'The subscription is active').toBe('active');
+        expect(userDoc.subscription.product.id, `The subscription is ${paidProduct.id}`).toBe(paidProduct.id);
+        expect(orderDoc.owner, 'The order was written').toBe(state.uid);
 
         state.orderCreatedUNIX = orderDoc.metadata.created.timestampUNIX;
         state.expiresUNIX = userDoc.subscription.expires.timestampUNIX;
@@ -101,7 +101,7 @@ module.exports = defineCases({
 
     {
       name: 'reprocessing-the-same-event-changes-nothing',
-      async run({ firestore, assert, waitFor, state }) {
+      async run({ firestore, expect, waitFor, state }) {
         // Exactly what a retry does: the same doc, put back to pending
         await firestore.set(`payments-webhooks/${state.eventId}`, {
           status: 'pending',
@@ -117,18 +117,18 @@ module.exports = defineCases({
         const userDoc = await firestore.get(`users/${state.uid}`);
         const orderDoc = await firestore.get(`payments-orders/${ORDER_ID}`);
 
-        assert.equal(webhookDoc.transition, null, 'The second pass detects no transition — no second welcome email');
-        assert.equal(userDoc.subscription.status, 'active', 'The subscription is unchanged');
-        assert.equal(userDoc.subscription.product.id, state.productId, 'The product is unchanged');
-        assert.equal(userDoc.subscription.expires.timestampUNIX, state.expiresUNIX, 'The expiry is unchanged');
-        assert.equal(orderDoc.owner, state.uid, 'The order still belongs to the same user');
-        assert.equal(orderDoc.metadata.created.timestampUNIX, state.orderCreatedUNIX, 'The order is the SAME order, not a second one');
+        expect(webhookDoc.transition, 'The second pass detects no transition — no second welcome email').toBe(null);
+        expect(userDoc.subscription.status, 'The subscription is unchanged').toBe('active');
+        expect(userDoc.subscription.product.id, 'The product is unchanged').toBe(state.productId);
+        expect(userDoc.subscription.expires.timestampUNIX, 'The expiry is unchanged').toBe(state.expiresUNIX);
+        expect(orderDoc.owner, 'The order still belongs to the same user').toBe(state.uid);
+        expect(orderDoc.metadata.created.timestampUNIX, 'The order is the SAME order, not a second one').toBe(state.orderCreatedUNIX);
       },
     },
 
     {
       name: 'a-failing-webhook-counts-its-attempt',
-      async run({ http, firestore, assert, waitFor, state, config, payments }) {
+      async run({ http, firestore, expect, waitFor, state, config, payments }) {
         state.failedEventId = `_test-evt-retry-fail-${Date.now()}`;
         state.failedResourceId = `_test-retry-fail-sub-${Date.now()}`;
         state.failedOrderId = '5151-5151-5151';
@@ -147,7 +147,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted (it fails during processing, not at the door)');
+        expect(response, 'Webhook should be accepted (it fails during processing, not at the door)').toBeSuccess();
 
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.failedEventId}`);
@@ -156,16 +156,16 @@ module.exports = defineCases({
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.failedEventId}`);
 
-        assert.match(webhookDoc.error, /no UID/i, 'The webhook failed on the unresolvable UID');
-        assert.equal(webhookDoc.retryCount, 1, 'The failed attempt is counted');
-        assert.ok(!webhookDoc.deadLetter, 'One failure is nowhere near the ceiling');
+        expect(webhookDoc.error, 'The webhook failed on the unresolvable UID').toMatch(/no UID/i);
+        expect(webhookDoc.retryCount, 'The failed attempt is counted').toBe(1);
+        expect(!webhookDoc.deadLetter, 'One failure is nowhere near the ceiling').toBeTruthy();
       },
     },
 
     {
       name: 'the-sweep-recovers-it',
       timeout: 120000,
-      async run({ firestore, assert, waitFor, pubsub, state }) {
+      async run({ firestore, expect, waitFor, pubsub, state }) {
         // Heal what made it fail — the owner the payload never carried. This is the
         // transient fault standing in for a provider blip: the next pass succeeds.
         await firestore.set(`payments-webhooks/${state.failedEventId}`, { owner: state.uid }, { merge: true });
@@ -179,16 +179,16 @@ module.exports = defineCases({
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.failedEventId}`);
 
-        assert.equal(webhookDoc.status, 'completed', 'The sweep put it back to pending and the retry completed it');
-        assert.equal(webhookDoc.retryCount, 1, 'A successful retry does not count another attempt');
-        assert.equal(webhookDoc.owner, state.uid, 'It processed as the recovered owner');
+        expect(webhookDoc.status, 'The sweep put it back to pending and the retry completed it').toBe('completed');
+        expect(webhookDoc.retryCount, 'A successful retry does not count another attempt').toBe(1);
+        expect(webhookDoc.owner, 'It processed as the recovered owner').toBe(state.uid);
       },
     },
 
     {
       name: 'the-ceiling-dead-letters-instead-of-retrying-forever',
       timeout: 120000,
-      async run({ firestore, assert, waitFor, pubsub, state, payments }) {
+      async run({ firestore, expect, waitFor, pubsub, state, payments }) {
         const now = powertools.timestamp(new Date(), { output: 'string' });
         state.deadEventId = `_test-evt-retry-dead-${Date.now()}`;
 
@@ -220,9 +220,9 @@ module.exports = defineCases({
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.deadEventId}`);
 
-        assert.equal(webhookDoc.deadLetter, true, 'The doc at the ceiling is dead-lettered');
-        assert.equal(webhookDoc.status, 'failed', 'It is NOT put back to pending');
-        assert.equal(webhookDoc.retryCount, MAX_RETRIES, 'Dead-lettering counts no further attempt');
+        expect(webhookDoc.deadLetter, 'The doc at the ceiling is dead-lettered').toBe(true);
+        expect(webhookDoc.status, 'It is NOT put back to pending').toBe('failed');
+        expect(webhookDoc.retryCount, 'Dead-lettering counts no further attempt').toBe(MAX_RETRIES);
       },
     },
   ],

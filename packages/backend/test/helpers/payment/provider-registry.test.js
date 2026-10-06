@@ -57,63 +57,63 @@ module.exports = defineCases({
   tests: [
     {
       name: 'every-provider-file-has-a-descriptor-and-every-descriptor-a-file',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const dir of EVERY_PROVIDER_DIRS) {
-          assert.deepEqual(providerFiles(dir), ids(() => true), `${dir} holds one module per descriptor`);
+          expect(providerFiles(dir), `${dir} holds one module per descriptor`).toEqual(ids(() => true));
         }
       },
     },
 
     {
       name: 'the-subscription-routes-hold-exactly-the-providers-that-sell-subscriptions',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const dir of SUBSCRIPTION_DIRS) {
-          assert.deepEqual(providerFiles(dir), ids((descriptor) => descriptor.subscriptions), `${dir} matches the subscriptions capability`);
+          expect(providerFiles(dir), `${dir} matches the subscriptions capability`).toEqual(ids((descriptor) => descriptor.subscriptions));
         }
       },
     },
 
     {
       name: 'the-zero-charge-refusal-set-equals-the-descriptors',
-      async run({ assert }) {
+      async run({ expect }) {
         const code = discountCodes.validate('WELCOME10OFF');
         const refused = [];
 
         for (const id of ids(() => true)) {
           try {
-            assert.equal(discountCodes.chargeableAmount(9.99, code, { provider: id }), 0, `${id} takes the $0 charge`);
+            expect(discountCodes.chargeableAmount(9.99, code, { provider: id }), `${id} takes the $0 charge`).toBe(0);
           } catch (e) {
             if (e.code !== 400) throw e;
-            assert.match(e.message, new RegExp(`nothing for ${registry.PAYMENT_PROVIDERS[id].name} to charge`), `${id}'s refusal names it`);
+            expect(e.message, `${id}'s refusal names it`).toMatch(new RegExp(`nothing for ${registry.PAYMENT_PROVIDERS[id].name} to charge`));
             refused.push(id);
           }
         }
 
-        assert.deepEqual(refused, ids((descriptor) => !descriptor.acceptsZeroCharge));
+        expect(refused).toEqual(ids((descriptor) => !descriptor.acceptsZeroCharge));
       },
     },
 
     {
       name: 'the-refund-refusal-set-equals-the-descriptors',
-      async run({ assert }) {
+      async run({ expect }) {
         const refused = ids(() => true).filter((id) => oneTimeRefundRefusal(completedOrder(id))?.reason === 'provider-cannot-refund');
 
-        assert.deepEqual(refused, ids((descriptor) => !descriptor.refundable));
+        expect(refused).toEqual(ids((descriptor) => !descriptor.refundable));
       },
     },
 
     {
       name: 'an-unknown-id-has-no-descriptor',
-      async run({ assert }) {
-        assert.equal(registry.paymentProvider('unknown-provider'), null);
-        assert.equal(registry.paymentProvider('constructor'), null, 'an inherited name is never a provider');
-        assert.equal(registry.paymentProvider('paypal'), registry.PAYMENT_PROVIDERS.paypal);
+      async run({ expect }) {
+        expect(registry.paymentProvider('unknown-provider')).toBe(null);
+        expect(registry.paymentProvider('constructor'), 'an inherited name is never a provider').toBe(null);
+        expect(registry.paymentProvider('paypal')).toBe(registry.PAYMENT_PROVIDERS.paypal);
       },
     },
 
     {
       name: 'the-zero-charge-guard-refuses-an-id-the-registry-does-not-know',
-      async run({ assert }) {
+      async run({ expect }) {
         // A caller passing a display name or a typo is a bug, never a provider
         // that silently accepts $0
         let thrown = null;
@@ -124,7 +124,7 @@ module.exports = defineCases({
           thrown = e;
         }
 
-        assert.match(thrown?.message || '', /No payment provider "PayPal"/, 'an unknown id throws, naming it');
+        expect(thrown?.message || '', 'an unknown id throws, naming it').toMatch(/No payment provider "PayPal"/);
       },
     },
   ],

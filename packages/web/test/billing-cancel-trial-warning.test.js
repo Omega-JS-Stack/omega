@@ -22,8 +22,7 @@
  * stubbed: the stub client delegates to @omega.js/account, the same resolver the
  * real client calls, so "trialing" here means what it means in production.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -314,273 +313,309 @@ async function wireCancelFlow(account, { analyticsBlocked = false } = {}) {
   return { opened, clickTrigger, clickById, handlersFor, isAccordionOpen, attributesOf };
 }
 
-test('#267: the trial gate stops the questionnaire and opens the warning instead', async () => {
-  const { opened, clickTrigger } = await wireCancelFlow(trialingAccount());
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-cancel-trial-warning',
+  tests: [
+    {
+      name: '#267: the trial gate stops the questionnaire and opens the warning instead',
+      run: async (ctx) => {
+        const { opened, clickTrigger } = await wireCancelFlow(trialingAccount());
 
-  const event = clickTrigger();
+        const event = clickTrigger();
 
-  // The declarative collapse toggle lives on `document`; only stopping the
-  // event there keeps the questionnaire shut.
-  assert.strictEqual(event.propagationStopped, true, 'the declarative collapse never gets the click');
-  assert.strictEqual(event.defaultPrevented, true, 'and the default action is cancelled');
-  assert.deepStrictEqual(opened, ['modal:cancel-trial-warning-modal'], 'the warning is what opened');
-});
+        // The declarative collapse toggle lives on `document`; only stopping the
+        // event there keeps the questionnaire shut.
+        ctx.expect(event.propagationStopped, 'the declarative collapse never gets the click').toBe(true);
+        ctx.expect(event.defaultPrevented, 'and the default action is cancelled').toBe(true);
+        ctx.expect(opened, 'the warning is what opened').toEqual(['modal:cancel-trial-warning-modal']);
+      },
+    },
 
-test('#267: the questionnaire does not move while the warning is up', async () => {
-  // The live fail: the dialog appeared and the accordion slid open BEHIND it.
-  // Bootstrap's collapse data-api is a CAPTURE-phase delegate on `document`, so
-  // it toggles on the way down to the button — stopping the event at the button
-  // is too late, and only taking `data-bs-toggle` off it holds the
-  // questionnaire shut.
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(trialingAccount());
+    {
+      name: '#267: the questionnaire does not move while the warning is up',
+      run: async (ctx) => {
+        // The live fail: the dialog appeared and the accordion slid open BEHIND it.
+        // Bootstrap's collapse data-api is a CAPTURE-phase delegate on `document`, so
+        // it toggles on the way down to the button — stopping the event at the button
+        // is too late, and only taking `data-bs-toggle` off it holds the
+        // questionnaire shut.
+        const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(trialingAccount());
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.deepStrictEqual(opened, ['modal:cancel-trial-warning-modal'], 'the warning is what opened');
-  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire never moved');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'a gated trigger is not a Bootstrap toggle at all');
-});
+        ctx.expect(opened, 'the warning is what opened').toEqual(['modal:cancel-trial-warning-modal']);
+        ctx.expect(isAccordionOpen(), 'and the questionnaire never moved').toBe(false);
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'a gated trigger is not a Bootstrap toggle at all').toBe(undefined);
+      },
+    },
 
-test('#267: an open questionnaire closes on the next click, with no second warning', async () => {
-  // The other half of the live fail: with the accordion open, the click that
-  // should just CLOSE it re-opened the dialog — the gate never asked whether
-  // the thing it guards was already open.
-  const { opened, clickTrigger, clickById, isAccordionOpen, attributesOf } = await wireCancelFlow(trialingAccount());
+    {
+      name: '#267: an open questionnaire closes on the next click, with no second warning',
+      run: async (ctx) => {
+        // The other half of the live fail: with the accordion open, the click that
+        // should just CLOSE it re-opened the dialog — the gate never asked whether
+        // the thing it guards was already open.
+        const { opened, clickTrigger, clickById, isAccordionOpen, attributesOf } = await wireCancelFlow(trialingAccount());
 
-  clickTrigger();
-  clickById('cancel-trial-continue-btn');
+        clickTrigger();
+        clickById('cancel-trial-continue-btn');
 
-  assert.strictEqual(isAccordionOpen(), true, 'confirming opened the questionnaire');
+        ctx.expect(isAccordionOpen(), 'confirming opened the questionnaire').toBe(true);
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.strictEqual(isAccordionOpen(), false, 'the next click closes it');
-  assert.strictEqual(
-    opened.filter((entry) => entry === 'modal:cancel-trial-warning-modal').length,
-    1,
-    'closing never re-opens the warning',
-  );
+        ctx.expect(isAccordionOpen(), 'the next click closes it').toBe(false);
+        ctx.expect(opened.filter((entry) => entry === 'modal:cancel-trial-warning-modal').length, 'closing never re-opens the warning').toBe(1);
 
-  // Bootstrap tracks `aria-expanded` for the triggers it owns; a gated trigger
-  // is not one of them any more, so the page owes the state itself.
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['aria-expanded'], 'false', 'and the trigger reports itself closed');
-});
+        // Bootstrap tracks `aria-expanded` for the triggers it owns; a gated trigger
+        // is not one of them any more, so the page owes the state itself.
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['aria-expanded'], 'and the trigger reports itself closed').toBe('false');
+      },
+    },
 
-test('#267: a paid cancel still opens the questionnaire declaratively', async () => {
-  // The gate works by taking the declarative toggle OFF a trial's trigger, so
-  // the paid trigger keeping it — and Bootstrap alone opening the accordion —
-  // is what "unchanged" means here.
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
+    {
+      name: '#267: a paid cancel still opens the questionnaire declaratively',
+      run: async (ctx) => {
+        // The gate works by taking the declarative toggle OFF a trial's trigger, so
+        // the paid trigger keeping it — and Bootstrap alone opening the accordion —
+        // is what "unchanged" means here.
+        const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
 
-  clickTrigger();
+        clickTrigger();
 
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the paid trigger is still a Bootstrap toggle');
-  assert.strictEqual(isAccordionOpen(), true, 'and Bootstrap opened the questionnaire on its own');
-  assert.deepStrictEqual(opened, [], 'with nothing asked of Bootstrap by the page');
-});
+        ctx.expect(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'the paid trigger is still a Bootstrap toggle').toBe('collapse');
+        ctx.expect(isAccordionOpen(), 'and Bootstrap opened the questionnaire on its own').toBe(true);
+        ctx.expect(opened, 'with nothing asked of Bootstrap by the page').toEqual([]);
+      },
+    },
 
-test('#267: the gate is registered in the CAPTURE phase', async () => {
-  // Bootstrap delegates from `document`, so a bubble-phase listener on the
-  // button would fire too late to stop it in some orderings. This is the one
-  // detail the interception depends on.
-  const { handlersFor } = await wireCancelFlow(trialingAccount());
-  const click = handlersFor('cancel-subscription-trigger-btn').find((h) => h.type === 'click');
+    {
+      name: '#267: the gate is registered in the CAPTURE phase',
+      run: async (ctx) => {
+        // Bootstrap delegates from `document`, so a bubble-phase listener on the
+        // button would fire too late to stop it in some orderings. This is the one
+        // detail the interception depends on.
+        const { handlersFor } = await wireCancelFlow(trialingAccount());
+        const click = handlersFor('cancel-subscription-trigger-btn').find((h) => h.type === 'click');
 
-  assert.strictEqual(click.capture, true, 'the gate listens in the capture phase');
-});
+        ctx.expect(click.capture, 'the gate listens in the capture phase').toBe(true);
+      },
+    },
 
-test('#267: confirming proceeds to the questionnaire, keeping the trial does not', async () => {
-  const { opened, clickTrigger, clickById } = await wireCancelFlow(trialingAccount());
+    {
+      name: '#267: confirming proceeds to the questionnaire, keeping the trial does not',
+      run: async (ctx) => {
+        const { opened, clickTrigger, clickById } = await wireCancelFlow(trialingAccount());
 
-  clickTrigger();
-  clickById('cancel-trial-continue-btn');
+        clickTrigger();
+        clickById('cancel-trial-continue-btn');
 
-  assert.ok(opened.includes('collapse:cancel-subscription-accordion'), 'confirming opens the questionnaire');
-  assert.ok(opened.includes('modal-hide:cancel-trial-warning-modal'), 'and closes the warning behind it');
+        ctx.expect(opened.includes('collapse:cancel-subscription-accordion'), 'confirming opens the questionnaire').toBeTruthy();
+        ctx.expect(opened.includes('modal-hide:cancel-trial-warning-modal'), 'and closes the warning behind it').toBeTruthy();
 
-  // Backing out opens nothing at all — the trial simply stays.
-  const back = await wireCancelFlow(trialingAccount());
-  back.clickTrigger();
-  back.clickById('cancel-trial-keep-btn');
+        // Backing out opens nothing at all — the trial simply stays.
+        const back = await wireCancelFlow(trialingAccount());
+        back.clickTrigger();
+        back.clickById('cancel-trial-keep-btn');
 
-  assert.deepStrictEqual(back.opened, ['modal:cancel-trial-warning-modal'], 'keeping the trial opens no questionnaire');
-});
+        ctx.expect(back.opened, 'keeping the trial opens no questionnaire').toEqual(['modal:cancel-trial-warning-modal']);
+      },
+    },
 
-test('#267: blocked analytics cannot leave the cancel button doing nothing', async () => {
-  // The gate stops the declarative collapse before it opens anything, so if the
-  // warning failed to open the customer would be left with a dead button and no
-  // way to cancel. trackBilling() reaches for `gtag`/`fbq`/`ttq` as bare
-  // globals, which an ad blocker simply never defines.
-  const { opened, clickTrigger } = await wireCancelFlow(trialingAccount(), { analyticsBlocked: true });
+    {
+      name: '#267: blocked analytics cannot leave the cancel button doing nothing',
+      run: async (ctx) => {
+        // The gate stops the declarative collapse before it opens anything, so if the
+        // warning failed to open the customer would be left with a dead button and no
+        // way to cancel. trackBilling() reaches for `gtag`/`fbq`/`ttq` as bare
+        // globals, which an ad blocker simply never defines.
+        const { opened, clickTrigger } = await wireCancelFlow(trialingAccount(), { analyticsBlocked: true });
 
-  try {
-    clickTrigger();
-  } catch (e) {
-    // The counting may fail; the dialog must already be up regardless.
-  }
+        try {
+          clickTrigger();
+        } catch (e) {
+          // The counting may fail; the dialog must already be up regardless.
+        }
 
-  assert.deepStrictEqual(opened, ['modal:cancel-trial-warning-modal'], 'the warning opened before anything was counted');
-});
+        ctx.expect(opened, 'the warning opened before anything was counted').toEqual(['modal:cancel-trial-warning-modal']);
+      },
+    },
 
-test('#267: a paid cancel is never intercepted — the flow is untouched', async () => {
-  const { opened, clickTrigger } = await wireCancelFlow(paidAccount());
+    {
+      name: '#267: a paid cancel is never intercepted — the flow is untouched',
+      run: async (ctx) => {
+        const { opened, clickTrigger } = await wireCancelFlow(paidAccount());
 
-  const event = clickTrigger();
+        const event = clickTrigger();
 
-  assert.strictEqual(event.propagationStopped, false, 'the declarative collapse handles it, exactly as before');
-  assert.strictEqual(event.defaultPrevented, false, 'nothing is cancelled');
-  assert.deepStrictEqual(opened, [], 'and no warning dialog is opened');
-});
+        ctx.expect(event.propagationStopped, 'the declarative collapse handles it, exactly as before').toBe(false);
+        ctx.expect(event.defaultPrevented, 'nothing is cancelled').toBe(false);
+        ctx.expect(opened, 'and no warning dialog is opened').toEqual([]);
+      },
+    },
 
-test('#267: the built account page carries the dialog the gate opens', async () => {
-  // The gate stops the questionnaire and opens `#cancel-trial-warning-modal` by
-  // id. If the markup ever loses it, the trial cancel becomes a dead button —
-  // so the ids the JS reaches for are pinned against the real build.
-  // The browser globals the harness above installs are FAKES, and the build
-  // toolchain reads the real ones at require time (sass probes `window`). Hand
-  // the build back a node environment.
-  for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
-    delete globalThis[name];
-  }
+    {
+      name: '#267: the built account page carries the dialog the gate opens',
+      run: async (ctx) => {
+        // The gate stops the questionnaire and opens `#cancel-trial-warning-modal` by
+        // id. If the markup ever loses it, the trial cancel becomes a dead button —
+        // so the ids the JS reaches for are pinned against the real build.
+        // The browser globals the harness above installs are FAKES, and the build
+        // toolchain reads the real ones at require time (sass probes `window`). Hand
+        // the build back a node environment.
+        for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
+          delete globalThis[name];
+        }
 
-  const { buildWith, miniData } = require('./lib/build.js');
-  const pages = await buildWith(miniData, {}, 'billing-trial-warning-test');
-  const page = pages.get('/dashboard/account');
-  assert.ok(page, 'account page built');
+        const { buildWith, miniData } = require('./lib/build.js');
+        const pages = await buildWith(miniData, {}, 'billing-trial-warning-test');
+        const page = pages.get('/dashboard/account');
+        ctx.expect(page, 'account page built').toBeTruthy();
 
-  for (const id of ['cancel-subscription-trigger-btn', 'cancel-trial-warning-modal', 'cancel-trial-continue-btn', 'cancel-trial-keep-btn']) {
-    assert.ok(page.includes(`id="${id}"`), `the JS hook survives the markup: ${id}`);
-  }
+        for (const id of ['cancel-subscription-trigger-btn', 'cancel-trial-warning-modal', 'cancel-trial-continue-btn', 'cancel-trial-keep-btn']) {
+          ctx.expect(page.includes(`id="${id}"`), `the JS hook survives the markup: ${id}`).toBeTruthy();
+        }
 
-  // The trigger still opens the questionnaire declaratively — that is what the
-  // paid flow rides on, and what the trial gate intercepts.
-  const triggerAt = page.indexOf('id="cancel-subscription-trigger-btn"');
-  const trigger = page.slice(page.lastIndexOf('<button', triggerAt), page.indexOf('>', triggerAt) + 1);
-  assert.match(trigger, /data-bs-toggle="collapse"/, 'the paid path stays declarative');
-  assert.match(trigger, /data-bs-target="#cancel-subscription-accordion"/, 'and still targets the questionnaire');
+        // The trigger still opens the questionnaire declaratively — that is what the
+        // paid flow rides on, and what the trial gate intercepts.
+        const triggerAt = page.indexOf('id="cancel-subscription-trigger-btn"');
+        const trigger = page.slice(page.lastIndexOf('<button', triggerAt), page.indexOf('>', triggerAt) + 1);
+        ctx.expect(trigger, 'the paid path stays declarative').toMatch(/data-bs-toggle="collapse"/);
+        ctx.expect(trigger, 'and still targets the questionnaire').toMatch(/data-bs-target="#cancel-subscription-accordion"/);
 
-  // The dialog states the consequence, and offers the way back out.
-  const modalAt = page.indexOf('id="cancel-trial-warning-modal"');
-  const modal = page.slice(modalAt, page.indexOf('id="change-plan-modal"'));
-  assert.match(modal, /immediately/i, 'the dialog says the trial ends immediately');
-  assert.match(modal, /Keep my trial/, 'and offers the way back');
-  assert.ok(
-    modal.includes('data-omega-bind="@text billing.cancelWarning.trialEndDate"'),
-    'the trial end date is bound from the same state the card renders',
-  );
-});
+        // The dialog states the consequence, and offers the way back out.
+        const modalAt = page.indexOf('id="cancel-trial-warning-modal"');
+        const modal = page.slice(modalAt, page.indexOf('id="change-plan-modal"'));
+        ctx.expect(modal, 'the dialog says the trial ends immediately').toMatch(/immediately/i);
+        ctx.expect(modal, 'and offers the way back').toMatch(/Keep my trial/);
+        ctx.expect(modal.includes('data-omega-bind="@text billing.cancelWarning.trialEndDate"'), 'the trial end date is bound from the same state the card renders').toBeTruthy();
+      },
+    },
 
-test('#267: a trial cancel is gated behind a warning, a paid cancel is not', async () => {
-  const trialing = await billingStateFor(trialingAccount());
+    {
+      name: '#267: a trial cancel is gated behind a warning, a paid cancel is not',
+      run: async (ctx) => {
+        const trialing = await billingStateFor(trialingAccount());
 
-  assert.strictEqual(trialing.buttons.cancel, true, 'a trialing subscription can still be cancelled');
-  assert.strictEqual(trialing.cancelWarning.show, true, 'and it owes the customer a warning first');
+        ctx.expect(trialing.buttons.cancel, 'a trialing subscription can still be cancelled').toBe(true);
+        ctx.expect(trialing.cancelWarning.show, 'and it owes the customer a warning first').toBe(true);
 
-  const paid = await billingStateFor(paidAccount());
+        const paid = await billingStateFor(paidAccount());
 
-  assert.strictEqual(paid.buttons.cancel, true, 'a paid subscription can be cancelled');
-  assert.strictEqual(paid.cancelWarning.show, false, 'and goes straight to the questionnaire, exactly as before');
-});
+        ctx.expect(paid.buttons.cancel, 'a paid subscription can be cancelled').toBe(true);
+        ctx.expect(paid.cancelWarning.show, 'and goes straight to the questionnaire, exactly as before').toBe(false);
+      },
+    },
 
-test('#267: the warning names the date the trial would otherwise run to', async () => {
-  // "You would keep it until X" is the whole decision — a warning that cannot
-  // say when the trial ends is not worth showing a date slot for.
-  const trialing = await billingStateFor(trialingAccount());
+    {
+      name: '#267: the warning names the date the trial would otherwise run to',
+      run: async (ctx) => {
+        // "You would keep it until X" is the whole decision — a warning that cannot
+        // say when the trial ends is not worth showing a date slot for.
+        const trialing = await billingStateFor(trialingAccount());
 
-  assert.strictEqual(trialing.cancelWarning.hasTrialEndDate, true, 'the trial end date is known');
-  assert.ok(trialing.cancelWarning.trialEndDate, 'and rendered');
-  assert.strictEqual(
-    trialing.cancelWarning.trialEndDate,
-    trialing.alerts.trialEndDate,
-    'and it is the SAME date the billing card already shows — one formatting, one answer',
-  );
-});
+        ctx.expect(trialing.cancelWarning.hasTrialEndDate, 'the trial end date is known').toBe(true);
+        ctx.expect(trialing.cancelWarning.trialEndDate, 'and rendered').toBeTruthy();
+        ctx.expect(trialing.cancelWarning.trialEndDate, 'and it is the SAME date the billing card already shows — one formatting, one answer').toBe(trialing.alerts.trialEndDate);
+      },
+    },
 
-test('#267: the questionnaire behind the warning tells a trial the same story', async () => {
-  // The dialog says "immediately" and then hands the customer a form whose own
-  // copy promised access "until the end of your current billing period", with a
-  // REQUIRED checkbox attesting to it. One flag decides both, so the form can
-  // never contradict the warning that opened it.
-  const trialing = await billingStateFor(trialingAccount());
-  const paid = await billingStateFor(paidAccount());
+    {
+      name: '#267: the questionnaire behind the warning tells a trial the same story',
+      run: async (ctx) => {
+        // The dialog says "immediately" and then hands the customer a form whose own
+        // copy promised access "until the end of your current billing period", with a
+        // REQUIRED checkbox attesting to it. One flag decides both, so the form can
+        // never contradict the warning that opened it.
+        const trialing = await billingStateFor(trialingAccount());
+        const paid = await billingStateFor(paidAccount());
 
-  assert.strictEqual(trialing.cancelForm.trial, true, 'a trial cancel gets the immediate-end copy');
-  assert.strictEqual(
-    trialing.cancelForm.trial,
-    trialing.cancelWarning.show,
-    'and it is the SAME answer the warning gate reads — one rule, not two',
-  );
+        ctx.expect(trialing.cancelForm.trial, 'a trial cancel gets the immediate-end copy').toBe(true);
+        ctx.expect(trialing.cancelForm.trial, 'and it is the SAME answer the warning gate reads — one rule, not two').toBe(trialing.cancelWarning.show);
 
-  assert.strictEqual(paid.cancelForm.trial, false, 'a paid cancel keeps the period-end copy it always had');
-});
+        ctx.expect(paid.cancelForm.trial, 'a paid cancel keeps the period-end copy it always had').toBe(false);
+      },
+    },
 
-test('#267: the built questionnaire carries both the trial and the paid wording', async () => {
-  for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
-    delete globalThis[name];
-  }
+    {
+      name: '#267: the built questionnaire carries both the trial and the paid wording',
+      run: async (ctx) => {
+        for (const name of ['window', 'document', 'bootstrap', 'gtag', 'fbq', 'ttq', '__omegaClient']) {
+          delete globalThis[name];
+        }
 
-  const { buildWith, miniData } = require('./lib/build.js');
-  const pages = await buildWith(miniData, {}, 'billing-trial-questionnaire-test');
-  const page = pages.get('/dashboard/account');
-  assert.ok(page, 'account page built');
+        const { buildWith, miniData } = require('./lib/build.js');
+        const pages = await buildWith(miniData, {}, 'billing-trial-questionnaire-test');
+        const page = pages.get('/dashboard/account');
+        ctx.expect(page, 'account page built').toBeTruthy();
 
-  // The questionnaire is everything from the accordion to the dialog that gates it.
-  const formAt = page.indexOf('id="cancel-subscription-accordion"');
-  const form = page.slice(formAt, page.indexOf('id="cancel-trial-warning-modal"'));
-  assert.ok(form.length > 0, 'the questionnaire markup was found');
+        // The questionnaire is everything from the accordion to the dialog that gates it.
+        const formAt = page.indexOf('id="cancel-subscription-accordion"');
+        const form = page.slice(formAt, page.indexOf('id="cancel-trial-warning-modal"'));
+        ctx.expect(form.length > 0, 'the questionnaire markup was found').toBeTruthy();
 
-  // Both variants are rendered, each gated on the one flag.
-  assert.match(form, /@show billing\.cancelForm\.trial/, 'the trial copy is shown for a trial cancel');
-  assert.match(form, /@hide billing\.cancelForm\.trial/, 'and the paid copy is hidden for one');
+        // Both variants are rendered, each gated on the one flag.
+        ctx.expect(form, 'the trial copy is shown for a trial cancel').toMatch(/@show billing\.cancelForm\.trial/);
+        ctx.expect(form, 'and the paid copy is hidden for one').toMatch(/@hide billing\.cancelForm\.trial/);
 
-  // The trial half says the thing the warning said.
-  const trialBlocks = [...form.matchAll(/@show billing\.cancelForm\.trial"[^>]*>([\s\S]*?)<\/(?:p|span)>/g)].map((m) => m[1]);
-  assert.ok(trialBlocks.length >= 2, 'both the explanation and the confirmation label have a trial variant');
+        // The trial half says the thing the warning said.
+        const trialBlocks = [...form.matchAll(/@show billing\.cancelForm\.trial"[^>]*>([\s\S]*?)<\/(?:p|span)>/g)].map((m) => m[1]);
+        ctx.expect(trialBlocks.length >= 2, 'both the explanation and the confirmation label have a trial variant').toBeTruthy();
 
-  for (const block of trialBlocks) {
-    assert.match(block, /immediately/i, 'a trial variant states that access ends immediately');
-    assert.ok(!/end of (your|the) current billing period/i.test(block), 'and never promises the period out');
-  }
+        for (const block of trialBlocks) {
+          ctx.expect(block, 'a trial variant states that access ends immediately').toMatch(/immediately/i);
+          ctx.expect(!/end of (your|the) current billing period/i.test(block), 'and never promises the period out').toBeTruthy();
+        }
 
-  // The paid half is untouched — same sentence, same attestation.
-  const paidBlocks = [...form.matchAll(/@hide billing\.cancelForm\.trial"[^>]*>([\s\S]*?)<\/(?:p|span)>/g)].map((m) => m[1]);
-  assert.ok(paidBlocks.length >= 2, 'the paid copy keeps both of its halves');
+        // The paid half is untouched — same sentence, same attestation.
+        const paidBlocks = [...form.matchAll(/@hide billing\.cancelForm\.trial"[^>]*>([\s\S]*?)<\/(?:p|span)>/g)].map((m) => m[1]);
+        ctx.expect(paidBlocks.length >= 2, 'the paid copy keeps both of its halves').toBeTruthy();
 
-  for (const block of paidBlocks) {
-    assert.match(block, /end of (your|the) current billing period/i, 'a paid variant still promises the period out');
-  }
+        for (const block of paidBlocks) {
+          ctx.expect(block, 'a paid variant still promises the period out').toMatch(/end of (your|the) current billing period/i);
+        }
 
-  // The attestation is still ONE required checkbox — only its wording varies.
-  assert.strictEqual((form.match(/id="cancel-confirm-checkbox"/g) || []).length, 1, 'one confirmation checkbox');
-  assert.match(form.slice(form.indexOf('id="cancel-confirm-checkbox"') - 200, form.indexOf('id="cancel-confirm-checkbox"') + 200), /required/, 'still required');
-});
+        // The attestation is still ONE required checkbox — only its wording varies.
+        ctx.expect((form.match(/id="cancel-confirm-checkbox"/g) || []).length, 'one confirmation checkbox').toBe(1);
+        ctx.expect(form.slice(form.indexOf('id="cancel-confirm-checkbox"') - 200, form.indexOf('id="cancel-confirm-checkbox"') + 200), 'still required').toMatch(/required/);
+      },
+    },
 
-test('#267: a state that cannot cancel is never gated', async () => {
-  // The warning is a gate in FRONT of the cancel button. Where there is no
-  // button there is nothing to gate, and a stray warning flag would be a dialog
-  // that can never be dismissed by completing the flow.
-  const cases = [
-    { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
-    { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
-    { what: 'a paid subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
-  ];
+    {
+      name: '#267: a state that cannot cancel is never gated',
+      run: async (ctx) => {
+        // The warning is a gate in FRONT of the cancel button. Where there is no
+        // button there is nothing to gate, and a stray warning flag would be a dialog
+        // that can never be dismissed by completing the flow.
+        const cases = [
+          { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
+          { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
+          { what: 'a paid subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
+        ];
 
-  for (const { what, account } of cases) {
-    const state = await billingStateFor(account);
+        for (const { what, account } of cases) {
+          const state = await billingStateFor(account);
 
-    assert.strictEqual(state.buttons.cancel, false, `${what}: offers no cancel button`);
-    assert.strictEqual(state.cancelWarning.show, false, `${what}: and no warning gate`);
-  }
-});
+          ctx.expect(state.buttons.cancel, `${what}: offers no cancel button`).toBe(false);
+          ctx.expect(state.cancelWarning.show, `${what}: and no warning gate`).toBe(false);
+        }
+      },
+    },
 
-test('#267: the gate never disagrees with the button it guards', async () => {
-  // A TRIALING subscription carrying a scheduled cancellation still offers the
-  // cancel button: the `cancelling` getter is `pending && !trialing`, and the
-  // provider's own portal can schedule one (#226). Cancelling from there still
-  // ends the trial immediately, so the warning has to ride along with it.
-  const account = trialingAccount({ cancellation: { pending: true, date: { timestampUNIX: WEEK_FROM_NOW } } });
-  const state = await billingStateFor(account);
+    {
+      name: '#267: the gate never disagrees with the button it guards',
+      run: async (ctx) => {
+        // A TRIALING subscription carrying a scheduled cancellation still offers the
+        // cancel button: the `cancelling` getter is `pending && !trialing`, and the
+        // provider's own portal can schedule one (#226). Cancelling from there still
+        // ends the trial immediately, so the warning has to ride along with it.
+        const account = trialingAccount({ cancellation: { pending: true, date: { timestampUNIX: WEEK_FROM_NOW } } });
+        const state = await billingStateFor(account);
 
-  assert.strictEqual(state.buttons.cancel, true, 'the cancel button is still offered here');
-  assert.strictEqual(state.cancelWarning.show, true, 'so the warning is still owed');
+        ctx.expect(state.buttons.cancel, 'the cancel button is still offered here').toBe(true);
+        ctx.expect(state.cancelWarning.show, 'so the warning is still owed').toBe(true);
+      },
+    },
+  ],
 });

@@ -5,59 +5,82 @@
  * extraScope, and left RAW when no scope exists yet (the preprocessor defers
  * them to the engine's `resolved` computed, which passes { resolved, page }).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { createFrontmatterResolver } = require('../src/frontmatter-liquid.js');
 
 const site = { brand: { name: 'MiniCo' }, theme: { id: 'classy' } };
 
-test('site refs render against the constant site global and cache by raw source', () => {
-  const resolver = createFrontmatterResolver({ site });
-  assert.strictEqual(resolver.render('Welcome to {{ site.brand.name }}'), 'Welcome to MiniCo');
-  assert.strictEqual(resolver.cacheSize(), 1);
-  assert.strictEqual(resolver.render('Welcome to {{ site.brand.name }}'), 'Welcome to MiniCo');
-  assert.strictEqual(resolver.cacheSize(), 1, 'second render served from cache');
-});
-
-test('legacy bracket refs are NOT accepted — the value renders untouched (#148)', () => {
-  const resolver = createFrontmatterResolver({ site });
-  const value = 'themes/[ site.theme.id ]/frontend/core/base';
-  assert.strictEqual(resolver.render(value), value, 'brackets are literal text — `omega migrate` is the converter');
-});
-
-test('resolved refs render against the per-page scope (layout-default templating)', () => {
-  const resolver = createFrontmatterResolver({ site });
-  const tpl = "d-flex align-items-{{ resolved.theme.main.align | default: 'center' }} py-5";
-  const out = resolver.render(tpl, { resolved: { theme: { main: { align: 'start' } } } });
-  assert.strictEqual(out, 'd-flex align-items-start py-5');
-});
-
-test('resolved refs are per-page: a second page must not inherit the first rendering', () => {
-  const resolver = createFrontmatterResolver({ site });
-  const tpl = "align-items-{{ resolved.theme.main.align | default: 'center' }}";
-  assert.strictEqual(resolver.render(tpl, { resolved: { theme: { main: { align: 'start' } } } }), 'align-items-start');
-  assert.strictEqual(resolver.render(tpl, { resolved: {} }), 'align-items-center', 'default applies when the page sets no align');
-  assert.strictEqual(resolver.cacheSize(), 0, 'per-page renderings never enter the raw-string cache');
-});
-
-test('resolved refs without a per-page scope stay raw (deferred, not rendered empty)', () => {
-  const resolver = createFrontmatterResolver({ site });
-  const tpl = 'The #1 {{ resolved.alternative.competitor.name }} alternative';
-  assert.strictEqual(resolver.render(tpl), tpl);
-});
-
-test('renderData renders resolved refs through the merged tree (engine resolved pass)', () => {
-  const resolver = createFrontmatterResolver({ site });
-  const data = {
-    theme: { main: { class: "align-items-{{ resolved.theme.main.align | default: 'center' }}", align: 'start' } },
-    alternative: {
-      competitor: { name: 'Acme Growth' },
-      hero: { tagline: 'The #1 {{ resolved.alternative.competitor.name }} alternative' },
+module.exports = defineCases({
+  type: 'group',
+  description: 'frontmatter-liquid',
+  tests: [
+    {
+      name: 'site refs render against the constant site global and cache by raw source',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        ctx.expect(resolver.render('Welcome to {{ site.brand.name }}')).toBe('Welcome to MiniCo');
+        ctx.expect(resolver.cacheSize()).toBe(1);
+        ctx.expect(resolver.render('Welcome to {{ site.brand.name }}')).toBe('Welcome to MiniCo');
+        ctx.expect(resolver.cacheSize(), 'second render served from cache').toBe(1);
+      },
     },
-    untouched: { keep: 'me' },
-  };
-  const out = resolver.renderData(data, { resolved: data });
-  assert.strictEqual(out.theme.main.class, 'align-items-start');
-  assert.strictEqual(out.alternative.hero.tagline, 'The #1 Acme Growth alternative');
-  assert.strictEqual(out.untouched, data.untouched, 'copy-on-write: untouched subtrees keep identity');
+
+    {
+      name: 'legacy bracket refs are NOT accepted — the value renders untouched (#148)',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        const value = 'themes/[ site.theme.id ]/frontend/core/base';
+        ctx.expect(resolver.render(value), 'brackets are literal text — `omega migrate` is the converter').toBe(value);
+      },
+    },
+
+    {
+      name: 'resolved refs render against the per-page scope (layout-default templating)',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        const tpl = "d-flex align-items-{{ resolved.theme.main.align | default: 'center' }} py-5";
+        const out = resolver.render(tpl, { resolved: { theme: { main: { align: 'start' } } } });
+        ctx.expect(out).toBe('d-flex align-items-start py-5');
+      },
+    },
+
+    {
+      name: 'resolved refs are per-page: a second page must not inherit the first rendering',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        const tpl = "align-items-{{ resolved.theme.main.align | default: 'center' }}";
+        ctx.expect(resolver.render(tpl, { resolved: { theme: { main: { align: 'start' } } } })).toBe('align-items-start');
+        ctx.expect(resolver.render(tpl, { resolved: {} }), 'default applies when the page sets no align').toBe('align-items-center');
+        ctx.expect(resolver.cacheSize(), 'per-page renderings never enter the raw-string cache').toBe(0);
+      },
+    },
+
+    {
+      name: 'resolved refs without a per-page scope stay raw (deferred, not rendered empty)',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        const tpl = 'The #1 {{ resolved.alternative.competitor.name }} alternative';
+        ctx.expect(resolver.render(tpl)).toBe(tpl);
+      },
+    },
+
+    {
+      name: 'renderData renders resolved refs through the merged tree (engine resolved pass)',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        const data = {
+          theme: { main: { class: "align-items-{{ resolved.theme.main.align | default: 'center' }}", align: 'start' } },
+          alternative: {
+            competitor: { name: 'Acme Growth' },
+            hero: { tagline: 'The #1 {{ resolved.alternative.competitor.name }} alternative' },
+          },
+          untouched: { keep: 'me' },
+        };
+        const out = resolver.renderData(data, { resolved: data });
+        ctx.expect(out.theme.main.class).toBe('align-items-start');
+        ctx.expect(out.alternative.hero.tagline).toBe('The #1 Acme Growth alternative');
+        ctx.expect(out.untouched, 'copy-on-write: untouched subtrees keep identity').toBe(data.untouched);
+      },
+    },
+  ],
 });

@@ -74,128 +74,128 @@ module.exports = defineCases({
   tests: [
     {
       name: 'admin sees every built-in tool',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/list', {}, key);
 
-        assert.ok(response?.result?.tools, 'Should return tools list');
+        expect(response?.result?.tools, 'Should return tools list').toBeTruthy();
 
         const tools = response.result.tools;
-        assert.equal(tools.length, TOOLS.length, `Admin should see all ${TOOLS.length} tools, got ${tools.length}`);
+        expect(tools.length, `Admin should see all ${TOOLS.length} tools, got ${tools.length}`).toBe(TOOLS.length);
 
         const names = tools.map((t) => t.name);
-        assert.ok(names.includes('firestore_read'), 'Admin should see firestore_read');
-        assert.ok(names.includes('get_user'), 'Admin should see get_user');
-        assert.ok(names.includes('health_check'), 'Admin should see health_check');
+        expect(names.includes('firestore_read'), 'Admin should see firestore_read').toBeTruthy();
+        expect(names.includes('get_user'), 'Admin should see get_user').toBeTruthy();
+        expect(names.includes('health_check'), 'Admin should see health_check').toBeTruthy();
       },
     },
 
     {
       name: 'user with roles.admin sees all tools (DB role promotion)',
-      async run({ assert, accounts, config }) {
+      async run({ expect, accounts, config }) {
         const adminUserKey = accounts.admin?.privateKey;
-        assert.ok(adminUserKey, 'Admin test account should have a privateKey');
+        expect(adminUserKey, 'Admin test account should have a privateKey').toBeTruthy();
 
         const response = await mcpRequest(config, 'tools/list', {}, adminUserKey);
 
-        assert.ok(response?.result?.tools, 'Should return tools list');
+        expect(response?.result?.tools, 'Should return tools list').toBeTruthy();
 
         const tools = response.result.tools;
-        assert.equal(tools.length, TOOLS.length, `Admin-role user should see all ${TOOLS.length} tools, got ${tools.length}`);
+        expect(tools.length, `Admin-role user should see all ${TOOLS.length} tools, got ${tools.length}`).toBe(TOOLS.length);
 
         const names = tools.map((t) => t.name);
-        assert.ok(names.includes('firestore_read'), 'Should see admin tool firestore_read');
-        assert.ok(names.includes('get_user'), 'Should see user tool get_user');
-        assert.ok(names.includes('health_check'), 'Should see public tool health_check');
+        expect(names.includes('firestore_read'), 'Should see admin tool firestore_read').toBeTruthy();
+        expect(names.includes('get_user'), 'Should see user tool get_user').toBeTruthy();
+        expect(names.includes('health_check'), 'Should see public tool health_check').toBeTruthy();
       },
     },
 
     {
       name: 'user sees only user + public tools',
-      async run({ assert, accounts, config }) {
+      async run({ expect, accounts, config }) {
         const userKey = accounts.basic?.privateKey;
-        assert.ok(userKey, 'Test account should have a privateKey');
+        expect(userKey, 'Test account should have a privateKey').toBeTruthy();
 
         const response = await mcpRequest(config, 'tools/list', {}, userKey);
 
-        assert.ok(response?.result?.tools, 'Should return tools list');
+        expect(response?.result?.tools, 'Should return tools list').toBeTruthy();
 
         const tools = response.result.tools;
         const names = tools.map((t) => t.name);
 
         // User should see user-role tools
-        assert.ok(names.includes('get_user'), 'User should see get_user');
-        assert.ok(names.includes('get_subscription'), 'User should see get_subscription');
+        expect(names.includes('get_user'), 'User should see get_user').toBeTruthy();
+        expect(names.includes('get_subscription'), 'User should see get_subscription').toBeTruthy();
 
         // User should see public tools
-        assert.ok(names.includes('health_check'), 'User should see health_check');
+        expect(names.includes('health_check'), 'User should see health_check').toBeTruthy();
 
         // User should NOT see admin tools
-        assert.ok(!names.includes('firestore_read'), 'User should NOT see firestore_read');
-        assert.ok(!names.includes('send_email'), 'User should NOT see send_email');
-        assert.ok(!names.includes('cancel_subscription'), 'User should NOT see cancel_subscription');
-        assert.ok(!names.includes('generate_uuid'), 'User should NOT see generate_uuid');
+        expect(!names.includes('firestore_read'), 'User should NOT see firestore_read').toBeTruthy();
+        expect(!names.includes('send_email'), 'User should NOT see send_email').toBeTruthy();
+        expect(!names.includes('cancel_subscription'), 'User should NOT see cancel_subscription').toBeTruthy();
+        expect(!names.includes('generate_uuid'), 'User should NOT see generate_uuid').toBeTruthy();
 
         const expected = TOOLS.filter((t) => t.role === 'user' || t.role === 'public').length;
-        assert.equal(tools.length, expected, `User should see ${expected} tools (user + public), got ${tools.length}`);
+        expect(tools.length, `User should see ${expected} tools (user + public), got ${tools.length}`).toBe(expected);
       },
     },
 
     {
       name: 'unauthenticated gets 401 (triggers OAuth flow)',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         try {
           const response = await mcpRequest(config, 'tools/list', {});
           // If we got here, check for Unauthorized error
-          assert.equal(response?.error, 'Unauthorized', 'Should return Unauthorized');
+          expect(response?.error, 'Should return Unauthorized').toBe('Unauthorized');
         } catch (error) {
           // 401 throws — this is correct behavior
-          assert.ok(true, 'Unauthenticated request returned 401');
+          expect(true, 'Unauthenticated request returned 401').toBeTruthy();
         }
       },
     },
 
     {
       name: 'admin can call an admin tool',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
 
-        assert.ok(response?.result, 'Should return a result');
-        assert.ok(!response.result.isError, 'Should not be an error');
-        assert.ok(response.result.content?.length > 0, 'Should have content');
+        expect(response?.result, 'Should return a result').toBeTruthy();
+        expect(!response.result.isError, 'Should not be an error').toBeTruthy();
+        expect(response.result.content?.length > 0, 'Should have content').toBeTruthy();
       },
     },
 
     {
       name: 'user cannot call an admin tool',
-      async run({ assert, accounts, config }) {
+      async run({ expect, accounts, config }) {
         const userKey = accounts.basic?.privateKey;
         const response = await mcpRequest(config, 'tools/call', {
           name: 'firestore_read',
           arguments: { path: 'users/test' },
         }, userKey);
 
-        assert.ok(response?.result, 'Should return a result');
-        assert.equal(response.result.isError, true, 'Should be an error');
-        assert.ok(response.result.content?.[0]?.text?.includes('Unknown tool'), 'Should say unknown tool');
+        expect(response?.result, 'Should return a result').toBeTruthy();
+        expect(response.result.isError, 'Should be an error').toBe(true);
+        expect(response.result.content?.[0]?.text?.includes('Unknown tool'), 'Should say unknown tool').toBeTruthy();
       },
     },
 
     {
       name: 'unauthenticated cannot call any tool (gets 401)',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         try {
           const response = await mcpRequest(config, 'tools/call', {
             name: 'get_user',
             arguments: {},
           });
-          assert.equal(response?.error, 'Unauthorized', 'Should return Unauthorized');
+          expect(response?.error, 'Should return Unauthorized').toBe('Unauthorized');
         } catch (error) {
-          assert.ok(true, 'Unauthenticated tool call returned 401');
+          expect(true, 'Unauthenticated tool call returned 401').toBeTruthy();
         }
       },
     },

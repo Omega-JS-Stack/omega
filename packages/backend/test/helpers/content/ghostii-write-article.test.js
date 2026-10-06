@@ -53,191 +53,191 @@ module.exports = defineCases({
   tests: [
     {
       name: 'defaults-when-no-overrides',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({ brand: MOCK_BRAND, description: 'Test prompt', links: ['https://link.com'] });
 
-        assert.ok(capturedBody, 'request body captured');
-        assert.deepEqual(capturedBody.keywords, [], 'default keywords');
-        assert.equal(capturedBody.length, 'long', 'default length');
-        assert.equal(capturedBody.research, true, 'default research');
-        assert.equal(capturedBody.insertImages, true, 'default insertImages');
-        assert.equal(capturedBody.headerImageUrl, 'unsplash', 'default headerImageUrl');
-        assert.equal(capturedBody.maxLinks, 6, 'default maxLinks');
-        assert.ok(capturedBody.sectionQuantity >= 3 && capturedBody.sectionQuantity <= 6, 'default sectionQuantity in range');
-        assert.equal(capturedBody.description, 'Test prompt', 'description passed through');
-        assert.deepEqual(capturedBody.links, ['https://link.com'], 'links passed through');
-        assert.equal(capturedBody.sourceContent, undefined, 'no sourceContent by default');
+        expect(capturedBody, 'request body captured').toBeTruthy();
+        expect(capturedBody.keywords, 'default keywords').toEqual([]);
+        expect(capturedBody.length, 'default length').toBe('long');
+        expect(capturedBody.research, 'default research').toBe(true);
+        expect(capturedBody.insertImages, 'default insertImages').toBe(true);
+        expect(capturedBody.headerImageUrl, 'default headerImageUrl').toBe('unsplash');
+        expect(capturedBody.maxLinks, 'default maxLinks').toBe(6);
+        expect(capturedBody.sectionQuantity >= 3 && capturedBody.sectionQuantity <= 6, 'default sectionQuantity in range').toBeTruthy();
+        expect(capturedBody.description, 'description passed through').toBe('Test prompt');
+        expect(capturedBody.links, 'links passed through').toEqual(['https://link.com']);
+        expect(capturedBody.sourceContent, 'no sourceContent by default').toBe(undefined);
       },
     },
 
     {
       name: 'override-keywords',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { keywords: ['AI', 'tech'] },
         });
-        assert.deepEqual(capturedBody.keywords, ['AI', 'tech']);
+        expect(capturedBody.keywords).toEqual(['AI', 'tech']);
       },
     },
 
     {
       name: 'override-length',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { length: 'comprehensive' },
         });
-        assert.equal(capturedBody.length, 'comprehensive');
+        expect(capturedBody.length).toBe('comprehensive');
       },
     },
 
     {
       name: 'override-research-false',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { research: false },
         });
-        assert.equal(capturedBody.research, false);
+        expect(capturedBody.research).toBe(false);
       },
     },
 
     {
       name: 'override-insertImages-false',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { insertImages: false },
         });
-        assert.equal(capturedBody.insertImages, false);
+        expect(capturedBody.insertImages).toBe(false);
       },
     },
 
     {
       name: 'override-insertLinks-false',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { insertLinks: false },
         });
-        assert.equal(capturedBody.insertLinks, false);
+        expect(capturedBody.insertLinks).toBe(false);
       },
     },
 
     {
       name: 'override-headerImageUrl',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { headerImageUrl: 'generate' },
         });
-        assert.equal(capturedBody.headerImageUrl, 'generate');
+        expect(capturedBody.headerImageUrl).toBe('generate');
       },
     },
 
     {
       name: 'override-maxLinks',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { maxLinks: 12 },
         });
-        assert.equal(capturedBody.maxLinks, 12);
+        expect(capturedBody.maxLinks).toBe(12);
       },
     },
 
     {
       name: 'override-sectionQuantity',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { sectionQuantity: 8 },
         });
-        assert.equal(capturedBody.sectionQuantity, 8);
+        expect(capturedBody.sectionQuantity).toBe(8);
       },
     },
 
     {
       name: 'override-feedUrl',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { feedUrl: 'https://myblog.com/feed.json' },
         });
-        assert.equal(capturedBody.feedUrl, 'https://myblog.com/feed.json');
+        expect(capturedBody.feedUrl).toBe('https://myblog.com/feed.json');
       },
     },
 
     {
       name: 'sourceContent-included-when-provided',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           sourceContent: 'This is the source article text for rewriting.',
         });
-        assert.equal(capturedBody.sourceContent, 'This is the source article text for rewriting.');
+        expect(capturedBody.sourceContent).toBe('This is the source article text for rewriting.');
       },
     },
 
     {
       name: 'sourceContent-omitted-when-empty',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           sourceContent: '',
         });
-        assert.equal(capturedBody.sourceContent, undefined, 'empty sourceContent not sent');
+        expect(capturedBody.sourceContent, 'empty sourceContent not sent').toBe(undefined);
       },
     },
 
     {
       name: 'sourceContent-omitted-when-absent',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
         });
-        assert.equal(capturedBody.sourceContent, undefined, 'missing sourceContent not sent');
+        expect(capturedBody.sourceContent, 'missing sourceContent not sent').toBe(undefined);
       },
     },
 
     {
       name: 'partial-overrides-only-replace-specified',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
           overrides: { length: 'short' },
         });
-        assert.equal(capturedBody.length, 'short', 'length overridden');
-        assert.equal(capturedBody.maxLinks, 6, 'maxLinks keeps default');
-        assert.equal(capturedBody.research, true, 'research keeps default');
-        assert.equal(capturedBody.headerImageUrl, 'unsplash', 'headerImageUrl keeps default');
+        expect(capturedBody.length, 'length overridden').toBe('short');
+        expect(capturedBody.maxLinks, 'maxLinks keeps default').toBe(6);
+        expect(capturedBody.research, 'research keeps default').toBe(true);
+        expect(capturedBody.headerImageUrl, 'headerImageUrl keeps default').toBe('unsplash');
       },
     },
 
     {
       name: 'brand-url-used-in-body',
-      async run({ assert }) {
+      async run({ expect }) {
         const { writeArticle } = loadModuleWithMock();
         await writeArticle({
           brand: MOCK_BRAND, description: 'Test', links: [],
         });
-        assert.equal(capturedBody.url, 'https://example.com');
-        assert.equal(capturedBody.feedUrl, 'https://example.com/feeds/posts.json');
+        expect(capturedBody.url).toBe('https://example.com');
+        expect(capturedBody.feedUrl).toBe('https://example.com/feeds/posts.json');
       },
     },
   ],

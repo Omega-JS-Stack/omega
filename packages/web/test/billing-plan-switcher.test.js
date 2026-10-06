@@ -29,8 +29,7 @@
  * plan switcher wires. The modal's `show.bs.modal` handler is invoked exactly as
  * Bootstrap would, and the assertion is the HTML it wrote.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -537,416 +536,12 @@ function find(cards, productId) {
   return cards.find((card) => card.productId === productId);
 }
 
-test('plan switcher: one card per plan, priced at the cadence the toggle is on', async () => {
-  const view = await openSwitcher(paidAccount({}));
-
-  assert.deepStrictEqual(
-    view.cards.map((card) => card.productId),
-    ['premium', 'pro'],
-    'One card per subscription plan — the one-time product and basic are not switch targets',
-  );
-
-  assert.equal(find(view.cards, 'premium').price, '$10.00 / month', 'The card is priced at the toggled cadence');
-  assert.equal(find(view.cards, 'pro').price, '$25.00 / month');
-
-  // Flipping the toggle re-prices every card in place — the plan × cadence
-  // rows the first cut shipped are gone.
-  const annual = view.flip('annually');
-
-  assert.deepStrictEqual(annual.cards.map((card) => card.productId), ['premium', 'pro'], 'Still one card per plan');
-  assert.equal(find(annual.cards, 'premium').price, '$100.00 / year', 'Premium re-prices to its annual price');
-  assert.equal(find(annual.cards, 'pro').price, '$250.00 / year', 'Pro re-prices to its annual price');
-  assert.equal(find(annual.cards, 'premium').frequency, 'annually', 'The card submits the toggled cadence');
-  assert.equal(annual.confirmDisabled, true, 'Re-pricing clears the pick, so there is nothing to confirm');
-});
-
-test('plan switcher: the toggle opens on the account\'s own cadence and tags the real annual saving', async () => {
-  const monthly = await openSwitcher(paidAccount({}));
-
-  assert.equal(monthly.cadence.present, true, 'A brand selling both cadences gets the toggle');
-  assert.equal(monthly.cadenceHidden, false, 'and its container is shown');
-  assert.deepStrictEqual(
-    monthly.cadence.segments.map((segment) => segment.frequency),
-    ['monthly', 'annually'],
-    'Monthly then Annually, the cadences the catalog actually sells',
-  );
-  assert.deepStrictEqual(
-    monthly.cadence.segments.map((segment) => segment.checked),
-    [true, false],
-    'A monthly subscriber opens on Monthly',
-  );
-
-  // $100/yr against 12 × $10 is a real 17% — computed from the catalog, never
-  // a decorative number.
-  assert.equal(monthly.cadence.segments[1].label, 'Annually Save 17%', 'The annual segment carries the saving it really offers');
-
-  const annualAccount = await openSwitcher(paidAccount({ payment: { frequency: 'annually', price: 100 } }));
-  assert.deepStrictEqual(
-    annualAccount.cadence.segments.map((segment) => segment.checked),
-    [false, true],
-    'An annual subscriber opens on Annually',
-  );
-
-  // Annual pricing that does not beat twelve months of monthly earns no tag.
-  const noDiscount = await openSwitcher(paidAccount({}), {
-    currency: 'USD',
-    products: [{ id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10, annually: 120 } }],
-  });
-  assert.equal(noDiscount.cadence.segments[1].label, 'Annually', 'No real saving, no Save tag');
-});
-
-test('plan switcher: the current plan is greyed out and locked at its own cadence, selectable at the other', async () => {
-  const view = await openSwitcher(paidAccount({}));
-
-  const current = find(view.cards, 'premium');
-  assert.equal(current.disabled, true, 'The plan the account is on must not be selectable');
-  assert.equal(current.badged, true, 'The current plan carries the "Current plan" badge');
-  assert.equal(current.greyed, true, 'and carries the modifier that greys it out, not just another row');
-
-  assert.equal(find(view.cards, 'pro').disabled, false, 'Another product stays selectable');
-
-  // Cadence switching is a supported move — the guard keys on product AND
-  // frequency, exactly like the backend's.
-  const annual = view.flip('annually');
-  assert.equal(find(annual.cards, 'premium').disabled, false, 'The same product at another cadence stays selectable');
-  assert.equal(find(annual.cards, 'premium').badged, false, 'and is not the plan in force');
-});
-
-test('plan switcher: an unrecorded frequency locks the current product at BOTH cadences', async () => {
-  // The repro: a subscription whose `payment.frequency` never got recorded made
-  // the old exact-pair filter miss, and the modal offered Studio → Studio. With
-  // nothing to match on, the product id alone decides.
-  const view = await openSwitcher(paidAccount({ payment: { price: 10, provider: 'test' } }));
-
-  assert.equal(view.cadence.segments[0].checked, true, 'With no cadence on record the toggle opens on Monthly');
-  assert.equal(find(view.cards, 'premium').disabled, true, 'No recorded frequency: the monthly card is conservative');
-  assert.equal(find(view.cards, 'premium').badged, true, 'and reads as the current plan');
-  assert.equal(find(view.cards, 'pro').disabled, false, 'Another product is unaffected');
-
-  const annual = view.flip('annually');
-  assert.equal(find(annual.cards, 'premium').disabled, true, 'No recorded frequency: the annual card is conservative too');
-  assert.equal(find(annual.cards, 'premium').badged, true, 'Both cadences of the current product read as the current plan');
-  assert.equal(find(annual.cards, 'pro').disabled, false, 'Another product is unaffected at either cadence');
-});
-
-test('plan switcher: features render the pricing page\'s way — green check, catalog value, hover explanation', async () => {
-  const view = await openSwitcher(paidAccount({}));
-
-  const premium = find(view.cards, 'premium');
-
-  // The catalog is the only home of this copy: values resolve from the feature
-  // itself or the product's limits, -1 renders as unlimited, and the list stops
-  // at four bullets even though Premium declares five.
-  assert.deepStrictEqual(
-    premium.features,
-    ['1,000 API requests', '3 Team seats', 'Priority support', 'Unlimited History'],
-    'Premium shows its first four features, values resolved',
-  );
-  assert.equal(premium.checks, premium.features.length, 'Every bullet carries the pricing card\'s green check');
-
-  // The pricing page's mechanism, not a second one: the feature NAME is the
-  // dotted-underlined hover target and the definition is its tooltip title.
-  assert.deepStrictEqual(
-    premium.hovers,
-    [['API requests', 'Calls you can make to the API each month.']],
-    'The feature with a definition is hoverable; the ones without stay plain text',
-  );
-  assert.match(view.html, /text-decoration-underline text-decoration-dotted cursor-help/, 'The hover target is the pricing page\'s dotted-underline affordance');
-
-  // Hover text is hover text — a screen reader gets it in words too.
-  assert.deepStrictEqual(
-    premium.spokenDefinitions,
-    ['— Calls you can make to the API each month.'],
-    'The explanation is programmatically associated, not hover-only',
-  );
-
-  // A definition authored on ONE product's copy of a feature explains every
-  // other copy, exactly as the pricing composer backfills them.
-  const pro = find(view.cards, 'pro');
-  assert.deepStrictEqual(pro.features, ['Unlimited API requests'], 'Pro reads its unlimited request limit off the catalog');
-  assert.deepStrictEqual(
-    pro.hovers,
-    [['API requests', 'Calls you can make to the API each month.']],
-    'Pro\'s copy of the feature inherits the definition authored on Premium',
-  );
-});
-
-test('plan switcher: the whole card picks it — minus the parts that own their own clicks', async () => {
-  // The card head is a thin strip; the feature list and the padding around it
-  // are most of the card, and clicking them did nothing at all (worst on
-  // touch, where the head is the hardest part to hit).
-  const view = await openSwitcher(paidAccount({}));
-
-  // A feature's hover explanation belongs to the tooltip — a click there is
-  // someone reading, not choosing.
-  let after = view.clickCard('pro', 'tooltip');
-  assert.equal(after.selection, null, 'Clicking a feature explanation must not pick the card');
-  assert.equal(after.confirmDisabled, true, 'and must not arm Confirm');
-
-  // The label is the browser's own job; picking it up again would fire a
-  // second change event for one click.
-  after = view.clickCard('pro', 'head');
-  assert.equal(after.selection, null, 'The label click stays the browser\'s');
-
-  after = view.clickCard('pro', 'features');
-  assert.deepStrictEqual(after.selection, { productId: 'pro', frequency: 'monthly' }, 'Clicking the feature list picks the card');
-  assert.equal(after.confirmDisabled, false, 'and arms Confirm, exactly as the radio would');
-
-  // The plan in force is locked — its card is not a target either.
-  const locked = view.clickCard('premium', 'features');
-  assert.deepStrictEqual(locked.selection, { productId: 'pro', frequency: 'monthly' }, 'The locked current plan cannot steal the pick');
-});
-
-test('plan switcher: a feature value only prints when it says something', async () => {
-  // `true` means "included" — which the check already says — and `''` says
-  // nothing either; both used to print themselves ("false Priority support").
-  // `false` is not a promise at all now (#647): the tier omits the row.
-  const view = await openSwitcher(paidAccount({}), {
-    currency: 'USD',
-    products: [
-      { id: 'basic', name: 'Basic', type: 'subscription', prices: {} },
-      {
-        id: 'premium',
-        name: 'Premium',
-        type: 'subscription',
-        prices: { monthly: 10, annually: 100 },
-        features: { seats: 0, support: true, sso: false, domain: '' },
-      },
-    ],
-  });
-
-  assert.deepStrictEqual(
-    find(view.cards, 'premium').features,
-    ['0 Team seats', 'Priority support', 'Custom domain'],
-    'a number prints (zero included), true/empty print nothing of themselves, false omits the row entirely',
-  );
-});
-
-test('plan switcher: reopening and re-pricing retire the tooltips they replace', async () => {
-  // Bootstrap keeps one instance per element and never learns the element is
-  // gone: without a dispose pass, every cadence flip left a full set of
-  // tooltips bound to nodes that no longer exist.
-  const view = await openSwitcher(paidAccount({}));
-  const opened = view.liveTooltips;
-
-  assert.ok(opened > 0, 'the bullets really do carry tooltips');
-  assert.equal(view.flip('annually').liveTooltips, opened, 'a cadence flip replaces the set, it does not add one');
-  assert.equal(view.flip('monthly').liveTooltips, opened, 'and again');
-});
-
-test('plan switcher: a one-plan brand says why nothing is pickable, and has no cadence to toggle', async () => {
-  // A brand selling a single plan at a single cadence renders one locked card.
-  // Alone, that is a mystery — the sentence is the explanation, and a toggle
-  // with one side is not a toggle.
-  const view = await openSwitcher(paidAccount({}), SINGLE_PLAN_CONFIG);
-
-  assert.equal(view.cards.length, 1, 'The one plan the brand sells still renders');
-  assert.equal(view.cards[0].disabled, true, 'It is the current plan, so it is not selectable');
-  assert.match(view.html, /no other plans to switch to/i, 'The list carries the sentence that explains the dead end');
-  assert.equal(view.cadence.present, false, 'One cadence on sale: no toggle');
-  assert.equal(view.cadenceHidden, true, 'and the empty container is hidden, so it holds no gap either');
-});
-
-test('plan switcher: every card is named and described, the locked one included', async () => {
-  // Accessibility floor: the radio's name comes from its own label (the current
-  // plan's included), and the feature bullets — which sit outside the label,
-  // because a list is not phrasing content — are wired with aria-describedby.
-  const view = await openSwitcher(paidAccount({}));
-
-  for (const card of view.cards) {
-    assert.equal(card.labelFor, card.inputId, `${card.productId}: the label must name its own radio`);
-    assert.equal(card.describedBy, card.featuresListId, `${card.productId}: the radio must point at its feature list`);
-    assert.ok(card.features.length > 0, `${card.productId}: the description has content`);
-  }
-
-  const current = find(view.cards, 'premium');
-  assert.equal(current.disabled, true, 'The named-and-described rule covers the locked current plan too');
-  assert.equal(current.badged, true, 'The current plan is marked with TEXT, never colour alone');
-
-  // The toggle is a labelled group of real radios, each named by its own label.
-  assert.equal(view.cadence.groupLabel, 'Billing cadence', 'The cadence control names itself');
-  for (const segment of view.cadence.segments) {
-    assert.equal(segment.labelFor, segment.inputId, `${segment.frequency}: the segment's label names its own radio`);
-  }
-});
-
-test('plan switcher: the cadence toggle is the pricing page\'s GLIDING control, adopted the moment it is rendered', async () => {
-  // "Use the pricing page's toggle" includes the part that makes it feel made:
-  // the thumb that glides between segments. That is the shared motion engine,
-  // driven by `data-omega-segmented` — which the modal's markup omitted, so it
-  // rendered a static control wearing a thumb-ready skin. The engine's own
-  // MutationObserver would find an injected node eventually; the modal renders
-  // and opens in the same tick, so the section hands it the container.
-  const view = await openSwitcher(paidAccount({}));
-
-  assert.match(view.cadenceHtml, /data-omega-segmented/, 'the toggle declares itself to the motion engine');
-  assert.equal(view.segmentedScans.length, 1, 'and the section asks the engine to adopt it, once per render');
-  assert.match(view.segmentedScans[0], /omega-billing-toggle/, 'the node handed over is the freshly rendered toggle');
-
-  // A brand with one cadence renders no toggle at all — and asks for nothing.
-  const single = await openSwitcher(paidAccount({}), SINGLE_PLAN_CONFIG);
-  assert.equal(single.segmentedScans.length, 0, 'no toggle, no adoption');
-});
-
-test('plan switcher: a pricing-page link opens the modal on the plan it named, armed to confirm', async () => {
-  // The pricing page's "Switch to this plan" button used to send a subscriber
-  // through CHECKOUT — a second purchase for a move that is a proration. It
-  // now lands here naming the plan, and the trip ends where it started: this
-  // modal, on that plan, at that cadence, one Confirm away.
-  const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
-
-  assert.equal(view.modalsShown, 1, 'the modal opens on arrival — no hunting for the Change button');
-  assert.equal(view.cadencePicked, 'annually', 'the toggle is set to the cadence the link asked for, not the account\'s own');
-  assert.equal(find(view.cards, 'pro').price, '$250.00 / year', 'so every card is priced at that cadence');
-  assert.deepStrictEqual(
-    view.selection,
-    { productId: 'pro', frequency: 'annually' },
-    'and the plan the link named is picked, by the same mechanism a card click uses',
-  );
-  assert.equal(view.confirmDisabled, false, 'so Confirm is armed the moment the modal appears');
-});
-
-test('plan switcher: the plan-switch params are consumed once — a refresh reopens nothing', async () => {
-  // Params that survive the visit reopen the modal on every refresh and on
-  // every back — over a plan the user may have just declined.
-  const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
-
-  assert.equal(view.url, '/dashboard/account#billing', 'the request is struck from the URL, the billing tab is not');
-  assert.equal(window.replaced, '/dashboard/account#billing', 'and it went through history.replaceState — no second navigation');
-
-  // Anything else in the query belongs to somebody else and stays put.
-  const shared = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?ref=email&product=pro&frequency=annually' });
-  assert.equal(shared.url, '/dashboard/account?ref=email#billing', 'only the two params it consumed are removed');
-});
-
-test('plan switcher: no params, no modal — the billing page opens as itself', async () => {
-  const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '' });
-
-  assert.equal(view.modalsShown, 0, 'a plain visit to the billing tab opens no modal');
-  assert.equal(view.html, '', 'and renders no picker behind it');
-  assert.equal(view.url, '/dashboard/account#billing', 'the URL is left alone');
-});
-
-test('plan switcher: a cancelling account lands on the billing tab plainly', async () => {
-  // Change is hidden while a cancellation is scheduled — the backend refuses
-  // the switch outright (`cancellation-pending`) — so a link that opened the
-  // modal anyway would offer a move that cannot happen. Undo cancellation is
-  // the button that state owns.
-  const cancelling = paidAccount({ cancellation: { pending: true, date: { timestampUNIX: HOUR_FROM_NOW } } });
-  const view = await openSwitcher(cancelling, PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
-
-  assert.equal(view.modalsShown, 0, 'the modal stays shut in the one state that cannot switch');
-  assert.equal(view.url, '/dashboard/account#billing', 'and the request is still consumed, so a refresh changes nothing');
-});
-
 /** Every compiled rule whose selector mentions `needle`, as { selector, body }. */
 function rulesFor(css, needle) {
   return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .map((match) => ({ selector: match[1].trim(), body: match[2] }))
     .filter((rule) => rule.selector.includes(needle));
 }
-
-test('plan switcher: the current card reads DISABLED — a muted well, never the accent highlight', () => {
-  // The accent said SELECTED, which is the one thing the plan in force is not:
-  // it is the single card a click cannot reach. So it paints the neutral
-  // tokens and fades its own content, and the accent stays with the cards that
-  // still answer.
-  const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
-  const rules = rulesFor(css, '.omega-plan-card--current');
-  const card = rules.find((rule) => rule.selector.endsWith('.omega-plan-card--current'));
-
-  assert.ok(card, 'the current card still has styles of its own');
-  assert.match(card.body, /background:\s*var\(--omega-surface-2\)/, 'it sits in the muted well');
-  assert.match(card.body, /border-color:\s*var\(--omega-line-strong\)/, 'edged by the neutral line, not the accent');
-  assert.ok(
-    rules.every((rule) => !rule.body.includes('--omega-accent')),
-    'nothing accent-coloured survives on the card that cannot be picked',
-  );
-
-  // The fade is the second half of the disabled reading — and it stops short
-  // of the badge, the one thing on the card that must stay crisp.
-  const faded = rules.filter((rule) => /opacity:\s*0\./.test(rule.body));
-  assert.ok(faded.length > 0, 'the current card dims its content');
-  assert.ok(
-    faded.every((rule) => !rule.selector.includes('__badge') && !rule.selector.includes('__head')),
-    'the "Current plan" badge is excluded from the fade',
-  );
-
-  // The other cards are untouched: picked still rides ink, focus still rings
-  // the accent.
-  const checked = rulesFor(css, '.btn-check:checked + .omega-plan-card')[0];
-  const focused = rulesFor(css, '.btn-check:focus-visible + .omega-plan-card')[0];
-
-  assert.match(checked.body, /border-color:\s*var\(--omega-ink\)/, 'the card you picked still reads as picked');
-  assert.match(focused.body, /outline:\s*2px solid var\(--omega-accent\)/, 'and the focus ring is still the accent');
-});
-
-test('plan switcher: the whole card is the pointer — except the one that cannot be picked', () => {
-  // The click handler makes the WHOLE card selectable, but only the head
-  // (a <label>) said so: the cursor stayed an arrow over the features and the
-  // padding, which is most of the card's area. The pointer now covers the card
-  // itself, and the current plan — the one card a click cannot reach — keeps
-  // the default arrow.
-  const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
-
-  const card = rulesFor(css, '.omega-plan-card').find((rule) => rule.selector.endsWith('.omega-plan-card'));
-  assert.match(card.body, /cursor:\s*pointer/, 'the whole selectable card affords the click');
-
-  const current = rulesFor(css, '.omega-plan-card--current').find((rule) => rule.selector.endsWith('.omega-plan-card--current'));
-  assert.match(current.body, /cursor:\s*default/, 'the locked current plan is not a click target, and does not pretend to be');
-
-  // A feature's hover explanation owns its own click, and its own cursor: the
-  // bullets wear `cursor-help` (the pricing page's utility, universal to every
-  // theme), which the card's pointer cannot take from them.
-  const utilities = sass.compile(
-    path.join(__dirname, '..', 'themes', 'bootstrap', 'overrides', '_cursor-utilities.scss'),
-    { logger: { warn: () => {}, debug: () => {} } },
-  ).css;
-  assert.match(rulesFor(utilities, '.cursor-help')[0].body, /cursor:\s*help\s*!important/, 'the tooltip trigger keeps the help cursor');
-
-  // `cursor` INHERITS, so the pointer covers the card's whole surface unless a
-  // rule takes it back from a child. Nothing in this sheet may — the affordance
-  // has to be gapless, and the one legitimate exception (the tooltip trigger)
-  // lives in the shared utility above, not here.
-  const takesTheCursorBack = rulesFor(css, 'cursor')
-    .concat(rulesFor(css, '.omega-plan-card'))
-    .filter((rule) => /cursor\s*:/.test(rule.body))
-    .filter((rule) => !/\.omega-plan-card(--current)?$/.test(rule.selector));
-
-  assert.deepStrictEqual(
-    takesTheCursorBack.map((rule) => rule.selector),
-    [],
-    'no child of the plan card sets a cursor of its own — the card and its --current modifier are the only two rules',
-  );
-});
-
-test('plan switcher: nothing floats over the card and eats the affordance', () => {
-  // QA round 4 (Ian): a horizontal DEAD STRIP between the card head and the
-  // feature list — pointer everywhere else, arrow there. Nothing in the account
-  // sheet explains it (the test above pins that), because the culprit is not a
-  // descendant at all: Bootstrap appends a shown tooltip to `document.body`
-  // (tooltip.js — `container: false` resolves to the body), so it floats over
-  // the card, inherits none of its cursor, and is fully hit-testable. Default
-  // placement is `top`, which puts it exactly above the hovered feature bullet:
-  // the strip. The same overlay swallowed the click that should have picked the
-  // plan.
-  //
-  // A hover/focus tooltip is decoration and can hold nothing interactive, so it
-  // is inert framework-wide — one home, every surface (the pricing page's cards
-  // carry the same triggers).
-  const css = sass.compile(
-    path.join(__dirname, '..', 'core', 'css', 'core', '_utilities.scss'),
-    { logger: { warn: () => {}, debug: () => {} } },
-  ).css;
-
-  const tooltip = rulesFor(css, '.tooltip').find((rule) => rule.selector === '.tooltip');
-
-  assert.ok(tooltip, 'the framework says something about tooltips at all');
-  assert.match(tooltip.body, /pointer-events:\s*none/, 'a tooltip is never a surface: it takes no pointer, so the card keeps its own');
-
-  // Popovers CAN hold interactive content — the rule must not have reached them.
-  assert.deepStrictEqual(rulesFor(css, '.popover').map((rule) => rule.selector), [], 'popovers keep their events');
-});
 
 // The packaged themes, all three, as the vocabulary guard names them.
 const THEMES = ['classy', 'newsflash', 'neobrutalism'];
@@ -976,61 +571,464 @@ function classWeight(selector) {
   return (selector.match(/\.[\w-]+|\[[^\]]+\]|(?<!:):[\w-]+/g) || []).length;
 }
 
-test('plan switcher: the cadence toggle is skinned in the MAIN bundle — the modal wears what the pricing page wears', () => {
-  // The modal builds the pricing page's own `omega-billing-toggle` markup, so
-  // the two are the same control — but newsflash and neobrutalism dressed it
-  // in their PRICING PAGE sheet, which the account page never loads, and the
-  // modal rendered the undressed classy floor ([#236] QA round 3). The skin
-  // belongs to the component, so it belongs to the main bundle: every surface
-  // that renders the toggle loads that.
-  for (const theme of THEMES) {
-    const themeRoot = path.join(__dirname, '..', 'themes', theme);
-    const compile = (entry) => sass.compile(entry, {
-      loadPaths: [themeRoot],
-      quietDeps: true,
-      silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
-      logger: { warn: () => {}, debug: () => {} },
-    }).css;
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-plan-switcher',
+  tests: [
+    {
+      name: 'plan switcher: one card per plan, priced at the cadence the toggle is on',
+      run: async (ctx) => {
+        const view = await openSwitcher(paidAccount({}));
 
-    const mainCss = compile(path.join(themeRoot, '_theme.scss'));
-    const main = rulesFor(mainCss, '.omega-billing-toggle');
-    const base = main.find((rule) => rule.selector.endsWith('.omega-billing-toggle'));
+        ctx.expect(view.cards.map((card) => card.productId), 'One card per subscription plan — the one-time product and basic are not switch targets').toEqual(['premium', 'pro']);
 
-    assert.ok(base, `${theme}: the main bundle carries the toggle`);
-    assert.match(
-      main.filter((rule) => rule.selector.endsWith('.omega-billing-toggle')).at(-1).body,
-      TOGGLE_SKIN[theme],
-      `${theme}: the theme's OWN dressing lands in the main bundle, last — after the classy floor`,
-    );
+        ctx.expect(find(view.cards, 'premium').price, 'The card is priced at the toggled cadence').toBe('$10.00 / month');
+        ctx.expect(find(view.cards, 'pro').price).toBe('$25.00 / month');
 
-    // The hover tint has to survive the move. A page sheet re-emits Bootstrap
-    // AFTER the main bundle, so the neutraliser below lands later than every
-    // rule here: a toggle hover that only TIES it (the plain
-    // `.omega-billing-toggle .btn:hover` this dressing shipped as) loses on
-    // /pricing and the segments go dead under the pointer, while the account
-    // modal — whose themes ship no page sheet — keeps the tint. Out-specifying
-    // it is what makes the two surfaces behave the same.
-    assert.ok(
-      rulesFor(mainCss, BOOTSTRAP_HOVER).some((rule) => rule.selector === BOOTSTRAP_HOVER),
-      `${theme}: Bootstrap's segment neutraliser is in the bundle — it is the rule to beat`,
-    );
+        // Flipping the toggle re-prices every card in place — the plan × cadence
+        // rows the first cut shipped are gone.
+        const annual = view.flip('annually');
 
-    for (const rule of main.filter((candidate) => candidate.selector.endsWith(':hover'))) {
-      assert.ok(
-        classWeight(rule.selector) > classWeight(BOOTSTRAP_HOVER),
-        `${theme}: "${rule.selector}" must out-specify "${BOOTSTRAP_HOVER}", which loads after it on every page sheet`,
-      );
-    }
+        ctx.expect(annual.cards.map((card) => card.productId), 'Still one card per plan').toEqual(['premium', 'pro']);
+        ctx.expect(find(annual.cards, 'premium').price, 'Premium re-prices to its annual price').toBe('$100.00 / year');
+        ctx.expect(find(annual.cards, 'pro').price, 'Pro re-prices to its annual price').toBe('$250.00 / year');
+        ctx.expect(find(annual.cards, 'premium').frequency, 'The card submits the toggled cadence').toBe('annually');
+        ctx.expect(annual.confirmDisabled, 'Re-pricing clears the pick, so there is nothing to confirm').toBe(true);
+      },
+    },
 
-    // And nothing of it is left behind on the pricing page, where only that
-    // page would have got it.
-    const pageSheet = path.join(themeRoot, 'css', 'pages', 'pricing', 'index.scss');
-    if (fs.existsSync(pageSheet)) {
-      assert.deepStrictEqual(
-        rulesFor(compile(pageSheet), '.omega-billing-toggle').map((rule) => rule.selector),
-        [],
-        `${theme}: no toggle rule may be page-scoped — the account page never loads that sheet`,
-      );
-    }
-  }
+    {
+      name: 'plan switcher: the toggle opens on the account\'s own cadence and tags the real annual saving',
+      run: async (ctx) => {
+        const monthly = await openSwitcher(paidAccount({}));
+
+        ctx.expect(monthly.cadence.present, 'A brand selling both cadences gets the toggle').toBe(true);
+        ctx.expect(monthly.cadenceHidden, 'and its container is shown').toBe(false);
+        ctx.expect(monthly.cadence.segments.map((segment) => segment.frequency), 'Monthly then Annually, the cadences the catalog actually sells').toEqual(['monthly', 'annually']);
+        ctx.expect(monthly.cadence.segments.map((segment) => segment.checked), 'A monthly subscriber opens on Monthly').toEqual([true, false]);
+
+        // $100/yr against 12 × $10 is a real 17% — computed from the catalog, never
+        // a decorative number.
+        ctx.expect(monthly.cadence.segments[1].label, 'The annual segment carries the saving it really offers').toBe('Annually Save 17%');
+
+        const annualAccount = await openSwitcher(paidAccount({ payment: { frequency: 'annually', price: 100 } }));
+        ctx.expect(annualAccount.cadence.segments.map((segment) => segment.checked), 'An annual subscriber opens on Annually').toEqual([false, true]);
+
+        // Annual pricing that does not beat twelve months of monthly earns no tag.
+        const noDiscount = await openSwitcher(paidAccount({}), {
+          currency: 'USD',
+          products: [{ id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10, annually: 120 } }],
+        });
+        ctx.expect(noDiscount.cadence.segments[1].label, 'No real saving, no Save tag').toBe('Annually');
+      },
+    },
+
+    {
+      name: 'plan switcher: the current plan is greyed out and locked at its own cadence, selectable at the other',
+      run: async (ctx) => {
+        const view = await openSwitcher(paidAccount({}));
+
+        const current = find(view.cards, 'premium');
+        ctx.expect(current.disabled, 'The plan the account is on must not be selectable').toBe(true);
+        ctx.expect(current.badged, 'The current plan carries the "Current plan" badge').toBe(true);
+        ctx.expect(current.greyed, 'and carries the modifier that greys it out, not just another row').toBe(true);
+
+        ctx.expect(find(view.cards, 'pro').disabled, 'Another product stays selectable').toBe(false);
+
+        // Cadence switching is a supported move — the guard keys on product AND
+        // frequency, exactly like the backend's.
+        const annual = view.flip('annually');
+        ctx.expect(find(annual.cards, 'premium').disabled, 'The same product at another cadence stays selectable').toBe(false);
+        ctx.expect(find(annual.cards, 'premium').badged, 'and is not the plan in force').toBe(false);
+      },
+    },
+
+    {
+      name: 'plan switcher: an unrecorded frequency locks the current product at BOTH cadences',
+      run: async (ctx) => {
+        // The repro: a subscription whose `payment.frequency` never got recorded made
+        // the old exact-pair filter miss, and the modal offered Studio → Studio. With
+        // nothing to match on, the product id alone decides.
+        const view = await openSwitcher(paidAccount({ payment: { price: 10, provider: 'test' } }));
+
+        ctx.expect(view.cadence.segments[0].checked, 'With no cadence on record the toggle opens on Monthly').toBe(true);
+        ctx.expect(find(view.cards, 'premium').disabled, 'No recorded frequency: the monthly card is conservative').toBe(true);
+        ctx.expect(find(view.cards, 'premium').badged, 'and reads as the current plan').toBe(true);
+        ctx.expect(find(view.cards, 'pro').disabled, 'Another product is unaffected').toBe(false);
+
+        const annual = view.flip('annually');
+        ctx.expect(find(annual.cards, 'premium').disabled, 'No recorded frequency: the annual card is conservative too').toBe(true);
+        ctx.expect(find(annual.cards, 'premium').badged, 'Both cadences of the current product read as the current plan').toBe(true);
+        ctx.expect(find(annual.cards, 'pro').disabled, 'Another product is unaffected at either cadence').toBe(false);
+      },
+    },
+
+    {
+      name: 'plan switcher: features render the pricing page\'s way — green check, catalog value, hover explanation',
+      run: async (ctx) => {
+        const view = await openSwitcher(paidAccount({}));
+
+        const premium = find(view.cards, 'premium');
+
+        // The catalog is the only home of this copy: values resolve from the feature
+        // itself or the product's limits, -1 renders as unlimited, and the list stops
+        // at four bullets even though Premium declares five.
+        ctx.expect(premium.features, 'Premium shows its first four features, values resolved').toEqual(['1,000 API requests', '3 Team seats', 'Priority support', 'Unlimited History']);
+        ctx.expect(premium.checks, 'Every bullet carries the pricing card\'s green check').toBe(premium.features.length);
+
+        // The pricing page's mechanism, not a second one: the feature NAME is the
+        // dotted-underlined hover target and the definition is its tooltip title.
+        ctx.expect(premium.hovers, 'The feature with a definition is hoverable; the ones without stay plain text').toEqual([['API requests', 'Calls you can make to the API each month.']]);
+        ctx.expect(view.html, 'The hover target is the pricing page\'s dotted-underline affordance').toMatch(/text-decoration-underline text-decoration-dotted cursor-help/);
+
+        // Hover text is hover text — a screen reader gets it in words too.
+        ctx.expect(premium.spokenDefinitions, 'The explanation is programmatically associated, not hover-only').toEqual(['— Calls you can make to the API each month.']);
+
+        // A definition authored on ONE product's copy of a feature explains every
+        // other copy, exactly as the pricing composer backfills them.
+        const pro = find(view.cards, 'pro');
+        ctx.expect(pro.features, 'Pro reads its unlimited request limit off the catalog').toEqual(['Unlimited API requests']);
+        ctx.expect(pro.hovers, 'Pro\'s copy of the feature inherits the definition authored on Premium').toEqual([['API requests', 'Calls you can make to the API each month.']]);
+      },
+    },
+
+    {
+      name: 'plan switcher: the whole card picks it — minus the parts that own their own clicks',
+      run: async (ctx) => {
+        // The card head is a thin strip; the feature list and the padding around it
+        // are most of the card, and clicking them did nothing at all (worst on
+        // touch, where the head is the hardest part to hit).
+        const view = await openSwitcher(paidAccount({}));
+
+        // A feature's hover explanation belongs to the tooltip — a click there is
+        // someone reading, not choosing.
+        let after = view.clickCard('pro', 'tooltip');
+        ctx.expect(after.selection, 'Clicking a feature explanation must not pick the card').toBe(null);
+        ctx.expect(after.confirmDisabled, 'and must not arm Confirm').toBe(true);
+
+        // The label is the browser's own job; picking it up again would fire a
+        // second change event for one click.
+        after = view.clickCard('pro', 'head');
+        ctx.expect(after.selection, 'The label click stays the browser\'s').toBe(null);
+
+        after = view.clickCard('pro', 'features');
+        ctx.expect(after.selection, 'Clicking the feature list picks the card').toEqual({ productId: 'pro', frequency: 'monthly' });
+        ctx.expect(after.confirmDisabled, 'and arms Confirm, exactly as the radio would').toBe(false);
+
+        // The plan in force is locked — its card is not a target either.
+        const locked = view.clickCard('premium', 'features');
+        ctx.expect(locked.selection, 'The locked current plan cannot steal the pick').toEqual({ productId: 'pro', frequency: 'monthly' });
+      },
+    },
+
+    {
+      name: 'plan switcher: a feature value only prints when it says something',
+      run: async (ctx) => {
+        // `true` means "included" — which the check already says — and `''` says
+        // nothing either; both used to print themselves ("false Priority support").
+        // `false` is not a promise at all now (#647): the tier omits the row.
+        const view = await openSwitcher(paidAccount({}), {
+          currency: 'USD',
+          products: [
+            { id: 'basic', name: 'Basic', type: 'subscription', prices: {} },
+            {
+              id: 'premium',
+              name: 'Premium',
+              type: 'subscription',
+              prices: { monthly: 10, annually: 100 },
+              features: { seats: 0, support: true, sso: false, domain: '' },
+            },
+          ],
+        });
+
+        ctx.expect(find(view.cards, 'premium').features, 'a number prints (zero included), true/empty print nothing of themselves, false omits the row entirely').toEqual(['0 Team seats', 'Priority support', 'Custom domain']);
+      },
+    },
+
+    {
+      name: 'plan switcher: reopening and re-pricing retire the tooltips they replace',
+      run: async (ctx) => {
+        // Bootstrap keeps one instance per element and never learns the element is
+        // gone: without a dispose pass, every cadence flip left a full set of
+        // tooltips bound to nodes that no longer exist.
+        const view = await openSwitcher(paidAccount({}));
+        const opened = view.liveTooltips;
+
+        ctx.expect(opened > 0, 'the bullets really do carry tooltips').toBeTruthy();
+        ctx.expect(view.flip('annually').liveTooltips, 'a cadence flip replaces the set, it does not add one').toBe(opened);
+        ctx.expect(view.flip('monthly').liveTooltips, 'and again').toBe(opened);
+      },
+    },
+
+    {
+      name: 'plan switcher: a one-plan brand says why nothing is pickable, and has no cadence to toggle',
+      run: async (ctx) => {
+        // A brand selling a single plan at a single cadence renders one locked card.
+        // Alone, that is a mystery — the sentence is the explanation, and a toggle
+        // with one side is not a toggle.
+        const view = await openSwitcher(paidAccount({}), SINGLE_PLAN_CONFIG);
+
+        ctx.expect(view.cards.length, 'The one plan the brand sells still renders').toBe(1);
+        ctx.expect(view.cards[0].disabled, 'It is the current plan, so it is not selectable').toBe(true);
+        ctx.expect(view.html, 'The list carries the sentence that explains the dead end').toMatch(/no other plans to switch to/i);
+        ctx.expect(view.cadence.present, 'One cadence on sale: no toggle').toBe(false);
+        ctx.expect(view.cadenceHidden, 'and the empty container is hidden, so it holds no gap either').toBe(true);
+      },
+    },
+
+    {
+      name: 'plan switcher: every card is named and described, the locked one included',
+      run: async (ctx) => {
+        // Accessibility floor: the radio's name comes from its own label (the current
+        // plan's included), and the feature bullets — which sit outside the label,
+        // because a list is not phrasing content — are wired with aria-describedby.
+        const view = await openSwitcher(paidAccount({}));
+
+        for (const card of view.cards) {
+          ctx.expect(card.labelFor, `${card.productId}: the label must name its own radio`).toBe(card.inputId);
+          ctx.expect(card.describedBy, `${card.productId}: the radio must point at its feature list`).toBe(card.featuresListId);
+          ctx.expect(card.features.length > 0, `${card.productId}: the description has content`).toBeTruthy();
+        }
+
+        const current = find(view.cards, 'premium');
+        ctx.expect(current.disabled, 'The named-and-described rule covers the locked current plan too').toBe(true);
+        ctx.expect(current.badged, 'The current plan is marked with TEXT, never colour alone').toBe(true);
+
+        // The toggle is a labelled group of real radios, each named by its own label.
+        ctx.expect(view.cadence.groupLabel, 'The cadence control names itself').toBe('Billing cadence');
+        for (const segment of view.cadence.segments) {
+          ctx.expect(segment.labelFor, `${segment.frequency}: the segment's label names its own radio`).toBe(segment.inputId);
+        }
+      },
+    },
+
+    {
+      name: 'plan switcher: the cadence toggle is the pricing page\'s GLIDING control, adopted the moment it is rendered',
+      run: async (ctx) => {
+        // "Use the pricing page's toggle" includes the part that makes it feel made:
+        // the thumb that glides between segments. That is the shared motion engine,
+        // driven by `data-omega-segmented` — which the modal's markup omitted, so it
+        // rendered a static control wearing a thumb-ready skin. The engine's own
+        // MutationObserver would find an injected node eventually; the modal renders
+        // and opens in the same tick, so the section hands it the container.
+        const view = await openSwitcher(paidAccount({}));
+
+        ctx.expect(view.cadenceHtml, 'the toggle declares itself to the motion engine').toMatch(/data-omega-segmented/);
+        ctx.expect(view.segmentedScans.length, 'and the section asks the engine to adopt it, once per render').toBe(1);
+        ctx.expect(view.segmentedScans[0], 'the node handed over is the freshly rendered toggle').toMatch(/omega-billing-toggle/);
+
+        // A brand with one cadence renders no toggle at all — and asks for nothing.
+        const single = await openSwitcher(paidAccount({}), SINGLE_PLAN_CONFIG);
+        ctx.expect(single.segmentedScans.length, 'no toggle, no adoption').toBe(0);
+      },
+    },
+
+    {
+      name: 'plan switcher: a pricing-page link opens the modal on the plan it named, armed to confirm',
+      run: async (ctx) => {
+        // The pricing page's "Switch to this plan" button used to send a subscriber
+        // through CHECKOUT — a second purchase for a move that is a proration. It
+        // now lands here naming the plan, and the trip ends where it started: this
+        // modal, on that plan, at that cadence, one Confirm away.
+        const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
+
+        ctx.expect(view.modalsShown, 'the modal opens on arrival — no hunting for the Change button').toBe(1);
+        ctx.expect(view.cadencePicked, 'the toggle is set to the cadence the link asked for, not the account\'s own').toBe('annually');
+        ctx.expect(find(view.cards, 'pro').price, 'so every card is priced at that cadence').toBe('$250.00 / year');
+        ctx.expect(view.selection, 'and the plan the link named is picked, by the same mechanism a card click uses').toEqual({ productId: 'pro', frequency: 'annually' });
+        ctx.expect(view.confirmDisabled, 'so Confirm is armed the moment the modal appears').toBe(false);
+      },
+    },
+
+    {
+      name: 'plan switcher: the plan-switch params are consumed once — a refresh reopens nothing',
+      run: async (ctx) => {
+        // Params that survive the visit reopen the modal on every refresh and on
+        // every back — over a plan the user may have just declined.
+        const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
+
+        ctx.expect(view.url, 'the request is struck from the URL, the billing tab is not').toBe('/dashboard/account#billing');
+        ctx.expect(window.replaced, 'and it went through history.replaceState — no second navigation').toBe('/dashboard/account#billing');
+
+        // Anything else in the query belongs to somebody else and stays put.
+        const shared = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '?ref=email&product=pro&frequency=annually' });
+        ctx.expect(shared.url, 'only the two params it consumed are removed').toBe('/dashboard/account?ref=email#billing');
+      },
+    },
+
+    {
+      name: 'plan switcher: no params, no modal — the billing page opens as itself',
+      run: async (ctx) => {
+        const view = await openSwitcher(paidAccount({}), PAYMENT_CONFIG, { search: '' });
+
+        ctx.expect(view.modalsShown, 'a plain visit to the billing tab opens no modal').toBe(0);
+        ctx.expect(view.html, 'and renders no picker behind it').toBe('');
+        ctx.expect(view.url, 'the URL is left alone').toBe('/dashboard/account#billing');
+      },
+    },
+
+    {
+      name: 'plan switcher: a cancelling account lands on the billing tab plainly',
+      run: async (ctx) => {
+        // Change is hidden while a cancellation is scheduled — the backend refuses
+        // the switch outright (`cancellation-pending`) — so a link that opened the
+        // modal anyway would offer a move that cannot happen. Undo cancellation is
+        // the button that state owns.
+        const cancelling = paidAccount({ cancellation: { pending: true, date: { timestampUNIX: HOUR_FROM_NOW } } });
+        const view = await openSwitcher(cancelling, PAYMENT_CONFIG, { search: '?product=pro&frequency=annually' });
+
+        ctx.expect(view.modalsShown, 'the modal stays shut in the one state that cannot switch').toBe(0);
+        ctx.expect(view.url, 'and the request is still consumed, so a refresh changes nothing').toBe('/dashboard/account#billing');
+      },
+    },
+
+    {
+      name: 'plan switcher: the current card reads DISABLED — a muted well, never the accent highlight',
+      run: (ctx) => {
+        // The accent said SELECTED, which is the one thing the plan in force is not:
+        // it is the single card a click cannot reach. So it paints the neutral
+        // tokens and fades its own content, and the accent stays with the cards that
+        // still answer.
+        const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
+        const rules = rulesFor(css, '.omega-plan-card--current');
+        const card = rules.find((rule) => rule.selector.endsWith('.omega-plan-card--current'));
+
+        ctx.expect(card, 'the current card still has styles of its own').toBeTruthy();
+        ctx.expect(card.body, 'it sits in the muted well').toMatch(/background:\s*var\(--omega-surface-2\)/);
+        ctx.expect(card.body, 'edged by the neutral line, not the accent').toMatch(/border-color:\s*var\(--omega-line-strong\)/);
+        ctx.expect(rules.every((rule) => !rule.body.includes('--omega-accent')), 'nothing accent-coloured survives on the card that cannot be picked').toBeTruthy();
+
+        // The fade is the second half of the disabled reading — and it stops short
+        // of the badge, the one thing on the card that must stay crisp.
+        const faded = rules.filter((rule) => /opacity:\s*0\./.test(rule.body));
+        ctx.expect(faded.length > 0, 'the current card dims its content').toBeTruthy();
+        ctx.expect(faded.every((rule) => !rule.selector.includes('__badge') && !rule.selector.includes('__head')), 'the "Current plan" badge is excluded from the fade').toBeTruthy();
+
+        // The other cards are untouched: picked still rides ink, focus still rings
+        // the accent.
+        const checked = rulesFor(css, '.btn-check:checked + .omega-plan-card')[0];
+        const focused = rulesFor(css, '.btn-check:focus-visible + .omega-plan-card')[0];
+
+        ctx.expect(checked.body, 'the card you picked still reads as picked').toMatch(/border-color:\s*var\(--omega-ink\)/);
+        ctx.expect(focused.body, 'and the focus ring is still the accent').toMatch(/outline:\s*2px solid var\(--omega-accent\)/);
+      },
+    },
+
+    {
+      name: 'plan switcher: the whole card is the pointer — except the one that cannot be picked',
+      run: (ctx) => {
+        // The click handler makes the WHOLE card selectable, but only the head
+        // (a <label>) said so: the cursor stayed an arrow over the features and the
+        // padding, which is most of the card's area. The pointer now covers the card
+        // itself, and the current plan — the one card a click cannot reach — keeps
+        // the default arrow.
+        const css = sass.compile(ACCOUNT_STYLES, { logger: { warn: () => {}, debug: () => {} } }).css;
+
+        const card = rulesFor(css, '.omega-plan-card').find((rule) => rule.selector.endsWith('.omega-plan-card'));
+        ctx.expect(card.body, 'the whole selectable card affords the click').toMatch(/cursor:\s*pointer/);
+
+        const current = rulesFor(css, '.omega-plan-card--current').find((rule) => rule.selector.endsWith('.omega-plan-card--current'));
+        ctx.expect(current.body, 'the locked current plan is not a click target, and does not pretend to be').toMatch(/cursor:\s*default/);
+
+        // A feature's hover explanation owns its own click, and its own cursor: the
+        // bullets wear `cursor-help` (the pricing page's utility, universal to every
+        // theme), which the card's pointer cannot take from them.
+        const utilities = sass.compile(
+          path.join(__dirname, '..', 'themes', 'bootstrap', 'overrides', '_cursor-utilities.scss'),
+          { logger: { warn: () => {}, debug: () => {} } },
+        ).css;
+        ctx.expect(rulesFor(utilities, '.cursor-help')[0].body, 'the tooltip trigger keeps the help cursor').toMatch(/cursor:\s*help\s*!important/);
+
+        // `cursor` INHERITS, so the pointer covers the card's whole surface unless a
+        // rule takes it back from a child. Nothing in this sheet may — the affordance
+        // has to be gapless, and the one legitimate exception (the tooltip trigger)
+        // lives in the shared utility above, not here.
+        const takesTheCursorBack = rulesFor(css, 'cursor')
+          .concat(rulesFor(css, '.omega-plan-card'))
+          .filter((rule) => /cursor\s*:/.test(rule.body))
+          .filter((rule) => !/\.omega-plan-card(--current)?$/.test(rule.selector));
+
+        ctx.expect(takesTheCursorBack.map((rule) => rule.selector), 'no child of the plan card sets a cursor of its own — the card and its --current modifier are the only two rules').toEqual([]);
+      },
+    },
+
+    {
+      name: 'plan switcher: nothing floats over the card and eats the affordance',
+      run: (ctx) => {
+        // QA round 4 (Ian): a horizontal DEAD STRIP between the card head and the
+        // feature list — pointer everywhere else, arrow there. Nothing in the account
+        // sheet explains it (the test above pins that), because the culprit is not a
+        // descendant at all: Bootstrap appends a shown tooltip to `document.body`
+        // (tooltip.js — `container: false` resolves to the body), so it floats over
+        // the card, inherits none of its cursor, and is fully hit-testable. Default
+        // placement is `top`, which puts it exactly above the hovered feature bullet:
+        // the strip. The same overlay swallowed the click that should have picked the
+        // plan.
+        //
+        // A hover/focus tooltip is decoration and can hold nothing interactive, so it
+        // is inert framework-wide — one home, every surface (the pricing page's cards
+        // carry the same triggers).
+        const css = sass.compile(
+          path.join(__dirname, '..', 'core', 'css', 'core', '_utilities.scss'),
+          { logger: { warn: () => {}, debug: () => {} } },
+        ).css;
+
+        const tooltip = rulesFor(css, '.tooltip').find((rule) => rule.selector === '.tooltip');
+
+        ctx.expect(tooltip, 'the framework says something about tooltips at all').toBeTruthy();
+        ctx.expect(tooltip.body, 'a tooltip is never a surface: it takes no pointer, so the card keeps its own').toMatch(/pointer-events:\s*none/);
+
+        // Popovers CAN hold interactive content — the rule must not have reached them.
+        ctx.expect(rulesFor(css, '.popover').map((rule) => rule.selector), 'popovers keep their events').toEqual([]);
+      },
+    },
+
+    {
+      name: 'plan switcher: the cadence toggle is skinned in the MAIN bundle — the modal wears what the pricing page wears',
+      run: (ctx) => {
+        // The modal builds the pricing page's own `omega-billing-toggle` markup, so
+        // the two are the same control — but newsflash and neobrutalism dressed it
+        // in their PRICING PAGE sheet, which the account page never loads, and the
+        // modal rendered the undressed classy floor ([#236] QA round 3). The skin
+        // belongs to the component, so it belongs to the main bundle: every surface
+        // that renders the toggle loads that.
+        for (const theme of THEMES) {
+          const themeRoot = path.join(__dirname, '..', 'themes', theme);
+          const compile = (entry) => sass.compile(entry, {
+            loadPaths: [themeRoot],
+            quietDeps: true,
+            silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+            logger: { warn: () => {}, debug: () => {} },
+          }).css;
+
+          const mainCss = compile(path.join(themeRoot, '_theme.scss'));
+          const main = rulesFor(mainCss, '.omega-billing-toggle');
+          const base = main.find((rule) => rule.selector.endsWith('.omega-billing-toggle'));
+
+          ctx.expect(base, `${theme}: the main bundle carries the toggle`).toBeTruthy();
+          ctx.expect(main.filter((rule) => rule.selector.endsWith('.omega-billing-toggle')).at(-1).body, `${theme}: the theme's OWN dressing lands in the main bundle, last — after the classy floor`).toMatch(TOGGLE_SKIN[theme]);
+
+          // The hover tint has to survive the move. A page sheet re-emits Bootstrap
+          // AFTER the main bundle, so the neutraliser below lands later than every
+          // rule here: a toggle hover that only TIES it (the plain
+          // `.omega-billing-toggle .btn:hover` this dressing shipped as) loses on
+          // /pricing and the segments go dead under the pointer, while the account
+          // modal — whose themes ship no page sheet — keeps the tint. Out-specifying
+          // it is what makes the two surfaces behave the same.
+          ctx.expect(rulesFor(mainCss, BOOTSTRAP_HOVER).some((rule) => rule.selector === BOOTSTRAP_HOVER), `${theme}: Bootstrap's segment neutraliser is in the bundle — it is the rule to beat`).toBeTruthy();
+
+          for (const rule of main.filter((candidate) => candidate.selector.endsWith(':hover'))) {
+            ctx.expect(classWeight(rule.selector) > classWeight(BOOTSTRAP_HOVER), `${theme}: "${rule.selector}" must out-specify "${BOOTSTRAP_HOVER}", which loads after it on every page sheet`).toBeTruthy();
+          }
+
+          // And nothing of it is left behind on the pricing page, where only that
+          // page would have got it.
+          const pageSheet = path.join(themeRoot, 'css', 'pages', 'pricing', 'index.scss');
+          if (fs.existsSync(pageSheet)) {
+            ctx.expect(rulesFor(compile(pageSheet), '.omega-billing-toggle').map((rule) => rule.selector), `${theme}: no toggle rule may be page-scoped — the account page never loads that sheet`).toEqual([]);
+          }
+        }
+      },
+    },
+  ],
 });

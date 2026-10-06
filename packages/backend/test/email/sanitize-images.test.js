@@ -6,7 +6,7 @@
  *
  * Plain-node unit test (no emulator, no network).
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const { sanitizeImagesForEmail } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -22,7 +22,7 @@ module.exports = defineCases({
           { brandmark: '/assets/images/brand/brandmark.png' },
           'https://playground.omegajs.dev/'
         );
-        assert.equal(out.brandmark, 'https://playground.omegajs.dev/assets/images/brand/brandmark.png');
+        expect(out.brandmark).toBe('https://playground.omegajs.dev/assets/images/brand/brandmark.png');
       },
     },
 
@@ -31,7 +31,7 @@ module.exports = defineCases({
 
       run() {
         const out = sanitizeImagesForEmail({ social: 'https://cdn.example.com/social.png' }, 'https://x.dev');
-        assert.equal(out.social, 'https://cdn.example.com/social.png');
+        expect(out.social).toBe('https://cdn.example.com/social.png');
       },
     },
 
@@ -40,7 +40,7 @@ module.exports = defineCases({
 
       run() {
         const out = sanitizeImagesForEmail({ brandmark: '/assets/brand/logo-x.svg' }, 'https://x.dev');
-        assert.equal(out.brandmark, 'https://x.dev/assets/brand/logo-1024.png');
+        expect(out.brandmark).toBe('https://x.dev/assets/brand/logo-1024.png');
       },
     },
 
@@ -49,7 +49,7 @@ module.exports = defineCases({
 
       run() {
         const out = sanitizeImagesForEmail({ brandmark: '/mark.png' }, undefined);
-        assert.equal(out.brandmark, '/mark.png');
+        expect(out.brandmark).toBe('/mark.png');
       },
     },
 
@@ -58,8 +58,8 @@ module.exports = defineCases({
 
       run() {
         const out = sanitizeImagesForEmail({ brandmark: null, social: 42 }, 'https://x.dev');
-        assert.equal(out.brandmark, null);
-        assert.equal(out.social, 42);
+        expect(out.brandmark).toBe(null);
+        expect(out.social).toBe(42);
       },
     },
   ],

@@ -18,7 +18,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const uid = accounts['journey-payments-failure'].uid;
 
         // Resolve first paid subscription product. If the brand has none configured,
@@ -40,7 +40,7 @@ module.exports = defineCases({
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
-        assert.isSuccess(response, 'Intent should succeed');
+        expect(response, 'Intent should succeed').toBeSuccess();
         state.orderId = response.data.orderId;
 
         // Wait for subscription to activate
@@ -50,9 +50,9 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc.subscription?.product?.id, paidProduct.id, `Should start as ${paidProduct.id}`);
-        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
-        assert.equal(userDoc.subscription?.payment?.orderId, state.orderId, 'Order ID should match intent');
+        expect(userDoc.subscription?.product?.id, `Should start as ${paidProduct.id}`).toBe(paidProduct.id);
+        expect(userDoc.subscription?.status, 'Should be active').toBe('active');
+        expect(userDoc.subscription?.payment?.orderId, 'Order ID should match intent').toBe(state.orderId);
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
       },
@@ -60,7 +60,7 @@ module.exports = defineCases({
 
     {
       name: 'send-invoice-payment-failed',
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         state.eventId = `_test-evt-journey-failure-${Date.now()}`;
 
         // Send invoice.payment_failed with subscription billing reason
@@ -87,13 +87,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted');
+        expect(response, 'Webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'verify-webhook-categorized-as-subscription',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Wait for webhook doc to be saved
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.eventId}`);
@@ -101,47 +101,47 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
-        assert.ok(webhookDoc, 'Webhook doc should exist');
-        assert.equal(webhookDoc.event?.category, 'subscription', 'Category should be subscription');
-        assert.equal(webhookDoc.event?.resourceType, 'subscription', 'Resource type should be subscription');
-        assert.equal(webhookDoc.event?.resourceId, state.subscriptionId, 'Resource ID should be subscription ID');
-        assert.equal(webhookDoc.transition, 'payment-failed', 'Transition should be payment-failed');
+        expect(webhookDoc, 'Webhook doc should exist').toBeTruthy();
+        expect(webhookDoc.event?.category, 'Category should be subscription').toBe('subscription');
+        expect(webhookDoc.event?.resourceType, 'Resource type should be subscription').toBe('subscription');
+        expect(webhookDoc.event?.resourceId, 'Resource ID should be subscription ID').toBe(state.subscriptionId);
+        expect(webhookDoc.transition, 'Transition should be payment-failed').toBe('payment-failed');
       },
     },
 
     {
       name: 'subscription-suspended',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.status, 'suspended', 'Status should be suspended after payment failure');
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should still be ${state.paidProductId}`);
+        expect(userDoc.subscription.status, 'Status should be suspended after payment failure').toBe('suspended');
+        expect(userDoc.subscription.product.id, `Product should still be ${state.paidProductId}`).toBe(state.paidProductId);
       },
     },
 
     {
       name: 'order-doc-verified',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
-        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.type, 'Type should be subscription').toBe('subscription');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(orderDoc.requests !== undefined, 'requests field should exist').toBeTruthy();
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should be null').toBe(null);
+        expect(orderDoc.requests.refund, 'requests.refund should be null').toBe(null);
       },
     },
 
     {
       name: 'intent-doc-completed',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
 
-        assert.ok(intentDoc, 'Intent doc should exist');
-        assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
-        assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after initial webhook processing');
-        assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');
+        expect(intentDoc, 'Intent doc should exist').toBeTruthy();
+        expect(intentDoc.id, 'ID should match orderId').toBe(state.orderId);
+        expect(intentDoc.status, 'Intent status should be completed after initial webhook processing').toBe('completed');
+        expect(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set').toBeTruthy();
       },
     },
   ],

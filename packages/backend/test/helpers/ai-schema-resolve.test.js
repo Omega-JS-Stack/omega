@@ -38,75 +38,75 @@ module.exports = defineCases({
   tests: [
     {
       name: 'undefined-returns-undefined',
-      async run({ assert }) {
-        assert.equal(resolveSchema(undefined, noopLog), undefined, 'undefined → undefined');
+      async run({ expect }) {
+        expect(resolveSchema(undefined, noopLog), 'undefined → undefined').toBe(undefined);
       },
     },
 
     {
       name: 'null-returns-undefined',
-      async run({ assert }) {
-        assert.equal(resolveSchema(null, noopLog), undefined, 'null → undefined');
+      async run({ expect }) {
+        expect(resolveSchema(null, noopLog), 'null → undefined').toBe(undefined);
       },
     },
 
     {
       name: 'false-returns-undefined',
-      async run({ assert }) {
-        assert.equal(resolveSchema(false, noopLog), undefined, 'false → undefined');
+      async run({ expect }) {
+        expect(resolveSchema(false, noopLog), 'false → undefined').toBe(undefined);
       },
     },
 
     {
       name: 'inline-object-returned-as-is',
-      async run({ assert }) {
+      async run({ expect }) {
         const inline = { type: 'object', properties: { x: { type: 'string' } } };
         const result = resolveSchema(inline, noopLog);
-        assert.deepEqual(result, inline, 'inline schema passed through unchanged');
+        expect(result, 'inline schema passed through unchanged').toEqual(inline);
       },
     },
 
     {
       name: 'path-loads-json-file',
-      async run({ assert }) {
+      async run({ expect }) {
         ensureFixtures();
         const result = resolveSchema({ path: VALID_SCHEMA_PATH }, noopLog);
-        assert.deepEqual(result, VALID_SCHEMA, 'loaded schema matches fixture');
+        expect(result, 'loaded schema matches fixture').toEqual(VALID_SCHEMA);
       },
     },
 
     {
       name: 'path-not-found-throws',
-      async run({ assert }) {
+      async run({ expect }) {
         let threw = false;
         try {
           resolveSchema({ path: '/nonexistent/schema.json' }, noopLog);
         } catch (e) {
           threw = true;
-          assert.equal(e.message.includes('not found'), true, 'error mentions not found');
+          expect(e.message.includes('not found'), 'error mentions not found').toBe(true);
         }
-        assert.equal(threw, true, 'should throw on missing file');
+        expect(threw, 'should throw on missing file').toBe(true);
       },
     },
 
     {
       name: 'path-to-directory-throws',
-      async run({ assert }) {
+      async run({ expect }) {
         ensureFixtures();
         let threw = false;
         try {
           resolveSchema({ path: FIXTURES_DIR }, noopLog);
         } catch (e) {
           threw = true;
-          assert.equal(e.message.includes('is a directory'), true, 'error mentions directory');
+          expect(e.message.includes('is a directory'), 'error mentions directory').toBe(true);
         }
-        assert.equal(threw, true, 'should throw on directory path');
+        expect(threw, 'should throw on directory path').toBe(true);
       },
     },
 
     {
       name: 'invalid-json-throws',
-      async run({ assert }) {
+      async run({ expect }) {
         ensureFixtures();
         let threw = false;
         try {
@@ -114,7 +114,7 @@ module.exports = defineCases({
         } catch (e) {
           threw = true;
         }
-        assert.equal(threw, true, 'should throw on invalid JSON');
+        expect(threw, 'should throw on invalid JSON').toBe(true);
       },
     },
   ],

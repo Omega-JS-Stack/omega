@@ -19,10 +19,10 @@
  *     on every `resolved` walk. A green build of a fixture whose pages loop
  *     `site.posts` IS that proof.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, before, after } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildSite, miniData, MINI, PKG } = require('./lib/build.js');
 
@@ -42,52 +42,10 @@ const nfData = { ...miniData, theme: { id: 'newsflash' } };
 
 let pages;
 
-before(async () => {
-  fs.rmSync(CONSUMER, { recursive: true, force: true });
-  fs.cpSync(MINI, CONSUMER, { recursive: true });
-
-  // The newest post, so it lands in the homepage's cover-story slot.
-  fs.mkdirSync(path.join(CONSUMER, '_posts', '2025'), { recursive: true });
-  fs.writeFileSync(path.join(CONSUMER, '_posts', '2025', '2025-06-01-the-long-read.md'), [
-    '---',
-    'layout: blueprint/blog/post',
-    'post:',
-    '  title: "The long read"',
-    '  description: "A post nobody finishes in a minute"',
-    '  author: jane doe',
-    '  id: 1000042',
-    '  tags: ["automation"]',
-    '  categories: ["Growth"]',
-    '---',
-    '',
-    LONG_BODY,
-    '',
-  ].join('\n'));
-
-  // The direct probe: a page that iterates site.posts and reads each doc's
-  // body at render time, exactly like a migrating UJM consumer's loop.
-  fs.writeFileSync(path.join(CONSUMER, 'pages', 'site-posts-probe.html'), [
-    '---',
-    'layout: frontend/core/base',
-    'permalink: /site-posts-probe',
-    '---',
-    '{%- for post in site.posts -%}',
-    '<span data-post="{{ post.url }}" data-len="{{ post.content | size }}" data-rt="{% omega_readtime post.content %}"></span>',
-    '{%- endfor -%}',
-    '',
-  ].join('\n'));
-
-  pages = await buildSite(CONSUMER, nfData, {}, 'site-collection-content');
-});
-
-after(() => {
-  fs.rmSync(CONSUMER, { recursive: true, force: true });
-});
-
 /** Every probed post: url → { len, rt }. */
 function probed() {
   const html = pages.get('/site-posts-probe');
-  assert.ok(html, 'the probe page built');
+  expect(html, 'the probe page built').toBeTruthy();
   const found = {};
   for (const m of html.matchAll(/<span data-post="([^"]*)" data-len="(\d+)" data-rt="(\d+)"><\/span>/g)) {
     found[m[1]] = { len: Number(m[2]), rt: Number(m[3]) };
@@ -95,42 +53,97 @@ function probed() {
   return found;
 }
 
-test('#711: a site.posts loop reads each post\'s rendered body at render time', () => {
-  const docs = probed();
-  const urls = Object.keys(docs);
+module.exports = defineCases({
+  type: 'group',
+  description: 'site-collection-content',
+  setup: async () => {
+    fs.rmSync(CONSUMER, { recursive: true, force: true });
+    fs.cpSync(MINI, CONSUMER, { recursive: true });
 
-  assert.ok(urls.length >= 18, `the fixture's posts all reach site.posts (got ${urls.length})`);
-  const empty = urls.filter((url) => docs[url].len === 0);
-  assert.deepStrictEqual(empty, [], 'no site.posts doc carries an empty body');
+    // The newest post, so it lands in the homepage's cover-story slot.
+    fs.mkdirSync(path.join(CONSUMER, '_posts', '2025'), { recursive: true });
+    fs.writeFileSync(path.join(CONSUMER, '_posts', '2025', '2025-06-01-the-long-read.md'), [
+      '---',
+      'layout: blueprint/blog/post',
+      'post:',
+      '  title: "The long read"',
+      '  description: "A post nobody finishes in a minute"',
+      '  author: jane doe',
+      '  id: 1000042',
+      '  tags: ["automation"]',
+      '  categories: ["Growth"]',
+      '---',
+      '',
+      LONG_BODY,
+      '',
+    ].join('\n'));
 
-  // The rendered body, not the raw source: the markdown ran.
-  const long = docs['/blog/the-long-read'];
-  assert.ok(long, `the long post is in site.posts: ${urls.join(', ')}`);
-  assert.ok(long.len > 1000, `the long post's body is real (${long.len} chars)`);
-});
+    // The direct probe: a page that iterates site.posts and reads each doc's
+    // body at render time, exactly like a migrating UJM consumer's loop.
+    fs.writeFileSync(path.join(CONSUMER, 'pages', 'site-posts-probe.html'), [
+      '---',
+      'layout: frontend/core/base',
+      'permalink: /site-posts-probe',
+      '---',
+      '{%- for post in site.posts -%}',
+      '<span data-post="{{ post.url }}" data-len="{{ post.content | size }}" data-rt="{% omega_readtime post.content %}"></span>',
+      '{%- endfor -%}',
+      '',
+    ].join('\n'));
 
-test('#711: the newsflash homepage cover story prints the post\'s OWN readtime, not "1 min read"', () => {
-  // The four homepage slots (cover story, top stories, the desk feed, more
-  // stories) all capture `{% omega_readtime post.content %}` off site.posts.
-  const home = pages.get('/about'); // the fixture page that rides the index layout
-  assert.ok(home, 'the homepage layout rendered');
+    pages = await buildSite(CONSUMER, nfData, {}, 'site-collection-content');
+  },
+  cleanup: () => {
+    fs.rmSync(CONSUMER, { recursive: true, force: true });
+  },
+  tests: [
+    {
+      name: '#711: a site.posts loop reads each post\'s rendered body at render time',
+      run: (ctx) => {
+        const docs = probed();
+        const urls = Object.keys(docs);
 
-  const post = pages.get('/blog/the-long-read');
-  assert.ok(post, 'the post page built');
-  const truth = Number((post.match(/<span class="badge bg-primary">(\d+) min read<\/span>/) || [])[1]);
-  assert.ok(truth > 1, `the post's own page counts a multi-minute read (got ${truth})`);
+        ctx.expect(urls.length >= 18, `the fixture's posts all reach site.posts (got ${urls.length})`).toBeTruthy();
+        const empty = urls.filter((url) => docs[url].len === 0);
+        ctx.expect(empty, 'no site.posts doc carries an empty body').toEqual([]);
 
-  const cover = home.match(/newsflash-hero__art[\s\S]*?<h2 class="h4 mb-1">The long read<\/h2>[\s\S]*?· (\d+) min read/);
-  assert.ok(cover, 'the cover story slot renders the long post with a byline');
-  assert.strictEqual(Number(cover[1]), truth, 'the card and the post agree — one body, one count');
-});
+        // The rendered body, not the raw source: the markdown ran.
+        const long = docs['/blog/the-long-read'];
+        ctx.expect(long, `the long post is in site.posts: ${urls.join(', ')}`).toBeTruthy();
+        ctx.expect(long.len > 1000, `the long post's body is real (${long.len} chars)`).toBeTruthy();
+      },
+    },
 
-test('#711: every posts-driven tile on the homepage counts a real body', () => {
-  const home = pages.get('/about');
-  const tiles = [...home.matchAll(/· (\d+) min read/g)].map((m) => Number(m[1]));
+    {
+      name: '#711: the newsflash homepage cover story prints the post\'s OWN readtime, not "1 min read"',
+      run: (ctx) => {
+        // The four homepage slots (cover story, top stories, the desk feed, more
+        // stories) all capture `{% omega_readtime post.content %}` off site.posts.
+        const home = pages.get('/about'); // the fixture page that rides the index layout
+        ctx.expect(home, 'the homepage layout rendered').toBeTruthy();
 
-  assert.ok(tiles.length >= 4, `the homepage renders its posts-driven bands (${tiles.length} bylines)`);
-  // The mini posts are genuinely one-minute reads; the long one is not, so a
-  // homepage where every byline says 1 is the content-less flattener.
-  assert.ok(tiles.some((rt) => rt > 1), `not every byline is the no-content answer: ${tiles.join(', ')}`);
+        const post = pages.get('/blog/the-long-read');
+        ctx.expect(post, 'the post page built').toBeTruthy();
+        const truth = Number((post.match(/<span class="badge bg-primary">(\d+) min read<\/span>/) || [])[1]);
+        ctx.expect(truth > 1, `the post's own page counts a multi-minute read (got ${truth})`).toBeTruthy();
+
+        const cover = home.match(/newsflash-hero__art[\s\S]*?<h2 class="h4 mb-1">The long read<\/h2>[\s\S]*?· (\d+) min read/);
+        ctx.expect(cover, 'the cover story slot renders the long post with a byline').toBeTruthy();
+        ctx.expect(Number(cover[1]), 'the card and the post agree — one body, one count').toBe(truth);
+      },
+    },
+
+    {
+      name: '#711: every posts-driven tile on the homepage counts a real body',
+      run: (ctx) => {
+        const home = pages.get('/about');
+        const tiles = [...home.matchAll(/· (\d+) min read/g)].map((m) => Number(m[1]));
+
+        ctx.expect(tiles.length >= 4, `the homepage renders its posts-driven bands (${tiles.length} bylines)`).toBeTruthy();
+        // The mini posts are genuinely one-minute reads; the long one is not, so a
+        // homepage where every byline says 1 is the content-less flattener.
+        ctx.expect(tiles.some((rt) => rt > 1), `not every byline is the no-content answer: ${tiles.join(', ')}`).toBeTruthy();
+      },
+    },
+  ],
 });

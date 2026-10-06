@@ -76,7 +76,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'reads-the-v2-refund-back-by-its-own-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = { [V2_ENDPOINT]: FIXTURE_CAPTURE_REFUNDED };
 
@@ -88,16 +88,16 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls.length, 1, 'The refund is read once');
-        assert.equal(calls[0], V2_ENDPOINT, 'A v2 capture refund reads at the v2 refunds endpoint');
-        assert.equal(details.amount, '9.99', 'The amount is PayPal\'s record of the refund');
-        assert.equal(details.currency, 'USD', 'And so is the currency');
+        expect(calls.length, 'The refund is read once').toBe(1);
+        expect(calls[0], 'A v2 capture refund reads at the v2 refunds endpoint').toBe(V2_ENDPOINT);
+        expect(details.amount, 'The amount is PayPal\'s record of the refund').toBe('9.99');
+        expect(details.currency, 'And so is the currency').toBe('USD');
       },
     },
 
     {
       name: 'reads-the-v1-refund-at-the-v1-endpoint',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const responses = {
           [V1_ENDPOINT]: { id: REFUND_ID, state: 'completed', amount: { total: '4.99', currency: 'EUR' }, reason_code: 'REFUND', sale_id: 'SALE-OT' },
@@ -111,16 +111,16 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls[0], V1_ENDPOINT, 'A v1 sale refund reads at the v1 refund endpoint');
-        assert.equal(details.amount, '4.99', 'The v1 `total` spelling still resolves');
-        assert.equal(details.currency, 'EUR', 'And the v1 `currency` spelling with it');
-        assert.equal(details.reason, 'REFUND', 'The reason comes off the refund record');
+        expect(calls[0], 'A v1 sale refund reads at the v1 refund endpoint').toBe(V1_ENDPOINT);
+        expect(details.amount, 'The v1 `total` spelling still resolves').toBe('4.99');
+        expect(details.currency, 'And the v1 `currency` spelling with it').toBe('EUR');
+        expect(details.reason, 'The reason comes off the refund record').toBe('REFUND');
       },
     },
 
     {
       name: 'never-answers-with-the-resource-the-refund-reversed',
-      async run({ assert }) {
+      async run({ expect }) {
         // The sale is the ORIGINAL payment: reading its amount would report the
         // purchase price as the refund, which a partial refund makes plainly wrong.
         const responses = {
@@ -131,13 +131,13 @@ module.exports = defineCases({
           return PayPal.getRefundDetails(SALE_RESOURCE, { refundId: REFUND_ID, eventType: 'PAYMENT.SALE.REFUNDED' });
         });
 
-        assert.equal(details.amount, '4.99', 'A partial refund reports what came back, not what was paid');
+        expect(details.amount, 'A partial refund reports what came back, not what was paid').toBe('4.99');
       },
     },
 
     {
       name: 'falls-back-to-the-refund-id-the-envelope-carries',
-      async run({ assert }) {
+      async run({ expect }) {
         // A doc stored before the parser threaded the id still names the refund in
         // the envelope — an identifier, read the same way resourceId is.
         const calls = [];
@@ -150,13 +150,13 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls[0], V1_ENDPOINT, 'The envelope\'s refund id is enough to ask PayPal');
+        expect(calls[0], 'The envelope\'s refund id is enough to ask PayPal').toBe(V1_ENDPOINT);
       },
     },
 
     {
       name: 'an-event-naming-no-refund-reports-no-amount',
-      async run({ assert }) {
+      async run({ expect }) {
         const warnings = [];
         const calls = [];
 
@@ -168,15 +168,15 @@ module.exports = defineCases({
           });
         });
 
-        assert.equal(calls.length, 0, 'There is nothing to ask PayPal about');
-        assert.equal(details.amount, null, 'The refund is recorded with no amount rather than with the payload\'s');
-        assert.equal(warnings.length, 1, 'And the gap is said out loud');
+        expect(calls.length, 'There is nothing to ask PayPal about').toBe(0);
+        expect(details.amount, 'The refund is recorded with no amount rather than with the payload\'s').toBe(null);
+        expect(warnings.length, 'And the gap is said out loud').toBe(1);
       },
     },
 
     {
       name: 'a-failed-refund-lookup-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // An amount that cannot be verified is not written at all ([#506]).
         let threw = null;
 
@@ -192,10 +192,10 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed lookup must throw');
-        assert.equal(threw.notFound, true, 'A refund PayPal does not have is a terminal miss, classified by the same seam');
-        assert.equal(threw.resourceType, 'refund', 'The failure names the lookup that missed');
-        assert.equal(threw.resourceId, REFUND_ID, 'And the id it missed on');
+        expect(threw, 'A failed lookup must throw').toBeTruthy();
+        expect(threw.notFound, 'A refund PayPal does not have is a terminal miss, classified by the same seam').toBe(true);
+        expect(threw.resourceType, 'The failure names the lookup that missed').toBe('refund');
+        expect(threw.resourceId, 'And the id it missed on').toBe(REFUND_ID);
       },
     },
   ],

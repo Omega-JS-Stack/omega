@@ -12,10 +12,9 @@
  * D5: the conditional-module skip log tells the truth — "not configured" for
  *     an absent section, "disabled" for a present one that says so.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { toSiteGlobal } = require('@omega.js/config');
 
@@ -33,165 +32,171 @@ const AGENT_ID = 'agent_fixture23';
 // The provisioning-only sentinel: a donor id that must never ship to a page.
 const TEMPLATE_ID = 'TEMPLATEdonorId23';
 
-// ─── D3: forms.providers.slapform.formId → the contact page ─────────────────
+module.exports = defineCases({
+  type: 'group',
+  description: 'config-rekey',
+  tests: [
+    // ─── D3: forms.providers.slapform.formId → the contact page ─────────────────
 
-test('D3: the contact page reads the ONE slapform path — pinned string', () => {
-  const page = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'contact', 'index.js'), 'utf8');
+    {
+      name: 'D3: the contact page reads the ONE slapform path — pinned string',
+      run: (ctx) => {
+        const page = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'contact', 'index.js'), 'utf8');
 
-  assert.ok(page.includes(CONTACT_READ_PATH), `contact page reads ${CONTACT_READ_PATH}`);
-  assert.ok(!page.includes('slapform-form-id'), 'the dead brand.contact key is gone');
-});
-
-test('D3: a configured formId survives toSiteGlobal under its exact path', () => {
-  const site = toSiteGlobal({
-    brand: { id: 'acme', name: 'Acme' },
-    forms: { providers: { slapform: { formId: FORM_ID } } },
-  });
-
-  assert.equal(site.forms.providers.slapform.formId, FORM_ID);
-});
-
-test('D3: the configured formId reaches the page as omega.config.forms.providers.slapform.formId', async () => {
-  const pages = await buildWith({
-    ...miniData,
-    forms: {
-      providers: {
-        slapform: {
-          formId: FORM_ID,
-          templateFormId: TEMPLATE_ID,
-          updateFormInfo: true,
-          plan: { id: 'pro', name: 'Pro' },
-        },
+        ctx.expect(page.includes(CONTACT_READ_PATH), `contact page reads ${CONTACT_READ_PATH}`).toBeTruthy();
+        ctx.expect(!page.includes('slapform-form-id'), 'the dead brand.contact key is gone').toBeTruthy();
       },
     },
-  });
-  const html = pages.get('/blog');
 
-  const configuration = readPageConfig(pages, html);
-  assert.ok(configuration, 'the OMEGA_BUILD_JSON snapshot is written');
-  assert.equal(
-    configuration.forms.providers.slapform.formId,
-    FORM_ID,
-    'the blob carries the form id at the path the contact page reads',
-  );
+    {
+      name: 'D3: a configured formId survives toSiteGlobal under its exact path',
+      run: (ctx) => {
+        const site = toSiteGlobal({
+          brand: { id: 'acme', name: 'Acme' },
+          forms: { providers: { slapform: { formId: FORM_ID } } },
+        });
 
-  // Curated: only the leaf the runtime reads goes public (#23).
-  assert.deepEqual(
-    Object.keys(configuration.forms.providers.slapform),
-    ['formId'],
-    'the provisioning-only slapform fields stay out of the public blob',
-  );
-  assert.ok(!html.includes(TEMPLATE_ID), 'the donor template form id never reaches the page');
-});
+        ctx.expect(site.forms.providers.slapform.formId).toBe(FORM_ID);
+      },
+    },
 
-// ─── D4: one chatsy home, manager writeback ≡ client read ───────────────────
-
-test('D4: the client reads the chat widget from inbound.chat.providers.chatsy', () => {
-  const client = fs.readFileSync(
-    path.join(PKG, '..', 'client', 'src', 'index.js'),
-    'utf8',
-  );
-
-  assert.ok(client.includes(CHATSY_READ_PATH), `client reads ${CHATSY_READ_PATH}`);
-  assert.ok(
-    client.includes('this.config.inbound.chat.providers.chatsy'),
-    'the initializer reads agentId + settings from the same home',
-  );
-  assert.ok(
-    !/chatsy:\s*\{\s*\n\s*enabled: false,\s*\n\s*config:/.test(client),
-    'the separate client-side chatsy blob is gone — one home',
-  );
-});
-
-test('D4: agentId + settings reach the page under the one chatsy home', async () => {
-  const settings = { button: { position: 'bottom-left' } };
-  const pages = await buildWith({
-    ...miniData,
-    inbound: {
-      chat: {
-        providers: {
-          chatsy: {
-            enabled: true,
-            agentId: AGENT_ID,
-            settings,
-            templateAgentId: TEMPLATE_ID,
-            updateAgentInfo: true,
-            plan: { id: 'pro', name: 'Pro' },
-            sponsorshipsUrl: 'https://example.com/SPONSORSHIPSdonor23',
+    {
+      name: 'D3: the configured formId reaches the page as omega.config.forms.providers.slapform.formId',
+      run: async (ctx) => {
+        const pages = await buildWith({
+          ...miniData,
+          forms: {
+            providers: {
+              slapform: {
+                formId: FORM_ID,
+                templateFormId: TEMPLATE_ID,
+                updateFormInfo: true,
+                plan: { id: 'pro', name: 'Pro' },
+              },
+            },
           },
-        },
+        });
+        const html = pages.get('/blog');
+
+        const configuration = readPageConfig(pages, html);
+        ctx.expect(configuration, 'the OMEGA_BUILD_JSON snapshot is written').toBeTruthy();
+        ctx.expect(configuration.forms.providers.slapform.formId, 'the blob carries the form id at the path the contact page reads').toBe(FORM_ID);
+
+        // Curated: only the leaf the runtime reads goes public (#23).
+        ctx.expect(Object.keys(configuration.forms.providers.slapform), 'the provisioning-only slapform fields stay out of the public blob').toEqual(['formId']);
+        ctx.expect(!html.includes(TEMPLATE_ID), 'the donor template form id never reaches the page').toBeTruthy();
       },
     },
-  });
-  const html = pages.get('/blog');
 
-  const configuration = readPageConfig(pages, html);
-  assert.ok(configuration, 'the OMEGA_BUILD_JSON snapshot is written');
-  const chatsy = configuration.inbound.chat.providers.chatsy;
-  assert.equal(chatsy.enabled, true);
-  assert.equal(chatsy.agentId, AGENT_ID);
-  assert.deepEqual(chatsy.settings, settings);
+    // ─── D4: one chatsy home, manager writeback ≡ client read ───────────────────
 
-  // Curated: only what the widget reads goes public (#23).
-  assert.deepEqual(
-    Object.keys(chatsy).sort(),
-    ['agentId', 'enabled', 'settings'],
-    'the provisioning-only chatsy fields stay out of the public blob',
-  );
-  assert.ok(!html.includes(TEMPLATE_ID), 'the donor template agent id never reaches the page');
-  assert.ok(!html.includes('SPONSORSHIPSdonor23'), 'the sponsorships url never reaches the page');
-});
+    {
+      name: 'D4: the client reads the chat widget from inbound.chat.providers.chatsy',
+      run: (ctx) => {
+        const client = fs.readFileSync(
+          path.join(PKG, '..', 'client', 'src', 'index.js'),
+          'utf8',
+        );
 
-// ─── D5: the skip log tells the truth ───────────────────────────────────────
+        ctx.expect(client.includes(CHATSY_READ_PATH), `client reads ${CHATSY_READ_PATH}`).toBeTruthy();
+        ctx.expect(client.includes('this.config.inbound.chat.providers.chatsy'), 'the initializer reads agentId + settings from the same home').toBeTruthy();
+        ctx.expect(!/chatsy:\s*\{\s*\n\s*enabled: false,\s*\n\s*config:/.test(client), 'the separate client-side chatsy blob is gone — one home').toBeTruthy();
+      },
+    },
 
-test('D5: an absent section logs "not configured", a disabled one logs "disabled"', () => {
-  const main = fs.readFileSync(path.join(PKG, 'core', 'js', 'main.js'), 'utf8');
+    {
+      name: 'D4: agentId + settings reach the page under the one chatsy home',
+      run: async (ctx) => {
+        const settings = { button: { position: 'bottom-left' } };
+        const pages = await buildWith({
+          ...miniData,
+          inbound: {
+            chat: {
+              providers: {
+                chatsy: {
+                  enabled: true,
+                  agentId: AGENT_ID,
+                  settings,
+                  templateAgentId: TEMPLATE_ID,
+                  updateAgentInfo: true,
+                  plan: { id: 'pro', name: 'Pro' },
+                  sponsorshipsUrl: 'https://example.com/SPONSORSHIPSdonor23',
+                },
+              },
+            },
+          },
+        });
+        const html = pages.get('/blog');
 
-  const match = main.match(/const why = moduleConfig \? (.+?);\n/);
-  assert.ok(match, 'the skip reason is derived from the section, not hardcoded');
+        const configuration = readPageConfig(pages, html);
+        ctx.expect(configuration, 'the OMEGA_BUILD_JSON snapshot is written').toBeTruthy();
+        const chatsy = configuration.inbound.chat.providers.chatsy;
+        ctx.expect(chatsy.enabled).toBe(true);
+        ctx.expect(chatsy.agentId).toBe(AGENT_ID);
+        ctx.expect(chatsy.settings).toEqual(settings);
 
-  // The source itself carries both wordings (main.js is a webpack-alias ESM
-  // entry — unloadable under node --test, so the strings are the contract).
-  assert.ok(main.includes('is disabled'), 'source carries the disabled wording');
-  assert.ok(main.includes('is not configured'), 'source carries the absent wording');
-  assert.ok(
-    !main.includes('config section enables it'),
-    'the old one-message-for-both wording is gone',
-  );
-});
+        // Curated: only what the widget reads goes public (#23).
+        ctx.expect(Object.keys(chatsy).sort(), 'the provisioning-only chatsy fields stay out of the public blob').toEqual(['agentId', 'enabled', 'settings']);
+        ctx.expect(!html.includes(TEMPLATE_ID), 'the donor template agent id never reaches the page').toBeTruthy();
+        ctx.expect(!html.includes('SPONSORSHIPSdonor23'), 'the sponsorships url never reaches the page').toBeTruthy();
+      },
+    },
 
-// ─── #894: the browser subset is the gate, on the page like everywhere else ──
+    // ─── D5: the skip log tells the truth ───────────────────────────────────────
 
-test('#894: the page bakes the ONE wrapper, and no credential section reaches it', async () => {
-  const pages = await buildWith({
-    ...miniData,
-    // The public halves the browser really reads…
-    cloud: { provider: 'firebase', config: { apiKey: 'AIza-rekey', projectId: 'demo-rekey' }, billingAccount: '01ABCD-234567-89EFGH', organizationId: '123456789' },
-    captcha: { providers: { recaptcha: { siteKey: 'site-key-rekey' } } },
-    // …and the sections that provision the brand, which never do
-    repo: { provider: 'github', owner: 'Rekey-Org' },
-    certificates: { providers: { apple: { teamId: 'TEAMREKEY' } } },
-    account: { enabled: true, admins: [{ email: 'root@rekey.example.com' }] },
-    edge: { providers: { cloudflare: { zone: 'rekey.example.com' } } },
-  });
-  const html = pages.get('/blog');
-  const buildJson = readBuildJson(pages);
+    {
+      name: 'D5: an absent section logs "not configured", a disabled one logs "disabled"',
+      run: (ctx) => {
+        const main = fs.readFileSync(path.join(PKG, 'core', 'js', 'main.js'), 'utf8');
 
-  // One wrapper, desktop's names, on every OMEGA browser surface
-  assert.deepEqual(Object.keys(buildJson).sort(), ['builtAt', 'config', 'license', 'mode', 'package']);
+        const match = main.match(/const why = moduleConfig \? (.+?);\n/);
+        ctx.expect(match, 'the skip reason is derived from the section, not hardcoded').toBeTruthy();
 
-  const config = buildJson.config;
-  assert.equal(config.runtime, 'web');
-  assert.equal(config.cloud.config.apiKey, 'AIza-rekey', 'the Firebase WEB config is public by design');
-  assert.equal(config.captcha.providers.recaptcha.siteKey, 'site-key-rekey');
+        // The source itself carries both wordings (main.js is a webpack-alias ESM
+        // entry — unloadable under node --test, so the strings are the contract).
+        ctx.expect(main.includes('is disabled'), 'source carries the disabled wording').toBeTruthy();
+        ctx.expect(main.includes('is not configured'), 'source carries the absent wording').toBeTruthy();
+        ctx.expect(!main.includes('config section enables it'), 'the old one-message-for-both wording is gone').toBeTruthy();
+      },
+    },
 
-  // Absent from the bake, and absent from the PAGE: a value that never enters
-  // the blob cannot leak through some other line of the chrome either.
-  for (const section of ['repo', 'certificates', 'account', 'edge']) {
-    assert.equal(config[section], undefined, `${section} must never reach a browser`);
-  }
-  assert.equal(config.cloud.billingAccount, undefined, 'nor the GCP account facts beside the web config');
-  assert.ok(!html.includes('01ABCD-234567-89EFGH'), 'the billing account is nowhere on the page');
-  assert.ok(!html.includes('TEAMREKEY'), 'nor the signing team id');
-  assert.ok(!html.includes('root@rekey.example.com'), 'nor the account admins');
+    // ─── #894: the browser subset is the gate, on the page like everywhere else ──
+
+    {
+      name: '#894: the page bakes the ONE wrapper, and no credential section reaches it',
+      run: async (ctx) => {
+        const pages = await buildWith({
+          ...miniData,
+          // The public halves the browser really reads…
+          cloud: { provider: 'firebase', config: { apiKey: 'AIza-rekey', projectId: 'demo-rekey' }, billingAccount: '01ABCD-234567-89EFGH', organizationId: '123456789' },
+          captcha: { providers: { recaptcha: { siteKey: 'site-key-rekey' } } },
+          // …and the sections that provision the brand, which never do
+          repo: { provider: 'github', owner: 'Rekey-Org' },
+          certificates: { providers: { apple: { teamId: 'TEAMREKEY' } } },
+          account: { enabled: true, admins: [{ email: 'root@rekey.example.com' }] },
+          edge: { providers: { cloudflare: { zone: 'rekey.example.com' } } },
+        });
+        const html = pages.get('/blog');
+        const buildJson = readBuildJson(pages);
+
+        // One wrapper, desktop's names, on every OMEGA browser surface
+        ctx.expect(Object.keys(buildJson).sort()).toEqual(['builtAt', 'config', 'license', 'mode', 'package']);
+
+        const config = buildJson.config;
+        ctx.expect(config.runtime).toBe('web');
+        ctx.expect(config.cloud.config.apiKey, 'the Firebase WEB config is public by design').toBe('AIza-rekey');
+        ctx.expect(config.captcha.providers.recaptcha.siteKey).toBe('site-key-rekey');
+
+        // Absent from the bake, and absent from the PAGE: a value that never enters
+        // the blob cannot leak through some other line of the chrome either.
+        for (const section of ['repo', 'certificates', 'account', 'edge']) {
+          ctx.expect(config[section], `${section} must never reach a browser`).toBe(undefined);
+        }
+        ctx.expect(config.cloud.billingAccount, 'nor the GCP account facts beside the web config').toBe(undefined);
+        ctx.expect(!html.includes('01ABCD-234567-89EFGH'), 'the billing account is nowhere on the page').toBeTruthy();
+        ctx.expect(!html.includes('TEAMREKEY'), 'nor the signing team id').toBeTruthy();
+        ctx.expect(!html.includes('root@rekey.example.com'), 'nor the account admins').toBeTruthy();
+      },
+    },
+  ],
 });

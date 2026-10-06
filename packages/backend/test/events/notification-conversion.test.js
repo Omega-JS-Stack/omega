@@ -98,43 +98,43 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-new-subscription-fires-the-canonical-notification-subscribe',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { delivery } = await runHandler({
           omega: omega,
           before: undefined,
           after: subscriptionDoc({ owner: '_test-notification-owner' }),
         });
 
-        assert.equal(delivery.length, 1, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`);
-        assert.equal(delivery[0].startsWith('deliverConversion: notification_subscribe →'), true, `the canonical catalog name, not the hyphenated invention: ${delivery[0]}`);
-        assert.equal(delivery[0].includes(`(event_id=notification_subscribe.${TOKEN})`), true, `the token is the stable per-doc key: ${delivery[0]}`);
+        expect(delivery.length, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`).toBe(1);
+        expect(delivery[0].startsWith('deliverConversion: notification_subscribe →'), `the canonical catalog name, not the hyphenated invention: ${delivery[0]}`).toBe(true);
+        expect(delivery[0].includes(`(event_id=notification_subscribe.${TOKEN})`), `the token is the stable per-doc key: ${delivery[0]}`).toBe(true);
 
         // GA4 only — no ad platform maps a push subscription, and an unmapped
         // provider is a decision the catalog makes, not an event to invent.
         for (const provider of ['meta', 'tiktok']) {
-          assert.equal(delivery[0].includes(`${provider} skipped (no mapping)`), true, `${provider} has no mapping for this event: ${delivery[0]}`);
+          expect(delivery[0].includes(`${provider} skipped (no mapping)`), `${provider} has no mapping for this event: ${delivery[0]}`).toBe(true);
         }
       },
     },
 
     {
       name: 'a-deleted-subscription-fires-the-canonical-notification-unsubscribe',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const { delivery } = await runHandler({
           omega: omega,
           before: subscriptionDoc({ owner: '_test-notification-owner' }),
           after: undefined,
         });
 
-        assert.equal(delivery.length, 1, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`);
-        assert.equal(delivery[0].startsWith('deliverConversion: notification_unsubscribe →'), true, `the canonical catalog name: ${delivery[0]}`);
-        assert.equal(delivery[0].includes(`(event_id=notification_unsubscribe.${TOKEN})`), true, `the token keys the unsubscribe too: ${delivery[0]}`);
+        expect(delivery.length, `expected one conversion delivery, got ${delivery.length}: ${delivery.join(' | ')}`).toBe(1);
+        expect(delivery[0].startsWith('deliverConversion: notification_unsubscribe →'), `the canonical catalog name: ${delivery[0]}`).toBe(true);
+        expect(delivery[0].includes(`(event_id=notification_unsubscribe.${TOKEN})`), `the token keys the unsubscribe too: ${delivery[0]}`).toBe(true);
       },
     },
 
     {
       name: 'an-update-fires-nothing',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // Re-tagging a device is not a subscription event. The handler returns
         // at its update branch, before any tracking.
         const { delivery } = await runHandler({
@@ -143,13 +143,13 @@ module.exports = defineCases({
           after: subscriptionDoc({ owner: '_test-notification-owner' }),
         });
 
-        assert.equal(delivery.length, 0, `an update must fire no conversion: ${delivery.join(' | ')}`);
+        expect(delivery.length, `an update must fire no conversion: ${delivery.join(' | ')}`).toBe(0);
       },
     },
 
     {
       name: 'an-anonymous-subscribe-still-fires-and-still-keys-on-the-token',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // `owner: null` is the anonymous-subscribe shape the rules explicitly
         // allow. There is no uid to key on and no identity to match — which is
         // exactly why the doc id is the id.
@@ -159,14 +159,14 @@ module.exports = defineCases({
           after: subscriptionDoc({ owner: null }),
         });
 
-        assert.equal(delivery.length, 1, `an anonymous device is still a subscription: ${delivery.join(' | ')}`);
-        assert.equal(delivery[0].includes(`(event_id=notification_subscribe.${TOKEN})`), true, delivery[0]);
+        expect(delivery.length, `an anonymous device is still a subscription: ${delivery.join(' | ')}`).toBe(1);
+        expect(delivery[0].includes(`(event_id=notification_subscribe.${TOKEN})`), delivery[0]).toBe(true);
       },
     },
 
     {
       name: 'a-declined-analytics-snapshot-blocks-the-fire',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The gate is the whole point of routing through deliverConversion: a
         // raw analytics call asked nobody anything.
         const doc = subscriptionDoc({ owner: '_test-notification-owner' });
@@ -174,8 +174,8 @@ module.exports = defineCases({
 
         const { delivery } = await runHandler({ omega: omega, before: undefined, after: doc });
 
-        assert.equal(delivery.length, 1, delivery.join(' | '));
-        assert.equal(delivery[0].includes('ga4 skipped (consent: analytics)'), true, `an opted-out device reaches no platform: ${delivery[0]}`);
+        expect(delivery.length, delivery.join(' | ')).toBe(1);
+        expect(delivery[0].includes('ga4 skipped (consent: analytics)'), `an opted-out device reaches no platform: ${delivery[0]}`).toBe(true);
       },
     },
   ],

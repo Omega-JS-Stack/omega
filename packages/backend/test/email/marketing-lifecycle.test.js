@@ -33,7 +33,7 @@ module.exports = defineCases({
       name: 'add-contact',
       auth: 'admin',
 
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         const response = await http.post('omega/marketing/contact', {
           email: state.testEmail,
           firstName: 'Lifecycle',
@@ -46,17 +46,17 @@ module.exports = defineCases({
           skipValidation: true,
         });
 
-        assert.isSuccess(response, 'Add contact should succeed');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Add contact should succeed').toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
 
         if (process.env.SENDGRID_API_KEY) {
-          assert.hasProperty(response, 'data.providers.campaigns', 'Should have SendGrid result');
-          assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid add should succeed');
+          expect(response, 'Should have SendGrid result').toHaveProperty('data.providers.campaigns');
+          expect(response, 'SendGrid add should succeed').toHaveProperty('data.providers.campaigns.success', true);
         }
 
         if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
-          assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
-          assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv add should succeed');
+          expect(response, 'Should have Beehiiv result').toHaveProperty('data.providers.newsletter');
+          expect(response, 'Beehiiv add should succeed').toHaveProperty('data.providers.newsletter.success', true);
         }
       },
     },
@@ -67,7 +67,7 @@ module.exports = defineCases({
       name: 'sync-contact-by-uid',
       auth: 'admin',
 
-      async run({ http, assert, accounts, config, omega }) {
+      async run({ http, expect, accounts, config, omega }) {
         // Dedicated journey account — its _test.allow_* prefix bypasses validation, and the
         // cleanup step's DELETE revokes its doc consent, so it must not be a shared sentinel
         // (consent-granted is used by the signup + consent-lifecycle suites).
@@ -81,17 +81,17 @@ module.exports = defineCases({
           uid: grantedUid,
         });
 
-        assert.isSuccess(response, 'Sync contact should succeed');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Sync contact should succeed').toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
 
         if (process.env.SENDGRID_API_KEY) {
-          assert.hasProperty(response, 'data.providers.campaigns', 'Should have SendGrid result');
-          assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid sync should succeed');
+          expect(response, 'Should have SendGrid result').toHaveProperty('data.providers.campaigns');
+          expect(response, 'SendGrid sync should succeed').toHaveProperty('data.providers.campaigns.success', true);
         }
 
         if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
-          assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
-          assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv sync should succeed');
+          expect(response, 'Should have Beehiiv result').toHaveProperty('data.providers.newsletter');
+          expect(response, 'Beehiiv sync should succeed').toHaveProperty('data.providers.newsletter.success', true);
         }
       },
     },
@@ -101,22 +101,22 @@ module.exports = defineCases({
       name: 'remove-contact',
       auth: 'admin',
 
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         const response = await http.delete('omega/marketing/contact', {
           email: state.testEmail,
         });
 
-        assert.isSuccess(response, 'Remove contact should succeed');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Remove contact should succeed').toBeSuccess();
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
 
         if (process.env.SENDGRID_API_KEY) {
-          assert.hasProperty(response, 'data.providers.campaigns', 'Should have SendGrid result');
-          assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid remove should succeed');
+          expect(response, 'Should have SendGrid result').toHaveProperty('data.providers.campaigns');
+          expect(response, 'SendGrid remove should succeed').toHaveProperty('data.providers.campaigns.success', true);
         }
 
         if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
-          assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
-          assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv remove should succeed');
+          expect(response, 'Should have Beehiiv result').toHaveProperty('data.providers.newsletter');
+          expect(response, 'Beehiiv remove should succeed').toHaveProperty('data.providers.newsletter.success', true);
         }
       },
     },

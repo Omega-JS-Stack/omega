@@ -13,27 +13,27 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/dispute-alert', {});
 
-        assert.isError(response, 401, 'Should reject missing key');
+        expect(response, 'Should reject missing key').toBeError(401);
       },
     },
 
     {
       name: 'rejects-invalid-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/dispute-alert?key=wrong-key', {});
 
-        assert.isError(response, 401, 'Should reject invalid key');
+        expect(response, 'Should reject invalid key').toBeError(401);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/dispute-alert?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-unknown-provider',
           card: '4242',
@@ -41,70 +41,70 @@ module.exports = defineCases({
           transactionDate: '2026-01-15',
         });
 
-        assert.isError(response, 400, 'Should reject unknown alert provider');
+        expect(response, 'Should reject unknown alert provider').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-id',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           card: '4242',
           amount: 9.99,
           transactionDate: '2026-01-15',
         });
 
-        assert.isError(response, 400, 'Should reject missing id');
+        expect(response, 'Should reject missing id').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-card',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-card',
           amount: 9.99,
           transactionDate: '2026-01-15',
         });
 
-        assert.isError(response, 400, 'Should reject missing card');
+        expect(response, 'Should reject missing card').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-amount',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-amount',
           card: '4242',
           transactionDate: '2026-01-15',
         });
 
-        assert.isError(response, 400, 'Should reject missing amount');
+        expect(response, 'Should reject missing amount').toBeError(400);
       },
     },
 
     {
       name: 'rejects-missing-transaction-date',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-date',
           card: '4242',
           amount: 9.99,
         });
 
-        assert.isError(response, 400, 'Should reject missing transactionDate');
+        expect(response, 'Should reject missing transactionDate').toBeError(400);
       },
     },
 
     {
       name: 'accepts-valid-chargeblast-alert',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-valid';
 
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
@@ -126,45 +126,42 @@ module.exports = defineCases({
           isRefunded: false,
         });
 
-        assert.isSuccess(response, 'Should accept valid Chargeblast alert');
-        assert.equal(response.data.received, true, 'Should confirm receipt');
+        expect(response, 'Should accept valid Chargeblast alert').toBeSuccess();
+        expect(response.data.received, 'Should confirm receipt').toBe(true);
 
         // Verify doc was saved to Firestore
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.ok(doc, 'Dispute doc should exist in Firestore');
-        assert.equal(doc.provider, 'chargeblast', 'Provider should be chargeblast');
-        assert.ok(
-          doc.status === 'pending' || doc.status === 'processing',
-          'Status should be pending or processing',
-        );
+        expect(doc, 'Dispute doc should exist in Firestore').toBeTruthy();
+        expect(doc.provider, 'Provider should be chargeblast').toBe('chargeblast');
+        expect(doc.status === 'pending' || doc.status === 'processing', 'Status should be pending or processing').toBeTruthy();
 
         // Verify core normalized alert data
-        assert.equal(doc.alert.card.last4, '4242', 'Should extract last4 from full card number');
-        assert.equal(doc.alert.card.brand, 'visa', 'Should lowercase card brand');
-        assert.equal(doc.alert.amount, 29.99, 'Amount should be preserved');
-        assert.equal(doc.alert.transactionDate, '2026-03-07', 'Should extract date without time');
-        assert.equal(doc.alert.provider, 'stripe', 'Provider should be stripe');
+        expect(doc.alert.card.last4, 'Should extract last4 from full card number').toBe('4242');
+        expect(doc.alert.card.brand, 'Should lowercase card brand').toBe('visa');
+        expect(doc.alert.amount, 'Amount should be preserved').toBe(29.99);
+        expect(doc.alert.transactionDate, 'Should extract date without time').toBe('2026-03-07');
+        expect(doc.alert.provider, 'Provider should be stripe').toBe('stripe');
 
         // Verify new normalized fields
-        assert.equal(doc.alert.alertType, 'FRAUD', 'Alert type should be preserved');
-        assert.equal(doc.alert.customerEmail, 'test@example.com', 'Customer email should be preserved');
-        assert.equal(doc.alert.chargeId, 'ch_test123', 'Charge ID should be extracted from externalOrder');
-        assert.equal(doc.alert.paymentIntentId, 'pi_test456', 'Payment intent ID should be extracted from metadata');
-        assert.equal(doc.alert.stripeUrl, 'https://dashboard.stripe.com/charges/ch_test123', 'Stripe URL should be preserved');
-        assert.equal(doc.alert.reasonCode, 'WIP', 'Reason code should be preserved');
-        assert.equal(doc.alert.subprovider, 'Ethoca', 'Subprovider should be preserved');
-        assert.equal(doc.alert.isRefunded, false, 'isRefunded should be preserved');
+        expect(doc.alert.alertType, 'Alert type should be preserved').toBe('FRAUD');
+        expect(doc.alert.customerEmail, 'Customer email should be preserved').toBe('test@example.com');
+        expect(doc.alert.chargeId, 'Charge ID should be extracted from externalOrder').toBe('ch_test123');
+        expect(doc.alert.paymentIntentId, 'Payment intent ID should be extracted from metadata').toBe('pi_test456');
+        expect(doc.alert.stripeUrl, 'Stripe URL should be preserved').toBe('https://dashboard.stripe.com/charges/ch_test123');
+        expect(doc.alert.reasonCode, 'Reason code should be preserved').toBe('WIP');
+        expect(doc.alert.subprovider, 'Subprovider should be preserved').toBe('Ethoca');
+        expect(doc.alert.isRefunded, 'isRefunded should be preserved').toBe(false);
 
         // Verify raw payload is preserved
-        assert.ok(doc.raw, 'Raw payload should be preserved');
-        assert.equal(doc.raw.id, alertId, 'Raw id should match');
+        expect(doc.raw, 'Raw payload should be preserved').toBeTruthy();
+        expect(doc.raw.id, 'Raw id should match').toBe(alertId);
       },
     },
 
     {
       name: 'accepts-alert-with-alertId-field',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-alertid-field';
 
         // Chargeblast alert.created events use alertId instead of id
@@ -176,20 +173,20 @@ module.exports = defineCases({
           transactionDate: '2026-03-19 00:00:00.000000Z',
         });
 
-        assert.isSuccess(response, 'Should accept alert using alertId field');
+        expect(response, 'Should accept alert using alertId field').toBeSuccess();
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.ok(doc, 'Dispute doc should exist in Firestore');
-        assert.equal(doc.id, alertId, 'Doc ID should match alertId');
-        assert.equal(doc.alert.id, alertId, 'Alert id should be set from alertId');
-        assert.equal(doc.alert.card.last4, '5805', 'Should extract last4 from masked card');
+        expect(doc, 'Dispute doc should exist in Firestore').toBeTruthy();
+        expect(doc.id, 'Doc ID should match alertId').toBe(alertId);
+        expect(doc.alert.id, 'Alert id should be set from alertId').toBe(alertId);
+        expect(doc.alert.card.last4, 'Should extract last4 from masked card').toBe('5805');
       },
     },
 
     {
       name: 'accepts-alert-without-optional-fields',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-minimal';
 
         // Send minimal alert (alert.created shape — no externalOrder, metadata, etc.)
@@ -200,26 +197,26 @@ module.exports = defineCases({
           transactionDate: '2026-03-21 00:01:02',
         });
 
-        assert.isSuccess(response, 'Should accept minimal alert');
+        expect(response, 'Should accept minimal alert').toBeSuccess();
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.equal(doc.alert.card.last4, '9124', 'Should use card as last4');
-        assert.equal(doc.alert.provider, 'stripe', 'Provider should default to stripe');
-        assert.equal(doc.alert.chargeId, null, 'Charge ID should be null when not provided');
-        assert.equal(doc.alert.paymentIntentId, null, 'Payment intent should be null when not provided');
-        assert.equal(doc.alert.customerEmail, null, 'Customer email should be null when not provided');
-        assert.equal(doc.alert.alertType, null, 'Alert type should be null when not provided');
-        assert.equal(doc.alert.stripeUrl, null, 'Stripe URL should be null when not provided');
-        assert.equal(doc.alert.reasonCode, null, 'Reason code should be null when not provided');
-        assert.equal(doc.alert.subprovider, null, 'Subprovider should be null when not provided');
-        assert.equal(doc.alert.isRefunded, false, 'isRefunded should default to false');
+        expect(doc.alert.card.last4, 'Should use card as last4').toBe('9124');
+        expect(doc.alert.provider, 'Provider should default to stripe').toBe('stripe');
+        expect(doc.alert.chargeId, 'Charge ID should be null when not provided').toBe(null);
+        expect(doc.alert.paymentIntentId, 'Payment intent should be null when not provided').toBe(null);
+        expect(doc.alert.customerEmail, 'Customer email should be null when not provided').toBe(null);
+        expect(doc.alert.alertType, 'Alert type should be null when not provided').toBe(null);
+        expect(doc.alert.stripeUrl, 'Stripe URL should be null when not provided').toBe(null);
+        expect(doc.alert.reasonCode, 'Reason code should be null when not provided').toBe(null);
+        expect(doc.alert.subprovider, 'Subprovider should be null when not provided').toBe(null);
+        expect(doc.alert.isRefunded, 'isRefunded should default to false').toBe(false);
       },
     },
 
     {
       name: 'accepts-alert-with-last4-only',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-last4';
 
         const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
@@ -229,18 +226,18 @@ module.exports = defineCases({
           transactionDate: '2026-01-15',
         });
 
-        assert.isSuccess(response, 'Should accept alert with card last4 only');
+        expect(response, 'Should accept alert with card last4 only').toBeSuccess();
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.equal(doc.alert.card.last4, '1234', 'Should use card value as last4 when already 4 digits');
-        assert.equal(doc.alert.provider, 'stripe', 'Provider should default to stripe');
+        expect(doc.alert.card.last4, 'Should use card value as last4 when already 4 digits').toBe('1234');
+        expect(doc.alert.provider, 'Provider should default to stripe').toBe('stripe');
       },
     },
 
     {
       name: 'deduplicates-dispute-alerts',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-duplicate';
 
         // Pre-seed an in-flight dispute directly. We seed (rather than POST a first alert)
@@ -262,15 +259,15 @@ module.exports = defineCases({
           transactionDate: '2026-03-07',
         });
 
-        assert.isSuccess(response, 'Duplicate should still return 200');
-        assert.equal(response.data.duplicate, true, 'Should indicate duplicate');
+        expect(response, 'Duplicate should still return 200').toBeSuccess();
+        expect(response.data.duplicate, 'Should indicate duplicate').toBe(true);
       },
     },
 
     {
       name: 'retries-failed-alerts',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-retry';
 
         // Pre-seed a failed dispute
@@ -288,22 +285,19 @@ module.exports = defineCases({
           transactionDate: '2026-03-07',
         });
 
-        assert.isSuccess(response, 'Should accept retry of failed alert');
-        assert.ok(!response.data.duplicate, 'Should not indicate duplicate for failed retry');
+        expect(response, 'Should accept retry of failed alert').toBeSuccess();
+        expect(!response.data.duplicate, 'Should not indicate duplicate for failed retry').toBeTruthy();
 
         // Verify doc was updated
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.ok(
-          doc.status === 'pending' || doc.status === 'processing',
-          'Status should be pending or processing after retry',
-        );
+        expect(doc.status === 'pending' || doc.status === 'processing', 'Status should be pending or processing after retry').toBeTruthy();
       },
     },
 
     {
       name: 'defaults-provider-to-chargeblast',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const alertId = '_test-dispute-default-provider';
 
         // Send without provider query param
@@ -314,10 +308,10 @@ module.exports = defineCases({
           transactionDate: '2026-01-15',
         });
 
-        assert.isSuccess(response, 'Should accept without explicit provider param');
+        expect(response, 'Should accept without explicit provider param').toBeSuccess();
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        assert.equal(doc.provider, 'chargeblast', 'Provider should default to chargeblast');
+        expect(doc.provider, 'Provider should default to chargeblast').toBe('chargeblast');
       },
     },
   ],

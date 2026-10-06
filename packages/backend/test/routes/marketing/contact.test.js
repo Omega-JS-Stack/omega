@@ -44,7 +44,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
 
@@ -58,19 +58,19 @@ module.exports = defineCases({
           // No firstName/lastName - should be inferred as "Rachel Greene"
         });
 
-        assert.isSuccess(response, 'Add marketing contact should succeed for admin');
-        assert.hasProperty(response, 'data.success', 'Response should contain success');
-        assert.propertyEquals(response, 'data.success', true, 'success should be true');
+        expect(response, 'Add marketing contact should succeed for admin').toBeSuccess();
+        expect(response, 'Response should contain success').toHaveProperty('data.success');
+        expect(response, 'success should be true').toHaveProperty('data.success', true);
 
         // Admin gets detailed response
-        assert.hasProperty(response, 'data.providers', 'Admin response should contain providers');
+        expect(response, 'Admin response should contain providers').toHaveProperty('data.providers');
 
         // If TEST_EXTENDED_MODE is set, verify provider results
         if (process.env.TEST_EXTENDED_MODE) {
           const providers = response.data.providers || {};
 
           if (process.env.SENDGRID_API_KEY) {
-            assert.hasProperty(response, 'data.providers.campaigns', 'Should have SendGrid result');
+            expect(response, 'Should have SendGrid result').toHaveProperty('data.providers.campaigns');
             if (providers.campaigns?.success) {
               state.sendgridAdded = true;
             } else {
@@ -80,7 +80,7 @@ module.exports = defineCases({
           }
 
           if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
-            assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
+            expect(response, 'Should have Beehiiv result').toHaveProperty('data.providers.newsletter');
             if (providers.newsletter?.success) {
               state.beehiivAdded = true;
             } else {
@@ -111,13 +111,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/contact', {
           email: 'not-a-valid-email',
           source: 'backend-test',
         });
 
-        assert.isError(response, 400, 'Invalid email format should return 400');
+        expect(response, 'Invalid email format should return 400').toBeError(400);
       },
     },
 
@@ -127,13 +127,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/contact', {
           firstName: 'Test',
           source: 'backend-test',
         });
 
-        assert.isError(response, 400, 'Missing email should return 400');
+        expect(response, 'Missing email should return 400').toBeError(400);
       },
     },
 
@@ -143,13 +143,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/marketing/contact', {
           email: 'test@mailinator.com',
           source: 'backend-test',
         });
 
-        assert.isError(response, 400, 'Disposable email should return 400');
+        expect(response, 'Disposable email should return 400').toBeError(400);
       },
     },
 
@@ -160,7 +160,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Use valid email without providing name - should infer "Rachel Greene"
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
@@ -175,15 +175,12 @@ module.exports = defineCases({
           skipValidation: true,
         });
 
-        assert.isSuccess(response, 'Add marketing contact should succeed');
+        expect(response, 'Add marketing contact should succeed').toBeSuccess();
 
         // Check name was inferred
-        assert.hasProperty(response, 'data.nameInferred', 'Should have nameInferred');
-        assert.ok(
-          response.data.nameInferred.firstName || response.data.nameInferred.lastName,
-          'Name should be inferred from email'
-        );
-        assert.hasProperty(response.data.nameInferred, 'method', 'Should include inference method');
+        expect(response, 'Should have nameInferred').toHaveProperty('data.nameInferred');
+        expect(response.data.nameInferred.firstName || response.data.nameInferred.lastName, 'Name should be inferred from email').toBeTruthy();
+        expect(response.data.nameInferred, 'Should include inference method').toHaveProperty('method');
 
         // Track if providers were called
         if (process.env.TEST_EXTENDED_MODE) {
@@ -207,7 +204,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Use disposable domain - normally blocked, but skipValidation bypasses
         const testEmail = 'rachel.greene+bem@mailinator.com';
         state.testEmail = testEmail;
@@ -219,7 +216,7 @@ module.exports = defineCases({
         });
 
         // Should succeed because validation was skipped
-        assert.isSuccess(response, 'Add marketing contact with skipValidation should succeed');
+        expect(response, 'Add marketing contact with skipValidation should succeed').toBeSuccess();
 
         if (process.env.TEST_EXTENDED_MODE) {
           state.sendgridAdded = response.data?.providers?.campaigns?.success;
@@ -245,7 +242,7 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE or mailbox API key not set'
         : false,
 
-      async run({ http, assert, state, skip }) {
+      async run({ http, expect, state, skip }) {
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
 
@@ -261,28 +258,25 @@ module.exports = defineCases({
         // proves the paid mailbox pipeline ran and rejected. Nothing was added, so
         // cleanup is a no-op.
         if (response.status === 400) {
-          assert.ok(
-            response.error?.includes('Email validation failed'),
-            `400 should be the validation-failed branch, got: ${response.error}`
-          );
+          expect(response.error?.includes('Email validation failed'), `400 should be the validation-failed branch, got: ${response.error}`).toBeTruthy();
 
           if (response.error.includes('(dns)')) {
             skip('Transient DNS failure — mailbox check never ran');
           }
 
-          assert.ok(response.error.includes('(mailbox)'), `Failed check should be mailbox, got: ${response.error}`);
+          expect(response.error.includes('(mailbox)'), `Failed check should be mailbox, got: ${response.error}`).toBeTruthy();
           return;
         }
 
         // Outcome B: provider accepted (valid/catch-all/unknown) or failed open.
-        assert.isSuccess(response, 'Add marketing contact should succeed');
+        expect(response, 'Add marketing contact should succeed').toBeSuccess();
 
         // Check that validation info is included
-        assert.hasProperty(response, 'data.validation', 'Response should contain validation');
-        assert.hasProperty(response, 'data.validation.checks', 'Validation should contain checks');
+        expect(response, 'Response should contain validation').toHaveProperty('data.validation');
+        expect(response, 'Validation should contain checks').toHaveProperty('data.validation.checks');
 
         // Mailbox check should be in checks when key is set
-        assert.hasProperty(response, 'data.validation.checks.mailbox', 'Should have mailbox check');
+        expect(response, 'Should have mailbox check').toHaveProperty('data.validation.checks.mailbox');
 
         const mbResult = response.data.validation.checks.mailbox;
 
@@ -292,7 +286,7 @@ module.exports = defineCases({
           skip(`Mailbox verification unavailable: ${mbResult.error}`);
         }
 
-        assert.hasProperty(mbResult, 'status', 'Mailbox check should return status');
+        expect(mbResult, 'Mailbox check should return status').toHaveProperty('status');
 
         state.sendgridAdded = response.data?.providers?.campaigns?.success;
         state.beehiivAdded = response.data?.providers?.newsletter?.success;
@@ -316,7 +310,7 @@ module.exports = defineCases({
         ? 'TEST_EXTENDED_MODE or mailbox API key not set'
         : false,
 
-      async run({ http, assert, skip }) {
+      async run({ http, expect, skip }) {
         // Email that should reach the mailbox provider and be flagged as undeliverable.
         // Must NOT trip earlier checks (localPart blocklist, disposable, corporate).
         const testEmail = TEST_EMAILS.invalid();
@@ -343,15 +337,15 @@ module.exports = defineCases({
             skip('Transient DNS failure — mailbox check never ran');
           }
 
-          assert.ok(response.error?.includes('(mailbox)'), `Failed check should be mailbox, got: ${response.error}`);
+          expect(response.error?.includes('(mailbox)'), `Failed check should be mailbox, got: ${response.error}`).toBeTruthy();
           return;
         }
 
         // Otherwise expect a 200 with a non-"valid" mailbox status.
-        assert.isSuccess(response, 'Request should succeed (fail-open) or error 400');
+        expect(response, 'Request should succeed (fail-open) or error 400').toBeSuccess();
         if (mbResult) {
-          assert.hasProperty(mbResult, 'status', 'Should have status');
-          assert.notEqual(mbResult.status, 'valid', 'Fake email should not be marked valid');
+          expect(mbResult, 'Should have status').toHaveProperty('status');
+          expect(mbResult.status, 'Fake email should not be marked valid').not.toBe('valid');
         }
       },
     },
@@ -362,7 +356,7 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // The public lane's gate is an EXPLICIT per-IP counter, not a plan
         // feature ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)):
         // `MARKETING_RATE_LIMIT` subscribes from one caller go through, the
@@ -382,13 +376,13 @@ module.exports = defineCases({
         for (let i = 1; i <= MARKETING_RATE_LIMIT; i++) {
           const response = await send();
 
-          assert.isSuccess(response, `Anonymous subscribe ${i} of ${MARKETING_RATE_LIMIT} should be inside the gate`);
+          expect(response, `Anonymous subscribe ${i} of ${MARKETING_RATE_LIMIT} should be inside the gate`).toBeSuccess();
         }
 
         const refused = await send();
 
-        assert.ok(!refused.success, `Anonymous subscribe ${MARKETING_RATE_LIMIT + 1} should be refused`);
-        assert.equal(refused.status, 429, `Expected 429 past the gate but got ${refused.status}`);
+        expect(!refused.success, `Anonymous subscribe ${MARKETING_RATE_LIMIT + 1} should be refused`).toBeTruthy();
+        expect(refused.status, `Expected 429 past the gate but got ${refused.status}`).toBe(429);
       },
     },
 
@@ -401,7 +395,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Clean up the rachel.greene+bem test contact from marketing providers
         const testEmail = TEST_EMAILS.valid();
 
@@ -409,7 +403,7 @@ module.exports = defineCases({
           email: testEmail,
         });
 
-        assert.isSuccess(response, 'Remove marketing contact should succeed');
+        expect(response, 'Remove marketing contact should succeed').toBeSuccess();
       },
     },
   ],

@@ -23,8 +23,8 @@
  * test's control, the lazy-loading/auth-policy convention (node has no DOM and
  * web pulls in no jsdom).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -133,47 +133,9 @@ async function runCompletion({ framesFire }) {
  * @param {string} message - What the case expects.
  */
 function assertBusyCleared(documentElement, body, message) {
-  assert.equal(body.getAttribute('aria-busy'), 'false', message);
-  assert.equal(documentElement.getAttribute('aria-busy'), null, 'the <html> carries no busy flag at all');
+  expect(body.getAttribute('aria-busy'), message).toBe('false');
+  expect(documentElement.getAttribute('aria-busy'), 'the <html> carries no busy flag at all').toBe(null);
 }
-
-test('#803: the page-loading state clears even when no frame ever fires', async () => {
-  const { documentElement, body, frames } = await runCompletion({ framesFire: false });
-
-  assert.equal(frames.length, 1, 'the frame was still asked for, so the paint boundary is unchanged');
-  assert.equal(documentElement.getAttribute('data-page-loading'), 'true', 'and nothing clears the state in the frame window');
-
-  await delay(PAST_DELAY);
-
-  assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the timer cleared the state the frame never did');
-  assertBusyCleared(documentElement, body, 'the page tells assistive tech it is done, too');
-});
-
-test('#803: on a drawing renderer the FRAME clears the state, well before the timer', async () => {
-  const { documentElement, body, frames } = await runCompletion({ framesFire: true });
-
-  assert.equal(frames.length, 1, 'one frame requested');
-  assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the paint boundary is what cleared it, not the fallback');
-  assertBusyCleared(documentElement, body, 'and the busy flag is down');
-
-  await delay(PAST_DELAY);
-
-  assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the timer behind it is a no-op');
-});
-
-test('#803: a frame that arrives after the timer is a no-op, not a second clear', async () => {
-  const { documentElement, body, frames } = await runCompletion({ framesFire: false });
-
-  await delay(PAST_DELAY);
-
-  assert.deepEqual(documentElement.removed, ['data-page-loading'], 'the timer went first');
-
-  // The display wakes: the frame the module asked for finally runs
-  frames[0]();
-
-  assert.deepEqual(documentElement.removed, ['data-page-loading'], 'and the late frame clears nothing a second time');
-  assertBusyCleared(documentElement, body, 'the busy flag stays down');
-});
 
 /**
  * The opening tag of one element in a rendered page.
@@ -184,25 +146,81 @@ test('#803: a frame that arrives after the timer is a no-op, not a second clear'
  */
 function openingTag(html, name) {
   const match = html.match(new RegExp(`<${name}\\b[^>]*>`));
-  assert.ok(match, `the page renders a <${name}>`);
+  expect(match, `the page renders a <${name}>`).toBeTruthy();
 
   return match[0];
 }
 
-// The root layout's two tags as a build renders them: the loading state on the
-// <html>, the busy flag on the <body> only.
-test('#1063: the root layout renders the busy flag on the body, the loading state on the html', async () => {
-  const pages = await buildWith(miniData, {}, 'page-loading-test');
+module.exports = defineCases({
+  type: 'group',
+  description: 'page-loading-complete',
+  tests: [
+    {
+      name: '#803: the page-loading state clears even when no frame ever fires',
+      run: async (ctx) => {
+        const { documentElement, body, frames } = await runCompletion({ framesFire: false });
 
-  for (const url of ['/', '/signup']) {
-    const html = pages.get(url);
-    assert.ok(html, `${url} built`);
+        ctx.expect(frames.length, 'the frame was still asked for, so the paint boundary is unchanged').toBe(1);
+        ctx.expect(documentElement.getAttribute('data-page-loading'), 'and nothing clears the state in the frame window').toBe('true');
 
-    const htmlTag = openingTag(html, 'html');
-    const bodyTag = openingTag(html, 'body');
+        await delay(PAST_DELAY);
 
-    assert.match(htmlTag, /\sdata-page-loading="true"/, `${url}: the <html> starts in the loading state`);
-    assert.ok(!/\saria-busy=/.test(htmlTag), `${url}: the <html> carries no aria-busy`);
-    assert.match(bodyTag, /\saria-busy="true"/, `${url}: the <body> starts busy`);
-  }
+        ctx.expect(documentElement.removed, 'the timer cleared the state the frame never did').toEqual(['data-page-loading']);
+        assertBusyCleared(documentElement, body, 'the page tells assistive tech it is done, too');
+      },
+    },
+
+    {
+      name: '#803: on a drawing renderer the FRAME clears the state, well before the timer',
+      run: async (ctx) => {
+        const { documentElement, body, frames } = await runCompletion({ framesFire: true });
+
+        ctx.expect(frames.length, 'one frame requested').toBe(1);
+        ctx.expect(documentElement.removed, 'the paint boundary is what cleared it, not the fallback').toEqual(['data-page-loading']);
+        assertBusyCleared(documentElement, body, 'and the busy flag is down');
+
+        await delay(PAST_DELAY);
+
+        ctx.expect(documentElement.removed, 'the timer behind it is a no-op').toEqual(['data-page-loading']);
+      },
+    },
+
+    {
+      name: '#803: a frame that arrives after the timer is a no-op, not a second clear',
+      run: async (ctx) => {
+        const { documentElement, body, frames } = await runCompletion({ framesFire: false });
+
+        await delay(PAST_DELAY);
+
+        ctx.expect(documentElement.removed, 'the timer went first').toEqual(['data-page-loading']);
+
+        // The display wakes: the frame the module asked for finally runs
+        frames[0]();
+
+        ctx.expect(documentElement.removed, 'and the late frame clears nothing a second time').toEqual(['data-page-loading']);
+        assertBusyCleared(documentElement, body, 'the busy flag stays down');
+      },
+    },
+
+    // The root layout's two tags as a build renders them: the loading state on the
+    // <html>, the busy flag on the <body> only.
+    {
+      name: '#1063: the root layout renders the busy flag on the body, the loading state on the html',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData, {}, 'page-loading-test');
+
+        for (const url of ['/', '/signup']) {
+          const html = pages.get(url);
+          ctx.expect(html, `${url} built`).toBeTruthy();
+
+          const htmlTag = openingTag(html, 'html');
+          const bodyTag = openingTag(html, 'body');
+
+          ctx.expect(htmlTag, `${url}: the <html> starts in the loading state`).toMatch(/\sdata-page-loading="true"/);
+          ctx.expect(!/\saria-busy=/.test(htmlTag), `${url}: the <html> carries no aria-busy`).toBeTruthy();
+          ctx.expect(bodyTag, `${url}: the <body> starts busy`).toMatch(/\saria-busy="true"/);
+        }
+      },
+    },
+  ],
 });

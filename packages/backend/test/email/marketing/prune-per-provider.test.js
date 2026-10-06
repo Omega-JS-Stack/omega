@@ -21,7 +21,7 @@
  * in Firestore permanently. The live provider surface is covered by the
  * extended-mode marketing-lifecycle suite.
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const cron = require('../../../dist/omega/events/cron/daily/marketing-prune.js');
 const omega = require('../../../dist/omega/index.js');
 const sendgridProvider = require('../../../dist/omega/libraries/email/providers/sendgrid.js');
@@ -269,32 +269,32 @@ const INACTIVE_CASES = [
   {
     name: 'never opened or clicked across the received floor',
     subscription: { email: 'cold@gmail.com' },
-    expect: true,
+    expected: true,
   },
   {
     name: 'opened at least once (a rate survives forever)',
     subscription: { email: 'opener@gmail.com', openRate: 12.5 },
-    expect: false,
+    expected: false,
   },
   {
     name: 'clicked at least once',
     subscription: { email: 'clicker@gmail.com', clickRate: 4 },
-    expect: false,
+    expected: false,
   },
   {
     name: 'under the received floor (a quiet channel prunes nobody)',
     subscription: { email: 'unmailed@gmail.com', received: NEWSLETTER_RECEIVED_FLOOR - 1 },
-    expect: false,
+    expected: false,
   },
   {
     name: 'exactly at the received floor',
     subscription: { email: 'floor@gmail.com', received: NEWSLETTER_RECEIVED_FLOOR },
-    expect: true,
+    expected: true,
   },
   {
     name: 'too new to judge (inside the grace period)',
     subscription: { email: 'fresh@gmail.com', ageDays: NEWSLETTER_MIN_AGE_DAYS - 1 },
-    expect: false,
+    expected: false,
   },
 ];
 
@@ -321,30 +321,22 @@ module.exports = defineCases({
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
         }, () => stagePrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(
-          beehiivRemovals,
-          [],
-          `SendGrid engagement must never delete a Beehiiv subscriber, removed: ${JSON.stringify(beehiivRemovals)}`,
-        );
-        assert.deepStrictEqual(deleted, ['sg_1'], `The SendGrid delete still runs, got ${JSON.stringify(deleted)}`);
-        assert.strictEqual(writes.length, 1, `Stage 2 writes one prune log, got ${writes.length}`);
-        assert.strictEqual(
-          writes[0].path,
-          `marketing-prune-logs/${BRAND.id}/runs/${logKey()}`,
-          `The SendGrid lane keeps its run doc path, got ${writes[0].path}`,
-        );
-        assert.deepStrictEqual(writes[0].data.emails, ['newsletter.reader@gmail.com'], 'The log keeps the deleted emails for recoverability');
+        expect(beehiivRemovals, `SendGrid engagement must never delete a Beehiiv subscriber, removed: ${JSON.stringify(beehiivRemovals)}`).toEqual([]);
+        expect(deleted, `The SendGrid delete still runs, got ${JSON.stringify(deleted)}`).toEqual(['sg_1']);
+        expect(writes.length, `Stage 2 writes one prune log, got ${writes.length}`).toBe(1);
+        expect(writes[0].path, `The SendGrid lane keeps its run doc path, got ${writes[0].path}`).toBe(`marketing-prune-logs/${BRAND.id}/runs/${logKey()}`);
+        expect(writes[0].data.emails, 'The log keeps the deleted emails for recoverability').toEqual(['newsletter.reader@gmail.com']);
       },
     },
 
     // ─── 2. The Beehiiv lane's rule ───
-    ...INACTIVE_CASES.map(({ name, subscription: options, expect }) => ({
+    ...INACTIVE_CASES.map(({ name, subscription: options, expected }) => ({
       name: `isNewsletterInactive: ${name}`,
 
       run() {
         const actual = isNewsletterInactive(subscription(options), Date.now());
 
-        assert.strictEqual(actual, expect, `Expected ${expect}, got ${actual}`);
+        expect(actual, `Expected ${expected}, got ${actual}`).toBe(expected);
       },
     })),
 
@@ -354,12 +346,8 @@ module.exports = defineCases({
       run() {
         const bare = { id: 'sub_1', email: 'nostats@gmail.com', created: Math.round((Date.now() - (400 * DAY)) / 1000) };
 
-        assert.strictEqual(isNewsletterInactive(bare, Date.now()), false, 'A subscription with no stats is never prunable');
-        assert.strictEqual(
-          isNewsletterInactive({ ...bare, stats: { emails_received: 40 } }, Date.now()),
-          false,
-          'A stats block missing the rates is never prunable',
-        );
+        expect(isNewsletterInactive(bare, Date.now()), 'A subscription with no stats is never prunable').toBe(false);
+        expect(isNewsletterInactive({ ...bare, stats: { emails_received: 40 } }, Date.now()), 'A stats block missing the rates is never prunable').toBe(false);
       },
     },
 
@@ -393,18 +381,10 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(removals, ['cold@gmail.com'], `Only the Beehiiv-inactive subscriber is deleted, got ${JSON.stringify(removals)}`);
-        assert.deepStrictEqual(
-          listArgs,
-          [{ status: 'active', expand: ['stats'] }],
-          `The lane reads Beehiiv's own per-subscriber stats, got ${JSON.stringify(listArgs)}`,
-        );
-        assert.strictEqual(
-          writes[0]?.path,
-          `marketing-prune-logs/${BRAND.id}/runs/${logKey()}-newsletter`,
-          `The Beehiiv lane logs under its own run doc, got ${writes[0]?.path}`,
-        );
-        assert.deepStrictEqual(writes[0].data.emails, ['cold@gmail.com'], 'The log keeps the deleted emails for recoverability');
+        expect(removals, `Only the Beehiiv-inactive subscriber is deleted, got ${JSON.stringify(removals)}`).toEqual(['cold@gmail.com']);
+        expect(listArgs, `The lane reads Beehiiv's own per-subscriber stats, got ${JSON.stringify(listArgs)}`).toEqual([{ status: 'active', expand: ['stats'] }]);
+        expect(writes[0]?.path, `The Beehiiv lane logs under its own run doc, got ${writes[0]?.path}`).toBe(`marketing-prune-logs/${BRAND.id}/runs/${logKey()}-newsletter`);
+        expect(writes[0].data.emails, 'The log keeps the deleted emails for recoverability').toEqual(['cold@gmail.com']);
       },
     },
 
@@ -431,8 +411,8 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(removals, [], `Dormancy is the guard working, got ${JSON.stringify(removals)}`);
-        assert.strictEqual(writes.length, 0, 'Nothing deleted means nothing logged');
+        expect(removals, `Dormancy is the guard working, got ${JSON.stringify(removals)}`).toEqual([]);
+        expect(writes.length, 'Nothing deleted means nothing logged').toBe(0);
       },
     },
 
@@ -453,8 +433,8 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(removals, [], `A partial or failed read must never drive deletes, got ${JSON.stringify(removals)}`);
-        assert.strictEqual(calls.errors.length, 1, `The failed listing is logged loudly, got ${JSON.stringify(calls.errors)}`);
+        expect(removals, `A partial or failed read must never drive deletes, got ${JSON.stringify(removals)}`).toEqual([]);
+        expect(calls.errors.length, `The failed listing is logged loudly, got ${JSON.stringify(calls.errors)}`).toBe(1);
       },
     },
 
@@ -484,12 +464,8 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(
-          writes[0]?.data.emails,
-          ['cold@gmail.com'],
-          `Only the subscribers this run actually deleted are logged, got ${JSON.stringify(writes[0]?.data.emails)}`,
-        );
-        assert.strictEqual(writes[0]?.data.count, 1, `The recoverability count matches the deletes, got ${writes[0]?.data.count}`);
+        expect(writes[0]?.data.emails, `Only the subscribers this run actually deleted are logged, got ${JSON.stringify(writes[0]?.data.emails)}`).toEqual(['cold@gmail.com']);
+        expect(writes[0]?.data.count, `The recoverability count matches the deletes, got ${writes[0]?.data.count}`).toBe(1);
       },
     },
 
@@ -522,17 +498,9 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(
-          removals,
-          ['free@gmail.com', 'cancelled@gmail.com', 'noaccount@gmail.com'],
-          `A paying account is never pruned, and nobody else is spared, got ${JSON.stringify(removals)}`,
-        );
-        assert.strictEqual(writes[0]?.data.skippedPaid, 1, `The run log counts the skipped payer, got ${writes[0]?.data.skippedPaid}`);
-        assert.deepStrictEqual(
-          writes[0]?.data.emails,
-          ['free@gmail.com', 'cancelled@gmail.com', 'noaccount@gmail.com'],
-          `The run log holds only the deleted emails, got ${JSON.stringify(writes[0]?.data.emails)}`,
-        );
+        expect(removals, `A paying account is never pruned, and nobody else is spared, got ${JSON.stringify(removals)}`).toEqual(['free@gmail.com', 'cancelled@gmail.com', 'noaccount@gmail.com']);
+        expect(writes[0]?.data.skippedPaid, `The run log counts the skipped payer, got ${writes[0]?.data.skippedPaid}`).toBe(1);
+        expect(writes[0]?.data.emails, `The run log holds only the deleted emails, got ${JSON.stringify(writes[0]?.data.emails)}`).toEqual(['free@gmail.com', 'cancelled@gmail.com', 'noaccount@gmail.com']);
       },
     },
 
@@ -555,8 +523,8 @@ module.exports = defineCases({
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
-        assert.deepStrictEqual(removals, [], `Nothing left to prune means no deletes, got ${JSON.stringify(removals)}`);
-        assert.strictEqual(writes.length, 0, 'Nothing deleted means nothing logged');
+        expect(removals, `Nothing left to prune means no deletes, got ${JSON.stringify(removals)}`).toEqual([]);
+        expect(writes.length, 'Nothing deleted means nothing logged').toBe(0);
       },
     },
 
@@ -579,7 +547,7 @@ module.exports = defineCases({
           ctx,
         ));
 
-        assert.strictEqual(listed, false, 'A disabled newsletter never reaches the provider');
+        expect(listed, 'A disabled newsletter never reaches the provider').toBe(false);
       },
     },
 
@@ -604,14 +572,14 @@ module.exports = defineCases({
           request,
         ));
 
-        assert.strictEqual(result.success, true, `Expected a successful walk, got ${JSON.stringify(result)}`);
-        assert.strictEqual(result.subscriptions.length, 3, `Every page's subscribers are collected, got ${result.subscriptions.length}`);
-        assert.strictEqual(calls.length, 2, `The walk stops on has_more: false, got ${calls.length} calls`);
-        assert.match(calls[0], /limit=100/, `The first page asks for a full page, got ${calls[0]}`);
-        assert.match(calls[0], /status=active/, `The status filter rides the query, got ${calls[0]}`);
-        assert.match(calls[0], /expand\[\]=stats/, `The stats expand rides the query unencoded, got ${calls[0]}`);
-        assert.ok(!calls[0].includes('cursor='), `The first page carries no cursor, got ${calls[0]}`);
-        assert.match(calls[1], /cursor=cursor_2/, `The next page carries the returned cursor, got ${calls[1]}`);
+        expect(result.success, `Expected a successful walk, got ${JSON.stringify(result)}`).toBe(true);
+        expect(result.subscriptions.length, `Every page's subscribers are collected, got ${result.subscriptions.length}`).toBe(3);
+        expect(calls.length, `The walk stops on has_more: false, got ${calls.length} calls`).toBe(2);
+        expect(calls[0], `The first page asks for a full page, got ${calls[0]}`).toMatch(/limit=100/);
+        expect(calls[0], `The status filter rides the query, got ${calls[0]}`).toMatch(/status=active/);
+        expect(calls[0], `The stats expand rides the query unencoded, got ${calls[0]}`).toMatch(/expand\[\]=stats/);
+        expect(!calls[0].includes('cursor='), `The first page carries no cursor, got ${calls[0]}`).toBeTruthy();
+        expect(calls[1], `The next page carries the returned cursor, got ${calls[1]}`).toMatch(/cursor=cursor_2/);
       },
     },
 
@@ -627,9 +595,9 @@ module.exports = defineCases({
           return full;
         }));
 
-        assert.strictEqual(result.success, false, `A response with no has_more and more pages behind it must fail, got ${JSON.stringify(result).slice(0, 120)}`);
-        assert.match(result.error, /offset/i, `The error names the shape, got ${result.error}`);
-        assert.strictEqual(calls, 1, `The walk stops at the unexpected shape, got ${calls} calls`);
+        expect(result.success, `A response with no has_more and more pages behind it must fail, got ${JSON.stringify(result).slice(0, 120)}`).toBe(false);
+        expect(result.error, `The error names the shape, got ${result.error}`).toMatch(/offset/i);
+        expect(calls, `The walk stops at the unexpected shape, got ${calls} calls`).toBe(1);
 
         // The carve-out: one short page with nothing behind it is complete, not truncated.
         const short = await withPublication(() => beehiivProvider.listSubscriptions({}, async () => ({
@@ -637,8 +605,8 @@ module.exports = defineCases({
           limit: 100,
         })));
 
-        assert.strictEqual(short.success, true, `A single short page is a complete list, got ${JSON.stringify(short).slice(0, 120)}`);
-        assert.strictEqual(short.subscriptions.length, 2, `Got ${short.subscriptions.length}`);
+        expect(short.success, `A single short page is a complete list, got ${JSON.stringify(short).slice(0, 120)}`).toBe(true);
+        expect(short.subscriptions.length, `Got ${short.subscriptions.length}`).toBe(2);
       },
     },
 
@@ -653,10 +621,10 @@ module.exports = defineCases({
           return { data: [{ id: `sub_${calls}` }], has_more: true, next_cursor: `cursor_${calls}` };
         }));
 
-        assert.strictEqual(result.success, false, `A never-ending walk must fail, got ${JSON.stringify(result).slice(0, 120)}`);
-        assert.match(result.error, /500 pages/, `The error names the cap, got ${result.error}`);
-        assert.strictEqual(calls, 500, `The cap stops the walk at 500 pages, got ${calls}`);
-        assert.strictEqual(result.subscriptions, undefined, 'A capped walk reports no list at all, so nobody can prune from it');
+        expect(result.success, `A never-ending walk must fail, got ${JSON.stringify(result).slice(0, 120)}`).toBe(false);
+        expect(result.error, `The error names the cap, got ${result.error}`).toMatch(/500 pages/);
+        expect(calls, `The cap stops the walk at 500 pages, got ${calls}`).toBe(500);
+        expect(result.subscriptions, 'A capped walk reports no list at all, so nobody can prune from it').toBe(undefined);
       },
     },
 
@@ -689,10 +657,10 @@ module.exports = defineCases({
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
         }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(NEWSLETTER_ENABLED, admin) })));
 
-        assert.deepStrictEqual(deleted, ['sg_1'], `An unmentioned prune is ON, so the SendGrid lane deletes, got ${JSON.stringify(deleted)}`);
-        assert.deepStrictEqual(removals, ['cold@gmail.com'], `An unmentioned prune is ON, so the Beehiiv lane deletes, got ${JSON.stringify(removals)}`);
-        assert.strictEqual(sent.length, 1, `The re-engagement campaign sends, got ${sent.length}`);
-        assert.strictEqual(writes.length, 2, `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`);
+        expect(deleted, `An unmentioned prune is ON, so the SendGrid lane deletes, got ${JSON.stringify(deleted)}`).toEqual(['sg_1']);
+        expect(removals, `An unmentioned prune is ON, so the Beehiiv lane deletes, got ${JSON.stringify(removals)}`).toEqual(['cold@gmail.com']);
+        expect(sent.length, `The re-engagement campaign sends, got ${sent.length}`).toBe(1);
+        expect(writes.length, `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`).toBe(2);
       },
     },
 
@@ -718,14 +686,11 @@ module.exports = defineCases({
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
         }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(PRUNE_DISABLED, admin) })));
 
-        assert.deepStrictEqual(deleted, [], `A brand that opted out deletes no SendGrid contact, got ${JSON.stringify(deleted)}`);
-        assert.deepStrictEqual(removals, [], `A brand that opted out deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`);
-        assert.deepStrictEqual(sent, [], `A brand that opted out sends no re-engagement campaign, got ${JSON.stringify(sent)}`);
-        assert.strictEqual(writes.length, 0, `Nothing ran, so nothing is logged, got ${JSON.stringify(writes)}`);
-        assert.ok(
-          calls.logs.some((line) => line.includes('Marketing prune: disabled')),
-          `The skip is logged, got ${JSON.stringify(calls.logs)}`,
-        );
+        expect(deleted, `A brand that opted out deletes no SendGrid contact, got ${JSON.stringify(deleted)}`).toEqual([]);
+        expect(removals, `A brand that opted out deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`).toEqual([]);
+        expect(sent, `A brand that opted out sends no re-engagement campaign, got ${JSON.stringify(sent)}`).toEqual([]);
+        expect(writes.length, `Nothing ran, so nothing is logged, got ${JSON.stringify(writes)}`).toBe(0);
+        expect(calls.logs.some((line) => line.includes('Marketing prune: disabled')), `The skip is logged, got ${JSON.stringify(calls.logs)}`).toBeTruthy();
       },
     },
 
@@ -751,17 +716,13 @@ module.exports = defineCases({
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
         }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(PRUNE_ENABLED, admin) })));
 
-        assert.deepStrictEqual(deleted, ['sg_1'], `The SendGrid lane still deletes, got ${JSON.stringify(deleted)}`);
-        assert.deepStrictEqual(removals, ['cold@gmail.com'], `The Beehiiv lane still deletes, got ${JSON.stringify(removals)}`);
-        assert.strictEqual(sent.length, 1, `The re-engagement campaign still sends, got ${sent.length}`);
-        assert.deepStrictEqual(
-          writes.map((write) => write.path),
-          [
+        expect(deleted, `The SendGrid lane still deletes, got ${JSON.stringify(deleted)}`).toEqual(['sg_1']);
+        expect(removals, `The Beehiiv lane still deletes, got ${JSON.stringify(removals)}`).toEqual(['cold@gmail.com']);
+        expect(sent.length, `The re-engagement campaign still sends, got ${sent.length}`).toBe(1);
+        expect(writes.map((write) => write.path), `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`).toEqual([
             `marketing-prune-logs/${BRAND.id}/runs/${logKey()}`,
             `marketing-prune-logs/${BRAND.id}/runs/${logKey()}-newsletter`,
-          ],
-          `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`,
-        );
+          ]);
       },
     },
   ],

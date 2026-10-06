@@ -30,7 +30,7 @@ module.exports = defineCases({
     {
       name: 'old-notes-go-and-recent-notes-stay',
 
-      async run({ omega, ctx, firestore, assert }) {
+      async run({ omega, ctx, firestore, expect }) {
         await firestore.set('notes/prune-old', note('prune-old', 31));
         await firestore.set('notes/prune-recent', note('prune-recent', 29));
 
@@ -38,9 +38,9 @@ module.exports = defineCases({
         const job = require(path.join(omega.cwd, 'hooks', 'cron', 'daily', 'prune-notes.js'));
         const result = await job({ ctx, omega, context: {} });
 
-        assert.ok(result.pruned >= 1, 'the job reports what it deleted');
-        assert.equal(await firestore.exists('notes/prune-old'), false, 'a 31-day-old note is pruned');
-        assert.ok(await firestore.exists('notes/prune-recent'), 'a 29-day-old note is kept');
+        expect(result.pruned >= 1, 'the job reports what it deleted').toBeTruthy();
+        expect(await firestore.exists('notes/prune-old'), 'a 31-day-old note is pruned').toBe(false);
+        expect(await firestore.exists('notes/prune-recent'), 'a 29-day-old note is kept').toBeTruthy();
       },
     },
   ],

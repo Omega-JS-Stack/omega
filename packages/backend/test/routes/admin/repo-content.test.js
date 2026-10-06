@@ -31,12 +31,12 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/repo/content', {
           content: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing path should return 400');
+        expect(response, 'Missing path should return 400').toBeError(400);
       },
     },
 
@@ -46,12 +46,12 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
         });
 
-        assert.isError(response, 400, 'Missing content should return 400');
+        expect(response, 'Missing content should return 400').toBeError(400);
       },
     },
 
@@ -61,16 +61,16 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 60000,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const uniqueContent = `@omega.js/backend Test - ${new Date().toISOString()}`;
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-write-test.txt',
           content: uniqueContent,
         });
 
-        assert.isSuccess(response, 'Admin should be able to write content');
-        assert.hasProperty(response, 'data.path', 'Response should contain path');
-        assert.equal(response.data.path, '_test/backend-write-test.txt', 'Path should match');
+        expect(response, 'Admin should be able to write content').toBeSuccess();
+        expect(response, 'Response should contain path').toHaveProperty('data.path');
+        expect(response.data.path, 'Path should match').toBe('_test/backend-write-test.txt');
 
         // Store for cleanup
         state.filesCreated = state.filesCreated || [];
@@ -84,15 +84,15 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/type-test.txt',
           content: 'Test content with default type',
         });
 
-        assert.isSuccess(response, 'Write with default type should succeed');
-        assert.hasProperty(response, 'data.type', 'Response should contain type');
-        assert.equal(response.data.type, 'text', 'Default type should be text');
+        expect(response, 'Write with default type should succeed').toBeSuccess();
+        expect(response, 'Response should contain type').toHaveProperty('data.type');
+        expect(response.data.type, 'Default type should be text').toBe('text');
 
         // Store for cleanup
         state.filesCreated = state.filesCreated || [];
@@ -106,13 +106,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/custom-repo-test.txt',
           content: 'Test content',
         });
 
-        assert.isError(response, 404, 'Non-existent repo should return 404');
+        expect(response, 'Non-existent repo should return 404').toBeError(404);
       },
     },
 
@@ -122,13 +122,13 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
           content: 'Test content',
         });
 
-        assert.isError(response, 401, 'Write repo content should fail without authentication');
+        expect(response, 'Write repo content should fail without authentication').toBeError(401);
       },
     },
 
@@ -137,13 +137,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
           content: 'Test content',
         });
 
-        assert.isError(response, 403, 'Write repo content should fail for non-admin user');
+        expect(response, 'Write repo content should fail for non-admin user').toBeError(403);
       },
     },
 

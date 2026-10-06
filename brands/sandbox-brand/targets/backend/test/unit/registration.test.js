@@ -3,10 +3,9 @@
  * route it dispatches to still loads. `src/index.js` is read as TEXT (requiring it
  * boots the framework); each route handler IS required, so a broken import fails here.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { defineCases } = require('@omega.js/backend/test');
+const { defineCases, expect } = require('@omega.js/backend/test');
 
 const APP_DIR = path.join(__dirname, '..', '..');
 const SRC = path.join(APP_DIR, 'src');
@@ -50,9 +49,9 @@ module.exports = defineCases({
       name: 'index-js-boots-the-installed-framework',
 
       run() {
-        assert.match(INDEX, /require\('@omega\.js\/backend'\)/, 'index.js does not boot @omega.js/backend');
-        assert.match(INDEX, /\.initialize\(/, 'omega.initialize(…) is the bootstrap call');
-        assert.match(INDEX, /module\.exports = omega\.functions;/, 'index.js exports omega.functions, the Cloud Functions map');
+        expect(INDEX, 'index.js does not boot @omega.js/backend').toMatch(/require\('@omega\.js\/backend'\)/);
+        expect(INDEX, 'omega.initialize(…) is the bootstrap call').toMatch(/\.initialize\(/);
+        expect(INDEX, 'index.js exports omega.functions, the Cloud Functions map').toMatch(/module\.exports = omega\.functions;/);
 
         // The specifier index.js requires, resolved the way NODE resolves it FROM
         // src/, the same lookup the deployed function performs at cold start. A
@@ -60,10 +59,7 @@ module.exports = defineCases({
         // directory all fail here instead of at boot.
         const resolved = require.resolve('@omega.js/backend', { paths: [SRC] });
 
-        assert.ok(
-          resolved.startsWith(FRAMEWORK_DIR + path.sep),
-          `index.js's '@omega.js/backend' resolves to ${resolved}, outside the framework package`,
-        );
+        expect(resolved.startsWith(FRAMEWORK_DIR + path.sep), `index.js's '@omega.js/backend' resolves to ${resolved}, outside the framework package`).toBeTruthy();
       },
     },
 
@@ -73,10 +69,7 @@ module.exports = defineCases({
       run() {
         for (const fn of consumerFunctions()) {
           for (const prefix of RESERVED_PREFIXES) {
-            assert.ok(
-              !fn.name.startsWith(prefix),
-              `omega.functions.${fn.name} takes the framework's reserved "${prefix}" prefix: one of the two functions will not deploy`,
-            );
+            expect(!fn.name.startsWith(prefix), `omega.functions.${fn.name} takes the framework's reserved "${prefix}" prefix: one of the two functions will not deploy`).toBeTruthy();
           }
         }
       },
@@ -92,24 +85,21 @@ module.exports = defineCases({
         // resolve, so it is this test's business only if it names a route.
         for (const fn of consumerFunctions().filter((f) => f.route)) {
           const routeDir = path.resolve(SRC, 'routes', fn.route);
-          assert.ok(fs.existsSync(routeDir), `src/routes/${fn.route}/ does not exist: the route answers 500`);
+          expect(fs.existsSync(routeDir), `src/routes/${fn.route}/ does not exist: the route answers 500`).toBeTruthy();
 
           const handlers = [...METHOD_FILES, 'index.js']
             .map((file) => path.join(routeDir, file))
             .filter((file) => fs.existsSync(file));
 
-          assert.ok(
-            handlers.length > 0,
-            `src/routes/${fn.route}/ has no <method>.js and no index.js: every request answers 405`,
-          );
+          expect(handlers.length > 0, `src/routes/${fn.route}/ has no <method>.js and no index.js: every request answers 405`).toBeTruthy();
 
           // Requiring is the point: a route's own imports are exercised here instead
           // of at cold start.
           for (const file of handlers) {
             const handler = require(file);
 
-            assert.equal(typeof handler, 'function', `${path.relative(APP_DIR, file)} does not export a handler function`);
-            assert.equal(handler.constructor.name, 'AsyncFunction', `${path.relative(APP_DIR, file)}'s handler is not async`);
+            expect(typeof handler, `${path.relative(APP_DIR, file)} does not export a handler function`).toBe('function');
+            expect(handler.constructor.name, `${path.relative(APP_DIR, file)}'s handler is not async`).toBe('AsyncFunction');
           }
         }
       },
@@ -122,8 +112,8 @@ module.exports = defineCases({
         const FIREBASE = firebaseJson(skip);
 
         // `omega build` copies src/** → dist/** and firebase.json deploys dist/.
-        assert.equal(FIREBASE.functions[0].source, 'dist', 'functions deploy from the staged dist/, never src/');
-        assert.equal(FIREBASE.hosting.public, 'dist/public', 'hosting serves the staged public dir');
+        expect(FIREBASE.functions[0].source, 'functions deploy from the staged dist/, never src/').toBe('dist');
+        expect(FIREBASE.hosting.public, 'hosting serves the staged public dir').toBe('dist/public');
       },
     },
 
@@ -134,19 +124,19 @@ module.exports = defineCases({
         const rewrites = firebaseJson(skip).hosting.rewrites;
         const api = rewrites.find((r) => r.function === 'omega_api');
 
-        assert.ok(api, 'no omega_api rewrite: every built-in route would 404');
+        expect(api, 'no omega_api rewrite: every built-in route would 404').toBeTruthy();
 
         // Firebase hosting glob groups match a WHOLE path, so `/omega/**` alone would
         // not cover the bare `/omega`. Each prefix is listed on its own as well.
         const alternatives = api.source.replace(/^\{|\}$/g, '').split(',');
 
         for (const prefix of ['/omega', '/omega/**']) {
-          assert.ok(alternatives.includes(prefix), `the ${prefix} path is not routed to omega_api`);
+          expect(alternatives.includes(prefix), `the ${prefix} path is not routed to omega_api`).toBeTruthy();
         }
 
         // The omega rewrite has to stay FIRST: hosting takes the first match, and a
         // broader pattern above it would swallow the framework prefixes.
-        assert.equal(rewrites[0].function, 'omega_api', 'the omega_api rewrite is no longer first');
+        expect(rewrites[0].function, 'the omega_api rewrite is no longer first').toBe('omega_api');
       },
     },
   ],

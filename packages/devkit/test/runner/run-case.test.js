@@ -135,6 +135,27 @@ module.exports = defineCases({
     },
 
     {
+      name: 'case-27 a ctx.skip in a suite skips every later case with its reason; a group runs on',
+      run: async (ctx) => {
+        const ran = [];
+        const tests = () => [
+          { name: 'a', run: (inner) => inner.skip('no paid product') },
+          { name: 'b', run: () => ran.push('b') },
+          { name: 'c', run: () => ran.push('c') },
+        ];
+
+        const suiteEvents = await runSpec({ type: 'suite', description: 'stops on skip', tests: tests() });
+        ctx.expect(suiteEvents.map((e) => e.status)).toEqual(['skip', 'skip', 'skip']);
+        ctx.expect(suiteEvents.map((e) => e.reason)).toEqual(['no paid product', 'no paid product', 'no paid product']);
+        ctx.expect(ran).toEqual([]);
+
+        const groupEvents = await runSpec({ type: 'group', description: 'keeps going', tests: tests() });
+        ctx.expect(groupEvents.map((e) => e.status)).toEqual(['skip', 'pass', 'pass']);
+        ctx.expect(ran).toEqual(['b', 'c']);
+      },
+    },
+
+    {
       name: 'case-28 a case with skip never runs its body',
       run: async (ctx) => {
         let ran = false;
@@ -312,6 +333,29 @@ module.exports = defineCases({
 
         const standalone = normalizeSpec({ description: 'has a run', run: () => {} }, { file: FILE });
         ctx.expect(standalone.cases.length).toBe(1);
+      },
+    },
+
+    {
+      name: 'case-116 a suite keeps its own keys, and an extras function sees them on info.suite',
+      run: async (ctx) => {
+        const spec = { type: 'suite', description: 'admin suite', auth: 'admin', tests: [{ name: 'only', run: () => {} }] };
+        const normalized = normalizeSpec(spec, { file: FILE });
+        ctx.expect(normalized.auth).toBe('admin');
+
+        const seen = [];
+        const events = [];
+        await runSuite(normalized, {
+          expect,
+          extras: (info) => {
+            if (info.name) seen.push(info.suite.auth);
+            return {};
+          },
+          defaultTimeout: 5000,
+          report: (event) => events.push(event),
+        });
+        ctx.expect(events.map((e) => e.status)).toEqual(['pass']);
+        ctx.expect(seen).toEqual(['admin']);
       },
     },
   ],

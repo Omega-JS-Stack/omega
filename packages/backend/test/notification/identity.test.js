@@ -10,7 +10,7 @@
  *
  * Plain-node unit test (no emulator, no network).
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const { buildPayload } = require('../../dist/omega/libraries/notification.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -37,7 +37,7 @@ module.exports = defineCases({
       run() {
         const payload = buildPayload(brand, { title: 'Hi', body: 'There' });
 
-        assert.equal(payload.imageUrl, 'https://acme.example/brandmark.png');
+        expect(payload.imageUrl).toBe('https://acme.example/brandmark.png');
       },
     },
 
@@ -47,10 +47,7 @@ module.exports = defineCases({
       run() {
         const payload = buildPayload(brand, { title: 'Hi', body: 'There' });
 
-        assert.ok(
-          payload.click_action.startsWith('https://acme.example/?cb='),
-          `unexpected click_action: ${payload.click_action}`,
-        );
+        expect(payload.click_action.startsWith('https://acme.example/?cb='), `unexpected click_action: ${payload.click_action}`).toBeTruthy();
       },
     },
 
@@ -65,8 +62,8 @@ module.exports = defineCases({
           clickAction: 'https://acme.example/sale',
         });
 
-        assert.equal(payload.imageUrl, 'https://acme.example/campaign.png');
-        assert.ok(payload.click_action.startsWith('https://acme.example/sale?cb='));
+        expect(payload.imageUrl).toBe('https://acme.example/campaign.png');
+        expect(payload.click_action.startsWith('https://acme.example/sale?cb=')).toBeTruthy();
       },
     },
 
@@ -78,10 +75,7 @@ module.exports = defineCases({
       run() {
         const payload = buildPayload(brandWithoutImages, { title: 'Hi', body: 'There' });
 
-        assert.ok(
-          !('imageUrl' in payload),
-          `sent a stand-in mark: ${JSON.stringify(payload)}`,
-        );
+        expect(!('imageUrl' in payload), `sent a stand-in mark: ${JSON.stringify(payload)}`).toBeTruthy();
       },
     },
 
@@ -89,11 +83,7 @@ module.exports = defineCases({
       name: 'no click target anywhere throws',
 
       run() {
-        assert.throws(
-          () => buildPayload({ name: 'Acme' }, { title: 'Hi', body: 'There' }),
-          (error) => /brand\.url/.test(error.message),
-          'a missing click target must fail loudly',
-        );
+        expect(() => buildPayload({ name: 'Acme' }, { title: 'Hi', body: 'There' }), 'a missing click target must fail loudly').toThrow((error) => /brand\.url/.test(error.message));
       },
     },
 
@@ -103,7 +93,7 @@ module.exports = defineCases({
       run() {
         // The message matcher keeps this red-capable: a missing/renamed buildPayload
         // would throw a TypeError here and still "throw", but not with this message.
-        assert.throws(() => buildPayload(undefined, { title: 'Hi', body: 'There' }), /brand\.url/);
+        expect(() => buildPayload(undefined, { title: 'Hi', body: 'There' })).toThrow(/brand\.url/);
       },
     },
 
@@ -119,10 +109,10 @@ module.exports = defineCases({
           thrown = error;
         }
 
-        assert.ok(thrown, 'expected a throw');
-        assert.match(thrown.message, /brand\.url/, 'expected the config-hole refusal, not an unrelated error');
-        assert.strictEqual(thrown.code, 400, 'a config hole is the caller\'s 400, never a code-less 500');
-        assert.ok(!FRAMEWORK_IDENTITY.test(thrown.message), `error message leaked an identity: ${thrown.message}`);
+        expect(thrown, 'expected a throw').toBeTruthy();
+        expect(thrown.message, 'expected the config-hole refusal, not an unrelated error').toMatch(/brand\.url/);
+        expect(thrown.code, 'a config hole is the caller\'s 400, never a code-less 500').toBe(400);
+        expect(!FRAMEWORK_IDENTITY.test(thrown.message), `error message leaked an identity: ${thrown.message}`).toBeTruthy();
       },
     },
 
@@ -134,10 +124,7 @@ module.exports = defineCases({
       run() {
         const payload = buildPayload(brandWithoutImages, { title: 'Hi', body: 'There' });
 
-        assert.ok(
-          !FRAMEWORK_IDENTITY.test(JSON.stringify(payload)),
-          `payload leaked the framework identity: ${JSON.stringify(payload)}`,
-        );
+        expect(!FRAMEWORK_IDENTITY.test(JSON.stringify(payload)), `payload leaked the framework identity: ${JSON.stringify(payload)}`).toBeTruthy();
       },
     },
 
@@ -145,10 +132,7 @@ module.exports = defineCases({
       name: 'an invalid click target still fails loudly (unchanged)',
 
       run() {
-        assert.throws(
-          () => buildPayload(brand, { title: 'Hi', body: 'There', clickAction: 'not-a-url' }),
-          /Invalid click_action URL/,
-        );
+        expect(() => buildPayload(brand, { title: 'Hi', body: 'There', clickAction: 'not-a-url' })).toThrow(/Invalid click_action URL/);
       },
     },
   ],

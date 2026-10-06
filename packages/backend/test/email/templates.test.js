@@ -64,26 +64,26 @@ module.exports = defineCases({
   tests: [
     {
       name: 'every registered template resolves and has build()',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const name of TEMPLATES) {
           const t = resolveTemplate(name);
-          assert.ok(t, `Template "${name}" should resolve`);
-          assert.ok(typeof t.build === 'function', `Template "${name}" should expose build()`);
-          assert.ok(t.meta?.name, `Template "${name}" should expose meta.name`);
+          expect(t, `Template "${name}" should resolve`).toBeTruthy();
+          expect(typeof t.build === 'function', `Template "${name}" should expose build()`).toBeTruthy();
+          expect(t.meta?.name, `Template "${name}" should expose meta.name`).toBeTruthy();
         }
       },
     },
 
     {
       name: 'every template renders valid HTML without MJML errors',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const name of TEMPLATES) {
           const result = await render(name);
-          assert.ok(result.html.includes('<html'), `${name}: produces HTML`);
-          assert.equal(result.template, name, `${name}: reports correct template name`);
+          expect(result.html.includes('<html'), `${name}: produces HTML`).toBeTruthy();
+          expect(result.template, `${name}: reports correct template name`).toBe(name);
           // plain uses width="100%" which MJML warns about (expected — it bypasses the 600px default)
           if (name !== 'plain') {
-            assert.equal(result.errors.length, 0, `${name}: no MJML errors`);
+            expect(result.errors.length, `${name}: no MJML errors`).toBe(0);
           }
         }
       },
@@ -91,22 +91,22 @@ module.exports = defineCases({
 
     {
       name: 'card template renders brand, title, message, signoff, and footer',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('card');
 
-        assert.ok(result.html.includes('TestCo'), 'card: brand name renders');
-        assert.ok(result.html.includes('Test Title'), 'card: title renders');
-        assert.ok(result.html.includes('Hello <strong>world</strong>'), 'card: HTML message preserved');
-        assert.ok(result.html.includes('Sincerely'), 'card: team signoff renders');
-        assert.ok(result.html.includes('TestCo Holdings Inc'), 'card: configured parent company renders');
-        assert.ok(result.html.includes('company-wordmark.png'), 'card: configured company wordmark renders');
-        assert.ok(result.html.includes('123 Main St'), 'card: address renders');
+        expect(result.html.includes('TestCo'), 'card: brand name renders').toBeTruthy();
+        expect(result.html.includes('Test Title'), 'card: title renders').toBeTruthy();
+        expect(result.html.includes('Hello <strong>world</strong>'), 'card: HTML message preserved').toBeTruthy();
+        expect(result.html.includes('Sincerely'), 'card: team signoff renders').toBeTruthy();
+        expect(result.html.includes('TestCo Holdings Inc'), 'card: configured parent company renders').toBeTruthy();
+        expect(result.html.includes('company-wordmark.png'), 'card: configured company wordmark renders').toBeTruthy();
+        expect(result.html.includes('123 Main St'), 'card: address renders').toBeTruthy();
       },
     },
 
     {
       name: 'card template renders personal signoff with image and link',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('card', {
           signoff: {
             type: 'personal',
@@ -117,16 +117,16 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('Jane Doe'), 'card: personal signoff name renders');
-        assert.ok(result.html.includes('Warm regards'), 'card: personal signoff greeting renders');
-        assert.ok(result.html.includes('headshot.jpg'), 'card: personal signoff image renders');
-        assert.ok(result.html.includes('@janedoe'), 'card: personal signoff link text renders');
+        expect(result.html.includes('Jane Doe'), 'card: personal signoff name renders').toBeTruthy();
+        expect(result.html.includes('Warm regards'), 'card: personal signoff greeting renders').toBeTruthy();
+        expect(result.html.includes('headshot.jpg'), 'card: personal signoff image renders').toBeTruthy();
+        expect(result.html.includes('@janedoe'), 'card: personal signoff link text renders').toBeTruthy();
       },
     },
 
     {
       name: 'card template renders CTA button when provided',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('card', {
           content: {
             title: 'Test',
@@ -135,40 +135,34 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('Get Started'), 'card: button text renders');
-        assert.ok(result.html.includes('testco.example/action'), 'card: button URL renders');
+        expect(result.html.includes('Get Started'), 'card: button text renders').toBeTruthy();
+        expect(result.html.includes('testco.example/action'), 'card: button URL renders').toBeTruthy();
       },
     },
 
     {
       name: 'card template includes hidden ASM tags for SendGrid',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('card');
 
-        assert.ok(
-          result.html.includes('asm_group_unsubscribe_raw_url'),
-          'card: hidden ASM unsubscribe tag present',
-        );
-        assert.ok(
-          result.html.includes('asm_preferences_raw_url'),
-          'card: hidden ASM preferences tag present',
-        );
+        expect(result.html.includes('asm_group_unsubscribe_raw_url'), 'card: hidden ASM unsubscribe tag present').toBeTruthy();
+        expect(result.html.includes('asm_preferences_raw_url'), 'card: hidden ASM preferences tag present').toBeTruthy();
       },
     },
 
     {
       name: 'plain template renders without card wrapper',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('plain');
 
-        assert.ok(result.html.includes('TestCo'), 'plain: brand name renders');
-        assert.ok(result.html.includes('Hello <strong>world</strong>'), 'plain: message renders');
+        expect(result.html.includes('TestCo'), 'plain: brand name renders').toBeTruthy();
+        expect(result.html.includes('Hello <strong>world</strong>'), 'plain: message renders').toBeTruthy();
       },
     },
 
     {
       name: 'order template renders order summary when data provided',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('order', {
           content: {
             event: 'confirmation',
@@ -182,14 +176,14 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('ORD-12345'), 'order: order ID renders');
-        assert.ok(result.html.includes('9.99'), 'order: price renders');
+        expect(result.html.includes('ORD-12345'), 'order: order ID renders').toBeTruthy();
+        expect(result.html.includes('9.99'), 'order: price renders').toBeTruthy();
       },
     },
 
     {
       name: 'order template names the PRODUCT on a one-time receipt',
-      async run({ assert }) {
+      async run({ expect }) {
         // A one-time row was labelled `Order #<id>` — the id the header already
         // prints above it — so the receipt for a $49.99 purchase named the
         // product nowhere at all
@@ -207,17 +201,17 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('Starter Library'), 'order: a one-time receipt names what was bought');
-        assert.ok(result.html.includes('One-time purchase'), 'order: and says nothing renews, where a subscription names its cadence');
-        assert.ok(!result.html.includes('Billed'), 'order: a one-time buy is billed on no cadence');
-        assert.ok(result.html.includes('49.99'), 'order: the price still renders');
-        assert.ok(result.html.includes('ORD-ONETIME'), 'order: and the order id still rides the header');
+        expect(result.html.includes('Starter Library'), 'order: a one-time receipt names what was bought').toBeTruthy();
+        expect(result.html.includes('One-time purchase'), 'order: and says nothing renews, where a subscription names its cadence').toBeTruthy();
+        expect(!result.html.includes('Billed'), 'order: a one-time buy is billed on no cadence').toBeTruthy();
+        expect(result.html.includes('49.99'), 'order: the price still renders').toBeTruthy();
+        expect(result.html.includes('ORD-ONETIME'), 'order: and the order id still rides the header').toBeTruthy();
       },
     },
 
     {
       name: 'order template renders a percent promo line',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('order', {
           content: {
             event: 'confirmation',
@@ -231,15 +225,15 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('WELCOME15'), 'order: the redeemed code renders');
-        assert.ok(result.html.includes('15% off'), 'order: a percent code reads as "15% off"');
-        assert.ok(result.html.includes('7.50'), 'order: the savings render');
+        expect(result.html.includes('WELCOME15'), 'order: the redeemed code renders').toBeTruthy();
+        expect(result.html.includes('15% off'), 'order: a percent code reads as "15% off"').toBeTruthy();
+        expect(result.html.includes('7.50'), 'order: the savings render').toBeTruthy();
       },
     },
 
     {
       name: 'order template renders an amount promo line as money, not a percent',
-      async run({ assert }) {
+      async run({ expect }) {
         // A flat-dollar code has no percent to quote — the line used to render
         // "undefined% off" for one ([#239](https://github.com/Omega-JS-Stack/omega/issues/239))
         const result = await render('order', {
@@ -255,40 +249,40 @@ module.exports = defineCases({
           },
         });
 
-        assert.ok(result.html.includes('WELCOME10OFF'), 'order: the redeemed code renders');
-        assert.ok(result.html.includes('$10.00 off'), 'order: an amount code reads as "$10.00 off", formatted like every other amount');
-        assert.ok(!result.html.includes('% off'), 'order: an amount code never quotes a percentage');
-        assert.ok(!result.html.includes('undefined'), 'order: nothing renders as undefined');
+        expect(result.html.includes('WELCOME10OFF'), 'order: the redeemed code renders').toBeTruthy();
+        expect(result.html.includes('$10.00 off'), 'order: an amount code reads as "$10.00 off", formatted like every other amount').toBeTruthy();
+        expect(!result.html.includes('% off'), 'order: an amount code never quotes a percentage').toBeTruthy();
+        expect(!result.html.includes('undefined'), 'order: nothing renders as undefined').toBeTruthy();
       },
     },
 
     {
       name: 'feedback template renders',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await render('feedback');
 
-        assert.ok(result.html.includes('<html'), 'feedback: produces valid HTML');
-        assert.ok(result.html.includes('TestCo'), 'feedback: brand name renders');
+        expect(result.html.includes('<html'), 'feedback: produces valid HTML').toBeTruthy();
+        expect(result.html.includes('TestCo'), 'feedback: brand name renders').toBeTruthy();
       },
     },
 
     {
       name: 'direct template names resolve correctly',
-      async run({ assert }) {
+      async run({ expect }) {
         const names = { card: 'card', plain: 'plain', order: 'order', feedback: 'feedback' };
 
         for (const [name, expected] of Object.entries(names)) {
           const t = resolveTemplate(name);
-          assert.equal(t.meta.name, expected, `Template "${name}" should resolve`);
+          expect(t.meta.name, `Template "${name}" should resolve`).toBe(expected);
         }
       },
     },
 
     {
       name: 'unknown template falls back to card',
-      async run({ assert }) {
+      async run({ expect }) {
         const t = resolveTemplate('nonexistent-template');
-        assert.equal(t.meta.name, 'card', 'Unknown template should fall back to card');
+        expect(t.meta.name, 'Unknown template should fall back to card').toBe('card');
       },
     },
   ],

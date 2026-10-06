@@ -54,35 +54,32 @@ module.exports = defineCases({
   tests: [
     {
       name: 'an-unused-id-is-handed-back-on-the-first-try',
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, ctx, logs } = context();
 
         const orderId = await OrderId.mint({ admin, ctx, generate: scripted([FREE]) });
 
-        assert.equal(orderId, FREE, 'An id no intent holds is the id the checkout gets');
-        assert.equal(logs.length, 0, `Nothing to say about an uncontended mint, got: ${logs.join(' | ')}`);
+        expect(orderId, 'An id no intent holds is the id the checkout gets').toBe(FREE);
+        expect(logs.length, `Nothing to say about an uncontended mint, got: ${logs.join(' | ')}`).toBe(0);
       },
     },
 
     {
       name: 'a-duplicate-is-thrown-away-and-the-next-id-is-used',
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, ctx, logs } = context();
 
         // The collision, on demand: the first id is one an intent already holds
         const orderId = await OrderId.mint({ admin, ctx, generate: scripted([TAKEN, FREE]) });
 
-        assert.equal(orderId, FREE, 'The taken id is never handed out — the next one is');
-        assert.ok(
-          logs.some((line) => line.includes(TAKEN) && /collision/i.test(line)),
-          `The collision must be recorded, got: ${logs.join(' | ')}`,
-        );
+        expect(orderId, 'The taken id is never handed out — the next one is').toBe(FREE);
+        expect(logs.some((line) => line.includes(TAKEN) && /collision/i.test(line)), `The collision must be recorded, got: ${logs.join(' | ')}`).toBeTruthy();
       },
     },
 
     {
       name: 'a-generator-that-only-ever-collides-fails-loudly',
-      async run({ assert }) {
+      async run({ expect }) {
         const { admin, ctx } = context();
 
         // Never silently: an id that is already an intent would overwrite the
@@ -91,8 +88,8 @@ module.exports = defineCases({
 
         await OrderId.mint({ admin, ctx, generate: scripted([TAKEN]) }).catch((e) => { thrown = e; });
 
-        assert.ok(thrown, 'Exhausting every attempt must throw rather than return a taken id');
-        assert.match(thrown.message, /order id/i, `The error should say what could not be minted, got: ${thrown?.message}`);
+        expect(thrown, 'Exhausting every attempt must throw rather than return a taken id').toBeTruthy();
+        expect(thrown.message, `The error should say what could not be minted, got: ${thrown?.message}`).toMatch(/order id/i);
       },
     },
   ],

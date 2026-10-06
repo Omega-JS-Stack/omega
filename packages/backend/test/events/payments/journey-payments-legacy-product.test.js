@@ -24,7 +24,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'find-product-with-legacy-ids',
-      async run({ accounts, assert, state, config }) {
+      async run({ accounts, expect, state, config }) {
         const uid = accounts['journey-payments-legacy-product'].uid;
         state.uid = uid;
 
@@ -47,14 +47,14 @@ module.exports = defineCases({
         state.currentStripeProductId = productWithLegacy.stripe.productId;
         state.legacyStripeProductId = productWithLegacy.stripe.legacyProductIds[0];
 
-        assert.ok(state.legacyStripeProductId, 'Legacy product ID should exist');
-        assert.notEqual(state.legacyStripeProductId, state.currentStripeProductId, 'Legacy ID should differ from current ID');
+        expect(state.legacyStripeProductId, 'Legacy product ID should exist').toBeTruthy();
+        expect(state.legacyStripeProductId, 'Legacy ID should differ from current ID').not.toBe(state.currentStripeProductId);
       },
     },
 
     {
       name: 'send-webhook-with-legacy-product-id',
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         if (state.skip) {
           return;
         }
@@ -90,13 +90,13 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook with legacy product ID should be accepted');
+        expect(response, 'Webhook with legacy product ID should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'legacy-product-resolved-correctly',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         if (state.skip) {
           return;
         }
@@ -108,24 +108,20 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.legacyEventId}`);
-        assert.equal(webhookDoc.status, 'completed', 'Webhook should complete successfully');
-        assert.equal(webhookDoc.transition, 'new-subscription', 'Transition should be new-subscription');
+        expect(webhookDoc.status, 'Webhook should complete successfully').toBe('completed');
+        expect(webhookDoc.transition, 'Transition should be new-subscription').toBe('new-subscription');
 
         // Core assertion: the legacy product ID resolved to the correct current product
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(
-          userDoc.subscription.product.id,
-          state.productId,
-          `Legacy product ID "${state.legacyStripeProductId}" should resolve to "${state.productId}" (not "basic")`,
-        );
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
-        assert.equal(userDoc.subscription.payment.provider, 'test', 'Provider should be test');
+        expect(userDoc.subscription.product.id, `Legacy product ID "${state.legacyStripeProductId}" should resolve to "${state.productId}" (not "basic")`).toBe(state.productId);
+        expect(userDoc.subscription.status, 'Status should be active').toBe('active');
+        expect(userDoc.subscription.payment.provider, 'Provider should be test').toBe('test');
       },
     },
 
     {
       name: 'order-doc-has-correct-product',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         if (state.skip) {
           return;
         }
@@ -139,11 +135,7 @@ module.exports = defineCases({
 
         if (orderQuery && orderQuery.length > 0) {
           const orderDoc = orderQuery[0];
-          assert.equal(
-            orderDoc.unified?.product?.id,
-            state.productId,
-            `Order unified product should be "${state.productId}"`,
-          );
+          expect(orderDoc.unified?.product?.id, `Order unified product should be "${state.productId}"`).toBe(state.productId);
         }
       },
     },

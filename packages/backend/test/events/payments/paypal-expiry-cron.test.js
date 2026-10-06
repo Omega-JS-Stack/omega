@@ -30,7 +30,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'seed-pending-cancellations',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ firestore, expect, state, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -63,14 +63,14 @@ module.exports = defineCases({
         });
 
         const seeded = await firestore.get(`payments-orders/${EXPIRE_ORDER}`);
-        assert.equal(seeded.unified.status, 'active', 'The order starts alive alongside the subscription');
+        expect(seeded.unified.status, 'The order starts alive alongside the subscription').toBe('active');
       },
     },
 
     {
       name: 'the-order-flips-with-the-subscription',
       timeout: 150000,
-      async run({ firestore, assert, waitFor, pubsub, state }) {
+      async run({ firestore, expect, waitFor, pubsub, state }) {
         await pubsub.trigger('omega_cronDaily');
 
         await waitFor(async () => {
@@ -81,38 +81,31 @@ module.exports = defineCases({
         const user = await firestore.get(`users/${EXPIRE_UID}`);
         const order = await firestore.get(`payments-orders/${EXPIRE_ORDER}`);
 
-        assert.equal(user.subscription.status, 'cancelled', 'The paid term ended');
-        assert.equal(user.subscription.cancellation.pending, false, 'Nothing is left pending');
+        expect(user.subscription.status, 'The paid term ended').toBe('cancelled');
+        expect(user.subscription.cancellation.pending, 'Nothing is left pending').toBe(false);
 
-        assert.equal(order.unified.status, 'cancelled', 'The order doc flips WITH the subscription — it is what handlers and the UI read');
-        assert.equal(order.unified.cancellation.pending, false, 'The order mirror clears the pending flag too');
-        assert.ok(
-          order.metadata.updated.timestampUNIX > state.expiredUNIX,
-          'The order carries a fresh update stamp, so the NEXT webhook can tell it is newer',
-        );
+        expect(order.unified.status, 'The order doc flips WITH the subscription — it is what handlers and the UI read').toBe('cancelled');
+        expect(order.unified.cancellation.pending, 'The order mirror clears the pending flag too').toBe(false);
+        expect(order.metadata.updated.timestampUNIX > state.expiredUNIX, 'The order carries a fresh update stamp, so the NEXT webhook can tell it is newer').toBeTruthy();
 
         // The write is the cron's delta, not a whole map: everything else on the order
         // survives untouched
-        assert.equal(order.unified.product.id, state.paidProductId, 'The order still names its product');
-        assert.equal(order.unified.cancellation.date.timestampUNIX, state.expiredUNIX, 'The cancellation date the user requested survives');
-        assert.equal(order.owner, EXPIRE_UID, 'The order still belongs to its owner');
+        expect(order.unified.product.id, 'The order still names its product').toBe(state.paidProductId);
+        expect(order.unified.cancellation.date.timestampUNIX, 'The cancellation date the user requested survives').toBe(state.expiredUNIX);
+        expect(order.owner, 'The order still belongs to its owner').toBe(EXPIRE_UID);
       },
     },
 
     {
       name: 'a-newer-webhook-stamp-wins-and-the-cron-stands-down',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const user = await firestore.get(`users/${RACE_UID}`);
         const order = await firestore.get(`payments-orders/${RACE_ORDER}`);
 
-        assert.equal(user.subscription.status, 'active', 'A subscription whose order was written after the read is left alone');
-        assert.equal(user.subscription.cancellation.pending, true, 'Its pending flag is untouched');
-        assert.equal(order.unified.status, 'active', 'The order the newer write owns is untouched');
-        assert.equal(
-          order.metadata.updated.timestampUNIX,
-          state.raceUpdatedUNIX,
-          'The newer stamp survives — the cron did not overwrite it with its own',
-        );
+        expect(user.subscription.status, 'A subscription whose order was written after the read is left alone').toBe('active');
+        expect(user.subscription.cancellation.pending, 'Its pending flag is untouched').toBe(true);
+        expect(order.unified.status, 'The order the newer write owns is untouched').toBe('active');
+        expect(order.metadata.updated.timestampUNIX, 'The newer stamp survives — the cron did not overwrite it with its own').toBe(state.raceUpdatedUNIX);
       },
     },
   ],

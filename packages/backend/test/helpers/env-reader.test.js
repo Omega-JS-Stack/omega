@@ -18,7 +18,7 @@
  * Run: npx omega test framework:helpers/env-reader
  */
 
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -110,7 +110,7 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
 
   try {
     const { Omega } = freshOmegaModule();
-    const omega = new Omega().initialize({ cwd: dir });
+    const omega = new Omega().initialize({ cwd: dir, runnerHost: true });
 
     // Read INSIDE the boot's env: the finally below puts the runner's own
     // input back, and this boot's answer is the one it named
@@ -153,7 +153,7 @@ function bootWithConfig({ config, environment }) {
 
   try {
     const { Omega } = freshOmegaModule();
-    new Omega().initialize({ cwd: dir });
+    new Omega().initialize({ cwd: dir, runnerHost: true });
     return { warnings };
   } finally {
     console.warn = originalWarn;
@@ -183,9 +183,9 @@ module.exports = defineCases({
       name: 'reading an undeclared key fails at the read, not at the symptom',
 
       run() {
-        assert.throws(() => env.get('NOT_IN_THE_ENV_SCHEMA'), (error) => {
-          assert.strictEqual(error.name, 'UnknownEnvKeyError');
-          assert.match(error.message, /NOT_IN_THE_ENV_SCHEMA/);
+        expect(() => env.get('NOT_IN_THE_ENV_SCHEMA')).toThrow((error) => {
+          expect(error.name).toBe('UnknownEnvKeyError');
+          expect(error.message).toMatch(/NOT_IN_THE_ENV_SCHEMA/);
           return true;
         });
 
@@ -193,11 +193,11 @@ module.exports = defineCases({
         const saved = process.env.GH_TOKEN;
         try {
           process.env.GH_TOKEN = 'fixture-token';
-          assert.strictEqual(env.get('GH_TOKEN'), 'fixture-token');
-          assert.strictEqual(env.has('GH_TOKEN'), true);
+          expect(env.get('GH_TOKEN')).toBe('fixture-token');
+          expect(env.has('GH_TOKEN')).toBe(true);
 
           process.env.GH_TOKEN = '';
-          assert.strictEqual(env.has('GH_TOKEN'), false);
+          expect(env.has('GH_TOKEN')).toBe(false);
         } finally {
           if (saved === undefined) delete process.env.GH_TOKEN;
           else process.env.GH_TOKEN = saved;
@@ -218,14 +218,14 @@ module.exports = defineCases({
         process.env[REQUIRED[0]] = 'fixture-value-present';
 
         try {
-          assert.throws(() => env.assertRequired('backend'), (error) => {
-            assert.strictEqual(error.name, 'MissingEnvKeysError');
-            assert.deepStrictEqual(error.keys, REQUIRED.slice(1));
+          expect(() => env.assertRequired('backend')).toThrow((error) => {
+            expect(error.name).toBe('MissingEnvKeysError');
+            expect(error.keys).toEqual(REQUIRED.slice(1));
             for (const name of REQUIRED.slice(1)) {
-              assert.ok(error.message.includes(name), `the error names ${name}`);
+              expect(error.message.includes(name), `the error names ${name}`).toBeTruthy();
             }
-            assert.ok(!error.message.includes(REQUIRED[0]), 'the key that IS set is not reported missing');
-            assert.ok(!error.message.includes('fixture-value-present'), 'no value ever appears in the message');
+            expect(!error.message.includes(REQUIRED[0]), 'the key that IS set is not reported missing').toBeTruthy();
+            expect(!error.message.includes('fixture-value-present'), 'no value ever appears in the message').toBeTruthy();
             return true;
           });
         } finally {
@@ -241,13 +241,13 @@ module.exports = defineCases({
       name: "a brand's backend refuses to boot in development, naming the missing keys",
 
       run() {
-        assert.throws(() => bootWithoutRequiredKeys({ consumerConfig: true }), (error) => {
-          assert.strictEqual(error.name, 'MissingEnvKeysError');
+        expect(() => bootWithoutRequiredKeys({ consumerConfig: true })).toThrow((error) => {
+          expect(error.name).toBe('MissingEnvKeysError');
           for (const name of REQUIRED) {
-            assert.ok(error.message.includes(name), `the boot failure names ${name}`);
+            expect(error.message.includes(name), `the boot failure names ${name}`).toBeTruthy();
           }
           // The fix, not just the fault
-          assert.match(error.message, /omega manage/);
+          expect(error.message).toMatch(/omega manage/);
           return true;
         });
       },
@@ -264,23 +264,23 @@ module.exports = defineCases({
         // a read returns the same value in every environment.
         for (const vars of [DEVELOPMENT, PRODUCTION, { OMEGA_ENVIRONMENT: 'testing' }]) {
           withEnv({ ...vars, STRIPE_SECRET_KEY: 'sk_from_the_cascade' }, () => {
-            assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_from_the_cascade');
+            expect(env.get('STRIPE_SECRET_KEY')).toBe('sk_from_the_cascade');
           });
         }
 
         // The twin names are not declared anywhere, so reading one is the
         // undeclared-key programmer error, not a silent undefined
         for (const name of ['STRIPE_SECRET_KEY_DEV', 'PAYPAL_CLIENT_SECRET_DEV', 'CHARGEBEE_API_KEY_DEV']) {
-          assert.throws(() => env.get(name), (error) => {
-            assert.strictEqual(error.name, 'UnknownEnvKeyError');
+          expect(() => env.get(name), `${name} must not be a declared key`).toThrow((error) => {
+            expect(error.name).toBe('UnknownEnvKeyError');
             return true;
-          }, `${name} must not be a declared key`);
+          });
         }
 
         // …and a live-shaped value is TRUSTED now: the overlay is where a
         // local run puts its test credential, and no key gets a shape guard
         withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_live_trusted' }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_live_trusted');
+          expect(env.get('STRIPE_SECRET_KEY')).toBe('sk_live_trusted');
         });
       },
     },
@@ -293,12 +293,12 @@ module.exports = defineCases({
         // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), under the
         // same name every other OMEGA surface calls it by: the bare
         // `environment()` alias it used to add is gone, and so is any second copy.
-        assert.strictEqual(env.getEnvironment, getEnvironment, "the reader re-exports @omega.js/config's module, never a second copy");
-        assert.strictEqual(env.environment, undefined, 'the bare alias is gone');
+        expect(env.getEnvironment, "the reader re-exports @omega.js/config's module, never a second copy").toBe(getEnvironment);
+        expect(env.environment, 'the bare alias is gone').toBe(undefined);
 
-        withEnv(DEVELOPMENT, () => assert.strictEqual(env.getEnvironment(), 'development'));
-        withEnv(PRODUCTION, () => assert.strictEqual(env.getEnvironment(), 'production'));
-        withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => assert.strictEqual(env.getEnvironment(), 'testing'));
+        withEnv(DEVELOPMENT, () => expect(env.getEnvironment()).toBe('development'));
+        withEnv(PRODUCTION, () => expect(env.getEnvironment()).toBe('production'));
+        withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => expect(env.getEnvironment()).toBe('testing'));
       },
     },
 
@@ -308,11 +308,11 @@ module.exports = defineCases({
       run() {
         const { warnings, environment } = bootWithoutRequiredKeys({ consumerConfig: false });
 
-        assert.strictEqual(environment, 'development', 'the development branch was not reached');
+        expect(environment, 'the development branch was not reached').toBe('development');
 
         const guardWarnings = warnings.filter((line) => line.includes('required env'));
-        assert.strictEqual(guardWarnings.length, 1, `the fault is still said out loud, got ${guardWarnings.length}`);
-        assert.match(guardWarnings[0], /\[@omega\.js\/backend:index\]/);
+        expect(guardWarnings.length, `the fault is still said out loud, got ${guardWarnings.length}`).toBe(1);
+        expect(guardWarnings[0]).toMatch(/\[@omega\.js\/backend:index\]/);
       },
     },
 
@@ -321,26 +321,26 @@ module.exports = defineCases({
 
       run() {
         withEnv({ RECAPTCHA_SECRET_KEY: null }, () => {
-          assert.throws(() => env.assertRules(HALF_KEYED_CAPTCHA), (error) => {
-            assert.strictEqual(error.name, 'MissingConditionalEnvKeysError');
-            assert.deepStrictEqual(error.keys, ['RECAPTCHA_SECRET_KEY']);
+          expect(() => env.assertRules(HALF_KEYED_CAPTCHA)).toThrow((error) => {
+            expect(error.name).toBe('MissingConditionalEnvKeysError');
+            expect(error.keys).toEqual(['RECAPTCHA_SECRET_KEY']);
             // The BRAND-level key name, which is what a human sets, and the
             // config path that made it mandatory
-            assert.ok(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the error names the key');
-            assert.ok(error.message.includes('captcha.providers.recaptcha.siteKey'), 'and the path that requires it');
+            expect(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the error names the key').toBeTruthy();
+            expect(error.message.includes('captcha.providers.recaptcha.siteKey'), 'and the path that requires it').toBeTruthy();
             return true;
           });
         });
 
         // The same config with the key present owes nothing…
         withEnv({ RECAPTCHA_SECRET_KEY: 'fixture-secret' }, () => {
-          assert.strictEqual(env.assertRules(HALF_KEYED_CAPTCHA), undefined);
+          expect(env.assertRules(HALF_KEYED_CAPTCHA)).toBe(undefined);
         });
 
         // …and a brand that never set the site key owes nothing either: the
         // rule is one-directional, and an unkeyed brand is sanctioned (#17)
         withEnv({ RECAPTCHA_SECRET_KEY: null }, () => {
-          assert.strictEqual(env.assertRules({ brand: { id: 'fixture' } }), undefined);
+          expect(env.assertRules({ brand: { id: 'fixture' } })).toBe(undefined);
         });
       },
     },
@@ -349,17 +349,17 @@ module.exports = defineCases({
       name: 'a production boot REFUSES on a conditional key, development warns and continues (#626)',
 
       run() {
-        assert.throws(() => bootWithConfig({ config: HALF_KEYED_CAPTCHA, environment: 'production' }), (error) => {
-          assert.strictEqual(error.name, 'MissingConditionalEnvKeysError');
-          assert.ok(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the boot failure names the key');
+        expect(() => bootWithConfig({ config: HALF_KEYED_CAPTCHA, environment: 'production' })).toThrow((error) => {
+          expect(error.name).toBe('MissingConditionalEnvKeysError');
+          expect(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the boot failure names the key').toBeTruthy();
           return true;
         });
 
         const { warnings } = bootWithConfig({ config: HALF_KEYED_CAPTCHA, environment: 'development' });
         const ruleWarnings = warnings.filter((line) => line.includes('RECAPTCHA_SECRET_KEY'));
-        assert.strictEqual(ruleWarnings.length, 1, `one warning line, got ${ruleWarnings.length}`);
-        assert.match(ruleWarnings[0], /\[@omega\.js\/backend:index\]/);
-        assert.ok(ruleWarnings[0].includes('captcha.providers.recaptcha.siteKey'), 'the warning names the path too');
+        expect(ruleWarnings.length, `one warning line, got ${ruleWarnings.length}`).toBe(1);
+        expect(ruleWarnings[0]).toMatch(/\[@omega\.js\/backend:index\]/);
+        expect(ruleWarnings[0].includes('captcha.providers.recaptcha.siteKey'), 'the warning names the path too').toBeTruthy();
       },
     },
   ],

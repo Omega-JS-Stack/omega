@@ -90,104 +90,104 @@ module.exports = defineCases({
   tests: [
     {
       name: 'no-flag-drift-warns-and-never-writes',
-      async run({ assert }) {
+      async run({ expect }) {
         const stores = { 'missing docs': {}, 'drifted enforced field': driftedStore() };
 
         for (const [label, store] of Object.entries(stores)) {
           const test = buildTest({ projectId: 'real-project', argv: {}, store: store });
           const result = await runLikeSetup(test);
 
-          assert.equal(result, 'warn', `${label}: without --seed-campaigns drift must warn, never fail into fix()`);
-          assert.equal(test.writes.length, 0, `${label}: without --seed-campaigns nothing may be written`);
+          expect(result, `${label}: without --seed-campaigns drift must warn, never fail into fix()`).toBe('warn');
+          expect(test.writes.length, `${label}: without --seed-campaigns nothing may be written`).toBe(0);
         }
       },
     },
 
     {
       name: 'no-flag-fully-seeded-passes-clean',
-      async run({ assert }) {
+      async run({ expect }) {
         // The common case on a live project: reads run, everything matches,
         // the check passes with no standing warning.
         const test = buildTest({ projectId: 'real-project', argv: {}, store: seededStore() });
         const result = await runLikeSetup(test);
 
-        assert.equal(result, true, 'correct seeds pass without the flag');
-        assert.equal(test.adminCalls, 1, 'the read-only check runs without the flag');
-        assert.equal(test.writes.length, 0, 'a clean pass writes nothing');
+        expect(result, 'correct seeds pass without the flag').toBe(true);
+        expect(test.adminCalls, 'the read-only check runs without the flag').toBe(1);
+        expect(test.writes.length, 'a clean pass writes nothing').toBe(0);
       },
     },
 
     {
       name: 'no-flag-no-connection-skips',
-      async run({ assert }) {
+      async run({ expect }) {
         const test = buildTest({ projectId: 'real-project', argv: {}, store: null });
         const result = await runLikeSetup(test);
 
-        assert.equal(result, true, 'no connection still skips gracefully without the flag');
-        assert.equal(test.writes.length, 0, 'no connection writes nothing');
+        expect(result, 'no connection still skips gracefully without the flag').toBe(true);
+        expect(test.writes.length, 'no connection writes nothing').toBe(0);
       },
     },
 
     {
       name: 'no-flag-fix-never-writes',
-      async run({ assert }) {
+      async run({ expect }) {
         // Belt for any future caller that reaches fix() directly.
         const test = buildTest({ projectId: 'real-project', argv: {}, store: {} });
         await test.fix();
 
-        assert.equal(test.writes.length, 0, 'fix() without --seed-campaigns must never write');
+        expect(test.writes.length, 'fix() without --seed-campaigns must never write').toBe(0);
       },
     },
 
     {
       name: 'flag-drift-fails-into-fix-and-seeds',
-      async run({ assert }) {
+      async run({ expect }) {
         // Both the kebab and camelCase keys the parse mints opt in.
         for (const argv of [{ 'seed-campaigns': true }, { seedCampaigns: true }]) {
           const test = buildTest({ projectId: 'real-project', argv: argv, store: {} });
           const result = await test.run();
 
-          assert.equal(result, false, `${JSON.stringify(argv)}: with the flag, drift fails so the runner fixes`);
+          expect(result, `${JSON.stringify(argv)}: with the flag, drift fails so the runner fixes`).toBe(false);
 
           await test.fix();
-          assert.equal(test.writes.length, SEEDS.length, `${JSON.stringify(argv)}: fix() creates every missing seed`);
+          expect(test.writes.length, `${JSON.stringify(argv)}: fix() creates every missing seed`).toBe(SEEDS.length);
         }
       },
     },
 
     {
       name: 'flag-preserves-the-no-connection-skip',
-      async run({ assert }) {
+      async run({ expect }) {
         const test = buildTest({ projectId: 'real-project', argv: { 'seed-campaigns': true }, store: null });
         const result = await runLikeSetup(test);
 
-        assert.equal(result, true, 'no connection still skips gracefully with the flag');
-        assert.equal(test.writes.length, 0, 'no connection writes nothing');
+        expect(result, 'no connection still skips gracefully with the flag').toBe(true);
+        expect(test.writes.length, 'no connection writes nothing').toBe(0);
       },
     },
 
     {
       name: 'demo-project-passes-before-every-other-guard',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const argv of [{}, { 'seed-campaigns': true }]) {
           const test = buildTest({ projectId: 'demo-omega', argv: argv, store: {} });
           const result = await runLikeSetup(test);
 
-          assert.equal(result, true, `${JSON.stringify(argv)}: demo-* projects pass, emulator seeds on boot`);
-          assert.equal(test.adminCalls, 0, `${JSON.stringify(argv)}: demo-* projects never construct admin`);
-          assert.equal(test.writes.length, 0, `${JSON.stringify(argv)}: demo-* projects never write`);
+          expect(result, `${JSON.stringify(argv)}: demo-* projects pass, emulator seeds on boot`).toBe(true);
+          expect(test.adminCalls, `${JSON.stringify(argv)}: demo-* projects never construct admin`).toBe(0);
+          expect(test.writes.length, `${JSON.stringify(argv)}: demo-* projects never write`).toBe(0);
         }
       },
     },
 
     {
       name: 'warning-names-the-opt-in-flag',
-      async run({ assert }) {
+      async run({ expect }) {
         const test = buildTest({ projectId: 'real-project', argv: {}, store: {} });
         const warning = test.getWarning();
 
-        assert.equal(Array.isArray(warning), true, 'getWarning() returns the runner\'s detail lines');
-        assert.match(warning.join(' '), /--seed-campaigns/, 'the warning must name the exact flag that opts in');
+        expect(Array.isArray(warning), 'getWarning() returns the runner\'s detail lines').toBe(true);
+        expect(warning.join(' '), 'the warning must name the exact flag that opts in').toMatch(/--seed-campaigns/);
       },
     },
   ],

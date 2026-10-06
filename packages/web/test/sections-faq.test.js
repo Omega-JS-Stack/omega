@@ -8,9 +8,8 @@
  * the authored icon dropped on the way in, the text-only head, and the same
  * under the `variant: "center"` presentation since one path serves both.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -40,41 +39,56 @@ function makeEngine() {
 
 const ITEMS = 'items:\n  - question: "Is there a free tier?"\n    answer: "Yes, free forever for personal projects."\n';
 
-test('an authored superheadline.icon is ignored — the eyebrow renders its label alone', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "marketing/faq" %}\nsuperheadline:\n  icon: "circle-question"\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
-    {},
-  );
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-faq',
+  tests: [
+    {
+      name: 'an authored superheadline.icon is ignored — the eyebrow renders its label alone',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "marketing/faq" %}\nsuperheadline:\n  icon: "circle-question"\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('<span class="omega-micro">FAQ</span>'), 'the label alone, icon key or not');
-  assert.ok(!/<i class="fa-/.test(html), 'no icon markup anywhere in the head');
-  assert.ok(!html.includes('<i class="fa'), 'no orphan icon shell');
-  assert.ok(!html.includes('[object Object]'), 'never the raw object');
-  assert.deepEqual(warnings, [], 'the icon key is ignored, not an error');
-});
+        ctx.expect(html.includes('<span class="omega-micro">FAQ</span>'), 'the label alone, icon key or not').toBeTruthy();
+        ctx.expect(!/<i class="fa-/.test(html), 'no icon markup anywhere in the head').toBeTruthy();
+        ctx.expect(!html.includes('<i class="fa'), 'no orphan icon shell').toBeTruthy();
+        ctx.expect(!html.includes('[object Object]'), 'never the raw object').toBeTruthy();
+        ctx.expect(warnings, 'the icon key is ignored, not an error').toEqual([]);
+      },
+    },
 
-test('an eyebrow with no icon renders the text-only head, unchanged', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "marketing/faq" %}\nsuperheadline:\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
-    {},
-  );
+    {
+      name: 'an eyebrow with no icon renders the text-only head, unchanged',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "marketing/faq" %}\nsuperheadline:\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('<span class="omega-micro">FAQ</span>'), 'the label alone, exactly as before');
-  assert.ok(!html.includes('<i class="fa'), 'no orphan icon shell');
-  assert.deepEqual(warnings, []);
-});
+        ctx.expect(html.includes('<span class="omega-micro">FAQ</span>'), 'the label alone, exactly as before').toBeTruthy();
+        ctx.expect(!html.includes('<i class="fa'), 'no orphan icon shell').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('the centered variant serves the same text-only eyebrow', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    `{% section "marketing/faq" %}\nvariant: "center"\nsuperheadline:\n  icon: "circle-question"\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
-    {},
-  );
+    {
+      name: 'the centered variant serves the same text-only eyebrow',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          `{% section "marketing/faq" %}\nvariant: "center"\nsuperheadline:\n  icon: "circle-question"\n  text: "FAQ"\n${ITEMS}{% endsection %}`,
+          {},
+        );
 
-  assert.ok(html.includes('omega-section-head--center'), 'the centered presentation');
-  assert.ok(html.includes('<span class="omega-micro">FAQ</span>'), 'with the same bare label in its head');
-  assert.ok(!html.includes('data-icon='), 'and no icon, here either');
-  assert.deepEqual(warnings, []);
+        ctx.expect(html.includes('omega-section-head--center'), 'the centered presentation').toBeTruthy();
+        ctx.expect(html.includes('<span class="omega-micro">FAQ</span>'), 'with the same bare label in its head').toBeTruthy();
+        ctx.expect(!html.includes('data-icon='), 'and no icon, here either').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
+  ],
 });

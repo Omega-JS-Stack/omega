@@ -174,7 +174,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-dead-runs-orphaned-watcher-is-reaped-from-its-record',
-      async run({ assert }) {
+      async run({ expect }) {
         // The defect: the watcher binds nothing, so the port reaper cannot see
         // it, and this boot is about to overwrite the only file that names it.
         const { command, cleanup } = commandWithRecord({ pids: [4001, 4002], rootPid: 4001 });
@@ -183,8 +183,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signalled(4002), ['SIGTERM'], 'the orphaned watcher is stopped by the record that named it');
-          assert.deepEqual(table.signalled(4001), [], 'the root is already gone — nothing to signal');
+          expect(table.signalled(4002), 'the orphaned watcher is stopped by the record that named it').toEqual(['SIGTERM']);
+          expect(table.signalled(4001), 'the root is already gone — nothing to signal').toEqual([]);
         } finally {
           cleanup();
         }
@@ -193,7 +193,7 @@ module.exports = defineCases({
 
     {
       name: 'a-recycled-pid-running-something-else-is-never-signalled',
-      async run({ assert }) {
+      async run({ expect }) {
         // The number came back, attached to a stranger. The record says it is
         // ours; the LIVE command line is the only thing that can disagree, and
         // it does.
@@ -203,8 +203,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'a recorded number now running a stranger is left alone');
-          assert.match(lines.join('\n'), /Left 1 recorded/);
+          expect(table.signals, 'a recorded number now running a stranger is left alone').toEqual([]);
+          expect(lines.join('\n')).toMatch(/Left 1 recorded/);
         } finally {
           cleanup();
         }
@@ -213,7 +213,7 @@ module.exports = defineCases({
 
     {
       name: 'a-recycled-pid-on-another-brands-jar-is-left-alone',
-      async run({ assert }) {
+      async run({ expect }) {
         // The harder recycling: the number came back as emulator machinery, so
         // "is this a jar" passes. The jar names ITS project on its own command
         // line, and it is not ours.
@@ -223,7 +223,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], "another brand's live jar must survive our recorded number");
+          expect(table.signals, "another brand's live jar must survive our recorded number").toEqual([]);
         } finally {
           cleanup();
         }
@@ -232,7 +232,7 @@ module.exports = defineCases({
 
     {
       name: 'a-pid-whose-command-cannot-be-read-is-never-signalled',
-      async run({ assert }) {
+      async run({ expect }) {
         // No command line is no evidence — the process is gone, or the read
         // failed. Either way there is no proof of identity, so there is no
         // kill order.
@@ -242,7 +242,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'a pid with no readable command is never signalled');
+          expect(table.signals, 'a pid with no readable command is never signalled').toEqual([]);
         } finally {
           cleanup();
         }
@@ -251,7 +251,7 @@ module.exports = defineCases({
 
     {
       name: 'the-run-never-signals-itself',
-      async run({ assert }) {
+      async run({ expect }) {
         // `omega emulator` matches the machinery signature by NAME, so a
         // recorded number recycled onto this very process would read as a
         // reapable leftover and the boot would SIGTERM itself.
@@ -261,7 +261,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'this process is never a reap target');
+          expect(table.signals, 'this process is never a reap target').toEqual([]);
         } finally {
           cleanup();
         }
@@ -270,7 +270,7 @@ module.exports = defineCases({
 
     {
       name: 'a-live-root-means-the-record-is-not-stale',
-      async run({ assert }) {
+      async run({ expect }) {
         // The record belongs to a run that is still UP. Its jars are that run's
         // business, and this boot is a second stack beside it — reaping here
         // would kill a live sibling emulator mid-session.
@@ -284,7 +284,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'a record whose root is alive is a LIVE record, not a leftover');
+          expect(table.signals, 'a record whose root is alive is a LIVE record, not a leftover').toEqual([]);
         } finally {
           cleanup();
         }
@@ -293,7 +293,7 @@ module.exports = defineCases({
 
     {
       name: 'a-record-with-no-root-pid-is-not-a-kill-order',
-      async run({ assert }) {
+      async run({ expect }) {
         // Staleness is proved by the ROOT, and a record that never named one
         // proves nothing. Read as "no root answering", a rootPid-less record
         // over a LIVE stack of this very project reads as pure leftovers — and
@@ -308,7 +308,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'a record with no root pid supports no kill order');
+          expect(table.signals, 'a record with no root pid supports no kill order').toEqual([]);
         } finally {
           cleanup();
         }
@@ -317,7 +317,7 @@ module.exports = defineCases({
 
     {
       name: 'an-expired-record-names-nobody',
-      async run({ assert }) {
+      async run({ expect }) {
         // Past the record's age bound the numbers are no longer known to name
         // the processes they named, so the record supports no pid at all — the
         // same rule every other path reads it by.
@@ -327,7 +327,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], 'an expired record is not a kill order');
+          expect(table.signals, 'an expired record is not a kill order').toEqual([]);
         } finally {
           cleanup();
         }
@@ -336,7 +336,7 @@ module.exports = defineCases({
 
     {
       name: 'sigkill-escalates-only-while-the-identity-still-holds',
-      async run({ assert }) {
+      async run({ expect }) {
         // The grace window is long enough for a pid to be freed and handed out
         // again, and there is no apologising to a SIGKILL. 4002 takes the
         // SIGTERM and the number comes back as a stranger; 4003 is still the
@@ -350,13 +350,13 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signalled(4002), ['SIGTERM'], 'a number recycled inside the grace window is not SIGKILLed');
-          assert.deepEqual(table.signalled(4003), ['SIGTERM', 'SIGKILL'], 'a survivor that is still ours is taken');
+          expect(table.signalled(4002), 'a number recycled inside the grace window is not SIGKILLed').toEqual(['SIGTERM']);
+          expect(table.signalled(4003), 'a survivor that is still ours is taken').toEqual(['SIGTERM', 'SIGKILL']);
           // The count is what went DOWN, not what was ordered down: 4002 is
           // spared here, so reporting it reaped would contradict the very next
           // line of output.
-          assert.match(lines.join('\n'), /Reaped 1 recorded process left by a previous run \(1 needed SIGKILL\)/);
-          assert.match(lines.join('\n'), /Left 1 recorded pid alone/);
+          expect(lines.join('\n')).toMatch(/Reaped 1 recorded process left by a previous run \(1 needed SIGKILL\)/);
+          expect(lines.join('\n')).toMatch(/Left 1 recorded pid alone/);
         } finally {
           cleanup();
         }
@@ -365,7 +365,7 @@ module.exports = defineCases({
 
     {
       name: 'a-recycled-pid-on-a-live-stacks-no-project-jar-is-left-alone',
-      async run({ assert }) {
+      async run({ expect }) {
         // The residual the project-id proof cannot reach: the pubsub emulator
         // names no project at all, so a recycled number running the NEIGHBOUR
         // brand's LIVE pubsub jar reads as our own leftover on record
@@ -379,8 +379,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signals, [], "another brand's live jar must survive our recorded number, project id or not");
-          assert.match(lines.join('\n'), /Left 1 recorded pid alone/);
+          expect(table.signals, "another brand's live jar must survive our recorded number, project id or not").toEqual([]);
+          expect(lines.join('\n')).toMatch(/Left 1 recorded pid alone/);
         } finally {
           cleanup();
         }
@@ -389,7 +389,7 @@ module.exports = defineCases({
 
     {
       name: 'a-jar-still-hanging-off-the-dead-run-is-reaped',
-      async run({ assert }) {
+      async run({ expect }) {
         // The other half of the parent proof, so it cannot narrow to "orphans
         // only": the `sh` root is gone but the firebase it spawned outlived it,
         // and the jars still hang off THAT — a pid this very record names. The
@@ -403,8 +403,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signalled(4002), ['SIGTERM'], "the dead run's own firebase parent is reaped");
-          assert.deepEqual(table.signalled(4003), ['SIGTERM'], 'and so is the jar still parented to it');
+          expect(table.signalled(4002), "the dead run's own firebase parent is reaped").toEqual(['SIGTERM']);
+          expect(table.signalled(4003), 'and so is the jar still parented to it').toEqual(['SIGTERM']);
         } finally {
           cleanup();
         }
@@ -413,7 +413,7 @@ module.exports = defineCases({
 
     {
       name: 'a-reap-waits-for-the-recorded-ports-to-come-back',
-      async run({ assert }) {
+      async run({ expect }) {
         // A SIGKILLed JVM holds its listener for a moment after kill() returns
         // and the allocator probes these very ports a few lines later — the
         // same race the port-driven reaper answers. A reap here is BY PID, so
@@ -430,8 +430,8 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.signalled(4002), ['SIGTERM'], 'the recorded jar goes down');
-          assert.deepEqual([...new Set(table.probed)].sort(), [5443, 8080], "the reaped record's ports are waited on, https excluded");
+          expect(table.signalled(4002), 'the recorded jar goes down').toEqual(['SIGTERM']);
+          expect([...new Set(table.probed)].sort(), "the reaped record's ports are waited on, https excluded").toEqual([5443, 8080]);
         } finally {
           cleanup();
         }
@@ -440,7 +440,7 @@ module.exports = defineCases({
 
     {
       name: 'a-reap-that-took-nothing-waits-for-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         // The wait is the price of a kill, not of a boot: a record that proved
         // nothing reapable freed no port, so the allocator is not held up.
         const { command, cleanup } = commandWithRecord({
@@ -453,7 +453,7 @@ module.exports = defineCases({
         try {
           await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), table.seams);
 
-          assert.deepEqual(table.probed, [], 'nothing was reaped, so no port is waited on');
+          expect(table.probed, 'nothing was reaped, so no port is waited on').toEqual([]);
         } finally {
           cleanup();
         }
@@ -462,7 +462,7 @@ module.exports = defineCases({
 
     {
       name: 'the-boot-path-reaps-the-stale-record-before-it-overwrites-it',
-      async run({ assert }) {
+      async run({ expect }) {
         // Nothing else in this suite executes the CALL, so deleting the line in
         // startEmulators left every case green. This one drives the real boot
         // path: the reap runs, it is handed the PREVIOUS record (the file this
@@ -515,9 +515,9 @@ module.exports = defineCases({
         try {
           await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
 
-          assert.equal(spawned.length, 1, 'the boot spawned exactly one child — the fixture, never a real emulator');
-          assert.deepEqual(order, ['reap', 'record'], 'the stale record is reaped BEFORE this boot overwrites it');
-          assert.deepEqual(table.signalled(4002), ['SIGTERM'], "the previous run's watcher is stopped by the boot path itself");
+          expect(spawned.length, 'the boot spawned exactly one child — the fixture, never a real emulator').toBe(1);
+          expect(order, 'the stale record is reaped BEFORE this boot overwrites it').toEqual(['reap', 'record']);
+          expect(table.signalled(4002), "the previous run's watcher is stopped by the boot path itself").toEqual(['SIGTERM']);
         } finally {
           // The child's close handler owns the log sink's timer.
           if (child) child.emit('close', 0, null);
@@ -537,7 +537,7 @@ module.exports = defineCases({
     // member read spares the pid instead of signalling on a guess.
     {
       name: 'an-unreadable-ps-reads-as-alive-never-as-gone',
-      async run({ assert }) {
+      async run({ expect }) {
         const realExecSync = childProcess.execSync;
 
         try {
@@ -546,25 +546,18 @@ module.exports = defineCases({
             gone.status = 1;
             throw gone;
           };
-          assert.equal(
-            EmulatorCommand.readProcessInfo(4001),
-            null,
-            'ps exiting 1 is the provable answer: the pid is gone',
-          );
+          expect(EmulatorCommand.readProcessInfo(4001), 'ps exiting 1 is the provable answer: the pid is gone').toBe(null);
 
           childProcess.execSync = () => {
             throw new Error('spawn ps EAGAIN');
           };
           const unreadable = EmulatorCommand.readProcessInfo(4001);
 
-          assert.ok(unreadable, 'an exec failure is NOT proof of death — the root gate must read it as alive');
-          assert.ok(
-            !EmulatorCommand.isReapableRecordedProcess(
+          expect(unreadable, 'an exec failure is NOT proof of death — the root gate must read it as alive').toBeTruthy();
+          expect(!EmulatorCommand.isReapableRecordedProcess(
               { pid: 4001, ppid: unreadable.ppid, command: unreadable.command },
               { pids: [4001, 4002], rootPid: 4001, projectId: OURS },
-            ),
-            'the sentinel proves no identity, so a member read spares the pid',
-          );
+            ), 'the sentinel proves no identity, so a member read spares the pid').toBeTruthy();
         } finally {
           childProcess.execSync = realExecSync;
         }

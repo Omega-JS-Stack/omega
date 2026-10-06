@@ -24,7 +24,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'declined-checkout-suspends-user',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const uid = accounts['journey-payments-decline'].uid;
 
         // Resolve first paid subscription product. If the brand has none configured,
@@ -45,7 +45,7 @@ module.exports = defineCases({
           simulate: 'decline',
         });
 
-        assert.isSuccess(response, 'Intent should succeed — the checkout starts, the payment is what fails');
+        expect(response, 'Intent should succeed — the checkout starts, the payment is what fails').toBeSuccess();
         state.orderId = response.data.orderId;
 
         // Wait for the declined subscription to land on the user
@@ -55,9 +55,9 @@ module.exports = defineCases({
         }, 20000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc.subscription.status, 'suspended', 'Status should be suspended after a declined checkout');
-        assert.equal(userDoc.subscription.product.id, paidProduct.id, 'Product should be the ATTEMPTED product');
-        assert.equal(userDoc.subscription.payment.orderId, state.orderId, 'Order ID should match the intent');
+        expect(userDoc.subscription.status, 'Status should be suspended after a declined checkout').toBe('suspended');
+        expect(userDoc.subscription.product.id, 'Product should be the ATTEMPTED product').toBe(paidProduct.id);
+        expect(userDoc.subscription.payment.orderId, 'Order ID should match the intent').toBe(state.orderId);
 
         state.subscriptionId = userDoc.subscription.payment.resourceId;
       },
@@ -65,19 +65,19 @@ module.exports = defineCases({
 
     {
       name: 'suspended-grants-no-access',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const userDoc = await firestore.get(`users/${state.uid}`);
         const resolved = new User(userDoc);
 
-        assert.equal(resolved.active, false, 'Suspended should grant no access');
-        assert.equal(resolved.plan, 'basic', 'Effective plan should fall back to basic');
-        assert.equal(resolved.trialing, false, 'A declined checkout should claim no trial');
+        expect(resolved.active, 'Suspended should grant no access').toBe(false);
+        expect(resolved.plan, 'Effective plan should fall back to basic').toBe('basic');
+        expect(resolved.trialing, 'A declined checkout should claim no trial').toBe(false);
       },
     },
 
     {
       name: 'checkout-declined-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // A user doc carries subscription.status 'active' on 'basic' from birth, so a
         // FIRST-checkout decline used to read as active → suspended and send the
         // renewal-dunning email to someone who never had a subscription. The
@@ -100,14 +100,14 @@ module.exports = defineCases({
 
         const webhookDoc = snapshot.docs[0].data();
 
-        assert.equal(webhookDoc.status, 'completed', 'Subscription webhook should process cleanly');
-        assert.equal(webhookDoc.transition, 'checkout-declined', 'Transition should be checkout-declined, not the renewal-dunning payment-failed');
+        expect(webhookDoc.status, 'Subscription webhook should process cleanly').toBe('completed');
+        expect(webhookDoc.transition, 'Transition should be checkout-declined, not the renewal-dunning payment-failed').toBe('checkout-declined');
       },
     },
 
     {
       name: 'failed-invoice-webhook-recorded',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // The declined checkout fires TWO events: the dunning subscription, then its
         // failed first invoice (billing_reason: subscription_create)
         const snapshot = await waitFor(async () => {
@@ -127,50 +127,50 @@ module.exports = defineCases({
 
         const webhookDoc = snapshot.docs[0].data();
 
-        assert.equal(webhookDoc.status, 'completed', 'Failed-invoice webhook should process cleanly');
-        assert.equal(webhookDoc.event.category, 'subscription', 'Category should be subscription');
-        assert.equal(webhookDoc.event.resourceId, state.subscriptionId, 'Resource ID should be the subscription');
-        assert.equal(webhookDoc.orderId, state.orderId, 'Webhook should resolve to the checkout order');
+        expect(webhookDoc.status, 'Failed-invoice webhook should process cleanly').toBe('completed');
+        expect(webhookDoc.event.category, 'Category should be subscription').toBe('subscription');
+        expect(webhookDoc.event.resourceId, 'Resource ID should be the subscription').toBe(state.subscriptionId);
+        expect(webhookDoc.orderId, 'Webhook should resolve to the checkout order').toBe(state.orderId);
 
         // The subscription event already suspended the user, so the invoice event is
         // suspended → suspended: no second transition, no duplicate dunning email.
-        assert.equal(webhookDoc.transition, null, 'The failed invoice should not re-fire the dunning transition');
+        expect(webhookDoc.transition, 'The failed invoice should not re-fire the dunning transition').toBe(null);
       },
     },
 
     {
       name: 'order-doc-holds-the-attempted-product',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.productId, state.paidProductId, 'Order should name the attempted product');
-        assert.equal(orderDoc.unified.status, 'suspended', 'Unified status should be suspended');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.type, 'Type should be subscription').toBe('subscription');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(orderDoc.productId, 'Order should name the attempted product').toBe(state.paidProductId);
+        expect(orderDoc.unified.status, 'Unified status should be suspended').toBe('suspended');
       },
     },
 
     {
       name: 'intent-doc-reflects-webhook-outcome',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
 
-        assert.ok(intentDoc, 'Intent doc should exist');
-        assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
+        expect(intentDoc, 'Intent doc should exist').toBeTruthy();
+        expect(intentDoc.id, 'ID should match orderId').toBe(state.orderId);
 
         // 'completed' means the PIPELINE completed, not that the payment succeeded —
         // the intent sync is outcome-blind today. A decline that ends 'failed' needs
         // the pipeline's intent sync to read the payment outcome ([#212]).
-        assert.equal(intentDoc.status, 'completed', 'Intent status tracks webhook processing, not payment outcome');
-        assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');
-        assert.equal(intentDoc.simulate, undefined, 'simulate is request-only — never persisted');
+        expect(intentDoc.status, 'Intent status tracks webhook processing, not payment outcome').toBe('completed');
+        expect(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set').toBeTruthy();
+        expect(intentDoc.simulate, 'simulate is request-only — never persisted').toBe(undefined);
       },
     },
 
     {
       name: 'send-recovery-webhook',
-      async run({ http, assert, state, config, payments }) {
+      async run({ http, expect, state, config, payments }) {
         const futureDate = new Date();
         futureDate.setMonth(futureDate.getMonth() + 1);
 
@@ -197,28 +197,28 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Recovery webhook should be accepted');
+        expect(response, 'Recovery webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'recovered-subscription-grants-access',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.recoveryEventId}`);
           return doc?.status === 'completed';
         }, 20000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.recoveryEventId}`);
-        assert.equal(webhookDoc.transition, 'payment-recovered', 'Transition should be payment-recovered');
+        expect(webhookDoc.transition, 'Transition should be payment-recovered').toBe('payment-recovered');
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should be active after recovery');
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should still be ${state.paidProductId}`);
+        expect(userDoc.subscription.status, 'Status should be active after recovery').toBe('active');
+        expect(userDoc.subscription.product.id, `Product should still be ${state.paidProductId}`).toBe(state.paidProductId);
 
         const resolved = new User(userDoc);
-        assert.equal(resolved.active, true, 'Recovered subscription should grant access');
-        assert.equal(resolved.plan, state.paidProductId, 'Effective plan should be the paid product');
+        expect(resolved.active, 'Recovered subscription should grant access').toBe(true);
+        expect(resolved.plan, 'Effective plan should be the paid product').toBe(state.paidProductId);
       },
     },
   ],

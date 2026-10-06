@@ -26,25 +26,25 @@ module.exports = defineCases({
 
     {
       name: 'stamps-updated-and-tag-on-a-bare-document',
-      async run({ assert }) {
+      async run({ expect }) {
         const doc = {};
         const metadata = new Metadata(ctx).set({}, doc);
 
-        assert.equal(typeof metadata.updated.timestamp, 'string');
-        assert.equal(typeof metadata.updated.timestampUNIX, 'number');
-        assert.equal(typeof metadata.tag, 'string');
-        assert.equal(doc.metadata, metadata, 'the stamp is written onto the document');
+        expect(typeof metadata.updated.timestamp).toBe('string');
+        expect(typeof metadata.updated.timestampUNIX).toBe('number');
+        expect(typeof metadata.tag).toBe('string');
+        expect(doc.metadata, 'the stamp is written onto the document').toBe(metadata);
       },
     },
 
     {
       name: 'timestamp-and-timestampUNIX-describe-the-same-instant',
-      async run({ assert }) {
+      async run({ expect }) {
         const metadata = new Metadata(ctx).set({}, {});
         const iso = metadata.updated.timestamp;
 
-        assert.equal(iso.endsWith('Z'), true, 'ISO-8601 in UTC');
-        assert.equal(Math.floor(new Date(iso).getTime() / 1000), metadata.updated.timestampUNIX);
+        expect(iso.endsWith('Z'), 'ISO-8601 in UTC').toBe(true);
+        expect(Math.floor(new Date(iso).getTime() / 1000)).toBe(metadata.updated.timestampUNIX);
       },
     },
 
@@ -52,21 +52,21 @@ module.exports = defineCases({
 
     {
       name: 'a-supplied-tag-is-used-verbatim',
-      async run({ assert }) {
+      async run({ expect }) {
         const metadata = new Metadata(ctx).set({ tag: 'evt_abc123' }, {});
 
-        assert.equal(metadata.tag, 'evt_abc123');
+        expect(metadata.tag).toBe('evt_abc123');
       },
     },
 
     {
       name: 'an-absent-tag-becomes-a-fresh-uuid-every-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const first = new Metadata(ctx).set({}, {});
         const second = new Metadata(ctx).set({}, {});
 
-        assert.equal(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(first.tag), true);
-        assert.equal(first.tag === second.tag, false, 'two stamps never share a tag');
+        expect(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(first.tag)).toBe(true);
+        expect(first.tag === second.tag, 'two stamps never share a tag').toBe(false);
       },
     },
 
@@ -74,7 +74,7 @@ module.exports = defineCases({
 
     {
       name: 're-stamping-refreshes-updated-and-preserves-created',
-      async run({ assert }) {
+      async run({ expect }) {
         const doc = {
           name: 'keep me',
           metadata: {
@@ -86,23 +86,23 @@ module.exports = defineCases({
 
         const metadata = new Metadata(ctx).set({ tag: 'new-tag' }, doc);
 
-        assert.deepEqual(metadata.created, { timestamp: '2020-01-01T00:00:00.000Z', timestampUNIX: 1577836800 });
-        assert.equal(metadata.updated.timestamp === '2020-01-01T00:00:00.000Z', false, 'updated moved');
-        assert.equal(metadata.updated.timestampUNIX > 1577836800, true);
-        assert.equal(metadata.tag, 'new-tag');
-        assert.equal(doc.name, 'keep me', 'non-metadata fields are untouched');
+        expect(metadata.created).toEqual({ timestamp: '2020-01-01T00:00:00.000Z', timestampUNIX: 1577836800 });
+        expect(metadata.updated.timestamp === '2020-01-01T00:00:00.000Z', 'updated moved').toBe(false);
+        expect(metadata.updated.timestampUNIX > 1577836800).toBe(true);
+        expect(metadata.tag).toBe('new-tag');
+        expect(doc.name, 'non-metadata fields are untouched').toBe('keep me');
       },
     },
 
     {
       name: 'a-document-with-partial-metadata-is-filled-in',
-      async run({ assert }) {
+      async run({ expect }) {
         const doc = { metadata: { created: { timestamp: '2020-01-01T00:00:00.000Z' } } };
 
         const metadata = new Metadata(ctx).set({}, doc);
 
-        assert.equal(metadata.created.timestamp, '2020-01-01T00:00:00.000Z');
-        assert.equal(typeof metadata.updated.timestampUNIX, 'number');
+        expect(metadata.created.timestamp).toBe('2020-01-01T00:00:00.000Z');
+        expect(typeof metadata.updated.timestampUNIX).toBe('number');
       },
     },
 
@@ -110,11 +110,11 @@ module.exports = defineCases({
 
     {
       name: 'an-absent-document-stamps-onto-a-fresh-one',
-      async run({ assert }) {
+      async run({ expect }) {
         const metadata = new Metadata(ctx).set({});
 
-        assert.equal(typeof metadata.updated.timestamp, 'string');
-        assert.equal(typeof metadata.tag, 'string');
+        expect(typeof metadata.updated.timestamp).toBe('string');
+        expect(typeof metadata.tag).toBe('string');
       },
     },
   ],

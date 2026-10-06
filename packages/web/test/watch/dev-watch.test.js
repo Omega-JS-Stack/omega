@@ -11,11 +11,10 @@
  * real written output — no mocks and no sleeps; the assertions poll the
  * written page until the rebuild lands, deadlined.
  */
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { configureOmega } = require('../../src/index.js');
 const { buildAssets } = require('../../src/assets.js');
@@ -26,7 +25,7 @@ const { refreshLiveManifest } = require('../../src/live-manifest.js');
 // fixture; the deadline is the point at which "the edit never landed" is the
 // only remaining explanation. It scales with the lane's load knob (#211) and
 // with this machine's measured contention (#615).
-const { POLL_MS, buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done.
 const DRAIN_QUIET_POLLS = 20;
 
@@ -204,244 +203,260 @@ async function startWatch(t, fixture, options = {}) {
   };
 }
 
-test('a watched _layouts edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+module.exports = defineCases({
+  type: 'group',
+  description: 'dev-watch',
+  timeout: caseTimeoutMs(),
+  tests: [
+    {
+      name: 'a watched _layouts edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page(), /data-layout="BEFORE"/, 'the first build renders the authored layout');
+        ctx.expect(watch.page(), 'the first build renders the authored layout').toMatch(/data-layout="BEFORE"/);
 
-  fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
-  await watch.pageBecomes(/data-layout="AFTER"/, 'the rebuild serves the edit, not the config-time capture');
+        fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
+        await watch.pageBecomes(/data-layout="AFTER"/, 'the rebuild serves the edit, not the config-time capture');
 
-  // A second edit proves the loop keeps invalidating — the reset rebuilds the
-  // config, and the NEXT edit must reset the rebuilt one too.
-  fixture.write('_layouts/toy.html', '<main data-layout="AGAIN">{{ content }}</main>');
-  await watch.pageBecomes(/data-layout="AGAIN"/, 'every later edit lands too');
-});
+        // A second edit proves the loop keeps invalidating — the reset rebuilds the
+        // config, and the NEXT edit must reset the rebuilt one too.
+        fixture.write('_layouts/toy.html', '<main data-layout="AGAIN">{{ content }}</main>');
+        await watch.pageBecomes(/data-layout="AGAIN"/, 'every later edit lands too');
+      },
+    },
 
-test('a watched _includes json edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched _includes json edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page(), /data-nav="BEFORE"/, 'the first build renders the authored data file');
+        ctx.expect(watch.page(), 'the first build renders the authored data file').toMatch(/data-nav="BEFORE"/);
 
-  fixture.write('_includes/nav.json', '{ label: "AFTER" }');
-  await watch.pageBecomes(/data-nav="AFTER"/, 'site.data._includes is recomposed on the rebuild');
+        fixture.write('_includes/nav.json', '{ label: "AFTER" }');
+        await watch.pageBecomes(/data-nav="AFTER"/, 'site.data._includes is recomposed on the rebuild');
 
-  fixture.write('_includes/nav.json', '{ label: "AGAIN" }');
-  await watch.pageBecomes(/data-nav="AGAIN"/, 'every later edit lands too');
-});
+        fixture.write('_includes/nav.json', '{ label: "AGAIN" }');
+        await watch.pageBecomes(/data-nav="AGAIN"/, 'every later edit lands too');
+      },
+    },
 
-test('a watched theme-layer _layouts edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched theme-layer _layouts edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page('theme-page.html'), /data-theme-layout="BEFORE"/, 'the first build renders the theme layer\'s layout');
+        ctx.expect(watch.page('theme-page.html'), 'the first build renders the theme layer\'s layout').toMatch(/data-theme-layout="BEFORE"/);
 
-  fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AFTER">{{ content }}</main>');
-  await watch.pageBecomes(/data-theme-layout="AFTER"/, 'the rebuild serves the theme-layer edit', 'theme-page.html');
+        fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AFTER">{{ content }}</main>');
+        await watch.pageBecomes(/data-theme-layout="AFTER"/, 'the rebuild serves the theme-layer edit', 'theme-page.html');
 
-  fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AGAIN">{{ content }}</main>');
-  await watch.pageBecomes(/data-theme-layout="AGAIN"/, 'every later edit lands too', 'theme-page.html');
-});
+        fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AGAIN">{{ content }}</main>');
+        await watch.pageBecomes(/data-theme-layout="AGAIN"/, 'every later edit lands too', 'theme-page.html');
+      },
+    },
 
-test('a watched packaged-layer _layouts edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched packaged-layer _layouts edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page('core-page.html'), /data-core-layout="BEFORE"/, 'the first build renders the core layer\'s layout');
+        ctx.expect(watch.page('core-page.html'), 'the first build renders the core layer\'s layout').toMatch(/data-core-layout="BEFORE"/);
 
-  // The first packaged edit gets the re-save nudge (#688): the fresh packaged
-  // dir's FSEvents stream can still be initializing when this save lands, and
-  // a save that predates the stream is never replayed. The nudge stops on the
-  // first build event, so a woken-but-stale rebuild still fails (#49).
-  const editPackaged = () => fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AFTER">{{ content }}</main>');
-  editPackaged();
-  await watch.pageBecomes(/data-core-layout="AFTER"/, 'the rebuild serves the packaged-layer edit — the node_modules ignore does not swallow it', 'core-page.html', editPackaged);
+        // The first packaged edit gets the re-save nudge (#688): the fresh packaged
+        // dir's FSEvents stream can still be initializing when this save lands, and
+        // a save that predates the stream is never replayed. The nudge stops on the
+        // first build event, so a woken-but-stale rebuild still fails (#49).
+        const editPackaged = () => fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AFTER">{{ content }}</main>');
+        editPackaged();
+        await watch.pageBecomes(/data-core-layout="AFTER"/, 'the rebuild serves the packaged-layer edit — the node_modules ignore does not swallow it', 'core-page.html', editPackaged);
 
-  fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AGAIN">{{ content }}</main>');
-  await watch.pageBecomes(/data-core-layout="AGAIN"/, 'every later edit lands too', 'core-page.html');
-});
+        fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AGAIN">{{ content }}</main>');
+        await watch.pageBecomes(/data-core-layout="AGAIN"/, 'every later edit lands too', 'core-page.html');
+      },
+    },
 
-test('a watched defaults/pages edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched defaults/pages edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page('default-page.html'), /data-default="BEFORE"/, 'the first build renders the packaged default page');
+        ctx.expect(watch.page('default-page.html'), 'the first build renders the packaged default page').toMatch(/data-default="BEFORE"/);
 
-  fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AFTER">default</p>');
-  await watch.pageBecomes(/data-default="AFTER"/, 'the rebuild serves the defaults edit, not the config-time capture', 'default-page.html');
+        fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AFTER">default</p>');
+        await watch.pageBecomes(/data-default="AFTER"/, 'the rebuild serves the defaults edit, not the config-time capture', 'default-page.html');
 
-  fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AGAIN">default</p>');
-  await watch.pageBecomes(/data-default="AGAIN"/, 'every later edit lands too', 'default-page.html');
-});
+        fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AGAIN">default</p>');
+        await watch.pageBecomes(/data-default="AGAIN"/, 'every later edit lands too', 'default-page.html');
+      },
+    },
 
-test('a watched defaults/showcase edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched defaults/showcase edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page('showcase-page.html'), /data-showcase="BEFORE"/, 'the first build renders the packaged showcase page');
+        ctx.expect(watch.page('showcase-page.html'), 'the first build renders the packaged showcase page').toMatch(/data-showcase="BEFORE"/);
 
-  fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AFTER">showcase</p>');
-  await watch.pageBecomes(/data-showcase="AFTER"/, 'the rebuild serves the showcase edit, not the config-time capture', 'showcase-page.html');
+        fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AFTER">showcase</p>');
+        await watch.pageBecomes(/data-showcase="AFTER"/, 'the rebuild serves the showcase edit, not the config-time capture', 'showcase-page.html');
 
-  fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AGAIN">showcase</p>');
-  await watch.pageBecomes(/data-showcase="AGAIN"/, 'every later edit lands too', 'showcase-page.html');
-});
+        fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AGAIN">showcase</p>');
+        await watch.pageBecomes(/data-showcase="AGAIN"/, 'every later edit lands too', 'showcase-page.html');
+      },
+    },
 
-test('a watched _sections edit is served by the very next rebuild', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'a watched _sections edit is served by the very next rebuild',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  assert.match(watch.page('section-page.html'), /data-section="BEFORE"/, 'the first build renders the authored section');
+        ctx.expect(watch.page('section-page.html'), 'the first build renders the authored section').toMatch(/data-section="BEFORE"/);
 
-  fixture.write('_sections/toy-section/section.html', '<section data-section="AFTER-{{ args.label }}">toy</section>');
-  await watch.pageBecomes(/data-section="AFTER-BEFORE"/, 'the rebuild serves the section template edit, not the cached parse', 'section-page.html');
+        fixture.write('_sections/toy-section/section.html', '<section data-section="AFTER-{{ args.label }}">toy</section>');
+        await watch.pageBecomes(/data-section="AFTER-BEFORE"/, 'the rebuild serves the section template edit, not the cached parse', 'section-page.html');
 
-  fixture.write('_sections/toy-section/section.json5', '{ defaults: { label: "AFTER" } }');
-  await watch.pageBecomes(/data-section="AFTER-AFTER"/, 'the section defaults are re-read too', 'section-page.html');
-});
+        fixture.write('_sections/toy-section/section.json5', '{ defaults: { label: "AFTER" } }');
+        await watch.pageBecomes(/data-section="AFTER-AFTER"/, 'the section defaults are re-read too', 'section-page.html');
+      },
+    },
 
-// The font preloads left the engine for the asset manifest (#765): they are
-// picked off the compiled sheet's @font-face rules, so the CSS lane's watcher
-// — not a config-time capture — is what a theme's font edit rebuilds. The
-// whole path, end to end: the asset watcher rebuilds the sheet, folds the new
-// list into the live manifest the engine holds by reference, and rewrites the
-// manifest FILE; Eleventy watches that file, so it re-renders after the asset
-// build rather than racing it.
-test('a theme @font-face edit reaches the served head, through the manifest file', async (t) => {
-  const fixture = app();
+    // The font preloads left the engine for the asset manifest (#765): they are
+    // picked off the compiled sheet's @font-face rules, so the CSS lane's watcher
+    // — not a config-time capture — is what a theme's font edit rebuilds. The
+    // whole path, end to end: the asset watcher rebuilds the sheet, folds the new
+    // list into the live manifest the engine holds by reference, and rewrites the
+    // manifest FILE; Eleventy watches that file, so it re-renders after the asset
+    // build rather than racing it.
+    {
+      name: 'a theme @font-face edit reaches the served head, through the manifest file',
+      run: async (ctx) => {
+        const fixture = app();
 
-  // The consumer-local theme layer the dev asset lane compiles
-  // (resolveAssetThemeLayers): its own main.scss, its own vendored face.
-  const themeLayer = path.join(fixture.src, 'themes', ACTIVE_THEME);
-  const face = (name) => `@font-face { font-family: ${name}; src: url(/assets/fonts/${name}.woff2); unicode-range: U+0000-00FF; }`;
-  fs.mkdirSync(path.join(themeLayer, 'css'), { recursive: true });
-  fs.mkdirSync(path.join(themeLayer, 'fonts'), { recursive: true });
-  fs.writeFileSync(path.join(themeLayer, 'fonts', 'aaa.woff2'), 'face');
-  fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), face('aaa'));
-  // The same loop core/_includes/core/head.html runs, on a page of its own.
-  fixture.write('pages/fonts-page.html', [
-    '---',
-    'permalink: /fonts-page.html',
-    '---',
-    '{% for font in assetManifest.fontPreloads %}<link rel="preload" href="{{ font }}"/>{% endfor %}',
-  ].join('\n'));
+        // The consumer-local theme layer the dev asset lane compiles
+        // (resolveAssetThemeLayers): its own main.scss, its own vendored face.
+        const themeLayer = path.join(fixture.src, 'themes', ACTIVE_THEME);
+        const face = (name) => `@font-face { font-family: ${name}; src: url(/assets/fonts/${name}.woff2); unicode-range: U+0000-00FF; }`;
+        fs.mkdirSync(path.join(themeLayer, 'css'), { recursive: true });
+        fs.mkdirSync(path.join(themeLayer, 'fonts'), { recursive: true });
+        fs.writeFileSync(path.join(themeLayer, 'fonts', 'aaa.woff2'), 'face');
+        fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), face('aaa'));
+        // The same loop core/_includes/core/head.html runs, on a page of its own.
+        fixture.write('pages/fonts-page.html', [
+          '---',
+          'permalink: /fonts-page.html',
+          '---',
+          '{% for font in assetManifest.fontPreloads %}<link rel="preload" href="{{ font }}"/>{% endfor %}',
+        ].join('\n'));
 
-  const build = (only) => buildAssets({
-    layers: [themeLayer],
-    themeRoots: [themeLayer],
-    sectionRoots: [themeLayer],
-    themesDir: fixture.themesDir,
-    coreDir: fixture.coreDir,
-    outDir: fixture.out,
-    dev: true,
-    only: only || 'css',
-  });
+        const build = (only) => buildAssets({
+          layers: [themeLayer],
+          themeRoots: [themeLayer],
+          sectionRoots: [themeLayer],
+          themesDir: fixture.themesDir,
+          coreDir: fixture.coreDir,
+          outDir: fixture.out,
+          dev: true,
+          only: only || 'css',
+        });
 
-  const manifestPath = path.join(fixture.root, '.omega', 'asset-manifest.json');
-  const manifest = await build('css');
-  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+        const manifestPath = path.join(fixture.root, '.omega', 'asset-manifest.json');
+        const manifest = await build('css');
+        fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-  const watcher = watchAssetSources({ dirs: [themeLayer], build, manifest, manifestPath });
-  t.after(() => watcher.close());
+        const watcher = watchAssetSources({ dirs: [themeLayer], build, manifest, manifestPath });
+        ctx.after(() => watcher.close());
 
-  const watch = await startWatch(t, fixture, { assetManifest: manifest, watchTargets: [manifestPath] });
-  assert.match(watch.page('fonts-page.html'), /"\/assets\/fonts\/aaa\.woff2"/, 'the first build preloads the authored face');
+        const watch = await startWatch(ctx, fixture, { assetManifest: manifest, watchTargets: [manifestPath] });
+        ctx.expect(watch.page('fonts-page.html'), 'the first build preloads the authored face').toMatch(/"\/assets\/fonts\/aaa\.woff2"/);
 
-  fs.writeFileSync(path.join(themeLayer, 'fonts', 'mmm.woff2'), 'face');
-  // The theme layer's watch root is seconds old here, so the first save can
-  // fall before its FSEvents stream starts — the #688 nudge re-fires it until
-  // a build shows life (a rebuild that woke and served stale bytes still fails).
-  const declareBoth = () => fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), `${face('aaa')}\n${face('mmm')}`);
-  declareBoth();
-  await watch.pageBecomes(
-    /"\/assets\/fonts\/mmm\.woff2"/,
-    'the head the watcher serves carries the face the theme just declared',
-    'fonts-page.html',
-    declareBoth,
-  );
-  assert.match(
-    fs.readFileSync(manifestPath, 'utf8'),
-    /mmm\.woff2/,
-    'the manifest file — the courier whose change is what Eleventy watches — carries it too',
-  );
-});
+        fs.writeFileSync(path.join(themeLayer, 'fonts', 'mmm.woff2'), 'face');
+        // The theme layer's watch root is seconds old here, so the first save can
+        // fall before its FSEvents stream starts — the #688 nudge re-fires it until
+        // a build shows life (a rebuild that woke and served stale bytes still fails).
+        const declareBoth = () => fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), `${face('aaa')}\n${face('mmm')}`);
+        declareBoth();
+        await watch.pageBecomes(
+          /"\/assets\/fonts\/mmm\.woff2"/,
+          'the head the watcher serves carries the face the theme just declared',
+          'fonts-page.html',
+          declareBoth,
+        );
+        ctx.expect(fs.readFileSync(manifestPath, 'utf8'), 'the manifest file — the courier whose change is what Eleventy watches — carries it too').toMatch(/mmm\.woff2/);
+      },
+    },
 
-test('a css rebuild folds its font preloads into the live manifest', () => {
-  const manifest = { css: { main: '/assets/css/main.css' }, fontPreloads: ['/assets/fonts/aaa.woff2'] };
+    {
+      name: 'a css rebuild folds its font preloads into the live manifest',
+      run: (ctx) => {
+        const manifest = { css: { main: '/assets/css/main.css' }, fontPreloads: ['/assets/fonts/aaa.woff2'] };
 
-  assert.equal(
-    refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }),
-    true,
-    'a moved list is reported — that answer is what rewrites the manifest file',
-  );
-  assert.deepEqual(
-    manifest.fontPreloads,
-    ['/assets/fonts/mmm.woff2'],
-    'and it is written into the live object in place — the engine holds THIS reference',
-  );
+        ctx.expect(refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }), 'a moved list is reported — that answer is what rewrites the manifest file').toBe(true);
+        ctx.expect(manifest.fontPreloads, 'and it is written into the live object in place — the engine holds THIS reference').toEqual(['/assets/fonts/mmm.woff2']);
 
-  assert.equal(
-    refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }),
-    false,
-    'the SAME list is no change: an unchanged head must not trigger a re-render',
-  );
+        ctx.expect(refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }), 'the SAME list is no change: an unchanged head must not trigger a re-render').toBe(false);
 
-  assert.equal(refreshLiveManifest(manifest, { fontPreloads: [] }), true, 'a theme that dropped its @font-face rules drops its preloads');
-  assert.deepEqual(manifest.fontPreloads, []);
+        ctx.expect(refreshLiveManifest(manifest, { fontPreloads: [] }), 'a theme that dropped its @font-face rules drops its preloads').toBe(true);
+        ctx.expect(manifest.fontPreloads).toEqual([]);
 
-  // A js-only rebuild returns before the css lane, so it carries no list.
-  assert.equal(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js' } }), false, 'a js rebuild leaves the list alone');
-  assert.deepEqual(manifest.fontPreloads, []);
-  assert.equal(manifest.css.main, '/assets/css/main.css', 'and nothing else in the manifest moves');
-});
+        // A js-only rebuild returns before the css lane, so it carries no list.
+        ctx.expect(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js' } }), 'a js rebuild leaves the list alone').toBe(false);
+        ctx.expect(manifest.fontPreloads).toEqual([]);
+        ctx.expect(manifest.css.main, 'and nothing else in the manifest moves').toBe('/assets/css/main.css');
+      },
+    },
 
-test('a js rebuild folds its entry imports into the live manifest', () => {
-  const before = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js'] };
-  const after = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js', '/assets/js/chunks/chunk-MMMM.js'] };
-  const manifest = { js: { main: '/assets/js/main.js', imports: before }, css: { main: '/assets/css/main.css' } };
+    {
+      name: 'a js rebuild folds its entry imports into the live manifest',
+      run: (ctx) => {
+        const before = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js'] };
+        const after = { '/assets/js/main.js': ['/assets/js/chunks/chunk-AAAA.js', '/assets/js/chunks/chunk-MMMM.js'] };
+        const manifest = { js: { main: '/assets/js/main.js', imports: before }, css: { main: '/assets/css/main.css' } };
 
-  assert.equal(
-    refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: after } }),
-    true,
-    'a moved map is reported: that answer is what rewrites the manifest file',
-  );
-  assert.deepEqual(manifest.js.imports, after, 'and it is written into the live object in place, the one the engine holds');
+        ctx.expect(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: after } }), 'a moved map is reported: that answer is what rewrites the manifest file').toBe(true);
+        ctx.expect(manifest.js.imports, 'and it is written into the live object in place, the one the engine holds').toEqual(after);
 
-  assert.equal(
-    refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: structuredClone(after) } }),
-    false,
-    'the SAME map is no change: an unchanged page must not trigger a re-render',
-  );
+        ctx.expect(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js', imports: structuredClone(after) } }), 'the SAME map is no change: an unchanged page must not trigger a re-render').toBe(false);
 
-  // A css-only rebuild returns before the js lane, so it carries no map.
-  assert.equal(refreshLiveManifest(manifest, { css: { main: '/assets/css/main.css' } }), false, 'a css rebuild leaves the map alone');
-  assert.deepEqual(manifest.js.imports, after);
-  assert.equal(manifest.js.main, '/assets/js/main.js', 'and nothing else in the manifest moves');
-});
+        // A css-only rebuild returns before the js lane, so it carries no map.
+        ctx.expect(refreshLiveManifest(manifest, { css: { main: '/assets/css/main.css' } }), 'a css rebuild leaves the map alone').toBe(false);
+        ctx.expect(manifest.js.imports).toEqual(after);
+        ctx.expect(manifest.js.main, 'and nothing else in the manifest moves').toBe('/assets/js/main.js');
+      },
+    },
 
-test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {
-  const fixture = app();
-  const watch = await startWatch(t, fixture);
+    {
+      name: 'an ordinary page edit rebuilds incrementally — no config reset',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture);
 
-  const runsAfterFirstBuild = watch.configRuns.count;
+        const runsAfterFirstBuild = watch.configRuns.count;
 
-  fixture.write('pages/core-page.html', [
-    '---',
-    'layout: core-toy.html',
-    'permalink: /core-page.html',
-    '---',
-    '<p data-page="AFTER">core</p>',
-  ].join('\n'));
-  await watch.pageBecomes(/data-page="AFTER"/, 'the page edit lands', 'core-page.html');
+        fixture.write('pages/core-page.html', [
+          '---',
+          'layout: core-toy.html',
+          'permalink: /core-page.html',
+          '---',
+          '<p data-page="AFTER">core</p>',
+        ].join('\n'));
+        await watch.pageBecomes(/data-page="AFTER"/, 'the page edit lands', 'core-page.html');
 
-  assert.equal(watch.configRuns.count, runsAfterFirstBuild, 'a content edit never re-runs the config — page edits stay on the incremental path');
+        ctx.expect(watch.configRuns.count, 'a content edit never re-runs the config — page edits stay on the incremental path').toBe(runsAfterFirstBuild);
 
-  // The contrast: a layout edit DOES reset, so the counter is a real signal
-  // and not a constant.
-  fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
-  await watch.pageBecomes(/data-layout="AFTER"/, 'the layout edit lands');
-  assert.ok(watch.configRuns.count > runsAfterFirstBuild, 'a layout edit re-runs the config (the reset)');
+        // The contrast: a layout edit DOES reset, so the counter is a real signal
+        // and not a constant.
+        fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
+        await watch.pageBecomes(/data-layout="AFTER"/, 'the layout edit lands');
+        ctx.expect(watch.configRuns.count > runsAfterFirstBuild, 'a layout edit re-runs the config (the reset)').toBeTruthy();
+      },
+    },
+  ],
 });

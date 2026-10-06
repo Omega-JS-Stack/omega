@@ -95,5 +95,28 @@ module.exports = defineCases({
         ctx.expect(reverse).toEqual(['second', 'first']);
       },
     },
+    {
+      name: 'setupContext runs once, before the setups, whether or not any hook has a setup',
+      async run(ctx) {
+        const none = [];
+        await runInitSetups([root('no-setup')], PROJECT_ROOT, {
+          setupContext: async ({ hooks }) => {
+            none.push(hooks.length);
+            return {};
+          },
+        });
+        ctx.expect(none).toEqual([1]);
+
+        const record = [];
+        await runInitSetups([root('order-first'), root('order-second')], PROJECT_ROOT, {
+          factoryArgs: { record },
+          setupContext: async () => {
+            record.push('context');
+            return {};
+          },
+        });
+        ctx.expect(record).toEqual(['context', 'first', 'second']);
+      },
+    },
   ],
 });

@@ -15,8 +15,7 @@
  * touches (node has no DOM and web pulls in no jsdom) — the convention
  * consent-banner.test.js set.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -116,10 +115,6 @@ function makeDocument() {
   };
 }
 
-test.after(() => {
-  delete globalThis.document;
-});
-
 /** Arm the real handler over one fresh document. */
 async function boot() {
   await bundleOnce();
@@ -133,48 +128,69 @@ async function boot() {
   return doc;
 }
 
-test('pressing the close button hides its own alert', async () => {
-  const doc = await boot();
-  const outdated = makeAlert('outdated');
+module.exports = defineCases({
+  type: 'group',
+  description: 'alert-dismiss',
+  cleanup: () => {
+    delete globalThis.document;
+  },
+  tests: [
+    {
+      name: 'pressing the close button hides its own alert',
+      run: async (ctx) => {
+        const doc = await boot();
+        const outdated = makeAlert('outdated');
 
-  const event = doc.click(outdated.close);
+        const event = doc.click(outdated.close);
 
-  assert.equal(outdated.alert.hidden, true, 'the alert the button sits in is hidden');
-  assert.equal(event.defaultPrevented, true, 'the dismiss owns the click');
-});
+        ctx.expect(outdated.alert.hidden, 'the alert the button sits in is hidden').toBe(true);
+        ctx.expect(event.defaultPrevented, 'the dismiss owns the click').toBe(true);
+      },
+    },
 
-test('only the nearest alert closes — a second banner stays up', async () => {
-  // Two alerts can be on screen at once (an outdated browser AND a failed
-  // payment method), and dismissing one is not an answer about the other.
-  const doc = await boot();
-  const outdated = makeAlert('outdated');
-  const suspended = makeAlert('suspended');
+    {
+      name: 'only the nearest alert closes — a second banner stays up',
+      run: async (ctx) => {
+        // Two alerts can be on screen at once (an outdated browser AND a failed
+        // payment method), and dismissing one is not an answer about the other.
+        const doc = await boot();
+        const outdated = makeAlert('outdated');
+        const suspended = makeAlert('suspended');
 
-  doc.click(suspended.close);
+        doc.click(suspended.close);
 
-  assert.equal(suspended.alert.hidden, true, 'the pressed alert closes');
-  assert.equal(outdated.alert.hidden, false, 'the other one is untouched');
-});
+        ctx.expect(suspended.alert.hidden, 'the pressed alert closes').toBe(true);
+        ctx.expect(outdated.alert.hidden, 'the other one is untouched').toBe(false);
+      },
+    },
 
-test('a click elsewhere in the alert leaves it open', async () => {
-  // The alerts carry links ("click here to update your browser"): a click on
-  // the message is not a dismiss, and must keep its default navigation.
-  const doc = await boot();
-  const outdated = makeAlert('outdated');
+    {
+      name: 'a click elsewhere in the alert leaves it open',
+      run: async (ctx) => {
+        // The alerts carry links ("click here to update your browser"): a click on
+        // the message is not a dismiss, and must keep its default navigation.
+        const doc = await boot();
+        const outdated = makeAlert('outdated');
 
-  const event = doc.click(outdated.link);
+        const event = doc.click(outdated.link);
 
-  assert.equal(outdated.alert.hidden, false, 'the message is not a dismiss target');
-  assert.equal(event.defaultPrevented, false, 'the link still navigates');
-});
+        ctx.expect(outdated.alert.hidden, 'the message is not a dismiss target').toBe(false);
+        ctx.expect(event.defaultPrevented, 'the link still navigates').toBe(false);
+      },
+    },
 
-test('the shipped alerts carry the class the handler listens for', () => {
-  // The handler is markup wiring, so the markup is half the contract: every
-  // alert body.html ships must reach it.
-  const body = fs.readFileSync(BODY_INCLUDE, 'utf8');
-  const alerts = body.match(/class="main-alert /g) || [];
-  const closes = body.match(/<button[^>]*class="main-alert-close"/g) || [];
+    {
+      name: 'the shipped alerts carry the class the handler listens for',
+      run: (ctx) => {
+        // The handler is markup wiring, so the markup is half the contract: every
+        // alert body.html ships must reach it.
+        const body = fs.readFileSync(BODY_INCLUDE, 'utf8');
+        const alerts = body.match(/class="main-alert /g) || [];
+        const closes = body.match(/<button[^>]*class="main-alert-close"/g) || [];
 
-  assert.ok(alerts.length > 0, 'body.html ships alerts');
-  assert.equal(closes.length, alerts.length, 'every shipped alert has a real close button the handler can find');
+        ctx.expect(alerts.length > 0, 'body.html ships alerts').toBeTruthy();
+        ctx.expect(closes.length, 'every shipped alert has a real close button the handler can find').toBe(alerts.length);
+      },
+    },
+  ],
 });

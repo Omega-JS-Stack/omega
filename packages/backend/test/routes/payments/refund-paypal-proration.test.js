@@ -56,15 +56,15 @@ function resolve({ sub, plan, periodStart, ctx }) {
   });
 }
 
-async function rejects(assert, promise, pattern, message) {
+async function rejects(expect, promise, pattern, message) {
   try {
     await promise;
   } catch (e) {
-    assert.match(e.message, pattern, `${message} — got: ${e.message}`);
+    expect(e.message, `${message} — got: ${e.message}`).toMatch(pattern);
     return;
   }
 
-  assert.ok(false, `${message} — it resolved instead of refusing`);
+  expect(false, `${message} — it resolved instead of refusing`).toBeTruthy();
 }
 
 module.exports = defineCases({
@@ -74,68 +74,68 @@ module.exports = defineCases({
   tests: [
     {
       name: 'uses-paypals-own-next-billing-time',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-TEST', billing_info: { next_billing_time: '2026-04-01T00:00:00.000Z' } };
 
         const periodEnd = await resolve({ sub, plan: monthlyPlan, ctx });
 
-        assert.equal(periodEnd.toISOString(), '2026-04-01T00:00:00.000Z', "PayPal's own period end wins when it is present");
+        expect(periodEnd.toISOString(), "PayPal's own period end wins when it is present").toBe('2026-04-01T00:00:00.000Z');
       },
     },
 
     {
       name: 'derives-a-monthly-period-from-the-plan',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         // A cancelled subscription: no next_billing_time, which is the state a refund arrives in
         const sub = { plan_id: 'P-TEST', status: 'CANCELLED', billing_info: {} };
 
         const periodEnd = await resolve({ sub, plan: monthlyPlan, ctx });
 
-        assert.equal(periodEnd.toISOString(), '2026-04-01T00:00:00.000Z', 'One MONTH after the payment being refunded');
+        expect(periodEnd.toISOString(), 'One MONTH after the payment being refunded').toBe('2026-04-01T00:00:00.000Z');
       },
     },
 
     {
       name: 'derives-an-annual-period-from-the-plan',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-TEST', billing_info: {} };
 
         const periodEnd = await resolve({ sub, plan: annualPlan, ctx });
 
-        assert.equal(periodEnd.toISOString(), '2027-03-01T00:00:00.000Z', 'One YEAR after the payment being refunded');
+        expect(periodEnd.toISOString(), 'One YEAR after the payment being refunded').toBe('2027-03-01T00:00:00.000Z');
       },
     },
 
     {
       name: 'honors-the-plans-interval-count',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-TEST', billing_info: {} };
 
         const periodEnd = await resolve({ sub, plan: weeklyPlan, ctx });
 
-        assert.equal(periodEnd.toISOString(), '2026-03-15T00:00:00.000Z', 'Two WEEKs after the payment being refunded');
+        expect(periodEnd.toISOString(), 'Two WEEKs after the payment being refunded').toBe('2026-03-15T00:00:00.000Z');
       },
     },
 
     {
       name: 'ignores-the-trial-cycle',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         // monthlyPlan leads with a 7-day TRIAL cycle: the REGULAR one is the billing period
         const sub = { plan_id: 'P-TEST', billing_info: {} };
 
         const periodEnd = await resolve({ sub, plan: monthlyPlan, ctx });
 
-        assert.equal(periodEnd.toISOString(), '2026-04-01T00:00:00.000Z', 'The REGULAR cycle is the billing interval, not the trial');
+        expect(periodEnd.toISOString(), 'The REGULAR cycle is the billing interval, not the trial').toBe('2026-04-01T00:00:00.000Z');
       },
     },
 
     {
       name: 'refuses-when-the-subscription-has-no-plan',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { billing_info: {} };
 
         await rejects(
-          assert,
+          expect,
           resolve({ sub, plan: monthlyPlan, ctx }),
           /billing period cannot be derived/i,
           'No next_billing_time and no plan_id must refuse',
@@ -145,12 +145,12 @@ module.exports = defineCases({
 
     {
       name: 'refuses-when-the-plan-has-no-regular-cycle',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-TEST', billing_info: {} };
         const trialOnlyPlan = { billing_cycles: [{ tenure_type: 'TRIAL', frequency: { interval_unit: 'DAY', interval_count: 7 } }] };
 
         await rejects(
-          assert,
+          expect,
           resolve({ sub, plan: trialOnlyPlan, ctx }),
           /billing period cannot be derived/i,
           'A plan with no REGULAR cycle must refuse',
@@ -160,11 +160,11 @@ module.exports = defineCases({
 
     {
       name: 'refuses-when-the-plan-lookup-fails',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-GONE', billing_info: {} };
 
         await rejects(
-          assert,
+          expect,
           resolve({ sub, plan: null, ctx }),
           /PayPal API 404/,
           'A failed plan lookup must surface, not fall back to a guess',
@@ -174,12 +174,12 @@ module.exports = defineCases({
 
     {
       name: 'refuses-an-unknown-interval-unit',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const sub = { plan_id: 'P-TEST', billing_info: {} };
         const oddPlan = { billing_cycles: [{ tenure_type: 'REGULAR', frequency: { interval_unit: 'FORTNIGHT', interval_count: 1 } }] };
 
         await rejects(
-          assert,
+          expect,
           resolve({ sub, plan: oddPlan, ctx }),
           /billing period cannot be derived/i,
           'An interval unit we cannot convert must refuse',

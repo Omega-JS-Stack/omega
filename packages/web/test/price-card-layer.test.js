@@ -9,10 +9,9 @@
  * two now match, so the sheet EVERY page loads carries the skin and /pricing
  * keeps rendering identically (its styles just arrive from the shared layer).
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
@@ -45,23 +44,39 @@ const THEMES = [
   { name: 'newsflash', popular: /--nf-shadow-hard-hover/ },
 ];
 
-for (const theme of THEMES) {
-  test(`#531: ${theme.name} carries the price-card skin in the main bundle`, () => {
-    const css = compileMain(theme.name);
+module.exports = defineCases({
+  type: 'group',
+  description: 'price-card-layer',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const theme of THEMES) {
+        cases.push({
+          name: `#531: ${theme.name} carries the price-card skin in the main bundle`,
+          run: (ctx) => {
+            const css = compileMain(theme.name);
 
-    assert.match(css, /\.omega-price-card\b/, 'the card vocabulary is in the sheet every page loads');
-    // A sibling theme imports classy's floor, so the bundle holds more than
-    // one popular-plan rule — the theme's OWN has to be among them.
-    const popular = [...css.matchAll(/[^{}]*\.omega-price-card--popular\s*\{[^}]*\}/g)].map((match) => match[0]);
-    assert.ok(popular.length > 0, `${theme.name} skins the popular plan outside /pricing`);
-    assert.ok(popular.some((rule) => theme.popular.test(rule)), `${theme.name}'s own voice, not the bare themed card`);
-    assert.match(css, /\.omega-price-card__popular\s*\{[^}]*position:\s*absolute/, 'the "Most popular" flag is pinned to the card, not left in flow');
-  });
+            ctx.expect(css, 'the card vocabulary is in the sheet every page loads').toMatch(/\.omega-price-card\b/);
+            // A sibling theme imports classy's floor, so the bundle holds more than
+            // one popular-plan rule — the theme's OWN has to be among them.
+            const popular = [...css.matchAll(/[^{}]*\.omega-price-card--popular\s*\{[^}]*\}/g)].map((match) => match[0]);
+            ctx.expect(popular.length > 0, `${theme.name} skins the popular plan outside /pricing`).toBeTruthy();
+            ctx.expect(popular.some((rule) => theme.popular.test(rule)), `${theme.name}'s own voice, not the bare themed card`).toBeTruthy();
+            ctx.expect(css, 'the "Most popular" flag is pinned to the card, not left in flow').toMatch(/\.omega-price-card__popular\s*\{[^}]*position:\s*absolute/);
+          },
+        });
 
-  test(`#531: ${theme.name} keeps no price-card rules in the /pricing page sheet`, () => {
-    const sheet = pricingSheet(theme.name);
-    if (!fs.existsSync(sheet)) return; // classy forks no pricing page sheet
+        cases.push({
+          name: `#531: ${theme.name} keeps no price-card rules in the /pricing page sheet`,
+          run: (ctx) => {
+            const sheet = pricingSheet(theme.name);
+            if (!fs.existsSync(sheet)) return; // classy forks no pricing page sheet
 
-    assert.ok(!/\.omega-price-card/.test(compile(sheet, theme.name)), 'one home for the card skin — a page copy would drift');
-  });
-}
+            ctx.expect(!/\.omega-price-card/.test(compile(sheet, theme.name)), 'one home for the card skin — a page copy would drift').toBeTruthy();
+          },
+        });
+      }
+      return cases;
+    })(),
+  ],
+});

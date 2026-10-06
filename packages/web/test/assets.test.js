@@ -12,11 +12,10 @@
  * replace-with-extend lane is the site-wide main bundle — `omega:main` on both
  * sides.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { after, test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { buildAssets, purgeCss, resolvePageAsset } = require('../src/assets.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -26,11 +25,6 @@ const ROOT = path.resolve(PKG, '..', '..');
 // run (parallel agent, second terminal) wipe the first one's assets mid-flight.
 const OUT = path.join(PKG, '.omega', `assets-test-out-${process.pid}`);
 const ONLY_OUT = path.join(PKG, '.omega', `assets-only-out-${process.pid}`);
-
-after(() => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  fs.rmSync(ONLY_OUT, { recursive: true, force: true });
-});
 
 /**
  * Run buildAssets for a theme layer chain.
@@ -55,189 +49,6 @@ function build(themeIds) {
     clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
   });
 }
-
-test('layered page modules: every layer that ships one is an entry, all content-hashed', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['classy', 'base']);
-
-  // Site layer's flat index.js + the real UJM core modules under dir-index
-  // keys + wildcard filenames (blog/[slug] serves every post URL — spec §7)
-  for (const key of ['index', 'pricing/index', 'signin/index', 'signup/index', 'payment/checkout/index', 'blog/[slug]']) {
-    assert.ok(manifest.js.pages[key] && manifest.js.pages[key].length, `manifest has ${key}`);
-    for (const url of manifest.js.pages[key]) {
-      assert.match(url, /^\/assets\/js\/pages\/.+-[A-Z0-9]+\.js$/, `${key} is content-hashed`);
-    }
-  }
-  assert.ok(!manifest.js.pages['payment/checkout/modules/api'], 'helper modules are NOT entries');
-  assert.ok(!manifest.js.pages['dashboard/account/sections/billing'], 'section helpers are NOT entries');
-  assert.ok(!manifest.js.pages['legal/_document'], 'underscore partials are NOT entries');
-
-  // The 404 page's script is an ordinary page asset, keyed by its URL (#624 —
-  // it used to ride the fixed-URL modules lane).
-  assert.ok(manifest.js.pages['404/index'], 'the 404 page module is a normal page asset');
-});
-
-// #624 — ONE rule for page assets, JS and CSS alike: EVERY layer's file for a
-// key loads, in layer order (core → theme → consumer). The newsflash chain is
-// the real case the audit found: its js/pages/blog/[slug].js used to REPLACE
-// core's blog script while both layers' page CSS loaded — two rules for one
-// feature.
-test('#624: every layer\'s page JS loads, in layer order — core, then theme, then consumer', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['newsflash', 'base']);
-
-  const urls = manifest.js.pages['blog/[slug]'];
-  assert.equal(urls.length, 3, `core + newsflash + consumer all ship blog/[slug].js (${JSON.stringify(urls)})`);
-
-  const [core, theme, consumer] = urls.map((url) => readGraph(url));
-  assert.ok(core.includes('No valid positions for vert insertion'), 'the CORE blog script loads first — a framework page script always runs');
-  assert.ok(theme.includes('newsflash-progress'), 'the active theme decorates second');
-  assert.ok(consumer.includes('consumer wins'), 'the consumer adds last');
-});
-
-test('#624: page CSS follows the same one rule — no themePages namespace left', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['newsflash', 'base']);
-
-  assert.ok(!manifest.css.themePages, 'the theme page-css namespace is gone — one bucket, one rule');
-
-  // One key, every layer's sheet, in load order: each is either a hashed file
-  // or (#767) the css text itself when it is small enough to inline.
-  const sheets = manifest.css.pages['blog/[slug]'];
-  assert.equal(sheets.length, 3, `core + newsflash + consumer sheets all emit (${JSON.stringify(sheets)})`);
-  for (const sheet of sheets) {
-    if (sheet.href) assert.match(sheet.href, /^\/assets\/css\/pages\/.+-[a-f0-9]{8}\.css$/, `${sheet.href} is content-hashed`);
-    else assert.ok(sheet.inline.length, 'an inlined sheet carries its compiled css instead of a url');
-  }
-
-  const [core, theme, consumer] = sheets.map((sheet) => (
-    sheet.inline || fs.readFileSync(path.join(OUT, sheet.href.slice(1)), 'utf8')
-  ));
-  assert.ok(core.includes('.blog-post-content'), 'core page sheet first');
-  assert.ok(theme.includes('newsflash'), 'the active theme second');
-  assert.ok(consumer.includes('.consumer-blog-probe'), 'the consumer last — it wins the cascade by ORDER, not by replacement');
-});
-
-test('a page sheet that compiles to nothing is never emitted or linked', async () => {
-  // core's pricing, 404 and alternatives sheets are EMPTY files, and the head
-  // linked each as a render-blocking stylesheet: on Slow 4G that empty request
-  // queued behind the font preloads and held pricing's first paint a full
-  // second past the home page's (#763 proof: 1,884 ms against 824 ms).
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['newsflash', 'base']);
-
-  assert.equal(manifest.css.pages['empty-probe'], undefined, 'no manifest bucket for a sheet with no rules');
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'css', 'pages', 'empty-probe')), 'and no file on disk');
-});
-
-test('#624: layout-keyed assets resolve like page assets, hashed, from every layer', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['classy', 'base']);
-
-  // js/layouts/<layout>.js — the redirect layout's script, keyed by the layout
-  // name the page's frontmatter writes.
-  const js = manifest.js.layouts['modules/utilities/redirect'];
-  assert.equal(js.length, 1, 'core is the only layer shipping the redirect layout script');
-  assert.match(js[0], /^\/assets\/js\/layouts\/modules\/utilities\/redirect-[A-Z0-9]+\.js$/, 'content-hashed like a page bundle');
-  assert.ok(readGraph(js[0]).includes('redirect-config'), 'the redirect module rides the layout lane');
-
-  // css/layouts/<layout>.scss — same key, same layering. The fixture's sheet is
-  // a couple of rules, so it rides the manifest inline (#767); the hashed-file
-  // half of the lane is pinned on an over-budget sheet in inline-sheets.test.js.
-  const css = manifest.css.layouts['modules/utilities/redirect'];
-  assert.equal(css.length, 1, 'the fixture consumer layer ships the layout sheet');
-  assert.ok(css[0].inline.includes('.consumer-redirect-probe'), 'the consumer layout sheet compiled');
-});
-
-test('#624: the modules lane is deleted — no second esbuild pass, no fixed-URL bundles', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  await build(['classy', 'base']);
-
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules')), 'nothing emits at /assets/js/modules/ any more');
-  assert.ok(!fs.existsSync(path.join(PKG, 'core', 'js', 'modules')), 'and the core layer ships no modules/ dir');
-});
-
-test('resolvePageAsset: exact beats /index spelling beats wildcard; segments match one-to-one', () => {
-  const map = {
-    'pricing/index': '/pricing-dir.js',
-    'blog/index': '/blog-list.js',
-    'blog/[slug]': '/blog-post.js',
-    'alternatives/[alternative]/index': '/alternative.js',
-    'updates/index': '/updates-list.js',
-    'updates/[update]': '/updates-detail.css',
-    'team/lead': '/team-lead.js',
-    'team/[id]': '/team-member.js',
-  };
-
-  assert.strictEqual(resolvePageAsset(map, 'pricing'), '/pricing-dir.js', 'per-page-dir /index spelling');
-  assert.strictEqual(resolvePageAsset(map, 'blog'), '/blog-list.js', 'list page hits its exact key, not the wildcard');
-  assert.strictEqual(resolvePageAsset(map, 'blog/hello-world'), '/blog-post.js', '[slug] matches any post segment');
-  assert.strictEqual(resolvePageAsset(map, 'blog/hello/world'), null, 'a wildcard segment never spans two URL segments');
-  assert.strictEqual(resolvePageAsset(map, 'team/lead'), '/team-lead.js', 'exact path beats wildcard');
-  assert.strictEqual(resolvePageAsset(map, 'team/anyone-else'), '/team-member.js', 'wildcard serves the rest of the family');
-  assert.strictEqual(resolvePageAsset(map, 'alternatives/acme'), '/alternative.js', 'trailing /index on a wildcard key is the per-page-dir spelling');
-  assert.strictEqual(resolvePageAsset(map, 'updates/v1.0.0'), '/updates-detail.css', 'dots in the URL segment are fine');
-  assert.strictEqual(resolvePageAsset(map, 'nowhere'), null, 'no match → null');
-  assert.strictEqual(resolvePageAsset(undefined, 'blog'), null, 'missing bucket → null');
-
-  // Specificity: the most-literal wildcard wins; full ties break lexicographically
-  const overlap = { '[a]/[b]': '/wide.js', 'blog/[slug]': '/narrow.js' };
-  assert.strictEqual(resolvePageAsset(overlap, 'blog/post-1'), '/narrow.js', 'most-literal wildcard wins');
-  assert.strictEqual(resolvePageAsset({ '[x]': '/x.js', '[y]': '/y.js' }, 'anything'), '/x.js', 'ties are deterministic');
-});
-
-test('the asset_path families resolve by URL alone against the real manifest', async () => {
-  const manifest = await build(['classy', 'base']);
-
-  // The dead frontmatter's old exact keys are gone…
-  for (const dead of ['blog/post', 'updates/update', 'alternatives/alternative/index', 'legal/document/index']) {
-    assert.ok(!manifest.js.pages[dead] && !manifest.css.pages[dead], `no manifest bucket carries dead key ${dead}`);
-  }
-
-  // …their replacements resolve straight from page URLs
-  assert.strictEqual(resolvePageAsset(manifest.css.pages, 'blog/my-first-post'), manifest.css.pages['blog/[slug]'], 'post css via wildcard');
-  assert.strictEqual(resolvePageAsset(manifest.css.pages, 'updates/v1.2.0'), manifest.css.pages['updates/[update]'], 'update css via wildcard');
-  assert.ok(String(resolvePageAsset(manifest.js.pages, 'alternatives/acme')).includes('/assets/js/pages/alternatives/[alternative]'), 'alternative js via per-page-dir wildcard');
-  assert.strictEqual(resolvePageAsset(manifest.css.pages, 'updates'), manifest.css.pages['updates/index'], 'the /updates list page keeps its exact entry');
-
-  // The flat legal URLs each own an exact entry over the shared _document partials
-  for (const url of ['terms', 'cookies', 'privacy']) {
-    assert.ok(manifest.js.pages[url], `js.pages has ${url}`);
-    assert.ok(manifest.css.pages[url].length, `classy theme css has ${url}`);
-  }
-  const termsGraph = readGraph(manifest.js.pages.terms[0]);
-  assert.ok(termsGraph.includes('data-legal-toc'), 'terms entry reaches the shared legal-document module');
-});
-
-test('§7 asset lanes: section.scss joins the main sheet, section.js boots behind DOM presence', async () => {
-  const manifest = await build(['classy', 'base']);
-
-  // css lane: the fixture's section.scss compiled in via omega:sections
-  const mainCss = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
-  assert.ok(mainCss.includes('.section-assets-probe'), 'section.scss landed in the main sheet');
-
-  // js lane: the main boot stub carries the registry + presence-init runtime
-  const graph = readGraph(manifest.js.main);
-  assert.ok(graph.includes('demo/probe'), 'registry carries the section id');
-  assert.ok(graph.includes('sectionProbed'), 'the section.js module body bundled');
-  assert.ok(graph.includes('data-omega-'), 'presence-init selector rides the bundle');
-
-  // page bundles stay clean — sections ride the MAIN stub only
-  const pageGraph = readGraph(manifest.js.pages['blog/[slug]'][0]);
-  assert.ok(!pageGraph.includes('sectionProbed'), 'page stubs carry no section registry');
-
-  // classy's product-demo section.js rides the same lane (the video-tab
-  // behavior that moved out of the dead core index page module)
-  assert.ok(graph.includes('marketing/product-demo'), 'product-demo id in the section registry');
-  assert.ok(graph.includes('shown.bs.tab'), 'the tab-video behavior bundled via the section lane');
-});
-
-test('the redirect layout script keeps forwarding the querystring and the fragment', async () => {
-  const manifest = await build(['classy', 'base']);
-  const redirect = readGraph(manifest.js.layouts['modules/utilities/redirect'][0]);
-  assert.ok(redirect.includes('redirect-config'), 'the layout bundle reads its config element');
-  assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');
-});
 
 // Read an entry bundle plus every chunk it transitively imports (the module
 // graph the browser would evaluate for that <script type="module">).
@@ -270,447 +81,711 @@ function walkJs(dir) {
     .map((e) => path.join(e.parentPath, e.name));
 }
 
-test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runtime', async () => {
-  const manifest = await build(['classy', 'base']);
-  assert.ok(manifest.js.main, 'main bundle in manifest');
-
-  const graph = readGraph(manifest.js.main);
-  assert.ok(graph.includes('Global module loaded successfully'), 'core runtime module in the graph');
-  // The theme's dev-only "loaded successfully" log is STRIPPED from this
-  // production build (cp268) — assert on durable theme code instead.
-  assert.ok(graph.includes('window.bootstrap'), 'active theme _theme.js inlined via __theme__');
-  assert.ok(!graph.includes('Classy theme loaded successfully'), 'theme dev-only block stripped in production');
-  assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
-});
-
-test('a production build writes a .map beside the main bundle, and the manifest names no map', async () => {
-  const manifest = await build(['classy', 'base']);
-  assert.ok(fs.existsSync(path.join(OUT, `${manifest.js.main.slice(1)}.map`)), 'main.js.map sits beside the main bundle');
-
-  // Every string the js block holds, entry URLs and the `imports` keys and lists alike.
-  const urls = [];
-  const collect = (value) => {
-    if (typeof value === 'string') urls.push(value);
-    else if (Array.isArray(value)) value.forEach(collect);
-    else if (value && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => { urls.push(key); collect(inner); });
-  };
-  collect(manifest.js);
-  assert.ok(Object.keys(manifest.js.imports).length > 0, 'the imports map was read');
-  assert.deepStrictEqual(urls.filter((url) => url.endsWith('.map')), [], 'no source map is an entry or a preload');
-});
-
-test('tooltips: one shared initializer on the core layer, wired by every theme (#99)', async () => {
-  // The initializer had a byte-identical copy under every theme's js/ — a fix
-  // had to be made three times. One home on the core layer, imported through
-  // __main_assets__ like the chart helper beside it.
-  const SHARED = path.join(PKG, 'core', 'js', 'libs', 'initialize-tooltips.js');
-  assert.ok(fs.existsSync(SHARED), 'the shared initializer lives on the core layer');
-
-  for (const theme of fs.readdirSync(path.join(PKG, 'themes'))) {
-    const copy = path.join(PKG, 'themes', theme, 'js', 'initialize-tooltips.js');
-    assert.ok(!fs.existsSync(copy), `${theme} carries no private copy`);
-  }
-
-  // Every theme that wires tooltips still gets them into its bundle graph
-  // (real chain: a sibling theme always sits over the base layer).
-  for (const theme of ['classy', 'newsflash', 'neobrutalism']) {
-    const manifest = await build([theme, 'base']);
-    const graph = readGraph(manifest.js.main);
-    assert.ok(graph.includes('data-bs-toggle="tooltip"'), `${theme}: the shared initializer rides the bundle`);
-    assert.ok(graph.includes('tooltips'), `${theme}: the initializer body (not just the selector) bundled`);
-  }
-});
-
-test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chunk', async () => {
-  // The invariant is per BUILD, and the count below walks the whole out dir —
-  // so start clean: stale chunks accumulated from PREVIOUS RUNS (differently
-  // hashed as sources drift) read as duplicates, exactly like the sibling
-  // tests that clear OUT before building.
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['classy', 'base']);
-
-  // Page entries are thin boot stubs importing shared chunks
-  const signinEntry = fs.readFileSync(path.join(OUT, manifest.js.pages['signin/index'][0].slice(1)), 'utf8');
-  assert.ok(signinEntry.length < 2000, `page entry is a thin stub (${signinEntry.length} bytes)`);
-  assert.ok(/chunks\/chunk-/.test(signinEntry), 'stub imports shared chunks');
-
-  // The client (`_stateGeneration` is its auth module's constructor marker)
-  // appears in exactly one file across ALL bundles: the shared chunk both
-  // main and pages import, where the web runtime instance lives.
-  const withClient = walkJs(path.join(OUT, 'assets', 'js')).filter((f) => fs.readFileSync(f, 'utf8').includes('_stateGeneration'));
-  assert.strictEqual(withClient.length, 1, `client code in exactly one file (found ${withClient.length})`);
-  assert.ok(withClient[0].includes(`${path.sep}chunks${path.sep}`), 'client lives in a shared chunk');
-
-  // The page's own code is still in its graph (via the @omega.js/web/runtime alias)
-  const graph = readGraph(manifest.js.pages['signin/index'][0]);
-  assert.ok(graph.includes('Email is required'), 'real UJM auth page module code present');
-  assert.ok(graph.includes('_stateGeneration'), 'client reachable from the page graph');
-});
-
-test('layered sass: main css compiles per theme through omega:theme', async () => {
-  const classy = await build(['classy', 'base']);
-  const newsflash = await build(['newsflash', 'base']);
-
-  const classyCss = fs.readFileSync(path.join(OUT, classy.css.main.slice(1)), 'utf8');
-  const newsflashCss = fs.readFileSync(path.join(OUT, newsflash.css.main.slice(1)), 'utf8');
-  assert.ok(classyCss.includes('#2563EB') || classyCss.includes('#2563eb'), 'classy primary in classy build');
-  assert.ok(newsflashCss.includes('#F03612') || newsflashCss.includes('#f03612'), 'newsflash primary in newsflash build');
-  assert.ok(classyCss.includes('.btn'), 'bootstrap compiled in via the theme config');
-  assert.notStrictEqual(classy.css.main, newsflash.css.main, 'content hash differs per theme');
-
-  // cp190 floor: sibling themes carry classy's token-pure app/auth
-  // vocabulary so fall-through pages render styled (Lane B)
-  assert.ok(newsflashCss.includes('.omega-auth'), 'newsflash bundle carries the classy auth floor');
-  assert.ok(newsflashCss.includes('.omega-statgrid'), 'newsflash bundle carries the classy app floor');
-  // cp192: the shared footer include speaks omega-footer vocabulary on every
-  // page — the floor supplies its structure, the theme re-inks it
-  assert.ok(newsflashCss.includes('.omega-footer'), 'newsflash bundle carries the classy footer floor');
-  // …and speaks the shared token contract after the cp187 rebase
-  assert.ok(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)');
-
-  // One page-css bucket, layered (#624): the core sheet and the active theme's
-  // both land under the same key, in load order.
-  assert.equal(newsflash.css.pages['blog/[slug]'].length, 3, 'core + newsflash + consumer sheets for blog/[slug]');
-  // classy ships blog/[slug] page css since the cp170 editorial extras
-  // (reading progress + article rail) — it layers over core's the same way
-  assert.equal(classy.css.pages['blog/[slug]'].length, 3, 'core + classy + consumer sheets for blog/[slug]');
-});
-
-test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await buildAssets({
-    layers: [path.join(__dirname, 'fixtures', 'site-assets'), path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')],
-    themeRoots: [path.join(PKG, 'themes', 'classy')],
-    themesDir: path.join(PKG, 'themes'),
-    coreDir: path.join(PKG, 'core'),
-    outDir: OUT,
-    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-    dev: true,
-  });
-
-  assert.strictEqual(manifest.js.main, '/assets/js/main.js', 'main js un-hashed');
-  assert.deepStrictEqual(manifest.js.pages['signin/index'], ['/assets/js/pages/signin/index.js'], 'page js un-hashed');
-  // One key, one file per LAYER — the suffix names the owning layer, so two
-  // layers' bundles for the same key never collide on a stable dev name.
-  assert.deepStrictEqual(
-    manifest.js.pages['blog/[slug]'],
-    ['/assets/js/pages/blog/[slug].js', '/assets/js/pages/blog/[slug].site.js'],
-    'wildcard filenames survive esbuild verbatim, one per layer in load order',
-  );
-  assert.strictEqual(manifest.css.main, '/assets/css/main.css', 'main css un-hashed');
-  fs.rmSync(OUT, { recursive: true, force: true });
-});
-
-test('PurgeCSS strips selectors unused by the rendered HTML', async () => {
-  const manifest = await build(['classy', 'base']);
-  fs.writeFileSync(
-    path.join(OUT, 'index.html'),
-    '<body class="omega-body"><div class="container"><a class="btn btn-primary">x</a></div></body>'
-  );
-
-  const sizes = await purgeCss({ outDir: OUT, manifest });
-  const purged = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
-  assert.ok(purged.includes('.btn-primary'), 'used selector kept');
-  assert.ok(!purged.includes('.carousel-inner'), 'unused selector stripped');
-  assert.ok(sizes.after < sizes.before, `size shrank (${sizes.before} → ${sizes.after})`);
-});
-
-test('only-half rebuilds (dev watcher narrowing): css writes no js, js writes no css', async () => {
-  const outDir = ONLY_OUT;
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [path.join(PKG, 'themes', 'classy')];
-  const base = {
-    layers: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots, path.join(PKG, 'core')],
-    themeRoots,
-    themesDir: path.join(PKG, 'themes'),
-    coreDir: path.join(PKG, 'core'),
-    outDir,
-    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-    dev: true,
-  };
-
-  const cssOnly = await buildAssets({ ...base, only: 'css' });
-  assert.ok(cssOnly.css.main, 'css half built');
-  assert.ok(!cssOnly.js.main, 'no js in the manifest');
-  assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'js')), 'no js files written — the dev server can hot-swap');
-
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const jsOnly = await buildAssets({ ...base, only: 'js' });
-  assert.ok(jsOnly.js.main, 'js half built');
-  assert.ok(!jsOnly.css.main, 'no css in the manifest');
-  assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'css')), 'no css files written');
-});
-
-test('fonts: the layer union is pruned to css-referenced faces — sibling themes ship no base-layer fat (cp243)', async () => {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  await build(['newsflash', 'base']);
-  const fonts = path.join(OUT, 'assets', 'fonts');
-  assert.ok(fs.existsSync(path.join(fonts, 'fraunces-normal-latin.woff2')), 'newsflash ships its own faces');
-  assert.ok(!fs.existsSync(path.join(fonts, 'newsreader-normal-latin.woff2')), 'classy faces pruned from the newsflash chain');
-
-  fs.rmSync(OUT, { recursive: true, force: true });
-  await build(['classy', 'base']);
-  assert.ok(fs.existsSync(path.join(OUT, 'assets', 'fonts', 'newsreader-normal-latin.woff2')), 'the classy chain keeps its own faces');
-});
-
-test('fonts: a face named only by an INLINED page sheet survives the prune (#767)', async () => {
-  // #767 keeps a small page/layout sheet out of the file tree entirely: it
-  // rides the manifest as css text. The prune reads the emitted css to decide
-  // which copied faces are referenced, so an inlined sheet is invisible to it,
-  // and a face that sheet declares would be deleted out from under the page
-  // that needs it. No packaged sheet declares a face in a page lane today; a
-  // consumer sheet can, which is exactly the case nothing else covers.
-  const layer = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-inline-face-')));
-  fs.mkdirSync(path.join(layer, 'css', 'pages'), { recursive: true });
-  fs.mkdirSync(path.join(layer, 'fonts'), { recursive: true });
-  fs.writeFileSync(path.join(layer, 'fonts', 'page-only.woff2'), 'face');
-  fs.writeFileSync(path.join(layer, 'fonts', 'nobody-asks.woff2'), 'face');
-  fs.writeFileSync(path.join(layer, 'css', 'pages', 'fontpage.scss'), [
-    '@font-face { font-family: PageOnly; src: url(/assets/fonts/page-only.woff2) format("woff2"); }',
-    '.omega-page-only { font-family: PageOnly; }',
-  ].join('\n'));
-
-  try {
+module.exports = defineCases({
+  type: 'group',
+  description: 'assets',
+  cleanup: () => {
     fs.rmSync(OUT, { recursive: true, force: true });
-    const manifest = await buildAssets({
-      layers: [layer, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')],
-      themeRoots: [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')],
-      sectionRoots: [layer, path.join(PKG, 'themes', 'classy')],
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir: OUT,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-    });
+    fs.rmSync(ONLY_OUT, { recursive: true, force: true });
+  },
+  tests: [
+    {
+      name: 'layered page modules: every layer that ships one is an entry, all content-hashed',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['classy', 'base']);
 
-    // The premise: this sheet really did inline, so the face has no file on
-    // disk naming it. Without that, the case below proves nothing.
-    const sheets = manifest.css.pages.fontpage;
-    assert.ok(sheets && sheets[0].inline, 'the small page sheet rides the manifest as text');
-    assert.ok(sheets[0].inline.includes('/assets/fonts/page-only.woff2'), 'and its @font-face is in that text');
+        // Site layer's flat index.js + the real UJM core modules under dir-index
+        // keys + wildcard filenames (blog/[slug] serves every post URL — spec §7)
+        for (const key of ['index', 'pricing/index', 'signin/index', 'signup/index', 'payment/checkout/index', 'blog/[slug]']) {
+          ctx.expect(manifest.js.pages[key] && manifest.js.pages[key].length, `manifest has ${key}`).toBeTruthy();
+          for (const url of manifest.js.pages[key]) {
+            ctx.expect(url, `${key} is content-hashed`).toMatch(/^\/assets\/js\/pages\/.+-[A-Z0-9]+\.js$/);
+          }
+        }
+        ctx.expect(!manifest.js.pages['payment/checkout/modules/api'], 'helper modules are NOT entries').toBeTruthy();
+        ctx.expect(!manifest.js.pages['dashboard/account/sections/billing'], 'section helpers are NOT entries').toBeTruthy();
+        ctx.expect(!manifest.js.pages['legal/_document'], 'underscore partials are NOT entries').toBeTruthy();
 
-    const fonts = path.join(OUT, 'assets', 'fonts');
-    assert.ok(fs.existsSync(path.join(fonts, 'page-only.woff2')), 'the inlined sheet keeps its face');
-    assert.ok(!fs.existsSync(path.join(fonts, 'nobody-asks.woff2')), 'a face nothing names is still pruned');
-  } finally {
-    fs.rmSync(layer, { recursive: true, force: true });
-  }
-});
+        // The 404 page's script is an ordinary page asset, keyed by its URL (#624 —
+        // it used to ride the fixed-URL modules lane).
+        ctx.expect(manifest.js.pages['404/index'], 'the 404 page module is a normal page asset').toBeTruthy();
+      },
+    },
 
-// #624 — the site-wide main bundle is the one REPLACE-with-extend lane, and
-// JS now spells the extend exactly as CSS does: `omega:main` resolves the same
-// name from the layers BELOW the importing file (sass's `@use 'omega:main'`).
-test('#624: a consumer main.js extends the framework main through `omega:main`', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-main-extend-'));
-  const siteLayer = path.join(tmp, 'assets');
-  fs.mkdirSync(path.join(siteLayer, 'js'), { recursive: true });
-  fs.writeFileSync(
-    path.join(siteLayer, 'js', 'main.js'),
-    "import coreMain from 'omega:main';\n"
-    + "export default async (context) => {\n"
-    + "  await coreMain(context);\n"
-    + "  console.log('consumer main extended the framework main');\n"
-    + "};\n",
-  );
+    // #624 — ONE rule for page assets, JS and CSS alike: EVERY layer's file for a
+    // key loads, in layer order (core → theme → consumer). The newsflash chain is
+    // the real case the audit found: its js/pages/blog/[slug].js used to REPLACE
+    // core's blog script while both layers' page CSS loaded — two rules for one
+    // feature.
+    {
+      name: '#624: every layer\'s page JS loads, in layer order — core, then theme, then consumer',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['newsflash', 'base']);
 
-  const outDir = path.join(PKG, '.omega', `assets-main-extend-${process.pid}`);
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
-  try {
-    const manifest = await buildAssets({
-      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      dev: true,
-      only: 'js',
-    });
+        const urls = manifest.js.pages['blog/[slug]'];
+        ctx.expect(urls.length, `core + newsflash + consumer all ship blog/[slug].js (${JSON.stringify(urls)})`).toBe(3);
 
-    const graph = fs.readFileSync(path.join(outDir, manifest.js.main.slice(1)), 'utf8')
-      + fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks'), { withFileTypes: true })
-        .map((entry) => fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')).join('\n');
+        const [core, theme, consumer] = urls.map((url) => readGraph(url));
+        ctx.expect(core.includes('No valid positions for vert insertion'), 'the CORE blog script loads first — a framework page script always runs').toBeTruthy();
+        ctx.expect(theme.includes('newsflash-progress'), 'the active theme decorates second').toBeTruthy();
+        ctx.expect(consumer.includes('consumer wins'), 'the consumer adds last').toBeTruthy();
+      },
+    },
 
-    assert.ok(graph.includes('consumer main extended the framework main'), 'the consumer main is the entry');
-    assert.ok(graph.includes('Global module loaded successfully'), 'and the FRAMEWORK main it extends is in the graph');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
-});
+    {
+      name: '#624: page CSS follows the same one rule — no themePages namespace left',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['newsflash', 'base']);
 
-// `omega:` means BELOW, not "anything but me": the scan starts one layer under
-// the importer's own, so a theme's own main.js reaches CORE and can never
-// resolve UPWARD into the consumer layer that extends it.
-test('#624: `omega:main` from a THEME layer resolves down to core, never up to the consumer', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-main-below-'));
-  const siteLayer = path.join(tmp, 'assets');
-  const themeLayer = path.join(tmp, 'themes', 'probe');
-  fs.mkdirSync(path.join(siteLayer, 'js'), { recursive: true });
-  fs.mkdirSync(path.join(themeLayer, 'js'), { recursive: true });
-  fs.writeFileSync(
-    path.join(siteLayer, 'js', 'main.js'),
-    "import below from 'omega:main';\n"
-    + "export default async (context) => {\n"
-    + "  await below(context);\n"
-    + "  console.log('consumer main ran last');\n"
-    + "};\n",
-  );
-  fs.writeFileSync(
-    path.join(themeLayer, 'js', 'main.js'),
-    "import below from 'omega:main';\n"
-    + "export default async (context) => {\n"
-    + "  await below(context);\n"
-    + "  console.log('theme main ran in between');\n"
-    + "};\n",
-  );
+        ctx.expect(!manifest.css.themePages, 'the theme page-css namespace is gone — one bucket, one rule').toBeTruthy();
 
-  const outDir = path.join(PKG, '.omega', `assets-main-below-${process.pid}`);
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [themeLayer, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
-  try {
-    const manifest = await buildAssets({
-      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      dev: true,
-      only: 'js',
-    });
+        // One key, every layer's sheet, in load order: each is either a hashed file
+        // or (#767) the css text itself when it is small enough to inline.
+        const sheets = manifest.css.pages['blog/[slug]'];
+        ctx.expect(sheets.length, `core + newsflash + consumer sheets all emit (${JSON.stringify(sheets)})`).toBe(3);
+        for (const sheet of sheets) {
+          if (sheet.href) ctx.expect(sheet.href, `${sheet.href} is content-hashed`).toMatch(/^\/assets\/css\/pages\/.+-[a-f0-9]{8}\.css$/);
+          else ctx.expect(sheet.inline.length, 'an inlined sheet carries its compiled css instead of a url').toBeTruthy();
+        }
 
-    const graph = fs.readFileSync(path.join(outDir, manifest.js.main.slice(1)), 'utf8')
-      + fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks'), { withFileTypes: true })
-        .map((entry) => fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')).join('\n');
+        const [core, theme, consumer] = sheets.map((sheet) => (
+          sheet.inline || fs.readFileSync(path.join(OUT, sheet.href.slice(1)), 'utf8')
+        ));
+        ctx.expect(core.includes('.blog-post-content'), 'core page sheet first').toBeTruthy();
+        ctx.expect(theme.includes('newsflash'), 'the active theme second').toBeTruthy();
+        ctx.expect(consumer.includes('.consumer-blog-probe'), 'the consumer last — it wins the cascade by ORDER, not by replacement').toBeTruthy();
+      },
+    },
 
-    assert.ok(graph.includes('consumer main ran last'), 'the consumer main is the entry');
-    assert.ok(graph.includes('theme main ran in between'), 'the consumer extends the THEME below it');
-    assert.ok(graph.includes('Global module loaded successfully'), "the theme's own `omega:main` reached CORE — a skip-self scan would have looped back up to the consumer instead");
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
-});
+    {
+      name: 'a page sheet that compiles to nothing is never emitted or linked',
+      run: async (ctx) => {
+        // core's pricing, 404 and alternatives sheets are EMPTY files, and the head
+        // linked each as a render-blocking stylesheet: on Slow 4G that empty request
+        // queued behind the font preloads and held pricing's first paint a full
+        // second past the home page's (#763 proof: 1,884 ms against 824 ms).
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['newsflash', 'base']);
 
-// #249 — a `js/modules/` dir is not an asset lane. It was the framework's own
-// standalone-IIFE lane until #624 deleted it; a consumer's copy was never built
-// (its constraints — fixed URL, no `@omega.js/client` — were the framework's),
-// and now nobody's is. Shared code goes in `js/libs/`, and the build says so
-// instead of ignoring the directory in silence.
-test('#249: a js/modules/ dir is built by nothing, and says so once', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-consumer-modules-'));
-  const siteLayer = path.join(tmp, 'assets');
-  fs.mkdirSync(path.join(siteLayer, 'js', 'modules'), { recursive: true });
-  fs.writeFileSync(
-    path.join(siteLayer, 'js', 'modules', 'foo.js'),
-    "import { Manager } from '@omega.js/client';\nexport const foo = () => Manager;\n",
-  );
+        ctx.expect(manifest.css.pages['empty-probe'], 'no manifest bucket for a sheet with no rules').toBe(undefined);
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', 'css', 'pages', 'empty-probe')), 'and no file on disk').toBeTruthy();
+      },
+    },
 
-  const outDir = path.join(PKG, '.omega', `assets-consumer-modules-${process.pid}`);
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
-  const warnings = [];
-  try {
-    await buildAssets({
-      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      warn: (message) => warnings.push(message),
-      only: 'js',
-    });
+    {
+      name: '#624: layout-keyed assets resolve like page assets, hashed, from every layer',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['classy', 'base']);
 
-    assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'js', 'modules')), 'nothing is emitted for the directory');
+        // js/layouts/<layout>.js — the redirect layout's script, keyed by the layout
+        // name the page's frontmatter writes.
+        const js = manifest.js.layouts['modules/utilities/redirect'];
+        ctx.expect(js.length, 'core is the only layer shipping the redirect layout script').toBe(1);
+        ctx.expect(js[0], 'content-hashed like a page bundle').toMatch(/^\/assets\/js\/layouts\/modules\/utilities\/redirect-[A-Z0-9]+\.js$/);
+        ctx.expect(readGraph(js[0]).includes('redirect-config'), 'the redirect module rides the layout lane').toBeTruthy();
 
-    const warning = warnings.filter((line) => line.includes('js/modules'));
-    assert.equal(warning.length, 1, `exactly one warning: ${warnings.join(' | ')}`);
-    assert.ok(warning[0].includes(path.join(siteLayer, 'js', 'modules')), 'the warning names the offending directory');
-    assert.ok(warning[0].includes('js/libs/'), 'the warning names the js/libs/ convention');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
-});
+        // css/layouts/<layout>.scss — same key, same layering. The fixture's sheet is
+        // a couple of rules, so it rides the manifest inline (#767); the hashed-file
+        // half of the lane is pinned on an over-budget sheet in inline-sheets.test.js.
+        const css = manifest.css.layouts['modules/utilities/redirect'];
+        ctx.expect(css.length, 'the fixture consumer layer ships the layout sheet').toBe(1);
+        ctx.expect(css[0].inline.includes('.consumer-redirect-probe'), 'the consumer layout sheet compiled').toBeTruthy();
+      },
+    },
 
-// #469 — the legacy 4-segment page module (js/pages/dashboard/agents/edit.js)
-// is collected as a HELPER, so the page ships with no JS and the build stays
-// green. Real helpers (checkout modules/, account sections/) reach a bundle
-// through their page entry; an orphan reaches nothing, and says so.
-test('#469: a page module no entry reaches warns loudly; helpers and partials stay silent', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-orphan-page-'));
-  const siteLayer = path.join(tmp, 'assets');
-  const pageDir = path.join(siteLayer, 'js', 'pages', 'dashboard', 'agents');
-  fs.mkdirSync(pageDir, { recursive: true });
-  fs.writeFileSync(path.join(pageDir, 'edit.js'), 'export default () => {};\n');
-  fs.writeFileSync(path.join(pageDir, '_shared.js'), 'export const shared = () => {};\n');
+    {
+      name: '#624: the modules lane is deleted — no second esbuild pass, no fixed-URL bundles',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        await build(['classy', 'base']);
 
-  const outDir = path.join(PKG, '.omega', `assets-orphan-page-${process.pid}`);
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
-  const warnings = [];
-  try {
-    await buildAssets({
-      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      warn: (message) => warnings.push(message),
-      only: 'js',
-    });
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules')), 'nothing emits at /assets/js/modules/ any more').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(PKG, 'core', 'js', 'modules')), 'and the core layer ships no modules/ dir').toBeTruthy();
+      },
+    },
 
-    const warning = warnings.filter((line) => line.includes('js/pages'));
-    assert.equal(warning.length, 1, `exactly one warning: ${warnings.join(' | ')}`);
-    assert.ok(warning[0].includes(path.join(pageDir, 'edit.js')), 'the warning names the orphaned file');
-    assert.ok(warning[0].includes('[slug]'), 'the warning names the [name] wildcard family file (#470)');
-    assert.ok(warning[0].indexOf('[slug]') < warning[0].indexOf('index.js'), 'the family file comes FIRST, the single-page spellings after');
-    assert.ok(warning[0].includes('index.js'), 'the warning names the accepted per-page-dir spelling');
-    assert.ok(warning[0].includes('3 segments'), 'the warning names the accepted flat spelling');
-    assert.ok(!warning[0].includes('_shared.js'), 'underscore partials stay silent');
-    assert.ok(!warning[0].includes(path.join('checkout', 'modules')), 'a helper its page entry imports stays silent');
-    assert.ok(!warning[0].includes(path.join('account', 'sections')), 'account section helpers stay silent');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
-});
+    {
+      name: 'resolvePageAsset: exact beats /index spelling beats wildcard; segments match one-to-one',
+      run: (ctx) => {
+        const map = {
+          'pricing/index': '/pricing-dir.js',
+          'blog/index': '/blog-list.js',
+          'blog/[slug]': '/blog-post.js',
+          'alternatives/[alternative]/index': '/alternative.js',
+          'updates/index': '/updates-list.js',
+          'updates/[update]': '/updates-detail.css',
+          'team/lead': '/team-lead.js',
+          'team/[id]': '/team-member.js',
+        };
 
-// #742 — the redirect layout module hops at IMPORT time and exports nothing
-// (core/js/layouts/modules/utilities/redirect.js), so the boot stub must never
-// read `.default` off its namespace: esbuild proves that access undefined and
-// warns. The warning hid behind esbuild's silenced printer until @omega.js/devkit's
-// bundle module started reporting its findings through the logger (#737), which
-// is why the guard is the COUNT rather than one message: every esbuild warning
-// this lane can raise is a real import that resolves to nothing.
-test('#742: the js build over the real layer chain emits zero esbuild warnings', async () => {
-  const outDir = path.join(PKG, '.omega', `assets-warning-free-${process.pid}`);
-  fs.rmSync(outDir, { recursive: true, force: true });
-  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+        ctx.expect(resolvePageAsset(map, 'pricing'), 'per-page-dir /index spelling').toBe('/pricing-dir.js');
+        ctx.expect(resolvePageAsset(map, 'blog'), 'list page hits its exact key, not the wildcard').toBe('/blog-list.js');
+        ctx.expect(resolvePageAsset(map, 'blog/hello-world'), '[slug] matches any post segment').toBe('/blog-post.js');
+        ctx.expect(resolvePageAsset(map, 'blog/hello/world'), 'a wildcard segment never spans two URL segments').toBe(null);
+        ctx.expect(resolvePageAsset(map, 'team/lead'), 'exact path beats wildcard').toBe('/team-lead.js');
+        ctx.expect(resolvePageAsset(map, 'team/anyone-else'), 'wildcard serves the rest of the family').toBe('/team-member.js');
+        ctx.expect(resolvePageAsset(map, 'alternatives/acme'), 'trailing /index on a wildcard key is the per-page-dir spelling').toBe('/alternative.js');
+        ctx.expect(resolvePageAsset(map, 'updates/v1.0.0'), 'dots in the URL segment are fine').toBe('/updates-detail.css');
+        ctx.expect(resolvePageAsset(map, 'nowhere'), 'no match → null').toBe(null);
+        ctx.expect(resolvePageAsset(undefined, 'blog'), 'missing bucket → null').toBe(null);
 
-  // esbuild's findings reach a human through the devkit logger (#737), so the
-  // console IS the warning channel to watch.
-  const warnings = [];
-  const realWarn = console.warn;
-  console.warn = (...args) => warnings.push(args.join(' '));
-  try {
-    await buildAssets({
-      layers: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      sectionRoots: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots],
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      only: 'js',
-    });
-  } finally {
-    console.warn = realWarn;
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
+        // Specificity: the most-literal wildcard wins; full ties break lexicographically
+        const overlap = { '[a]/[b]': '/wide.js', 'blog/[slug]': '/narrow.js' };
+        ctx.expect(resolvePageAsset(overlap, 'blog/post-1'), 'most-literal wildcard wins').toBe('/narrow.js');
+        ctx.expect(resolvePageAsset({ '[x]': '/x.js', '[y]': '/y.js' }, 'anything'), 'ties are deterministic').toBe('/x.js');
+      },
+    },
 
-  assert.deepEqual(warnings, [], `the js build warned: ${warnings.join(' | ')}`);
+    {
+      name: 'the asset_path families resolve by URL alone against the real manifest',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+
+        // The dead frontmatter's old exact keys are gone…
+        for (const dead of ['blog/post', 'updates/update', 'alternatives/alternative/index', 'legal/document/index']) {
+          ctx.expect(!manifest.js.pages[dead] && !manifest.css.pages[dead], `no manifest bucket carries dead key ${dead}`).toBeTruthy();
+        }
+
+        // …their replacements resolve straight from page URLs
+        ctx.expect(resolvePageAsset(manifest.css.pages, 'blog/my-first-post'), 'post css via wildcard').toBe(manifest.css.pages['blog/[slug]']);
+        ctx.expect(resolvePageAsset(manifest.css.pages, 'updates/v1.2.0'), 'update css via wildcard').toBe(manifest.css.pages['updates/[update]']);
+        ctx.expect(String(resolvePageAsset(manifest.js.pages, 'alternatives/acme')).includes('/assets/js/pages/alternatives/[alternative]'), 'alternative js via per-page-dir wildcard').toBeTruthy();
+        ctx.expect(resolvePageAsset(manifest.css.pages, 'updates'), 'the /updates list page keeps its exact entry').toBe(manifest.css.pages['updates/index']);
+
+        // The flat legal URLs each own an exact entry over the shared _document partials
+        for (const url of ['terms', 'cookies', 'privacy']) {
+          ctx.expect(manifest.js.pages[url], `js.pages has ${url}`).toBeTruthy();
+          ctx.expect(manifest.css.pages[url].length, `classy theme css has ${url}`).toBeTruthy();
+        }
+        const termsGraph = readGraph(manifest.js.pages.terms[0]);
+        ctx.expect(termsGraph.includes('data-legal-toc'), 'terms entry reaches the shared legal-document module').toBeTruthy();
+      },
+    },
+
+    {
+      name: '§7 asset lanes: section.scss joins the main sheet, section.js boots behind DOM presence',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+
+        // css lane: the fixture's section.scss compiled in via omega:sections
+        const mainCss = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
+        ctx.expect(mainCss.includes('.section-assets-probe'), 'section.scss landed in the main sheet').toBeTruthy();
+
+        // js lane: the main boot stub carries the registry + presence-init runtime
+        const graph = readGraph(manifest.js.main);
+        ctx.expect(graph.includes('demo/probe'), 'registry carries the section id').toBeTruthy();
+        ctx.expect(graph.includes('sectionProbed'), 'the section.js module body bundled').toBeTruthy();
+        ctx.expect(graph.includes('data-omega-'), 'presence-init selector rides the bundle').toBeTruthy();
+
+        // page bundles stay clean — sections ride the MAIN stub only
+        const pageGraph = readGraph(manifest.js.pages['blog/[slug]'][0]);
+        ctx.expect(!pageGraph.includes('sectionProbed'), 'page stubs carry no section registry').toBeTruthy();
+
+        // classy's product-demo section.js rides the same lane (the video-tab
+        // behavior that moved out of the dead core index page module)
+        ctx.expect(graph.includes('marketing/product-demo'), 'product-demo id in the section registry').toBeTruthy();
+        ctx.expect(graph.includes('shown.bs.tab'), 'the tab-video behavior bundled via the section lane').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'the redirect layout script keeps forwarding the querystring and the fragment',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+        const redirect = readGraph(manifest.js.layouts['modules/utilities/redirect'][0]);
+        ctx.expect(redirect.includes('redirect-config'), 'the layout bundle reads its config element').toBeTruthy();
+        ctx.expect(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'main bundle graph: real UJM runtime + theme via __theme__ + the boot runtime',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+        ctx.expect(manifest.js.main, 'main bundle in manifest').toBeTruthy();
+
+        const graph = readGraph(manifest.js.main);
+        ctx.expect(graph.includes('Global module loaded successfully'), 'core runtime module in the graph').toBeTruthy();
+        // The theme's dev-only "loaded successfully" log is STRIPPED from this
+        // production build (cp268) — assert on durable theme code instead.
+        ctx.expect(graph.includes('window.bootstrap'), 'active theme _theme.js inlined via __theme__').toBeTruthy();
+        ctx.expect(!graph.includes('Classy theme loaded successfully'), 'theme dev-only block stripped in production').toBeTruthy();
+        ctx.expect(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'a production build writes a .map beside the main bundle, and the manifest names no map',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+        ctx.expect(fs.existsSync(path.join(OUT, `${manifest.js.main.slice(1)}.map`)), 'main.js.map sits beside the main bundle').toBeTruthy();
+
+        // Every string the js block holds, entry URLs and the `imports` keys and lists alike.
+        const urls = [];
+        const collect = (value) => {
+          if (typeof value === 'string') urls.push(value);
+          else if (Array.isArray(value)) value.forEach(collect);
+          else if (value && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => { urls.push(key); collect(inner); });
+        };
+        collect(manifest.js);
+        ctx.expect(Object.keys(manifest.js.imports).length > 0, 'the imports map was read').toBeTruthy();
+        ctx.expect(urls.filter((url) => url.endsWith('.map')), 'no source map is an entry or a preload').toEqual([]);
+      },
+    },
+
+    {
+      name: 'tooltips: one shared initializer on the core layer, wired by every theme (#99)',
+      run: async (ctx) => {
+        // The initializer had a byte-identical copy under every theme's js/ — a fix
+        // had to be made three times. One home on the core layer, imported through
+        // __main_assets__ like the chart helper beside it.
+        const SHARED = path.join(PKG, 'core', 'js', 'libs', 'initialize-tooltips.js');
+        ctx.expect(fs.existsSync(SHARED), 'the shared initializer lives on the core layer').toBeTruthy();
+
+        for (const theme of fs.readdirSync(path.join(PKG, 'themes'))) {
+          const copy = path.join(PKG, 'themes', theme, 'js', 'initialize-tooltips.js');
+          ctx.expect(!fs.existsSync(copy), `${theme} carries no private copy`).toBeTruthy();
+        }
+
+        // Every theme that wires tooltips still gets them into its bundle graph
+        // (real chain: a sibling theme always sits over the base layer).
+        for (const theme of ['classy', 'newsflash', 'neobrutalism']) {
+          const manifest = await build([theme, 'base']);
+          const graph = readGraph(manifest.js.main);
+          ctx.expect(graph.includes('data-bs-toggle="tooltip"'), `${theme}: the shared initializer rides the bundle`).toBeTruthy();
+          ctx.expect(graph.includes('tooltips'), `${theme}: the initializer body (not just the selector) bundled`).toBeTruthy();
+        }
+      },
+    },
+
+    {
+      name: 'ESM splitting: @omega.js/client singleton lives in exactly ONE shared chunk',
+      run: async (ctx) => {
+        // The invariant is per BUILD, and the count below walks the whole out dir —
+        // so start clean: stale chunks accumulated from PREVIOUS RUNS (differently
+        // hashed as sources drift) read as duplicates, exactly like the sibling
+        // tests that clear OUT before building.
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await build(['classy', 'base']);
+
+        // Page entries are thin boot stubs importing shared chunks
+        const signinEntry = fs.readFileSync(path.join(OUT, manifest.js.pages['signin/index'][0].slice(1)), 'utf8');
+        ctx.expect(signinEntry.length < 2000, `page entry is a thin stub (${signinEntry.length} bytes)`).toBeTruthy();
+        ctx.expect(/chunks\/chunk-/.test(signinEntry), 'stub imports shared chunks').toBeTruthy();
+
+        // The client (`_stateGeneration` is its auth module's constructor marker)
+        // appears in exactly one file across ALL bundles: the shared chunk both
+        // main and pages import, where the web runtime instance lives.
+        const withClient = walkJs(path.join(OUT, 'assets', 'js')).filter((f) => fs.readFileSync(f, 'utf8').includes('_stateGeneration'));
+        ctx.expect(withClient.length, `client code in exactly one file (found ${withClient.length})`).toBe(1);
+        ctx.expect(withClient[0].includes(`${path.sep}chunks${path.sep}`), 'client lives in a shared chunk').toBeTruthy();
+
+        // The page's own code is still in its graph (via the @omega.js/web/runtime alias)
+        const graph = readGraph(manifest.js.pages['signin/index'][0]);
+        ctx.expect(graph.includes('Email is required'), 'real UJM auth page module code present').toBeTruthy();
+        ctx.expect(graph.includes('_stateGeneration'), 'client reachable from the page graph').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'layered sass: main css compiles per theme through omega:theme',
+      run: async (ctx) => {
+        const classy = await build(['classy', 'base']);
+        const newsflash = await build(['newsflash', 'base']);
+
+        const classyCss = fs.readFileSync(path.join(OUT, classy.css.main.slice(1)), 'utf8');
+        const newsflashCss = fs.readFileSync(path.join(OUT, newsflash.css.main.slice(1)), 'utf8');
+        ctx.expect(classyCss.includes('#2563EB') || classyCss.includes('#2563eb'), 'classy primary in classy build').toBeTruthy();
+        ctx.expect(newsflashCss.includes('#F03612') || newsflashCss.includes('#f03612'), 'newsflash primary in newsflash build').toBeTruthy();
+        ctx.expect(classyCss.includes('.btn'), 'bootstrap compiled in via the theme config').toBeTruthy();
+        ctx.expect(classy.css.main, 'content hash differs per theme').not.toBe(newsflash.css.main);
+
+        // cp190 floor: sibling themes carry classy's token-pure app/auth
+        // vocabulary so fall-through pages render styled (Lane B)
+        ctx.expect(newsflashCss.includes('.omega-auth'), 'newsflash bundle carries the classy auth floor').toBeTruthy();
+        ctx.expect(newsflashCss.includes('.omega-statgrid'), 'newsflash bundle carries the classy app floor').toBeTruthy();
+        // cp192: the shared footer include speaks omega-footer vocabulary on every
+        // page — the floor supplies its structure, the theme re-inks it
+        ctx.expect(newsflashCss.includes('.omega-footer'), 'newsflash bundle carries the classy footer floor').toBeTruthy();
+        // …and speaks the shared token contract after the cp187 rebase
+        ctx.expect(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)').toBeTruthy();
+
+        // One page-css bucket, layered (#624): the core sheet and the active theme's
+        // both land under the same key, in load order.
+        ctx.expect(newsflash.css.pages['blog/[slug]'].length, 'core + newsflash + consumer sheets for blog/[slug]').toBe(3);
+        // classy ships blog/[slug] page css since the cp170 editorial extras
+        // (reading progress + article rail) — it layers over core's the same way
+        ctx.expect(classy.css.pages['blog/[slug]'].length, 'core + classy + consumer sheets for blog/[slug]').toBe(3);
+      },
+    },
+
+    {
+      name: 'dev mode: stable un-hashed names so rebuilds keep their URLs',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        const manifest = await buildAssets({
+          layers: [path.join(__dirname, 'fixtures', 'site-assets'), path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')],
+          themeRoots: [path.join(PKG, 'themes', 'classy')],
+          themesDir: path.join(PKG, 'themes'),
+          coreDir: path.join(PKG, 'core'),
+          outDir: OUT,
+          clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+          dev: true,
+        });
+
+        ctx.expect(manifest.js.main, 'main js un-hashed').toBe('/assets/js/main.js');
+        ctx.expect(manifest.js.pages['signin/index'], 'page js un-hashed').toEqual(['/assets/js/pages/signin/index.js']);
+        // One key, one file per LAYER — the suffix names the owning layer, so two
+        // layers' bundles for the same key never collide on a stable dev name.
+        ctx.expect(manifest.js.pages['blog/[slug]'], 'wildcard filenames survive esbuild verbatim, one per layer in load order').toEqual(['/assets/js/pages/blog/[slug].js', '/assets/js/pages/blog/[slug].site.js']);
+        ctx.expect(manifest.css.main, 'main css un-hashed').toBe('/assets/css/main.css');
+        fs.rmSync(OUT, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'PurgeCSS strips selectors unused by the rendered HTML',
+      run: async (ctx) => {
+        const manifest = await build(['classy', 'base']);
+        fs.writeFileSync(
+          path.join(OUT, 'index.html'),
+          '<body class="omega-body"><div class="container"><a class="btn btn-primary">x</a></div></body>'
+        );
+
+        const sizes = await purgeCss({ outDir: OUT, manifest });
+        const purged = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
+        ctx.expect(purged.includes('.btn-primary'), 'used selector kept').toBeTruthy();
+        ctx.expect(!purged.includes('.carousel-inner'), 'unused selector stripped').toBeTruthy();
+        ctx.expect(sizes.after < sizes.before, `size shrank (${sizes.before} → ${sizes.after})`).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'only-half rebuilds (dev watcher narrowing): css writes no js, js writes no css',
+      run: async (ctx) => {
+        const outDir = ONLY_OUT;
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [path.join(PKG, 'themes', 'classy')];
+        const base = {
+          layers: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots, path.join(PKG, 'core')],
+          themeRoots,
+          themesDir: path.join(PKG, 'themes'),
+          coreDir: path.join(PKG, 'core'),
+          outDir,
+          clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+          dev: true,
+        };
+
+        const cssOnly = await buildAssets({ ...base, only: 'css' });
+        ctx.expect(cssOnly.css.main, 'css half built').toBeTruthy();
+        ctx.expect(!cssOnly.js.main, 'no js in the manifest').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(outDir, 'assets', 'js')), 'no js files written — the dev server can hot-swap').toBeTruthy();
+
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const jsOnly = await buildAssets({ ...base, only: 'js' });
+        ctx.expect(jsOnly.js.main, 'js half built').toBeTruthy();
+        ctx.expect(!jsOnly.css.main, 'no css in the manifest').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(outDir, 'assets', 'css')), 'no css files written').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'fonts: the layer union is pruned to css-referenced faces — sibling themes ship no base-layer fat (cp243)',
+      run: async (ctx) => {
+        fs.rmSync(OUT, { recursive: true, force: true });
+        await build(['newsflash', 'base']);
+        const fonts = path.join(OUT, 'assets', 'fonts');
+        ctx.expect(fs.existsSync(path.join(fonts, 'fraunces-normal-latin.woff2')), 'newsflash ships its own faces').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(fonts, 'newsreader-normal-latin.woff2')), 'classy faces pruned from the newsflash chain').toBeTruthy();
+
+        fs.rmSync(OUT, { recursive: true, force: true });
+        await build(['classy', 'base']);
+        ctx.expect(fs.existsSync(path.join(OUT, 'assets', 'fonts', 'newsreader-normal-latin.woff2')), 'the classy chain keeps its own faces').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'fonts: a face named only by an INLINED page sheet survives the prune (#767)',
+      run: async (ctx) => {
+        // #767 keeps a small page/layout sheet out of the file tree entirely: it
+        // rides the manifest as css text. The prune reads the emitted css to decide
+        // which copied faces are referenced, so an inlined sheet is invisible to it,
+        // and a face that sheet declares would be deleted out from under the page
+        // that needs it. No packaged sheet declares a face in a page lane today; a
+        // consumer sheet can, which is exactly the case nothing else covers.
+        const layer = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-inline-face-')));
+        fs.mkdirSync(path.join(layer, 'css', 'pages'), { recursive: true });
+        fs.mkdirSync(path.join(layer, 'fonts'), { recursive: true });
+        fs.writeFileSync(path.join(layer, 'fonts', 'page-only.woff2'), 'face');
+        fs.writeFileSync(path.join(layer, 'fonts', 'nobody-asks.woff2'), 'face');
+        fs.writeFileSync(path.join(layer, 'css', 'pages', 'fontpage.scss'), [
+          '@font-face { font-family: PageOnly; src: url(/assets/fonts/page-only.woff2) format("woff2"); }',
+          '.omega-page-only { font-family: PageOnly; }',
+        ].join('\n'));
+
+        try {
+          fs.rmSync(OUT, { recursive: true, force: true });
+          const manifest = await buildAssets({
+            layers: [layer, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')],
+            themeRoots: [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')],
+            sectionRoots: [layer, path.join(PKG, 'themes', 'classy')],
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir: OUT,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+          });
+
+          // The premise: this sheet really did inline, so the face has no file on
+          // disk naming it. Without that, the case below proves nothing.
+          const sheets = manifest.css.pages.fontpage;
+          ctx.expect(sheets && sheets[0].inline, 'the small page sheet rides the manifest as text').toBeTruthy();
+          ctx.expect(sheets[0].inline.includes('/assets/fonts/page-only.woff2'), 'and its @font-face is in that text').toBeTruthy();
+
+          const fonts = path.join(OUT, 'assets', 'fonts');
+          ctx.expect(fs.existsSync(path.join(fonts, 'page-only.woff2')), 'the inlined sheet keeps its face').toBeTruthy();
+          ctx.expect(!fs.existsSync(path.join(fonts, 'nobody-asks.woff2')), 'a face nothing names is still pruned').toBeTruthy();
+        } finally {
+          fs.rmSync(layer, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // #624 — the site-wide main bundle is the one REPLACE-with-extend lane, and
+    // JS now spells the extend exactly as CSS does: `omega:main` resolves the same
+    // name from the layers BELOW the importing file (sass's `@use 'omega:main'`).
+    {
+      name: '#624: a consumer main.js extends the framework main through `omega:main`',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-main-extend-'));
+        const siteLayer = path.join(tmp, 'assets');
+        fs.mkdirSync(path.join(siteLayer, 'js'), { recursive: true });
+        fs.writeFileSync(
+          path.join(siteLayer, 'js', 'main.js'),
+          "import coreMain from 'omega:main';\n"
+          + "export default async (context) => {\n"
+          + "  await coreMain(context);\n"
+          + "  console.log('consumer main extended the framework main');\n"
+          + "};\n",
+        );
+
+        const outDir = path.join(PKG, '.omega', `assets-main-extend-${process.pid}`);
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+        try {
+          const manifest = await buildAssets({
+            layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+            themeRoots,
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+            dev: true,
+            only: 'js',
+          });
+
+          const graph = fs.readFileSync(path.join(outDir, manifest.js.main.slice(1)), 'utf8')
+            + fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks'), { withFileTypes: true })
+              .map((entry) => fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')).join('\n');
+
+          ctx.expect(graph.includes('consumer main extended the framework main'), 'the consumer main is the entry').toBeTruthy();
+          ctx.expect(graph.includes('Global module loaded successfully'), 'and the FRAMEWORK main it extends is in the graph').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // `omega:` means BELOW, not "anything but me": the scan starts one layer under
+    // the importer's own, so a theme's own main.js reaches CORE and can never
+    // resolve UPWARD into the consumer layer that extends it.
+    {
+      name: '#624: `omega:main` from a THEME layer resolves down to core, never up to the consumer',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-main-below-'));
+        const siteLayer = path.join(tmp, 'assets');
+        const themeLayer = path.join(tmp, 'themes', 'probe');
+        fs.mkdirSync(path.join(siteLayer, 'js'), { recursive: true });
+        fs.mkdirSync(path.join(themeLayer, 'js'), { recursive: true });
+        fs.writeFileSync(
+          path.join(siteLayer, 'js', 'main.js'),
+          "import below from 'omega:main';\n"
+          + "export default async (context) => {\n"
+          + "  await below(context);\n"
+          + "  console.log('consumer main ran last');\n"
+          + "};\n",
+        );
+        fs.writeFileSync(
+          path.join(themeLayer, 'js', 'main.js'),
+          "import below from 'omega:main';\n"
+          + "export default async (context) => {\n"
+          + "  await below(context);\n"
+          + "  console.log('theme main ran in between');\n"
+          + "};\n",
+        );
+
+        const outDir = path.join(PKG, '.omega', `assets-main-below-${process.pid}`);
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [themeLayer, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+        try {
+          const manifest = await buildAssets({
+            layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+            themeRoots,
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+            dev: true,
+            only: 'js',
+          });
+
+          const graph = fs.readFileSync(path.join(outDir, manifest.js.main.slice(1)), 'utf8')
+            + fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks'), { withFileTypes: true })
+              .map((entry) => fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')).join('\n');
+
+          ctx.expect(graph.includes('consumer main ran last'), 'the consumer main is the entry').toBeTruthy();
+          ctx.expect(graph.includes('theme main ran in between'), 'the consumer extends the THEME below it').toBeTruthy();
+          ctx.expect(graph.includes('Global module loaded successfully'), "the theme's own `omega:main` reached CORE — a skip-self scan would have looped back up to the consumer instead").toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // #249 — a `js/modules/` dir is not an asset lane. It was the framework's own
+    // standalone-IIFE lane until #624 deleted it; a consumer's copy was never built
+    // (its constraints — fixed URL, no `@omega.js/client` — were the framework's),
+    // and now nobody's is. Shared code goes in `js/libs/`, and the build says so
+    // instead of ignoring the directory in silence.
+    {
+      name: '#249: a js/modules/ dir is built by nothing, and says so once',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-consumer-modules-'));
+        const siteLayer = path.join(tmp, 'assets');
+        fs.mkdirSync(path.join(siteLayer, 'js', 'modules'), { recursive: true });
+        fs.writeFileSync(
+          path.join(siteLayer, 'js', 'modules', 'foo.js'),
+          "import { Manager } from '@omega.js/client';\nexport const foo = () => Manager;\n",
+        );
+
+        const outDir = path.join(PKG, '.omega', `assets-consumer-modules-${process.pid}`);
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+        const warnings = [];
+        try {
+          await buildAssets({
+            layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+            themeRoots,
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+            warn: (message) => warnings.push(message),
+            only: 'js',
+          });
+
+          ctx.expect(!fs.existsSync(path.join(outDir, 'assets', 'js', 'modules')), 'nothing is emitted for the directory').toBeTruthy();
+
+          const warning = warnings.filter((line) => line.includes('js/modules'));
+          ctx.expect(warning.length, `exactly one warning: ${warnings.join(' | ')}`).toBe(1);
+          ctx.expect(warning[0].includes(path.join(siteLayer, 'js', 'modules')), 'the warning names the offending directory').toBeTruthy();
+          ctx.expect(warning[0].includes('js/libs/'), 'the warning names the js/libs/ convention').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // #469 — the legacy 4-segment page module (js/pages/dashboard/agents/edit.js)
+    // is collected as a HELPER, so the page ships with no JS and the build stays
+    // green. Real helpers (checkout modules/, account sections/) reach a bundle
+    // through their page entry; an orphan reaches nothing, and says so.
+    {
+      name: '#469: a page module no entry reaches warns loudly; helpers and partials stay silent',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-orphan-page-'));
+        const siteLayer = path.join(tmp, 'assets');
+        const pageDir = path.join(siteLayer, 'js', 'pages', 'dashboard', 'agents');
+        fs.mkdirSync(pageDir, { recursive: true });
+        fs.writeFileSync(path.join(pageDir, 'edit.js'), 'export default () => {};\n');
+        fs.writeFileSync(path.join(pageDir, '_shared.js'), 'export const shared = () => {};\n');
+
+        const outDir = path.join(PKG, '.omega', `assets-orphan-page-${process.pid}`);
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+        const warnings = [];
+        try {
+          await buildAssets({
+            layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+            themeRoots,
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+            warn: (message) => warnings.push(message),
+            only: 'js',
+          });
+
+          const warning = warnings.filter((line) => line.includes('js/pages'));
+          ctx.expect(warning.length, `exactly one warning: ${warnings.join(' | ')}`).toBe(1);
+          ctx.expect(warning[0].includes(path.join(pageDir, 'edit.js')), 'the warning names the orphaned file').toBeTruthy();
+          ctx.expect(warning[0].includes('[slug]'), 'the warning names the [name] wildcard family file (#470)').toBeTruthy();
+          ctx.expect(warning[0].indexOf('[slug]') < warning[0].indexOf('index.js'), 'the family file comes FIRST, the single-page spellings after').toBeTruthy();
+          ctx.expect(warning[0].includes('index.js'), 'the warning names the accepted per-page-dir spelling').toBeTruthy();
+          ctx.expect(warning[0].includes('3 segments'), 'the warning names the accepted flat spelling').toBeTruthy();
+          ctx.expect(!warning[0].includes('_shared.js'), 'underscore partials stay silent').toBeTruthy();
+          ctx.expect(!warning[0].includes(path.join('checkout', 'modules')), 'a helper its page entry imports stays silent').toBeTruthy();
+          ctx.expect(!warning[0].includes(path.join('account', 'sections')), 'account section helpers stay silent').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    // #742 — the redirect layout module hops at IMPORT time and exports nothing
+    // (core/js/layouts/modules/utilities/redirect.js), so the boot stub must never
+    // read `.default` off its namespace: esbuild proves that access undefined and
+    // warns. The warning hid behind esbuild's silenced printer until @omega.js/devkit's
+    // bundle module started reporting its findings through the logger (#737), which
+    // is why the guard is the COUNT rather than one message: every esbuild warning
+    // this lane can raise is a real import that resolves to nothing.
+    {
+      name: '#742: the js build over the real layer chain emits zero esbuild warnings',
+      run: async (ctx) => {
+        const outDir = path.join(PKG, '.omega', `assets-warning-free-${process.pid}`);
+        fs.rmSync(outDir, { recursive: true, force: true });
+        const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+
+        // esbuild's findings reach a human through the devkit logger (#737), so the
+        // console IS the warning channel to watch.
+        const warnings = [];
+        const realWarn = console.warn;
+        console.warn = (...args) => warnings.push(args.join(' '));
+        try {
+          await buildAssets({
+            layers: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots, path.join(PKG, 'core')],
+            themeRoots,
+            sectionRoots: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots],
+            themesDir: path.join(PKG, 'themes'),
+            coreDir: path.join(PKG, 'core'),
+            outDir,
+            clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+            only: 'js',
+          });
+        } finally {
+          console.warn = realWarn;
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+
+        ctx.expect(warnings, `the js build warned: ${warnings.join(' | ')}`).toEqual([]);
+      },
+    },
+  ],
 });

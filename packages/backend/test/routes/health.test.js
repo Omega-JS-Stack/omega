@@ -39,36 +39,32 @@ module.exports = defineCases({
     {
       name: 'serves-unauthenticated-with-the-full-payload',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').get('omega/health');
 
-        assert.isSuccess(response, 'The liveness probe should answer without auth');
-        assert.propertyEquals(response, 'data.status', 'healthy', 'It should report healthy');
+        expect(response, 'The liveness probe should answer without auth').toBeSuccess();
+        expect(response, 'It should report healthy').toHaveProperty('data.status', 'healthy');
 
         for (const key of PAYLOAD_KEYS) {
-          assert.hasProperty(response, `data.${key}`, `The payload should carry ${key}`);
+          expect(response, `The payload should carry ${key}`).toHaveProperty(`data.${key}`);
         }
 
-        assert.deepEqual(
-          Object.keys(response.data).sort(),
-          [...PAYLOAD_KEYS].sort(),
-          'The payload should be exactly the documented fields'
-        );
+        expect(Object.keys(response.data).sort(), 'The payload should be exactly the documented fields').toEqual([...PAYLOAD_KEYS].sort());
 
         // @omega.js/manager's live API check compares the deployed version to
         // the npm latest, and the test runner reads the mode off this payload
-        assert.isType(response.data.version, 'string', 'version should be a string');
-        assert.isType(response.data.backendVersion, 'string', 'backendVersion should be a string');
-        assert.isType(response.data.testExtendedMode, 'boolean', 'testExtendedMode should be a boolean');
-        assert.contains(['development', 'testing', 'production'], response.data.environment, 'environment should be a resolved environment');
-        assert.match(response.data.timestamp, /^\d{4}-\d{2}-\d{2}T/, 'timestamp should be an ISO string');
+        expect(response.data.version, 'version should be a string').toBeTypeOf('string');
+        expect(response.data.backendVersion, 'backendVersion should be a string').toBeTypeOf('string');
+        expect(response.data.testExtendedMode, 'testExtendedMode should be a boolean').toBeTypeOf('boolean');
+        expect(['development', 'testing', 'production'], 'environment should be a resolved environment').toContain(response.data.environment);
+        expect(response.data.timestamp, 'timestamp should be an ISO string').toMatch(/^\d{4}-\d{2}-\d{2}T/);
       },
     },
 
     {
       name: 'echoes-no-request-input',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // A public, unauthenticated endpoint that reflected anything a caller
         // sent would be a free open-reflection surface on a production host —
         // the property that made the old carve-out defensible, kept here.
@@ -79,30 +75,22 @@ module.exports = defineCases({
           injected: '<script>alert(1)</script>',
         });
 
-        assert.isSuccess(response, 'Unknown params should not break the probe');
-        assert.propertyEquals(response, 'data.status', 'healthy', 'status is the route\'s own, not the caller\'s');
-        assert.notEqual(response.data.projectId, 'evil-project', 'projectId is read from config, never echoed');
-        assert.notEqual(response.data.environment, 'production', 'environment is resolved, never echoed');
-        assert.deepEqual(
-          Object.keys(response.data).sort(),
-          [...PAYLOAD_KEYS].sort(),
-          'No caller-supplied key should appear in the payload'
-        );
+        expect(response, 'Unknown params should not break the probe').toBeSuccess();
+        expect(response, 'status is the route\'s own, not the caller\'s').toHaveProperty('data.status', 'healthy');
+        expect(response.data.projectId, 'projectId is read from config, never echoed').not.toBe('evil-project');
+        expect(response.data.environment, 'environment is resolved, never echoed').not.toBe('production');
+        expect(Object.keys(response.data).sort(), 'No caller-supplied key should appear in the payload').toEqual([...PAYLOAD_KEYS].sort());
       },
     },
 
     {
       name: 'answers-in-production-and-under-the-emulator',
-      async run({ assert }) {
+      async run({ expect }) {
         // The folder gate is a pure decision over (route, environment), so the
         // production leg is provable here — the emulator only ever runs
         // development/testing.
         for (const environment of ['production', 'development', 'testing']) {
-          assert.equal(
-            isDevOnlyRouteBlocked('health', environment),
-            false,
-            `The liveness probe must answer in ${environment}`
-          );
+          expect(isDevOnlyRouteBlocked('health', environment), `The liveness probe must answer in ${environment}`).toBe(false);
         }
       },
     },

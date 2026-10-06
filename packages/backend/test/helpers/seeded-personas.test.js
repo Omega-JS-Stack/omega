@@ -36,7 +36,7 @@ module.exports = defineCases({
     // has since lapsed from — quotes the catalog's own price and cadence.
     {
       name: 'purchased-personas-quote-the-catalog',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
@@ -44,24 +44,23 @@ module.exports = defineCases({
         const definitions = getAccountDefinitions('example.com', config);
         const purchased = Object.entries(definitions).filter(([, definition]) => isPurchase(definition.properties?.subscription));
 
-        assert.ok(purchased.length > 0, 'The seeder must define personas that bought a subscription');
+        expect(purchased.length > 0, 'The seeder must define personas that bought a subscription').toBeTruthy();
 
         for (const [key, definition] of purchased) {
           const subscription = definition.properties.subscription;
           const payment = subscription.payment || {};
           const plan = planBought(subscription, config);
 
-          assert.ok(plan, `Persona '${key}' names a plan the catalog does not carry`);
-          assert.ok(
+          expect(plan, `Persona '${key}' names a plan the catalog does not carry`).toBeTruthy();
+          expect(
             payment.frequency && plan.prices[payment.frequency] !== undefined,
             `Persona '${key}' must be billed at a cadence the catalog sells ${plan.id} at (got ${payment.frequency})`,
-          );
-          assert.equal(
+          ).toBeTruthy();
+          expect(
             payment.price,
-            plan.prices[payment.frequency],
             `Persona '${key}' must quote the catalog price for ${plan.id}/${payment.frequency}`,
-          );
-          assert.ok(payment.price > 0, `Persona '${key}' bought a paid plan, so its price cannot be 0`);
+          ).toBe(plan.prices[payment.frequency]);
+          expect(payment.price > 0, `Persona '${key}' bought a paid plan, so its price cannot be 0`).toBeTruthy();
         }
       },
     },
@@ -70,7 +69,7 @@ module.exports = defineCases({
     // date a decade away no real provider would ever record.
     {
       name: 'live-terms-end-with-the-billing-cycle',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
         const nowUNIX = Math.floor(Date.now() / 1000);
 
@@ -88,11 +87,11 @@ module.exports = defineCases({
           const cycleDays = { daily: 1, weekly: 7, monthly: 30, annually: 365 }[cadence];
           const remaining = (expiresUNIX - nowUNIX) / 86400;
 
-          assert.ok(cycleDays, `Persona '${key}' is billed at an unknown cadence (${cadence})`);
-          assert.ok(
+          expect(cycleDays, `Persona '${key}' is billed at an unknown cadence (${cadence})`).toBeTruthy();
+          expect(
             remaining <= cycleDays + 1,
             `Persona '${key}' expires ${Math.round(remaining)} days out — a ${cadence} term ends within ${cycleDays}`,
-          );
+          ).toBeTruthy();
         }
       },
     },
@@ -103,7 +102,7 @@ module.exports = defineCases({
     // one of them must have a fixture behind it.
     {
       name: 'every-seeded-orderid-has-an-order-fixture',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
@@ -112,7 +111,7 @@ module.exports = defineCases({
         const definitions = getAccountDefinitions('example.com', config);
         const seeded = Object.entries(TEST_ACCOUNTS).filter(([, account]) => account.properties?.subscription?.payment?.orderId);
 
-        assert.ok(seeded.length > 0, 'The seeder must define personas whose subscription names an order');
+        expect(seeded.length > 0, 'The seeder must define personas whose subscription names an order').toBeTruthy();
 
         for (const [key, account] of seeded) {
           const orderId = account.properties.subscription.payment.orderId;
@@ -122,24 +121,24 @@ module.exports = defineCases({
           const bought = held.id !== 'basic' ? held.id : paidProduct.id;
           const fixture = buildOrderFixture(key, config);
 
-          assert.ok(fixture, `Persona '${key}' names order ${orderId} but the seeder builds no fixture for it`);
-          assert.equal(fixture.orderId, orderId, `The fixture for '${key}' must be the order its subscription names`);
-          assert.equal(fixture.doc.id, orderId, 'The order document is keyed by its own id');
-          assert.equal(fixture.doc.owner, account.uid, `The order for '${key}' belongs to that persona`);
-          assert.equal(fixture.doc.type, 'subscription', `The order for '${key}' records a subscription purchase`);
-          assert.equal(fixture.doc.productId, bought, `The order for '${key}' names the plan that was bought`);
-          assert.equal(fixture.doc.unified.product.id, bought, `The order's unified product for '${key}' is the plan that was bought`);
-          assert.equal(fixture.doc.unified.status, account.properties.subscription.status, `The order for '${key}' mirrors the subscription's state`);
-          assert.ok(fixture.doc.unified.payment.price > 0, `The order for '${key}' records what was paid`);
-          assert.ok(fixture.doc.unified.payment.frequency, `The order for '${key}' records the cadence it was bought on`);
+          expect(fixture, `Persona '${key}' names order ${orderId} but the seeder builds no fixture for it`).toBeTruthy();
+          expect(fixture.orderId, `The fixture for '${key}' must be the order its subscription names`).toBe(orderId);
+          expect(fixture.doc.id, 'The order document is keyed by its own id').toBe(orderId);
+          expect(fixture.doc.owner, `The order for '${key}' belongs to that persona`).toBe(account.uid);
+          expect(fixture.doc.type, `The order for '${key}' records a subscription purchase`).toBe('subscription');
+          expect(fixture.doc.productId, `The order for '${key}' names the plan that was bought`).toBe(bought);
+          expect(fixture.doc.unified.product.id, `The order's unified product for '${key}' is the plan that was bought`).toBe(bought);
+          expect(fixture.doc.unified.status, `The order for '${key}' mirrors the subscription's state`).toBe(account.properties.subscription.status);
+          expect(fixture.doc.unified.payment.price > 0, `The order for '${key}' records what was paid`).toBeTruthy();
+          expect(fixture.doc.unified.payment.frequency, `The order for '${key}' records the cadence it was bought on`).toBeTruthy();
 
           // The blocks a real order carries: the cancel/refund requests the routes
           // write onto it, and the stamps of what last touched it.
-          assert.equal(fixture.doc.requests.cancellation, null, `Nothing has requested a cancellation of '${key}' order`);
-          assert.equal(fixture.doc.requests.refund, null, `Nothing has requested a refund of '${key}' order`);
-          assert.ok(fixture.doc.metadata.created.timestampUNIX > 0, `The order for '${key}' records when it was created`);
-          assert.ok(fixture.doc.metadata.updated.timestampUNIX > 0, `The order for '${key}' records when it was last written`);
-          assert.equal(fixture.doc.metadata.updatedBy.event.name, 'seed', `The order for '${key}' names the seed as its writer, not a webhook`);
+          expect(fixture.doc.requests.cancellation, `Nothing has requested a cancellation of '${key}' order`).toBe(null);
+          expect(fixture.doc.requests.refund, `Nothing has requested a refund of '${key}' order`).toBe(null);
+          expect(fixture.doc.metadata.created.timestampUNIX > 0, `The order for '${key}' records when it was created`).toBeTruthy();
+          expect(fixture.doc.metadata.updated.timestampUNIX > 0, `The order for '${key}' records when it was last written`).toBeTruthy();
+          expect(fixture.doc.metadata.updatedBy.event.name, `The order for '${key}' names the seed as its writer, not a webhook`).toBe('seed');
         }
       },
     },
@@ -149,7 +148,7 @@ module.exports = defineCases({
     // framework one's — and the order names the plan THAT persona holds.
     {
       name: 'project-personas-get-their-own-order-fixtures',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         const plan = otherPaidPlan(config) || paidPlan(config);
 
         if (!plan) {
@@ -174,11 +173,11 @@ module.exports = defineCases({
 
         const fixture = buildOrderFixture('project-subscriber', config, extraAccounts);
 
-        assert.ok(fixture, 'A project persona naming an order must get a fixture, not a dangling id');
-        assert.equal(fixture.orderId, '_test-order-project-subscriber', 'The fixture is the order the project persona names');
-        assert.equal(fixture.doc.owner, '_test-project-subscriber', 'The order belongs to the project persona');
-        assert.equal(fixture.doc.productId, plan.id, 'The order names the plan the persona actually holds, not the catalog default');
-        assert.equal(fixture.doc.unified.payment.price, plan.prices[Object.keys(plan.prices)[0]], 'The order records the catalog price of that plan');
+        expect(fixture, 'A project persona naming an order must get a fixture, not a dangling id').toBeTruthy();
+        expect(fixture.orderId, 'The fixture is the order the project persona names').toBe('_test-order-project-subscriber');
+        expect(fixture.doc.owner, 'The order belongs to the project persona').toBe('_test-project-subscriber');
+        expect(fixture.doc.productId, 'The order names the plan the persona actually holds, not the catalog default').toBe(plan.id);
+        expect(fixture.doc.unified.payment.price, 'The order records the catalog price of that plan').toBe(plan.prices[Object.keys(plan.prices)[0]]);
       },
     },
 
@@ -187,7 +186,7 @@ module.exports = defineCases({
     // than gaining null billing data that reads like an answer.
     {
       name: 'unpriced-plans-invent-no-billing-data',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const extraAccounts = {
           'project-unpriced': {
             id: 'project-unpriced',
@@ -207,9 +206,9 @@ module.exports = defineCases({
         const definition = getAccountDefinitions('example.com', config, extraAccounts)['project-unpriced'];
         const payment = definition.properties.subscription.payment;
 
-        assert.equal(payment.provider, 'test', 'The seeded payment record is left as written');
-        assert.equal(payment.frequency, undefined, 'A plan with no catalog price gets no cadence written onto it');
-        assert.equal(payment.price, undefined, 'A plan with no catalog price gets no price written onto it');
+        expect(payment.provider, 'The seeded payment record is left as written').toBe('test');
+        expect(payment.frequency, 'A plan with no catalog price gets no cadence written onto it').toBe(undefined);
+        expect(payment.price, 'A plan with no catalog price gets no price written onto it').toBe(undefined);
       },
     },
 
@@ -218,15 +217,15 @@ module.exports = defineCases({
     // its name disqualifies it from the trial its journey exists to prove.
     {
       name: 'never-subscribed-personas-stay-hollow',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
 
         for (const key of ['basic', 'journey-flows-trial', 'consent-granted']) {
           const subscription = definitions[key].properties.subscription;
 
-          assert.equal(subscription.product.id, 'basic', `Persona '${key}' is a free account`);
-          assert.equal(subscription.payment, undefined, `Persona '${key}' never bought anything, so it carries no payment record`);
-          assert.equal(buildOrderFixture(key, config), null, `Persona '${key}' must have no order behind it`);
+          expect(subscription.product.id, `Persona '${key}' is a free account`).toBe('basic');
+          expect(subscription.payment, `Persona '${key}' never bought anything, so it carries no payment record`).toBe(undefined);
+          expect(buildOrderFixture(key, config), `Persona '${key}' must have no order behind it`).toBe(null);
         }
       },
     },
@@ -239,18 +238,18 @@ module.exports = defineCases({
     // purchase record would answer for them.
     {
       name: 'the-discount-suites-purchasers-arrive-owning-nothing',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
         const purchasers = Object.keys(TEST_ACCOUNTS).filter((key) => key.startsWith('intent-discount-'));
 
-        assert.ok(purchasers.length > 0, 'The seeder must declare the discount suites their own purchasers');
+        expect(purchasers.length > 0, 'The seeder must declare the discount suites their own purchasers').toBeTruthy();
 
         for (const key of purchasers) {
           const subscription = definitions[key].properties.subscription;
 
-          assert.equal(subscription.product.id, 'basic', `Persona '${key}' must arrive on the free tier`);
-          assert.equal(subscription.payment, undefined, `Persona '${key}' has bought nothing yet, so it carries no payment record`);
-          assert.equal(buildOrderFixture(key, config), null, `Persona '${key}' must have no order behind it`);
+          expect(subscription.product.id, `Persona '${key}' must arrive on the free tier`).toBe('basic');
+          expect(subscription.payment, `Persona '${key}' has bought nothing yet, so it carries no payment record`).toBe(undefined);
+          expect(buildOrderFixture(key, config), `Persona '${key}' must have no order behind it`).toBe(null);
         }
       },
     },
@@ -262,7 +261,7 @@ module.exports = defineCases({
     // converted one by.
     {
       name: 'the-trialing-persona-is-inside-its-trial',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
@@ -270,42 +269,40 @@ module.exports = defineCases({
         const plan = getFirstPaidProduct(config);
         const definition = getAccountDefinitions('example.com', config)['premium-trialing'];
 
-        assert.ok(definition, 'The seeder must define a mid-trial persona');
+        expect(definition, 'The seeder must define a mid-trial persona').toBeTruthy();
 
         const subscription = definition.properties.subscription;
 
-        assert.equal(subscription.product.id, plan.id, 'The trialing persona holds the catalog\'s paid plan');
-        assert.equal(subscription.status, 'active', 'A live trial IS an active subscription — the providers\' trialing status maps to active');
-        assert.equal(subscription.trial.claimed, true, 'The trial has been claimed');
-        assert.equal(subscription.trial.outcome, null, 'A trial that is still running has not ended in anything yet');
-        assert.equal(
+        expect(subscription.product.id, 'The trialing persona holds the catalog\'s paid plan').toBe(plan.id);
+        expect(subscription.status, 'A live trial IS an active subscription: the providers\' trialing status maps to active').toBe('active');
+        expect(subscription.trial.claimed, 'The trial has been claimed').toBe(true);
+        expect(subscription.trial.outcome, 'A trial that is still running has not ended in anything yet').toBe(null);
+        expect(
           subscription.expires.timestampUNIX,
-          subscription.trial.expires.timestampUNIX,
           'The term ends exactly when the trial does — the equality that makes it read as trialing',
-        );
-        assert.ok(isTrialing(subscription), 'The cancel flow must read this persona as trialing');
+        ).toBe(subscription.trial.expires.timestampUNIX);
+        expect(isTrialing(subscription), 'The cancel flow must read this persona as trialing').toBeTruthy();
 
         // The trial runs for as long as the BRAND offers it on that plan, not a
         // hand-typed length the catalog never promised.
         const catalogDays = (config.payment?.products || []).find((product) => product.id === plan.id)?.trial?.days || 14;
         const remaining = (subscription.trial.expires.timestampUNIX - Math.floor(Date.now() / 1000)) / 86400;
 
-        assert.ok(
+        expect(
           Math.abs(remaining - catalogDays) < 1,
           `The trial must run the catalog's ${catalogDays} days (got ${Math.round(remaining)})`,
-        );
+        ).toBeTruthy();
 
         // And the purchase record behind it carries the same trial (the order's
         // `unified` IS the subscription).
         const fixture = buildOrderFixture('premium-trialing', config);
 
-        assert.ok(fixture, 'The trialing persona names an order, so it must have one');
-        assert.equal(fixture.doc.unified.trial.claimed, true, 'The purchase record shows the subscription was bought on a trial');
-        assert.equal(
+        expect(fixture, 'The trialing persona names an order, so it must have one').toBeTruthy();
+        expect(fixture.doc.unified.trial.claimed, 'The purchase record shows the subscription was bought on a trial').toBe(true);
+        expect(
           fixture.doc.unified.expires.timestampUNIX,
-          subscription.expires.timestampUNIX,
           'The order records the same term the persona holds',
-        );
+        ).toBe(subscription.expires.timestampUNIX);
       },
     },
 
@@ -316,7 +313,7 @@ module.exports = defineCases({
     // regress to that.
     {
       name: 'every-persona-is-a-full-account',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
 
         for (const [key, definition] of Object.entries(definitions)) {
@@ -325,24 +322,24 @@ module.exports = defineCases({
           for (const path of REAL_ACCOUNT_LEAVES) {
             const value = leafAt({ personal, activity }, path);
 
-            assert.ok(
+            expect(
               value !== undefined && value !== null && value !== '',
               `Persona '${key}' must carry ${path} — a real user has one`,
-            );
+            ).toBeTruthy();
           }
 
           // The numeric leaves default to 0, which is the schema saying "unset".
-          assert.ok(personal.telephone.national > 0, `Persona '${key}' must carry a telephone number`);
-          assert.ok(personal.birthday.timestampUNIX > 0, `Persona '${key}' must carry a birthday`);
-          assert.notEqual(activity.geolocation.latitude, 0, `Persona '${key}' must be somewhere (latitude)`);
-          assert.notEqual(activity.geolocation.longitude, 0, `Persona '${key}' must be somewhere (longitude)`);
-          assert.equal(typeof activity.client.mobile, 'boolean', `Persona '${key}' signed up on a known form factor`);
+          expect(personal.telephone.national > 0, `Persona '${key}' must carry a telephone number`).toBeTruthy();
+          expect(personal.birthday.timestampUNIX > 0, `Persona '${key}' must carry a birthday`).toBeTruthy();
+          expect(activity.geolocation.latitude, `Persona '${key}' must be somewhere (latitude)`).not.toBe(0);
+          expect(activity.geolocation.longitude, `Persona '${key}' must be somewhere (longitude)`).not.toBe(0);
+          expect(typeof activity.client.mobile, `Persona '${key}' signed up on a known form factor`).toBe('boolean');
 
           // The location is ONE fact: where the request came from is where the
           // person says they are. A persona split across two places is a bug in
           // the seeder, and it renders as one on the account page.
-          assert.equal(personal.location.country, activity.geolocation.country, `Persona '${key}' lives where it signed up from (country)`);
-          assert.equal(personal.location.city, activity.geolocation.city, `Persona '${key}' lives where it signed up from (city)`);
+          expect(personal.location.country, `Persona '${key}' lives where it signed up from (country)`).toBe(activity.geolocation.country);
+          expect(personal.location.city, `Persona '${key}' lives where it signed up from (city)`).toBe(activity.geolocation.city);
         }
       },
     },
@@ -356,30 +353,29 @@ module.exports = defineCases({
     // exactly this order.
     {
       name: 'the-palette-roster-is-the-seeds-own',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const labelled = Object.entries(TEST_ACCOUNTS).filter(([, account]) => account.palette);
 
-        assert.deepEqual(
+        expect(
           labelled.map(([, account]) => [account.email.split('@')[0], account.palette]),
-          [
-            ['_test.admin', 'Admin'],
-            ['_test.basic', 'Basic'],
-            ['_test.premium-active', 'Premium'],
-            ['_test.premium-trialing', 'Trialing'],
-            ['_test.premium-expired', 'Expired'],
-            ['_test.premium-suspended', 'Suspended'],
-            ['_test.premium-cancelling', 'Cancelling'],
-            ['_test.refunded', 'Refunded'],
-            ['_test.usage-spread', 'Usage'],
-            ['_test.referrer', 'Referrer'],
-            ['_test.referred', 'Referred'],
-            ['_test.journey-flows-upgrade', 'Journey: Upgrade'],
-            ['_test.journey-flows-cancel', 'Journey: Cancel'],
-            ['_test.journey-flows-failure', 'Journey: Failure'],
-            ['_test.journey-flows-trial', 'Journey: Trial'],
-          ],
           'The palette-facing personas are these, in the order the seeder declares them',
-        );
+        ).toEqual([
+          ['_test.admin', 'Admin'],
+          ['_test.basic', 'Basic'],
+          ['_test.premium-active', 'Premium'],
+          ['_test.premium-trialing', 'Trialing'],
+          ['_test.premium-expired', 'Expired'],
+          ['_test.premium-suspended', 'Suspended'],
+          ['_test.premium-cancelling', 'Cancelling'],
+          ['_test.refunded', 'Refunded'],
+          ['_test.usage-spread', 'Usage'],
+          ['_test.referrer', 'Referrer'],
+          ['_test.referred', 'Referred'],
+          ['_test.journey-flows-upgrade', 'Journey: Upgrade'],
+          ['_test.journey-flows-cancel', 'Journey: Cancel'],
+          ['_test.journey-flows-failure', 'Journey: Failure'],
+          ['_test.journey-flows-trial', 'Journey: Trial'],
+        ]);
 
         // The machinery an automated suite drives is never offered to somebody
         // mid-suite: a deletion fixture, a signup the suite has to perform
@@ -394,7 +390,7 @@ module.exports = defineCases({
           'webhook-chargebee-unreachable', 'webhook-retry-sweep',
           'intent-discount-percent-url', 'intent-discount-amount-trial',
         ]) {
-          assert.equal(TEST_ACCOUNTS[key].palette, undefined, `Persona '${key}' is machinery, so the palette must not offer it`);
+          expect(TEST_ACCOUNTS[key].palette, `Persona '${key}' is machinery, so the palette must not offer it`).toBe(undefined);
         }
 
         // A persona a human signs in as is a persona a human LOOKS at, so every
@@ -406,15 +402,15 @@ module.exports = defineCases({
         for (const [key] of labelled) {
           const definition = definitions[key];
 
-          assert.ok(definition, `Palette persona '${key}' must be a seeded account`);
+          expect(definition, `Palette persona '${key}' must be a seeded account`).toBeTruthy();
 
           for (const path of REAL_ACCOUNT_LEAVES) {
             const value = leafAt(definition.properties, path);
 
-            assert.ok(
+            expect(
               value !== undefined && value !== null && value !== '',
               `Palette persona '${key}' must carry ${path}: QA signs in as it and sees exactly that`,
-            );
+            ).toBeTruthy();
           }
         }
       },
@@ -425,21 +421,19 @@ module.exports = defineCases({
     // reseed never shuffles who anybody is.
     {
       name: 'a-persona-profile-is-the-same-on-every-boot',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const first = getAccountDefinitions('example.com', config);
         const second = getAccountDefinitions('example.com', config);
 
         for (const key of Object.keys(first)) {
-          assert.deepEqual(
+          expect(
             second[key].properties.personal,
-            first[key].properties.personal,
             `Persona '${key}' must draw the same identity on every seed`,
-          );
-          assert.deepEqual(
+          ).toEqual(first[key].properties.personal);
+          expect(
             second[key].properties.activity,
-            first[key].properties.activity,
             `Persona '${key}' must draw the same signup context on every seed`,
-          );
+          ).toEqual(first[key].properties.activity);
         }
       },
     },
@@ -450,7 +444,7 @@ module.exports = defineCases({
     // point of them.
     {
       name: 'test-provider-personas-carry-the-record-it-writes',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
@@ -458,25 +452,25 @@ module.exports = defineCases({
         const definitions = getAccountDefinitions('example.com', config);
         const bought = Object.entries(definitions).filter(([, definition]) => definition.properties.subscription?.payment?.provider === 'test');
 
-        assert.ok(bought.length > 0, 'The seeder must define personas bought through the test provider');
+        expect(bought.length > 0, 'The seeder must define personas bought through the test provider').toBeTruthy();
 
         for (const [key, definition] of bought) {
           const payment = definition.properties.subscription.payment;
 
-          assert.ok(payment.resourceId, `Persona '${key}' must name the resource the provider holds its subscription under`);
-          assert.ok(payment.startDate?.timestampUNIX > 0, `Persona '${key}' must record when its subscription began`);
-          assert.ok(payment.updatedBy?.event?.name, `Persona '${key}' must name the event that last wrote its subscription`);
-          assert.ok(payment.updatedBy?.date?.timestampUNIX > 0, `Persona '${key}' must record when that event landed`);
+          expect(payment.resourceId, `Persona '${key}' must name the resource the provider holds its subscription under`).toBeTruthy();
+          expect(payment.startDate?.timestampUNIX > 0, `Persona '${key}' must record when its subscription began`).toBeTruthy();
+          expect(payment.updatedBy?.event?.name, `Persona '${key}' must name the event that last wrote its subscription`).toBeTruthy();
+          expect(payment.updatedBy?.date?.timestampUNIX > 0, `Persona '${key}' must record when that event landed`).toBeTruthy();
 
           // The write's DATE follows the term: a term that already ended cannot
           // have been written to today (the email layer prints this stamp as the
           // last payment date). One day of slack absorbs boundary rounding.
           const expires = definition.properties.subscription.expires;
           if (expires?.timestampUNIX && expires.timestampUNIX <= Math.floor(Date.now() / 1000)) {
-            assert.ok(
+            expect(
               payment.updatedBy.date.timestampUNIX <= expires.timestampUNIX + 86400,
-              `Persona '${key}' ended ${expires.timestamp} but its last write claims ${payment.updatedBy.date.timestamp}`
-            );
+              `Persona '${key}' ended ${expires.timestamp} but its last write claims ${payment.updatedBy.date.timestamp}`,
+            ).toBeTruthy();
           }
         }
       },
@@ -489,7 +483,7 @@ module.exports = defineCases({
     // sections/billing.js), and QA read the missing pitch as a product bug.
     {
       name: 'the-premium-persona-is-a-real-subscriber',
-      async run({ assert, config, skip }) {
+      async run({ expect, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
@@ -497,23 +491,23 @@ module.exports = defineCases({
         const subscription = getAccountDefinitions('example.com', config)['premium-active'].properties.subscription;
         const payment = subscription.payment;
 
-        assert.equal(subscription.status, 'active', 'The Premium persona holds a live subscription');
-        assert.equal(subscription.product.id, getFirstPaidProduct(config).id, 'The Premium persona holds the catalog\'s paid plan');
-        assert.equal(subscription.cancellation.pending, false, 'Nothing has been cancelled — this is the steady-state subscriber');
+        expect(subscription.status, 'The Premium persona holds a live subscription').toBe('active');
+        expect(subscription.product.id, 'The Premium persona holds the catalog\'s paid plan').toBe(getFirstPaidProduct(config).id);
+        expect(subscription.cancellation.pending, 'Nothing has been cancelled: this is the steady-state subscriber').toBe(false);
 
         // The winback pitch's own gate, asserted as the gate reads it.
-        assert.ok(payment.provider && payment.resourceId, 'A payment-gated surface must be able to reach this persona at its provider');
-        assert.equal(payment.provider, 'test', 'The persona is held at the TEST provider — demo-safe, never a live one');
+        expect(payment.provider && payment.resourceId, 'A payment-gated surface must be able to reach this persona at its provider').toBeTruthy();
+        expect(payment.provider, 'The persona is held at the TEST provider: demo-safe, never a live one').toBe('test');
 
-        assert.ok(payment.startDate.timestampUNIX < Math.floor(Date.now() / 1000), 'The persona subscribed in the past, not this instant');
-        assert.ok(payment.price > 0, 'The persona pays what the catalog charges');
+        expect(payment.startDate.timestampUNIX < Math.floor(Date.now() / 1000), 'The persona subscribed in the past, not this instant').toBeTruthy();
+        expect(payment.price > 0, 'The persona pays what the catalog charges').toBeTruthy();
 
         // And the purchase behind it exists, like any real subscriber's.
         const fixture = buildOrderFixture('premium-active', config);
 
-        assert.ok(fixture, 'The Premium persona names an order, so it must have one');
-        assert.equal(fixture.doc.owner, '_test-premium-active', 'The order belongs to the Premium persona');
-        assert.equal(fixture.doc.unified.status, 'active', 'The order records the live subscription it bought');
+        expect(fixture, 'The Premium persona names an order, so it must have one').toBeTruthy();
+        expect(fixture.doc.owner, 'The order belongs to the Premium persona').toBe('_test-premium-active');
+        expect(fixture.doc.unified.status, 'The order records the live subscription it bought').toBe('active');
       },
     },
 
@@ -523,41 +517,40 @@ module.exports = defineCases({
     // shape a signup writes, and nobody could tell while no persona carried one.
     {
       name: 'referrers-carry-the-referrals-a-signup-writes',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
         const byUid = new Map(Object.values(definitions).map((definition) => [definition.uid, definition]));
         const referrers = Object.entries(definitions).filter(([, definition]) => (definition.properties.affiliate?.referrals || []).length > 0);
         const nowUNIX = Math.floor(Date.now() / 1000);
 
-        assert.ok(referrers.length > 0, 'The seeder must define personas that referred somebody');
+        expect(referrers.length > 0, 'The seeder must define personas that referred somebody').toBeTruthy();
 
         for (const [key, definition] of referrers) {
           const referrals = definition.properties.affiliate.referrals;
           const converted = [];
           const pending = [];
 
-          assert.ok(referrals.length > 1, `Persona '${key}' should carry a few referrals, not one`);
+          expect(referrals.length > 1, `Persona '${key}' should carry a few referrals, not one`).toBeTruthy();
 
           for (const referral of referrals) {
             // The record processAffiliate appends (routes/user/signup/post.js):
             // a uid and an ISO timestamp, and nothing else. A seed with extra
             // fields would let a reader lean on data no real referral has.
-            assert.deepEqual(
+            expect(
               Object.keys(referral).sort(),
-              ['timestamp', 'uid'],
               `Persona '${key}' must record referrals exactly as a signup writes them`,
-            );
+            ).toEqual(['timestamp', 'uid']);
 
             const at = Math.floor(new Date(referral.timestamp).getTime() / 1000);
 
-            assert.ok(at > 0, `Persona '${key}' has a referral with an unreadable timestamp (${referral.timestamp})`);
-            assert.ok(at < nowUNIX, `Persona '${key}' has a referral dated in the future`);
+            expect(at > 0, `Persona '${key}' has a referral with an unreadable timestamp (${referral.timestamp})`).toBeTruthy();
+            expect(at < nowUNIX, `Persona '${key}' has a referral dated in the future`).toBeTruthy();
 
             // The referred account exists: the panel prints the uid, and a
             // referral pointing at nobody is a uid the emulator cannot resolve.
             const referred = byUid.get(referral.uid);
 
-            assert.ok(referred, `Persona '${key}' referred ${referral.uid}, which is no seeded persona`);
+            expect(referred, `Persona '${key}' referred ${referral.uid}, which is no seeded persona`).toBeTruthy();
 
             const isConverted = referred.properties.subscription?.product?.id !== 'basic'
               || Boolean(referred.properties.subscription?.payment?.orderId);
@@ -569,8 +562,8 @@ module.exports = defineCases({
           // on to subscribe and some never did. Conversion is a fact about the
           // REFERRED account (the referral record itself carries no status), so
           // the mix only exists when the referrals name real personas.
-          assert.ok(converted.length > 0, `Persona '${key}' referred nobody who ever subscribed`);
-          assert.ok(pending.length > 0, `Persona '${key}' referred nobody who is still on the free tier`);
+          expect(converted.length > 0, `Persona '${key}' referred nobody who ever subscribed`).toBeTruthy();
+          expect(pending.length > 0, `Persona '${key}' referred nobody who is still on the free tier`).toBeTruthy();
         }
       },
     },
@@ -582,18 +575,17 @@ module.exports = defineCases({
     // told by an account that exists to tell the billing one.
     {
       name: 'only-the-referrer-persona-carries-referrals',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
         const carriers = Object.entries(definitions)
           .filter(([, definition]) => (definition.properties.affiliate?.referrals || []).length > 0)
           .map(([key]) => key);
 
-        assert.deepEqual(carriers, ['referrer'], 'The referrer persona is the only account seeded with referrals');
-        assert.equal(
+        expect(carriers, 'The referrer persona is the only account seeded with referrals').toEqual(['referrer']);
+        expect(
           (definitions['premium-active'].properties.affiliate?.referrals || []).length,
-          0,
           'The Premium persona demonstrates a subscription, not an affiliate link',
-        );
+        ).toBe(0);
 
         // The inbound half obeys the same rule (#369): being referred is the
         // referred persona's ONE state, so it is the only account seeded with an
@@ -603,7 +595,7 @@ module.exports = defineCases({
           .filter(([, definition]) => definition.properties.attribution?.affiliate?.code)
           .map(([key]) => key);
 
-        assert.deepEqual(attributed, ['referred'], 'The referred persona is the only account seeded as having come in through a referral');
+        expect(attributed, 'The referred persona is the only account seeded as having come in through a referral').toEqual(['referred']);
 
         // The one that DOES carry them stays a full realistic account (Ian
         // 2026-08-17, #327), and its dates stay the shape a signup writes: the
@@ -612,15 +604,14 @@ module.exports = defineCases({
         // `NaN years ago` (#343).
         const referrals = definitions.referrer.properties.affiliate.referrals;
 
-        assert.ok(referrals.length >= 3, `The referrer persona must carry a real list of referrals (got ${referrals.length})`);
+        expect(referrals.length >= 3, `The referrer persona must carry a real list of referrals (got ${referrals.length})`).toBeTruthy();
 
         for (const referral of referrals) {
-          assert.equal(
+          expect(
             typeof referral.timestamp,
-            'string',
             `Referral ${referral.uid} must be dated with the ISO string a signup writes, never epoch millis`,
-          );
-          assert.match(referral.timestamp, /^\d{4}-\d{2}-\d{2}T/, `Referral ${referral.uid} is dated '${referral.timestamp}', which no signup would write`);
+          ).toBe('string');
+          expect(referral.timestamp, `Referral ${referral.uid} is dated '${referral.timestamp}', which no signup would write`).toMatch(/^\d{4}-\d{2}-\d{2}T/);
         }
       },
     },
@@ -634,11 +625,11 @@ module.exports = defineCases({
     // two halves had drifted apart.
     {
       name: 'the-referred-persona-is-the-inbound-half-of-the-pair',
-      async run({ assert, config }) {
+      async run({ expect, config }) {
         const definitions = getAccountDefinitions('example.com', config);
         const referred = definitions.referred;
 
-        assert.ok(referred, 'The seeder must define the persona that came in through a referral');
+        expect(referred, 'The seeder must define the persona that came in through a referral').toBeTruthy();
 
         const affiliate = referred.properties.attribution?.affiliate;
 
@@ -646,37 +637,35 @@ module.exports = defineCases({
         // account schema defines it (packages/account/src/schema.js): a code, a
         // click stamp, and where it was clicked. Extra fields would let a reader
         // lean on data no signup has ever written.
-        assert.deepEqual(
+        expect(
           Object.keys(affiliate || {}).sort(),
-          ['code', 'page', 'timestamp', 'url'],
           'The referred persona must carry attribution.affiliate exactly as a signup writes it',
-        );
-        assert.equal(
+        ).toEqual(['code', 'page', 'timestamp', 'url']);
+        expect(
           affiliate.code,
-          definitions.referrer.properties.affiliate.code,
           'The referred persona came in through the REFERRER persona\'s own code',
-        );
-        assert.match(affiliate.url, new RegExp(`ref=${affiliate.code}$`), `The link it arrived on carries the code (got ${affiliate.url})`);
-        assert.ok(affiliate.page, 'The referred persona records the page it landed on');
+        ).toBe(definitions.referrer.properties.affiliate.code);
+        expect(affiliate.url, `The link it arrived on carries the code (got ${affiliate.url})`).toMatch(new RegExp(`ref=${affiliate.code}$`));
+        expect(affiliate.page, 'The referred persona records the page it landed on').toBeTruthy();
 
         // The two halves are ONE event: the referrer's record for this account
         // and the account's own attribution are dated the same instant, which is
         // the only way a pair could have come from a single signup.
         const outbound = definitions.referrer.properties.affiliate.referrals.find((referral) => referral.uid === referred.uid);
 
-        assert.ok(outbound, 'The referrer\'s outbound list must include the account it referred');
-        assert.equal(outbound.timestamp, affiliate.timestamp, 'Both halves of the referral are dated the same signup');
-        assert.match(affiliate.timestamp, /^\d{4}-\d{2}-\d{2}T/, `The click is dated with the ISO string a signup writes (got ${affiliate.timestamp})`);
+        expect(outbound, 'The referrer\'s outbound list must include the account it referred').toBeTruthy();
+        expect(outbound.timestamp, 'Both halves of the referral are dated the same signup').toBe(affiliate.timestamp);
+        expect(affiliate.timestamp, `The click is dated with the ISO string a signup writes (got ${affiliate.timestamp})`).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
         // ONE distinguishing state: it was referred. It is a full realistic
         // account around that ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)) —
         // the exhaustive leaf sweep is 'every-persona-is-a-full-account' above —
         // and it tells no second story: no billing history, no referrals of its own.
-        assert.ok(referred.properties.personal.name.first, 'The referred persona is a real person, not a bare account');
-        assert.ok(referred.properties.activity.geolocation.city, 'The referred persona signed up from somewhere');
-        assert.equal(referred.properties.subscription.product.id, 'basic', 'The referred persona demonstrates a referral, not a purchase');
-        assert.equal(buildOrderFixture('referred', config), null, 'The referred persona bought nothing, so it has no order behind it');
-        assert.equal((referred.properties.affiliate?.referrals || []).length, 0, 'The referred persona is the referred one — it has referred nobody');
+        expect(referred.properties.personal.name.first, 'The referred persona is a real person, not a bare account').toBeTruthy();
+        expect(referred.properties.activity.geolocation.city, 'The referred persona signed up from somewhere').toBeTruthy();
+        expect(referred.properties.subscription.product.id, 'The referred persona demonstrates a referral, not a purchase').toBe('basic');
+        expect(buildOrderFixture('referred', config), 'The referred persona bought nothing, so it has no order behind it').toBe(null);
+        expect((referred.properties.affiliate?.referrals || []).length, 'The referred persona is the referred one: it has referred nobody').toBe(0);
       },
     },
 
@@ -686,19 +675,19 @@ module.exports = defineCases({
     // security panel showing the browser in front of you and nothing else.
     {
       name: 'personas-are-signed-in-on-their-other-devices',
-      async run({ assert }) {
+      async run({ expect }) {
         const withSessions = Object.keys(TEST_ACCOUNTS)
           .map((key) => [key, buildSessionFixtures(key, TEST_ACCOUNTS)])
           .filter(([, sessions]) => sessions);
         const nowUNIX = Math.floor(Date.now() / 1000);
 
-        assert.ok(withSessions.length > 0, 'The seeder must define personas that are signed in somewhere');
+        expect(withSessions.length > 0, 'The seeder must define personas that are signed in somewhere').toBeTruthy();
 
         for (const [key, sessions] of withSessions) {
           const ids = Object.keys(sessions);
           const platforms = new Set();
 
-          assert.ok(ids.length >= 2 && ids.length <= 3, `Persona '${key}' should carry 2-3 devices (got ${ids.length})`);
+          expect(ids.length >= 2 && ids.length <= 3, `Persona '${key}' should carry 2-3 devices (got ${ids.length})`).toBeTruthy();
 
           for (const id of ids) {
             const session = sessions[id];
@@ -706,29 +695,28 @@ module.exports = defineCases({
             // The route finds a user's sessions with `orderByChild('uid')`
             // (routes/user/sessions/get.js), so a record whose uid is not the
             // persona's is a session nothing will ever return.
-            assert.equal(session.uid, TEST_ACCOUNTS[key].uid, `Session ${id} must belong to persona '${key}'`);
+            expect(session.uid, `Session ${id} must belong to persona '${key}'`).toBe(TEST_ACCOUNTS[key].uid);
 
-            assert.ok(session.platform, `Session ${id} must name the platform it runs on — the panel renders the device from it`);
-            assert.ok(session.ip, `Session ${id} must record where it connected from`);
-            assert.ok(session.timestampUNIX > 0, `Session ${id} must record when it last checked in`);
-            assert.ok(session.timestampUNIX < nowUNIX, `Session ${id} checked in from the future`);
+            expect(session.platform, `Session ${id} must name the platform it runs on: the panel renders the device from it`).toBeTruthy();
+            expect(session.ip, `Session ${id} must record where it connected from`).toBeTruthy();
+            expect(session.timestampUNIX > 0, `Session ${id} must record when it last checked in`).toBeTruthy();
+            expect(session.timestampUNIX < nowUNIX, `Session ${id} checked in from the future`).toBeTruthy();
 
             // ACTIVE sessions: a device that last checked in a month ago is not
             // somebody who is signed in right now.
-            assert.ok(session.timestampUNIX > nowUNIX - (7 * 86400), `Session ${id} is too stale to read as an active session`);
+            expect(session.timestampUNIX > nowUNIX - (7 * 86400), `Session ${id} is too stale to read as an active session`).toBeTruthy();
 
             platforms.add(session.platform);
           }
 
-          assert.equal(platforms.size, ids.length, `Persona '${key}' should be signed in on ${ids.length} DIFFERENT devices`);
+          expect(platforms.size, `Persona '${key}' should be signed in on ${ids.length} DIFFERENT devices`).toBe(ids.length);
 
           // The ids are derived from the persona, so a re-seed replaces the same
           // records instead of piling a second set on top of them.
-          assert.deepEqual(
+          expect(
             Object.keys(buildSessionFixtures(key, TEST_ACCOUNTS)),
-            ids,
             `Persona '${key}' must seed the same session ids on every boot`,
-          );
+          ).toEqual(ids);
         }
       },
     },

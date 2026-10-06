@@ -12,8 +12,7 @@
  * established), so the map and the emit are proven together: the renderer reads
  * the status style through the core's own STATUS_STYLES.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -72,25 +71,37 @@ async function makeRenderer(core) {
   return { renderer: new calendar.CalendarRenderer(core), STATUS_STYLES: calendar.STATUS_STYLES };
 }
 
-test('#929: the view-mode toolbar emits its map entry verbatim', async () => {
-  const { renderer } = await makeRenderer({});
+module.exports = defineCases({
+  type: 'group',
+  description: 'calendar-icons',
+  tests: [
+    {
+      name: '#929: the view-mode toolbar emits its map entry verbatim',
+      run: async (ctx) => {
+        const { renderer } = await makeRenderer({});
 
-  assert.equal(renderer._getViewIcon('month'), '<i class="fa-solid fa-calendar fa-sm"></i>');
-  assert.equal(renderer._getViewIcon('week'), '<i class="fa-solid fa-calendar-week fa-sm"></i>');
-});
+        ctx.expect(renderer._getViewIcon('month')).toBe('<i class="fa-solid fa-calendar fa-sm"></i>');
+        ctx.expect(renderer._getViewIcon('week')).toBe('<i class="fa-solid fa-calendar-week fa-sm"></i>');
+      },
+    },
 
-test('#929: a campaign pill emits its status style\'s class string verbatim', async () => {
-  const { renderer, STATUS_STYLES } = await makeRenderer({
-    campaignColor: () => '#2563EB',
-    campaignStatusStyle: (campaign) => STATUS_STYLES[campaign.status] || STATUS_STYLES.pending,
-    isEditable: () => false,
-    isRecurring: () => false,
-  });
+    {
+      name: '#929: a campaign pill emits its status style\'s class string verbatim',
+      run: async (ctx) => {
+        const { renderer, STATUS_STYLES } = await makeRenderer({
+          campaignColor: () => '#2563EB',
+          campaignStatusStyle: (campaign) => STATUS_STYLES[campaign.status] || STATUS_STYLES.pending,
+          isEditable: () => false,
+          isRecurring: () => false,
+        });
 
-  const sent = renderer._renderEventPill({ id: 'c1', status: 'sent', sendAt: 1767225600, type: 'email', settings: { name: 'Launch' } });
-  assert.ok(sent.includes('<i class="fa-solid fa-circle-check fa-xs"></i>'), 'the status map\'s class string, as authored');
-  assert.ok(!sent.includes('fa-fa-'), 'and nothing wraps it a second time');
+        const sent = renderer._renderEventPill({ id: 'c1', status: 'sent', sendAt: 1767225600, type: 'email', settings: { name: 'Launch' } });
+        ctx.expect(sent.includes('<i class="fa-solid fa-circle-check fa-xs"></i>'), 'the status map\'s class string, as authored').toBeTruthy();
+        ctx.expect(!sent.includes('fa-fa-'), 'and nothing wraps it a second time').toBeTruthy();
 
-  const pending = renderer._renderEventPill({ id: 'c2', status: 'pending', sendAt: 1767225600, type: 'push', settings: { name: 'Nudge' } });
-  assert.ok(!pending.includes('fa-circle-check'), 'a pending campaign carries no status mark at all');
+        const pending = renderer._renderEventPill({ id: 'c2', status: 'pending', sendAt: 1767225600, type: 'push', settings: { name: 'Nudge' } });
+        ctx.expect(!pending.includes('fa-circle-check'), 'a pending campaign carries no status mark at all').toBeTruthy();
+      },
+    },
+  ],
 });

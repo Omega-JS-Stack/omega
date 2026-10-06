@@ -5,11 +5,10 @@
  * rendered EMPTY with no warning — a sidecar could not reference the data files
  * sitting beside it. The scope is now the same cascade a template render gets.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -55,31 +54,47 @@ function makeConsumer(sidecarExtension) {
   return { tmp, consumerDir };
 }
 
-for (const extension of ['json', 'js']) {
-  test(`#542: a .11tydata.${extension} sidecar renders the consumer's _data globals`, async () => {
-    const { tmp, consumerDir } = makeConsumer(extension);
-    try {
-      const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, `data-globals-${extension}`);
-      const html = pages.get('/');
-      assert.ok(html, 'page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'data-globals-frontmatter',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const extension of ['json', 'js']) {
+        cases.push({
+          name: `#542: a .11tydata.${extension} sidecar renders the consumer's _data globals`,
+          run: async (ctx) => {
+            const { tmp, consumerDir } = makeConsumer(extension);
+            try {
+              const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, `data-globals-${extension}`);
+              const html = pages.get('/');
+              ctx.expect(html, 'page built').toBeTruthy();
 
-      assert.ok(html.includes('<p id="blurb">We list 3 brands</p>'), 'the sidecar reads the _data file beside it');
-      assert.ok(html.includes('<p id="tally">Alpha leads</p>'), 'and indexes into it like any template would');
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-}
+              ctx.expect(html.includes('<p id="blurb">We list 3 brands</p>'), 'the sidecar reads the _data file beside it').toBeTruthy();
+              ctx.expect(html.includes('<p id="tally">Alpha leads</p>'), 'and indexes into it like any template would').toBeTruthy();
+            } finally {
+              fs.rmSync(tmp, { recursive: true, force: true });
+            }
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#542: page frontmatter reads the same globals, the config included', async () => {
-  const { tmp, consumerDir } = makeConsumer('json');
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'data-globals-meta');
-    const html = pages.get('/');
-    assert.ok(html, 'page built');
+    {
+      name: '#542: page frontmatter reads the same globals, the config included',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer('json');
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'data-globals-meta');
+          const html = pages.get('/');
+          ctx.expect(html, 'page built').toBeTruthy();
 
-    assert.ok(html.includes('<h1>3 brands · BareCo</h1>'), 'a _data ref and a config ref render side by side');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+          ctx.expect(html.includes('<h1>3 brands · BareCo</h1>'), 'a _data ref and a config ref render side by side').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

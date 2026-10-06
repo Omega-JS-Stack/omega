@@ -1,7 +1,7 @@
 /**
  * The source layer of the suite converter (scripts/convert-suites.js): acorn
- * parsing with ranges, a plain walker, binding and reference tests, and the
- * range splicer that renders the source back out with every edit applied and
+ * parsing with ranges, a plain walker, binding and reference tests, the refusal
+ * every layer throws, and the range splicer that renders the source back out with every edit applied and
  * any moved text re-indented (template literal text never moves).
  */
 
@@ -21,6 +21,19 @@ const pad = (n) => ' '.repeat(Math.max(0, n));
  * @returns {boolean} True for an ArrowFunctionExpression or a FunctionExpression.
  */
 const isFn = (node) => Boolean(node) && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression');
+
+/** A construct the converter will not rewrite; the file stays unwritten. */
+class Refusal extends Error {}
+
+/**
+ * Refuse a construct, naming it and, when a node is given, its line.
+ * @param {string} construct - What the converter will not rewrite.
+ * @param {object} [node] - The acorn node it sits at.
+ * @returns {never} Always throws a Refusal.
+ */
+function refuse(construct, node) {
+  throw new Refusal(node && node.loc ? `${construct} (line ${node.loc.start.line})` : construct);
+}
 
 function children(node) {
   const out = [];
@@ -232,6 +245,8 @@ function openSource(source) {
 module.exports = {
   pad,
   isFn,
+  Refusal,
+  refuse,
   walk,
   isReference,
   declared,

@@ -18,7 +18,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -59,7 +59,7 @@ module.exports = defineCases({
       name: 'the-deploy-lane-resolves-the-license-with-the-brand-root-key',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { projectDir, cleanup } = makeBrand();
         const license = require('../../dist/vendor/devkit/license.js');
         const attachLogFile = require('../../dist/cli/utils/attach-log-file');
@@ -93,8 +93,7 @@ module.exports = defineCases({
             if (!(error instanceof ResolvedHere)) throw error;
           }
 
-          assert.deepEqual(seen, ['brand-root-key'],
-            'the cascade is loaded first, so the brand root\'s key is the one the verdict answers for');
+          expect(seen, 'the cascade is loaded first, so the brand root\'s key is the one the verdict answers for').toEqual(['brand-root-key']);
         } finally {
           restoreTee();
           license.resolveLicenseStamp = realResolve;
@@ -139,7 +138,7 @@ module.exports = defineCases({
           const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: { direct: true }, options: {} });
           command.log = () => {};
 
-          await assert.rejects(() => command.execute(), ResolvedHere);
+          await expect((() => command.execute())()).rejects.toThrow(ResolvedHere);
           process.stdout.write('after the refusal\n');
           restoreTee();
           process.stdout.write('after the restore\n');
@@ -159,11 +158,11 @@ module.exports = defineCases({
         const verb = fs.readFileSync(verbLog, 'utf8');
         cleanup();
 
-        assert.match(outer, /^after the refusal$/m, 'the outer tee receives through the run');
-        assert.match(outer, /^after the restore$/m, 'and after the harness restores to its mark');
-        assert.ok(!lane.includes('after the refusal'), 'the direct lane took its own layer off at the refusal');
-        assert.match(verb, /^after the refusal$/m, 'the verb log stays on for the rest of the process');
-        assert.ok(!verb.includes('after the restore'), 'until the harness restores to its mark');
+        expect(outer, 'the outer tee receives through the run').toMatch(/^after the refusal$/m);
+        expect(outer, 'and after the harness restores to its mark').toMatch(/^after the restore$/m);
+        expect(!lane.includes('after the refusal'), 'the direct lane took its own layer off at the refusal').toBeTruthy();
+        expect(verb, 'the verb log stays on for the rest of the process').toMatch(/^after the refusal$/m);
+        expect(!verb.includes('after the restore'), 'until the harness restores to its mark').toBeTruthy();
       },
     },
   ],

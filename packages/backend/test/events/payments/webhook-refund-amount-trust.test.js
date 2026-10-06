@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refund-amount-trust
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -164,10 +164,10 @@ module.exports = defineCases({
         const { store } = await runOneTimeRefund({ chargeAnswer: charge({ amountCents: ACTUAL_CENTS, reason: 'requested_by_customer' }) });
         const refund = store.get(`payments-orders/${ORDER_ID}`)?.unified?.payment?.refund;
 
-        assert.equal(refund.amount, '9.99', 'the amount is the one Stripe\'s record of the charge carries');
-        assert.notEqual(refund.amount, '999.99', 'the number the caller posted is never the one booked');
-        assert.equal(refund.currency, 'USD', 'the currency comes off the same record');
-        assert.equal(refund.reason, 'requested_by_customer', 'and so does the reason');
+        expect(refund.amount, 'the amount is the one Stripe\'s record of the charge carries').toBe('9.99');
+        expect(refund.amount, 'the number the caller posted is never the one booked').not.toBe('999.99');
+        expect(refund.currency, 'the currency comes off the same record').toBe('USD');
+        expect(refund.reason, 'and so does the reason').toBe('requested_by_customer');
       },
     },
 
@@ -178,10 +178,10 @@ module.exports = defineCases({
         const { store } = await runOneTimeRefund({ chargeAnswer: charge({ amountCents: ACTUAL_CENTS, reason: 'requested_by_customer' }) });
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.equal(order.unified.status, 'refunded', 'the purchase reads as refunded');
-        assert.equal(order.unified.product.id, 'premium', 'the purchase keeps its product');
-        assert.equal(order.resourceId, CHECKOUT_ID, 'the purchase keeps the resource it was bought through');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'completed', 'the event completes');
+        expect(order.unified.status, 'the purchase reads as refunded').toBe('refunded');
+        expect(order.unified.product.id, 'the purchase keeps its product').toBe('premium');
+        expect(order.resourceId, 'the purchase keeps the resource it was bought through').toBe(CHECKOUT_ID);
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'the event completes').toBe('completed');
       },
     },
 
@@ -195,8 +195,8 @@ module.exports = defineCases({
 
         await runSubscriptionRefund({ chargeAnswer: charge({ amountCents: ACTUAL_CENTS, reason: 'requested_by_customer' }), calls });
 
-        assert.ok(calls.includes(`subscription:${SUBSCRIPTION_ID}`), 'the event\'s own resource is fetched as before');
-        assert.ok(calls.includes(`charge:${CHARGE_ID}`), 'and the charge the refund moved is read back by its id');
+        expect(calls.includes(`subscription:${SUBSCRIPTION_ID}`), 'the event\'s own resource is fetched as before').toBeTruthy();
+        expect(calls.includes(`charge:${CHARGE_ID}`), 'and the charge the refund moved is read back by its id').toBeTruthy();
       },
     },
 
@@ -212,11 +212,11 @@ module.exports = defineCases({
 
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.refusal?.reason, 'resource-not-found', 'the #506 seam classifies the miss — the refund lookup is a lookup like any other');
-        assert.equal(event.refusal?.resourceType, 'charge', 'the stamp names the lookup that actually missed');
-        assert.equal(event.refusal?.resourceId, CHARGE_ID, 'and the id it missed on');
-        assert.equal(event.status, 'completed', 'a resource the provider does not have is a decision, not a retry');
-        assert.ok(!store.get(`users/${UID}`), 'nothing is written off an event whose numbers could not be verified');
+        expect(event.refusal?.reason, 'the #506 seam classifies the miss — the refund lookup is a lookup like any other').toBe('resource-not-found');
+        expect(event.refusal?.resourceType, 'the stamp names the lookup that actually missed').toBe('charge');
+        expect(event.refusal?.resourceId, 'and the id it missed on').toBe(CHARGE_ID);
+        expect(event.status, 'a resource the provider does not have is a decision, not a retry').toBe('completed');
+        expect(!store.get(`users/${UID}`), 'nothing is written off an event whose numbers could not be verified').toBeTruthy();
       },
     },
   ],

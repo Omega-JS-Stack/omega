@@ -14,8 +14,7 @@
  * @firebase/auth stub shared with that suite (test/lib/firebase-auth-stub.js),
  * and window hand-rolled to the minimum the module touches.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -121,103 +120,139 @@ function makeFormManager() {
   return { errors, showError: (m) => errors.push(m), showSuccess: () => {}, ready: () => {} };
 }
 
-test('oauth: development runs the redirect flow too — the dev server proxies the emulator same-origin (#156)', async () => {
-  const { module } = await load({ development: true });
+module.exports = defineCases({
+  type: 'group',
+  description: 'auth-oauth',
+  tests: [
+    {
+      name: 'oauth: development runs the redirect flow too — the dev server proxies the emulator same-origin (#156)',
+      run: async (ctx) => {
+        const { module } = await load({ development: true });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), false);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(false);
+      },
+    },
 
-test('oauth: ?authPopup=true still forces the popup in development', async () => {
-  const { module } = await load({ development: true, href: 'https://localhost:4000/signin?authPopup=true' });
+    {
+      name: 'oauth: ?authPopup=true still forces the popup in development',
+      run: async (ctx) => {
+        const { module } = await load({ development: true, href: 'https://localhost:4000/signin?authPopup=true' });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), true);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(true);
+      },
+    },
 
-test('oauth: an iframed development auth page still uses the popup', async () => {
-  const { module } = await load({ development: true, top: { name: 'parent' } });
+    {
+      name: 'oauth: an iframed development auth page still uses the popup',
+      run: async (ctx) => {
+        const { module } = await load({ development: true, top: { name: 'parent' } });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), true);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(true);
+      },
+    },
 
-test('oauth: production defaults to the redirect flow', async () => {
-  const { module } = await load({ development: false });
+    {
+      name: 'oauth: production defaults to the redirect flow',
+      run: async (ctx) => {
+        const { module } = await load({ development: false });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), false);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(false);
+      },
+    },
 
-test('oauth: ?authPopup=true forces the popup in production', async () => {
-  const { module } = await load({ development: false, href: 'https://brand.test/signin?authPopup=true' });
+    {
+      name: 'oauth: ?authPopup=true forces the popup in production',
+      run: async (ctx) => {
+        const { module } = await load({ development: false, href: 'https://brand.test/signin?authPopup=true' });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), true);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(true);
+      },
+    },
 
-test('oauth: an iframed auth page uses the popup', async () => {
-  const { module } = await load({ development: false, top: { name: 'parent' } });
+    {
+      name: 'oauth: an iframed auth page uses the popup',
+      run: async (ctx) => {
+        const { module } = await load({ development: false, top: { name: 'parent' } });
 
-  assert.strictEqual(module.shouldUseAuthPopup(), true);
-});
+        ctx.expect(module.shouldUseAuthPopup()).toBe(true);
+      },
+    },
 
-test('oauth: starting a redirect marks the tab as pending', async () => {
-  const { module, store } = await load({ development: false });
+    {
+      name: 'oauth: starting a redirect marks the tab as pending',
+      run: async (ctx) => {
+        const { module, store } = await load({ development: false });
 
-  const redirects = [];
-  globalThis.__firebaseAuth = {
-    getAuth: () => ({}),
-    signInWithRedirect: async (auth, provider) => redirects.push(provider),
-  };
+        const redirects = [];
+        globalThis.__firebaseAuth = {
+          getAuth: () => ({}),
+          signInWithRedirect: async (auth, provider) => redirects.push(provider),
+        };
 
-  await module.signInWithProvider({ formManager: makeFormManager(), useAuthPopup: false }, 'google.com');
+        await module.signInWithProvider({ formManager: makeFormManager(), useAuthPopup: false }, 'google.com');
 
-  assert.strictEqual(redirects.length, 1);
-  assert.ok('omega:authRedirectPending' in store, 'the pending marker is written before the navigation');
-});
+        ctx.expect(redirects.length).toBe(1);
+        ctx.expect('omega:authRedirectPending' in store, 'the pending marker is written before the navigation').toBeTruthy();
+      },
+    },
 
-test('oauth: returning from a redirect with no result shows an error and reports it', async () => {
-  const { module, client, store } = await load({
-    development: false,
-    store: { 'omega:authRedirectPending': '1' },
-  });
+    {
+      name: 'oauth: returning from a redirect with no result shows an error and reports it',
+      run: async (ctx) => {
+        const { module, client, store } = await load({
+          development: false,
+          store: { 'omega:authRedirectPending': '1' },
+        });
 
-  globalThis.__firebaseAuth = {
-    getAuth: () => ({}),
-    getRedirectResult: async () => null,
-  };
+        globalThis.__firebaseAuth = {
+          getAuth: () => ({}),
+          getRedirectResult: async () => null,
+        };
 
-  const formManager = makeFormManager();
-  const handled = await module.handleRedirectResult({ formManager });
+        const formManager = makeFormManager();
+        const handled = await module.handleRedirectResult({ formManager });
 
-  assert.strictEqual(handled, false, 'no redirect result was processed');
-  assert.deepStrictEqual(formManager.errors, ['Sign-in did not complete. Please try again.']);
-  assert.deepStrictEqual(client.captured, ['OAuth redirect returned no result']);
-  assert.ok(!('omega:authRedirectPending' in store), 'the marker is one-shot');
-});
+        ctx.expect(handled, 'no redirect result was processed').toBe(false);
+        ctx.expect(formManager.errors).toEqual(['Sign-in did not complete. Please try again.']);
+        ctx.expect(client.captured).toEqual(['OAuth redirect returned no result']);
+        ctx.expect(!('omega:authRedirectPending' in store), 'the marker is one-shot').toBeTruthy();
+      },
+    },
 
-test('oauth: a rejected redirect clears the pending marker — no stale error next load', async () => {
-  const { module, store } = await load({ development: false });
+    {
+      name: 'oauth: a rejected redirect clears the pending marker — no stale error next load',
+      run: async (ctx) => {
+        const { module, store } = await load({ development: false });
 
-  globalThis.__firebaseAuth = {
-    getAuth: () => ({}),
-    signInWithRedirect: async () => { throw Object.assign(new Error('network down'), { code: 'auth/network-request-failed' }); },
-  };
+        globalThis.__firebaseAuth = {
+          getAuth: () => ({}),
+          signInWithRedirect: async () => { throw Object.assign(new Error('network down'), { code: 'auth/network-request-failed' }); },
+        };
 
-  const formManager = makeFormManager();
-  await assert.rejects(() => module.signInWithProvider({ formManager, useAuthPopup: false }, 'google.com'));
+        const formManager = makeFormManager();
+        await ctx.expect((() => module.signInWithProvider({ formManager, useAuthPopup: false }, 'google.com'))()).rejects.toThrow();
 
-  assert.ok(!('omega:authRedirectPending' in store), 'a redirect that never left the page is not pending');
-});
+        ctx.expect(!('omega:authRedirectPending' in store), 'a redirect that never left the page is not pending').toBeTruthy();
+      },
+    },
 
-test('oauth: a plain page load with no redirect pending stays quiet', async () => {
-  const { module, client } = await load({ development: false });
+    {
+      name: 'oauth: a plain page load with no redirect pending stays quiet',
+      run: async (ctx) => {
+        const { module, client } = await load({ development: false });
 
-  globalThis.__firebaseAuth = {
-    getAuth: () => ({}),
-    getRedirectResult: async () => null,
-  };
+        globalThis.__firebaseAuth = {
+          getAuth: () => ({}),
+          getRedirectResult: async () => null,
+        };
 
-  const formManager = makeFormManager();
-  const handled = await module.handleRedirectResult({ formManager });
+        const formManager = makeFormManager();
+        const handled = await module.handleRedirectResult({ formManager });
 
-  assert.strictEqual(handled, false);
-  assert.deepStrictEqual(formManager.errors, []);
-  assert.deepStrictEqual(client.captured, []);
+        ctx.expect(handled).toBe(false);
+        ctx.expect(formManager.errors).toEqual([]);
+        ctx.expect(client.captured).toEqual([]);
+      },
+    },
+  ],
 });

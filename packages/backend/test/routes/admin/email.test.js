@@ -18,13 +18,13 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: 'Test Email',
           to: [{ email: `_test-receiver@${config.domain}` }],
         });
 
-        assert.isError(response, 401, 'Send email should fail without authentication');
+        expect(response, 'Send email should fail without authentication').toBeError(401);
       },
     },
 
@@ -33,13 +33,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: 'Test Email',
           to: [{ email: `_test-receiver@${config.domain}` }],
         });
 
-        assert.isError(response, 403, 'Send email should fail for non-admin user');
+        expect(response, 'Send email should fail for non-admin user').toBeError(403);
       },
     },
 
@@ -50,13 +50,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,
         });
 
-        assert.isError(response, 400, 'Missing subject should return 400');
+        expect(response, 'Missing subject should return 400').toBeError(400);
       },
     },
 
@@ -67,7 +67,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Status Sent',
           to: [{ email: `_test-receiver@${config.domain}`, name: 'Test Receiver' }],
@@ -80,9 +80,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Admin should be able to send email');
-        assert.hasProperty(response, 'data.status', 'Response should have status');
-        assert.equal(response.data.status, 'sent', 'Status should be sent');
+        expect(response, 'Admin should be able to send email').toBeSuccess();
+        expect(response, 'Response should have status').toHaveProperty('data.status');
+        expect(response.data.status, 'Status should be sent').toBe('sent');
       },
     },
 
@@ -91,7 +91,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const sendAt = Math.floor(Date.now() / 1000) + (72 * 60 * 60);
 
         const response = await http.post('omega/admin/email', {
@@ -107,9 +107,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Admin should be able to queue email');
-        assert.hasProperty(response, 'data.status', 'Response should have status');
-        assert.equal(response.data.status, 'queued', 'Status should be queued when sendAt is beyond 71 hours');
+        expect(response, 'Admin should be able to queue email').toBeSuccess();
+        expect(response, 'Response should have status').toHaveProperty('data.status');
+        expect(response.data.status, 'Status should be queued when sendAt is beyond 71 hours').toBe('queued');
       },
     },
   ],

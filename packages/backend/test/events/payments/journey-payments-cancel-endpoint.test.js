@@ -16,7 +16,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+      async run({ accounts, firestore, expect, state, config, http, waitFor, skip, payments }) {
         const uid = accounts['journey-payments-cancel-route'].uid;
         // Resolve first paid product from config. If the brand has none configured,
         // skip the entire journey — this is a config-gap, not a code failure.
@@ -34,7 +34,7 @@ module.exports = defineCases({
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
-        assert.isSuccess(response, 'Intent should succeed');
+        expect(response, 'Intent should succeed').toBeSuccess();
         state.orderId = response.data.orderId;
 
         // Wait for subscription to activate
@@ -44,15 +44,15 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${uid}`);
-        assert.equal(userDoc.subscription?.product?.id, paidProduct.id, `Should be ${paidProduct.id}`);
-        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
-        assert.equal(userDoc.subscription?.cancellation?.pending, false, 'Should not be pending cancellation');
+        expect(userDoc.subscription?.product?.id, `Should be ${paidProduct.id}`).toBe(paidProduct.id);
+        expect(userDoc.subscription?.status, 'Should be active').toBe('active');
+        expect(userDoc.subscription?.cancellation?.pending, 'Should not be pending cancellation').toBe(false);
       },
     },
 
     {
       name: 'call-cancel-endpoint',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Test provider writes a payments-webhooks doc directly,
         // triggering the on-write pipeline automatically — no manual webhook needed.
         // skipGuards bypasses the 24-hour subscription-age guard.
@@ -63,14 +63,14 @@ module.exports = defineCases({
           skipGuards: true,
         });
 
-        assert.isSuccess(response, 'Cancel endpoint should succeed');
-        assert.equal(response.data.success, true, 'Should return { success: true }');
+        expect(response, 'Cancel endpoint should succeed').toBeSuccess();
+        expect(response.data.success, 'Should return { success: true }').toBe(true);
       },
     },
 
     {
       name: 'verify-cancellation-pending',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Poll user doc until the on-write pipeline updates subscription state
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
@@ -78,24 +78,24 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.cancellation.pending, true, 'Cancellation should be pending');
-        assert.ok(userDoc.subscription.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set');
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Cancellation should be pending').toBe(true);
+        expect(userDoc.subscription.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set').toBeTruthy();
       },
     },
 
     {
       name: 'cancellation-request-stored',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.ok(orderDoc.requests, 'requests field should exist');
-        assert.ok(orderDoc.requests.cancellation, 'requests.cancellation should be populated');
-        assert.equal(orderDoc.requests.cancellation.reason, 'Too expensive', 'Cancellation reason should match');
-        assert.equal(orderDoc.requests.cancellation.feedback, 'Would return at a lower price', 'Cancellation feedback should match');
-        assert.ok(orderDoc.requests.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should still be null');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.requests, 'requests field should exist').toBeTruthy();
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should be populated').toBeTruthy();
+        expect(orderDoc.requests.cancellation.reason, 'Cancellation reason should match').toBe('Too expensive');
+        expect(orderDoc.requests.cancellation.feedback, 'Cancellation feedback should match').toBe('Would return at a lower price');
+        expect(orderDoc.requests.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set').toBeTruthy();
+        expect(orderDoc.requests.refund, 'requests.refund should still be null').toBe(null);
       },
     },
   ],

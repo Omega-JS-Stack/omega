@@ -11,7 +11,7 @@
  *
  * Run: npx omega test backend:helpers/payment/license-gate
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
@@ -44,7 +44,7 @@ async function throwsFrom(fn, why) {
     return e;
   }
 
-  assert.fail(why);
+  expect.fail(why);
 }
 
 module.exports = defineCases({
@@ -61,10 +61,10 @@ module.exports = defineCases({
           for (const [name, library] of REAL_PROVIDERS) {
             const error = await throwsFrom(() => library.init(), `${name} must refuse to initialize on a keyless deploy`);
 
-            assert.equal(error.name, 'UnlicensedPaymentsError', `${name} refuses for the license, not for credentials`);
-            assert.equal(error.code, 500, 'a misconfigured server, never the caller\'s input');
-            assert.match(error.message, /OMEGA_LICENSE_KEY/, 'the refusal names the key that fixes it');
-            assert.match(error.message, /omegajs\.dev/, 'and where the license comes from');
+            expect(error.name, `${name} refuses for the license, not for credentials`).toBe('UnlicensedPaymentsError');
+            expect(error.code, 'a misconfigured server, never the caller\'s input').toBe(500);
+            expect(error.message, 'the refusal names the key that fixes it').toMatch(/OMEGA_LICENSE_KEY/);
+            expect(error.message, 'and where the license comes from').toMatch(/omegajs\.dev/);
           }
         });
       },
@@ -78,7 +78,7 @@ module.exports = defineCases({
       // provider is the whole of test mode, so the gate must not touch it.
       async run() {
         await withStatus('keyless', async () => {
-          assert.equal(Test.init(), null, 'the test provider initializes on a keyless deploy like always');
+          expect(Test.init(), 'the test provider initializes on a keyless deploy like always').toBe(null);
         });
       },
     },
@@ -99,12 +99,8 @@ module.exports = defineCases({
             for (const [name, library] of REAL_PROVIDERS) {
               const error = await throwsFrom(() => library.init(), `${name} still needs its credentials`);
 
-              assert.notEqual(error.name, 'UnlicensedPaymentsError', `${name} must not be license-gated when status is ${status}`);
-              assert.match(
-                error.message,
-                /environment variables? (is|are) required|is required in config\/omega\.json5/,
-                `${name} fails for its own missing input, got: ${error.message}`,
-              );
+              expect(error.name, `${name} must not be license-gated when status is ${status}`).not.toBe('UnlicensedPaymentsError');
+              expect(error.message, `${name} fails for its own missing input, got: ${error.message}`).toMatch(/environment variables? (is|are) required|is required in config\/omega\.json5/);
             }
           });
         }

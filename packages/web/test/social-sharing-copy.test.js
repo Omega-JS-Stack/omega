@@ -16,8 +16,7 @@
  * document that is only what it touches (node has no DOM and web pulls in no
  * jsdom) — the convention dev-palette.test.js set.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -173,13 +172,6 @@ function makeClient(showLabels, { fail = false } = {}) {
   };
 }
 
-test.after(() => {
-  delete globalThis.document;
-  delete globalThis.window;
-  delete globalThis.__omegaClient;
-  delete globalThis.__omegaEvents;
-});
-
 /** Render one sharing bar and hand back its copy button. */
 async function boot({ showLabels = true, fail = false } = {}) {
   await bundleOnce();
@@ -226,102 +218,135 @@ async function captureTimers(run) {
   return timers;
 }
 
-test('the copy button is built with a real `<i>` icon, not an `<img>`', async () => {
-  // The premise of the whole bug: the guard looked for markup the module never
-  // creates, so the confirmation could not fire.
-  const { $copy, $icon } = await boot();
+module.exports = defineCases({
+  type: 'group',
+  description: 'social-sharing-copy',
+  cleanup: () => {
+    delete globalThis.document;
+    delete globalThis.window;
+    delete globalThis.__omegaClient;
+    delete globalThis.__omegaEvents;
+  },
+  tests: [
+    {
+      name: 'the copy button is built with a real `<i>` icon, not an `<img>`',
+      run: async (ctx) => {
+        // The premise of the whole bug: the guard looked for markup the module never
+        // creates, so the confirmation could not fire.
+        const { $copy, $icon } = await boot();
 
-  assert.ok($icon, 'the button carries an icon element');
-  assert.equal($icon.tagName, 'I');
-  assert.ok($icon.classList.contains('fa-link'), 'the share state is the link icon');
-  assert.equal($copy.querySelector('[data-icon-type]'), null, 'nothing carries the attribute the dead guard matched');
-});
+        ctx.expect($icon, 'the button carries an icon element').toBeTruthy();
+        ctx.expect($icon.tagName).toBe('I');
+        ctx.expect($icon.classList.contains('fa-link'), 'the share state is the link icon').toBeTruthy();
+        ctx.expect($copy.querySelector('[data-icon-type]'), 'nothing carries the attribute the dead guard matched').toBe(null);
+      },
+    },
 
-test('copying a link swaps the icon to a check, then puts it back', async () => {
-  const { client, $copy, $icon } = await boot();
+    {
+      name: 'copying a link swaps the icon to a check, then puts it back',
+      run: async (ctx) => {
+        const { client, $copy, $icon } = await boot();
 
-  const timers = await captureTimers(() => $copy.click());
+        const timers = await captureTimers(() => $copy.click());
 
-  assert.deepEqual(client.copied, ['https://example.com/blog/post'], 'the share URL was copied');
-  assert.ok($icon.classList.contains('fa-check'), 'the icon confirms the copy');
-  assert.ok(!$icon.classList.contains('fa-link'), 'the link icon is gone while confirming');
-  assert.ok($icon.classList.contains('fa-solid'), 'the style class the icon watcher reads survives the swap');
+        ctx.expect(client.copied, 'the share URL was copied').toEqual(['https://example.com/blog/post']);
+        ctx.expect($icon.classList.contains('fa-check'), 'the icon confirms the copy').toBeTruthy();
+        ctx.expect(!$icon.classList.contains('fa-link'), 'the link icon is gone while confirming').toBeTruthy();
+        ctx.expect($icon.classList.contains('fa-solid'), 'the style class the icon watcher reads survives the swap').toBeTruthy();
 
-  assert.equal(timers.length, 1, 'one revert is scheduled');
-  assert.equal(timers[0].delay, 2000);
+        ctx.expect(timers.length, 'one revert is scheduled').toBe(1);
+        ctx.expect(timers[0].delay).toBe(2000);
 
-  timers[0].fn();
+        timers[0].fn();
 
-  assert.ok($icon.classList.contains('fa-link'), 'the icon goes back to the link');
-  assert.ok(!$icon.classList.contains('fa-check'), 'the check is cleared');
-});
+        ctx.expect($icon.classList.contains('fa-link'), 'the icon goes back to the link').toBeTruthy();
+        ctx.expect(!$icon.classList.contains('fa-check'), 'the check is cleared').toBeTruthy();
+      },
+    },
 
-test('the label confirms and reverts alongside the icon', async () => {
-  const { $copy, $label } = await boot();
+    {
+      name: 'the label confirms and reverts alongside the icon',
+      run: async (ctx) => {
+        const { $copy, $label } = await boot();
 
-  assert.equal($label.textContent, 'Copy Link');
+        ctx.expect($label.textContent).toBe('Copy Link');
 
-  const timers = await captureTimers(() => $copy.click());
+        const timers = await captureTimers(() => $copy.click());
 
-  assert.equal($label.textContent, 'Copied!');
+        ctx.expect($label.textContent).toBe('Copied!');
 
-  timers[0].fn();
+        timers[0].fn();
 
-  assert.equal($label.textContent, 'Copy Link');
-});
+        ctx.expect($label.textContent).toBe('Copy Link');
+      },
+    },
 
-test('a double click leaves the button named "Copy Link", not "Copied!" forever', async () => {
-  // The revert used to put back whatever the label READ when the click landed:
-  // a second click inside the 2000ms window captured 'Copied!' as the original,
-  // so the button kept that name for the rest of the page's life
-  // ([#727](https://github.com/Omega-JS-Stack/omega/issues/727)).
-  const { $copy, $label } = await boot();
+    {
+      name: 'a double click leaves the button named "Copy Link", not "Copied!" forever',
+      run: async (ctx) => {
+        // The revert used to put back whatever the label READ when the click landed:
+        // a second click inside the 2000ms window captured 'Copied!' as the original,
+        // so the button kept that name for the rest of the page's life
+        // ([#727](https://github.com/Omega-JS-Stack/omega/issues/727)).
+        const { $copy, $label } = await boot();
 
-  const first = await captureTimers(() => $copy.click());
-  const second = await captureTimers(() => $copy.click());
+        const first = await captureTimers(() => $copy.click());
+        const second = await captureTimers(() => $copy.click());
 
-  assert.equal($label.textContent, 'Copied!', 'the second click confirms too');
+        ctx.expect($label.textContent, 'the second click confirms too').toBe('Copied!');
 
-  // Both reverts fire, oldest first, the way the real timers would.
-  first[0].fn();
-  second[0].fn();
+        // Both reverts fire, oldest first, the way the real timers would.
+        first[0].fn();
+        second[0].fn();
 
-  assert.equal($label.textContent, 'Copy Link', 'the button carries its own name again');
-});
+        ctx.expect($label.textContent, 'the button carries its own name again').toBe('Copy Link');
+      },
+    },
 
-test('a refused clipboard confirms nothing', async () => {
-  // The clipboard rejects on a real refusal since
-  // [#726](https://github.com/Omega-JS-Stack/omega/issues/726) — a check mark
-  // would claim a copy that never happened.
-  const { client, $copy, $icon, $label } = await boot({ fail: true });
+    {
+      name: 'a refused clipboard confirms nothing',
+      run: async (ctx) => {
+        // The clipboard rejects on a real refusal since
+        // [#726](https://github.com/Omega-JS-Stack/omega/issues/726) — a check mark
+        // would claim a copy that never happened.
+        const { client, $copy, $icon, $label } = await boot({ fail: true });
 
-  const timers = await captureTimers(() => $copy.click());
+        const timers = await captureTimers(() => $copy.click());
 
-  assert.deepEqual(client.copied, [], 'nothing reached the clipboard');
-  assert.equal(timers.length, 0, 'no revert was scheduled, because nothing was swapped');
-  assert.ok($icon.classList.contains('fa-link'), 'the icon still says copy');
-  assert.equal($label.textContent, 'Copy Link', 'the label still says copy');
-});
+        ctx.expect(client.copied, 'nothing reached the clipboard').toEqual([]);
+        ctx.expect(timers.length, 'no revert was scheduled, because nothing was swapped').toBe(0);
+        ctx.expect($icon.classList.contains('fa-link'), 'the icon still says copy').toBeTruthy();
+        ctx.expect($label.textContent, 'the label still says copy').toBe('Copy Link');
+      },
+    },
 
-test('a bar with no labels still confirms', async () => {
-  // `showLabels: false` is the default: with no span to change, the icon IS
-  // the entire confirmation, which is what made the dead guard invisible.
-  const { $copy, $icon, $label } = await boot({ showLabels: false });
+    {
+      name: 'a bar with no labels still confirms',
+      run: async (ctx) => {
+        // `showLabels: false` is the default: with no span to change, the icon IS
+        // the entire confirmation, which is what made the dead guard invisible.
+        const { $copy, $icon, $label } = await boot({ showLabels: false });
 
-  assert.equal($label, null, 'no label was rendered');
+        ctx.expect($label, 'no label was rendered').toBe(null);
 
-  const timers = await captureTimers(() => $copy.click());
+        const timers = await captureTimers(() => $copy.click());
 
-  assert.ok($icon.classList.contains('fa-check'), 'the icon still confirms');
+        ctx.expect($icon.classList.contains('fa-check'), 'the icon still confirms').toBeTruthy();
 
-  timers[0].fn();
+        timers[0].fn();
 
-  assert.ok($icon.classList.contains('fa-link'));
-});
+        ctx.expect($icon.classList.contains('fa-link')).toBeTruthy();
+      },
+    },
 
-test('the undefined ICON_BASE_URL and its dead branch are gone', async () => {
-  const source = fs.readFileSync(ENTRY, 'utf8');
+    {
+      name: 'the undefined ICON_BASE_URL and its dead branch are gone',
+      run: async (ctx) => {
+        const source = fs.readFileSync(ENTRY, 'utf8');
 
-  assert.ok(!source.includes('ICON_BASE_URL'), 'no reference to a constant that never existed');
-  assert.ok(!source.includes('data-icon-type'), 'no guard on markup the module never builds');
+        ctx.expect(!source.includes('ICON_BASE_URL'), 'no reference to a constant that never existed').toBeTruthy();
+        ctx.expect(!source.includes('data-icon-type'), 'no guard on markup the module never builds').toBeTruthy();
+      },
+    },
+  ],
 });

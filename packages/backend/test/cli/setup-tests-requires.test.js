@@ -27,9 +27,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'every-relative-require-in-setup-tests-resolves',
-      async run({ assert }) {
+      async run({ expect }) {
         const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.js'));
-        assert.equal(files.length > 10, true, `setup-tests directory found (${files.length} modules)`);
+        expect(files.length > 10, `setup-tests directory found (${files.length} modules)`).toBe(true);
 
         for (const file of files) {
           const source = fs.readFileSync(path.join(DIR, file), 'utf8');
@@ -42,14 +42,14 @@ module.exports = defineCases({
             } catch (e) {
               resolved = false;
             }
-            assert.equal(resolved, true, `${file} requires "${target}" which does not resolve`);
+            expect(resolved, `${file} requires "${target}" which does not resolve`).toBe(true);
           }
         }
       },
     },
     {
       name: 'functions-package-compares-the-staged-deps-against-the-target-manifest',
-      async run({ assert }) {
+      async run({ expect }) {
         const FunctionsPackageTest = require(path.join(DIR, 'functions-package.js'));
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-functions-package-'));
         const manifest = { name: 'app', version: '1.0.0', private: true, dependencies: { 'firebase-admin': '^13.0.0' } };
@@ -63,7 +63,7 @@ module.exports = defineCases({
 
         const check = new FunctionsPackageTest({ package: manifest, main: { firebaseProjectPath: root, package: manifest } });
 
-        assert.equal(await check.run(), true, 'a staged manifest carrying the target deps passes');
+        expect(await check.run(), 'a staged manifest carrying the target deps passes').toBe(true);
       },
     },
   ],

@@ -18,7 +18,7 @@
  *
  * Run: npm test -- backend:events/payments/webhook-user-without-auth
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -62,9 +62,9 @@ module.exports = defineCases({
       async run() {
         const { store } = await runSubscriptionCreated({ authUids: [] });
 
-        assert.ok(!store.get(`users/${UID}`), 'a payment event must never mint a user doc');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'the event was refused, so nothing else is written either');
-        assert.ok(!store.get(`payments-intents/${ORDER_ID}`), 'no intent is closed out for a refused event');
+        expect(!store.get(`users/${UID}`), 'a payment event must never mint a user doc').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'the event was refused, so nothing else is written either').toBeTruthy();
+        expect(!store.get(`payments-intents/${ORDER_ID}`), 'no intent is closed out for a refused event').toBeTruthy();
       },
     },
 
@@ -75,10 +75,10 @@ module.exports = defineCases({
         const { store } = await runSubscriptionCreated({ authUids: [] });
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.refusal?.reason, 'user-without-auth', 'the stamp names what is wrong');
-        assert.equal(event.status, 'completed', 'the event reached a decision — the provider must not redeliver it forever');
-        assert.equal(event.transition, null, 'nothing happened to a subscription, so the trail must not say it did');
-        assert.equal(event.owner, UID, 'the uid it resolved to stays on the record');
+        expect(event.refusal?.reason, 'the stamp names what is wrong').toBe('user-without-auth');
+        expect(event.status, 'the event reached a decision — the provider must not redeliver it forever').toBe('completed');
+        expect(event.transition, 'nothing happened to a subscription, so the trail must not say it did').toBe(null);
+        expect(event.owner, 'the uid it resolved to stays on the record').toBe(UID);
       },
     },
 
@@ -89,9 +89,9 @@ module.exports = defineCases({
         const { logs } = await runSubscriptionCreated({ authUids: [] });
         const output = logs.join('\n');
 
-        assert.match(output, /USER WITHOUT AUTH/, 'the refusal is loud');
-        assert.match(output, new RegExp(`uid=${UID}`), 'the warning names the uid');
-        assert.match(output, new RegExp(`event=${EVENT_ID}`), 'the warning names the event');
+        expect(output, 'the refusal is loud').toMatch(/USER WITHOUT AUTH/);
+        expect(output, 'the warning names the uid').toMatch(new RegExp(`uid=${UID}`));
+        expect(output, 'the warning names the event').toMatch(new RegExp(`event=${EVENT_ID}`));
       },
     },
 
@@ -101,17 +101,17 @@ module.exports = defineCases({
       async run() {
         const { captures } = await runSubscriptionCreated({ authUids: [] });
 
-        assert.equal(captures.length, 1, 'the refusal reports exactly once');
+        expect(captures.length, 'the refusal reports exactly once').toBe(1);
 
         const capture = captures[0];
 
-        assert.equal(capture.level, 'warning', 'a refusal is a warning, not a server fault');
-        assert.match(capture.message, /user without auth/i, 'the message says what happened');
-        assert.equal(capture.extra.uid, UID, 'the uid is the join key back to the account');
-        assert.equal(capture.extra.eventId, EVENT_ID, 'the event is nameable in the provider dashboard');
-        assert.equal(capture.extra.reason, 'user-without-auth', 'the refusal reason matches the stamp on the doc');
-        assert.equal(capture.user?.id, UID, 'the uid rides as the user id');
-        assert.ok(!JSON.stringify(capture).includes('@'), 'no email is ever assembled into the report');
+        expect(capture.level, 'a refusal is a warning, not a server fault').toBe('warning');
+        expect(capture.message, 'the message says what happened').toMatch(/user without auth/i);
+        expect(capture.extra.uid, 'the uid is the join key back to the account').toBe(UID);
+        expect(capture.extra.eventId, 'the event is nameable in the provider dashboard').toBe(EVENT_ID);
+        expect(capture.extra.reason, 'the refusal reason matches the stamp on the doc').toBe('user-without-auth');
+        expect(capture.user?.id, 'the uid rides as the user id').toBe(UID);
+        expect(!JSON.stringify(capture).includes('@'), 'no email is ever assembled into the report').toBeTruthy();
       },
     },
 
@@ -123,9 +123,9 @@ module.exports = defineCases({
         // clean no-op, never a second failure on top of the refusal
         const { store, captures } = await runSubscriptionCreated({ authUids: [], reporting: false });
 
-        assert.equal(captures.length, 0, 'nothing is reported when reporting is off');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason, 'user-without-auth', 'the stamp still lands');
-        assert.ok(!store.get(`users/${UID}`), 'and the guard still refuses the write');
+        expect(captures.length, 'nothing is reported when reporting is off').toBe(0);
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.refusal?.reason, 'the stamp still lands').toBe('user-without-auth');
+        expect(!store.get(`users/${UID}`), 'and the guard still refuses the write').toBeTruthy();
       },
     },
 
@@ -138,11 +138,11 @@ module.exports = defineCases({
         // would strand it — so an existing doc is never even looked up in Auth.
         const { store, captures } = await runSubscriptionCreated({ authUids: [], seed: { [`users/${UID}`]: existingUser() } });
 
-        assert.equal(captures.length, 0, 'an ordinary update reports nothing — only the refusal does');
-        assert.equal(store.get(`users/${UID}`)?.subscription?.status, 'active', 'the subscription updates exactly as before');
-        assert.equal(store.get(`users/${UID}`)?.auth?.email, `${UID}@example.com`, 'the rest of the doc is untouched');
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'an update is refused nothing');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'the order is written as before');
+        expect(captures.length, 'an ordinary update reports nothing — only the refusal does').toBe(0);
+        expect(store.get(`users/${UID}`)?.subscription?.status, 'the subscription updates exactly as before').toBe('active');
+        expect(store.get(`users/${UID}`)?.auth?.email, 'the rest of the doc is untouched').toBe(`${UID}@example.com`);
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'an update is refused nothing').toBeTruthy();
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'the order is written as before').toBe(UID);
       },
     },
 
@@ -152,9 +152,9 @@ module.exports = defineCases({
       async run() {
         const { store } = await runSubscriptionCreated({ authUids: [UID] });
 
-        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a real customer is refused nothing');
-        assert.equal(store.get(`users/${UID}`)?.subscription?.status, 'active', 'the subscription lands on the user doc as before');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'the order is written as before');
+        expect(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a real customer is refused nothing').toBeTruthy();
+        expect(store.get(`users/${UID}`)?.subscription?.status, 'the subscription lands on the user doc as before').toBe('active');
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'the order is written as before').toBe(UID);
       },
     },
   ],

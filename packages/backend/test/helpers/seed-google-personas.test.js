@@ -36,7 +36,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-second-seed-of-an-existing-persona-succeeds',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const domain = seedDomain(config);
 
         if (!domain) {
@@ -51,7 +51,7 @@ module.exports = defineCases({
           // Precondition: the suite's seed already created this persona, so
           // this IS the re-seed the bug fired on.
           const existing = await admin.auth().getUser(account.uid).catch(() => null);
-          assert.ok(existing, `precondition: ${account.uid} should already be seeded`);
+          expect(existing, `precondition: ${account.uid} should already be seeded`).toBeTruthy();
 
           await importGoogleAccount(admin, { ...account, email: email });
 
@@ -63,7 +63,7 @@ module.exports = defineCases({
 
     {
       name: 'the-re-seeded-persona-still-carries-its-google-provider',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         const domain = seedDomain(config);
 
         if (!domain) {
@@ -81,15 +81,15 @@ module.exports = defineCases({
 
           // The whole point of these personas: the emulator's Google sign-in
           // picker lists an account only while its record carries the provider.
-          assert.equal(record.email, email);
-          assert.equal(record.providerData.some((provider) => provider.providerId === 'google.com'), true, `${account.uid} lost its google.com provider`);
+          expect(record.email).toBe(email);
+          expect(record.providerData.some((provider) => provider.providerId === 'google.com'), `${account.uid} lost its google.com provider`).toBe(true);
         }
       },
     },
 
     {
       name: 'a-persona-absent-from-the-emulator-still-imports',
-      async run({ assert, omega, config, skip }) {
+      async run({ expect, omega, config, skip }) {
         // The cold path must keep working — idempotency cannot depend on the
         // record already being there.
         const domain = seedDomain(config);
@@ -107,7 +107,7 @@ module.exports = defineCases({
         await importGoogleAccount(admin, { ...account, email: email });
 
         const record = await admin.auth().getUser(account.uid);
-        assert.equal(record.uid, account.uid);
+        expect(record.uid).toBe(account.uid);
       },
     },
   ],

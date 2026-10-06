@@ -10,10 +10,10 @@
  * it names and a bare name renders as the bare class it is, with no `fa-solid`
  * wrapper left anywhere in the chrome.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const jetpack = require('fs-jetpack');
 
 const { buildSite, miniData, MINI, PKG } = require('./lib/build.js');
@@ -106,68 +106,92 @@ async function buildChrome(t) {
  */
 function rail(app) {
   const opens = app.indexOf('<aside class="omega-shell__sidebar"');
-  assert.ok(opens !== -1, 'the shell rail rendered');
+  expect(opens !== -1, 'the shell rail rendered').toBeTruthy();
   return app.slice(opens, app.indexOf('</aside>', opens));
 }
 
-test('#903: the nav emits a link icon exactly as authored', async (t) => {
-  const home = (await buildChrome(t)).get('/');
-  const opens = home.indexOf('<header class="omega-nav"');
-  assert.ok(opens !== -1, 'the marketing nav rendered');
-  const nav = home.slice(opens, home.indexOf('</header>', opens));
+module.exports = defineCases({
+  type: 'group',
+  description: 'chrome-link-icons',
+  tests: [
+    {
+      name: '#903: the nav emits a link icon exactly as authored',
+      run: async (ctx) => {
+        const home = (await buildChrome(ctx)).get('/');
+        const opens = home.indexOf('<header class="omega-nav"');
+        ctx.expect(opens !== -1, 'the marketing nav rendered').toBeTruthy();
+        const nav = home.slice(opens, home.indexOf('</header>', opens));
 
-  assert.ok(nav.includes('fa-brands fa-github'), 'the authored brand classes reach the markup');
-  assert.ok(!nav.includes('fa-solid fa-github'), 'nothing re-wraps them as solid');
-  assert.match(nav, /<i class="bolt fa-sm me-2"/, 'a bare name lands as the bare class it is');
-  assert.ok(!nav.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the nav');
-});
+        ctx.expect(nav.includes('fa-brands fa-github'), 'the authored brand classes reach the markup').toBeTruthy();
+        ctx.expect(!nav.includes('fa-solid fa-github'), 'nothing re-wraps them as solid').toBeTruthy();
+        ctx.expect(nav, 'a bare name lands as the bare class it is').toMatch(/<i class="bolt fa-sm me-2"/);
+        ctx.expect(!nav.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the nav').toBeTruthy();
+      },
+    },
 
-test('#903: the app sidebar emits a link icon exactly as authored', async (t) => {
-  const sidebar = rail((await buildChrome(t)).get('/app'));
+    {
+      name: '#903: the app sidebar emits a link icon exactly as authored',
+      run: async (ctx) => {
+        const sidebar = rail((await buildChrome(ctx)).get('/app'));
 
-  assert.ok(sidebar.includes('fa-brands fa-github'), 'the authored brand classes reach the rail');
-  assert.ok(!sidebar.includes('fa-solid fa-github'), 'nothing re-wraps them as solid');
-  assert.match(sidebar, /<i class="bolt fa-sm"/, 'a bare name lands as the bare class it is');
-  assert.ok(!sidebar.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the rail');
-});
+        ctx.expect(sidebar.includes('fa-brands fa-github'), 'the authored brand classes reach the rail').toBeTruthy();
+        ctx.expect(!sidebar.includes('fa-solid fa-github'), 'nothing re-wraps them as solid').toBeTruthy();
+        ctx.expect(sidebar, 'a bare name lands as the bare class it is').toMatch(/<i class="bolt fa-sm"/);
+        ctx.expect(!sidebar.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the rail').toBeTruthy();
+      },
+    },
 
-test('#903: the app topbar emits an action icon exactly as authored', async (t) => {
-  const app = (await buildChrome(t)).get('/app');
-  const opens = app.indexOf('<header class="omega-shell__topbar">');
-  assert.ok(opens !== -1, 'the app topbar rendered');
-  const topbar = app.slice(opens, app.indexOf('</header>', opens));
+    {
+      name: '#903: the app topbar emits an action icon exactly as authored',
+      run: async (ctx) => {
+        const app = (await buildChrome(ctx)).get('/app');
+        const opens = app.indexOf('<header class="omega-shell__topbar">');
+        ctx.expect(opens !== -1, 'the app topbar rendered').toBeTruthy();
+        const topbar = app.slice(opens, app.indexOf('</header>', opens));
 
-  assert.ok(topbar.includes('fa-brands fa-github'), 'the authored brand classes reach the topbar');
-  assert.ok(!topbar.includes('fa-solid fa-github'), 'nothing re-wraps them as solid');
-  assert.match(topbar, /<i class="gear fa-sm me-2"/, 'a bare name lands as the bare class it is');
-  assert.ok(!topbar.includes('fa-solid fa-gear'), 'the fa-solid wrapper is gone from the topbar');
-});
+        ctx.expect(topbar.includes('fa-brands fa-github'), 'the authored brand classes reach the topbar').toBeTruthy();
+        ctx.expect(!topbar.includes('fa-solid fa-github'), 'nothing re-wraps them as solid').toBeTruthy();
+        ctx.expect(topbar, 'a bare name lands as the bare class it is').toMatch(/<i class="gear fa-sm me-2"/);
+        ctx.expect(!topbar.includes('fa-solid fa-gear'), 'the fa-solid wrapper is gone from the topbar').toBeTruthy();
+      },
+    },
 
-test('#903: the account dropdown emits an item icon exactly as authored', async (t) => {
-  const home = (await buildChrome(t)).get('/');
+    {
+      name: '#903: the account dropdown emits an item icon exactly as authored',
+      run: async (ctx) => {
+        const home = (await buildChrome(ctx)).get('/');
 
-  // The account items wear `fa-md me-3`, which no other region on the page uses.
-  assert.match(home, /<i class="fa-brands fa-github fa-md me-3"/, 'the authored brand classes reach the account menu');
-  assert.match(home, /<i class="wrench fa-md me-3"/, 'a bare name lands as the bare class it is');
-  assert.ok(!home.includes('fa-solid fa-wrench'), 'the fa-solid wrapper is gone from the account menu');
-});
+        // The account items wear `fa-md me-3`, which no other region on the page uses.
+        ctx.expect(home, 'the authored brand classes reach the account menu').toMatch(/<i class="fa-brands fa-github fa-md me-3"/);
+        ctx.expect(home, 'a bare name lands as the bare class it is').toMatch(/<i class="wrench fa-md me-3"/);
+        ctx.expect(!home.includes('fa-solid fa-wrench'), 'the fa-solid wrapper is gone from the account menu').toBeTruthy();
+      },
+    },
 
-test('#903: the account section header emits its icon exactly as authored', async (t) => {
-  const proof = (await buildChrome(t)).get('/section-header-proof');
+    {
+      name: '#903: the account section header emits its icon exactly as authored',
+      run: async (ctx) => {
+        const proof = (await buildChrome(ctx)).get('/section-header-proof');
 
-  assert.match(proof, /<i class="fa-brands fa-github fa-sm"/, 'the authored brand classes reach the section header');
-  assert.match(proof, /<i class="screwdriver fa-sm"/, 'a bare name lands as the bare class it is');
-  assert.ok(!proof.includes('fa-solid fa-screwdriver'), 'the fa-solid wrapper is gone from the section header');
-});
+        ctx.expect(proof, 'the authored brand classes reach the section header').toMatch(/<i class="fa-brands fa-github fa-sm"/);
+        ctx.expect(proof, 'a bare name lands as the bare class it is').toMatch(/<i class="screwdriver fa-sm"/);
+        ctx.expect(!proof.includes('fa-solid fa-screwdriver'), 'the fa-solid wrapper is gone from the section header').toBeTruthy();
+      },
+    },
 
-test('#903: the page header emits its title and action icons exactly as authored', async (t) => {
-  const app = (await buildChrome(t)).get('/app');
-  const opens = app.indexOf('<div class="page-header');
-  assert.ok(opens !== -1, 'the in-card page header rendered');
-  const header = app.slice(opens, app.indexOf('<div class="page-content', opens));
+    {
+      name: '#903: the page header emits its title and action icons exactly as authored',
+      run: async (ctx) => {
+        const app = (await buildChrome(ctx)).get('/app');
+        const opens = app.indexOf('<div class="page-header');
+        ctx.expect(opens !== -1, 'the in-card page header rendered').toBeTruthy();
+        const header = app.slice(opens, app.indexOf('<div class="page-content', opens));
 
-  assert.ok(header.includes('fa-brands fa-github'), 'the title icon carries the authored classes');
-  assert.ok(!header.includes('fa-solid fa-github'), 'nothing re-wraps the title icon as solid');
-  assert.match(header, /<i class="bolt fa-sm me-2"/, 'an action icon lands as the bare class it is');
-  assert.ok(!header.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the page header');
+        ctx.expect(header.includes('fa-brands fa-github'), 'the title icon carries the authored classes').toBeTruthy();
+        ctx.expect(!header.includes('fa-solid fa-github'), 'nothing re-wraps the title icon as solid').toBeTruthy();
+        ctx.expect(header, 'an action icon lands as the bare class it is').toMatch(/<i class="bolt fa-sm me-2"/);
+        ctx.expect(!header.includes('fa-solid fa-bolt'), 'the fa-solid wrapper is gone from the page header').toBeTruthy();
+      },
+    },
+  ],
 });

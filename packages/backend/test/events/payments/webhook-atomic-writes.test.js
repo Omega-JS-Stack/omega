@@ -14,7 +14,7 @@
  * only reachable by making one write fail, which is exactly what the stand-in
  * does. The emulator suites stay the integration surface for the happy paths.
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -46,10 +46,10 @@ module.exports = defineCases({
       async run() {
         const { store } = await runEvent();
 
-        assert.equal(store.get(`users/${UID}`)?.subscription?.status, 'active', 'the subscription lands');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`)?.owner, UID, 'the order lands');
-        assert.equal(store.get(`payments-intents/${ORDER_ID}`)?.status, 'completed', 'the intent is closed out');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'completed', 'the webhook completes');
+        expect(store.get(`users/${UID}`)?.subscription?.status, 'the subscription lands').toBe('active');
+        expect(store.get(`payments-orders/${ORDER_ID}`)?.owner, 'the order lands').toBe(UID);
+        expect(store.get(`payments-intents/${ORDER_ID}`)?.status, 'the intent is closed out').toBe('completed');
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'the webhook completes').toBe('completed');
       },
     },
 
@@ -59,10 +59,10 @@ module.exports = defineCases({
       async run() {
         const { store } = await runEvent({ failPath: `payments-orders/${ORDER_ID}` });
 
-        assert.ok(!store.get(`users/${UID}`)?.subscription, 'the user must not be left paid with no order');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'the order write is the one that failed');
-        assert.equal(store.get(`payments-intents/${ORDER_ID}`)?.status, 'failed', 'the failure path still closes the intent');
-        assert.equal(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'failed', 'the webhook is marked failed');
+        expect(!store.get(`users/${UID}`)?.subscription, 'the user must not be left paid with no order').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'the order write is the one that failed').toBeTruthy();
+        expect(store.get(`payments-intents/${ORDER_ID}`)?.status, 'the failure path still closes the intent').toBe('failed');
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.status, 'the webhook is marked failed').toBe('failed');
       },
     },
   ],

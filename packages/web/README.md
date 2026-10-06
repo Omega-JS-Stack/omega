@@ -32,9 +32,13 @@ npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   Omega monorepo + start its src→dist watch (docs/shared/local-dev.md there)
 npx omega build     # production: assets (hashed, @dev-only blocks stripped) → Eleventy → PurgeCSS → Firebase auth helpers (/__/auth/*) → dist/
                     # the auth-helper fetch fails the build loudly on error (demo-*/projectless brands skip); escape hatch: OMEGA_SKIP_FIREBASE_AUTH=true
-npx omega test      # PROJECT scope: production build + smoke checks + consumer test/
-                    #   (test/_init.js setup first; every verb scaffolds test/README.md,
-                    #   the layers build/ and pages/, and the _init.js hook)
+npx omega test      # PROJECT scope: production build, then ONE devkit runner run: the five
+                    #   smoke cases, then consumer test/ (defineCases files, a process each,
+                    #   side by side; test/_init.js setup first; every verb scaffolds
+                    #   test/README.md, web's one layer build (its build/ and pages/
+                    #   directories a convention), and the _init.js hook)
+                    #   --filter --layer --lane --extended --reporter=pretty|json; a path
+                    #   filter is a contains match; logs/test.log holds the run
                     #   framework:/omega:/web: = @omega.js/web's own suite; full: = both
                     #   (C5 scoping — docs/shared/testing.md in the Omega repo)
 npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → dispatch

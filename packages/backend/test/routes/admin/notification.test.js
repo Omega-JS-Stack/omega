@@ -16,7 +16,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: '@omega.js/backend Test Notification',
@@ -25,9 +25,9 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification should succeed for admin');
-        assert.hasProperty(response, 'data.sent', 'Response should have sent count');
-        assert.hasProperty(response, 'data.deleted', 'Response should have deleted count');
+        expect(response, 'Send notification should succeed for admin').toBeSuccess();
+        expect(response, 'Response should have sent count').toHaveProperty('data.sent');
+        expect(response, 'Response should have deleted count').toHaveProperty('data.deleted');
       },
     },
 
@@ -37,7 +37,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Filtered Notification',
@@ -49,8 +49,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification with filters should succeed');
-        assert.hasProperty(response, 'data.sent', 'Response should have sent count');
+        expect(response, 'Send notification with filters should succeed').toBeSuccess();
+        expect(response, 'Response should have sent count').toHaveProperty('data.sent');
       },
     },
 
@@ -60,7 +60,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Tagged Notification',
@@ -71,7 +71,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification with tags filter should succeed');
+        expect(response, 'Send notification with tags filter should succeed').toBeSuccess();
       },
     },
 
@@ -81,7 +81,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Limited Notification',
@@ -92,8 +92,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification with limit should succeed');
-        assert.hasProperty(response, 'data.sent', 'Response should have sent count');
+        expect(response, 'Send notification with limit should succeed').toBeSuccess();
+        expect(response, 'Response should have sent count').toHaveProperty('data.sent');
       },
     },
 
@@ -103,7 +103,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Omit notification entirely to test schema defaults are applied
         const response = await http.post('omega/admin/notification', {
           filters: {
@@ -111,7 +111,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification with defaults should succeed');
+        expect(response, 'Send notification with defaults should succeed').toBeSuccess();
       },
     },
 
@@ -122,7 +122,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.TEST_FCM_TOKEN ? 'TEST_FCM_TOKEN env var not set' : false,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: '@omega.js/backend Test Notification',
@@ -134,8 +134,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification to real token should succeed');
-        assert.hasProperty(response, 'data.sent', 'Response should have sent count');
+        expect(response, 'Send notification to real token should succeed').toBeSuccess();
+        expect(response, 'Response should have sent count').toHaveProperty('data.sent');
       },
     },
 
@@ -145,7 +145,7 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Fake Token Test',
@@ -156,7 +156,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Send notification to fake token should succeed API-wise');
+        expect(response, 'Send notification to fake token should succeed API-wise').toBeSuccess();
       },
     },
 
@@ -166,7 +166,7 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Test Notification',
@@ -174,7 +174,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isError(response, 401, 'Send notification should fail without authentication');
+        expect(response, 'Send notification should fail without authentication').toBeError(401);
       },
     },
 
@@ -184,7 +184,7 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Test Notification',
@@ -192,7 +192,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.isError(response, 403, 'Send notification should fail for non-admin user');
+        expect(response, 'Send notification should fail for non-admin user').toBeError(403);
       },
     },
   ],

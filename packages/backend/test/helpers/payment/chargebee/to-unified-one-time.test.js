@@ -30,118 +30,118 @@ module.exports = defineCases({
   tests: [
     {
       name: 'status-paid-to-completed',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ status: 'paid' });
-        assert.equal(result.status, 'completed', 'paid → completed');
+        expect(result.status, 'paid → completed').toBe('completed');
       },
     },
 
     {
       name: 'status-not-paid-to-failed',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ status: 'not_paid' });
-        assert.equal(result.status, 'failed', 'not_paid → failed');
+        expect(result.status, 'not_paid → failed').toBe('failed');
       },
     },
 
     {
       name: 'status-payment-due-to-failed',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ status: 'payment_due' });
-        assert.equal(result.status, 'failed', 'payment_due → failed');
+        expect(result.status, 'payment_due → failed').toBe('failed');
       },
     },
 
     {
       name: 'status-unknown-passthrough',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ status: 'pending' });
-        assert.equal(result.status, 'pending', 'Other statuses pass through');
+        expect(result.status, 'Other statuses pass through').toBe('pending');
       },
     },
 
     {
       name: 'provider-always-chargebee',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({});
-        assert.equal(result.payment.provider, 'chargebee', 'Provider should be chargebee');
+        expect(result.payment.provider, 'Provider should be chargebee').toBe('chargebee');
       },
     },
 
     {
       name: 'resource-id-from-invoice-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ id: 'inv_123' });
-        assert.equal(result.payment.resourceId, 'inv_123', 'resourceId from invoice id');
+        expect(result.payment.resourceId, 'resourceId from invoice id').toBe('inv_123');
       },
     },
 
     {
       name: 'order-id-from-meta-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ meta_data: '{"orderId":"1234-5678-9012"}' });
-        assert.equal(result.payment.orderId, '1234-5678-9012', 'orderId from meta_data');
+        expect(result.payment.orderId, 'orderId from meta_data').toBe('1234-5678-9012');
       },
     },
 
     {
       name: 'order-id-from-cf-legacy',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({ cf_clientorderid: 'legacy-order' });
-        assert.equal(result.payment.orderId, 'legacy-order', 'orderId from cf_clientorderid');
+        expect(result.payment.orderId, 'orderId from cf_clientorderid').toBe('legacy-order');
       },
     },
 
     {
       name: 'product-resolves-from-meta-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({
           meta_data: '{"productId":"credits-100"}',
           status: 'paid',
         });
-        assert.equal(result.product.id, 'credits-100', 'Product resolved from meta_data');
-        assert.equal(result.product.name, '100 Credits', 'Product name resolved');
+        expect(result.product.id, 'Product resolved from meta_data').toBe('credits-100');
+        expect(result.product.name, 'Product name resolved').toBe('100 Credits');
       },
     },
 
     {
       name: 'product-unknown-when-no-meta-data',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({});
-        assert.equal(result.product.id, 'unknown', 'No productId → unknown');
+        expect(result.product.id, 'No productId → unknown').toBe('unknown');
       },
     },
 
     {
       name: 'event-metadata-passed-through',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime({}, { eventName: 'invoice_generated', eventId: 'ev_inv' });
-        assert.equal(result.payment.updatedBy.event.name, 'invoice_generated', 'Event name');
-        assert.equal(result.payment.updatedBy.event.id, 'ev_inv', 'Event ID');
+        expect(result.payment.updatedBy.event.name, 'Event name').toBe('invoice_generated');
+        expect(result.payment.updatedBy.event.id, 'Event ID').toBe('ev_inv');
       },
     },
 
     {
       name: 'fixture-invoice-one-time',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime(FIXTURE_INVOICE);
-        assert.equal(result.status, 'completed', 'Fixture paid → completed');
-        assert.equal(result.payment.provider, 'chargebee', 'Provider is chargebee');
-        assert.equal(result.payment.resourceId, FIXTURE_INVOICE.id, 'Resource ID matches fixture');
-        assert.equal(result.payment.orderId, '6789-0123-4567', 'Order ID from meta_data');
-        assert.equal(result.product.id, 'credits-100', 'Product from meta_data productId');
+        expect(result.status, 'Fixture paid → completed').toBe('completed');
+        expect(result.payment.provider, 'Provider is chargebee').toBe('chargebee');
+        expect(result.payment.resourceId, 'Resource ID matches fixture').toBe(FIXTURE_INVOICE.id);
+        expect(result.payment.orderId, 'Order ID from meta_data').toBe('6789-0123-4567');
+        expect(result.product.id, 'Product from meta_data productId').toBe('credits-100');
       },
     },
 
     {
       name: 'unified-shape-complete',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = toUnifiedOneTime(FIXTURE_INVOICE);
-        assert.ok(result.product, 'Should have product');
-        assert.ok(result.status, 'Should have status');
-        assert.ok(result.payment, 'Should have payment');
-        assert.ok(result.payment.updatedBy, 'Should have updatedBy');
-        assert.ok(result.payment.updatedBy.date, 'Should have updatedBy.date');
+        expect(result.product, 'Should have product').toBeTruthy();
+        expect(result.status, 'Should have status').toBeTruthy();
+        expect(result.payment, 'Should have payment').toBeTruthy();
+        expect(result.payment.updatedBy, 'Should have updatedBy').toBeTruthy();
+        expect(result.payment.updatedBy.date, 'Should have updatedBy.date').toBeTruthy();
       },
     },
   ],

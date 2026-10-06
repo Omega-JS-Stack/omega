@@ -29,7 +29,7 @@
  *
  * Run: npx omega test backend:cli/custom-project-type
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -133,7 +133,8 @@ function setupCheckNames(dir) {
 
 /**
  * Boot a REAL Omega instance against a fixture target, with every required env key
- * present so the #581 boot guard passes, and restore the process env after.
+ * present so the #581 boot guard passes, and restore the process env after. The
+ * boot is the test-runner boot (`runnerHost: true`); an option passed in still wins.
  */
 function bootOmega(dir, options = {}) {
   const saved = {};
@@ -146,7 +147,7 @@ function bootOmega(dir, options = {}) {
   const { Omega } = require(OMEGA_PATH);
 
   try {
-    return new Omega().initialize({ cwd: dir, ...options });
+    return new Omega().initialize({ cwd: dir, runnerHost: true, ...options });
   } finally {
     for (const [name, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[name];
@@ -175,16 +176,16 @@ module.exports = defineCases({
         const bare = targetDir({});
 
         try {
-          assert.strictEqual(resolveProjectType(custom), 'custom');
-          assert.strictEqual(resolveProjectType(firebase), 'firebase');
-          assert.strictEqual(resolveProjectType(bare), 'firebase', 'an unset projectType is the Cloud Functions default');
-          assert.strictEqual(isCustomProject(custom), true);
-          assert.strictEqual(isCustomProject(bare), false);
+          expect(resolveProjectType(custom)).toBe('custom');
+          expect(resolveProjectType(firebase)).toBe('firebase');
+          expect(resolveProjectType(bare), 'an unset projectType is the Cloud Functions default').toBe('firebase');
+          expect(isCustomProject(custom)).toBe(true);
+          expect(isCustomProject(bare)).toBe(false);
 
           // No consumer config at all (the framework booting itself) is not a
           // custom backend — it is no backend target, and firebase is the answer
           // that changes nothing.
-          assert.strictEqual(resolveProjectType(os.tmpdir()), 'firebase');
+          expect(resolveProjectType(os.tmpdir())).toBe('firebase');
         } finally {
           for (const dir of [custom, firebase, bare]) fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -200,26 +201,26 @@ module.exports = defineCases({
 
         try {
           const customOmega = bootOmega(custom);
-          assert.strictEqual(customOmega.options.projectType, 'custom', 'the config is the switch — no init flag needed');
-          assert.strictEqual(customOmega.firebase.functions, null, 'custom mode must not load firebase-functions');
+          expect(customOmega.options.projectType, 'the config is the switch — no init flag needed').toBe('custom');
+          expect(customOmega.firebase.functions, 'custom mode must not load firebase-functions').toBe(null);
 
           const firebaseOmega = bootOmega(firebase);
-          assert.strictEqual(firebaseOmega.options.projectType, 'firebase');
-          assert.ok(firebaseOmega.firebase.functions, 'firebase mode still loads firebase-functions');
+          expect(firebaseOmega.options.projectType).toBe('firebase');
+          expect(firebaseOmega.firebase.functions, 'firebase mode still loads firebase-functions').toBeTruthy();
 
           // The whole point of the mode: the SAME backend, minus the artifact.
           for (const [mode, instance] of [['custom', customOmega], ['firebase', firebaseOmega]]) {
             for (const service of PROCESS_SERVICES) {
-              assert.strictEqual(typeof instance[service], 'object', `omega.${service} must work in ${mode} mode`);
+              expect(typeof instance[service], `omega.${service} must work in ${mode} mode`).toBe('object');
             }
-            assert.strictEqual(typeof instance.storage, 'function', `omega.storage() must work in ${mode} mode`);
+            expect(typeof instance.storage, `omega.storage() must work in ${mode} mode`).toBe('function');
 
             const ctx = new Context(instance);
             for (const service of REQUEST_SERVICES) {
-              assert.strictEqual(typeof ctx[service], 'object', `ctx.${service} must work in ${mode} mode`);
+              expect(typeof ctx[service], `ctx.${service} must work in ${mode} mode`).toBe('object');
             }
           }
-          assert.ok(customOmega.config.brand.id, 'the config still resolves in custom mode');
+          expect(customOmega.config.brand.id, 'the config still resolves in custom mode').toBeTruthy();
         } finally {
           for (const dir of [custom, firebase]) fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -234,8 +235,8 @@ module.exports = defineCases({
 
         try {
           const instance = bootOmega(custom, { projectType: 'firebase' });
-          assert.strictEqual(instance.options.projectType, 'firebase', 'an explicit option is the caller saying so');
-          assert.ok(instance.firebase.functions);
+          expect(instance.options.projectType, 'an explicit option is the caller saying so').toBe('firebase');
+          expect(instance.firebase.functions).toBeTruthy();
         } finally {
           fs.rmSync(custom, { recursive: true, force: true });
         }
@@ -251,11 +252,11 @@ module.exports = defineCases({
         try {
           const run = await runCommand(DeployCommand, dir);
 
-          assert.deepStrictEqual(run.shell, [], 'a custom backend must never run `firebase deploy`');
-          assert.strictEqual(run.exitCode, 1, 'a refused deploy must fail the process, never read green');
-          assert.match(run.output, /custom/, 'the refusal must name the mode');
-          assert.match(run.output, /deploy/, 'the refusal must name the lane that replaces it');
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist')), false, 'the refusal comes BEFORE staging');
+          expect(run.shell, 'a custom backend must never run `firebase deploy`').toEqual([]);
+          expect(run.exitCode, 'a refused deploy must fail the process, never read green').toBe(1);
+          expect(run.output, 'the refusal must name the mode').toMatch(/custom/);
+          expect(run.output, 'the refusal must name the lane that replaces it').toMatch(/deploy/);
+          expect(fs.existsSync(path.join(dir, 'dist')), 'the refusal comes BEFORE staging').toBe(false);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -269,19 +270,15 @@ module.exports = defineCases({
         const dir = targetDir({ projectType: 'custom' });
 
         try {
-          assert.deepStrictEqual(
-            Object.keys(FIREBASE_ONLY_VERBS).sort(),
-            ['deploy', 'dev', 'emulator', 'serve'],
-            'the refused verbs live in ONE table',
-          );
+          expect(Object.keys(FIREBASE_ONLY_VERBS).sort(), 'the refused verbs live in ONE table').toEqual(['deploy', 'dev', 'emulator', 'serve']);
 
           for (const [CommandClass, verb] of [[DevCommand, 'dev'], [EmulatorCommand, 'emulator'], [ServeCommand, 'serve']]) {
             const run = await runCommand(CommandClass, dir);
 
-            assert.deepStrictEqual(run.shell, [], `omega ${verb} must not reach the shell in custom mode`);
-            assert.strictEqual(run.exitCode, 1, `omega ${verb} must fail the process in custom mode`);
-            assert.match(run.output, /custom/, `omega ${verb} must name the mode`);
-            assert.ok(run.output.includes(FIREBASE_ONLY_VERBS[verb]), `omega ${verb} must print its own replacement lane: ${run.output}`);
+            expect(run.shell, `omega ${verb} must not reach the shell in custom mode`).toEqual([]);
+            expect(run.exitCode, `omega ${verb} must fail the process in custom mode`).toBe(1);
+            expect(run.output, `omega ${verb} must name the mode`).toMatch(/custom/);
+            expect(run.output.includes(FIREBASE_ONLY_VERBS[verb]), `omega ${verb} must print its own replacement lane: ${run.output}`).toBeTruthy();
           }
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
@@ -297,16 +294,113 @@ module.exports = defineCases({
         // goes straight to the project's suites, which pass or fail on their own
         const { stageProject, runRunnerChild } = require('./_runner-child.js');
         const dir = stageProject({
-          'unit/trivial.test.js': "module.exports = { type: 'group', tests: [{ name: 'trivial-case', run({ assert }) { assert.equal(1, 1); } }] };\n",
+          'unit/trivial.test.js': "module.exports = { type: 'group', tests: [{ name: 'trivial-case', run({ expect }) { expect(1).toBe(1); } }] };\n",
         });
 
         try {
           const run = runRunnerChild(dir);
 
-          assert.strictEqual(run.status, 0, run.output);
-          assert.match(run.output, /✓ trivial-case/, 'the discovered suite ran and passed');
-          assert.doesNotMatch(run.output, /Checking server health/, 'no hosting health check');
-          assert.doesNotMatch(run.output, /rules testing context/, 'no account setup');
+          expect(run.status, run.output).toBe(0);
+          expect(run.output, 'the discovered suite ran and passed').toMatch(/✓ trivial-case/);
+          expect(run.output, 'no hosting health check').not.toMatch(/Checking server health/);
+          expect(run.output, 'no account setup').not.toMatch(/rules testing context/);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a project _init.js setup runs once, before the first case, with the runner context',
+
+      async run() {
+        // The setup writes a marker; the case copies what it found to seen.json,
+        // so the marker's presence is read at case time, not after the run.
+        // Both stay inside the staged project's own test/ folder.
+        const { stageProject, runRunnerChild } = require('./_runner-child.js');
+        const dir = stageProject({
+          '_init.js': [
+            "const fs = require('node:fs');",
+            "const path = require('node:path');",
+            'module.exports = ({ projectRoot, config }) => ({',
+            '  accounts: [],',
+            '  setup(ctx) {',
+            "    const file = path.join(__dirname, 'init-marker.json');",
+            "    const prior = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { count: 0 };",
+            '    fs.writeFileSync(file, JSON.stringify({ keys: Object.keys(ctx).sort(), count: prior.count + 1 }));',
+            '  },',
+            '});',
+            '',
+          ].join('\n'),
+          'unit/order.test.js': [
+            "const fs = require('node:fs');",
+            "const path = require('node:path');",
+            "const testDir = path.join(__dirname, '..');",
+            "module.exports = { type: 'group', tests: [{ name: 'reads-the-marker', run() {",
+            "  const file = path.join(testDir, 'init-marker.json');",
+            "  const seen = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;",
+            "  fs.writeFileSync(path.join(testDir, 'seen.json'), JSON.stringify(seen));",
+            '} }] };',
+            '',
+          ].join('\n'),
+        });
+
+        try {
+          const run = runRunnerChild(dir);
+          expect(run.status, run.output).toBe(0);
+
+          const seen = JSON.parse(fs.readFileSync(path.join(dir, 'test', 'seen.json'), 'utf8'));
+          expect(seen, 'the marker exists when the first case runs').not.toBe(null);
+          expect(seen.keys, 'the setup ctx is the runner context').toEqual(['accounts', 'admin', 'config', 'ctx', 'omega', 'projectRoot']);
+          expect(seen.count, 'setup ran once before the case').toBe(1);
+          expect(JSON.parse(fs.readFileSync(path.join(dir, 'test', 'init-marker.json'), 'utf8')).count, 'and once in the whole run').toBe(1);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a project _init.js that throws on load fails the run naming it, and no case runs',
+
+      async run() {
+        const { stageProject, runRunnerChild } = require('./_runner-child.js');
+        const dir = stageProject({
+          '_init.js': "throw new Error('broken init');\n",
+          'unit/never.test.js': [
+            "const fs = require('node:fs');",
+            "const path = require('node:path');",
+            "module.exports = { type: 'group', tests: [{ name: 'never-runs', run() {",
+            "  fs.writeFileSync(path.join(__dirname, 'ran.json'), 'true');",
+            '} }] };',
+            '',
+          ].join('\n'),
+        });
+
+        try {
+          const run = runRunnerChild(dir);
+          expect(run.status, run.output).toBe(1);
+          expect(run.output, 'the failure names the broken file').toMatch(/_init\.js/);
+          expect(fs.existsSync(path.join(dir, 'test', 'unit', 'ran.json')), 'no case runs after a broken init').toBe(false);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'a case that ends the process before the report fails the run',
+
+      async run() {
+        const { stageProject, runRunnerChild } = require('./_runner-child.js');
+        const dir = stageProject({
+          'unit/exits.test.js': "module.exports = { type: 'group', tests: [{ name: 'exits-early', run() { process.exit(0); } }] };\n",
+        });
+
+        try {
+          const run = runRunnerChild(dir);
+          expect(run.status, run.output).not.toBe(0);
+          expect(run.stderr, 'stderr names the early end').toMatch(/The test run ended before its report was written/);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -324,19 +418,17 @@ module.exports = defineCases({
         const frameworkPackage = require('../../package.json');
         const { CUSTOM_OWNED_SCRIPTS: projectScriptsCustomOwned, verbOfCommand: verbOf } = require('../../dist/cli/utils/project-type.js');
         const projectScripts = require('../../dist/vendor/devkit/verb-scripts.js').projectScripts(frameworkPackage);
-        assert.strictEqual(frameworkPackage.projectScriptsCustomOwned, undefined, 'derived from FIREBASE_ONLY_VERBS, never hand-kept');
-        assert.deepStrictEqual([...projectScriptsCustomOwned].sort(), ['deploy', 'start']);
+        expect(frameworkPackage.projectScriptsCustomOwned, 'derived from FIREBASE_ONLY_VERBS, never hand-kept').toBe(undefined);
+        expect([...projectScriptsCustomOwned].sort()).toEqual(['deploy', 'start']);
 
         for (const key of projectScriptsCustomOwned) {
-          assert.ok(projectScripts[key], `projectScriptsCustomOwned names ${key}, which the target scripts must carry`);
-          assert.ok(FIREBASE_ONLY_VERBS[verbOf(projectScripts[key])],
-            `\`${key}\` is only the brand's because \`omega ${verbOf(projectScripts[key])}\` refuses in custom mode`);
+          expect(projectScripts[key], `projectScriptsCustomOwned names ${key}, which the target scripts must carry`).toBeTruthy();
+          expect(FIREBASE_ONLY_VERBS[verbOf(projectScripts[key])], `\`${key}\` is only the brand's because \`omega ${verbOf(projectScripts[key])}\` refuses in custom mode`).toBeTruthy();
         }
 
         for (const [key, command] of Object.entries(projectScripts)) {
           if (projectScriptsCustomOwned.includes(key)) continue;
-          assert.strictEqual(FIREBASE_ONLY_VERBS[verbOf(command)], undefined,
-            `\`${key}\` runs a verb this mode refuses — it belongs in projectScriptsCustomOwned`);
+          expect(FIREBASE_ONLY_VERBS[verbOf(command)], `\`${key}\` runs a verb this mode refuses — it belongs in projectScriptsCustomOwned`).toBe(undefined);
         }
       },
     },
@@ -351,15 +443,15 @@ module.exports = defineCases({
           const run = runSetupScaffold(dir);
 
           for (const file of FIREBASE_ONLY_SCAFFOLD) {
-            assert.strictEqual(fs.existsSync(path.join(dir, file)), false, `a custom backend has no Firebase lane — the scaffold must not write ${file}: ${run.output}`);
+            expect(fs.existsSync(path.join(dir, file)), `a custom backend has no Firebase lane — the scaffold must not write ${file}: ${run.output}`).toBe(false);
           }
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'firestore.rules')), false, 'and no compiled rules artifact either — nothing deploys it');
+          expect(fs.existsSync(path.join(dir, 'dist', 'firestore.rules')), 'and no compiled rules artifact either — nothing deploys it').toBe(false);
 
           // What custom mode does NOT take away: the project id, the authored
           // entry, and the staged output every backend builds.
-          assert.strictEqual(fs.existsSync(path.join(dir, '.firebaserc')), true, 'the project id is still the backend\'s — the admin SDK reads it in both modes');
-          assert.strictEqual(fs.existsSync(path.join(dir, 'src', 'index.js')), true);
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'index.js')), true);
+          expect(fs.existsSync(path.join(dir, '.firebaserc')), 'the project id is still the backend\'s — the admin SDK reads it in both modes').toBe(true);
+          expect(fs.existsSync(path.join(dir, 'src', 'index.js'))).toBe(true);
+          expect(fs.existsSync(path.join(dir, 'dist', 'index.js'))).toBe(true);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -376,9 +468,9 @@ module.exports = defineCases({
           const run = runSetupScaffold(dir);
 
           for (const file of FIREBASE_ONLY_SCAFFOLD) {
-            assert.strictEqual(fs.existsSync(path.join(dir, file)), true, `the default mode is unchanged — ${file} must still be scaffolded: ${run.output}`);
+            expect(fs.existsSync(path.join(dir, file)), `the default mode is unchanged — ${file} must still be scaffolded: ${run.output}`).toBe(true);
           }
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'firestore.rules')), true, 'the stage still compiles the artifact firebase.json points at');
+          expect(fs.existsSync(path.join(dir, 'dist', 'firestore.rules')), 'the stage still compiles the artifact firebase.json points at').toBe(true);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -402,8 +494,8 @@ module.exports = defineCases({
 
           runSetupScaffold(dir);
 
-          assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'firebase.json'), 'utf8')), authored, 'an authored firebase.json is left exactly as it was');
-          assert.strictEqual(fs.readFileSync(path.join(dir, 'firestore.rules'), 'utf8'), authoredRules);
+          expect(JSON.parse(fs.readFileSync(path.join(dir, 'firebase.json'), 'utf8')), 'an authored firebase.json is left exactly as it was').toEqual(authored);
+          expect(fs.readFileSync(path.join(dir, 'firestore.rules'), 'utf8')).toBe(authoredRules);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -421,21 +513,17 @@ module.exports = defineCases({
           const full = setupCheckNames(firebase);
           const kept = setupCheckNames(custom);
 
-          assert.strictEqual(
-            kept.length,
-            full.length - FIREBASE_ONLY_SETUP_CHECKS.length,
-            'every Firebase-only check, and no other, comes off the list',
-          );
-          assert.deepStrictEqual(kept, full.filter((name) => kept.includes(name)), 'the surviving checks keep their order');
+          expect(kept.length, 'every Firebase-only check, and no other, comes off the list').toBe(full.length - FIREBASE_ONLY_SETUP_CHECKS.length);
+          expect(kept, 'the surviving checks keep their order').toEqual(full.filter((name) => kept.includes(name)));
 
           // The two that matter most: one hard-FAILS a custom target ("this is
           // not a firebase project"), the other writes the emulator config.
-          assert.strictEqual(kept.includes('IsFirebaseProjectTest'), false, 'a custom backend is not a broken Firebase project');
-          assert.strictEqual(kept.includes('EmulatorConfigTest'), false, 'there is no emulator to configure');
+          expect(kept.includes('IsFirebaseProjectTest'), 'a custom backend is not a broken Firebase project').toBe(false);
+          expect(kept.includes('EmulatorConfigTest'), 'there is no emulator to configure').toBe(false);
 
           // Everything else is identical in both modes — that is the mode.
           for (const check of ['OmegaConfigTest', 'GitignoreTest', 'ServiceAccountTest', 'ProjectDirectoriesTest']) {
-            assert.strictEqual(kept.includes(check), true, `${check} is not a Firebase-lane check`);
+            expect(kept.includes(check), `${check} is not a Firebase-lane check`).toBe(true);
           }
         } finally {
           for (const dir of [custom, firebase]) fs.rmSync(dir, { recursive: true, force: true });
@@ -452,9 +540,9 @@ module.exports = defineCases({
         try {
           const run = await runCommand(BuildCommand, dir);
 
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'index.js')), true, `the authored src/ should be staged: ${run.output}`);
-          assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'package.json')), true, 'the staged manifest is the build output the manager checks for');
-          assert.notStrictEqual(run.exitCode, 1, 'build is not a Firebase-only verb');
+          expect(fs.existsSync(path.join(dir, 'dist', 'index.js')), `the authored src/ should be staged: ${run.output}`).toBe(true);
+          expect(fs.existsSync(path.join(dir, 'dist', 'package.json')), 'the staged manifest is the build output the manager checks for').toBe(true);
+          expect(run.exitCode, 'build is not a Firebase-only verb').not.toBe(1);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }

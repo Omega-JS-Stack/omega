@@ -21,18 +21,18 @@ module.exports = defineCases({
   tests: [
     {
       name: 'starts-paid-with-no-order',
-      async run({ accounts, firestore, assert, state }) {
+      async run({ accounts, firestore, expect, state }) {
         const uid = accounts['cancel-no-order'].uid;
         state.uid = uid;
 
         const userDoc = await firestore.get(`users/${uid}`);
 
-        assert.ok(userDoc, 'User doc should exist');
-        assert.notEqual(userDoc.subscription?.product?.id, 'basic', 'Persona should start on a paid product');
-        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
-        assert.equal(userDoc.subscription?.cancellation?.pending, false, 'Should not be pending cancellation');
-        assert.equal(userDoc.subscription?.payment?.provider, 'test', 'Should be on the test provider');
-        assert.equal(userDoc.subscription?.payment?.orderId, null, 'The bug scenario needs no order doc');
+        expect(userDoc, 'User doc should exist').toBeTruthy();
+        expect(userDoc.subscription?.product?.id, 'Persona should start on a paid product').not.toBe('basic');
+        expect(userDoc.subscription?.status, 'Should be active').toBe('active');
+        expect(userDoc.subscription?.cancellation?.pending, 'Should not be pending cancellation').toBe(false);
+        expect(userDoc.subscription?.payment?.provider, 'Should be on the test provider').toBe('test');
+        expect(userDoc.subscription?.payment?.orderId, 'The bug scenario needs no order doc').toBe(null);
 
         state.paidProductId = userDoc.subscription.product.id;
       },
@@ -40,7 +40,7 @@ module.exports = defineCases({
 
     {
       name: 'call-cancel-endpoint',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // The test provider writes a payments-webhooks doc directly, triggering the
         // on-write pipeline automatically — no manual webhook needed.
         const response = await http.as('cancel-no-order').post('omega/payments/cancel', {
@@ -48,14 +48,14 @@ module.exports = defineCases({
           reason: 'No longer needed',
         });
 
-        assert.isSuccess(response, 'Cancel endpoint should succeed');
-        assert.equal(response.data.success, true, 'Should return { success: true }');
+        expect(response, 'Cancel endpoint should succeed').toBeSuccess();
+        expect(response.data.success, 'Should return { success: true }').toBe(true);
       },
     },
 
     {
       name: 'verify-cancellation-pending-and-product-intact',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Wait for the pipeline to land either outcome: the cancellation (correct) or the
         // downgrade to Basic (the bug) — so the regression fails on its assertion, not a timeout.
         await waitFor(async () => {
@@ -66,10 +66,10 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should stay ${state.paidProductId}, not fall back to Basic`);
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.cancellation.pending, true, 'Cancellation should be pending');
-        assert.ok(userDoc.subscription.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set');
+        expect(userDoc.subscription.product.id, `Product should stay ${state.paidProductId}, not fall back to Basic`).toBe(state.paidProductId);
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Cancellation should be pending').toBe(true);
+        expect(userDoc.subscription.cancellation.date.timestampUNIX > 0, 'Cancellation date should be set').toBeTruthy();
       },
     },
   ],

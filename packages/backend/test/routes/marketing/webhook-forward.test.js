@@ -25,7 +25,7 @@ module.exports = defineCases({
     {
       name: 'forwarder-returns-404-on-non-parent-brand',
       auth: 'none',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         // This gate only applies to brands INSIDE a company. If this brand is
         // the webhook root (no company, or its own), the forwarder route is
         // visible by design, so there's nothing to assert here: skip rather
@@ -39,14 +39,14 @@ module.exports = defineCases({
           [{ sg_event_id: 'should-not-process', event: 'group_unsubscribe', email: 'test@example.com' }]
         );
 
-        assert.isError(response, 404, 'Forwarder should be invisible (404) on a brand inside a company');
+        expect(response, 'Forwarder should be invisible (404) on a brand inside a company').toBeError(404);
       },
     },
 
     {
       name: 'forwarder-returns-404-even-with-valid-key',
       auth: 'none',
-      async run({ http, assert, config, skip }) {
+      async run({ http, expect, config, skip }) {
         // Only meaningful on a brand inside a company. On the webhook root the
         // forwarder is visible by design, so skip rather than fail.
         if (!config.company?.id || config.company.id === 'self') {
@@ -60,7 +60,7 @@ module.exports = defineCases({
           { id: 'should-not-process', event: 'subscription.unsubscribed', email: 'test@example.com' }
         );
 
-        assert.isError(response, 404, 'Even with a valid key, a brand inside a company returns 404');
+        expect(response, 'Even with a valid key, a brand inside a company returns 404').toBeError(404);
       },
     },
   ],

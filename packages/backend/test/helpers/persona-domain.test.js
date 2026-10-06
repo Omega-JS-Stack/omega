@@ -46,19 +46,15 @@ module.exports = defineCases({
     // domain the brand happens to answer support mail on.
     {
       name: 'persona-emails-follow-the-brand-host',
-      async run({ assert }) {
+      async run({ expect }) {
         const domain = resolvedBrandHost(SPLIT_BRAND);
 
-        assert.equal(domain, 'switchboard.streamforge.app', 'The persona domain is the brand host');
-        assert.ok(domain !== 'streamforge.app', 'A support address on the apex must not shape persona identity');
+        expect(domain, 'The persona domain is the brand host').toBe('switchboard.streamforge.app');
+        expect(domain !== 'streamforge.app', 'A support address on the apex must not shape persona identity').toBeTruthy();
 
         const definitions = getAccountDefinitions(domain, SPLIT_BRAND);
 
-        assert.equal(
-          definitions.admin.email,
-          '_test.admin@switchboard.streamforge.app',
-          'The seeder composes persona addresses on the brand host, which is what the palette signs in on',
-        );
+        expect(definitions.admin.email, 'The seeder composes persona addresses on the brand host, which is what the palette signs in on').toBe('_test.admin@switchboard.streamforge.app');
       },
     },
 
@@ -66,20 +62,14 @@ module.exports = defineCases({
     // splits `brand.contact.email` for a domain is the bug itself.
     {
       name: 'every-seeding-lane-reads-the-one-derivation',
-      async run({ assert }) {
+      async run({ expect }) {
         for (const lane of SEEDING_LANES) {
           const source = fs.readFileSync(path.join(__dirname, '..', '..', lane), 'utf8');
 
-          assert.ok(
-            source.includes('resolvedBrandHost'),
-            `${lane} must read the persona domain from @omega.js/config's resolvedBrandHost`,
-          );
+          expect(source.includes('resolvedBrandHost'), `${lane} must read the persona domain from @omega.js/config's resolvedBrandHost`).toBeTruthy();
           // Multiline-tolerant on purpose: the pre-fix code read contact.email
           // on one line and split it on the next, which a one-line regex missed.
-          assert.ok(
-            !/contact(\?)?\.email[\s\S]{0,300}?split\('@'\)/.test(source),
-            `${lane} must not derive a persona domain from brand.contact.email`,
-          );
+          expect(!/contact(\?)?\.email[\s\S]{0,300}?split\('@'\)/.test(source), `${lane} must not derive a persona domain from brand.contact.email`).toBeTruthy();
         }
       },
     },

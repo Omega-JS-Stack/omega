@@ -26,9 +26,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'omega_api-health-responds-over-hosting-rewrite',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.get('omega/health');
-        assert.isSuccess(response, 'omega_api /health should respond through the emulator');
+        expect(response, 'omega_api /health should respond through the emulator').toBeSuccess();
       },
     },
   ],
@@ -56,7 +56,7 @@ Two packaging details keep the fixture sound: the fixture's `.firebaserc` is **r
 
 ## What happens in a consumer run
 
-The `boot/` smoke is **excluded from real-consumer runs** (`runner.js` `discoverTests` skips `boot/` unless `isFrameworkSelfTest`) — it targets the bundled fixture, so it would be redundant noise in a consumer's suite. Consumers run the full `routes`/`events`/`rules` suites against their own emulator as normal.
+The `boot/` smoke is **excluded from real-consumer runs** (devkit's discovery, `discoverSuites` in `packages/devkit/src/test/discovery.js`, skips a framework `boot/` unless the run is the framework's self-test): it targets the bundled fixture, so it would be redundant noise in a consumer's suite. Consumers run the full `routes`/`events`/`rules` suites against their own emulator as normal.
 
 ## Why this exists
 

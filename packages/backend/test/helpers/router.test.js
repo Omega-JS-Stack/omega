@@ -65,9 +65,9 @@ module.exports = defineCases({
 
     {
       name: 'strips-the-omega-prefix',
-      async run({ assert }) {
-        assert.equal(resolve('/omega/user/sign-up'), 'user/sign-up');
-        assert.equal(resolve('/omega/admin/post'), 'admin/post');
+      async run({ expect }) {
+        expect(resolve('/omega/user/sign-up')).toBe('user/sign-up');
+        expect(resolve('/omega/admin/post')).toBe('admin/post');
       },
     },
 
@@ -77,15 +77,15 @@ module.exports = defineCases({
       // never win a `/omega_api/…` path the way first-match alternation
       // used to (which left `_api/…`, a route that cannot exist).
       name: 'strips-the-direct-function-url-prefix',
-      async run({ assert }) {
-        assert.equal(resolve('/omega_api/user/sign-up'), 'user/sign-up');
+      async run({ expect }) {
+        expect(resolve('/omega_api/user/sign-up')).toBe('user/sign-up');
       },
     },
 
     {
       name: 'the-retired-backend-manager-alias-is-no-prefix',
-      async run({ assert }) {
-        assert.equal(resolve('/backend-manager/user/sign-up'), 'backend-manager/user/sign-up');
+      async run({ expect }) {
+        expect(resolve('/backend-manager/user/sign-up')).toBe('backend-manager/user/sign-up');
       },
     },
 
@@ -93,25 +93,25 @@ module.exports = defineCases({
 
     {
       name: 'a-bare-prefix-resolves-to-the-empty-route',
-      async run({ assert }) {
-        assert.equal(resolve('/omega/'), '');
-        assert.equal(resolve('/omega'), '');
-        assert.equal(resolve('/omega_api'), '');
+      async run({ expect }) {
+        expect(resolve('/omega/')).toBe('');
+        expect(resolve('/omega')).toBe('');
+        expect(resolve('/omega_api')).toBe('');
       },
     },
 
     {
       name: 'deep-paths-keep-every-remaining-segment',
-      async run({ assert }) {
-        assert.equal(resolve('/omega/payment/subscription/cancel'), 'payment/subscription/cancel');
-        assert.equal(resolve('/omega/a/b/c/d/e'), 'a/b/c/d/e');
+      async run({ expect }) {
+        expect(resolve('/omega/payment/subscription/cancel')).toBe('payment/subscription/cancel');
+        expect(resolve('/omega/a/b/c/d/e')).toBe('a/b/c/d/e');
       },
     },
 
     {
       name: 'trailing-slashes-are-preserved',
-      async run({ assert }) {
-        assert.equal(resolve('/omega/user/sign-up/'), 'user/sign-up/');
+      async run({ expect }) {
+        expect(resolve('/omega/user/sign-up/')).toBe('user/sign-up/');
       },
     },
 
@@ -119,18 +119,18 @@ module.exports = defineCases({
 
     {
       name: 'an-unprefixed-path-just-loses-its-leading-slash',
-      async run({ assert }) {
-        assert.equal(resolve('/user/sign-up'), 'user/sign-up');
-        assert.equal(resolve('user/sign-up'), 'user/sign-up');
+      async run({ expect }) {
+        expect(resolve('/user/sign-up')).toBe('user/sign-up');
+        expect(resolve('user/sign-up')).toBe('user/sign-up');
       },
     },
 
     {
       name: 'an-absent-path-resolves-to-the-empty-route',
-      async run({ assert }) {
-        assert.equal(resolve(''), '');
-        assert.equal(resolve(undefined), '');
-        assert.equal(resolve('/'), '');
+      async run({ expect }) {
+        expect(resolve('')).toBe('');
+        expect(resolve(undefined)).toBe('');
+        expect(resolve('/')).toBe('');
       },
     },
 
@@ -138,9 +138,9 @@ module.exports = defineCases({
 
     {
       name: 'a-prefix-word-mid-path-is-not-stripped',
-      async run({ assert }) {
-        assert.equal(resolve('/api/omega/user'), 'api/omega/user');
-        assert.equal(resolve('/omega/omega/user'), 'omega/user', 'only the leading prefix goes');
+      async run({ expect }) {
+        expect(resolve('/api/omega/user')).toBe('api/omega/user');
+        expect(resolve('/omega/omega/user'), 'only the leading prefix goes').toBe('omega/user');
       },
     },
 
@@ -149,9 +149,9 @@ module.exports = defineCases({
       // merely starts with a prefix word is not a prefixed path at all, and
       // keeps every character (minus its leading slash).
       name: 'a-route-merely-starting-with-a-prefix-word-is-untouched',
-      async run({ assert }) {
-        assert.equal(resolve('/omegatron/user'), 'omegatron/user');
-        assert.equal(resolve('/backend-manager-legacy/user'), 'backend-manager-legacy/user');
+      async run({ expect }) {
+        expect(resolve('/omegatron/user')).toBe('omegatron/user');
+        expect(resolve('/backend-manager-legacy/user')).toBe('backend-manager-legacy/user');
       },
     },
 
@@ -159,8 +159,8 @@ module.exports = defineCases({
 
     {
       name: 'the-resolution-returns-the-route-path-string',
-      async run({ assert }) {
-        assert.equal(typeof resolveRoutePath({ path: '/omega/user/sign-up' }), 'string');
+      async run({ expect }) {
+        expect(typeof resolveRoutePath({ path: '/omega/user/sign-up' })).toBe('string');
       },
     },
 
@@ -168,15 +168,15 @@ module.exports = defineCases({
 
     {
       name: 'a-route-only-the-consumer-ships-answers-the-framework-missing-route',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = bootOmega();
         omega.cwd = consumerCwd('only-in-consumer');
 
         const answer = await dispatchOnce(omega, '/omega/only-in-consumer');
 
-        assert.equal(answer.status, 404, 'the pipeline\'s missing-route answer');
-        assert.match(answer.text, /only-in-consumer\): route does not exist/, 'looked up under the framework\'s routes/');
-        assert.equal(answer.text.includes('"from":"consumer"'), false, 'the consumer module never answered');
+        expect(answer.status, 'the pipeline\'s missing-route answer').toBe(404);
+        expect(answer.text, 'looked up under the framework\'s routes/').toMatch(/only-in-consumer\): route does not exist/);
+        expect(answer.text.includes('"from":"consumer"'), 'the consumer module never answered').toBe(false);
       },
     },
   ],

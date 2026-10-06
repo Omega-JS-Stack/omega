@@ -36,7 +36,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-cancelled-pending-subscription',
-      async run({ accounts, firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, expect, state, config, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -83,14 +83,14 @@ module.exports = defineCases({
         }, { merge: true });
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'active', 'Should start active');
-        assert.equal(userDoc.subscription.cancellation.pending, true, 'Should start pending cancellation');
+        expect(userDoc.subscription.status, 'Should start active').toBe('active');
+        expect(userDoc.subscription.cancellation.pending, 'Should start pending cancellation').toBe(true);
       },
     },
 
     {
       name: 'call-uncancel-endpoint',
-      async run({ assert, omega, state }) {
+      async run({ expect, omega, state }) {
         const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
@@ -105,14 +105,14 @@ module.exports = defineCases({
           data: { confirmed: true },
         });
 
-        assert.equal(sent.code, 200, `Uncancel should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(sent.body?.success, true, `Should return { success: true }, got ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `Uncancel should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(sent.body?.success, `Should return { success: true }, got ${JSON.stringify(sent.body)}`).toBe(true);
       },
     },
 
     {
       name: 'verify-cancellation-cleared',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // Poll the user doc until the on-write pipeline writes the resumed state
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
@@ -120,17 +120,17 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.cancellation.pending, false, 'Cancellation should no longer be pending');
-        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.product.id, state.productId, `Product should still be ${state.productId}`);
-        assert.equal(userDoc.subscription.payment.frequency, state.frequency, `Frequency should still be ${state.frequency}`);
-        assert.equal(userDoc.subscription.payment.resourceId, RESOURCE_ID, 'Resource ID should be the same subscription');
+        expect(userDoc.subscription.cancellation.pending, 'Cancellation should no longer be pending').toBe(false);
+        expect(userDoc.subscription.status, 'Status should still be active').toBe('active');
+        expect(userDoc.subscription.product.id, `Product should still be ${state.productId}`).toBe(state.productId);
+        expect(userDoc.subscription.payment.frequency, `Frequency should still be ${state.frequency}`).toBe(state.frequency);
+        expect(userDoc.subscription.payment.resourceId, 'Resource ID should be the same subscription').toBe(RESOURCE_ID);
       },
     },
 
     {
       name: 'webhook-completed-with-cancellation-removed',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // The uncancel webhook reaches the pipeline and completes...
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
@@ -143,14 +143,14 @@ module.exports = defineCases({
         }, 15000, 500);
 
         const webhookDoc = snapshot.docs[0].data();
-        assert.equal(webhookDoc.status, 'completed', 'Webhook should complete');
+        expect(webhookDoc.status, 'Webhook should complete').toBe('completed');
 
         // ...and fires cancellation-removed, the withdrawal half of the pair whose
         // other half (pending false → true) is cancellation-requested. The handler
         // is log-only for now: the order template carries no copy for a withdrawn
         // cancellation, and its fallback variant would tell this subscriber their
         // subscription was just confirmed ([#212]).
-        assert.equal(webhookDoc.transition, 'cancellation-removed', `Withdrawing a scheduled cancellation should detect cancellation-removed, got: ${webhookDoc.transition}`);
+        expect(webhookDoc.transition, `Withdrawing a scheduled cancellation should detect cancellation-removed, got: ${webhookDoc.transition}`).toBe('cancellation-removed');
       },
     },
   ],

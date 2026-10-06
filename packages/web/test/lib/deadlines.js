@@ -89,6 +89,20 @@ function rebuildDeadlineMs(options) {
 }
 
 /**
+ * A watch case's own timeout: the deadline's ceiling (the floor at the capped
+ * load factor, times the lane scale) three times over, so a case holding
+ * several sequential waits ends on its waits' verdict, never a bare timeout.
+ * @param {object} [options]
+ * @param {object} [options.env] - environment to read the lane knob from
+ * @returns {number} milliseconds
+ */
+function caseTimeoutMs(options) {
+  const { env } = options || {};
+
+  return Math.round(BASE_REBUILD_DEADLINE_MS * MAX_LOAD_FACTOR * deadlineScale(env) * 3);
+}
+
+/**
  * A record of the build events a suite saw, so a timeout can say whether the
  * watcher was working or asleep (#615). Wired to Eleventy's own
  * `eleventy.before`/`eleventy.after`, or to whatever function IS the rebuild.
@@ -208,6 +222,7 @@ module.exports = {
   deadlineScale,
   loadFactor,
   rebuildDeadlineMs,
+  caseTimeoutMs,
   buildRecorder,
   waitForRebuild,
 };

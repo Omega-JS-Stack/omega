@@ -9,12 +9,11 @@
  * startup output and then dies on the missing input — enough of a run to prove
  * the tee is attached from the first line, and cheap.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const COMMANDS = path.join(__dirname, '..', 'src', 'commands');
 
@@ -25,7 +24,7 @@ function tmpTarget(t) {
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'config', 'omega.json5'),
-    '{ brand: { name: "Verb Logs", id: "verb-logs" }, targets: { web: { type: "web" } } }\n',
+    '{ brand: { name: "Verb Logs", id: "verb-logs", description: "A verb-logs fixture." }, targets: { web: { type: "web" } } }\n',
   );
   return root;
 }
@@ -47,43 +46,54 @@ function runVerb(root, verb, marker) {
   );
   env.FORCE_COLOR = '1';
 
-  return spawnSync(process.execPath, ['-e', script], { cwd: root, encoding: 'utf8', env });
+  // A script file, never `-e`: node hands an eval script to every child the test runner spawns.
+  const file = path.join(root, `run-${verb}.js`);
+  fs.writeFileSync(file, script);
+  return spawnSync(process.execPath, [file], { cwd: root, encoding: 'utf8', env });
 }
 
-test('`omega build` tees the run to logs/build.log, ANSI stripped in the file only', (t) => {
-  const root = tmpTarget(t);
+module.exports = defineCases({
+  type: 'group',
+  description: 'verb-logs',
+  tests: [
+    {
+      name: '`omega build` tees the run to logs/build.log, ANSI stripped in the file only',
+      run: (ctx) => {
+        const root = tmpTarget(ctx);
 
-  const result = runVerb(root, 'build', 'BUILD DONE');
-  assert.strictEqual(result.status, 0, result.stdout + result.stderr);
+        const result = runVerb(root, 'build', 'BUILD DONE');
+        ctx.expect(result.status, result.stdout + result.stderr).toBe(0);
 
-  const logPath = path.join(root, 'logs', 'build.log');
-  assert.ok(fs.existsSync(logPath), 'the verb must open logs/build.log');
-  const contents = fs.readFileSync(logPath, 'utf8');
+        const logPath = path.join(root, 'logs', 'build.log');
+        ctx.expect(fs.existsSync(logPath), 'the verb must open logs/build.log').toBeTruthy();
+        const contents = fs.readFileSync(logPath, 'utf8');
 
-  // The verb's own output — proof the tee is live before the work starts.
-  assert.match(contents, /payment\.products is empty/, "the verb's first log line is in the file");
-  assert.match(contents, /BUILD DONE/, 'the tee survives to the end of the run');
+        // The verb's own output — proof the tee is live before the work starts.
+        ctx.expect(contents, "the verb's first log line is in the file").toMatch(/payment\.products is empty/);
+        ctx.expect(contents, 'the tee survives to the end of the run').toMatch(/BUILD DONE/);
 
-  // Both sinks, one stripped: the terminal keeps the colors, the file has none.
-  assert.ok(result.stdout.includes('\x1B['), 'the terminal must still get ANSI');
-  assert.ok(!contents.includes('\x1B['), 'the file must be ANSI-free');
-});
+        // Both sinks, one stripped: the terminal keeps the colors, the file has none.
+        ctx.expect(result.stdout.includes('\x1B['), 'the terminal must still get ANSI').toBeTruthy();
+        ctx.expect(!contents.includes('\x1B['), 'the file must be ANSI-free').toBeTruthy();
+      },
+    },
 
-test('`omega test` keeps its own tee — the build it runs never steals logs/test.log', (t) => {
-  const root = tmpTarget(t);
+    {
+      name: '`omega test` keeps its own tee — the build it runs never steals logs/test.log',
+      run: (ctx) => {
+        const root = tmpTarget(ctx);
 
-  const result = runVerb(root, 'test', 'TEST DONE');
-  assert.strictEqual(result.status, 0, result.stdout + result.stderr);
+        const result = runVerb(root, 'test', 'TEST DONE');
+        ctx.expect(result.status, result.stdout + result.stderr).toBe(0);
 
-  const contents = fs.readFileSync(path.join(root, 'logs', 'test.log'), 'utf8');
+        const contents = fs.readFileSync(path.join(root, 'logs', 'test.log'), 'utf8');
 
-  // The nested build's output lands in test.log — under the old singleton it
-  // would have detached (and truncated) this file to open its own.
-  assert.match(contents, /payment\.products is empty/, 'the build phase logs into test.log');
-  assert.match(contents, /TEST DONE/, 'the tee is still attached after the build phase');
-  assert.strictEqual(
-    fs.existsSync(path.join(root, 'logs', 'build.log')),
-    false,
-    'a nested build must not open a second log file',
-  );
+        // The nested build's output lands in test.log — under the old singleton it
+        // would have detached (and truncated) this file to open its own.
+        ctx.expect(contents, 'the build phase logs into test.log').toMatch(/payment\.products is empty/);
+        ctx.expect(contents, 'the tee is still attached after the build phase').toMatch(/TEST DONE/);
+        ctx.expect(fs.existsSync(path.join(root, 'logs', 'build.log')), 'a nested build must not open a second log file').toBe(false);
+      },
+    },
+  ],
 });

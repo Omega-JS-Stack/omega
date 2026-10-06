@@ -20,7 +20,7 @@
  *
  * Run: npx omega test backend:cli/stripe-live-lane
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const lane = require('../../dist/cli/commands/test-lanes/stripe-live.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -66,8 +66,8 @@ module.exports = defineCases({
       async run() {
         const decision = lane.resolveGate({ env: reader('sk_test_abc123'), hasStripeCli: true });
 
-        assert.equal(decision.ok, true, 'a test secret key with the CLI installed is the whole requirement');
-        assert.equal(decision.key, 'sk_test_abc123', 'and the resolved key rides along, so nothing reads it twice');
+        expect(decision.ok, 'a test secret key with the CLI installed is the whole requirement').toBe(true);
+        expect(decision.key, 'and the resolved key rides along, so nothing reads it twice').toBe('sk_test_abc123');
       },
     },
 
@@ -78,8 +78,8 @@ module.exports = defineCases({
         for (const answer of [undefined, null, '']) {
           const decision = lane.resolveGate({ env: reader(answer), hasStripeCli: true });
 
-          assert.equal(decision.ok, false, `a ${JSON.stringify(answer)} secret must not open the lane`);
-          assert.ok(decision.reason.includes('.env.testing'), `the skip line names the overlay to put the key in, got: ${decision.reason}`);
+          expect(decision.ok, `a ${JSON.stringify(answer)} secret must not open the lane`).toBe(false);
+          expect(decision.reason.includes('.env.testing'), `the skip line names the overlay to put the key in, got: ${decision.reason}`).toBeTruthy();
         }
       },
     },
@@ -96,15 +96,15 @@ module.exports = defineCases({
         for (const live of ['sk_live_abc123', 'rk_live_abc123']) {
           const decision = lane.resolveGate({ env: reader(live), hasStripeCli: true });
 
-          assert.equal(decision.ok, false, `${live} must never open a lane that creates subscriptions`);
-          assert.ok(decision.reason.includes('sk_test_'), `the skip line names what it wanted, got: ${decision.reason}`);
+          expect(decision.ok, `${live} must never open a lane that creates subscriptions`).toBe(false);
+          expect(decision.reason.includes('sk_test_'), `the skip line names what it wanted, got: ${decision.reason}`).toBeTruthy();
         }
 
         // A reader FAULT is surfaced as a skip too, not a crash
         const faulted = lane.resolveGate({ env: reader(readerFault()), hasStripeCli: true });
 
-        assert.equal(faulted.ok, false, 'a lane that cannot resolve its key must not run');
-        assert.ok(faulted.reason.includes('STRIPE_SECRET_KEY'), `the skip line carries the reader's own words, got: ${faulted.reason}`);
+        expect(faulted.ok, 'a lane that cannot resolve its key must not run').toBe(false);
+        expect(faulted.reason.includes('STRIPE_SECRET_KEY'), `the skip line carries the reader's own words, got: ${faulted.reason}`).toBeTruthy();
       },
     },
 
@@ -118,8 +118,8 @@ module.exports = defineCases({
         for (const key of ['rk_test_abc', 'pk_test_abc', 'sk_live_abc', 'whsec_abc', 'nonsense']) {
           const decision = lane.resolveGate({ env: reader(key), hasStripeCli: true });
 
-          assert.equal(decision.ok, false, `${key.split('_')[0]}_… must not open the lane`);
-          assert.ok(decision.reason.includes(lane.TEST_KEY_PREFIX), `the skip line says what shape is required, got: ${decision.reason}`);
+          expect(decision.ok, `${key.split('_')[0]}_… must not open the lane`).toBe(false);
+          expect(decision.reason.includes(lane.TEST_KEY_PREFIX), `the skip line says what shape is required, got: ${decision.reason}`).toBeTruthy();
         }
       },
     },
@@ -130,8 +130,8 @@ module.exports = defineCases({
       async run() {
         const decision = lane.resolveGate({ env: reader('sk_test_abc123'), hasStripeCli: false });
 
-        assert.equal(decision.ok, false, 'the lane forwards with the CLI — without it there is nothing to forward');
-        assert.ok(decision.reason.includes('stripe.com/docs/stripe-cli'), `the skip line says how to install it, got: ${decision.reason}`);
+        expect(decision.ok, 'the lane forwards with the CLI — without it there is nothing to forward').toBe(false);
+        expect(decision.reason.includes('stripe.com/docs/stripe-cli'), `the skip line says how to install it, got: ${decision.reason}`).toBeTruthy();
       },
     },
 
@@ -146,11 +146,11 @@ module.exports = defineCases({
         for (const key of [secret, 'rk_test_ANOTHERSECRET', 'pk_test_THIRDSECRET']) {
           const decision = lane.resolveGate({ env: reader(key), hasStripeCli: true });
 
-          assert.equal(decision.ok, false, `${key} should be refused`);
-          assert.ok(!decision.reason.includes(key), `the skip line must never quote the credential, got: ${decision.reason}`);
+          expect(decision.ok, `${key} should be refused`).toBe(false);
+          expect(!decision.reason.includes(key), `the skip line must never quote the credential, got: ${decision.reason}`).toBeTruthy();
         }
 
-        assert.ok(!lane.skipLine('a reason').includes('sk_'), 'and the printed line carries only the reason');
+        expect(!lane.skipLine('a reason').includes('sk_'), 'and the printed line carries only the reason').toBeTruthy();
       },
     },
 
@@ -163,11 +163,7 @@ module.exports = defineCases({
         const { fixtures } = lane.planFixtures(CATALOGUE, 'USD');
         const ids = fixtures.map((f) => `${f.productId}/${f.frequency}`).sort();
 
-        assert.deepEqual(
-          ids,
-          ['credits/once', 'premium/annually', 'premium/monthly'],
-          'every priced, unarchived, non-basic product needs a fixture — and basic and archived need none',
-        );
+        expect(ids, 'every priced, unarchived, non-basic product needs a fixture — and basic and archived need none').toEqual(['credits/once', 'premium/annually', 'premium/monthly']);
       },
     },
 
@@ -182,18 +178,18 @@ module.exports = defineCases({
         const { fixtures } = lane.planFixtures(CATALOGUE, 'USD');
 
         const monthly = fixtures.find((f) => f.productId === 'premium' && f.frequency === 'monthly');
-        assert.equal(monthly.unitAmount, 499, '$4.99 is 499 minor units');
-        assert.equal(monthly.interval, 'month', 'monthly maps to Stripe\'s `month`');
+        expect(monthly.unitAmount, '$4.99 is 499 minor units').toBe(499);
+        expect(monthly.interval, 'monthly maps to Stripe\'s `month`').toBe('month');
 
         const annually = fixtures.find((f) => f.frequency === 'annually');
-        assert.equal(annually.unitAmount, 4999, '$49.99 is 4999 minor units');
-        assert.equal(annually.interval, 'year', 'annually maps to Stripe\'s `year` — not `annual`');
+        expect(annually.unitAmount, '$49.99 is 4999 minor units').toBe(4999);
+        expect(annually.interval, 'annually maps to Stripe\'s `year` — not `annual`').toBe('year');
 
         const once = fixtures.find((f) => f.frequency === 'once');
-        assert.equal(once.unitAmount, 950, '$9.50 is 950 minor units, not 95');
-        assert.equal(once.interval, null, 'a one-time price has no recurring interval at all');
+        expect(once.unitAmount, '$9.50 is 950 minor units, not 95').toBe(950);
+        expect(once.interval, 'a one-time price has no recurring interval at all').toBe(null);
 
-        assert.ok(fixtures.every((f) => f.currency === 'usd'), 'Stripe wants the currency lower-cased');
+        expect(fixtures.every((f) => f.currency === 'usd'), 'Stripe wants the currency lower-cased').toBeTruthy();
       },
     },
 
@@ -206,10 +202,10 @@ module.exports = defineCases({
           { id: 'empty', name: 'Empty', type: 'one-time', prices: {} },
         ], 'USD');
 
-        assert.equal(fixtures.length, 0, 'neither can be represented');
-        assert.equal(unsupported.length, 2, 'and both are reported rather than silently skipped');
-        assert.ok(unsupported[0].reason.includes('fortnightly'), `the reason names the frequency, got: ${unsupported[0].reason}`);
-        assert.ok(unsupported[1].reason.includes('once'), `the reason names the missing price, got: ${unsupported[1].reason}`);
+        expect(fixtures.length, 'neither can be represented').toBe(0);
+        expect(unsupported.length, 'and both are reported rather than silently skipped').toBe(2);
+        expect(unsupported[0].reason.includes('fortnightly'), `the reason names the frequency, got: ${unsupported[0].reason}`).toBeTruthy();
+        expect(unsupported[1].reason.includes('once'), `the reason names the missing price, got: ${unsupported[1].reason}`).toBeTruthy();
       },
     },
 
@@ -227,13 +223,9 @@ module.exports = defineCases({
           { id: 'price_right', unit_amount: 499, recurring: { interval: 'month' } },
         ];
 
-        assert.equal(lane.findSatisfyingPrice(monthly, existing).id, 'price_right', 'a rerun reuses the price the first run made');
-        assert.equal(lane.findSatisfyingPrice(monthly, []), null, 'and a first run finds nothing to reuse');
-        assert.equal(
-          lane.findSatisfyingPrice(monthly, [{ id: 'price_once', unit_amount: 499 }]),
-          null,
-          'a one-time price never satisfies a recurring fixture, however right the amount',
-        );
+        expect(lane.findSatisfyingPrice(monthly, existing).id, 'a rerun reuses the price the first run made').toBe('price_right');
+        expect(lane.findSatisfyingPrice(monthly, []), 'and a first run finds nothing to reuse').toBe(null);
+        expect(lane.findSatisfyingPrice(monthly, [{ id: 'price_once', unit_amount: 499 }]), 'a one-time price never satisfies a recurring fixture, however right the amount').toBe(null);
       },
     },
 
@@ -243,8 +235,8 @@ module.exports = defineCases({
       async run() {
         const [once] = lane.planFixtures([CATALOGUE[2]], 'USD').fixtures;
 
-        assert.equal(lane.findSatisfyingPrice(once, [{ id: 'price_sub', unit_amount: 950, recurring: { interval: 'month' } }]), null, 'a subscription price is not a one-time price');
-        assert.equal(lane.findSatisfyingPrice(once, [{ id: 'price_once', unit_amount: 950 }]).id, 'price_once', 'a bare price at the right amount is');
+        expect(lane.findSatisfyingPrice(once, [{ id: 'price_sub', unit_amount: 950, recurring: { interval: 'month' } }]), 'a subscription price is not a one-time price').toBe(null);
+        expect(lane.findSatisfyingPrice(once, [{ id: 'price_once', unit_amount: 950 }]).id, 'a bare price at the right amount is').toBe('price_once');
       },
     },
 
@@ -257,13 +249,9 @@ module.exports = defineCases({
         // The tunnel exists only once `stripe listen` says it does — resolving
         // earlier would let a trigger fire into nothing. That same line also
         // carries the CLI's signing secret, which is why it is never logged.
-        assert.equal(
-          lane.isReadyLine('> Ready! You are using Stripe API Version [2024-06-20]. Your webhook signing secret is whsec_abc123XYZ (^C to quit)'),
-          true,
-          'the ready line opens the gate',
-        );
-        assert.equal(lane.isReadyLine('2026-08-25 22:00:00  --> customer.subscription.created [evt_1]'), false, 'a delivery line does not');
-        assert.equal(lane.isReadyLine(''), false, 'and neither does an empty one');
+        expect(lane.isReadyLine('> Ready! You are using Stripe API Version [2024-06-20]. Your webhook signing secret is whsec_abc123XYZ (^C to quit)'), 'the ready line opens the gate').toBe(true);
+        expect(lane.isReadyLine('2026-08-25 22:00:00  --> customer.subscription.created [evt_1]'), 'a delivery line does not').toBe(false);
+        expect(lane.isReadyLine(''), 'and neither does an empty one').toBe(false);
       },
     },
 
@@ -273,18 +261,14 @@ module.exports = defineCases({
       name: 'the-lanes-suites-are-unreachable-without-the-gate',
 
       async run() {
-        // The exclusion is a STRING MATCH between the directory the suites live
-        // in and the lane's own name, in two files. Drift either one and the
-        // lane's suites either vanish from every run or, worse, join the default
-        // one — which is a suite hitting a real payment API because a folder was
-        // renamed.
-        const TestRunner = require('../../dist/test/runner.js');
+        // The runner keeps test/<lane>/ out of a default run by matching the
+        // directory against the lanes the manifest declares. Drift the two
+        // apart and the lane either vanishes from every run or joins the
+        // default one, a suite hitting a real payment API.
+        const { declaredLanes } = require('../../dist/utils/test-lanes.js');
 
-        assert.ok(
-          TestRunner.LANE_DIRECTORIES.has(lane.LANE),
-          `the runner must skip test/${lane.LANE}/ by default — its lane list holds ${[...TestRunner.LANE_DIRECTORIES].join(', ')}`,
-        );
-        assert.equal(lane.LANE_ENV, 'OMEGA_TEST_LANE', 'and the runner reads the open lane off exactly this env var');
+        expect(declaredLanes(), `the runner must skip test/${lane.LANE}/ by default; the declared lanes are ${declaredLanes().join(', ')}`).toContain(lane.LANE);
+        expect(lane.LANE_ENV, 'and the runner reads the open lane off exactly this env var').toBe('OMEGA_TEST_LANE');
       },
     },
 
@@ -294,9 +278,9 @@ module.exports = defineCases({
       async run() {
         const url = lane.forwardUrl({ hostingPort: 5099, webhookKey: '_test-key' });
 
-        assert.ok(url.startsWith('http://localhost:5099/omega/payments/webhook'), `the lane forwards to the route itself, got ${url}`);
-        assert.ok(url.includes('provider=stripe'), 'as the STRIPE provider — the whole point is that nothing is simulated');
-        assert.ok(url.includes('key=_test-key'), 'carrying the shared key the route also checks');
+        expect(url.startsWith('http://localhost:5099/omega/payments/webhook'), `the lane forwards to the route itself, got ${url}`).toBeTruthy();
+        expect(url.includes('provider=stripe'), 'as the STRIPE provider — the whole point is that nothing is simulated').toBeTruthy();
+        expect(url.includes('key=_test-key'), 'carrying the shared key the route also checks').toBeTruthy();
       },
     },
   ],

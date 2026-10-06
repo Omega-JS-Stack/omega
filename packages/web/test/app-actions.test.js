@@ -9,10 +9,10 @@
  * #3: the rail-collapse control asked for a `sidebar` icon the chain cannot
  * resolve; stock chrome must render a real SVG, never the tagged fallback.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildSite } = require('./lib/build.js');
 
@@ -22,41 +22,56 @@ const topbarData = JSON.parse(fs.readFileSync(path.join(FIXTURE, 'site-data.json
 const buildApp = async () => {
   const pages = await buildSite(FIXTURE, topbarData, {}, 'app-actions-test');
   const app = pages.get('/app');
-  assert.ok(app, 'app surface built');
+  expect(app, 'app surface built').toBeTruthy();
   return app;
 };
 
-test('#43: an action with no size renders NO size class — the btn-<keycount> trap is gone', async () => {
-  const app = await buildApp();
+module.exports = defineCases({
+  type: 'group',
+  description: 'app-actions',
+  tests: [
+    {
+      name: '#43: an action with no size renders NO size class — the btn-<keycount> trap is gone',
+      run: async (ctx) => {
+        const app = await buildApp();
 
-  assert.ok(!/\bbtn-\d/.test(app), 'no numeric btn-<N> class anywhere in the chrome');
-  assert.ok(app.includes('Unsized action'), 'the topbar action rendered');
-  assert.ok(app.includes('Unsized header action'), 'the page-header action rendered');
-  assert.ok(app.includes('Unsized dropdown'), 'the topbar dropdown action rendered');
-  assert.ok(app.includes('Unsized header dropdown'), 'the page-header dropdown action rendered');
-});
+        ctx.expect(!/\bbtn-\d/.test(app), 'no numeric btn-<N> class anywhere in the chrome').toBeTruthy();
+        ctx.expect(app.includes('Unsized action'), 'the topbar action rendered').toBeTruthy();
+        ctx.expect(app.includes('Unsized header action'), 'the page-header action rendered').toBeTruthy();
+        ctx.expect(app.includes('Unsized dropdown'), 'the topbar dropdown action rendered').toBeTruthy();
+        ctx.expect(app.includes('Unsized header dropdown'), 'the page-header dropdown action rendered').toBeTruthy();
+      },
+    },
 
-test('#43: size: lg still renders btn-lg — and no longer collides with the btn-sm default', async () => {
-  const app = await buildApp();
+    {
+      name: '#43: size: lg still renders btn-lg — and no longer collides with the btn-sm default',
+      run: async (ctx) => {
+        const app = await buildApp();
 
-  const large = app.match(/<a class="([^"]*)" href="\/large"/g) || [];
-  assert.equal(large.length, 2, 'both the topbar and the page-header large actions rendered');
-  for (const anchor of large) {
-    assert.match(anchor, /btn-lg/, 'the authored size lands as btn-lg');
-    assert.ok(!/btn-sm/.test(anchor), 'the small default steps aside for an authored size');
-  }
+        const large = app.match(/<a class="([^"]*)" href="\/large"/g) || [];
+        ctx.expect(large.length, 'both the topbar and the page-header large actions rendered').toBe(2);
+        for (const anchor of large) {
+          ctx.expect(anchor, 'the authored size lands as btn-lg').toMatch(/btn-lg/);
+          ctx.expect(!/btn-sm/.test(anchor), 'the small default steps aside for an authored size').toBeTruthy();
+        }
 
-  const unsized = app.match(/<a class="([^"]*)" href="\/unsized"/g) || [];
-  assert.equal(unsized.length, 2, 'both unsized actions rendered');
-  for (const anchor of unsized) {
-    assert.ok(!/btn-lg/.test(anchor), 'an unsized action never borrows a size');
-  }
-});
+        const unsized = app.match(/<a class="([^"]*)" href="\/unsized"/g) || [];
+        ctx.expect(unsized.length, 'both unsized actions rendered').toBe(2);
+        for (const anchor of unsized) {
+          ctx.expect(!/btn-lg/.test(anchor), 'an unsized action never borrows a size').toBeTruthy();
+        }
+      },
+    },
 
-test('#3: the stock app chrome resolves every icon — no fallback triangle, no missing tag', async () => {
-  const app = await buildApp();
+    {
+      name: '#3: the stock app chrome resolves every icon — no fallback triangle, no missing tag',
+      run: async (ctx) => {
+        const app = await buildApp();
 
-  assert.ok(!app.includes('data-omega-icon-missing'), 'no icon fell through to the empty marker');
-  assert.ok(app.includes('data-omega-fa="solid/table-columns"'), 'the rail-collapse toggle wears a resolvable icon');
-  assert.ok(!app.includes('fa-sidebar'), 'the unresolvable name is gone');
+        ctx.expect(!app.includes('data-omega-icon-missing'), 'no icon fell through to the empty marker').toBeTruthy();
+        ctx.expect(app.includes('data-omega-fa="solid/table-columns"'), 'the rail-collapse toggle wears a resolvable icon').toBeTruthy();
+        ctx.expect(!app.includes('fa-sidebar'), 'the unresolvable name is gone').toBeTruthy();
+      },
+    },
+  ],
 });

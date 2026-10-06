@@ -208,55 +208,55 @@ module.exports = defineCases({
   tests: [
     {
       name: 'charges-the-list-price-with-no-discount',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({}, calls);
 
-        assert.equal(calls.length, 1, 'Exactly one API call');
-        assert.equal(calls[0].endpoint, '/v2/checkout/orders', 'A one-time buy is a v2 Order');
-        assert.equal(amountOf(calls[0]), '49.99', 'The full price, undiscounted');
+        expect(calls.length, 'Exactly one API call').toBe(1);
+        expect(calls[0].endpoint, 'A one-time buy is a v2 Order').toBe('/v2/checkout/orders');
+        expect(amountOf(calls[0]), 'The full price, undiscounted').toBe('49.99');
       },
     },
 
     {
       name: 'a-validated-discount-comes-off-the-order',
-      async run({ assert }) {
+      async run({ expect }) {
         // The confirmation URL quotes this same number, so charging the list
         // price here sold a $49.99 order against a $44.99 receipt
         const calls = [];
         await createIntent({ discount: { valid: true, code: 'SAVE10', percent: 10, amount: 0 } }, calls);
 
-        assert.equal(amountOf(calls[0]), '44.99', '10% off $49.99');
+        expect(amountOf(calls[0]), '10% off $49.99').toBe('44.99');
       },
     },
 
     {
       name: 'a-flat-discount-comes-off-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({ discount: { valid: true, code: 'WELCOME10OFF', percent: 0, amount: 10 } }, calls);
 
-        assert.equal(amountOf(calls[0]), '39.99', '$10 off $49.99');
+        expect(amountOf(calls[0]), '$10 off $49.99').toBe('39.99');
       },
     },
 
     {
       name: 'a-subscription-with-no-code-pays-the-plan-price',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createSubscriptionIntent({}, calls);
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan_id, 'P-TEST-MONTHLY', 'The plan the manager created for $20.00 monthly');
-        assert.equal(body.plan, undefined, 'Nothing overridden: the plan charges its own $20.00 today');
-        assert.equal(body.start_time, undefined, 'Nothing to defer: PayPal starts the plan now');
+        expect(body.plan_id, 'The plan the manager created for $20.00 monthly').toBe('P-TEST-MONTHLY');
+        expect(body.plan, 'Nothing overridden: the plan charges its own $20.00 today').toBe(undefined);
+        expect(body.start_time, 'Nothing to defer: PayPal starts the plan now').toBe(undefined);
       },
     },
 
     {
       name: 'a-percent-code-discounts-the-subscriptions-first-period',
-      async run({ assert }) {
+      async run({ expect }) {
         // The confirmation URL quotes this same number for a subscription, so a
         // full-price plan charge here sold $20.00 against an $18.00 receipt
         const calls = [];
@@ -264,40 +264,42 @@ module.exports = defineCases({
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan.payment_preferences.setup_fee.value, '18.00', '10% off $20.00, charged at approval');
-        assert.equal(body.plan.payment_preferences.setup_fee.currency_code, 'USD', 'The plan currency');
-        assert.equal(body.plan.billing_cycles, undefined, 'The plan cycles stand, so every renewal is still $20.00');
-        assert.inRange(daysUntil(body.start_time), 27, 32, 'The plan bills a month out, so today is the discounted fee alone');
+        expect(body.plan.payment_preferences.setup_fee.value, '10% off $20.00, charged at approval').toBe('18.00');
+        expect(body.plan.payment_preferences.setup_fee.currency_code, 'The plan currency').toBe('USD');
+        expect(body.plan.billing_cycles, 'The plan cycles stand, so every renewal is still $20.00').toBe(undefined);
+        expect(daysUntil(body.start_time), 'The plan bills a month out, so today is the discounted fee alone').toBeGreaterThanOrEqual(27);
+        expect(daysUntil(body.start_time), 'The plan bills a month out, so today is the discounted fee alone').toBeLessThanOrEqual(32);
       },
     },
 
     {
       name: 'a-flat-code-discounts-the-subscription-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createSubscriptionIntent({ discount: { valid: true, code: 'WELCOME10OFF', percent: 0, amount: 10 } }, calls);
 
-        assert.equal(subscriptionBody(calls).plan.payment_preferences.setup_fee.value, '10.00', '$10 off $20.00');
+        expect(subscriptionBody(calls).plan.payment_preferences.setup_fee.value, '$10 off $20.00').toBe('10.00');
       },
     },
 
     {
       name: 'an-annual-code-defers-billing-a-year',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createSubscriptionIntent({ frequency: 'annually', discount: { valid: true, code: 'SAVE10', percent: 10, amount: 0 } }, calls);
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan_id, 'P-TEST-ANNUAL', 'The annual plan');
-        assert.equal(body.plan.payment_preferences.setup_fee.value, '180.00', '10% off $200.00');
-        assert.inRange(daysUntil(body.start_time), 360, 370, 'A period out is a YEAR here, not a month');
+        expect(body.plan_id, 'The annual plan').toBe('P-TEST-ANNUAL');
+        expect(body.plan.payment_preferences.setup_fee.value, '10% off $200.00').toBe('180.00');
+        expect(daysUntil(body.start_time), 'A period out is a YEAR here, not a month').toBeGreaterThanOrEqual(360);
+        expect(daysUntil(body.start_time), 'A period out is a YEAR here, not a month').toBeLessThanOrEqual(370);
       },
     },
 
     {
       name: 'a-free-trial-charges-nothing-today-even-with-a-code',
-      async run({ assert }) {
+      async run({ expect }) {
         // The confirmation URL quotes $0 for a trial, and a setup fee would be a
         // real charge on day zero against that quote
         const calls = [];
@@ -305,15 +307,15 @@ module.exports = defineCases({
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan_id, 'P-TEST-MONTHLY-TRIAL', 'The TRIAL twin — the free cycle lives on the plan');
-        assert.equal(body.plan, undefined, 'No setup fee: the plan trial cycle charges nothing today');
-        assert.equal(body.start_time, undefined, 'The trial cycle starts immediately');
+        expect(body.plan_id, 'The TRIAL twin — the free cycle lives on the plan').toBe('P-TEST-MONTHLY-TRIAL');
+        expect(body.plan, 'No setup fee: the plan trial cycle charges nothing today').toBe(undefined);
+        expect(body.start_time, 'The trial cycle starts immediately').toBe(undefined);
       },
     },
 
     {
       name: 'a-trial-product-bought-without-the-trial-takes-the-no-trial-twin',
-      async run({ assert }) {
+      async run({ expect }) {
         // Skipping the trial is a PLAN choice now: the no-trial twin has no free
         // cycle on it, so the buyer is charged the plan's price at approval and
         // reads as paying from day one (#761)
@@ -322,15 +324,15 @@ module.exports = defineCases({
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan_id, 'P-TEST-MONTHLY', 'The skip-trial twin, not the one carrying the TRIAL cycle');
-        assert.equal(body.plan, undefined, 'No override: the plan charges its own $20.00 today');
-        assert.equal(body.start_time, undefined, 'No trial cycle to outrun, so nothing is deferred');
+        expect(body.plan_id, 'The skip-trial twin, not the one carrying the TRIAL cycle').toBe('P-TEST-MONTHLY');
+        expect(body.plan, 'No override: the plan charges its own $20.00 today').toBe(undefined);
+        expect(body.start_time, 'No trial cycle to outrun, so nothing is deferred').toBe(undefined);
       },
     },
 
     {
       name: 'a-returning-buyers-code-discounts-a-trial-products-first-period',
-      async run({ assert }) {
+      async run({ expect }) {
         // The #759 carve-out is gone with the hole it guarded: the winback codes
         // target exactly this buyer, and the confirmation page quotes $16.00
         const calls = [];
@@ -338,15 +340,16 @@ module.exports = defineCases({
 
         const body = subscriptionBody(calls);
 
-        assert.equal(body.plan_id, 'P-TEST-MONTHLY', 'Still the skip-trial twin');
-        assert.equal(body.plan.payment_preferences.setup_fee.value, '16.00', '20% off $20.00, charged at approval');
-        assert.inRange(daysUntil(body.start_time), 27, 32, 'The plan bills a month out, so today is the discounted fee alone');
+        expect(body.plan_id, 'Still the skip-trial twin').toBe('P-TEST-MONTHLY');
+        expect(body.plan.payment_preferences.setup_fee.value, '20% off $20.00, charged at approval').toBe('16.00');
+        expect(daysUntil(body.start_time), 'The plan bills a month out, so today is the discounted fee alone').toBeGreaterThanOrEqual(27);
+        expect(daysUntil(body.start_time), 'The plan bills a month out, so today is the discounted fee alone').toBeLessThanOrEqual(32);
       },
     },
 
     {
       name: 'a-trial-product-with-no-skip-trial-twin-yet-refuses-loudly',
-      async run({ assert }) {
+      async run({ expect }) {
         // The manager mints the twin; until that walk runs there is no plan to
         // sell a trial-skipping buyer, and a silent fall back to the trial twin
         // would hand them a free period they were not owed
@@ -372,10 +375,10 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A missing twin refuses the checkout');
-        assert.match(threw.message, /No active PayPal plan/, 'The existing plan-lookup refusal');
-        assert.match(threw.message, /without a trial/, 'And it names the twin that is missing, so the fix is a manage run');
-        assert.equal(subscriptionBody(calls), null, 'Nothing was created');
+        expect(threw, 'A missing twin refuses the checkout').toBeTruthy();
+        expect(threw.message, 'The existing plan-lookup refusal').toMatch(/No active PayPal plan/);
+        expect(threw.message, 'And it names the twin that is missing, so the fix is a manage run').toMatch(/without a trial/);
+        expect(subscriptionBody(calls), 'Nothing was created').toBe(null);
       },
     },
   ],

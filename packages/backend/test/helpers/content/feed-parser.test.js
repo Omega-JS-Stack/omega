@@ -123,91 +123,91 @@ module.exports = defineCases({
     // ============================
     {
       name: 'rss-parses-standard-items',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items.length, 2, 'should parse 2 items');
-        assert.equal(items[0].title, 'First Article Title');
-        assert.equal(items[1].title, 'Second Article Title');
+        expect(items.length, 'should parse 2 items').toBe(2);
+        expect(items[0].title).toBe('First Article Title');
+        expect(items[1].title).toBe('Second Article Title');
       },
     },
 
     {
       name: 'rss-extracts-guid-as-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[0].id, 'https://example.com/article-1', 'text guid');
-        assert.equal(items[1].id, 'article-2-id', 'guid with isPermaLink attr');
+        expect(items[0].id, 'text guid').toBe('https://example.com/article-1');
+        expect(items[1].id, 'guid with isPermaLink attr').toBe('article-2-id');
       },
     },
 
     {
       name: 'rss-extracts-link-as-url',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[0].url, 'https://example.com/article-1');
-        assert.equal(items[1].url, 'https://example.com/article-2');
+        expect(items[0].url).toBe('https://example.com/article-1');
+        expect(items[1].url).toBe('https://example.com/article-2');
       },
     },
 
     {
       name: 'rss-extracts-description-as-summary',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[0].summary, 'Short description of the first article.');
+        expect(items[0].summary).toBe('Short description of the first article.');
       },
     },
 
     {
       name: 'rss-extracts-content-encoded-as-content',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.ok(items[0].content.includes('Full content of the first article'), 'has content:encoded text');
-        assert.ok(!items[0].content.includes('<p>'), 'HTML stripped from content');
+        expect(items[0].content.includes('Full content of the first article'), 'has content:encoded text').toBeTruthy();
+        expect(!items[0].content.includes('<p>'), 'HTML stripped from content').toBeTruthy();
       },
     },
 
     {
       name: 'rss-falls-back-to-description-when-no-content-encoded',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[1].content, 'Short description of the second article.');
+        expect(items[1].content).toBe('Short description of the second article.');
       },
     },
 
     {
       name: 'rss-extracts-pubdate',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[0].publishedAt, 'Mon, 16 Jun 2025 10:00:00 GMT');
+        expect(items[0].publishedAt).toBe('Mon, 16 Jun 2025 10:00:00 GMT');
       },
     },
 
     {
       name: 'rss-handles-missing-optional-fields',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_MINIMAL);
-        assert.equal(items.length, 1);
-        assert.equal(items[0].title, 'Only Title');
-        assert.equal(items[0].url, 'https://example.com/only');
-        assert.equal(items[0].summary, '', 'no description');
-        assert.equal(items[0].publishedAt, '', 'no pubDate');
+        expect(items.length).toBe(1);
+        expect(items[0].title).toBe('Only Title');
+        expect(items[0].url).toBe('https://example.com/only');
+        expect(items[0].summary, 'no description').toBe('');
+        expect(items[0].publishedAt, 'no pubDate').toBe('');
       },
     },
 
     {
       name: 'rss-preserves-item-order',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.equal(items[0].title, 'First Article Title', 'first item is first');
-        assert.equal(items[1].title, 'Second Article Title', 'second item is second');
+        expect(items[0].title, 'first item is first').toBe('First Article Title');
+        expect(items[1].title, 'second item is second').toBe('Second Article Title');
       },
     },
 
     {
       name: 'rss-empty-channel-returns-empty-items',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_EMPTY_CHANNEL);
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
@@ -216,61 +216,61 @@ module.exports = defineCases({
     // ============================
     {
       name: 'atom-parses-standard-entries',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items.length, 2, 'should parse 2 entries');
-        assert.equal(items[0].title, 'Atom Entry One');
+        expect(items.length, 'should parse 2 entries').toBe(2);
+        expect(items[0].title).toBe('Atom Entry One');
       },
     },
 
     {
       name: 'atom-extracts-id',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items[0].id, 'urn:uuid:entry-1');
-        assert.equal(items[1].id, 'urn:uuid:entry-2');
+        expect(items[0].id).toBe('urn:uuid:entry-1');
+        expect(items[1].id).toBe('urn:uuid:entry-2');
       },
     },
 
     {
       name: 'atom-picks-alternate-link-href',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items[0].url, 'https://example.com/atom-1', 'picks rel=alternate over enclosure');
+        expect(items[0].url, 'picks rel=alternate over enclosure').toBe('https://example.com/atom-1');
       },
     },
 
     {
       name: 'atom-falls-back-to-first-link-when-no-rel',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items[1].url, 'https://example.com/atom-2', 'link without rel');
+        expect(items[1].url, 'link without rel').toBe('https://example.com/atom-2');
       },
     },
 
     {
       name: 'atom-extracts-summary-and-content',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items[0].summary, 'Summary of entry one.');
-        assert.equal(items[0].content, 'Full content of entry one.');
+        expect(items[0].summary).toBe('Summary of entry one.');
+        expect(items[0].content).toBe('Full content of entry one.');
       },
     },
 
     {
       name: 'atom-extracts-published-or-updated',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_FULL);
-        assert.equal(items[0].publishedAt, '2025-06-16T10:00:00Z', 'published');
-        assert.equal(items[1].publishedAt, '2025-06-17T12:00:00Z', 'updated fallback');
+        expect(items[0].publishedAt, 'published').toBe('2025-06-16T10:00:00Z');
+        expect(items[1].publishedAt, 'updated fallback').toBe('2025-06-17T12:00:00Z');
       },
     },
 
     {
       name: 'atom-empty-feed-returns-empty-items',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(ATOM_EMPTY);
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
@@ -279,63 +279,63 @@ module.exports = defineCases({
     // ============================
     {
       name: 'json-parses-standard-items',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON_FEED);
-        assert.equal(items.length, 2);
-        assert.equal(items[0].title, 'JSON Article One');
-        assert.equal(items[1].title, 'JSON Article Two');
+        expect(items.length).toBe(2);
+        expect(items[0].title).toBe('JSON Article One');
+        expect(items[1].title).toBe('JSON Article Two');
       },
     },
 
     {
       name: 'json-extracts-id-and-url',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON_FEED);
-        assert.equal(items[0].id, 'json-1');
-        assert.equal(items[0].url, 'https://example.com/json-1');
+        expect(items[0].id).toBe('json-1');
+        expect(items[0].url).toBe('https://example.com/json-1');
       },
     },
 
     {
       name: 'json-prefers-content-html-over-content-text',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON_FEED);
-        assert.equal(items[0].content, '<p>Full HTML content.</p>');
+        expect(items[0].content).toBe('<p>Full HTML content.</p>');
       },
     },
 
     {
       name: 'json-falls-back-to-content-text',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON_FEED);
-        assert.equal(items[1].content, 'Second article text.');
+        expect(items[1].content).toBe('Second article text.');
       },
     },
 
     {
       name: 'json-extracts-dates',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON_FEED);
-        assert.equal(items[0].publishedAt, '2025-06-16T10:00:00Z', 'date_published');
-        assert.equal(items[1].publishedAt, '2025-06-17T12:00:00Z', 'date_modified fallback');
+        expect(items[0].publishedAt, 'date_published').toBe('2025-06-16T10:00:00Z');
+        expect(items[1].publishedAt, 'date_modified fallback').toBe('2025-06-17T12:00:00Z');
       },
     },
 
     {
       name: 'json-handles-rssapp-format',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSSAPP_FORMAT);
-        assert.equal(items.length, 1);
-        assert.equal(items[0].title, 'RSS.app Item');
-        assert.equal(items[0].content, 'Content from RSS.app feed.');
+        expect(items.length).toBe(1);
+        expect(items[0].title).toBe('RSS.app Item');
+        expect(items[0].content).toBe('Content from RSS.app feed.');
       },
     },
 
     {
       name: 'json-empty-items-returns-empty',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON.stringify({ items: [] }));
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
@@ -344,88 +344,88 @@ module.exports = defineCases({
     // ============================
     {
       name: 'returns-empty-for-null-input',
-      async run({ assert }) {
-        assert.deepEqual(parseFeed(null), { items: [] });
+      async run({ expect }) {
+        expect(parseFeed(null)).toEqual({ items: [] });
       },
     },
 
     {
       name: 'returns-empty-for-undefined-input',
-      async run({ assert }) {
-        assert.deepEqual(parseFeed(undefined), { items: [] });
+      async run({ expect }) {
+        expect(parseFeed(undefined)).toEqual({ items: [] });
       },
     },
 
     {
       name: 'returns-empty-for-empty-string',
-      async run({ assert }) {
-        assert.deepEqual(parseFeed(''), { items: [] });
+      async run({ expect }) {
+        expect(parseFeed('')).toEqual({ items: [] });
       },
     },
 
     {
       name: 'returns-empty-for-invalid-xml',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed('<not<valid>xml');
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
     {
       name: 'returns-empty-for-non-feed-json',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(JSON.stringify({ data: [1, 2, 3] }));
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
     {
       name: 'returns-empty-for-plain-text',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed('just some plain text content');
-        assert.equal(items.length, 0);
+        expect(items.length).toBe(0);
       },
     },
 
     {
       name: 'handles-bom-prefix',
-      async run({ assert }) {
+      async run({ expect }) {
         const withBom = '﻿' + RSS_MINIMAL;
         const { items } = parseFeed(withBom);
-        assert.equal(items.length, 1, 'BOM does not break parsing');
-        assert.equal(items[0].title, 'Only Title');
+        expect(items.length, 'BOM does not break parsing').toBe(1);
+        expect(items[0].title).toBe('Only Title');
       },
     },
 
     {
       name: 'handles-namespace-prefixed-elements',
-      async run({ assert }) {
+      async run({ expect }) {
         const { items } = parseFeed(RSS_FULL);
-        assert.ok(items[0].content.includes('Full content'), 'content:encoded parsed despite namespace');
+        expect(items[0].content.includes('Full content'), 'content:encoded parsed despite namespace').toBeTruthy();
       },
     },
 
     {
       name: 'truncates-long-content',
-      async run({ assert }) {
+      async run({ expect }) {
         const longContent = 'x'.repeat(20000);
         const feed = JSON.stringify({
           items: [{ id: '1', title: 'Long', url: 'https://example.com', content_text: longContent }],
         });
         const { items } = parseFeed(feed);
-        assert.ok(items[0].content.length <= 1024 * 14, 'content truncated to 14KB');
+        expect(items[0].content.length <= 1024 * 14, 'content truncated to 14KB').toBeTruthy();
       },
     },
 
     {
       name: 'truncates-long-summary',
-      async run({ assert }) {
+      async run({ expect }) {
         const longSummary = 'y'.repeat(1000);
         const feed = JSON.stringify({
           items: [{ id: '1', title: 'Long Summary', url: 'https://example.com', summary: longSummary }],
         });
         const { items } = parseFeed(feed);
-        assert.ok(items[0].summary.length <= 500, 'summary truncated to 500 chars');
+        expect(items[0].summary.length <= 500, 'summary truncated to 500 chars').toBeTruthy();
       },
     },
 
@@ -434,22 +434,22 @@ module.exports = defineCases({
     // ============================
     {
       name: 'stripHtml-removes-tags',
-      async run({ assert }) {
-        assert.equal(stripHtml('<p>Hello <strong>world</strong></p>'), 'Hello world');
+      async run({ expect }) {
+        expect(stripHtml('<p>Hello <strong>world</strong></p>')).toBe('Hello world');
       },
     },
 
     {
       name: 'stripHtml-normalizes-whitespace',
-      async run({ assert }) {
-        assert.equal(stripHtml('<p>Hello</p>   <p>World</p>'), 'Hello World');
+      async run({ expect }) {
+        expect(stripHtml('<p>Hello</p>   <p>World</p>')).toBe('Hello World');
       },
     },
 
     {
       name: 'stripHtml-handles-empty-string',
-      async run({ assert }) {
-        assert.equal(stripHtml(''), '');
+      async run({ expect }) {
+        expect(stripHtml('')).toBe('');
       },
     },
 
@@ -458,71 +458,71 @@ module.exports = defineCases({
     // ============================
     {
       name: 'extractTextFromHtml-extracts-from-article-tag',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><nav>Menu</nav><article class="post"><p>Article content</p></article><footer>Footer</footer></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Article content'), 'extracts article text');
-        assert.ok(!text.includes('Menu'), 'nav removed');
-        assert.ok(!text.includes('Footer'), 'footer removed');
+        expect(text.includes('Article content'), 'extracts article text').toBeTruthy();
+        expect(!text.includes('Menu'), 'nav removed').toBeTruthy();
+        expect(!text.includes('Footer'), 'footer removed').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-falls-back-to-main',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><main><p>Main content</p></main><aside>Sidebar</aside></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Main content'), 'extracts main text');
-        assert.ok(!text.includes('Sidebar'), 'aside removed');
+        expect(text.includes('Main content'), 'extracts main text').toBeTruthy();
+        expect(!text.includes('Sidebar'), 'aside removed').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-falls-back-to-body',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><p>Body content here</p></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Body content here'), 'extracts body text');
+        expect(text.includes('Body content here'), 'extracts body text').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-strips-scripts-and-styles',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><article><script>alert("xss")</script><style>.x{color:red}</style><p>Clean text</p></article></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Clean text'), 'keeps article text');
-        assert.ok(!text.includes('alert'), 'script removed');
-        assert.ok(!text.includes('color'), 'style removed');
+        expect(text.includes('Clean text'), 'keeps article text').toBeTruthy();
+        expect(!text.includes('alert'), 'script removed').toBeTruthy();
+        expect(!text.includes('color'), 'style removed').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-strips-forms-and-buttons',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><article><p>Article text</p><form><input placeholder="Email"><button>Subscribe</button></form></article></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Article text'), 'keeps article text');
-        assert.ok(!text.includes('Subscribe'), 'button removed');
+        expect(text.includes('Article text'), 'keeps article text').toBeTruthy();
+        expect(!text.includes('Subscribe'), 'button removed').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-strips-ad-classes',
-      async run({ assert }) {
+      async run({ expect }) {
         const html = '<html><body><article><p>Real content</p><div class="advertisement">Buy stuff</div><div class="social-share">Share this</div></article></body></html>';
         const text = extractTextFromHtml(html);
-        assert.ok(text.includes('Real content'), 'keeps article text');
-        assert.ok(!text.includes('Buy stuff'), 'ad removed');
-        assert.ok(!text.includes('Share this'), 'social share removed');
+        expect(text.includes('Real content'), 'keeps article text').toBeTruthy();
+        expect(!text.includes('Buy stuff'), 'ad removed').toBeTruthy();
+        expect(!text.includes('Share this'), 'social share removed').toBeTruthy();
       },
     },
 
     {
       name: 'extractTextFromHtml-returns-empty-for-empty-html',
-      async run({ assert }) {
-        assert.equal(extractTextFromHtml(''), '');
-        assert.equal(extractTextFromHtml('<html><body></body></html>'), '');
+      async run({ expect }) {
+        expect(extractTextFromHtml('')).toBe('');
+        expect(extractTextFromHtml('<html><body></body></html>')).toBe('');
       },
     },
   ],

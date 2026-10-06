@@ -12,53 +12,53 @@ module.exports = defineCases({
   tests: [
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-basic-user',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 400, 'Should reject basic user with no paid subscription');
+        expect(response, 'Should reject basic user with no paid subscription').toBeError(400);
       },
     },
 
     {
       name: 'rejects-no-provider',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // portal-no-provider starts with payment.provider=null
         const response = await http.as('portal-no-provider').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 400, 'Should reject when no provider is set');
+        expect(response, 'Should reject when no provider is set').toBeError(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // portal-unknown-provider starts with provider='unknown-provider'
         const response = await http.as('portal-unknown-provider').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'succeeds-with-test-provider',
-      async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
+      async run({ http, expect, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['journey-payments-portal-route'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
         if (!paidProduct) {
@@ -72,7 +72,7 @@ module.exports = defineCases({
           frequency: 'monthly',
         });
 
-        assert.isSuccess(intentResponse, 'Intent should succeed');
+        expect(intentResponse, 'Intent should succeed').toBeSuccess();
 
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
@@ -86,8 +86,8 @@ module.exports = defineCases({
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isSuccess(portalResponse, 'Portal should succeed');
-        assert.ok(portalResponse.data.url, 'Should return a URL');
+        expect(portalResponse, 'Portal should succeed').toBeSuccess();
+        expect(portalResponse.data.url, 'Should return a URL').toBeTruthy();
       },
     },
   ],

@@ -12,8 +12,7 @@
  * consent-banner): the REAL module through esbuild behind its bundler aliases,
  * over a document that answers only the selectors the page reads.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -151,15 +150,24 @@ async function loadPricingPage() {
   return { banner, nav, firstSection, computedReads };
 }
 
-test('the promo banner pushes the NAV down and leaves the page where it is (#764)', async () => {
-  const page = await loadPricingPage();
+module.exports = defineCases({
+  type: 'group',
+  description: 'pricing-promo-banner',
+  tests: [
+    {
+      name: 'the promo banner pushes the NAV down and leaves the page where it is (#764)',
+      run: async (ctx) => {
+        const page = await loadPricingPage();
 
-  assert.equal(page.banner.attributes.hidden, undefined, 'the banner is shown');
-  assert.equal(page.nav.style.marginTop, `${BANNER_HEIGHT}px`, 'the fixed nav takes the banner\'s full height');
+        ctx.expect(page.banner.attributes.hidden, 'the banner is shown').toBe(undefined);
+        ctx.expect(page.nav.style.marginTop, 'the fixed nav takes the banner\'s full height').toBe(`${BANNER_HEIGHT}px`);
 
-  // The bug: the opening section took that height as extra top padding too, so
-  // the masthead — and everything under it — dropped a banner's worth a second
-  // into the page.
-  assert.equal(page.firstSection.style.paddingTop, undefined, 'the opening section keeps the padding it painted with');
-  assert.ok(!page.computedReads.includes(page.firstSection), 'and the page never measures it: the banner is nav chrome, not page layout');
+        // The bug: the opening section took that height as extra top padding too, so
+        // the masthead — and everything under it — dropped a banner's worth a second
+        // into the page.
+        ctx.expect(page.firstSection.style.paddingTop, 'the opening section keeps the padding it painted with').toBe(undefined);
+        ctx.expect(!page.computedReads.includes(page.firstSection), 'and the page never measures it: the banner is nav chrome, not page layout').toBeTruthy();
+      },
+    },
+  ],
 });

@@ -37,38 +37,42 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-map-opens-exactly-the-doors-the-siblings-spell',
-      async run({ assert }) {
-        assert.deepEqual(Object.keys(pkg.exports || {}).sort(), DOORS);
+      async run({ expect }) {
+        expect(Object.keys(pkg.exports || {}).sort()).toEqual(DOORS);
       },
     },
     ...Object.entries(pkg.exports || {}).map(([door, target]) => ({
       name: `${door} resolves to ${target}`,
-      async run({ assert }) {
-        assert.equal(require.resolve(specifier(door)), path.join(PACKAGE_ROOT, target));
+      async run({ expect }) {
+        expect(require.resolve(specifier(door))).toBe(path.join(PACKAGE_ROOT, target));
       },
     })),
     {
       name: 'a-path-the-map-does-not-name-is-refused',
-      async run({ assert }) {
+      async run({ expect }) {
         let code = null;
         try {
           require.resolve(`${pkg.name}/dist/vendor/config/env.js`);
         } catch (e) {
           code = e.code;
         }
-        assert.equal(code, 'ERR_PACKAGE_PATH_NOT_EXPORTED');
+        expect(code).toBe('ERR_PACKAGE_PATH_NOT_EXPORTED');
       },
     },
     {
-      name: 'the-test-door-hands-consumers-defineCases',
-      async run({ assert }) {
-        assert.equal(require(`${pkg.name}/test`).defineCases, defineCases);
+      name: 'the-test-door-hands-consumers-defineCases-and-expect',
+      async run({ expect }) {
+        const door = require(`${pkg.name}/test`);
+
+        expect(door.defineCases).toBe(defineCases);
+        expect(typeof door.expect).toBe('function');
+        expect(door.expect).toBe(require('../../dist/vendor/devkit/test/expect.js'));
       },
     },
     {
       name: 'the-config-door-carries-the-deploy-workflows-serializeEnv',
-      async run({ assert }) {
-        assert.equal(typeof require(`${pkg.name}/config`).serializeEnv, 'function');
+      async run({ expect }) {
+        expect(typeof require(`${pkg.name}/config`).serializeEnv).toBe('function');
       },
     },
   ],

@@ -53,111 +53,111 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-context-with-no-request-is-signed-out-with-no-input',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
-        assert.equal(ctx.request, null, 'no req means no request');
-        assert.equal(ctx.user instanceof User, true, 'ctx.user is a User');
-        assert.equal(ctx.user.authenticated, false, 'signed out');
-        assert.equal(ctx.user.plan, 'basic');
-        assert.equal(ctx.data, undefined, 'data waits for the pipeline');
+        expect(ctx.request, 'no req means no request').toBe(null);
+        expect(ctx.user instanceof User, 'ctx.user is a User').toBe(true);
+        expect(ctx.user.authenticated, 'signed out').toBe(false);
+        expect(ctx.user.plan).toBe('basic');
+        expect(ctx.data, 'data waits for the pipeline').toBe(undefined);
 
         ctx.data = { name: 'set' };
-        assert.equal(ctx.data.name, 'set');
+        expect(ctx.data.name).toBe('set');
       },
     },
     {
       name: 'the-request-services-are-built-once-on-first-read',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
-        assert.equal(ctx.usage, ctx.usage, 'one counter per context');
-        assert.equal(ctx.analytics, ctx.analytics, 'one analytics per context');
-        assert.equal(ctx.email, ctx.email, 'one email door per context');
-        assert.equal(ctx.ai, ctx.ai, 'one AI surface per context');
-        assert.equal(ctx.usage.ctx, ctx, 'a request service is bound to its context');
+        expect(ctx.usage, 'one counter per context').toBe(ctx.usage);
+        expect(ctx.analytics, 'one analytics per context').toBe(ctx.analytics);
+        expect(ctx.email, 'one email door per context').toBe(ctx.email);
+        expect(ctx.ai, 'one AI surface per context').toBe(ctx.ai);
+        expect(ctx.usage.ctx, 'a request service is bound to its context').toBe(ctx);
       },
     },
     {
       name: 'authenticate-settles-once-per-request',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
         const first = ctx.authenticate();
         const second = ctx.authenticate();
 
-        assert.equal(first, second, 'the second call is the first answer');
+        expect(first, 'the second call is the first answer').toBe(second);
 
         const user = await first;
 
-        assert.equal(user, ctx.user, 'the answer is ctx.user');
-        assert.equal(user.authenticated, false, 'no credential, no account');
+        expect(user, 'the answer is ctx.user').toBe(ctx.user);
+        expect(user.authenticated, 'no credential, no account').toBe(false);
       },
     },
     {
       name: 'report-returns-decorated-error-without-sending',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
         const error = ctx.report('Something broke', { code: 502 });
 
-        if (!(error instanceof Error)) assert.fail('report() must return an Error');
-        assert.equal(error.message, 'Something broke');
-        assert.equal(error.code, 502);
-        assert.equal(typeof error.tag, 'string');
-        assert.equal(typeof error.usage, 'object');
+        if (!(error instanceof Error)) expect.fail('report() must return an Error');
+        expect(error.message).toBe('Something broke');
+        expect(error.code).toBe(502);
+        expect(typeof error.tag).toBe('string');
+        expect(typeof error.usage).toBe('object');
       },
     },
     {
       name: 'report-clamps-codes-into-error-range',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
-        assert.equal(ctx.report('x', { code: 200 }).code, 500);
-        assert.equal(ctx.report('x', { code: 999 }).code, 500);
-        assert.equal(ctx.report('x').code, 500);
-        assert.equal(ctx.report('x', { code: 429 }).code, 429);
+        expect(ctx.report('x', { code: 200 }).code).toBe(500);
+        expect(ctx.report('x', { code: 999 }).code).toBe(500);
+        expect(ctx.report('x').code).toBe(500);
+        expect(ctx.report('x', { code: 429 }).code).toBe(429);
       },
     },
     {
       name: 'report-preserves-an-existing-error-code-unless-overridden',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
         const carried = Object.assign(new Error('carried'), { code: 404 });
-        assert.equal(ctx.report(carried).code, 404);
+        expect(ctx.report(carried).code).toBe(404);
 
         const overridden = Object.assign(new Error('overridden'), { code: 404 });
-        assert.equal(ctx.report(overridden, { code: 410 }).code, 410);
+        expect(ctx.report(overridden, { code: 410 }).code).toBe(410);
       },
     },
     {
       name: 'server-faults-capture-to-sentry-automatically',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
         withSentryRecorder(omega(), (captured) => {
           ctx.report('boom', { code: 500 });
-          assert.equal(captured.length, 1);
-          assert.equal(captured[0].message, 'boom');
+          expect(captured.length).toBe(1);
+          expect(captured[0].message).toBe('boom');
         });
       },
     },
     {
       name: 'client-faults-never-capture-to-sentry',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
         withSentryRecorder(omega(), (captured) => {
           ctx.report('bad input', { code: 400 });
           ctx.report('limited', { code: 429 });
-          assert.equal(captured.length, 0);
+          expect(captured.length).toBe(0);
         });
       },
     },
     {
       name: 'report-survives-a-null-sentry-handle',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const instance = omega();
         const ctx = new Context(instance);
         const original = instance.sentry;
@@ -165,7 +165,7 @@ module.exports = defineCases({
         instance.sentry = null;
         try {
           const error = ctx.report('no sentry wired', { code: 503 });
-          assert.equal(error.code, 503);
+          expect(error.code).toBe(503);
         } finally {
           instance.sentry = original;
         }
@@ -173,21 +173,21 @@ module.exports = defineCases({
     },
     {
       name: 'retired-surface-stays-retired',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const ctx = new Context(omega());
 
-        assert.equal(ctx.errorify, undefined);
-        assert.equal(ctx.errorManager, undefined);
-        assert.equal(ctx.logProd, undefined);
-        assert.equal(ctx.parseRepo, undefined);
-        assert.equal(ctx.getHeaderIp, undefined);
-        assert.equal(ctx.ref, undefined, 'ctx.req/res/omega replace ctx.ref');
-        assert.equal(ctx.getUser, undefined, 'ctx.user replaces getUser()');
-        assert.equal(ctx.Manager, undefined, 'ctx.omega replaces ctx.Manager');
-        assert.equal(ctx.resolvedUser, undefined, 'authenticate() settles once instead');
-        assert.equal(ctx.constant, undefined, 'the pastTime constant is gone');
-        assert.equal(ctx.settings, undefined, 'ctx.data replaces ctx.settings');
-        assert.equal(ctx.parseMultipartFormData, undefined, 'parseMultipart() replaces it');
+        expect(ctx.errorify).toBe(undefined);
+        expect(ctx.errorManager).toBe(undefined);
+        expect(ctx.logProd).toBe(undefined);
+        expect(ctx.parseRepo).toBe(undefined);
+        expect(ctx.getHeaderIp).toBe(undefined);
+        expect(ctx.ref, 'ctx.req/res/omega replace ctx.ref').toBe(undefined);
+        expect(ctx.getUser, 'ctx.user replaces getUser()').toBe(undefined);
+        expect(ctx.Manager, 'ctx.omega replaces ctx.Manager').toBe(undefined);
+        expect(ctx.resolvedUser, 'authenticate() settles once instead').toBe(undefined);
+        expect(ctx.constant, 'the pastTime constant is gone').toBe(undefined);
+        expect(ctx.settings, 'ctx.data replaces ctx.settings').toBe(undefined);
+        expect(ctx.parseMultipartFormData, 'parseMultipart() replaces it').toBe(undefined);
       },
     },
   ],

@@ -12,11 +12,10 @@
  * One classy build over the contract fixture WITHOUT site.meta — the exact
  * shape that rendered empty <title> + empty nav on playground.omegajs.dev.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 // The lane NAMES the environment
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
 // that ONE input instead of a loose `options.environment`, and a fixture build
@@ -84,205 +83,243 @@ async function buildFixture(outDir, staticDirs) {
   });
 }
 
-before(async () => {
-  brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'static',
+  setup: async () => {
+    brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-'));
 
-  // The manager assets service mint contract
-  mint(['.omega', 'assets', 'favicon', 'favicon.ico'], 'minted-ico');
-  mint(['.omega', 'assets', 'favicon', 'favicon-32x32.png'], 'minted-32');
-  mint(['.omega', 'assets', 'favicon', 'site.webmanifest'], '{"name":"Contract"}');
-  mint(['.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'], '<svg/>');
-  mint(['.omega', 'assets', 'logo', 'brandmark', 'color-512.png'], 'minted-brandmark');
-  mint(['.omega', 'assets', 'social', 'brandmark', 'color-1024.png'], 'minted-social');
+    // The manager assets service mint contract
+    mint(['.omega', 'assets', 'favicon', 'favicon.ico'], 'minted-ico');
+    mint(['.omega', 'assets', 'favicon', 'favicon-32x32.png'], 'minted-32');
+    mint(['.omega', 'assets', 'favicon', 'site.webmanifest'], '{"name":"Contract"}');
+    mint(['.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'], '<svg/>');
+    mint(['.omega', 'assets', 'logo', 'brandmark', 'color-512.png'], 'minted-brandmark');
+    mint(['.omega', 'assets', 'social', 'brandmark', 'color-1024.png'], 'minted-social');
 
-  // Consumer asset layer — favicon.ico collides with the mint and must win
-  mint(['consumer-assets', 'images', 'favicon', 'favicon.ico'], 'consumer-ico');
-  mint(['consumer-assets', 'images', 'hero.png'], 'consumer-hero');
-  // Non-image media (#295): the live break was alarm mp3s 404ing
-  mint(['consumer-assets', 'audio', 'alarm.mp3'], 'consumer-alarm');
-  mint(['consumer-assets', 'downloads', 'guide.pdf'], 'consumer-guide');
-  // Hidden entries — Finder/editor noise sitting in src/assets is not content
-  mint(['consumer-assets', '.DS_Store'], 'finder-noise');
-  // The PIPELINE's lanes — the asset phase owns dist/assets/{js,css,fonts}
-  // (hashed bundles, and fonts pruned to referenced faces), so these must
-  // never ride the static copy
-  mint(['consumer-assets', 'js', 'main.js'], 'raw-source-must-not-ship');
-  mint(['consumer-assets', 'css', 'main.scss'], 'raw-source-must-not-ship');
-  mint(['consumer-assets', 'fonts', 'unreferenced.woff2'], 'pruned-face-must-not-return');
+    // Consumer asset layer — favicon.ico collides with the mint and must win
+    mint(['consumer-assets', 'images', 'favicon', 'favicon.ico'], 'consumer-ico');
+    mint(['consumer-assets', 'images', 'hero.png'], 'consumer-hero');
+    // Non-image media (#295): the live break was alarm mp3s 404ing
+    mint(['consumer-assets', 'audio', 'alarm.mp3'], 'consumer-alarm');
+    mint(['consumer-assets', 'downloads', 'guide.pdf'], 'consumer-guide');
+    // Hidden entries — Finder/editor noise sitting in src/assets is not content
+    mint(['consumer-assets', '.DS_Store'], 'finder-noise');
+    // The PIPELINE's lanes — the asset phase owns dist/assets/{js,css,fonts}
+    // (hashed bundles, and fonts pruned to referenced faces), so these must
+    // never ride the static copy
+    mint(['consumer-assets', 'js', 'main.js'], 'raw-source-must-not-ship');
+    mint(['consumer-assets', 'css', 'main.scss'], 'raw-source-must-not-ship');
+    mint(['consumer-assets', 'fonts', 'unreferenced.woff2'], 'pruned-face-must-not-return');
 
-  setEnvironment('development');
-  await buildFixture(OUT, resolveStaticDirs({
-    brandRoot,
-    assetsDir: path.join(brandRoot, 'consumer-assets'),
-  }));
-});
+    setEnvironment('development');
+    await buildFixture(OUT, resolveStaticDirs({
+      brandRoot,
+      assetsDir: path.join(brandRoot, 'consumer-assets'),
+    }));
+  },
+  tests: [
+    {
+      name: 'resolveStaticDirs: core images first, mint bridge next, consumer layer last, missing sources dropped',
+      run: (ctx) => {
+        const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
+        ctx.expect(dirs.map((entry) => entry.dest)).toEqual([
+          'assets/images/core', // framework-shipped pictures (exit-popup faces)
+          'assets/images/favicon',
+          'assets/images/brand/brandmark.svg',
+          'assets/images/brand/brandmark.png',
+          'assets/images/brand/social.png',
+          'assets/images', // consumer layer LAST — it wins collisions
+          'assets/audio', // …and the rest of src/assets rides with it (#295)
+          'assets/downloads',
+        ]);
 
-test('resolveStaticDirs: core images first, mint bridge next, consumer layer last, missing sources dropped', () => {
-  const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
-  assert.deepStrictEqual(dirs.map((entry) => entry.dest), [
-    'assets/images/core', // framework-shipped pictures (exit-popup faces)
-    'assets/images/favicon',
-    'assets/images/brand/brandmark.svg',
-    'assets/images/brand/brandmark.png',
-    'assets/images/brand/social.png',
-    'assets/images', // consumer layer LAST — it wins collisions
-    'assets/audio', // …and the rest of src/assets rides with it (#295)
-    'assets/downloads',
-  ]);
+        // No brand root (standalone consumer without a mint) → core + consumer layer
+        const bare = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(brandRoot, 'consumer-assets') });
+        ctx.expect(bare.map((entry) => entry.dest)).toEqual(['assets/images/core', 'assets/images', 'assets/audio', 'assets/downloads']);
 
-  // No brand root (standalone consumer without a mint) → core + consumer layer
-  const bare = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(brandRoot, 'consumer-assets') });
-  assert.deepStrictEqual(bare.map((entry) => entry.dest), ['assets/images/core', 'assets/images', 'assets/audio', 'assets/downloads']);
+        // No brand assets at all → the framework's own images still ship
+        ctx.expect(resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), assetsDir: path.join(brandRoot, 'nope2') })
+            .map((entry) => entry.dest)).toEqual(['assets/images/core']);
+      },
+    },
 
-  // No brand assets at all → the framework's own images still ship
-  assert.deepStrictEqual(
-    resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), assetsDir: path.join(brandRoot, 'nope2') })
-      .map((entry) => entry.dest),
-    ['assets/images/core'],
-  );
-});
+    {
+      name: 'static channel ships the minted set and the consumer layer wins collisions',
+      run: (ctx) => {
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'favicon', 'favicon-32x32.png'), 'utf8')).toBe('minted-32');
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'brandmark.png'), 'utf8')).toBe('minted-brandmark');
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'brandmark.svg'), 'utf8')).toBe('<svg/>');
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'social.png'), 'utf8')).toBe('minted-social');
+        ctx.expect(fs.existsSync(path.join(OUT, 'assets', 'images', 'favicon', 'site.webmanifest')), 'webmanifest shipped').toBeTruthy();
 
-test('static channel ships the minted set and the consumer layer wins collisions', () => {
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'favicon', 'favicon-32x32.png'), 'utf8'), 'minted-32');
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'brandmark.png'), 'utf8'), 'minted-brandmark');
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'brandmark.svg'), 'utf8'), '<svg/>');
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'brand', 'social.png'), 'utf8'), 'minted-social');
-  assert.ok(fs.existsSync(path.join(OUT, 'assets', 'images', 'favicon', 'site.webmanifest')), 'webmanifest shipped');
+        // Consumer overrides + additions
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'favicon', 'favicon.ico'), 'utf8'), 'consumer file wins the collision').toBe('consumer-ico');
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'images', 'hero.png'), 'utf8')).toBe('consumer-hero');
+      },
+    },
 
-  // Consumer overrides + additions
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'favicon', 'favicon.ico'), 'utf8'), 'consumer-ico', 'consumer file wins the collision');
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'hero.png'), 'utf8'), 'consumer-hero');
-});
+    {
+      name: '#295: the whole src/assets tree ships, but never the pipeline-owned lanes',
+      run: (ctx) => {
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'audio', 'alarm.mp3'), 'utf8'), 'audio ships (was silently dropped: 404 on the live site)').toBe('consumer-alarm');
+        ctx.expect(fs.readFileSync(path.join(OUT, 'assets', 'downloads', 'guide.pdf'), 'utf8')).toBe('consumer-guide');
 
-test('#295: the whole src/assets tree ships, but never the pipeline-owned lanes', () => {
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'audio', 'alarm.mp3'), 'utf8'), 'consumer-alarm', 'audio ships (was silently dropped: 404 on the live site)');
-  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'downloads', 'guide.pdf'), 'utf8'), 'consumer-guide');
+        // js/, css/ and fonts/ belong to the asset phase — its hashed bundles already
+        // sit in dist/assets, and a verbatim source copy would land beside them and
+        // put the pruned font faces back
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', 'js', 'main.js')), 'js sources never ride the static lane').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', 'css', 'main.scss')), 'css sources never ride the static lane').toBeTruthy();
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', 'fonts', 'unreferenced.woff2')), 'fonts never ride the static lane (the assets phase prunes unreferenced faces)').toBeTruthy();
 
-  // js/, css/ and fonts/ belong to the asset phase — its hashed bundles already
-  // sit in dist/assets, and a verbatim source copy would land beside them and
-  // put the pruned font faces back
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'main.js')), 'js sources never ride the static lane');
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'css', 'main.scss')), 'css sources never ride the static lane');
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'fonts', 'unreferenced.woff2')), 'fonts never ride the static lane (the assets phase prunes unreferenced faces)');
+        // …and neither does hidden noise: the widened lane lists every child of
+        // src/assets, and .DS_Store shipped to dist with it
+        ctx.expect(!fs.existsSync(path.join(OUT, 'assets', '.DS_Store')), 'dotfiles never ship').toBeTruthy();
+      },
+    },
 
-  // …and neither does hidden noise: the widened lane lists every child of
-  // src/assets, and .DS_Store shipped to dist with it
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', '.DS_Store')), 'dotfiles never ship');
-});
+    {
+      name: 'the shipped favicon.ico mirrors to the site root (#161: the browser probes /favicon.ico)',
+      run: (ctx) => {
+        const root = path.join(OUT, 'favicon.ico');
+        ctx.expect(fs.existsSync(root), 'root favicon.ico shipped').toBeTruthy();
+        ctx.expect(fs.readFileSync(root, 'utf8'), 'the root copy is the collision winner').toBe('consumer-ico');
 
-test('the shipped favicon.ico mirrors to the site root (#161: the browser probes /favicon.ico)', () => {
-  const root = path.join(OUT, 'favicon.ico');
-  assert.ok(fs.existsSync(root), 'root favicon.ico shipped');
-  assert.strictEqual(fs.readFileSync(root, 'utf8'), 'consumer-ico', 'the root copy is the collision winner');
+        // No favicon set shipped → nothing lands at the root
+        const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-bare-'));
+        copyStaticAssets({ staticDirs: [], outDir: bare });
+        ctx.expect(!fs.existsSync(path.join(bare, 'favicon.ico')), 'no set, no root favicon').toBeTruthy();
+      },
+    },
 
-  // No favicon set shipped → nothing lands at the root
-  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-bare-'));
-  copyStaticAssets({ staticDirs: [], outDir: bare });
-  assert.ok(!fs.existsSync(path.join(bare, 'favicon.ico')), 'no set, no root favicon');
-});
+    {
+      name: 'nav + footer render their section data (JSON5 json-in-_includes)',
+      run: (ctx) => {
+        const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
 
-test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
-  const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
+        // nav.json: links + actions
+        ctx.expect(html.includes('href="/pricing"'), 'nav links render').toBeTruthy();
+        ctx.expect(html.includes('Sign up'), 'nav actions render').toBeTruthy();
 
-  // nav.json: links + actions
-  assert.ok(html.includes('href="/pricing"'), 'nav links render');
-  assert.ok(html.includes('Sign up'), 'nav actions render');
+        // footer.json: link groups
+        ctx.expect(html.includes('About us'), 'footer link groups render').toBeTruthy();
+      },
+    },
 
-  // footer.json: link groups
-  assert.ok(html.includes('About us'), 'footer link groups render');
-});
+    {
+      name: 'admin sidebar renders its section data too (was silently empty under JSON.parse)',
+      run: (ctx) => {
+        const html = fs.readFileSync(path.join(OUT, 'admin.html'), 'utf8');
+        ctx.expect(html.includes('Dashboard'), 'admin sidebar labels render').toBeTruthy();
+        ctx.expect(html.includes('href="/admin/verts"'), 'verts card is reachable from the sidebar').toBeTruthy();
+      },
+    },
 
-test('admin sidebar renders its section data too (was silently empty under JSON.parse)', () => {
-  const html = fs.readFileSync(path.join(OUT, 'admin.html'), 'utf8');
-  assert.ok(html.includes('Dashboard'), 'admin sidebar labels render');
-  assert.ok(html.includes('href="/admin/verts"'), 'verts card is reachable from the sidebar');
-});
+    {
+      name: '<title> falls back to the brand name — no page ever renders an empty title',
+      run: (ctx) => {
+        let sawBrandFallback = false;
 
-test('<title> falls back to the brand name — no page ever renders an empty title', () => {
-  let sawBrandFallback = false;
+        for (const entry of fs.readdirSync(OUT, { recursive: true, withFileTypes: true })) {
+          if (!entry.isFile() || !entry.name.endsWith('.html')) continue;
+          const file = path.join(entry.parentPath, entry.name);
+          const match = fs.readFileSync(file, 'utf8').match(/<title>([^<]*)<\/title>/);
+          if (!match) continue; // pages without a head (bare fragments) are fine
+          ctx.expect(match[1].trim(), `${path.relative(OUT, file)}: empty <title>`).not.toBe('');
+          if (match[1].trim() === 'Contract') sawBrandFallback = true;
+        }
 
-  for (const entry of fs.readdirSync(OUT, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.html')) continue;
-    const file = path.join(entry.parentPath, entry.name);
-    const match = fs.readFileSync(file, 'utf8').match(/<title>([^<]*)<\/title>/);
-    if (!match) continue; // pages without a head (bare fragments) are fine
-    assert.notStrictEqual(match[1].trim(), '', `${path.relative(OUT, file)}: empty <title>`);
-    if (match[1].trim() === 'Contract') sawBrandFallback = true;
-  }
+        ctx.expect(sawBrandFallback, 'at least one page used the brand-name fallback').toBeTruthy();
+      },
+    },
 
-  assert.ok(sawBrandFallback, 'at least one page used the brand-name fallback');
-});
+    {
+      name: 'head wires the minted set: webmanifest link + og:image brand fallback',
+      run: (ctx) => {
+        const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
+        ctx.expect(html.includes('/assets/images/favicon/site.webmanifest'), 'manifest link points at the minted webmanifest').toBeTruthy();
+        ctx.expect(!html.includes('/manifest.json'), 'the old never-emitted /manifest.json link is gone').toBeTruthy();
+        ctx.expect(!html.includes('browserconfig.xml') && !html.includes('safari-pinned-tab'), 'legacy favicon tags dropped (mint never produces them)').toBeTruthy();
+        ctx.expect(html.includes('property="og:image" content="https://contract.test/assets/images/brand/social.png"'), 'og:image falls back to brand.images.social').toBeTruthy();
+      },
+    },
 
-test('head wires the minted set: webmanifest link + og:image brand fallback', () => {
-  const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
-  assert.ok(html.includes('/assets/images/favicon/site.webmanifest'), 'manifest link points at the minted webmanifest');
-  assert.ok(!html.includes('/manifest.json'), 'the old never-emitted /manifest.json link is gone');
-  assert.ok(!html.includes('browserconfig.xml') && !html.includes('safari-pinned-tab'), 'legacy favicon tags dropped (mint never produces them)');
-  assert.ok(html.includes('property="og:image" content="https://contract.test/assets/images/brand/social.png"'), 'og:image falls back to brand.images.social');
-});
+    // ─── The minted set reaches every build ───
 
-// ─── The minted set reaches every build ───
+    {
+      name: 'the static phase bridges the shared MINT_BRIDGE list to the same four site paths',
+      run: (ctx) => {
+        const sitePaths = [
+          'assets/images/favicon',
+          'assets/images/brand/brandmark.svg',
+          'assets/images/brand/brandmark.png',
+          'assets/images/brand/social.png',
+        ];
+        ctx.expect(MINT_BRIDGE.map((entry) => entry.dest), 'the one list lives in @omega.js/config').toEqual(sitePaths);
 
-test('the static phase bridges the shared MINT_BRIDGE list to the same four site paths', () => {
-  const sitePaths = [
-    'assets/images/favicon',
-    'assets/images/brand/brandmark.svg',
-    'assets/images/brand/brandmark.png',
-    'assets/images/brand/social.png',
-  ];
-  assert.deepStrictEqual(MINT_BRIDGE.map((entry) => entry.dest), sitePaths, 'the one list lives in @omega.js/config');
+        const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
+        ctx.expect(dirs.filter((entry) => sitePaths.includes(entry.dest))).toEqual([
+          { src: path.join(brandRoot, '.omega', 'assets', 'favicon'), dest: 'assets/images/favicon' },
+          { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), dest: 'assets/images/brand/brandmark.svg' },
+          { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-512.png'), dest: 'assets/images/brand/brandmark.png' },
+          { src: path.join(brandRoot, '.omega', 'assets', 'social', 'brandmark', 'color-1024.png'), dest: 'assets/images/brand/social.png' },
+        ]);
+        for (const sitePath of sitePaths) {
+          ctx.expect(fs.existsSync(path.join(OUT, sitePath)), `${sitePath} shipped`).toBeTruthy();
+        }
+      },
+    },
 
-  const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
-  assert.deepStrictEqual(dirs.filter((entry) => sitePaths.includes(entry.dest)), [
-    { src: path.join(brandRoot, '.omega', 'assets', 'favicon'), dest: 'assets/images/favicon' },
-    { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), dest: 'assets/images/brand/brandmark.svg' },
-    { src: path.join(brandRoot, '.omega', 'assets', 'logo', 'brandmark', 'color-512.png'), dest: 'assets/images/brand/brandmark.png' },
-    { src: path.join(brandRoot, '.omega', 'assets', 'social', 'brandmark', 'color-1024.png'), dest: 'assets/images/brand/social.png' },
-  ]);
-  for (const sitePath of sitePaths) {
-    assert.ok(fs.existsSync(path.join(OUT, sitePath)), `${sitePath} shipped`);
-  }
-});
+    {
+      name: 'a CI build of a brand with logo sources and no minted favicon set throws the one line',
+      run: (ctx) => {
+        const noMint = brandTree(['assets/logo/brandmark.svg']);
+        const logoOnly = brandTree(['assets/logo/brandmark.svg', '.omega/assets/logo/brandmark/color-512.png']);
+        // A favicon folder without site.webmanifest is not the set the page head needs
+        const noManifest = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico']);
 
-test('a CI build of a brand with logo sources and no minted favicon set throws the one line', () => {
-  const noMint = brandTree(['assets/logo/brandmark.svg']);
-  const logoOnly = brandTree(['assets/logo/brandmark.svg', '.omega/assets/logo/brandmark/color-512.png']);
-  // A favicon folder without site.webmanifest is not the set the page head needs
-  const noManifest = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico']);
+        for (const [root, env] of [
+          [noMint, { GITHUB_ACTIONS: 'true' }],
+          [noMint, { CI: 'true' }],
+          [logoOnly, { GITHUB_ACTIONS: 'true' }],
+          [noManifest, { GITHUB_ACTIONS: 'true' }],
+        ]) {
+          ctx.expect(() => assertMintedAssets({ brandRoot: root, env })).toThrow((error) => {
+            ctx.expect(error.message.includes(MINT_MESSAGE), `the message names the fix: ${error.message}`).toBeTruthy();
+            ctx.expect(!error.message.includes('\n'), 'one line').toBeTruthy();
+            return true;
+          });
+        }
+      },
+    },
 
-  for (const [root, env] of [
-    [noMint, { GITHUB_ACTIONS: 'true' }],
-    [noMint, { CI: 'true' }],
-    [logoOnly, { GITHUB_ACTIONS: 'true' }],
-    [noManifest, { GITHUB_ACTIONS: 'true' }],
-  ]) {
-    assert.throws(() => assertMintedAssets({ brandRoot: root, env }), (error) => {
-      assert.ok(error.message.includes(MINT_MESSAGE), `the message names the fix: ${error.message}`);
-      assert.ok(!error.message.includes('\n'), 'one line');
-      return true;
-    });
-  }
-});
+    {
+      name: 'a CI build with no logo sources, and a local build with no mint, are both clean',
+      run: (ctx) => {
+        const env = { GITHUB_ACTIONS: 'true' };
+        ctx.expect(() => assertMintedAssets({ brandRoot: brandTree(['assets/fonts/brand.ttf']), env }), 'no logo sources').not.toThrow();
+        ctx.expect(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/wordmark.svg']), env }), 'a wordmark is not the mint source').not.toThrow();
+        ctx.expect(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/brandmark.svg']), env: {} }), 'a local build').not.toThrow();
+        const minted = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico', '.omega/assets/favicon/site.webmanifest']);
+        ctx.expect(() => assertMintedAssets({ brandRoot: minted, env }), 'a CI build that has its minted set').not.toThrow();
+      },
+    },
 
-test('a CI build with no logo sources, and a local build with no mint, are both clean', () => {
-  const env = { GITHUB_ACTIONS: 'true' };
-  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/fonts/brand.ttf']), env }), 'no logo sources');
-  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/wordmark.svg']), env }), 'a wordmark is not the mint source');
-  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: brandTree(['assets/logo/brandmark.svg']), env: {} }), 'a local build');
-  const minted = brandTree(['assets/logo/brandmark.svg', '.omega/assets/favicon/favicon.ico', '.omega/assets/favicon/site.webmanifest']);
-  assert.doesNotThrow(() => assertMintedAssets({ brandRoot: minted, env }), 'a CI build that has its minted set');
-});
+    {
+      name: 'the head carries the favicon and manifest links with a minted set, and neither without one',
+      run: async (ctx) => {
+        const minted = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
+        ctx.expect(minted, 'favicon links').toMatch(/<link rel="icon"[^>]*href="[^"]*\/assets\/images\/favicon\//);
+        ctx.expect(minted, 'manifest link').toMatch(/<link rel="manifest"[^>]*href="[^"]*\/assets\/images\/favicon\/site\.webmanifest/);
 
-test('the head carries the favicon and manifest links with a minted set, and neither without one', async () => {
-  const minted = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
-  assert.match(minted, /<link rel="icon"[^>]*href="[^"]*\/assets\/images\/favicon\//, 'favicon links');
-  assert.match(minted, /<link rel="manifest"[^>]*href="[^"]*\/assets\/images\/favicon\/site\.webmanifest/, 'manifest link');
+        const bare = brandTree([]);
+        const outDir = path.join(PKG, '.omega', 'static-no-mint');
+        await buildFixture(outDir, resolveStaticDirs({ brandRoot: bare, assetsDir: path.join(bare, 'assets') }));
 
-  const bare = brandTree([]);
-  const outDir = path.join(PKG, '.omega', 'static-no-mint');
-  await buildFixture(outDir, resolveStaticDirs({ brandRoot: bare, assetsDir: path.join(bare, 'assets') }));
-
-  const none = fs.readFileSync(path.join(outDir, 'about.html'), 'utf8');
-  assert.doesNotMatch(none, /rel="(?:shortcut )?icon"|rel="apple-touch-icon"/, 'no favicon links');
-  assert.doesNotMatch(none, /rel="manifest"/, 'no manifest link');
+        const none = fs.readFileSync(path.join(outDir, 'about.html'), 'utf8');
+        ctx.expect(none, 'no favicon links').not.toMatch(/rel="(?:shortcut )?icon"|rel="apple-touch-icon"/);
+        ctx.expect(none, 'no manifest link').not.toMatch(/rel="manifest"/);
+      },
+    },
+  ],
 });

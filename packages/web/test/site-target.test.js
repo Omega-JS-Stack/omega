@@ -15,11 +15,11 @@
  *
  * Run: node --require @omega.js/devkit/test/stdout-guard --test test/site-target.test.js
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { loadSiteData } = require('../src/consumer.js');
 const { SITE_FACT_KEYS } = require('../src/config-sections.js');
@@ -43,29 +43,42 @@ function brandWithCommunityTarget() {
 async function configurationOf(siteData, name) {
   const pages = await buildWith(siteData, {}, name);
   const buildJson = readBuildJson(pages);
-  assert.ok(buildJson, 'the build wrote the OMEGA_BUILD_JSON snapshot');
+  expect(buildJson, 'the build wrote the OMEGA_BUILD_JSON snapshot').toBeTruthy();
 
   return buildJson.config;
 }
 
-test('#887: the site data carries the RESOLVED target name, not a guess', () => {
-  const siteData = loadSiteData(brandWithCommunityTarget());
+module.exports = defineCases({
+  type: 'group',
+  description: 'site-target',
+  tests: [
+    {
+      name: '#887: the site data carries the RESOLVED target name, not a guess',
+      run: (ctx) => {
+        const siteData = loadSiteData(brandWithCommunityTarget());
 
-  assert.deepStrictEqual(siteData.target, { name: 'community', type: 'web' },
-    'the target folder names the target, so a second website is addressable');
-});
+        ctx.expect(siteData.target, 'the target folder names the target, so a second website is addressable').toEqual({ name: 'community', type: 'web' });
+      },
+    },
 
-test('#887: site.target is a build fact, beside the targets map', async () => {
-  assert.ok(SITE_FACT_KEYS.includes('target'), 'the read census has to know the key, or a template read of it is refused');
+    {
+      name: '#887: site.target is a build fact, beside the targets map',
+      run: async (ctx) => {
+        ctx.expect(SITE_FACT_KEYS.includes('target'), 'the read census has to know the key, or a template read of it is refused').toBeTruthy();
 
-  const config = await configurationOf({ ...miniData, target: { name: 'community', type: 'web' } }, 'site-target-bake');
+        const config = await configurationOf({ ...miniData, target: { name: 'community', type: 'web' } }, 'site-target-bake');
 
-  assert.strictEqual(config.target, 'community',
-    'the page hands the client its own target name, which is what the admin editor sends to the CMS routes');
-});
+        ctx.expect(config.target, 'the page hands the client its own target name, which is what the admin editor sends to the CMS routes').toBe('community');
+      },
+    },
 
-test('#887: a build with no resolved target bakes null, never a guessed name', async () => {
-  const config = await configurationOf({ ...miniData }, 'site-target-absent');
+    {
+      name: '#887: a build with no resolved target bakes null, never a guessed name',
+      run: async (ctx) => {
+        const config = await configurationOf({ ...miniData }, 'site-target-absent');
 
-  assert.strictEqual(config.target, null, 'an unknown target is stated as unknown; the backend default rule then applies');
+        ctx.expect(config.target, 'an unknown target is stated as unknown; the backend default rule then applies').toBe(null);
+      },
+    },
+  ],
 });

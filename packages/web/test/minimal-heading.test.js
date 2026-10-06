@@ -7,11 +7,10 @@
  * is the accessibility checklist's one-h1 rule, broken by the layout itself.
  * Legacy UJM did the same; OMEGA owns the layout now.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, miniData, BARE } = require('./lib/build.js');
 
@@ -41,49 +40,60 @@ async function buildMinimal(name, pages) {
   }
 }
 
-test('#491: a minimal page with no breadcrumb ships no empty h1 above its body', async () => {
-  const built = await buildMinimal('minimal-h1-absent', {
-    'doc.md': [
-      '---',
-      'layout: frontend/core/minimal',
-      'permalink: /doc',
-      'meta:',
-      '  title: "Authorize"',
-      '---',
-      '',
-      '# Authorize your account',
-      '',
-      'Body copy.',
-    ].join('\n'),
-  });
+module.exports = defineCases({
+  type: 'group',
+  description: 'minimal-heading',
+  tests: [
+    {
+      name: '#491: a minimal page with no breadcrumb ships no empty h1 above its body',
+      run: async (ctx) => {
+        const built = await buildMinimal('minimal-h1-absent', {
+          'doc.md': [
+            '---',
+            'layout: frontend/core/minimal',
+            'permalink: /doc',
+            'meta:',
+            '  title: "Authorize"',
+            '---',
+            '',
+            '# Authorize your account',
+            '',
+            'Body copy.',
+          ].join('\n'),
+        });
 
-  const html = built.get('/doc');
-  assert.ok(html, 'the page built');
-  assert.ok(!/<h1[^>]*>\s*<\/h1>/.test(html), `no blank h1: ${html.slice(html.indexOf('<h1'), html.indexOf('<h1') + 200)}`);
-  assert.strictEqual(h1s(html).length, 1, 'exactly one h1 — the document\'s own title');
-  assert.ok(html.includes('Authorize your account'), 'the body title is the one that survives');
-});
+        const html = built.get('/doc');
+        ctx.expect(html, 'the page built').toBeTruthy();
+        ctx.expect(!/<h1[^>]*>\s*<\/h1>/.test(html), `no blank h1: ${html.slice(html.indexOf('<h1'), html.indexOf('<h1') + 200)}`).toBeTruthy();
+        ctx.expect(h1s(html).length, 'exactly one h1 — the document\'s own title').toBe(1);
+        ctx.expect(html.includes('Authorize your account'), 'the body title is the one that survives').toBeTruthy();
+      },
+    },
 
-test('#491: an authored breadcrumb still renders the masthead h1', async () => {
-  const built = await buildMinimal('minimal-h1-present', {
-    'doc.md': [
-      '---',
-      'layout: frontend/core/minimal',
-      'permalink: /doc',
-      'meta:',
-      '  title: "Privacy policy"',
-      '  breadcrumb: "Privacy policy"',
-      '  description: "How we handle your data."',
-      '---',
-      '',
-      'Body copy.',
-    ].join('\n'),
-  });
+    {
+      name: '#491: an authored breadcrumb still renders the masthead h1',
+      run: async (ctx) => {
+        const built = await buildMinimal('minimal-h1-present', {
+          'doc.md': [
+            '---',
+            'layout: frontend/core/minimal',
+            'permalink: /doc',
+            'meta:',
+            '  title: "Privacy policy"',
+            '  breadcrumb: "Privacy policy"',
+            '  description: "How we handle your data."',
+            '---',
+            '',
+            'Body copy.',
+          ].join('\n'),
+        });
 
-  const html = built.get('/doc');
-  assert.ok(html, 'the page built');
-  assert.strictEqual(h1s(html).length, 1, 'the masthead h1 is the page\'s one h1');
-  assert.ok(/<h1 class="omega-display omega-display--page"[^>]*>\s*Privacy policy/.test(html),
-    'the breadcrumb renders in the display h1, exactly as before');
-  assert.ok(html.includes('How we handle your data.'), 'the description line is untouched');
+        const html = built.get('/doc');
+        ctx.expect(html, 'the page built').toBeTruthy();
+        ctx.expect(h1s(html).length, 'the masthead h1 is the page\'s one h1').toBe(1);
+        ctx.expect(/<h1 class="omega-display omega-display--page"[^>]*>\s*Privacy policy/.test(html), 'the breadcrumb renders in the display h1, exactly as before').toBeTruthy();
+        ctx.expect(html.includes('How we handle your data.'), 'the description line is untouched').toBeTruthy();
+      },
+    },
+  ],
 });

@@ -218,7 +218,7 @@ module.exports = defineCases({
 
     {
       name: 'a-real-ps-snapshot-parses-into-rows',
-      async run({ assert }) {
+      async run({ expect }) {
         const text = [
           `    1     0     0 /sbin/launchd`,
           `73529     1   501 ${FIRESTORE_JAR}`,
@@ -229,15 +229,15 @@ module.exports = defineCases({
 
         const rows = parseProcessTable(text);
 
-        assert.equal(rows.length, 3, 'blank and unparseable lines are dropped, never guessed at');
-        assert.deepEqual(rows[0], { pid: 1, ppid: 0, uid: 0, command: '/sbin/launchd' });
-        assert.equal(rows[1].pid, 73529);
-        assert.equal(rows[1].ppid, 1);
-        assert.equal(rows[1].uid, 501);
-        assert.equal(rows[1].command, FIRESTORE_JAR, 'the command keeps every flag and space it was printed with');
-        assert.equal(rows[2].ppid, OUR_BOOT);
-        assert.deepEqual(parseProcessTable(''), []);
-        assert.deepEqual(parseProcessTable(null), []);
+        expect(rows.length, 'blank and unparseable lines are dropped, never guessed at').toBe(3);
+        expect(rows[0]).toEqual({ pid: 1, ppid: 0, uid: 0, command: '/sbin/launchd' });
+        expect(rows[1].pid).toBe(73529);
+        expect(rows[1].ppid).toBe(1);
+        expect(rows[1].uid).toBe(501);
+        expect(rows[1].command, 'the command keeps every flag and space it was printed with').toBe(FIRESTORE_JAR);
+        expect(rows[2].ppid).toBe(OUR_BOOT);
+        expect(parseProcessTable('')).toEqual([]);
+        expect(parseProcessTable(null)).toEqual([]);
       },
     },
 
@@ -245,135 +245,135 @@ module.exports = defineCases({
 
     {
       name: 'this-sessions-live-stack-is-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         // Every member of a LIVE stack hangs off the boot that spawned it, so
         // the sweep never considers it — the boot cannot eat its own tail.
-        assert.equal(isOrphanedEmulatorFamily(row(37088, OUR_BOOT, FIRESTORE_JAR), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(37360, OUR_BOOT, PUBSUB_JAR), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(37361, OUR_BOOT, WORKER), UID), false);
+        expect(isOrphanedEmulatorFamily(row(37088, OUR_BOOT, FIRESTORE_JAR), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(37360, OUR_BOOT, PUBSUB_JAR), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(37361, OUR_BOOT, WORKER), UID)).toBe(false);
       },
     },
 
     {
       name: 'a-hand-run-hub-in-a-terminal-is-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         // A developer typed `firebase emulators:start` in a shell that is still
         // open: the shell is its parent, so it is nobody's leftover.
-        assert.equal(isOrphanedEmulatorFamily(row(51901, A_TERMINAL, HUB), UID), false);
+        expect(isOrphanedEmulatorFamily(row(51901, A_TERMINAL, HUB), UID)).toBe(false);
       },
     },
 
     {
       name: 'another-uid-is-never-a-candidate',
-      async run({ assert }) {
+      async run({ expect }) {
         // Same row, same PID 1, a different owner. Signalling it would fail
         // anyway — but the verdict is the gate, not the OS's refusal.
-        assert.equal(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR, OTHER_UID), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR), undefined), false, 'no uid of our own proves nothing');
+        expect(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR, OTHER_UID), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR), undefined), 'no uid of our own proves nothing').toBe(false);
       },
     },
 
     {
       name: 'a-legacy-workers-orphan-is-reaped-whatever-node-installed-it',
-      async run({ assert }) {
+      async run({ expect }) {
         // The ~100-deep pile: a firebase-tools from a node version this machine
         // no longer even runs. No path and no version is part of the match.
-        assert.equal(isOrphanedEmulatorFamily(row(38483, ORPHANED, WORKER), UID), true);
+        expect(isOrphanedEmulatorFamily(row(38483, ORPHANED, WORKER), UID)).toBe(true);
       },
     },
 
     {
       name: 'the-discovery-servers-orphan-is-reaped-in-both-its-shapes',
-      async run({ assert }) {
+      async run({ expect }) {
         // The row that outlived two boots on switchboard: the hub that spawned
         // it went down inside its 10s quit window, so nothing was left to ask
         // it to leave and nothing but this sweep can reach it (#805).
-        assert.equal(isOrphanedEmulatorFamily(row(38500, ORPHANED, DISCOVERY), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(38501, ORPHANED, DISCOVERY_ENTRY), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(38504, ORPHANED, DISCOVERY_RELATIVE), UID), true, 'a bare-relative source dir puts nothing at all before `node_modules`');
+        expect(isOrphanedEmulatorFamily(row(38500, ORPHANED, DISCOVERY), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(38501, ORPHANED, DISCOVERY_ENTRY), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(38504, ORPHANED, DISCOVERY_RELATIVE), UID), 'a bare-relative source dir puts nothing at all before `node_modules`').toBe(true);
       },
     },
 
     {
       name: 'a-discovery-server-under-a-living-hub-is-untouched',
-      async run({ assert }) {
+      async run({ expect }) {
         // Same parentage rule as the worker: while the hub that spawned it is
         // alive, the hub owns its teardown and the sweep never considers it.
-        assert.equal(isOrphanedEmulatorFamily(row(38502, OUR_BOOT, DISCOVERY), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(38503, A_TERMINAL, DISCOVERY_ENTRY), UID), false);
+        expect(isOrphanedEmulatorFamily(row(38502, OUR_BOOT, DISCOVERY), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(38503, A_TERMINAL, DISCOVERY_ENTRY), UID)).toBe(false);
       },
     },
 
     {
       name: 'a-command-that-merely-names-firebase-functions-survives-the-sweep',
-      async run({ assert }) {
+      async run({ expect }) {
         // The #293 lesson on the newest shape: the match is a node RUNNING the
         // bin, so an editor holding that very file open is not family, and
         // neither is anything else naming the package.
-        assert.equal(isOrphanedEmulatorFamily(row(60009, ORPHANED, EDITOR_ON_DISCOVERY_BIN), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60010, ORPHANED, EDITOR_ON_FUNCTIONS_SOURCE), UID), false);
-        assert.equal(describeFamilyMember(EDITOR_ON_DISCOVERY_BIN), null);
-        assert.equal(describeFamilyMember(EDITOR_ON_FUNCTIONS_SOURCE), null);
+        expect(isOrphanedEmulatorFamily(row(60009, ORPHANED, EDITOR_ON_DISCOVERY_BIN), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60010, ORPHANED, EDITOR_ON_FUNCTIONS_SOURCE), UID)).toBe(false);
+        expect(describeFamilyMember(EDITOR_ON_DISCOVERY_BIN)).toBe(null);
+        expect(describeFamilyMember(EDITOR_ON_FUNCTIONS_SOURCE)).toBe(null);
       },
     },
 
     {
       name: 'a-bumped-port-hub-and-every-jar-under-it-are-reaped',
-      async run({ assert }) {
+      async run({ expect }) {
         // The hub sat on 4402, so no port this run wants could ever reach it,
         // and it named another brand's project — which stops mattering the
         // moment its parent is gone (#781 supersedes #293 on that point).
-        assert.equal(isOrphanedEmulatorFamily(row(38400, ORPHANED, HUB), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(38401, ORPHANED, HUB_TOOLS_ENTRY), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(73530, ORPHANED, DATABASE_JAR), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(74155, ORPHANED, PUBSUB_JAR), UID), true);
-        assert.equal(isOrphanedEmulatorFamily(row(74156, ORPHANED, STORAGE_JAR), UID), true);
+        expect(isOrphanedEmulatorFamily(row(38400, ORPHANED, HUB), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(38401, ORPHANED, HUB_TOOLS_ENTRY), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(73529, ORPHANED, FIRESTORE_JAR), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(73530, ORPHANED, DATABASE_JAR), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(74155, ORPHANED, PUBSUB_JAR), UID)).toBe(true);
+        expect(isOrphanedEmulatorFamily(row(74156, ORPHANED, STORAGE_JAR), UID)).toBe(true);
       },
     },
 
     {
       name: 'puppeteers-headless-browser-is-family',
-      async run({ assert }) {
+      async run({ expect }) {
         // A lane's chrome outlives the lane exactly as the jars do, and its
         // throwaway profile directory is the only thing that says so.
-        assert.equal(isOrphanedEmulatorFamily(row(41003, ORPHANED, PUPPETEER_CHROME), UID), true);
+        expect(isOrphanedEmulatorFamily(row(41003, ORPHANED, PUPPETEER_CHROME), UID)).toBe(true);
       },
     },
 
     {
       name: 'the-reload-watcher-survives-the-sweep',
-      async run({ assert }) {
+      async run({ expect }) {
         // nodemon runs at PID 1 with a LIVE session behind it, and its argv
         // names firebase paths. The strict family match is the whole reason it
         // lives: it is not a hub, a worker, a jar, a helper or a browser.
-        assert.equal(isOrphanedEmulatorFamily(row(60001, ORPHANED, RELOAD_WATCHER), UID), false);
-        assert.equal(describeFamilyMember(RELOAD_WATCHER), null);
+        expect(isOrphanedEmulatorFamily(row(60001, ORPHANED, RELOAD_WATCHER), UID)).toBe(false);
+        expect(describeFamilyMember(RELOAD_WATCHER)).toBe(null);
       },
     },
 
     {
       name: 'the-cli-a-deploy-and-a-users-browser-survive-the-sweep',
-      async run({ assert }) {
+      async run({ expect }) {
         // `omega emulator` is the process running this very sweep; `firebase
         // deploy` is a live publish; a Chrome launched from Finder has PID 1
         // for a parent and no puppeteer profile.
-        assert.equal(isOrphanedEmulatorFamily(row(60002, ORPHANED, OMEGA_CLI), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60003, ORPHANED, MGR_CLI), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60004, ORPHANED, FIREBASE_DEPLOY), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60005, ORPHANED, USER_CHROME), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60006, ORPHANED, 'node /Users/ian/some-other-tool/server.js'), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(60007, ORPHANED, 'java -jar /Users/ian/Developer/tools/some-app.jar'), UID), false, 'a jar outside the firebase emulator cache is somebody else\'s');
-        assert.equal(isOrphanedEmulatorFamily(row(60008, ORPHANED, EDITOR_ON_PORT_HOLD), UID), false, "a devkit lane helper is a library module, so a process NAMING one is never running one");
+        expect(isOrphanedEmulatorFamily(row(60002, ORPHANED, OMEGA_CLI), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60003, ORPHANED, MGR_CLI), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60004, ORPHANED, FIREBASE_DEPLOY), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60005, ORPHANED, USER_CHROME), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60006, ORPHANED, 'node /Users/ian/some-other-tool/server.js'), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60007, ORPHANED, 'java -jar /Users/ian/Developer/tools/some-app.jar'), UID), 'a jar outside the firebase emulator cache is somebody else\'s').toBe(false);
+        expect(isOrphanedEmulatorFamily(row(60008, ORPHANED, EDITOR_ON_PORT_HOLD), UID), "a devkit lane helper is a library module, so a process NAMING one is never running one").toBe(false);
       },
     },
 
     {
       name: 'init-itself-is-never-a-candidate',
-      async run({ assert }) {
-        assert.equal(isOrphanedEmulatorFamily(row(1, 0, '/sbin/launchd'), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(row(NaN, ORPHANED, WORKER), UID), false);
-        assert.equal(isOrphanedEmulatorFamily(undefined, UID), false);
+      async run({ expect }) {
+        expect(isOrphanedEmulatorFamily(row(1, 0, '/sbin/launchd'), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(row(NaN, ORPHANED, WORKER), UID)).toBe(false);
+        expect(isOrphanedEmulatorFamily(undefined, UID)).toBe(false);
       },
     },
 
@@ -381,20 +381,20 @@ module.exports = defineCases({
 
     {
       name: 'every-family-member-has-a-short-name',
-      async run({ assert }) {
-        assert.equal(describeFamilyMember(HUB), 'firebase hub');
-        assert.equal(describeFamilyMember(HUB_TOOLS_ENTRY), 'firebase hub');
-        assert.equal(describeFamilyMember(WORKER), 'functions worker');
-        assert.equal(describeFamilyMember(DISCOVERY), 'functions discovery server');
-        assert.equal(describeFamilyMember(DISCOVERY_ENTRY), 'functions discovery server');
-        assert.equal(describeFamilyMember(FIRESTORE_JAR), 'firestore jar', 'the firestore jar names a database edition — the JAR decides, not the argv');
-        assert.equal(describeFamilyMember(DATABASE_JAR), 'database jar');
-        assert.equal(describeFamilyMember(PUBSUB_JAR), 'pubsub jar');
-        assert.equal(describeFamilyMember(STORAGE_JAR), 'storage jar');
-        assert.equal(describeFamilyMember(UNKNOWN_JAR), 'emulator jar', 'a jar the cache grows tomorrow is still an emulator jar');
-        assert.equal(describeFamilyMember(PUPPETEER_CHROME), 'puppeteer chrome');
-        assert.equal(describeFamilyMember(USER_CHROME), null);
-        assert.equal(describeFamilyMember(EDITOR_ON_PORT_HOLD), null);
+      async run({ expect }) {
+        expect(describeFamilyMember(HUB)).toBe('firebase hub');
+        expect(describeFamilyMember(HUB_TOOLS_ENTRY)).toBe('firebase hub');
+        expect(describeFamilyMember(WORKER)).toBe('functions worker');
+        expect(describeFamilyMember(DISCOVERY)).toBe('functions discovery server');
+        expect(describeFamilyMember(DISCOVERY_ENTRY)).toBe('functions discovery server');
+        expect(describeFamilyMember(FIRESTORE_JAR), 'the firestore jar names a database edition — the JAR decides, not the argv').toBe('firestore jar');
+        expect(describeFamilyMember(DATABASE_JAR)).toBe('database jar');
+        expect(describeFamilyMember(PUBSUB_JAR)).toBe('pubsub jar');
+        expect(describeFamilyMember(STORAGE_JAR)).toBe('storage jar');
+        expect(describeFamilyMember(UNKNOWN_JAR), 'a jar the cache grows tomorrow is still an emulator jar').toBe('emulator jar');
+        expect(describeFamilyMember(PUPPETEER_CHROME)).toBe('puppeteer chrome');
+        expect(describeFamilyMember(USER_CHROME)).toBe(null);
+        expect(describeFamilyMember(EDITOR_ON_PORT_HOLD)).toBe(null);
       },
     },
 
@@ -402,7 +402,7 @@ module.exports = defineCases({
 
     {
       name: 'the-sweep-signals-every-orphan-and-nothing-else',
-      async run({ assert }) {
+      async run({ expect }) {
         const table = processTable({
           73529: { ppid: ORPHANED, command: FIRESTORE_JAR },
           74155: { ppid: ORPHANED, command: PUBSUB_JAR },
@@ -414,18 +414,18 @@ module.exports = defineCases({
 
         const result = await reapMachineOrphans(table.seams);
 
-        assert.deepEqual(result.reaped.map((entry) => entry.pid).sort(), [38483, 73529, 74155]);
-        assert.deepEqual(result.killed, [], 'everything left on the first signal');
-        assert.deepEqual(table.signals.map((entry) => entry.signal), ['SIGTERM', 'SIGTERM', 'SIGTERM']);
-        assert.deepEqual(table.signalled(37088), [], "a live stack's jar is never signalled");
-        assert.deepEqual(table.signalled(60001), [], 'the watcher is never signalled');
-        assert.deepEqual(table.signalled(60002), [], "another user's jar is never signalled");
+        expect(result.reaped.map((entry) => entry.pid).sort()).toEqual([38483, 73529, 74155]);
+        expect(result.killed, 'everything left on the first signal').toEqual([]);
+        expect(table.signals.map((entry) => entry.signal)).toEqual(['SIGTERM', 'SIGTERM', 'SIGTERM']);
+        expect(table.signalled(37088), "a live stack's jar is never signalled").toEqual([]);
+        expect(table.signalled(60001), 'the watcher is never signalled').toEqual([]);
+        expect(table.signalled(60002), "another user's jar is never signalled").toEqual([]);
       },
     },
 
     {
       name: 'only-the-survivors-of-sigterm-are-sigkilled',
-      async run({ assert }) {
+      async run({ expect }) {
         // Escalation order is the safety story: SIGTERM to everything, and
         // SIGKILL only to what is still standing after the grace window.
         const table = processTable({
@@ -438,16 +438,16 @@ module.exports = defineCases({
 
         const result = await reapMachineOrphans(table.seams);
 
-        assert.deepEqual(table.signalled(74155), ['SIGTERM'], 'a process that left needs nothing more');
-        assert.deepEqual(table.signalled(73529), ['SIGTERM', 'SIGKILL'], 'the survivor is escalated, in that order');
-        assert.deepEqual(result.killed, [73529]);
-        assert.deepEqual(result.reaped.map((entry) => entry.pid).sort(), [73529, 74155]);
+        expect(table.signalled(74155), 'a process that left needs nothing more').toEqual(['SIGTERM']);
+        expect(table.signalled(73529), 'the survivor is escalated, in that order').toEqual(['SIGTERM', 'SIGKILL']);
+        expect(result.killed).toEqual([73529]);
+        expect(result.reaped.map((entry) => entry.pid).sort()).toEqual([73529, 74155]);
       },
     },
 
     {
       name: 'a-recycled-pid-is-spared-on-the-re-read',
-      async run({ assert }) {
+      async run({ expect }) {
         // The grace window is long enough for a number to be freed and handed
         // out again, and there is no apologising to a SIGKILL: the row is read
         // again and must STILL be an orphaned family member.
@@ -459,15 +459,15 @@ module.exports = defineCases({
 
         const result = await reapMachineOrphans(table.seams);
 
-        assert.deepEqual(table.signalled(73529), ['SIGTERM'], 'the number came back as a stranger — no SIGKILL');
-        assert.deepEqual(result.killed, []);
-        assert.deepEqual(result.reaped, [], 'nothing of ours went down, so nothing is reported reaped');
+        expect(table.signalled(73529), 'the number came back as a stranger — no SIGKILL').toEqual(['SIGTERM']);
+        expect(result.killed).toEqual([]);
+        expect(result.reaped, 'nothing of ours went down, so nothing is reported reaped').toEqual([]);
       },
     },
 
     {
       name: 'the-ports-the-orphans-held-are-waited-on-before-the-boot-continues',
-      async run({ assert }) {
+      async run({ expect }) {
         // A SIGKILLed JVM holds its listener after kill() returns, and the
         // allocator probes these very ports moments later.
         const table = processTable({
@@ -477,13 +477,13 @@ module.exports = defineCases({
 
         await reapMachineOrphans(table.seams);
 
-        assert.deepEqual([...new Set(table.probed)].sort((a, b) => a - b), [9150, 9152, 9154], 'every port the reaped rows published, websocket included');
+        expect([...new Set(table.probed)].sort((a, b) => a - b), 'every port the reaped rows published, websocket included').toEqual([9150, 9152, 9154]);
       },
     },
 
     {
       name: 'the-sweep-never-signals-itself-or-its-parent',
-      async run({ assert }) {
+      async run({ expect }) {
         // No ownership proof stands behind this sweep, so the two numbers it
         // must never signal are named outright: a family-shaped row wearing
         // this very pid would otherwise make the boot kill itself mid-reap.
@@ -495,19 +495,19 @@ module.exports = defineCases({
 
         // Not vacuous: both rows clear the verdict, so the guard is the only
         // thing standing between this boot and its own SIGTERM.
-        assert.equal(isOrphanedEmulatorFamily(row(process.pid, ORPHANED, FIRESTORE_JAR), UID), true);
+        expect(isOrphanedEmulatorFamily(row(process.pid, ORPHANED, FIRESTORE_JAR), UID)).toBe(true);
 
         const result = await reapMachineOrphans(table.seams);
 
-        assert.deepEqual(table.signalled(process.pid), [], 'the running boot is never a candidate');
-        assert.deepEqual(table.signalled(process.ppid), [], 'nor is whatever launched it');
-        assert.deepEqual(result.reaped.map((entry) => entry.pid), [73529], 'the real orphan beside them still goes');
+        expect(table.signalled(process.pid), 'the running boot is never a candidate').toEqual([]);
+        expect(table.signalled(process.ppid), 'nor is whatever launched it').toEqual([]);
+        expect(result.reaped.map((entry) => entry.pid), 'the real orphan beside them still goes').toEqual([73529]);
       },
     },
 
     {
       name: 'nothing-orphaned-means-no-signal-and-no-probe',
-      async run({ assert }) {
+      async run({ expect }) {
         const table = processTable({
           37088: { ppid: OUR_BOOT, command: FIRESTORE_JAR },
           60001: { ppid: ORPHANED, command: RELOAD_WATCHER },
@@ -515,9 +515,9 @@ module.exports = defineCases({
 
         const result = await reapMachineOrphans(table.seams);
 
-        assert.deepEqual(result, { reaped: [], killed: [] });
-        assert.deepEqual(table.signals, []);
-        assert.deepEqual(table.probed, [], 'a boot with nothing to reap pays for nothing');
+        expect(result).toEqual({ reaped: [], killed: [] });
+        expect(table.signals).toEqual([]);
+        expect(table.probed, 'a boot with nothing to reap pays for nothing').toEqual([]);
       },
     },
 
@@ -525,7 +525,7 @@ module.exports = defineCases({
 
     {
       name: 'the-boot-names-every-pid-it-reaped-and-what-it-was',
-      async run({ assert }) {
+      async run({ expect }) {
         const command = new EmulatorCommand({ firebaseProjectPath: os.tmpdir(), argv: {}, options: {} });
         const lines = [];
 
@@ -539,15 +539,15 @@ module.exports = defineCases({
 
         await command.reapMachineOrphans(table.seams);
 
-        assert.equal(lines.length, 1, 'one line per boot, not one per pid');
+        expect(lines.length, 'one line per boot, not one per pid').toBe(1);
         // Named in table order, which `ps -A` prints by pid.
-        assert.match(lines[0], /Reaped 3 orphaned emulator processes left by earlier runs: 38483 functions worker, 73529 firestore jar, 74155 pubsub jar\./);
+        expect(lines[0]).toMatch(/Reaped 3 orphaned emulator processes left by earlier runs: 38483 functions worker, 73529 firestore jar, 74155 pubsub jar\./);
       },
     },
 
     {
       name: 'the-boot-is-silent-when-there-is-nothing-to-reap',
-      async run({ assert }) {
+      async run({ expect }) {
         const command = new EmulatorCommand({ firebaseProjectPath: os.tmpdir(), argv: {}, options: {} });
         const lines = [];
 
@@ -557,13 +557,13 @@ module.exports = defineCases({
 
         await command.reapMachineOrphans(table.seams);
 
-        assert.deepEqual(lines, [], 'a clean machine says nothing at all');
+        expect(lines, 'a clean machine says nothing at all').toEqual([]);
       },
     },
 
     {
       name: 'a-single-reap-and-a-sigkill-read-in-plain-english',
-      async run({ assert }) {
+      async run({ expect }) {
         const command = new EmulatorCommand({ firebaseProjectPath: os.tmpdir(), argv: {}, options: {} });
         const lines = [];
 
@@ -575,7 +575,7 @@ module.exports = defineCases({
 
         // The escalation note sits where every sibling reap line puts it, so
         // the pid list is never read as "this one needed SIGKILL".
-        assert.match(lines[0], /Reaped 1 orphaned emulator process left by earlier runs \(1 needed SIGKILL\): 73529 firestore jar\./);
+        expect(lines[0]).toMatch(/Reaped 1 orphaned emulator process left by earlier runs \(1 needed SIGKILL\): 73529 firestore jar\./);
       },
     },
 
@@ -583,7 +583,7 @@ module.exports = defineCases({
 
     {
       name: 'a-real-orphan-is-reaped-and-a-parented-one-survives',
-      async run({ assert }) {
+      async run({ expect }) {
         // The whole chain against the real OS: a real `ps -A`, a real row for a
         // real process, and a real SIGTERM. The script is a plain idling node
         // whose path IS the functions-worker shape.
@@ -607,7 +607,7 @@ module.exports = defineCases({
             return found.length > 0 ? found[0] : null;
           }, 10000);
 
-          assert.ok(orphanPid, 'the drill needs a real orphan to reap');
+          expect(orphanPid, 'the drill needs a real orphan to reap').toBeTruthy();
 
           // The one it must NOT touch: same command line, live parent (this
           // very process), so the parentage half of the proof spares it.
@@ -637,14 +637,14 @@ module.exports = defineCases({
             isFree: async () => true,
           });
 
-          assert.ok(result.reaped.some((entry) => entry.pid === orphanPid), 'the real orphan is reported reaped');
-          assert.equal(result.reaped.find((entry) => entry.pid === orphanPid).label, 'functions worker');
+          expect(result.reaped.some((entry) => entry.pid === orphanPid), 'the real orphan is reported reaped').toBeTruthy();
+          expect(result.reaped.find((entry) => entry.pid === orphanPid).label).toBe('functions worker');
 
           const gone = await until(() => !livePidsRunning(script).includes(orphanPid), 5000);
 
-          assert.ok(gone, 'the real orphan is actually gone');
-          assert.ok(livePidsRunning(script).includes(live.pid), 'the same shape with a live parent survives the sweep');
-          assert.deepEqual(spared.filter((entry) => entry.pid === live.pid), [], 'the parented one was never even signalled');
+          expect(gone, 'the real orphan is actually gone').toBeTruthy();
+          expect(livePidsRunning(script).includes(live.pid), 'the same shape with a live parent survives the sweep').toBeTruthy();
+          expect(spared.filter((entry) => entry.pid === live.pid), 'the parented one was never even signalled').toEqual([]);
         } finally {
           if (live) {
             live.kill();

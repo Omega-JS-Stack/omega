@@ -27,7 +27,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-ordering
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -109,11 +109,11 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(store.get(`users/${UID}`).subscription.status, 'active', 'the newer state stands — a stale event must not cancel a live subscriber');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`).metadata.updated.timestampUNIX, orderWrittenUNIX, 'the order is untouched, down to its write stamp');
-        assert.equal(store.get(`payments-webhooks/_test-ordering-stale`).transition, null, 'a skipped event dispatches no transition, so no cancellation email goes out');
-        assert.equal(store.get(`payments-webhooks/_test-ordering-stale`).status, 'completed', 'it is still acknowledged — the provider must stop redelivering it');
-        assert.ok(logs.some((line) => line.includes('Stale webhook')), `the skip is logged by name, got: ${logs.join(' | ')}`);
+        expect(store.get(`users/${UID}`).subscription.status, 'the newer state stands — a stale event must not cancel a live subscriber').toBe('active');
+        expect(store.get(`payments-orders/${ORDER_ID}`).metadata.updated.timestampUNIX, 'the order is untouched, down to its write stamp').toBe(orderWrittenUNIX);
+        expect(store.get(`payments-webhooks/_test-ordering-stale`).transition, 'a skipped event dispatches no transition, so no cancellation email goes out').toBe(null);
+        expect(store.get(`payments-webhooks/_test-ordering-stale`).status, 'it is still acknowledged — the provider must stop redelivering it').toBe('completed');
+        expect(logs.some((line) => line.includes('Stale webhook')), `the skip is logged by name, got: ${logs.join(' | ')}`).toBeTruthy();
       },
     },
 
@@ -139,8 +139,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(store.get(`users/${UID}`).subscription.status, 'cancelled', 'the newer event is the one that decides');
-        assert.equal(store.get(`payments-webhooks/_test-ordering-fresh`).transition, 'subscription-cancelled', 'and it dispatches its transition');
+        expect(store.get(`users/${UID}`).subscription.status, 'the newer event is the one that decides').toBe('cancelled');
+        expect(store.get(`payments-webhooks/_test-ordering-fresh`).transition, 'and it dispatches its transition').toBe('subscription-cancelled');
       },
     },
 
@@ -168,7 +168,7 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(store.get(`users/${UID}`).subscription.status, 'cancelled', 'a same-second event is a follow-up, not a redelivery');
+        expect(store.get(`users/${UID}`).subscription.status, 'a same-second event is a follow-up, not a redelivery').toBe('cancelled');
       },
     },
 
@@ -188,11 +188,8 @@ module.exports = defineCases({
           seed: { [`users/${UID}`]: existingUser() },
         });
 
-        assert.ok(
-          logs.some((line) => line.includes('the staleness guard cannot run')),
-          `an unguarded event must announce itself, got: ${logs.join(' | ')}`,
-        );
-        assert.equal(store.get(`payments-webhooks/_test-ordering-no-order`).status, 'completed', 'and it is still processed — an unguarded event is not a refused one');
+        expect(logs.some((line) => line.includes('the staleness guard cannot run')), `an unguarded event must announce itself, got: ${logs.join(' | ')}`).toBeTruthy();
+        expect(store.get(`payments-webhooks/_test-ordering-no-order`).status, 'and it is still processed — an unguarded event is not a refused one').toBe('completed');
       },
     },
 
@@ -214,11 +211,11 @@ module.exports = defineCases({
 
         const webhook = store.get(`payments-webhooks/_test-ordering-unknown-category`);
 
-        assert.equal(webhook.status, 'failed', 'an unknown category fails rather than picking a branch');
-        assert.ok(webhook.error.includes('Unknown event category'), `the error names what went wrong, got: ${webhook.error}`);
-        assert.equal(webhook.retryCount, 1, 'and it enters the retry ladder like any other failure');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'nothing is written for an event nothing could interpret');
-        assert.ok(logs.some((line) => line.includes('Unknown event category')), 'the failure is logged');
+        expect(webhook.status, 'an unknown category fails rather than picking a branch').toBe('failed');
+        expect(webhook.error.includes('Unknown event category'), `the error names what went wrong, got: ${webhook.error}`).toBeTruthy();
+        expect(webhook.retryCount, 'and it enters the retry ladder like any other failure').toBe(1);
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'nothing is written for an event nothing could interpret').toBeTruthy();
+        expect(logs.some((line) => line.includes('Unknown event category')), 'the failure is logged').toBeTruthy();
       },
     },
 
@@ -239,8 +236,8 @@ module.exports = defineCases({
 
         const webhook = store.get(`payments-webhooks/_test-ordering-no-category`);
 
-        assert.equal(webhook.status, 'failed', 'a categoryless event cannot be processed');
-        assert.ok(webhook.error.includes('no category'), `the error names what is missing, got: ${webhook.error}`);
+        expect(webhook.status, 'a categoryless event cannot be processed').toBe('failed');
+        expect(webhook.error.includes('no category'), `the error names what is missing, got: ${webhook.error}`).toBeTruthy();
       },
     },
 
@@ -275,12 +272,12 @@ module.exports = defineCases({
         const webhook = store.get(`payments-webhooks/_test-ordering-payment-method`);
         const user = store.get(`users/${UID}`);
 
-        assert.equal(webhook.status, 'completed', 'the event is processed, not ignored');
-        assert.equal(webhook.transition, null, 'a new card is not a transition — nothing about the subscription changed');
-        assert.equal(user.subscription.status, 'active', 'the subscriber stays active across a card change');
-        assert.equal(user.subscription.product.id, 'premium', 'and keeps their plan');
-        assert.equal(store.get(`payments-orders/${ORDER_ID}`).unified.status, 'active', 'the order mirrors the refreshed state');
-        assert.equal(store.get(`payments-intents/${ORDER_ID}`).status, 'completed', 'and the intent is closed out with it');
+        expect(webhook.status, 'the event is processed, not ignored').toBe('completed');
+        expect(webhook.transition, 'a new card is not a transition — nothing about the subscription changed').toBe(null);
+        expect(user.subscription.status, 'the subscriber stays active across a card change').toBe('active');
+        expect(user.subscription.product.id, 'and keeps their plan').toBe('premium');
+        expect(store.get(`payments-orders/${ORDER_ID}`).unified.status, 'the order mirrors the refreshed state').toBe('active');
+        expect(store.get(`payments-intents/${ORDER_ID}`).status, 'and the intent is closed out with it').toBe('completed');
       },
     },
 
@@ -318,8 +315,8 @@ module.exports = defineCases({
 
         const webhook = store.get(`payments-webhooks/_test-ordering-redelivered`);
 
-        assert.equal(webhook.status, 'completed', 'a redelivery is acknowledged like any other pass');
-        assert.equal(webhook.transition, null, 'and dispatches nothing — the confirmation email already went out on the first pass');
+        expect(webhook.status, 'a redelivery is acknowledged like any other pass').toBe('completed');
+        expect(webhook.transition, 'and dispatches nothing — the confirmation email already went out on the first pass').toBe(null);
       },
     },
   ],

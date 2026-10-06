@@ -76,13 +76,18 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
    * Normalize any of the four case-spec forms (standalone, suite, group, bare array).
    * @param {object|Array} spec - What a case file passed to defineCases.
    * @param {{ file: string }} options - The case file; it prefixes every case id.
-   * @returns {object} `{ file, description, layer, type, stopOnFailure, timeout, skip, setup, cleanup, cases }`.
+   * @returns {object} `{ file, description, layer, type, stopOnFailure, timeout, skip, setup, cleanup, cases }`,
+   *   plus a suite's other own keys (a suite-level `auth`), as a case keeps its own.
    */
   function normalizeSpec(spec, { file }) {
     if (Array.isArray(spec)) return normalizeSpec({ type: 'group', tests: spec }, { file });
     if (spec === null || typeof spec !== 'object') throw new Error(`${file} does not export a \`defineCases\` spec: it must be an object or an array`);
 
     const type = specType(spec, file);
+    const own = {};
+    for (const key of Object.keys(spec)) {
+      if (!SUITE_KEYS.includes(key)) own[key] = spec[key];
+    }
     const suite = {
       file,
       description: spec.description,
@@ -96,14 +101,10 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     };
 
     if (type !== 'standalone') {
-      return { ...suite, cases: spec.tests.map((caseDef, index) => normalizeCase(caseDef, index, file)) };
+      return { ...own, ...suite, cases: spec.tests.map((caseDef, index) => normalizeCase(caseDef, index, file)) };
     }
 
-    // A standalone spec IS its one case: its cleanup is the case's, never the suite's.
-    const own = {};
-    for (const key of Object.keys(spec)) {
-      if (!SUITE_KEYS.includes(key)) own[key] = spec[key];
-    }
+    // A standalone spec IS its one case: its own keys and its cleanup are the case's, never the suite's.
     return { ...suite, setup: undefined, cleanup: undefined, cases: [normalizeCase(own, 0, file, spec.description)] };
   }
 
@@ -227,7 +228,7 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
 
     const state = {};
     const stopOnFailure = suite.type === 'suite' && suite.stopOnFailure !== false;
-    let stopped = false;
+    let stopped = null;
     let setupFailed = false;
 
     if (typeof suite.setup === 'function') {
@@ -241,7 +242,7 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
 
     for (const caseDef of setupFailed ? [] : suite.cases) {
       if (stopped) {
-        await report(skipEvent(caseDef, 'suite stopped'));
+        await report(skipEvent(caseDef, stopped));
         continue;
       }
       const ctx = createContext({
@@ -252,7 +253,9 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
       });
       const event = await runCase(caseDef, ctx, { timeout: suite.timeout || defaultTimeout });
       await report(event);
-      if (event.status === 'fail' && stopOnFailure) stopped = true;
+      // A runtime skip stops a suite too: its later steps lean on the state it never built.
+      if (stopOnFailure && event.status === 'fail') stopped = 'suite stopped';
+      if (stopOnFailure && event.status === 'skip' && !caseDef.skip) stopped = event.reason;
     }
 
     if (typeof suite.cleanup === 'function') {

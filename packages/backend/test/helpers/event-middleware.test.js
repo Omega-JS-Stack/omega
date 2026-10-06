@@ -99,18 +99,18 @@ module.exports = defineCases({
 
     {
       name: 'an-absolute-handler-name-is-used-verbatim',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile('module.exports = async () => "ran";');
 
         const outcome = await settle(events.run(makeOmega(), file, {}));
 
-        assert.equal(outcome.resolved, 'ran');
+        expect(outcome.resolved).toBe('ran');
       },
     },
 
     {
       name: 'a-relative-handler-name-resolves-under-the-consumer-events-dir',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile('module.exports = async () => "from-events-dir";');
         const cwd = path.dirname(path.dirname(file));
         fs.mkdirSync(path.join(cwd, 'events'), { recursive: true });
@@ -120,22 +120,22 @@ module.exports = defineCases({
           events.run(makeOmega({ cwd }), 'users__on-create', {}),
         );
 
-        assert.equal(outcome.resolved, 'from-events-dir');
+        expect(outcome.resolved).toBe('from-events-dir');
       },
     },
 
     {
       name: 'a-missing-handler-rejects-and-is-reported-not-swallowed',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = makeOmega();
 
         const outcome = await settle(events.run(omega, 'does/not/exist', {}));
 
-        assert.equal(outcome.rejected instanceof Error, true);
-        assert.equal(outcome.rejected.message.includes('Failed to load handler'), true);
-        assert.equal(outcome.rejected.cause.code, 'MODULE_NOT_FOUND', 'the require failure survives as the cause');
-        assert.equal(omega.reported.length, 1, 'the load failure goes through report() — logged AND captured');
-        assert.equal(omega.reported[0], outcome.rejected);
+        expect(outcome.rejected instanceof Error).toBe(true);
+        expect(outcome.rejected.message.includes('Failed to load handler')).toBe(true);
+        expect(outcome.rejected.cause.code, 'the require failure survives as the cause').toBe('MODULE_NOT_FOUND');
+        expect(omega.reported.length, 'the load failure goes through report() — logged AND captured').toBe(1);
+        expect(omega.reported[0]).toBe(outcome.rejected);
       },
     },
 
@@ -143,7 +143,7 @@ module.exports = defineCases({
 
     {
       name: 'the-handler-receives-omega-ctx-and-the-event-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile(`module.exports = async (context) => ({
           hasOmega: !!context.omega,
           hasCtx: typeof context.ctx.log === 'function',
@@ -162,7 +162,7 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(makeOmega(), file, payload));
 
-        assert.deepEqual(outcome.resolved, {
+        expect(outcome.resolved).toEqual({
           hasOmega: true,
           hasCtx: true,
           noRequest: true,
@@ -176,12 +176,12 @@ module.exports = defineCases({
 
     {
       name: 'event-keys-absent-from-the-payload-arrive-undefined-not-missing',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile(`module.exports = async (context) => Object.keys(context).sort().join(',');`);
 
         const outcome = await settle(events.run(makeOmega(), file, {}));
 
-        assert.equal(outcome.resolved, 'change,context,ctx,omega,snapshot,user');
+        expect(outcome.resolved).toBe('change,context,ctx,omega,snapshot,user');
       },
     },
 
@@ -189,7 +189,7 @@ module.exports = defineCases({
 
     {
       name: 'the-named-hook-runs-pre-then-handler-then-post',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = [];
         const file = handlerFile('module.exports = async () => "handled";');
         const omega = makeOmega({
@@ -198,14 +198,14 @@ module.exports = defineCases({
 
         const outcome = await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
-        assert.deepEqual(order, ['pre', 'post']);
-        assert.equal(outcome.resolved, 'handled');
+        expect(order).toEqual(['pre', 'post']);
+        expect(outcome.resolved).toBe('handled');
       },
     },
 
     {
       name: 'only-the-hook-registered-under-this-events-name-runs',
-      async run({ assert }) {
+      async run({ expect }) {
         const called = [];
         const file = handlerFile('module.exports = async () => "handled";');
         const omega = makeOmega({
@@ -217,13 +217,13 @@ module.exports = defineCases({
 
         await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
-        assert.deepEqual(called, ['mine', 'mine']);
+        expect(called).toEqual(['mine', 'mine']);
       },
     },
 
     {
       name: 'a-throwing-pre-hook-blocks-the-handler',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile('module.exports = async () => { throw new Error("handler ran"); };');
         const omega = makeOmega({
           handlers: {
@@ -235,7 +235,7 @@ module.exports = defineCases({
 
         const outcome = await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
-        assert.equal(outcome.rejected.message, 'blocked by pre hook');
+        expect(outcome.rejected.message).toBe('blocked by pre hook');
       },
     },
 
@@ -243,21 +243,21 @@ module.exports = defineCases({
 
     {
       name: 'a-plain-handler-error-rejects-and-is-reported',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile('module.exports = async () => { throw new Error("handler blew up"); };');
         const omega = makeOmega();
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(outcome.rejected.message, 'handler blew up', 'the rejection value is the handler\'s own error');
-        assert.equal(omega.reported.length, 1, 'a thrown trigger error is a server fault — reported');
-        assert.equal(omega.reported[0], outcome.rejected);
+        expect(outcome.rejected.message, 'the rejection value is the handler\'s own error').toBe('handler blew up');
+        expect(omega.reported.length, 'a thrown trigger error is a server fault — reported').toBe(1);
+        expect(omega.reported[0]).toBe(outcome.rejected);
       },
     },
 
     {
       name: 'an-auth-style-error-rethrows-untouched-and-unreported',
-      async run({ assert }) {
+      async run({ expect }) {
         // The HttpsError shape verbatim: its constructor sets `httpErrorCode`
         // from the code, which is how a deliberate block is recognized here.
         const file = handlerFile(`module.exports = async () => {
@@ -270,14 +270,14 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(outcome.rejected.code, 'permission-denied');
-        assert.equal(omega.reported.length, 0, 'a blocking auth error is not a framework fault');
+        expect(outcome.rejected.code).toBe('permission-denied');
+        expect(omega.reported.length, 'a blocking auth error is not a framework fault').toBe(0);
       },
     },
 
     {
       name: 'a-string-code-server-fault-is-reported-not-mistaken-for-a-block',
-      async run({ assert }) {
+      async run({ expect }) {
         // ENOENT, ECONNREFUSED, messaging/invalid-token: a string `.code` is a
         // SERVER fault. respond.js parseInts it to NaN and lands it on the 500
         // lane, so a trigger must report it too.
@@ -290,15 +290,15 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(outcome.rejected.message.includes('ENOENT'), true);
-        assert.equal(omega.reported.length, 1, 'a string-code system error is a framework fault — reported');
-        assert.equal(omega.reported[0], outcome.rejected);
+        expect(outcome.rejected.message.includes('ENOENT')).toBe(true);
+        expect(omega.reported.length, 'a string-code system error is a framework fault — reported').toBe(1);
+        expect(omega.reported[0]).toBe(outcome.rejected);
       },
     },
 
     {
       name: 'a-numeric-4xx-code-error-rethrows-unreported',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile(`module.exports = async () => {
           const e = new Error('bad request');
           e.code = 400;
@@ -308,14 +308,14 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(outcome.rejected.code, 400, 'the client-fault code survives untouched');
-        assert.equal(omega.reported.length, 0, 'an explicit 4xx is the client lane — never captured');
+        expect(outcome.rejected.code, 'the client-fault code survives untouched').toBe(400);
+        expect(omega.reported.length, 'an explicit 4xx is the client lane — never captured').toBe(0);
       },
     },
 
     {
       name: 'a-numeric-5xx-code-error-is-reported',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile(`module.exports = async () => {
           const e = new Error('upstream exploded');
           e.code = 503;
@@ -325,14 +325,14 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(omega.reported.length, 1, 'a 5xx code is a server fault, exactly as respond.js rules it');
-        assert.equal(omega.reported[0], outcome.rejected);
+        expect(omega.reported.length, 'a 5xx code is a server fault, exactly as respond.js rules it').toBe(1);
+        expect(omega.reported[0]).toBe(outcome.rejected);
       },
     },
 
     {
       name: 'an-httpErrorCode-error-also-rethrows-unreported',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile(`module.exports = async () => {
           const e = new Error('unauthenticated');
           e.httpErrorCode = { status: 401 };
@@ -342,8 +342,8 @@ module.exports = defineCases({
 
         const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(outcome.rejected.message, 'unauthenticated');
-        assert.equal(omega.reported.length, 0);
+        expect(outcome.rejected.message).toBe('unauthenticated');
+        expect(omega.reported.length).toBe(0);
       },
     },
 
@@ -351,33 +351,33 @@ module.exports = defineCases({
 
     {
       name: 'a-thrown-trigger-error-captures-to-sentry',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = bootOmega();
 
         const file = handlerFile('module.exports = async () => { throw new Error("trigger blew up"); };');
 
         const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
-        assert.equal(captured.length, 1, 'an event trigger that throws reaches Sentry, same as a 5xx route');
-        assert.equal(captured[0].message, 'trigger blew up');
+        expect(captured.length, 'an event trigger that throws reaches Sentry, same as a 5xx route').toBe(1);
+        expect(captured[0].message).toBe('trigger blew up');
       },
     },
 
     {
       name: 'a-handler-that-will-not-load-captures-to-sentry',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = bootOmega();
 
         const captured = await withSentryRecorder(omega, () => settle(events.run(omega, '/nonexistent/handler/path', {})));
 
-        assert.equal(captured.length, 1);
-        assert.equal(captured[0].message.includes('Failed to load handler'), true);
+        expect(captured.length).toBe(1);
+        expect(captured[0].message.includes('Failed to load handler')).toBe(true);
       },
     },
 
     {
       name: 'a-blocking-auth-error-never-reaches-sentry',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = bootOmega();
 
         const file = handlerFile(`module.exports = async () => {
@@ -389,13 +389,13 @@ module.exports = defineCases({
 
         const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
-        assert.equal(captured.length, 0, 'the trigger\'s 4xx lane never captures — the same rule respond.js runs');
+        expect(captured.length, 'the trigger\'s 4xx lane never captures — the same rule respond.js runs').toBe(0);
       },
     },
 
     {
       name: 'a-string-code-system-error-still-reaches-sentry',
-      async run({ assert }) {
+      async run({ expect }) {
         const omega = bootOmega();
 
         const file = handlerFile(`module.exports = async () => {
@@ -406,19 +406,19 @@ module.exports = defineCases({
 
         const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
-        assert.equal(captured.length, 1, 'a string .code is not a block — the server fault reaches Sentry');
-        assert.equal(captured[0].message.includes('ECONNREFUSED'), true);
+        expect(captured.length, 'a string .code is not a block — the server fault reaches Sentry').toBe(1);
+        expect(captured[0].message.includes('ECONNREFUSED')).toBe(true);
       },
     },
 
     {
       name: 'a-synchronous-handler-return-value-resolves-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const file = handlerFile('module.exports = () => ({ ok: true });');
 
         const outcome = await settle(events.run(makeOmega(), file, {}));
 
-        assert.deepEqual(outcome.resolved, { ok: true });
+        expect(outcome.resolved).toEqual({ ok: true });
       },
     },
   ],

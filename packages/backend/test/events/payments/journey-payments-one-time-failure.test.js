@@ -17,7 +17,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'resolve-one-time-product',
-      async run({ accounts, assert, state, config, skip }) {
+      async run({ accounts, expect, state, config, skip }) {
         const uid = accounts['journey-payments-one-time'].uid;
 
         // Resolve first one-time product from config. If none configured, skip the
@@ -34,7 +34,7 @@ module.exports = defineCases({
 
     {
       name: 'send-one-time-payment-failed',
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         state.eventId = `_test-evt-journey-onetime-fail-${Date.now()}`;
         state.invoiceId = `_test-inv-onetime-fail-${Date.now()}`;
         state.orderId = `0000-0000-0000`; // Fake orderId for test
@@ -61,52 +61,48 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted');
+        expect(response, 'Webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'webhook-categorized-as-one-time',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.eventId}`);
           return doc?.status === 'completed' || doc?.status === 'failed';
         }, 15000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
-        assert.ok(webhookDoc, 'Webhook doc should exist');
-        assert.equal(webhookDoc.event?.category, 'one-time', 'Category should be one-time');
-        assert.equal(webhookDoc.event?.resourceType, 'invoice', 'Resource type should be invoice');
-        assert.equal(webhookDoc.transition, 'purchase-failed', 'Transition should be purchase-failed');
+        expect(webhookDoc, 'Webhook doc should exist').toBeTruthy();
+        expect(webhookDoc.event?.category, 'Category should be one-time').toBe('one-time');
+        expect(webhookDoc.event?.resourceType, 'Resource type should be invoice').toBe('invoice');
+        expect(webhookDoc.transition, 'Transition should be purchase-failed').toBe('purchase-failed');
       },
     },
 
     {
       name: 'order-doc-created-with-failure',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
 
-        assert.ok(orderDoc, 'Order doc should exist');
-        assert.equal(orderDoc.type, 'one-time', 'Type should be one-time');
-        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
-        assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
-        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
-        assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');
+        expect(orderDoc, 'Order doc should exist').toBeTruthy();
+        expect(orderDoc.type, 'Type should be one-time').toBe('one-time');
+        expect(orderDoc.owner, 'Owner should match').toBe(state.uid);
+        expect(orderDoc.provider, 'Provider should be test').toBe('test');
+        expect(orderDoc.requests !== undefined, 'requests field should exist').toBeTruthy();
+        expect(orderDoc.requests.cancellation, 'requests.cancellation should be null').toBe(null);
+        expect(orderDoc.requests.refund, 'requests.refund should be null').toBe(null);
       },
     },
 
     {
       name: 'subscription-unchanged',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         // One-time payment failures must NOT modify subscription state
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(
-          userDoc.subscription?.product?.id,
-          'basic',
-          'Subscription should remain basic after one-time failure',
-        );
+        expect(userDoc.subscription?.product?.id, 'Subscription should remain basic after one-time failure').toBe('basic');
       },
     },
   ],

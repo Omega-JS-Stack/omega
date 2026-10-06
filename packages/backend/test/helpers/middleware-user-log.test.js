@@ -56,30 +56,30 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-private-key-never-reaches-the-projection',
-      async run({ assert }) {
+      async run({ expect }) {
         const projected = serialize(projectUserForLog(userDoc()));
 
-        assert.equal(projected.includes(PRIVATE_KEY), false, `api.privateKey leaked into the log line: ${projected}`);
-        assert.equal(projected.includes(CLIENT_ID), false, `api.clientId leaked into the log line: ${projected}`);
-        assert.equal(projected.includes('privateKey'), false, `the api key field survived: ${projected}`);
+        expect(projected.includes(PRIVATE_KEY), `api.privateKey leaked into the log line: ${projected}`).toBe(false);
+        expect(projected.includes(CLIENT_ID), `api.clientId leaked into the log line: ${projected}`).toBe(false);
+        expect(projected.includes('privateKey'), `the api key field survived: ${projected}`).toBe(false);
       },
     },
 
     {
       name: 'the-projection-is-id-plan-and-roles',
-      async run({ assert }) {
+      async run({ expect }) {
         const projection = projectUserForLog(userDoc());
 
-        assert.deepEqual(Object.keys(projection).sort(), ['id', 'plan', 'roles'], serialize(projection));
-        assert.equal(projection.id, 'uid-275');
-        assert.deepEqual(projection.plan, { id: 'premium', status: 'active' });
-        assert.deepEqual(projection.roles, ['betaTester']);
+        expect(Object.keys(projection).sort(), serialize(projection)).toEqual(['id', 'plan', 'roles']);
+        expect(projection.id).toBe('uid-275');
+        expect(projection.plan).toEqual({ id: 'premium', status: 'active' });
+        expect(projection.roles).toEqual(['betaTester']);
       },
     },
 
     {
       name: 'roles-carry-names-only-never-values',
-      async run({ assert }) {
+      async run({ expect }) {
         // `roles` is a $passthrough group, so a consumer can hang anything off
         // it — including something secret-shaped. Only the names of enabled
         // roles are emitted, so a value can never ride along.
@@ -87,37 +87,37 @@ module.exports = defineCases({
           roles: { admin: true, betaTester: false, internalToken: 'tok_275_secret' },
         }));
 
-        assert.deepEqual(projection.roles, ['admin'], serialize(projection.roles));
-        assert.equal(serialize(projection).includes('tok_275_secret'), false, serialize(projection));
+        expect(projection.roles, serialize(projection.roles)).toEqual(['admin']);
+        expect(serialize(projection).includes('tok_275_secret'), serialize(projection)).toBe(false);
       },
     },
 
     {
       name: 'a-new-secret-shaped-schema-field-cannot-opt-itself-in',
-      async run({ assert }) {
+      async run({ expect }) {
         // The allow-list is the guarantee: a field added to the account schema
         // tomorrow is absent from the log line until somebody adds it here on
         // purpose. Proven against the REAL schema's top-level groups.
         const doc = userDoc({ secrets: { webhookSigningKey: 'whsec_275_future_field' } });
         const projected = serialize(projectUserForLog(doc));
 
-        assert.equal(projected.includes('whsec_275_future_field'), false, projected);
+        expect(projected.includes('whsec_275_future_field'), projected).toBe(false);
 
         for (const group of Object.keys(USER_SCHEMA)) {
           if (group === 'auth' || group === 'subscription' || group === 'roles') continue;
 
-          assert.equal(projected.includes(`"${group}"`), false, `schema group "${group}" reached the log line: ${projected}`);
+          expect(projected.includes(`"${group}"`), `schema group "${group}" reached the log line: ${projected}`).toBe(false);
         }
       },
     },
 
     {
       name: 'an-incomplete-doc-projects-without-throwing',
-      async run({ assert }) {
+      async run({ expect }) {
         // The line logs before any route runs, so it must survive a user the
         // resolver never filled in (an unauthenticated or partial doc).
-        assert.deepEqual(projectUserForLog({}), { id: null, plan: { id: null, status: null }, roles: [] });
-        assert.deepEqual(projectUserForLog(undefined), { id: null, plan: { id: null, status: null }, roles: [] });
+        expect(projectUserForLog({})).toEqual({ id: null, plan: { id: null, status: null }, roles: [] });
+        expect(projectUserForLog(undefined)).toEqual({ id: null, plan: { id: null, status: null }, roles: [] });
       },
     },
   ],

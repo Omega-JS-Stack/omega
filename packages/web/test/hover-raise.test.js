@@ -9,9 +9,8 @@
  * two theme chains, so classy landing flat while a sibling still lifts is one
  * assertion each.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
@@ -79,96 +78,83 @@ const declsFor = (css, selector) => cssRules(css)
   .filter((rule) => rule.selectors.includes(selector))
   .map((rule) => rule.decls.replace(/\s+/g, ' ').trim());
 
-test('#686: nothing in the classy bundle raises on hover', () => {
-  const css = compileBundle('classy');
+module.exports = defineCases({
+  type: 'group',
+  description: 'hover-raise',
+  tests: [
+    {
+      name: '#686: nothing in the classy bundle raises on hover',
+      run: (ctx) => {
+        const css = compileBundle('classy');
 
-  assert.deepEqual(
-    hoverRaises(css),
-    [],
-    'the whole raise family lands flat in classy — buttons, tiles, cards, the store badge, the hero frame, the legacy utilities',
-  );
-});
+        ctx.expect(hoverRaises(css), 'the whole raise family lands flat in classy — buttons, tiles, cards, the store badge, the hero frame, the legacy utilities').toEqual([]);
+      },
+    },
 
-test('#686: the raise is classy\'s alone to drop — a sibling theme still lifts', () => {
-  const raises = hoverRaises(compileBundle('newsflash'));
+    {
+      name: '#686: the raise is classy\'s alone to drop — a sibling theme still lifts',
+      run: (ctx) => {
+        const raises = hoverRaises(compileBundle('newsflash'));
 
-  for (const selector of [
-    // The core motion idiom, untouched for every other skin.
-    '.omega-hover-lift:hover',
-    '.omega-hover-raise:hover',
-    '.omega-interactive--lift:hover',
-    '.omega-interactive--lift:focus-visible',
-    // The classy partials newsflash imports as its floor: the raise stays in
-    // the file, which is why classy opts out instead of deleting it.
-    '.omega-person:hover',
-    '.omega-hero__frame:hover .omega-hero__frame-inner',
-  ]) {
-    assert.ok(raises.includes(selector), `${selector} still raises outside classy`);
-  }
-});
+        for (const selector of [
+          // The core motion idiom, untouched for every other skin.
+          '.omega-hover-lift:hover',
+          '.omega-hover-raise:hover',
+          '.omega-interactive--lift:hover',
+          '.omega-interactive--lift:focus-visible',
+          // The classy partials newsflash imports as its floor: the raise stays in
+          // the file, which is why classy opts out instead of deleting it.
+          '.omega-person:hover',
+          '.omega-hero__frame:hover .omega-hero__frame-inner',
+        ]) {
+          ctx.expect(raises.includes(selector), `${selector} still raises outside classy`).toBeTruthy();
+        }
+      },
+    },
 
-test('#686: only the raise goes — highlight, ring, shadow and press all stay', () => {
-  const css = compileBundle('classy');
+    {
+      name: '#686: only the raise goes — highlight, ring, shadow and press all stay',
+      run: (ctx) => {
+        const css = compileBundle('classy');
 
-  // The core idiom keeps everything but the travel.
-  assert.ok(
-    declsFor(css, '.omega-hover-raise:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')),
-    'the raise utility still deepens its shadow',
-  );
-  assert.ok(
-    declsFor(css, '.omega-interactive:focus-visible').some((decls) => decls.includes('outline: 2px solid var(--omega-accent-ring)')),
-    'the keyboard ring is untouched',
-  );
-  assert.ok(
-    declsFor(css, '.omega-interactive:hover').some((decls) => decls.includes('background-color: var(--omega-surface-2)')),
-    'the surface still warms under the pointer',
-  );
+        // The core idiom keeps everything but the travel.
+        ctx.expect(declsFor(css, '.omega-hover-raise:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')), 'the raise utility still deepens its shadow').toBeTruthy();
+        ctx.expect(declsFor(css, '.omega-interactive:focus-visible').some((decls) => decls.includes('outline: 2px solid var(--omega-accent-ring)')), 'the keyboard ring is untouched').toBeTruthy();
+        ctx.expect(declsFor(css, '.omega-interactive:hover').some((decls) => decls.includes('background-color: var(--omega-surface-2)')), 'the surface still warms under the pointer').toBeTruthy();
 
-  // Classy's own surfaces keep their line/shadow highlights.
-  assert.ok(
-    declsFor(css, '.omega-tile:hover').some((decls) => decls.includes('border-color: var(--omega-line-strong)')),
-    'a tile still firms its hairline',
-  );
-  assert.ok(
-    declsFor(css, '.omega-dl-store__badge:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')),
-    'a store badge still lifts its shadow without lifting itself',
-  );
-  // The press is not a raise: a button still sinks under the click.
-  assert.ok(
-    declsFor(css, '.btn:active').some((decls) => decls.includes('transform: scale(0.985)')),
-    'the press feedback survives the un-lift',
-  );
+        // Classy's own surfaces keep their line/shadow highlights.
+        ctx.expect(declsFor(css, '.omega-tile:hover').some((decls) => decls.includes('border-color: var(--omega-line-strong)')), 'a tile still firms its hairline').toBeTruthy();
+        ctx.expect(declsFor(css, '.omega-dl-store__badge:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')), 'a store badge still lifts its shadow without lifting itself').toBeTruthy();
+        // The press is not a raise: a button still sinks under the click.
+        ctx.expect(declsFor(css, '.btn:active').some((decls) => decls.includes('transform: scale(0.985)')), 'the press feedback survives the un-lift').toBeTruthy();
 
-  // The hero frame keeps its tilt; only the 3px of travel went.
-  const frame = declsFor(css, '.omega-hero__frame:hover .omega-hero__frame-inner');
-  assert.ok(frame.includes('transform: rotateX(1.1deg);'), 'the frame still tips toward the pointer');
+        // The hero frame keeps its tilt; only the 3px of travel went.
+        const frame = declsFor(css, '.omega-hero__frame:hover .omega-hero__frame-inner');
+        ctx.expect(frame.includes('transform: rotateX(1.1deg);'), 'the frame still tips toward the pointer').toBeTruthy();
 
-  // Reduced motion still parks what it always parked — and a media query adds
-  // no specificity, so re-declaring the tilt means re-declaring its park.
-  assert.equal(frame.at(-1), 'transform: none;', 'reduced motion still stills the frame');
-  const reduced = css.slice(css.indexOf('prefers-reduced-motion: reduce'));
-  assert.match(reduced, /\.omega-interactive/, 'the reduced-motion park is intact');
-});
+        // Reduced motion still parks what it always parked — and a media query adds
+        // no specificity, so re-declaring the tilt means re-declaring its park.
+        ctx.expect(frame.at(-1), 'reduced motion still stills the frame').toBe('transform: none;');
+        const reduced = css.slice(css.indexOf('prefers-reduced-motion: reduce'));
+        ctx.expect(reduced, 'the reduced-motion park is intact').toMatch(/\.omega-interactive/);
+      },
+    },
 
-test('#686: the classy PAGE sheets land flat too — they load after core\'s own', () => {
-  // Page css is its own lane (core → base → theme, per page), so the two
-  // classy page sheets that raised are pinned where they compile.
-  const timeline = compileSheet(path.join(CLASSY, 'css', 'pages', 'updates', 'index.scss'));
-  assert.deepEqual(hoverRaises(timeline), [], 'a release entry answers the pointer without moving');
-  assert.ok(
-    declsFor(timeline, '.omega-timeline__body:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')),
-    'and it still answers — line and shadow',
-  );
+    {
+      name: '#686: the classy PAGE sheets land flat too — they load after core\'s own',
+      run: (ctx) => {
+        // Page css is its own lane (core → base → theme, per page), so the two
+        // classy page sheets that raised are pinned where they compile.
+        const timeline = compileSheet(path.join(CLASSY, 'css', 'pages', 'updates', 'index.scss'));
+        ctx.expect(hoverRaises(timeline), 'a release entry answers the pointer without moving').toEqual([]);
+        ctx.expect(declsFor(timeline, '.omega-timeline__body:hover').some((decls) => decls.includes('box-shadow: var(--omega-shadow-2)')), 'and it still answers — line and shadow').toBeTruthy();
 
-  // core/css/pages/feedback/index.scss raises the rating button 4px and loads
-  // FIRST on that page, so classy's sheet has to say flat out loud.
-  const feedback = compileSheet(path.join(CLASSY, 'css', 'pages', 'feedback', 'index.scss'));
-  assert.ok(
-    declsFor(feedback, '.feedback-rating-btn:hover').some((decls) => decls.includes('transform: none')),
-    'classy cancels core\'s raise rather than leaving it to win',
-  );
-  assert.ok(
-    declsFor(feedback, '.feedback-rating-btn:hover').some((decls) => decls.includes('border-color: var(--omega-line-strong)')),
-    'the line still firms under the pointer',
-  );
+        // core/css/pages/feedback/index.scss raises the rating button 4px and loads
+        // FIRST on that page, so classy's sheet has to say flat out loud.
+        const feedback = compileSheet(path.join(CLASSY, 'css', 'pages', 'feedback', 'index.scss'));
+        ctx.expect(declsFor(feedback, '.feedback-rating-btn:hover').some((decls) => decls.includes('transform: none')), 'classy cancels core\'s raise rather than leaving it to win').toBeTruthy();
+        ctx.expect(declsFor(feedback, '.feedback-rating-btn:hover').some((decls) => decls.includes('border-color: var(--omega-line-strong)')), 'the line still firms under the pointer').toBeTruthy();
+      },
+    },
+  ],
 });

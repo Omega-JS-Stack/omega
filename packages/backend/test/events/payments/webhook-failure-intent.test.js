@@ -22,7 +22,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'seed-pending-intent',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const now = powertools.timestamp(new Date(), { output: 'string' });
 
         state.orderId = ORDER_ID;
@@ -42,13 +42,13 @@ module.exports = defineCases({
         });
 
         const intentDoc = await firestore.get(`payments-intents/${ORDER_ID}`);
-        assert.equal(intentDoc.status, 'pending', 'Intent should start pending');
+        expect(intentDoc.status, 'Intent should start pending').toBe('pending');
       },
     },
 
     {
       name: 'send-webhook-with-no-uid',
-      async run({ http, assert, state, config }) {
+      async run({ http, expect, state, config }) {
         // Carries the orderId but no uid, and names a subscription no order was ever
         // written for — so nothing can reconstruct the uid and processing throws
         const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
@@ -68,25 +68,25 @@ module.exports = defineCases({
           },
         });
 
-        assert.isSuccess(response, 'Webhook should be accepted (it fails during processing, not at the door)');
+        expect(response, 'Webhook should be accepted (it fails during processing, not at the door)').toBeSuccess();
       },
     },
 
     {
       name: 'webhook-fails-and-intent-is-failed',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const doc = await firestore.get(`payments-webhooks/${state.eventId}`);
           return doc?.status === 'failed';
         }, 15000, 500);
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
-        assert.match(webhookDoc.error, /no UID/i, 'The webhook should have failed on the unresolvable UID');
+        expect(webhookDoc.error, 'The webhook should have failed on the unresolvable UID').toMatch(/no UID/i);
 
         // The point: the intent no longer hangs pending behind that failure
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
-        assert.equal(intentDoc.status, 'failed', 'The intent should be marked failed, not left pending');
-        assert.ok(intentDoc.error, 'The intent should carry the failure reason');
+        expect(intentDoc.status, 'The intent should be marked failed, not left pending').toBe('failed');
+        expect(intentDoc.error, 'The intent should carry the failure reason').toBeTruthy();
       },
     },
   ],

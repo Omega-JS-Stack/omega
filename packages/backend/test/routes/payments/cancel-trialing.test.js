@@ -187,32 +187,29 @@ module.exports = defineCases({
     {
       name: 'a-trial-cancel-is-not-blocked-by-the-24-hour-guard',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = youngSubscriber(omega, { uid: '_test-cancel-trialing-young', trialing: true });
 
         const sent = await cancelInProduction(omega, user);
 
-        assert.equal(sent.code, 400, `Expected the request to reach the provider lookup, got ${sent.code}: ${sent.body}`);
-        assert.ok(
-          !/still being set up/i.test(`${sent.body}`),
-          `A trial must never be told it is still being set up, got: ${sent.body}`,
-        );
-        assert.match(`${sent.body}`, /Unknown provider/i, 'The trial cancel should get PAST the age guard');
+        expect(sent.code, `Expected the request to reach the provider lookup, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(!/still being set up/i.test(`${sent.body}`), `A trial must never be told it is still being set up, got: ${sent.body}`).toBeTruthy();
+        expect(`${sent.body}`, 'The trial cancel should get PAST the age guard').toMatch(/Unknown provider/i);
       },
     },
 
     {
       name: 'a-paid-cancel-that-young-is-still-guarded',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The other half of the ruling: paid cancels keep today's behavior
         // exactly. Same age, same everything — only the trial differs.
         const user = youngSubscriber(omega, { uid: '_test-cancel-paid-young', trialing: false });
 
         const sent = await cancelInProduction(omega, user);
 
-        assert.equal(sent.code, 400, `A young PAID subscription must still be guarded, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /still being set up/i, 'The age guard should be the rejection for a paid subscription');
+        expect(sent.code, `A young PAID subscription must still be guarded, got ${sent.code}: ${sent.body}`).toBe(400);
+        expect(`${sent.body}`, 'The age guard should be the rejection for a paid subscription').toMatch(/still being set up/i);
       },
     },
 
@@ -221,90 +218,90 @@ module.exports = defineCases({
     {
       name: 'classifies-a-live-trial-as-trialing',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const trialEnd = nowUNIX + (14 * DAY);
 
-        assert.equal(isTrialing({
+        expect(isTrialing({
           status: 'active',
           trial: { claimed: true, expires: at(trialEnd) },
           expires: at(trialEnd),
-        }), true, 'A live trial expires exactly when its trial does');
+        }), 'A live trial expires exactly when its trial does').toBe(true);
       },
     },
 
     {
       name: 'classifies-a-converted-trial-as-paid',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // Conversion moves `expires` out to the end of the first paid period
         // while `trial.expires` stays put — that gap IS the conversion.
-        assert.equal(isTrialing({
+        expect(isTrialing({
           status: 'active',
           trial: { claimed: true, expires: at(nowUNIX - DAY) },
           expires: at(nowUNIX + (30 * DAY)),
-        }), false, 'A converted trial is a paid subscription and cancels at period end');
+        }), 'A converted trial is a paid subscription and cancels at period end').toBe(false);
       },
     },
 
     {
       name: 'classifies-a-subscription-that-never-trialed-as-paid',
       auth: 'none',
-      async run({ assert }) {
-        assert.equal(isTrialing({
+      async run({ expect }) {
+        expect(isTrialing({
           status: 'active',
           trial: { claimed: false },
           expires: at(nowUNIX + (30 * DAY)),
-        }), false, 'No trial claimed, no immediate cancel');
+        }), 'No trial claimed, no immediate cancel').toBe(false);
       },
     },
 
     {
       name: 'classifies-a-suspended-trial-as-not-trialing',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // A suspended subscription is already out of the live path; the route
         // handles it through the force-cancel branch instead.
         const trialEnd = nowUNIX + (14 * DAY);
 
-        assert.equal(isTrialing({
+        expect(isTrialing({
           status: 'suspended',
           trial: { claimed: true, expires: at(trialEnd) },
           expires: at(trialEnd),
-        }), false, 'Only a live subscription can be in its trial');
+        }), 'Only a live subscription can be in its trial').toBe(false);
       },
     },
 
     {
       name: 'classifies-an-expired-but-unswept-trial-as-trialing',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // The lapse sweep has not run yet. Nothing was ever paid, so there is
         // no period to let ride — this still cancels now.
         const trialEnd = nowUNIX - DAY;
 
-        assert.equal(isTrialing({
+        expect(isTrialing({
           status: 'active',
           trial: { claimed: true, expires: at(trialEnd) },
           expires: at(trialEnd),
-        }), true, 'An unswept expired trial has no paid period to serve out');
+        }), 'An unswept expired trial has no paid period to serve out').toBe(true);
       },
     },
 
     {
       name: 'a-missing-expiry-never-reads-as-trialing',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // The three copies this was folded out of compared the two timestamps
         // directly, so a subscription carrying NEITHER matched itself on
         // `undefined`. That answer now waives a guard, and a guard must never
         // be waived by absent data.
-        assert.equal(isTrialing({
+        expect(isTrialing({
           status: 'active',
           trial: { claimed: true },
-        }), false, 'No expiry on either side is not a trial');
+        }), 'No expiry on either side is not a trial').toBe(false);
 
-        assert.equal(isTrialing({}), false, 'An empty subscription is not a trial');
-        assert.equal(isTrialing(null), false, 'No subscription at all is not a trial');
+        expect(isTrialing({}), 'An empty subscription is not a trial').toBe(false);
+        expect(isTrialing(null), 'No subscription at all is not a trial').toBe(false);
       },
     },
 
@@ -313,7 +310,7 @@ module.exports = defineCases({
     {
       name: 'stripe-cancels-a-trial-now-and-a-paid-subscription-at-period-end',
       auth: 'none',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const calls = [];
         const sdk = {
           subscriptions: {
@@ -324,27 +321,23 @@ module.exports = defineCases({
 
         const trialLogs = await withStub(StripeLib, 'init', () => sdk, () => cancelVia(stripeCancel, { trialing: true, ctx }));
 
-        assert.deepEqual(
-          calls,
-          [{ verb: 'cancel', id: 'sub_test_immediacy' }],
-          'A trial must reach subscriptions.cancel — cancel_at_period_end would serve the trial out',
-        );
-        assert.match(trialLogs.join('\n'), /immediate \(trialing\)/, 'and the log names the cancel it performed');
+        expect(calls, 'A trial must reach subscriptions.cancel — cancel_at_period_end would serve the trial out').toEqual([{ verb: 'cancel', id: 'sub_test_immediacy' }]);
+        expect(trialLogs.join('\n'), 'and the log names the cancel it performed').toMatch(/immediate \(trialing\)/);
 
         calls.length = 0;
         const paidLogs = await withStub(StripeLib, 'init', () => sdk, () => cancelVia(stripeCancel, { trialing: false, ctx }));
 
-        assert.equal(calls.length, 1, 'A paid cancel is one call too');
-        assert.equal(calls[0].verb, 'update', 'A paid subscription is scheduled, never cancelled outright');
-        assert.deepEqual(calls[0].params, { cancel_at_period_end: true }, 'with the period-end flag');
-        assert.match(paidLogs.join('\n'), /at period end/, 'and the log says so');
+        expect(calls.length, 'A paid cancel is one call too').toBe(1);
+        expect(calls[0].verb, 'A paid subscription is scheduled, never cancelled outright').toBe('update');
+        expect(calls[0].params, 'with the period-end flag').toEqual({ cancel_at_period_end: true });
+        expect(paidLogs.join('\n'), 'and the log says so').toMatch(/at period end/);
       },
     },
 
     {
       name: 'chargebee-cancels-a-trial-immediately-and-a-paid-subscription-at-end-of-term',
       auth: 'none',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const calls = [];
         const request = async (path, options) => { calls.push({ path, options }); return {}; };
 
@@ -352,25 +345,25 @@ module.exports = defineCases({
           withStub(ChargebeeLib, 'request', request, () => cancelVia(chargebeeCancel, { trialing: true, ctx }))
         ));
 
-        assert.equal(calls.length, 1, 'One cancel call');
-        assert.equal(calls[0].path, '/subscriptions/sub_test_immediacy/cancel_for_items', 'Chargebee\'s cancel endpoint');
-        assert.equal(calls[0].options.body.cancel_option, 'immediately', 'A trial takes the immediate path');
-        assert.match(trialLogs.join('\n'), /immediate \(trialing\)/, 'and the log names it');
+        expect(calls.length, 'One cancel call').toBe(1);
+        expect(calls[0].path, 'Chargebee\'s cancel endpoint').toBe('/subscriptions/sub_test_immediacy/cancel_for_items');
+        expect(calls[0].options.body.cancel_option, 'A trial takes the immediate path').toBe('immediately');
+        expect(trialLogs.join('\n'), 'and the log names it').toMatch(/immediate \(trialing\)/);
 
         calls.length = 0;
         const paidLogs = await withStub(ChargebeeLib, 'init', () => ({}), () => (
           withStub(ChargebeeLib, 'request', request, () => cancelVia(chargebeeCancel, { trialing: false, ctx }))
         ));
 
-        assert.equal(calls[0].options.body.cancel_option, 'end_of_term', 'A paid subscription runs to the end of its term');
-        assert.match(paidLogs.join('\n'), /at period end/, 'and the log says so');
+        expect(calls[0].options.body.cancel_option, 'A paid subscription runs to the end of its term').toBe('end_of_term');
+        expect(paidLogs.join('\n'), 'and the log says so').toMatch(/at period end/);
       },
     },
 
     {
       name: 'paypal-cancels-through-the-one-endpoint-and-names-the-trial',
       auth: 'none',
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         // PayPal exposes no second cancel mode, so the CALL is the same one in
         // both states — what differs is the reason it carries and the log it
         // writes. The immediacy itself lives in the unified transform, pinned in
@@ -380,48 +373,48 @@ module.exports = defineCases({
 
         const trialLogs = await withStub(PayPalLib, 'request', request, () => cancelVia(paypalCancel, { trialing: true, ctx }));
 
-        assert.equal(calls.length, 1, 'One cancel call');
-        assert.equal(calls[0].path, '/v1/billing/subscriptions/sub_test_immediacy/cancel', 'PayPal\'s cancel endpoint');
-        assert.match(calls[0].body.reason, /free trial/i, 'The reason PayPal records says this was a trial cancel');
-        assert.match(trialLogs.join('\n'), /immediate \(trialing\)/, 'and our log names it');
+        expect(calls.length, 'One cancel call').toBe(1);
+        expect(calls[0].path, 'PayPal\'s cancel endpoint').toBe('/v1/billing/subscriptions/sub_test_immediacy/cancel');
+        expect(calls[0].body.reason, 'The reason PayPal records says this was a trial cancel').toMatch(/free trial/i);
+        expect(trialLogs.join('\n'), 'and our log names it').toMatch(/immediate \(trialing\)/);
 
         calls.length = 0;
         const paidLogs = await withStub(PayPalLib, 'request', request, () => cancelVia(paypalCancel, { trialing: false, ctx }));
 
-        assert.equal(calls[0].path, '/v1/billing/subscriptions/sub_test_immediacy/cancel', 'The same endpoint — PayPal has only the one');
-        assert.match(calls[0].body.reason, /requested cancellation/i, 'with the ordinary reason');
-        assert.match(paidLogs.join('\n'), /at period end/, 'and the log says which cancel this was');
+        expect(calls[0].path, 'The same endpoint — PayPal has only the one').toBe('/v1/billing/subscriptions/sub_test_immediacy/cancel');
+        expect(calls[0].body.reason, 'with the ordinary reason').toMatch(/requested cancellation/i);
+        expect(paidLogs.join('\n'), 'and the log says which cancel this was').toMatch(/at period end/);
       },
     },
 
     {
       name: 'the-test-provider-fabricates-the-immediate-cancel-event',
       auth: 'none',
-      async run({ assert, ctx, firestore }) {
+      async run({ expect, ctx, firestore }) {
         // The test provider's "provider" is Firestore, so this one runs for
         // real: the webhook doc it writes IS the cancel, and the pipeline folds
         // it exactly as a Stripe delivery.
         const trialLogs = await cancelVia(testCancel, { trialing: true, ctx });
         const trialEventId = trialLogs.join('\n').match(/payments-webhooks\/([\w-]+)/)?.[1];
 
-        assert.ok(trialEventId, `The provider should name the event it wrote, got: ${trialLogs.join('\n')}`);
+        expect(trialEventId, `The provider should name the event it wrote, got: ${trialLogs.join('\n')}`).toBeTruthy();
 
         const trialEvent = await firestore.get(`payments-webhooks/${trialEventId}`);
         const trialSubscription = trialEvent.raw.data.object;
 
-        assert.equal(trialEvent.raw.type, 'customer.subscription.deleted', 'A trial cancel is the DELETED event — the subscription ends now');
-        assert.equal(trialSubscription.status, 'canceled', 'with the subscription already cancelled');
-        assert.equal(trialSubscription.cancel_at_period_end, false, 'and nothing scheduled for later');
-        assert.ok(trialSubscription.current_period_end <= Math.floor(Date.now() / 1000), 'the period ends now, not in a month');
+        expect(trialEvent.raw.type, 'A trial cancel is the DELETED event — the subscription ends now').toBe('customer.subscription.deleted');
+        expect(trialSubscription.status, 'with the subscription already cancelled').toBe('canceled');
+        expect(trialSubscription.cancel_at_period_end, 'and nothing scheduled for later').toBe(false);
+        expect(trialSubscription.current_period_end <= Math.floor(Date.now() / 1000), 'the period ends now, not in a month').toBeTruthy();
 
         const paidLogs = await cancelVia(testCancel, { trialing: false, ctx });
         const paidEventId = paidLogs.join('\n').match(/payments-webhooks\/([\w-]+)/)?.[1];
         const paidEvent = await firestore.get(`payments-webhooks/${paidEventId}`);
         const paidSubscription = paidEvent.raw.data.object;
 
-        assert.equal(paidEvent.raw.type, 'customer.subscription.updated', 'A paid cancel is the UPDATED event');
-        assert.equal(paidSubscription.status, 'active', 'the subscription is still live');
-        assert.equal(paidSubscription.cancel_at_period_end, true, 'with the cancellation scheduled at its period end');
+        expect(paidEvent.raw.type, 'A paid cancel is the UPDATED event').toBe('customer.subscription.updated');
+        expect(paidSubscription.status, 'the subscription is still live').toBe('active');
+        expect(paidSubscription.cancel_at_period_end, 'with the cancellation scheduled at its period end').toBe(true);
       },
     },
   ],

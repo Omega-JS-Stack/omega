@@ -103,21 +103,21 @@ module.exports = defineCases({
 
     {
       name: 'rejects-unauthenticated',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/uncancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 401, 'Should reject unauthenticated request');
+        expect(response, 'Should reject unauthenticated request').toBeError(401);
       },
     },
 
     {
       name: 'rejects-missing-confirmed',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/payments/uncancel', {});
 
-        assert.isError(response, 400, 'Should reject a request that never confirmed');
+        expect(response, 'Should reject a request that never confirmed').toBeError(400);
       },
     },
 
@@ -126,75 +126,75 @@ module.exports = defineCases({
     {
       name: 'rejects-unconfirmed',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-unconfirmed' });
 
         const sent = await uncancel(omega, user, { confirmed: false });
 
-        assert.equal(sent.code, 400, `An unconfirmed uncancel must be refused, got ${sent.code}`);
+        expect(sent.code, `An unconfirmed uncancel must be refused, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-basic-user',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-basic', productId: 'basic' });
 
         const sent = await uncancel(omega, user);
 
-        assert.equal(sent.code, 400, `A free user has no cancellation to undo, got ${sent.code}`);
+        expect(sent.code, `A free user has no cancellation to undo, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-no-pending-cancellation',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-not-pending', pending: false });
 
         const sent = await uncancel(omega, user);
 
-        assert.equal(sent.code, 400, `Nothing is scheduled, so there is nothing to resume, got ${sent.code}`);
-        assert.match(`${sent.body}`, /not scheduled to cancel/i, `Expected the no-pending-cancellation message, got: ${sent.body}`);
+        expect(sent.code, `Nothing is scheduled, so there is nothing to resume, got ${sent.code}`).toBe(400);
+        expect(`${sent.body}`, `Expected the no-pending-cancellation message, got: ${sent.body}`).toMatch(/not scheduled to cancel/i);
       },
     },
 
     {
       name: 'rejects-a-subscription-that-is-no-longer-active',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // A suspended (or fully cancelled) subscription cannot be resumed by
         // clearing a scheduled cancellation — the term is already broken.
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-suspended', status: 'suspended' });
 
         const sent = await uncancel(omega, user);
 
-        assert.equal(sent.code, 400, `Only an ACTIVE subscription can be resumed, got ${sent.code}`);
+        expect(sent.code, `Only an ACTIVE subscription can be resumed, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-missing-payment-details',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-no-provider', provider: null, resourceId: null });
 
         const sent = await uncancel(omega, user);
 
-        assert.equal(sent.code, 400, `Without a provider there is nothing to call, got ${sent.code}`);
+        expect(sent.code, `Without a provider there is nothing to call, got ${sent.code}`).toBe(400);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-unknown', provider: 'unknown-provider' });
 
         const sent = await uncancel(omega, user);
 
-        assert.equal(sent.code, 400, `An unknown provider must be refused, got ${sent.code}`);
+        expect(sent.code, `An unknown provider must be refused, got ${sent.code}`).toBe(400);
       },
     },
 
@@ -203,7 +203,7 @@ module.exports = defineCases({
     {
       name: 'paypal-is-gated-before-any-api-call',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const user = pendingSubscriber(omega, { uid: '_test-uncancel-paypal', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         // PayPal's credential is stripped: ANY attempt to reach PayPal would
@@ -213,16 +213,16 @@ module.exports = defineCases({
         // config, which a route test never rewrites.
         const sent = await withEnvironment({ PAYPAL_CLIENT_SECRET: null }, () => uncancel(omega, user));
 
-        assert.equal(sent.code, 400, `An unsupported operation is a client fault, not an outage, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.match(`${sent.body}`, /billing portal/i, `The refusal should point at the billing portal, got: ${sent.body}`);
-        assert.ok(!/paypal api/i.test(`${sent.body}`), `No PayPal call may be attempted, got: ${sent.body}`);
+        expect(sent.code, `An unsupported operation is a client fault, not an outage, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(400);
+        expect(`${sent.body}`, `The refusal should point at the billing portal, got: ${sent.body}`).toMatch(/billing portal/i);
+        expect(!/paypal api/i.test(`${sent.body}`), `No PayPal call may be attempted, got: ${sent.body}`).toBeTruthy();
       },
     },
 
     {
       name: 'the-gate-carries-a-structured-code',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The client branches on the code, not on the sentence — so the code
         // rides the response's own properties, where every 4xx carries its
         // machine-readable half.
@@ -233,8 +233,8 @@ module.exports = defineCases({
           () => uncancelReadingProperties(omega, user),
         );
 
-        assert.equal(sent.code, 400, `Expected the capability gate, got ${sent.code}`);
-        assert.equal(properties?.additional?.code, 'not-supported-by-provider', `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`);
+        expect(sent.code, `Expected the capability gate, got ${sent.code}`).toBe(400);
+        expect(properties?.additional?.code, `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`).toBe('not-supported-by-provider');
       },
     },
 
@@ -243,9 +243,9 @@ module.exports = defineCases({
     {
       name: 'every-provider-module-loads',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         PROVIDERS.forEach((name) => {
-          assert.ok(providerModule(name), `routes/payments/uncancel/providers/${name}.js should exist so the route can ask it about the operation`);
+          expect(providerModule(name), `routes/payments/uncancel/providers/${name}.js should exist so the route can ask it about the operation`).toBeTruthy();
         });
       },
     },
@@ -253,9 +253,9 @@ module.exports = defineCases({
     {
       name: 'stripe-chargebee-and-test-support-uncancel',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         ['stripe', 'chargebee', 'test'].forEach((name) => {
-          assert.equal(typeof providerModule(name).uncancel, 'function', `${name} should export uncancel()`);
+          expect(typeof providerModule(name).uncancel, `${name} should export uncancel()`).toBe('function');
         });
       },
     },
@@ -263,10 +263,10 @@ module.exports = defineCases({
     {
       name: 'paypal-ships-no-uncancel-export',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // PayPal's API cannot resume a cancelled subscription — activate only
         // works on a SUSPENDED one. The missing export is the whole gate.
-        assert.equal(typeof providerModule('paypal').uncancel, 'undefined', 'paypal must not export uncancel() — its API cannot resume a cancelled subscription');
+        expect(typeof providerModule('paypal').uncancel, 'paypal must not export uncancel() — its API cannot resume a cancelled subscription').toBe('undefined');
       },
     },
   ],

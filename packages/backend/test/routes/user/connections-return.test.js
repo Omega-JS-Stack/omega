@@ -159,31 +159,31 @@ module.exports = defineCases({
     {
       name: 'a-valid-returnurl-rides-the-state-and-comes-back-at-tokenize',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const leg = await authorize({ returnUrl: RETURN_URL });
 
-        assert.equal(leg.response.options.code, undefined, `a path on the site is accepted: ${leg.response.message}`);
-        assert.ok(leg.encryptedState, 'the authorize url carries the encrypted state');
+        expect(leg.response.options.code, `a path on the site is accepted: ${leg.response.message}`).toBe(undefined);
+        expect(leg.encryptedState, 'the authorize url carries the encrypted state').toBeTruthy();
 
         // The path is CARRIED, not answered: the browser leaves for the provider
         // in between, and the state is the only thing that survives the trip
         const state = decryptState(leg.encryptedState);
 
-        assert.equal(state.returnUrl, RETURN_URL, 'the state carries the path, query and hash included');
-        assert.equal(JSON.stringify(leg.writes).includes(RETURN_URL), false, 'and the one-time session stores nothing of it');
+        expect(state.returnUrl, 'the state carries the path, query and hash included').toBe(RETURN_URL);
+        expect(JSON.stringify(leg.writes).includes(RETURN_URL), 'and the one-time session stores nothing of it').toBe(false);
 
         const tokenized = await tokenize(leg);
 
-        assert.equal(tokenized.options.code, undefined, `the exchange still completes: ${tokenized.message}`);
-        assert.equal(tokenized.message.success, true, 'reporting success');
-        assert.equal(tokenized.message.returnUrl, RETURN_URL, 'and the answer names where the callback page lands');
+        expect(tokenized.options.code, `the exchange still completes: ${tokenized.message}`).toBe(undefined);
+        expect(tokenized.message.success, 'reporting success').toBe(true);
+        expect(tokenized.message.returnUrl, 'and the answer names where the callback page lands').toBe(RETURN_URL);
       },
     },
 
     {
       name: 'every-off-site-returnurl-answers-400-naming-the-rule',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Each one is a way of leaving the site with a value that starts out
         // looking like a path.
         const refused = [
@@ -197,11 +197,11 @@ module.exports = defineCases({
         for (const value of refused) {
           const leg = await authorize({ returnUrl: value });
 
-          assert.equal(leg.response.options.code, 400, `${JSON.stringify(value)} is refused: ${leg.response.message}`);
-          assert.match(leg.response.message, /returnUrl/, `and the message names the parameter: ${leg.response.message}`);
-          assert.match(leg.response.message, /\//, `and states the rule it broke: ${leg.response.message}`);
-          assert.equal(leg.response.message.includes(value.trim()), false, "the caller's value is not echoed back into the page's error");
-          assert.equal(leg.writes.length, 0, 'and nothing was minted — no session, no state');
+          expect(leg.response.options.code, `${JSON.stringify(value)} is refused: ${leg.response.message}`).toBe(400);
+          expect(leg.response.message, `and the message names the parameter: ${leg.response.message}`).toMatch(/returnUrl/);
+          expect(leg.response.message, `and states the rule it broke: ${leg.response.message}`).toMatch(/\//);
+          expect(leg.response.message.includes(value.trim()), "the caller's value is not echoed back into the page's error").toBe(false);
+          expect(leg.writes.length, 'and nothing was minted — no session, no state').toBe(0);
         }
       },
     },
@@ -209,31 +209,31 @@ module.exports = defineCases({
     {
       name: 'status-refuses-a-returnurl-it-would-otherwise-ignore',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const leg = await authorize({ action: 'status', returnUrl: RETURN_URL });
 
-        assert.equal(leg.response.options.code, 400, `status does not take a returnUrl: ${leg.response.message}`);
-        assert.match(leg.response.message, /authorize/, 'and the message names the action that does');
-        assert.equal(leg.writes.length, 0, 'and nothing was written');
+        expect(leg.response.options.code, `status does not take a returnUrl: ${leg.response.message}`).toBe(400);
+        expect(leg.response.message, 'and the message names the action that does').toMatch(/authorize/);
+        expect(leg.writes.length, 'and nothing was written').toBe(0);
       },
     },
 
     {
       name: 'no-returnurl-means-no-returnurl-in-the-tokenize-answer',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const leg = await authorize();
 
-        assert.equal(leg.response.options.code, undefined, `the parameter is optional: ${leg.response.message}`);
+        expect(leg.response.options.code, `the parameter is optional: ${leg.response.message}`).toBe(undefined);
 
         const state = decryptState(leg.encryptedState);
 
-        assert.equal('returnUrl' in state, false, 'the state carries no returnUrl key at all');
+        expect('returnUrl' in state, 'the state carries no returnUrl key at all').toBe(false);
 
         const tokenized = await tokenize(leg);
 
-        assert.equal(tokenized.message.success, true, 'the exchange completes as it always did');
-        assert.equal('returnUrl' in tokenized.message, false, 'and the answer names no destination, so the page keeps its default');
+        expect(tokenized.message.success, 'the exchange completes as it always did').toBe(true);
+        expect('returnUrl' in tokenized.message, 'and the answer names no destination, so the page keeps its default').toBe(false);
       },
     },
   ],

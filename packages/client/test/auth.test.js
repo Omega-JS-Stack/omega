@@ -15,7 +15,8 @@ function createHarness() {
   const storageWrites = [];
   const omega = {
     config: {},
-    firebaseAuth: { currentUser: null },
+    // The saved session is restored already unless a case holds authStateReady() open
+    firebaseAuth: { currentUser: null, authStateReady: async () => {} },
     // Firebase is configured (the app exists), and Firestore loads through the loader
     firebaseApp: {},
     loadFirebaseFirestore: async () => ({}),
@@ -545,6 +546,86 @@ module.exports = defineCases({
           ctx.expect(state.user.plan, 'and resolves with what that build landed').toBe('pro');
           ctx.expect(states.length).toBe(1);
           ctx.expect(states[0]).toBe(state);
+        },
+      });
+      return cases;
+    })(),
+
+    // Right after a page load Firebase is still restoring the saved session, so
+    // `currentUser` reads null until `authStateReady()` resolves; a reload() called
+    // then must wait for the restored user, never land a signed-out state.
+    ...(() => {
+      const cases = [];
+      const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
+      const PRO_DOC = { subscription: { product: { id: 'pro' }, status: 'active' } };
+
+      cases.push({
+        name: 'Auth Module: reload() waits for the session restore > should land nothing until the restore settles, then resolve with the restored user',
+        run: async (ctx) => {
+          await beforeEachHook();
+          const { auth, omega, states } = createHarness();
+
+          let fetches = 0;
+          auth._getAccountData = async () => { fetches++; return PRO_DOC; };
+          auth.listen((state) => states.push(state));
+
+          // The restore we control: still pending, no current user yet
+          let finishRestore;
+          omega.firebaseAuth.authStateReady = () => new Promise((resolve) => { finishRestore = resolve; });
+          const before = auth.state;
+
+          let settled = false;
+          const reloading = auth.reload();
+          reloading.then(() => { settled = true; });
+          await flush();
+
+          ctx.expect(settled, 'reload() waits on the restore').toBe(false);
+          ctx.expect(states.length, 'no state lands while the restore is pending').toBe(0);
+          ctx.expect(auth.state, 'auth.state is untouched').toBe(before);
+
+          omega.firebaseAuth.currentUser = USER;
+          finishRestore();
+          const state = await reloading;
+
+          ctx.expect(state.user.uid).toBe('user-1');
+          ctx.expect(state.user.authenticated).toBe(true);
+          ctx.expect(fetches, 'the restored user\'s account is fetched once').toBe(1);
+        },
+      });
+
+      cases.push({
+        name: 'Auth Module: reload() waits for the session restore > should resolve signed out and fetch nothing with no Firebase auth',
+        run: async (ctx) => {
+          await beforeEachHook();
+          const { auth, omega } = createHarness();
+
+          let fetches = 0;
+          auth._getAccountData = async () => { fetches++; return PRO_DOC; };
+          delete omega.firebaseAuth;
+
+          const state = await auth.reload();
+
+          ctx.expect(state.user instanceof User).toBeTruthy();
+          ctx.expect(state.user.authenticated).toBe(false);
+          ctx.expect(fetches).toBe(0);
+        },
+      });
+
+      cases.push({
+        name: 'Auth Module: reload() waits for the session restore > should resolve with the current user once the restore has already settled',
+        run: async (ctx) => {
+          await beforeEachHook();
+          const { auth, omega } = createHarness();
+
+          let fetches = 0;
+          auth._getAccountData = async () => { fetches++; return PRO_DOC; };
+          omega.firebaseAuth.currentUser = USER;
+
+          const state = await auth.reload();
+
+          ctx.expect(state.user.uid).toBe('user-1');
+          ctx.expect(state.user.authenticated).toBe(true);
+          ctx.expect(fetches).toBe(1);
         },
       });
       return cases;

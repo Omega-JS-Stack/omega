@@ -96,7 +96,7 @@ omega.initialize(options);
 | `express.bodyParser.json` | `{ limit: '100kb' }` | Express JSON body parser options |
 | `express.bodyParser.urlencoded` | `{ limit: '100kb', extended: true }` | Express URL-encoded options |
 
-The test runner passes nothing: `OMEGA_TEST_RUNNER` alone turns off the Firebase init, the function wiring, the custom server and Sentry.
+The test runner calls `initialize({ runnerHost: true })`: that alone turns off the Firebase init, the function wiring, the custom server and Sentry.
 
 ## Configuration File
 
@@ -770,12 +770,11 @@ npx omega test user/ admin/       # Multiple project paths
 The **verb** tees its own run to `<projectDir>/logs/`, the lane every OMEGA framework shares:
 - **`logs/dev.log`** — `npx omega serve` / `npx omega emulator` (port allocation, the proxy, the watcher)
 - **`logs/build.log`** — `npx omega build`
-- **`logs/test.log`** — `npx omega test` (setup lines, port summary, emulator boot)
+- **`logs/test.log`**: `npx omega test` (setup lines, port summary, emulator boot, and the test runner's own output)
 
 The firebase **children** write to `<projectDir>/dist/`, alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place:
 - **`dist/dev.log`** — the `firebase serve` child
 - **`dist/emulator.log`** — full emulator + Cloud Functions output
-- **`dist/test.log`** — the test runner child
 - **`dist/deploy.log`** — `npx omega deploy`
 - **`dist/production.log`** — Production Cloud Function logs (`npx omega logs:read` or `npx omega logs:tail`)
 
@@ -790,7 +789,7 @@ Bare runs and bare paths are PROJECT-scoped (C5); reach the framework corpus exp
 
 ### Writing Tests
 
-A case file exports its spec through `defineCases`, from the public test API (`@omega.js/backend/test`).
+A case file exports its spec through `defineCases`, from the public test API (`@omega.js/backend/test`). Every case receives the real `omega` instance, a real `ctx`, `http`, `accounts`, `firestore` and the rest of the emulator layer's extras, and asserts with the `expect` it receives beside them (`toBe`, `toEqual`, `toBeTruthy`, `toBeSuccess()`, `toBeError(status)`, `toHaveProperty`, `toContain`, `toBeTypeOf`, `expect.fail` and the rest of devkit's matchers). The test command runs every suite in ONE process on devkit's shared runner and ends on one Results block; `--filter=<text>`, `--extended`, `--lane=<name>` and `--reporter=json` shape the run. An optional `test/_init.js` is a factory, `({ projectRoot, config, omega, ctx }) => ({ accounts, setup })`, that declares extra test accounts and seeds fixtures; if it fails to load or throws, the run stops and names the file.
 
 **Suite** - Sequential tests with shared state (stops on first failure):
 
@@ -804,19 +803,19 @@ module.exports = defineCases({
   tests: [
     {
       name: 'verify-referrer-exists',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         state.referrerUid = accounts.referrer.uid;
         const doc = await firestore.get(`users/${state.referrerUid}`);
-        assert.ok(doc, 'Referrer should exist');
+        expect(doc, 'Referrer should exist').toBeTruthy();
       },
     },
     {
       name: 'call-user-signup-with-affiliate',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('signup-referred').post('omega/user/signup', {
           attribution: { affiliate: { code: 'TESTREF' } },
         });
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
       },
     },
   ],
@@ -836,30 +835,30 @@ module.exports = defineCases({
     {
       name: 'admin-auth-succeeds',
       auth: 'admin',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/firestore', {
           path: '_test/doc',
           document: { test: 'value' },
         });
-        assert.isSuccess(response);
+        expect(response).toBeSuccess();
       },
     },
     {
       name: 'unauthenticated-rejected',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.post('omega/admin/firestore', {
           path: '_test/doc',
           document: { test: 'value' },
         });
-        assert.isError(response, 401);
+        expect(response).toBeError(401);
       },
     },
   ],
 });
 ```
 
-**Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`
+**Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired` (a case's own `auth`, else its suite's, else `none`)
 
 See [docs/backend/test-framework.md](../../docs/backend/test-framework.md) for complete test API documentation.
 

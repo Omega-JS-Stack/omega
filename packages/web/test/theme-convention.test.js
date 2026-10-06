@@ -16,10 +16,10 @@
  * directions. Classy ships zero markup files, and base appears in no fork
  * list.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const JSON5 = require('json5');
 
 const { PKG } = require('./lib/build.js');
@@ -42,7 +42,7 @@ const ALLOWLIST = JSON5.parse(
   fs.readFileSync(path.join(__dirname, 'fixtures', 'theme-class-allowlist.json5'), 'utf8'),
 );
 const ALLOW_PREFIXES = ALLOWLIST.patterns.map((pattern) => {
-  assert.ok(pattern.endsWith('-*'), `allowlist pattern "${pattern}" must end with -*`);
+  expect(pattern.endsWith('-*'), `allowlist pattern "${pattern}" must end with -*`).toBeTruthy();
   return pattern.slice(0, -1);
 });
 
@@ -116,64 +116,6 @@ function collectJson5Tokens(source) {
 const allowed = (token) => ALLOWLIST.literals.includes(token)
   || ALLOW_PREFIXES.some((prefix) => token.startsWith(prefix) && token.length > prefix.length);
 
-// ─── Guard 1: class-discipline census ───────────────────────────────────────
-
-test('#177 guard 1: every theme class token is omega-*, own-theme-*, or allowlisted', () => {
-  const violations = [];
-  let fileCount = 0;
-  let tokenCount = 0;
-
-  for (const theme of THEMES) {
-    for (const file of walk(path.join(PKG, 'themes', theme))) {
-      let tokens;
-      if (file.endsWith('.html')) tokens = collectHtmlTokens(fs.readFileSync(file, 'utf8'));
-      else if (file.endsWith('.json5')) tokens = collectJson5Tokens(fs.readFileSync(file, 'utf8'));
-      else continue;
-
-      fileCount += 1;
-      for (const token of tokens) {
-        tokenCount += 1;
-        if (!/^[A-Za-z0-9_-]+$/.test(token)) {
-          violations.push(`${rel(file)}: "${token}" is not a valid class token`);
-          continue;
-        }
-        if (token.startsWith('omega-')) continue;
-
-        const prefix = Object.keys(PREFIX_OWNERS).find((candidate) => token.startsWith(candidate));
-        if (prefix) {
-          const owner = PREFIX_OWNERS[prefix];
-          if (owner === null) {
-            violations.push(`${rel(file)}: "${token}" wears the classy- prefix, which is legal nowhere (classy ships no markup)`);
-          }
-          else if (owner !== theme) {
-            violations.push(`${rel(file)}: "${token}" wears the ${prefix}* prefix, which is legal only inside themes/${owner}`);
-          }
-          continue;
-        }
-
-        if (!allowed(token)) {
-          violations.push(`${rel(file)}: bare class "${token}" is not in the allowlist; prefix it per the convention or allowlist it in review (test/fixtures/theme-class-allowlist.json5)`);
-        }
-      }
-    }
-  }
-
-  // Tripwire: a broken walk or tokenizer would pass vacuously.
-  assert.ok(fileCount >= 50, `census walked only ${fileCount} markup files; the walk is broken`);
-  assert.ok(tokenCount >= 1000, `census saw only ${tokenCount} class tokens; the tokenizer is broken`);
-
-  // Tripwire: a theme folder the census does not know is unguarded markup.
-  // Adding a theme means adding it to THEMES (and the convention) here.
-  const onDisk = fs.readdirSync(path.join(PKG, 'themes'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !NON_CENSUS_DIRS.includes(entry.name))
-    .map((entry) => entry.name)
-    .sort();
-  assert.deepEqual(onDisk, [...THEMES].sort(),
-    `themes on disk do not match the census list; register new themes in THEMES (and PREFIX_OWNERS/FORK_THEMES as fits)`);
-
-  assert.deepEqual(violations, [], `class-discipline violations:\n  ${violations.join('\n  ')}`);
-});
-
 // ─── Guard 2: fork boundaries ───────────────────────────────────────────────
 
 /**
@@ -185,50 +127,116 @@ test('#177 guard 1: every theme class token is omega-*, own-theme-*, or allowlis
 function parseForkList(theme) {
   const readme = fs.readFileSync(path.join(PKG, 'themes', theme, 'README.md'), 'utf8');
   const match = readme.match(/^## Forks$([\s\S]*?)(?=^## |(?![\s\S]))/m);
-  assert.ok(match, `themes/${theme}/README.md has no "## Forks" section`);
+  expect(match, `themes/${theme}/README.md has no "## Forks" section`).toBeTruthy();
 
   const bullets = match[1].split('\n').filter((line) => line.startsWith('- '));
-  assert.ok(bullets.length > 0, `themes/${theme}/README.md "## Forks" section lists no bullets`);
+  expect(bullets.length > 0, `themes/${theme}/README.md "## Forks" section lists no bullets`).toBeTruthy();
 
   return bullets.map((bullet) => {
     const spans = [...bullet.matchAll(/`([^`]+)`/g)].map((span) => span[1]);
-    assert.equal(
-      spans.length, 1,
-      `themes/${theme}/README.md fork bullet must carry exactly one backticked path, got ${spans.length}: ${bullet}`,
-    );
+    expect(spans.length, `themes/${theme}/README.md fork bullet must carry exactly one backticked path, got ${spans.length}: ${bullet}`).toBe(1);
     return spans[0];
   });
 }
 
-test('#177 guard 2: skin fork lists match markup on disk in both directions', () => {
-  for (const theme of FORK_THEMES) {
-    const listed = parseForkList(theme);
-    const onDisk = walk(path.join(PKG, 'themes', theme))
-      .filter((file) => file.endsWith('.html'))
-      .map(rel);
+module.exports = defineCases({
+  type: 'group',
+  description: 'theme-convention',
+  tests: [
+    // ─── Guard 1: class-discipline census ───────────────────────────────────────
 
-    // Every listed path stays inside its own theme; base is forked by nobody.
-    for (const entry of listed) {
-      assert.ok(
-        entry.startsWith(`themes/${theme}/`),
-        `themes/${theme}/README.md lists "${entry}", which is outside themes/${theme}/`,
-      );
-      assert.ok(!entry.startsWith('themes/base/'), `themes/${theme}/README.md lists a base path: ${entry}`);
-    }
+    {
+      name: '#177 guard 1: every theme class token is omega-*, own-theme-*, or allowlisted',
+      run: (ctx) => {
+        const violations = [];
+        let fileCount = 0;
+        let tokenCount = 0;
 
-    const missing = listed.filter((entry) => !onDisk.includes(entry));
-    assert.deepEqual(missing, [], `themes/${theme}/README.md lists forks with no file on disk:\n  ${missing.join('\n  ')}`);
+        for (const theme of THEMES) {
+          for (const file of walk(path.join(PKG, 'themes', theme))) {
+            let tokens;
+            if (file.endsWith('.html')) tokens = collectHtmlTokens(fs.readFileSync(file, 'utf8'));
+            else if (file.endsWith('.json5')) tokens = collectJson5Tokens(fs.readFileSync(file, 'utf8'));
+            else continue;
 
-    const unlisted = onDisk.filter((file) => !listed.includes(file));
-    assert.deepEqual(unlisted, [], `themes/${theme} markup files missing from the README fork list:\n  ${unlisted.join('\n  ')}`);
+            fileCount += 1;
+            for (const token of tokens) {
+              tokenCount += 1;
+              if (!/^[A-Za-z0-9_-]+$/.test(token)) {
+                violations.push(`${rel(file)}: "${token}" is not a valid class token`);
+                continue;
+              }
+              if (token.startsWith('omega-')) continue;
 
-    assert.deepEqual(listed.slice().sort(), onDisk.slice().sort(), `themes/${theme} fork list and disk disagree`);
-  }
-});
+              const prefix = Object.keys(PREFIX_OWNERS).find((candidate) => token.startsWith(candidate));
+              if (prefix) {
+                const owner = PREFIX_OWNERS[prefix];
+                if (owner === null) {
+                  violations.push(`${rel(file)}: "${token}" wears the classy- prefix, which is legal nowhere (classy ships no markup)`);
+                }
+                else if (owner !== theme) {
+                  violations.push(`${rel(file)}: "${token}" wears the ${prefix}* prefix, which is legal only inside themes/${owner}`);
+                }
+                continue;
+              }
 
-test('#177 guard 2: classy is a skin and ships zero markup files', () => {
-  const markup = walk(path.join(PKG, 'themes', 'classy'))
-    .filter((file) => file.endsWith('.html'))
-    .map(rel);
-  assert.deepEqual(markup, [], `themes/classy must ship no markup; found:\n  ${markup.join('\n  ')}`);
+              if (!allowed(token)) {
+                violations.push(`${rel(file)}: bare class "${token}" is not in the allowlist; prefix it per the convention or allowlist it in review (test/fixtures/theme-class-allowlist.json5)`);
+              }
+            }
+          }
+        }
+
+        // Tripwire: a broken walk or tokenizer would pass vacuously.
+        ctx.expect(fileCount >= 50, `census walked only ${fileCount} markup files; the walk is broken`).toBeTruthy();
+        ctx.expect(tokenCount >= 1000, `census saw only ${tokenCount} class tokens; the tokenizer is broken`).toBeTruthy();
+
+        // Tripwire: a theme folder the census does not know is unguarded markup.
+        // Adding a theme means adding it to THEMES (and the convention) here.
+        const onDisk = fs.readdirSync(path.join(PKG, 'themes'), { withFileTypes: true })
+          .filter((entry) => entry.isDirectory() && !NON_CENSUS_DIRS.includes(entry.name))
+          .map((entry) => entry.name)
+          .sort();
+        ctx.expect(onDisk, `themes on disk do not match the census list; register new themes in THEMES (and PREFIX_OWNERS/FORK_THEMES as fits)`).toEqual([...THEMES].sort());
+
+        ctx.expect(violations, `class-discipline violations:\n  ${violations.join('\n  ')}`).toEqual([]);
+      },
+    },
+
+    {
+      name: '#177 guard 2: skin fork lists match markup on disk in both directions',
+      run: (ctx) => {
+        for (const theme of FORK_THEMES) {
+          const listed = parseForkList(theme);
+          const onDisk = walk(path.join(PKG, 'themes', theme))
+            .filter((file) => file.endsWith('.html'))
+            .map(rel);
+
+          // Every listed path stays inside its own theme; base is forked by nobody.
+          for (const entry of listed) {
+            ctx.expect(entry.startsWith(`themes/${theme}/`), `themes/${theme}/README.md lists "${entry}", which is outside themes/${theme}/`).toBeTruthy();
+            ctx.expect(!entry.startsWith('themes/base/'), `themes/${theme}/README.md lists a base path: ${entry}`).toBeTruthy();
+          }
+
+          const missing = listed.filter((entry) => !onDisk.includes(entry));
+          ctx.expect(missing, `themes/${theme}/README.md lists forks with no file on disk:\n  ${missing.join('\n  ')}`).toEqual([]);
+
+          const unlisted = onDisk.filter((file) => !listed.includes(file));
+          ctx.expect(unlisted, `themes/${theme} markup files missing from the README fork list:\n  ${unlisted.join('\n  ')}`).toEqual([]);
+
+          ctx.expect(listed.slice().sort(), `themes/${theme} fork list and disk disagree`).toEqual(onDisk.slice().sort());
+        }
+      },
+    },
+
+    {
+      name: '#177 guard 2: classy is a skin and ships zero markup files',
+      run: (ctx) => {
+        const markup = walk(path.join(PKG, 'themes', 'classy'))
+          .filter((file) => file.endsWith('.html'))
+          .map(rel);
+        ctx.expect(markup, `themes/classy must ship no markup; found:\n  ${markup.join('\n  ')}`).toEqual([]);
+      },
+    },
+  ],
 });

@@ -45,7 +45,7 @@ class BaseCommand {
 
   /**
    * Resolve a path for a human-readable log file. @omega.js/backend-owned logs (dev.log,
-   * emulator.log, test.log, production.log) live in `dist/` alongside
+   * emulator.log, production.log) live in `dist/` alongside
    * firebase-tools' own *-debug.log files so all log output is grep-able from
    * one place. Reset sentinels and other internal-only artifacts use
    * `getTempPath()` instead.
@@ -92,7 +92,6 @@ class BaseCommand {
       'dev.log',
       'deploy.log',
       'emulator.log',
-      'test.log',
       'production.log',
     ];
     const resetSentinels = [

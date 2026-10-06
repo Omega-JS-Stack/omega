@@ -8,9 +8,8 @@
  * contract. Pins: head plus paragraphs render, an absent body renders the head
  * alone, and the gallery entry ships with its variants.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 
 const { registerSectionTags } = require('../src/sections.js');
@@ -45,65 +44,83 @@ function bodyParagraphs(html) {
   return at === -1 ? [] : (html.slice(at).match(/<p[^>]*>[\s\S]*?<\/p>/g) || []);
 }
 
-test('#515: the band renders the head cluster over its body paragraphs', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/prose" %}\n'
-    + 'superheadline: "About"\nheadline: "Why we built"\nheadline_accent: "ACME"\n'
-    + 'subheadline: "The short version."\n'
-    + 'body:\n'
-    + '  - "We started because the tooling kept getting in the way."\n'
-    + '  - "Ten years later, that is still the whole idea."\n'
-    + '{% endsection %}',
-    SITE,
-  );
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-prose',
+  tests: [
+    {
+      name: '#515: the band renders the head cluster over its body paragraphs',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/prose" %}\n'
+          + 'superheadline: "About"\nheadline: "Why we built"\nheadline_accent: "ACME"\n'
+          + 'subheadline: "The short version."\n'
+          + 'body:\n'
+          + '  - "We started because the tooling kept getting in the way."\n'
+          + '  - "Ten years later, that is still the whole idea."\n'
+          + '{% endsection %}',
+          SITE,
+        );
 
-  assert.ok(html.includes('<section'), 'the band renders as a full-width section');
-  assert.ok(html.includes('<span class="omega-micro">About</span>'), 'the eyebrow rides the shared head cluster');
-  assert.ok(html.includes('<h2 class="omega-display omega-display--section">'), 'the head is an h2 beneath the page h1');
-  assert.ok(html.includes('Why we built') && html.includes('<em>ACME</em>'), 'headline and accent render');
-  assert.ok(html.includes('The short version.'), 'the sub line renders');
+        ctx.expect(html.includes('<section'), 'the band renders as a full-width section').toBeTruthy();
+        ctx.expect(html.includes('<span class="omega-micro">About</span>'), 'the eyebrow rides the shared head cluster').toBeTruthy();
+        ctx.expect(html.includes('<h2 class="omega-display omega-display--section">'), 'the head is an h2 beneath the page h1').toBeTruthy();
+        ctx.expect(html.includes('Why we built') && html.includes('<em>ACME</em>'), 'headline and accent render').toBeTruthy();
+        ctx.expect(html.includes('The short version.'), 'the sub line renders').toBeTruthy();
 
-  const paragraphs = bodyParagraphs(html);
-  assert.strictEqual(paragraphs.length, 2, 'one paragraph per body entry');
-  assert.ok(paragraphs[0].includes('the tooling kept getting in the way'), 'first paragraph');
-  assert.ok(paragraphs[1].includes('that is still the whole idea'), 'second paragraph, not just the first');
-  assert.ok(!html.includes('<img') && !html.includes('<video'), 'no media: this band is words');
-  assert.deepEqual(warnings, [], 'every arg is declared — no unknown-arg warning');
-});
+        const paragraphs = bodyParagraphs(html);
+        ctx.expect(paragraphs.length, 'one paragraph per body entry').toBe(2);
+        ctx.expect(paragraphs[0].includes('the tooling kept getting in the way'), 'first paragraph').toBeTruthy();
+        ctx.expect(paragraphs[1].includes('that is still the whole idea'), 'second paragraph, not just the first').toBeTruthy();
+        ctx.expect(!html.includes('<img') && !html.includes('<video'), 'no media: this band is words').toBeTruthy();
+        ctx.expect(warnings, 'every arg is declared — no unknown-arg warning').toEqual([]);
+      },
+    },
 
-test('#515: an absent body renders the head alone', async () => {
-  const { engine, warnings } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/prose" %}\nheadline: "How it works"\n{% endsection %}',
-    SITE,
-  );
+    {
+      name: '#515: an absent body renders the head alone',
+      run: async (ctx) => {
+        const { engine, warnings } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/prose" %}\nheadline: "How it works"\n{% endsection %}',
+          SITE,
+        );
 
-  assert.ok(html.includes('How it works'), 'the head still renders');
-  assert.ok(!html.includes('omega-prose'), 'and no empty prose column under it');
-  assert.deepEqual(warnings, []);
-});
+        ctx.expect(html.includes('How it works'), 'the head still renders').toBeTruthy();
+        ctx.expect(!html.includes('omega-prose'), 'and no empty prose column under it').toBeTruthy();
+        ctx.expect(warnings).toEqual([]);
+      },
+    },
 
-test('#515: neutral defaults — an unauthored call puts no words on the page', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender('{% section "marketing/prose" %}', SITE);
+    {
+      name: '#515: neutral defaults — an unauthored call puts no words on the page',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender('{% section "marketing/prose" %}', SITE);
 
-  assert.ok(!html.includes('<h2'), 'a shared band never speaks for a page it knows nothing about');
-  assert.ok(!html.includes('omega-prose'), 'and carries no body of its own');
-});
+        ctx.expect(!html.includes('<h2'), 'a shared band never speaks for a page it knows nothing about').toBeTruthy();
+        ctx.expect(!html.includes('omega-prose'), 'and carries no body of its own').toBeTruthy();
+      },
+    },
 
-test('#515: the gallery ships the entry and its variants', async () => {
-  const pages = await buildWith(miniData);
+    {
+      name: '#515: the gallery ships the entry and its variants',
+      run: async (ctx) => {
+        const pages = await buildWith(miniData);
 
-  const entry = pages.get('/test/sections/marketing/prose');
-  assert.ok(entry, 'the entry page built');
-  assert.ok(entry.includes('body'), 'the args table documents the body arg');
+        const entry = pages.get('/test/sections/marketing/prose');
+        ctx.expect(entry, 'the entry page built').toBeTruthy();
+        ctx.expect(entry.includes('body'), 'the args table documents the body arg').toBeTruthy();
 
-  const full = pages.get('/test/sections/marketing/prose/frames/head-and-lede');
-  assert.ok(full, 'the Head and lede variant frame built');
-  assert.ok(full.includes('omega-prose'), 'with its paragraphs');
+        const full = pages.get('/test/sections/marketing/prose/frames/head-and-lede');
+        ctx.expect(full, 'the Head and lede variant frame built').toBeTruthy();
+        ctx.expect(full.includes('omega-prose'), 'with its paragraphs').toBeTruthy();
 
-  const headOnly = pages.get('/test/sections/marketing/prose/frames/head-only');
-  assert.ok(headOnly, 'the Head only variant frame built');
-  assert.ok(!headOnly.includes('omega-prose'), 'and renders exactly that');
+        const headOnly = pages.get('/test/sections/marketing/prose/frames/head-only');
+        ctx.expect(headOnly, 'the Head only variant frame built').toBeTruthy();
+        ctx.expect(!headOnly.includes('omega-prose'), 'and renders exactly that').toBeTruthy();
+      },
+    },
+  ],
 });

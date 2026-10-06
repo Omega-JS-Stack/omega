@@ -70,56 +70,56 @@ module.exports = defineCases({
 
     {
       name: 'getEnvironment: the one input is the answer, whatever the ambient signals say',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // The boot resolved the input once; nothing re-sniffs ENVIRONMENT or
         // FUNCTIONS_EMULATOR at read time any more (#817).
         withEnv({ OMEGA_ENVIRONMENT: 'testing', ENVIRONMENT: 'production' }, () => {
-          assert.equal(omega.getEnvironment(), 'testing');
+          expect(omega.getEnvironment()).toBe('testing');
         });
       },
     },
     {
       name: 'getEnvironment: production when the lane named production',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
-          assert.equal(omega.getEnvironment(), 'production');
+          expect(omega.getEnvironment()).toBe('production');
         });
       },
     },
     {
       name: 'getEnvironment: development when the lane named development',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'development' }, () => {
-          assert.equal(omega.getEnvironment(), 'development');
+          expect(omega.getEnvironment()).toBe('development');
         });
       },
     },
     {
       name: 'the boot resolves the input from the ambient answer: FUNCTIONS_EMULATOR is development',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // envEnvironment() is the PRODUCER of the input, and the boot runs it
         // once. Its ambient rules are unchanged: an emulator run is development.
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-          assert.equal(envEnvironment(), 'development');
+          expect(envEnvironment()).toBe('development');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
-          assert.equal(envEnvironment(), 'production');
+          expect(envEnvironment()).toBe('production');
         });
         withEnv({ OMEGA_ENVIRONMENT: 'testing', ENVIRONMENT: 'production' }, () => {
-          assert.equal(envEnvironment(), 'testing', 'a test run is not production, whatever else says');
+          expect(envEnvironment(), 'a test run is not production, whatever else says').toBe('testing');
         });
         withEnv({}, () => {
-          assert.equal(envEnvironment(), 'production', 'no signal is production, a deployed function carries none');
+          expect(envEnvironment(), 'no signal is production, a deployed function carries none').toBe('production');
         });
         // And the input, once named, wins over every ambient signal.
         withEnv({ OMEGA_ENVIRONMENT: 'development', ENVIRONMENT: 'production' }, () => {
-          assert.equal(envEnvironment(), 'development');
+          expect(envEnvironment()).toBe('development');
         });
       },
     },
     {
       name: 'getEnvironment: NO default, a missing input is a loud error naming the variable',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // The four framework copies this replaced each had their own default,
         // and they disagreed (#817). There is none here: a process whose lane
         // never named an environment says so instead of guessing one.
@@ -132,8 +132,8 @@ module.exports = defineCases({
             thrown = error;
           }
 
-          assert.ok(thrown, 'a process whose lane named no environment must refuse, never answer');
-          assert.match(thrown.message, /OMEGA_ENVIRONMENT/, `the refusal names the variable, got: ${thrown && thrown.message}`);
+          expect(thrown, 'a process whose lane named no environment must refuse, never answer').toBeTruthy();
+          expect(thrown.message, `the refusal names the variable, got: ${thrown && thrown.message}`).toMatch(/OMEGA_ENVIRONMENT/);
         });
       },
     },
@@ -141,17 +141,17 @@ module.exports = defineCases({
     {
       name: 'the test lane names testing through the one input, here and in the Functions runtime',
       auth: 'none',
-      async run({ omega, http, assert }) {
+      async run({ omega, http, expect }) {
         // The lane (the gate) sets OMEGA_ENVIRONMENT=testing on every child it
         // starts and no other test-run name, so this process reads it untouched.
-        assert.equal(process.env.OMEGA_ENVIRONMENT, 'testing', 'the runner child carries the one input');
-        assert.equal(process.env.OMEGA_TEST_MODE, undefined, 'the retired test-mode flag is set by no lane');
-        assert.equal(omega.isTesting(), true, 'isTesting() answers the test run');
+        expect(process.env.OMEGA_ENVIRONMENT, 'the runner child carries the one input').toBe('testing');
+        expect(process.env.OMEGA_TEST_MODE, 'the retired test-mode flag is set by no lane').toBe(undefined);
+        expect(omega.isTesting(), 'isTesting() answers the test run').toBe(true);
 
         const response = await http.as('none').get('omega/health');
 
-        assert.isSuccess(response, 'the liveness probe answers');
-        assert.equal(response.data.environment, 'testing', 'the Functions runtime resolves testing from the same input');
+        expect(response, 'the liveness probe answers').toBeSuccess();
+        expect(response.data.environment, 'the Functions runtime resolves testing from the same input').toBe('testing');
       },
     },
 
@@ -159,7 +159,7 @@ module.exports = defineCases({
 
     {
       name: 'invariant: is*() exactly matches getEnvironment() across every scenario',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const scenarios = [
           { env: { OMEGA_ENVIRONMENT: 'testing', ENVIRONMENT: 'production' }, expect: 'testing' },
           { env: { OMEGA_ENVIRONMENT: 'production' },                     expect: 'production' },
@@ -168,18 +168,18 @@ module.exports = defineCases({
         for (const s of scenarios) {
           withEnv(s.env, () => {
             const e = omega.getEnvironment();
-            assert.equal(e, s.expect, `getEnvironment for ${JSON.stringify(s.env)}`);
+            expect(e, `getEnvironment for ${JSON.stringify(s.env)}`).toBe(s.expect);
             // Each is*() must equal (getEnvironment() === its value) — no independent reads.
-            assert.equal(omega.isDevelopment(), e === 'development', `isDevelopment for ${e}`);
-            assert.equal(omega.isTesting(),     e === 'testing',     `isTesting for ${e}`);
-            assert.equal(omega.isProduction(),  e === 'production',  `isProduction for ${e}`);
+            expect(omega.isDevelopment(), `isDevelopment for ${e}`).toBe(e === 'development');
+            expect(omega.isTesting(), `isTesting for ${e}`).toBe(e === 'testing');
+            expect(omega.isProduction(), `isProduction for ${e}`).toBe(e === 'production');
           });
         }
       },
     },
     {
       name: 'invariant: exactly one of is*() is true in every scenario (mutually exclusive)',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const envs = [
           { OMEGA_ENVIRONMENT: 'testing' },
           { OMEGA_ENVIRONMENT: 'production' },
@@ -189,18 +189,18 @@ module.exports = defineCases({
           withEnv(env, () => {
             const trueCount = [omega.isDevelopment(), omega.isTesting(), omega.isProduction()]
               .filter(Boolean).length;
-            assert.equal(trueCount, 1, `exactly one true for ${JSON.stringify(env)}`);
+            expect(trueCount, `exactly one true for ${JSON.stringify(env)}`).toBe(1);
           });
         }
       },
     },
     {
       name: 'isProduction is a real positive check (NOT just !isDevelopment) — false in testing',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => {
-          assert.equal(omega.isDevelopment(), false, 'isDevelopment false in testing');
-          assert.equal(omega.isProduction(),  false, 'isProduction false in testing');
-          assert.equal(omega.isTesting(),     true,  'isTesting true in testing');
+          expect(omega.isDevelopment(), 'isDevelopment false in testing').toBe(false);
+          expect(omega.isProduction(), 'isProduction false in testing').toBe(false);
+          expect(omega.isTesting(), 'isTesting true in testing').toBe(true);
         });
       },
     },
@@ -209,7 +209,7 @@ module.exports = defineCases({
 
     {
       name: 'ctx forwards getEnvironment()/is*() to the omega (identical)',
-      async run({ omega, ctx, assert }) {
+      async run({ omega, ctx, expect }) {
         const cases = [
           { OMEGA_ENVIRONMENT: 'testing' },
           { OMEGA_ENVIRONMENT: 'production' },
@@ -217,10 +217,10 @@ module.exports = defineCases({
         ];
         for (const env of cases) {
           withEnv(env, () => {
-            assert.equal(ctx.getEnvironment(), omega.getEnvironment(), 'getEnvironment forward');
-            assert.equal(ctx.isDevelopment(), omega.isDevelopment(), 'isDevelopment forward');
-            assert.equal(ctx.isTesting(),     omega.isTesting(),     'isTesting forward');
-            assert.equal(ctx.isProduction(),  omega.isProduction(),  'isProduction forward');
+            expect(ctx.getEnvironment(), 'getEnvironment forward').toBe(omega.getEnvironment());
+            expect(ctx.isDevelopment(), 'isDevelopment forward').toBe(omega.isDevelopment());
+            expect(ctx.isTesting(), 'isTesting forward').toBe(omega.isTesting());
+            expect(ctx.isProduction(), 'isProduction forward').toBe(omega.isProduction());
           });
         }
       },
@@ -230,45 +230,45 @@ module.exports = defineCases({
 
     {
       name: 'getApiUrl: localhost in development AND testing, prod otherwise',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const hosting = `http://localhost:${localPort('hosting')}`;
         withEnv({ OMEGA_ENVIRONMENT: 'development' }, () => {
-          assert.equal(omega.getApiUrl(), hosting, 'dev → localhost');
+          expect(omega.getApiUrl(), 'dev → localhost').toBe(hosting);
         });
         withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => {
-          assert.equal(omega.getApiUrl(), hosting, 'testing → localhost');
+          expect(omega.getApiUrl(), 'testing → localhost').toBe(hosting);
         });
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
-          assert.match(omega.getApiUrl(), /^https:\/\/api\./, 'prod → api.<domain>');
+          expect(omega.getApiUrl(), 'prod → api.<domain>').toMatch(/^https:\/\/api\./);
         });
       },
     },
     {
       name: 'getApiUrl: explicit env arg overrides current environment',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // Under the test harness we're in 'testing', but an explicit arg forces the mapping.
-        assert.equal(omega.getApiUrl('development'), `http://localhost:${localPort('hosting')}`, "arg 'development' → localhost");
-        assert.match(omega.getApiUrl('production'), /^https:\/\/api\./, "arg 'production' → prod");
+        expect(omega.getApiUrl('development'), "arg 'development' → localhost").toBe(`http://localhost:${localPort('hosting')}`);
+        expect(omega.getApiUrl('production'), "arg 'production' → prod").toMatch(/^https:\/\/api\./);
       },
     },
     {
       name: 'getFunctionsUrl: localhost in development AND testing, cloudfunctions otherwise',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         const functions = new RegExp(`^http://localhost:${localPort('functions')}/`);
         withEnv({ OMEGA_ENVIRONMENT: 'development' }, () => {
-          assert.match(omega.getFunctionsUrl(), functions, `dev → localhost:${localPort('functions')}`);
+          expect(omega.getFunctionsUrl(), `dev → localhost:${localPort('functions')}`).toMatch(functions);
         });
         withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => {
-          assert.match(omega.getFunctionsUrl(), functions, `testing → localhost:${localPort('functions')}`);
+          expect(omega.getFunctionsUrl(), `testing → localhost:${localPort('functions')}`).toMatch(functions);
         });
         withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
-          assert.match(omega.getFunctionsUrl(), /cloudfunctions\.net$/, 'prod → cloudfunctions.net');
+          expect(omega.getFunctionsUrl(), 'prod → cloudfunctions.net').toMatch(/cloudfunctions\.net$/);
         });
       },
     },
     {
       name: 'getWebsiteUrl: localhost:4000 in development AND testing, brand.url otherwise',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // The scheme follows the local https stack (cp177): OMEGA_HTTPS_PORT set
         // (this process runs behind the mkcert proxy) → the website dev server
         // shares the same mkcert default → https. Unset → both sides plain http.
@@ -278,20 +278,20 @@ module.exports = defineCases({
         try {
           delete process.env.OMEGA_HTTPS_PORT;
           withEnv({ OMEGA_ENVIRONMENT: 'development' }, () => {
-            assert.equal(omega.getWebsiteUrl(), `http://localhost:${website}`, `dev → localhost:${website}`);
+            expect(omega.getWebsiteUrl(), `dev → localhost:${website}`).toBe(`http://localhost:${website}`);
           });
           withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => {
-            assert.equal(omega.getWebsiteUrl(), `http://localhost:${website}`, `testing → localhost:${website}`);
+            expect(omega.getWebsiteUrl(), `testing → localhost:${website}`).toBe(`http://localhost:${website}`);
           });
 
           process.env.OMEGA_HTTPS_PORT = '5002';
           withEnv({ OMEGA_ENVIRONMENT: 'development' }, () => {
-            assert.equal(omega.getWebsiteUrl(), `https://localhost:${website}`, 'dev behind the https proxy → https website');
+            expect(omega.getWebsiteUrl(), 'dev behind the https proxy → https website').toBe(`https://localhost:${website}`);
           });
 
           withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
             const url = omega.getWebsiteUrl();
-            assert.equal(url.includes('localhost'), false, 'prod → NOT localhost');
+            expect(url.includes('localhost'), 'prod → NOT localhost').toBe(false);
           });
         } finally {
           if (savedHttpsPort === undefined) delete process.env.OMEGA_HTTPS_PORT;
@@ -304,14 +304,14 @@ module.exports = defineCases({
 
     {
       name: 'getParentApiUrl / getParentUrl never redirect to localhost (always live)',
-      async run({ omega, assert }) {
+      async run({ omega, expect }) {
         // Even under the test harness ('testing'), the parent is a real remote server.
         const parentUrl = omega.getParentUrl();
         const parentApi = omega.getParentApiUrl();
-        assert.equal((parentUrl || '').includes('localhost'), false, 'getParentUrl not localhost');
-        assert.equal((parentApi || '').includes('localhost'), false, 'getParentApiUrl not localhost');
+        expect((parentUrl || '').includes('localhost'), 'getParentUrl not localhost').toBe(false);
+        expect((parentApi || '').includes('localhost'), 'getParentApiUrl not localhost').toBe(false);
         // When set, the parent API URL carries the api. subdomain.
-        if (parentApi) assert.match(parentApi, /^https:\/\/api\./, 'parent api uses api. subdomain');
+        if (parentApi) expect(parentApi, 'parent api uses api. subdomain').toMatch(/^https:\/\/api\./);
       },
     },
   ],

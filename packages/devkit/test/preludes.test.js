@@ -392,6 +392,38 @@ module.exports = defineCases({
     },
 
     {
+      name: 'with no injected log, the heal and the drift lines go to stderr, never stdout',
+      run: (ctx) => {
+        const { seams: injected } = seams({
+          origin: `https://github.com/${STALE}.git\n`,
+          resolved: { full_name: CURRENT },
+        });
+        delete injected.log;
+        const out = [];
+        const err = [];
+        const original = { log: console.log, error: console.error };
+        console.log = (line) => out.push(line);
+        console.error = (line) => err.push(line);
+
+        try {
+          originHeal.run({
+            brandRoot: brandRoot(ctx),
+            config: { brand: { id: 'acme' }, repo: { provider: 'github', owner: 'Other-Org' } },
+            ...injected,
+          });
+        } finally {
+          console.log = original.log;
+          console.error = original.error;
+        }
+
+        ctx.expect(out, 'a verb\'s stdout carries none of the prelude').toEqual([]);
+        ctx.expect(err.length).toBe(2);
+        ctx.expect(err[0]).toMatch(/origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
+        ctx.expect(err[1]).toMatch(/config derives Other-Org\/acme-omega/);
+      },
+    },
+
+    {
       name: 'a repo GitHub does not have is left alone, silently',
       run: (ctx) => {
         const { calls, lines, seams: injected } = seams({
@@ -517,9 +549,10 @@ module.exports = defineCases({
         const first = boot();
 
         ctx.expect(first.status, `the verb ran: ${first.stderr}`).toBe(0);
-        ctx.expect(first.stdout).toMatch(/origin healed from Old-Org\/sandbox-brand-omega to Omega-JS-Stack\/sandbox-brand-omega/);
+        ctx.expect(first.stderr).toMatch(/origin healed from Old-Org\/sandbox-brand-omega to Omega-JS-Stack\/sandbox-brand-omega/);
         ctx.expect(first.stdout, 'the verb itself still ran').toMatch(/@omega\.js\/manager v/);
-        ctx.expect(first.stdout, 'the config derives the repo GitHub serves it from').not.toMatch(/config derives/);
+        ctx.expect(first.stdout, 'the heal never lands on the verb\'s stdout').not.toMatch(/origin healed/);
+        ctx.expect(first.stderr, 'the config derives the repo GitHub serves it from').not.toMatch(/config derives/);
         ctx.expect(git('remote', 'get-url', 'origin')).toBe('https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
 
         // A converged brand: the second boot mutates nothing and says nothing, which
@@ -527,8 +560,8 @@ module.exports = defineCases({
         const second = boot();
 
         ctx.expect(second.status).toBe(0);
-        ctx.expect(second.stdout).not.toMatch(/origin healed/);
-        ctx.expect(second.stdout).not.toMatch(/config derives/);
+        ctx.expect(second.stderr).not.toMatch(/origin healed/);
+        ctx.expect(second.stderr).not.toMatch(/config derives/);
         ctx.expect(git('remote', 'get-url', 'origin')).toBe('https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
       },
     },

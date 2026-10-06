@@ -42,11 +42,11 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-service-account-check-reads-the-devkit-path',
-      async run({ assert }) {
+      async run({ expect }) {
         const { root, targetDir } = seedBrand();
         const check = new ServiceAccountTest({ main: { firebaseProjectPath: targetDir } });
 
-        assert.equal(check.resolveSaPath(), path.join(root, SERVICE_ACCOUNT_REL));
+        expect(check.resolveSaPath()).toBe(path.join(root, SERVICE_ACCOUNT_REL));
 
         jetpack.remove(root);
       },

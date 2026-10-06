@@ -9,9 +9,8 @@
  * The about layout authors both bands' real sub lines itself, so the packaged
  * /about page is unchanged — that half is pinned by the about page tests.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 
@@ -53,37 +52,6 @@ const SWEPT = [
   },
 ];
 
-for (const band of SWEPT) {
-  test(`#512: ${band.id} inherits no sub line — an absent subheadline renders nothing`, async () => {
-    const { engine, warnings } = makeEngine();
-    const html = await engine.parseAndRender(`{% section "${band.id}" %}\n${band.body}{% endsection %}`, {});
-
-    assert.ok(!html.includes(band.leaked), 'the demo sentence never reaches a brand band');
-    assert.ok(!/<p>[^<]/.test(html.slice(0, html.indexOf('</h2>') + 5)), 'no sub node in the head at all');
-    assert.ok(html.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched');
-    assert.deepEqual(warnings, []);
-  });
-
-  test(`#512: ${band.id} keeps its demo line in the gallery`, async () => {
-    const pages = await buildWith(miniData, {}, `default-copy-${band.id.replace('/', '-')}`);
-    const frame = pages.get(band.frame);
-    assert.ok(frame, `the ${band.id} default variant frame built`);
-
-    assert.ok(frame.includes(band.leaked), 'sample content, where sample content belongs');
-  });
-}
-
-test('#512: an authored sub line still renders on the swept bands', async () => {
-  const { engine } = makeEngine();
-  for (const band of SWEPT) {
-    const html = await engine.parseAndRender(
-      `{% section "${band.id}" %}\nsubheadline: "Our own line."\n${band.body}{% endsection %}`,
-      {},
-    );
-    assert.ok(html.includes('Our own line.'), `${band.id} renders the page's own words`);
-  }
-});
-
 /**
  * #530 — the sweep remainder: the three marketing bands the packaged homepage
  * composes WITHOUT copy of its own, so a demo sub line in their defaults is
@@ -121,33 +89,96 @@ function headOf(html) {
   return html.slice(start, html.indexOf('</div>', start));
 }
 
-for (const band of SWEPT_530) {
-  test(`#530: ${band.id} inherits no sub line — an absent subheadline renders nothing`, async () => {
-    const { engine, warnings } = makeEngine();
-    const html = await engine.parseAndRender(`{% section "${band.id}" %}\n${band.body}{% endsection %}`, {});
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-default-copy',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const band of SWEPT) {
+        cases.push({
+          name: `#512: ${band.id} inherits no sub line — an absent subheadline renders nothing`,
+          run: async (ctx) => {
+            const { engine, warnings } = makeEngine();
+            const html = await engine.parseAndRender(`{% section "${band.id}" %}\n${band.body}{% endsection %}`, {});
 
-    assert.ok(!html.includes(band.leaked), 'the demo sentence never reaches a brand band');
-    assert.ok(!/<p>/.test(headOf(html)), 'no sub node in the head at all');
-    assert.ok(html.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched');
-    assert.deepEqual(warnings, []);
-  });
+            ctx.expect(!html.includes(band.leaked), 'the demo sentence never reaches a brand band').toBeTruthy();
+            ctx.expect(!/<p>[^<]/.test(html.slice(0, html.indexOf('</h2>') + 5)), 'no sub node in the head at all').toBeTruthy();
+            ctx.expect(html.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched').toBeTruthy();
+            ctx.expect(warnings).toEqual([]);
+          },
+        });
 
-  test(`#530: ${band.id} keeps its demo line in the gallery`, async () => {
-    const pages = await buildWith(miniData, {}, `default-copy-${band.id.replace('/', '-')}`);
-    const frame = pages.get(band.frame);
-    assert.ok(frame, `the ${band.id} default variant frame built`);
+        cases.push({
+          name: `#512: ${band.id} keeps its demo line in the gallery`,
+          run: async (ctx) => {
+            const pages = await buildWith(miniData, {}, `default-copy-${band.id.replace('/', '-')}`);
+            const frame = pages.get(band.frame);
+            ctx.expect(frame, `the ${band.id} default variant frame built`).toBeTruthy();
 
-    assert.ok(frame.includes(band.leaked), 'sample content, where sample content belongs');
-  });
-}
+            ctx.expect(frame.includes(band.leaked), 'sample content, where sample content belongs').toBeTruthy();
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#530: an authored sub line still renders on the marketing bands', async () => {
-  const { engine } = makeEngine();
-  for (const band of SWEPT_530) {
-    const html = await engine.parseAndRender(
-      `{% section "${band.id}" %}\nsubheadline: "Our own line."\n${band.body}{% endsection %}`,
-      {},
-    );
-    assert.ok(html.includes('Our own line.'), `${band.id} renders the page's own words`);
-  }
+    {
+      name: '#512: an authored sub line still renders on the swept bands',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        for (const band of SWEPT) {
+          const html = await engine.parseAndRender(
+            `{% section "${band.id}" %}\nsubheadline: "Our own line."\n${band.body}{% endsection %}`,
+            {},
+          );
+          ctx.expect(html.includes('Our own line.'), `${band.id} renders the page's own words`).toBeTruthy();
+        }
+      },
+    },
+
+    ...(() => {
+      const cases = [];
+      for (const band of SWEPT_530) {
+        cases.push({
+          name: `#530: ${band.id} inherits no sub line — an absent subheadline renders nothing`,
+          run: async (ctx) => {
+            const { engine, warnings } = makeEngine();
+            const html = await engine.parseAndRender(`{% section "${band.id}" %}\n${band.body}{% endsection %}`, {});
+
+            ctx.expect(!html.includes(band.leaked), 'the demo sentence never reaches a brand band').toBeTruthy();
+            ctx.expect(!/<p>/.test(headOf(html)), 'no sub node in the head at all').toBeTruthy();
+            ctx.expect(html.includes('<h2 class="omega-display omega-display--section">'), 'the structural head is untouched').toBeTruthy();
+            ctx.expect(warnings).toEqual([]);
+          },
+        });
+
+        cases.push({
+          name: `#530: ${band.id} keeps its demo line in the gallery`,
+          run: async (ctx) => {
+            const pages = await buildWith(miniData, {}, `default-copy-${band.id.replace('/', '-')}`);
+            const frame = pages.get(band.frame);
+            ctx.expect(frame, `the ${band.id} default variant frame built`).toBeTruthy();
+
+            ctx.expect(frame.includes(band.leaked), 'sample content, where sample content belongs').toBeTruthy();
+          },
+        });
+      }
+      return cases;
+    })(),
+
+    {
+      name: '#530: an authored sub line still renders on the marketing bands',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        for (const band of SWEPT_530) {
+          const html = await engine.parseAndRender(
+            `{% section "${band.id}" %}\nsubheadline: "Our own line."\n${band.body}{% endsection %}`,
+            {},
+          );
+          ctx.expect(html.includes('Our own line.'), `${band.id} renders the page's own words`).toBeTruthy();
+        }
+      },
+    },
+  ],
 });

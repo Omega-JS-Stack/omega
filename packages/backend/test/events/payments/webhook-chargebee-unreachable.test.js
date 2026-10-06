@@ -30,7 +30,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'send-chargebee-subscription-webhook',
-      async run({ accounts, http, firestore, assert, state, config }) {
+      async run({ accounts, http, firestore, expect, state, config }) {
         state.uid = accounts[PERSONA].uid;
 
         // Deleted so the run starts from nothing: anything found afterwards was
@@ -71,13 +71,13 @@ module.exports = defineCases({
 
         // The ROUTE still accepts it — storing the event is what makes the retry
         // ladder possible at all. The processing is what refuses to guess.
-        assert.isSuccess(response, 'Webhook should be accepted');
+        expect(response, 'Webhook should be accepted').toBeSuccess();
       },
     },
 
     {
       name: 'the-event-defers-and-nothing-is-written-from-its-payload',
-      async run({ firestore, assert, waitFor, state }) {
+      async run({ firestore, expect, waitFor, state }) {
         // 45s, not the usual 15s: this is the first suite of the run and the emulator
         // is still draining the seeding wipe, which stretches the read back out
         await waitFor(async () => {
@@ -87,19 +87,19 @@ module.exports = defineCases({
 
         const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
 
-        assert.equal(webhookDoc.status, 'failed', 'An unreachable Chargebee defers — the retry sweep is the reconciliation path');
-        assert.equal(webhookDoc.retryCount, 1, 'The attempt is counted toward the retry ladder');
-        assert.ok(!webhookDoc.refusal, 'A deferral is not a refusal — nothing was decided about this event');
+        expect(webhookDoc.status, 'An unreachable Chargebee defers — the retry sweep is the reconciliation path').toBe('failed');
+        expect(webhookDoc.retryCount, 'The attempt is counted toward the retry ladder').toBe(1);
+        expect(!webhookDoc.refusal, 'A deferral is not a refusal — nothing was decided about this event').toBeTruthy();
 
         // The payload carried a complete active subscription. Anything below that
         // exists could only have come from it.
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.ok(!userDoc?.subscription, 'No subscription state is written from a payload the provider never confirmed');
+        expect(!userDoc?.subscription, 'No subscription state is written from a payload the provider never confirmed').toBeTruthy();
 
         const orderDoc = await firestore.get(`payments-orders/${ORDER_ID}`);
 
-        assert.ok(!orderDoc, 'And no order is minted behind it');
+        expect(!orderDoc, 'And no order is minted behind it').toBeTruthy();
       },
     },
   ],

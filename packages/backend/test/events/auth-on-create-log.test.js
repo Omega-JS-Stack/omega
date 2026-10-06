@@ -58,10 +58,10 @@ const EVENT_CONTEXT = {
 // The persona's user doc must already exist — that is what sends the handler down
 // its read-only "already exists" branch. Checked before every call so a missing doc
 // fails the test instead of quietly rewriting a shared account.
-async function assertDocExists({ assert, firestore, user }) {
+async function assertDocExists({ expect, firestore, user }) {
   const doc = await firestore.get(`users/${user.uid}`);
 
-  assert.equal(!!doc?.auth?.uid, true, `precondition: users/${user.uid} should already exist`);
+  expect(!!doc?.auth?.uid, `precondition: users/${user.uid} should already exist`).toBe(true);
 }
 
 // Run the thunk with the debug switch in a known state — the logger reads it live.
@@ -111,53 +111,53 @@ module.exports = defineCases({
   tests: [
     {
       name: 'headline-is-the-uid-alone',
-      run: async ({ assert, omega, accounts, firestore }) => {
+      run: async ({ expect, omega, accounts, firestore }) => {
         const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
-        await assertDocExists({ assert: assert, firestore: firestore, user: user });
+        await assertDocExists({ expect: expect, firestore: firestore, user: user });
 
         const { calls, headlines } = await runHandler({ omega: omega, user: user, debug: undefined });
 
-        assert.equal(headlines.length, 1, `expected one headline line, got ${headlines.length}`);
-        assert.equal(headlines[0][1], `onCreate: ${user.uid}`, headlines[0][1]);
+        expect(headlines.length, `expected one headline line, got ${headlines.length}`).toBe(1);
+        expect(headlines[0][1], headlines[0][1]).toBe(`onCreate: ${user.uid}`);
 
         // Prefix + message and nothing else — the record is off this line.
-        assert.equal(headlines[0].length, 2, `the headline carries a payload: ${JSON.stringify(headlines[0].slice(2)).slice(0, 200)}`);
+        expect(headlines[0].length, `the headline carries a payload: ${JSON.stringify(headlines[0].slice(2)).slice(0, 200)}`).toBe(2);
 
         // And the address is off every line, not just moved along the headline.
         const leaked = calls.log.filter((args) => render(args).includes(user.email));
 
-        assert.equal(leaked.length, 0, `the email must not ride any log line: ${leaked.map(render).join(' | ').slice(0, 200)}`);
+        expect(leaked.length, `the email must not ride any log line: ${leaked.map(render).join(' | ').slice(0, 200)}`).toBe(0);
       },
     },
 
     {
       name: 'the-record-does-not-print-on-a-normal-run',
-      run: async ({ assert, omega, accounts, firestore }) => {
+      run: async ({ expect, omega, accounts, firestore }) => {
         const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
-        await assertDocExists({ assert: assert, firestore: firestore, user: user });
+        await assertDocExists({ expect: expect, firestore: firestore, user: user });
 
         const { calls } = await runHandler({ omega: omega, user: user, debug: undefined });
 
-        assert.equal(calls.debug.length, 0, 'the record must stay behind the debug gate by default');
-        assert.equal(calls.log.filter((args) => args.includes(user)).length, 0, 'the record must not ride any log line');
+        expect(calls.debug.length, 'the record must stay behind the debug gate by default').toBe(0);
+        expect(calls.log.filter((args) => args.includes(user)).length, 'the record must not ride any log line').toBe(0);
       },
     },
 
     {
       name: 'the-full-record-is-reachable-with-omega-debug',
-      run: async ({ assert, omega, accounts, firestore }) => {
+      run: async ({ expect, omega, accounts, firestore }) => {
         const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
-        await assertDocExists({ assert: assert, firestore: firestore, user: user });
+        await assertDocExists({ expect: expect, firestore: firestore, user: user });
 
         const { calls } = await runHandler({ omega: omega, user: user, debug: '1' });
 
         const records = calls.debug.filter((args) => args.includes(user));
 
-        assert.equal(records.length, 1, 'the full UserRecord should log once at debug level');
-        assert.equal(records[0].includes(EVENT_CONTEXT), true, 'the event context should ride the debug line too');
+        expect(records.length, 'the full UserRecord should log once at debug level').toBe(1);
+        expect(records[0].includes(EVENT_CONTEXT), 'the event context should ride the debug line too').toBe(true);
       },
     },
   ],

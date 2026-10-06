@@ -11,7 +11,7 @@
  *
  * Plain-node unit test (no emulator, no network): build() is a pure string.
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 const order = require('../../dist/omega/libraries/email/generators/lib/templates/order.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -50,14 +50,14 @@ module.exports = defineCases({
     {
       name: 'a-one-time-confirmation-links-to-the-orders-list',
       async run() {
-        assert.ok(build('confirmation', 'one-time').includes('https://test.dev/dashboard/account#orders'), 'the receipt CTA should open the orders list');
+        expect(build('confirmation', 'one-time').includes('https://test.dev/dashboard/account#orders'), 'the receipt CTA should open the orders list').toBeTruthy();
       },
     },
 
     {
       name: 'a-one-time-refund-notice-links-to-the-orders-list',
       async run() {
-        assert.ok(build('refunded', 'one-time').includes('https://test.dev/dashboard/account#orders'), 'the refund CTA should open the orders list too');
+        expect(build('refunded', 'one-time').includes('https://test.dev/dashboard/account#orders'), 'the refund CTA should open the orders list too').toBeTruthy();
       },
     },
 
@@ -66,10 +66,10 @@ module.exports = defineCases({
       async run() {
         const html = build('payment-failed', 'one-time');
 
-        assert.ok(!/subscription/i.test(html), `a one-time buyer has no subscription to be told about: ${html}`);
-        assert.ok(!html.includes('/dashboard/account#billing'), 'and no billing section to update a payment method in');
-        assert.ok(html.includes('View your order'), 'the CTA offers the one thing they do have — the order');
-        assert.ok(html.includes('https://test.dev/dashboard/account#orders'), 'and it opens the orders list, where that order is');
+        expect(!/subscription/i.test(html), `a one-time buyer has no subscription to be told about: ${html}`).toBeTruthy();
+        expect(!html.includes('/dashboard/account#billing'), 'and no billing section to update a payment method in').toBeTruthy();
+        expect(html.includes('View your order'), 'the CTA offers the one thing they do have — the order').toBeTruthy();
+        expect(html.includes('https://test.dev/dashboard/account#orders'), 'and it opens the orders list, where that order is').toBeTruthy();
       },
     },
 
@@ -78,9 +78,9 @@ module.exports = defineCases({
       async run() {
         const html = build('payment-failed', 'subscription');
 
-        assert.ok(html.includes('not cancelled'), 'a subscriber is still told their subscription survives the decline');
-        assert.ok(html.includes('Update payment method'), 'and still asked to fix the payment method');
-        assert.ok(html.includes('https://test.dev/dashboard/account#billing'), 'in the billing section they actually have');
+        expect(html.includes('not cancelled'), 'a subscriber is still told their subscription survives the decline').toBeTruthy();
+        expect(html.includes('Update payment method'), 'and still asked to fix the payment method').toBeTruthy();
+        expect(html.includes('https://test.dev/dashboard/account#billing'), 'in the billing section they actually have').toBeTruthy();
       },
     },
 
@@ -89,8 +89,8 @@ module.exports = defineCases({
       async run() {
         const html = build('confirmation', 'subscription');
 
-        assert.ok(html.includes('https://test.dev/dashboard/account'), 'the subscription CTA is unchanged');
-        assert.ok(!html.includes('/dashboard/account#orders'), 'and it does not send a subscriber to the orders list');
+        expect(html.includes('https://test.dev/dashboard/account'), 'the subscription CTA is unchanged').toBeTruthy();
+        expect(!html.includes('/dashboard/account#orders'), 'and it does not send a subscriber to the orders list').toBeTruthy();
       },
     },
   ],

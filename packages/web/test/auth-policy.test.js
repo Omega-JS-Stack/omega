@@ -14,8 +14,7 @@
  * Navigation is the assertion: `redirect()` writes `window.location.href`, so
  * every case reads as the list of hrefs the page tried to go to.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -237,162 +236,6 @@ const PENDING_ACCOUNT = { flags: { signupProcessed: false } };
 
 const REDIRECTS = { authenticated: '/dashboard/account', unauthenticated: '/signin' };
 
-test('auth policy: signed out on an authenticated page kicks the user to signin with a return url', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  await fire({ user: new User(), denied: false });
-
-  assert.deepStrictEqual(navigations, [
-    'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
-  ]);
-});
-
-test('auth policy: signed in on an unauthenticated page bounces to the authenticated destination', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/signin',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-  });
-
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1', email: 'a@b.co' }), denied: false });
-
-  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account']);
-});
-
-test('auth policy: signed in on an unauthenticated page prefers authReturnUrl over the default', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fpricing',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-  });
-
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.deepStrictEqual(navigations, ['https://brand.test/pricing']);
-});
-
-test('auth policy: a signout in flight with an authReturnUrl keeps the user on the page', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  // The signout pass: still signed in, param present — sets justSignedOut.
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-  // The state change the signout produces: no kick-out, the page re-authenticates.
-  await fire({ user: new User(), denied: false });
-
-  assert.deepStrictEqual(navigations, []);
-});
-
-test('auth policy: the suppression is one-shot — the next signed-out state still kicks out', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-  await fire({ user: new User(), denied: false });
-  await fire({ user: new User(), denied: false });
-
-  assert.deepStrictEqual(navigations, [
-    'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26authReturnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
-  ]);
-});
-
-test('auth policy: a stale signed-in state after the authSignout param is stripped keeps the page (#196)', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/signin',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-  });
-
-  // What handleAuthSignout leaves behind mid-signout: the flag set, and the URL
-  // already stripped of ?authSignout — so only the flag can catch the stale event.
-  window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
-
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.deepStrictEqual(navigations, [], 'the stale signed-in event must not bounce off /signin');
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'the flag holds until the signed-out event lands');
-
-  // The signed-out event the flag was waiting for: clears it, page stays put.
-  await fire({ user: new User(), denied: false });
-
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
-  assert.deepStrictEqual(navigations, []);
-});
-
-test('auth policy: the signed-out state clears the signout flag and falls through to the normal path', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
-
-  await fire({ user: new User(), denied: false });
-
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
-  assert.deepStrictEqual(navigations, [
-    'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
-  ], 'no authReturnUrl to stay for — the authenticated page still kicks the user out');
-});
-
-test('auth policy: a signed-OUT visit to ?authSignout=true never wedges the next sign-in (#196)', async () => {
-  const { navigations, fire, client, sessionParams } = await boot({
-    href: 'https://brand.test/signin?authSignout=true',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-  });
-
-  // Nobody is signed in — checkout's switch-account link and the legacy reset
-  // redirects both land here. signOut() changes no uid, so firebase fires NO
-  // state change, so nothing would ever clear a flag set now.
-  client.auth.user = new User();
-
-  await sessionParams.handleAuthSignout();
-
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, undefined, 'no state change is coming — the flag must not be set');
-  assert.deepStrictEqual(client.signOuts, [true], 'the signOut still runs unconditionally');
-  assert.strictEqual(window.location.href, 'https://brand.test/signin', 'and the param is still stripped');
-
-  // The user signs in on this same page load: the policy must still bounce them.
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account'], 'a swallowed sign-in strands the user on /signin');
-});
-
-test('auth policy: a signed-IN visit to ?authSignout=true still flags the signout for the listener', async () => {
-  const { fire, client, sessionParams } = await boot({
-    href: 'https://brand.test/dashboard/account?authSignout=true',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  client.auth.user = new User({}, { uid: 'u1' });
-
-  await sessionParams.handleAuthSignout();
-
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'a real signout is in flight — the flag guards the stale event');
-
-  // The signed-out state change the flag was waiting for clears it.
-  await fire({ user: new User(), denied: false });
-
-  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
-});
-
 /**
  * Everything the modules printed while `run()` ran. createLogger resolves
  * `console[method]` at ACCESS time precisely so a test can swap it — and a
@@ -414,207 +257,6 @@ async function captureConsole(run) {
     Object.assign(console, real);
   }
 }
-
-// #661: an ?authCustomToken expires in an hour, so a DURABLE url (an OBS dock,
-// a kiosk, a bookmark) carries an `api.privateKey` instead — and trades it for a
-// fresh custom token at POST /omega/user/token on every load.
-test('auth policy: ?authPrivateKey trades the key for a custom token and follows the return url (#661)', async () => {
-  const signIns = [];
-  const { navigations, client, sessionParams } = await boot({
-    href: 'https://brand.test/signin?authPrivateKey=pk-live-abc123&authReturnUrl=%2Fdashboard%2Fstream',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-    firebaseAuth: {
-      getAuth: () => ({}),
-      signInWithCustomToken: async (auth, token) => {
-        signIns.push(token);
-        return { user: { uid: 'u1', email: 'dock@brand.test' } };
-      },
-    },
-  });
-
-  client.answerRequests(async () => ({ token: 'minted-custom-token' }));
-
-  const { result: handled, printed } = await captureConsole(() => sessionParams.handlePrivateKeySignin());
-
-  assert.strictEqual(handled, true, 'the handler owns the page from here');
-  assert.deepStrictEqual(client.requests, [{
-    url: '/omega/user/token',
-    options: {
-      method: 'POST',
-      auth: false,
-      headers: { Authorization: 'Bearer pk-live-abc123' },
-    },
-  }], 'the key IS the credential — sent as the Bearer, never as the signed-in ID token');
-  assert.deepStrictEqual(signIns, ['minted-custom-token'], 'the MINTED token signs the user in');
-  assert.strictEqual(
-    window.location.href,
-    'https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream',
-    'the key is stripped from the address bar before the page moves'
-  );
-  assert.deepStrictEqual(navigations, ['/dashboard/stream']);
-  assert.ok(!printed.join(' ').includes('pk-live-abc123'), 'a credential must never be printed');
-});
-
-test('auth policy: a rejected ?authPrivateKey strips the key and leaves the normal sign-in page (#661)', async () => {
-  const signIns = [];
-  const { navigations, client, sessionParams } = await boot({
-    href: 'https://brand.test/signin?authPrivateKey=pk-live-revoked&authReturnUrl=%2Fdashboard%2Fstream',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-    firebaseAuth: {
-      getAuth: () => ({}),
-      signInWithCustomToken: async (auth, token) => {
-        signIns.push(token);
-        return { user: { uid: 'u1' } };
-      },
-    },
-  });
-
-  // What the backend answers a dead key with.
-  client.answerRequests(async () => {
-    throw Object.assign(new Error('Authentication required'), { code: 401 });
-  });
-
-  const { result: handled, printed } = await captureConsole(() => sessionParams.handlePrivateKeySignin());
-
-  assert.strictEqual(handled, false, 'nobody was signed in — the page keeps its own form');
-  assert.deepStrictEqual(signIns, [], 'a 401 never reaches firebase');
-  assert.strictEqual(
-    window.location.href,
-    'https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream',
-    'the dead key is stripped either way'
-  );
-  assert.deepStrictEqual(navigations, [], 'and the visitor stays on /signin');
-  assert.strictEqual(window.__OMEGA_CUSTOM_TOKEN_SIGNIN, false, 'navigation control goes back to the policy listener');
-  assert.strictEqual(client.notificationsShown.length, 1, 'the visitor is told why');
-  assert.strictEqual(client.notificationsShown[0].options.type, 'danger');
-
-  const reported = [
-    ...printed,
-    ...client.notificationsShown.map((notification) => notification.message),
-    ...client.sentryCaptures.map(({ error, url }) => `${error.message} ${error.cause?.message} ${url}`),
-  ].join(' ');
-
-  assert.ok(!reported.includes('pk-live-revoked'), 'the key must never reach a log, a notification, or Sentry');
-  assert.ok(
-    client.sentryCaptures.every(({ url }) => !url.includes('authPrivateKey')),
-    'the strip runs BEFORE the capture — the url Sentry attaches carries no key'
-  );
-});
-
-test('auth policy: policy disabled registers no listener and never navigates', async () => {
-  const { navigations, client } = await boot({
-    href: 'https://brand.test/vert/iframe',
-    policy: 'disabled',
-    redirects: REDIRECTS,
-  });
-
-  assert.deepStrictEqual(client.listeners, [], 'no auth listener is set up at all');
-  assert.deepStrictEqual(navigations, []);
-});
-
-test('auth policy: a signed-out visitor to a public page stays put', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/pricing',
-    policy: 'public',
-    redirects: REDIRECTS,
-    pagePath: '/pricing',
-  });
-
-  await fire({ user: new User(), denied: false });
-
-  assert.deepStrictEqual(navigations, []);
-});
-
-test('auth policy: a signed-in user missing a required role is sent to the authenticated destination', async () => {
-  const { navigations, fire } = await boot({
-    href: 'https://brand.test/dashboard/admin',
-    policy: 'authenticated',
-    roles: { admin: true },
-    redirects: REDIRECTS,
-  });
-
-  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account']);
-});
-
-// #700: the listener used to AWAIT the signup post, so a fresh signup sat on a
-// loading page for the whole server round trip — and the await only existed to
-// order the post before a consent guard that was 100% legacy. The guard is
-// deleted, the post is fire-and-forget, and the two states it used to conflate
-// are told apart: a doc that is not written yet is NORMAL, a rules
-// permission-denied on the account read is a real failure.
-test('auth policy: the signup post never blocks the rest of the listener (#700)', async () => {
-  const { navigations, fire, client } = await boot({
-    href: 'https://brand.test/dashboard/admin',
-    policy: 'authenticated',
-    roles: { admin: true },
-    redirects: REDIRECTS,
-    pagePath: '/dashboard/admin',
-  });
-
-  // A post that never answers: awaiting it would strand the listener here.
-  client.blockRequests();
-
-  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.strictEqual(client.requests.length, 1, 'the post still goes out');
-  assert.strictEqual(client.requests[0].url, '/omega/user/signup');
-  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account'], 'and the page moves on without it');
-});
-
-test('auth policy: a doc that is not written yet keeps the user signed in (#700)', async () => {
-  const { navigations, fire, client } = await boot({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
-
-  assert.deepStrictEqual(client.signOuts, [], 'pending is the normal state right after signup');
-  assert.deepStrictEqual(client.notificationsShown, [], 'and nothing to tell the user about');
-  assert.deepStrictEqual(navigations, []);
-});
-
-test('auth policy: a processed doc with no legal consent is no longer signed out (#700)', async () => {
-  const { navigations, fire, client } = await boot({
-    href: 'https://brand.test/signin',
-    policy: 'unauthenticated',
-    redirects: REDIRECTS,
-    pagePath: '/signin',
-  });
-
-  // Exactly what the deleted consent guard kicked out on.
-  await fire({
-    user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'revoked' } } }, { uid: 'u1' }),
-    denied: false,
-  });
-
-  assert.deepStrictEqual(client.signOuts, [], 'the guard is gone — consent is the signup route\'s business');
-  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account'], 'the user falls through to the policy');
-});
-
-test('auth policy: a denied account read signs the user out and posts nothing (#700)', async () => {
-  const { navigations, fire, client } = await boot({
-    href: 'https://brand.test/dashboard/account',
-    policy: 'authenticated',
-    redirects: REDIRECTS,
-  });
-
-  // The one signal that means a real failure: rules refused the read.
-  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: true });
-
-  assert.deepStrictEqual(client.signOuts, [true]);
-  assert.strictEqual(client.notificationsShown.length, 1, 'the user is told, not silently bounced');
-  assert.strictEqual(client.notificationsShown[0].options.type, 'danger');
-  assert.deepStrictEqual(client.requests, [], 'a denied read must not post signup metadata');
-  assert.deepStrictEqual(navigations, [], 'the signout state change owns the navigation from here');
-});
 
 /** A FormManager that records what the user was shown and what it let them do. */
 function makeFormManager() {
@@ -667,41 +309,453 @@ async function bootAuthPage({ href, pagePath, firebaseAuth }) {
   return { formManager, navigations, client };
 }
 
-// #701: the return leg resolved getRedirectResult OUTSIDE its own try, so a
-// server-side signup rejection (the blocking function's rate limit, delivered
-// as a 503 / `auth/error-code:-47`) escaped the function entirely. The caller
-// awaits it with no catch, right after disabling the form — so the person saw
-// nothing at all: no message, and a form that never came back.
-test('auth page: a rate-limited OAuth signup shows the reason and gives the form back (#701)', async () => {
-  const { formManager } = await bootAuthPage({
-    href: 'https://brand.test/signup',
-    pagePath: '/signup',
-    firebaseAuth: {
-      getAuth: () => ({}),
-      getRedirectResult: async () => {
-        // What identitytoolkit's signInWithIdp 503 reaches the client as: the
-        // code, and nothing else — no customData.serverResponse blob.
-        throw Object.assign(new Error('Firebase: Error (auth/error-code:-47).'), {
-          name: 'FirebaseError',
-          code: 'auth/error-code:-47',
+module.exports = defineCases({
+  type: 'group',
+  description: 'auth-policy',
+  tests: [
+    {
+      name: 'auth policy: signed out on an authenticated page kicks the user to signin with a return url',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
         });
+
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(navigations).toEqual([
+          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+        ]);
       },
     },
-  });
 
-  assert.strictEqual(formManager.errors.length, 1, 'the person is told why the signup failed');
-  assert.match(formManager.errors[0], /^Account creation is temporarily restricted/);
-  assert.deepStrictEqual(formManager.calls, [
-    '_setDisabled(true)',
-    'showError()',
-    'ready()',
-  ], 'the form is handed back, not left disabled behind spinners');
-});
+    {
+      name: 'auth policy: signed in on an unauthenticated page bounces to the authenticated destination',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/signin',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+        });
 
-test('auth policy: the consent guard flag is gone from the source (#700)', async () => {
-  // Behaviour alone cannot tell a deleted guard from one flipped to false, and
-  // Ian's ruling was deletion.
-  const source = fs.readFileSync(AUTH_ENTRY, 'utf8');
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1', email: 'a@b.co' }), denied: false });
 
-  assert.ok(!source.includes('ENFORCE_CONSENT_GUARD'), 'the consent guard flag must not exist at all');
+        ctx.expect(navigations).toEqual(['https://brand.test/dashboard/account']);
+      },
+    },
+
+    {
+      name: 'auth policy: signed in on an unauthenticated page prefers authReturnUrl over the default',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fpricing',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+        });
+
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(navigations).toEqual(['https://brand.test/pricing']);
+      },
+    },
+
+    {
+      name: 'auth policy: a signout in flight with an authReturnUrl keeps the user on the page',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        // The signout pass: still signed in, param present — sets justSignedOut.
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+        // The state change the signout produces: no kick-out, the page re-authenticates.
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'auth policy: the suppression is one-shot — the next signed-out state still kicks out',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+        await fire({ user: new User(), denied: false });
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(navigations).toEqual([
+          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26authReturnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
+        ]);
+      },
+    },
+
+    {
+      name: 'auth policy: a stale signed-in state after the authSignout param is stripped keeps the page (#196)',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/signin',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+        });
+
+        // What handleAuthSignout leaves behind mid-signout: the flag set, and the URL
+        // already stripped of ?authSignout — so only the flag can catch the stale event.
+        window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
+
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(navigations, 'the stale signed-in event must not bounce off /signin').toEqual([]);
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS, 'the flag holds until the signed-out event lands').toBe(true);
+
+        // The signed-out event the flag was waiting for: clears it, page stays put.
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS).toBe(false);
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'auth policy: the signed-out state clears the signout flag and falls through to the normal path',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
+
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS).toBe(false);
+        ctx.expect(navigations, 'no authReturnUrl to stay for — the authenticated page still kicks the user out').toEqual([
+          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+        ]);
+      },
+    },
+
+    {
+      name: 'auth policy: a signed-OUT visit to ?authSignout=true never wedges the next sign-in (#196)',
+      run: async (ctx) => {
+        const { navigations, fire, client, sessionParams } = await boot({
+          href: 'https://brand.test/signin?authSignout=true',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+        });
+
+        // Nobody is signed in — checkout's switch-account link and the legacy reset
+        // redirects both land here. signOut() changes no uid, so firebase fires NO
+        // state change, so nothing would ever clear a flag set now.
+        client.auth.user = new User();
+
+        await sessionParams.handleAuthSignout();
+
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS, 'no state change is coming — the flag must not be set').toBe(undefined);
+        ctx.expect(client.signOuts, 'the signOut still runs unconditionally').toEqual([true]);
+        ctx.expect(window.location.href, 'and the param is still stripped').toBe('https://brand.test/signin');
+
+        // The user signs in on this same page load: the policy must still bounce them.
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(navigations, 'a swallowed sign-in strands the user on /signin').toEqual(['https://brand.test/dashboard/account']);
+      },
+    },
+
+    {
+      name: 'auth policy: a signed-IN visit to ?authSignout=true still flags the signout for the listener',
+      run: async (ctx) => {
+        const { fire, client, sessionParams } = await boot({
+          href: 'https://brand.test/dashboard/account?authSignout=true',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        client.auth.user = new User({}, { uid: 'u1' });
+
+        await sessionParams.handleAuthSignout();
+
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS, 'a real signout is in flight — the flag guards the stale event').toBe(true);
+
+        // The signed-out state change the flag was waiting for clears it.
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS).toBe(false);
+      },
+    },
+
+    // #661: an ?authCustomToken expires in an hour, so a DURABLE url (an OBS dock,
+    // a kiosk, a bookmark) carries an `api.privateKey` instead — and trades it for a
+    // fresh custom token at POST /omega/user/token on every load.
+    {
+      name: 'auth policy: ?authPrivateKey trades the key for a custom token and follows the return url (#661)',
+      run: async (ctx) => {
+        const signIns = [];
+        const { navigations, client, sessionParams } = await boot({
+          href: 'https://brand.test/signin?authPrivateKey=pk-live-abc123&authReturnUrl=%2Fdashboard%2Fstream',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+          firebaseAuth: {
+            getAuth: () => ({}),
+            signInWithCustomToken: async (auth, token) => {
+              signIns.push(token);
+              return { user: { uid: 'u1', email: 'dock@brand.test' } };
+            },
+          },
+        });
+
+        client.answerRequests(async () => ({ token: 'minted-custom-token' }));
+
+        const { result: handled, printed } = await captureConsole(() => sessionParams.handlePrivateKeySignin());
+
+        ctx.expect(handled, 'the handler owns the page from here').toBe(true);
+        ctx.expect(client.requests, 'the key IS the credential — sent as the Bearer, never as the signed-in ID token').toEqual([{
+          url: '/omega/user/token',
+          options: {
+            method: 'POST',
+            auth: false,
+            headers: { Authorization: 'Bearer pk-live-abc123' },
+          },
+        }]);
+        ctx.expect(signIns, 'the MINTED token signs the user in').toEqual(['minted-custom-token']);
+        ctx.expect(window.location.href, 'the key is stripped from the address bar before the page moves').toBe('https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream');
+        ctx.expect(navigations).toEqual(['/dashboard/stream']);
+        ctx.expect(!printed.join(' ').includes('pk-live-abc123'), 'a credential must never be printed').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'auth policy: a rejected ?authPrivateKey strips the key and leaves the normal sign-in page (#661)',
+      run: async (ctx) => {
+        const signIns = [];
+        const { navigations, client, sessionParams } = await boot({
+          href: 'https://brand.test/signin?authPrivateKey=pk-live-revoked&authReturnUrl=%2Fdashboard%2Fstream',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+          firebaseAuth: {
+            getAuth: () => ({}),
+            signInWithCustomToken: async (auth, token) => {
+              signIns.push(token);
+              return { user: { uid: 'u1' } };
+            },
+          },
+        });
+
+        // What the backend answers a dead key with.
+        client.answerRequests(async () => {
+          throw Object.assign(new Error('Authentication required'), { code: 401 });
+        });
+
+        const { result: handled, printed } = await captureConsole(() => sessionParams.handlePrivateKeySignin());
+
+        ctx.expect(handled, 'nobody was signed in — the page keeps its own form').toBe(false);
+        ctx.expect(signIns, 'a 401 never reaches firebase').toEqual([]);
+        ctx.expect(window.location.href, 'the dead key is stripped either way').toBe('https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream');
+        ctx.expect(navigations, 'and the visitor stays on /signin').toEqual([]);
+        ctx.expect(window.__OMEGA_CUSTOM_TOKEN_SIGNIN, 'navigation control goes back to the policy listener').toBe(false);
+        ctx.expect(client.notificationsShown.length, 'the visitor is told why').toBe(1);
+        ctx.expect(client.notificationsShown[0].options.type).toBe('danger');
+
+        const reported = [
+          ...printed,
+          ...client.notificationsShown.map((notification) => notification.message),
+          ...client.sentryCaptures.map(({ error, url }) => `${error.message} ${error.cause?.message} ${url}`),
+        ].join(' ');
+
+        ctx.expect(!reported.includes('pk-live-revoked'), 'the key must never reach a log, a notification, or Sentry').toBeTruthy();
+        ctx.expect(client.sentryCaptures.every(({ url }) => !url.includes('authPrivateKey')), 'the strip runs BEFORE the capture — the url Sentry attaches carries no key').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'auth policy: policy disabled registers no listener and never navigates',
+      run: async (ctx) => {
+        const { navigations, client } = await boot({
+          href: 'https://brand.test/vert/iframe',
+          policy: 'disabled',
+          redirects: REDIRECTS,
+        });
+
+        ctx.expect(client.listeners, 'no auth listener is set up at all').toEqual([]);
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'auth policy: a signed-out visitor to a public page stays put',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/pricing',
+          policy: 'public',
+          redirects: REDIRECTS,
+          pagePath: '/pricing',
+        });
+
+        await fire({ user: new User(), denied: false });
+
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'auth policy: a signed-in user missing a required role is sent to the authenticated destination',
+      run: async (ctx) => {
+        const { navigations, fire } = await boot({
+          href: 'https://brand.test/dashboard/admin',
+          policy: 'authenticated',
+          roles: { admin: true },
+          redirects: REDIRECTS,
+        });
+
+        await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(navigations).toEqual(['https://brand.test/dashboard/account']);
+      },
+    },
+
+    // #700: the listener used to AWAIT the signup post, so a fresh signup sat on a
+    // loading page for the whole server round trip — and the await only existed to
+    // order the post before a consent guard that was 100% legacy. The guard is
+    // deleted, the post is fire-and-forget, and the two states it used to conflate
+    // are told apart: a doc that is not written yet is NORMAL, a rules
+    // permission-denied on the account read is a real failure.
+    {
+      name: 'auth policy: the signup post never blocks the rest of the listener (#700)',
+      run: async (ctx) => {
+        const { navigations, fire, client } = await boot({
+          href: 'https://brand.test/dashboard/admin',
+          policy: 'authenticated',
+          roles: { admin: true },
+          redirects: REDIRECTS,
+          pagePath: '/dashboard/admin',
+        });
+
+        // A post that never answers: awaiting it would strand the listener here.
+        client.blockRequests();
+
+        await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(client.requests.length, 'the post still goes out').toBe(1);
+        ctx.expect(client.requests[0].url).toBe('/omega/user/signup');
+        ctx.expect(navigations, 'and the page moves on without it').toEqual(['https://brand.test/dashboard/account']);
+      },
+    },
+
+    {
+      name: 'auth policy: a doc that is not written yet keeps the user signed in (#700)',
+      run: async (ctx) => {
+        const { navigations, fire, client } = await boot({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
+
+        ctx.expect(client.signOuts, 'pending is the normal state right after signup').toEqual([]);
+        ctx.expect(client.notificationsShown, 'and nothing to tell the user about').toEqual([]);
+        ctx.expect(navigations).toEqual([]);
+      },
+    },
+
+    {
+      name: 'auth policy: a processed doc with no legal consent is no longer signed out (#700)',
+      run: async (ctx) => {
+        const { navigations, fire, client } = await boot({
+          href: 'https://brand.test/signin',
+          policy: 'unauthenticated',
+          redirects: REDIRECTS,
+          pagePath: '/signin',
+        });
+
+        // Exactly what the deleted consent guard kicked out on.
+        await fire({
+          user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'revoked' } } }, { uid: 'u1' }),
+          denied: false,
+        });
+
+        ctx.expect(client.signOuts, 'the guard is gone — consent is the signup route\'s business').toEqual([]);
+        ctx.expect(navigations, 'the user falls through to the policy').toEqual(['https://brand.test/dashboard/account']);
+      },
+    },
+
+    {
+      name: 'auth policy: a denied account read signs the user out and posts nothing (#700)',
+      run: async (ctx) => {
+        const { navigations, fire, client } = await boot({
+          href: 'https://brand.test/dashboard/account',
+          policy: 'authenticated',
+          redirects: REDIRECTS,
+        });
+
+        // The one signal that means a real failure: rules refused the read.
+        await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: true });
+
+        ctx.expect(client.signOuts).toEqual([true]);
+        ctx.expect(client.notificationsShown.length, 'the user is told, not silently bounced').toBe(1);
+        ctx.expect(client.notificationsShown[0].options.type).toBe('danger');
+        ctx.expect(client.requests, 'a denied read must not post signup metadata').toEqual([]);
+        ctx.expect(navigations, 'the signout state change owns the navigation from here').toEqual([]);
+      },
+    },
+
+    // #701: the return leg resolved getRedirectResult OUTSIDE its own try, so a
+    // server-side signup rejection (the blocking function's rate limit, delivered
+    // as a 503 / `auth/error-code:-47`) escaped the function entirely. The caller
+    // awaits it with no catch, right after disabling the form — so the person saw
+    // nothing at all: no message, and a form that never came back.
+    {
+      name: 'auth page: a rate-limited OAuth signup shows the reason and gives the form back (#701)',
+      run: async (ctx) => {
+        const { formManager } = await bootAuthPage({
+          href: 'https://brand.test/signup',
+          pagePath: '/signup',
+          firebaseAuth: {
+            getAuth: () => ({}),
+            getRedirectResult: async () => {
+              // What identitytoolkit's signInWithIdp 503 reaches the client as: the
+              // code, and nothing else — no customData.serverResponse blob.
+              throw Object.assign(new Error('Firebase: Error (auth/error-code:-47).'), {
+                name: 'FirebaseError',
+                code: 'auth/error-code:-47',
+              });
+            },
+          },
+        });
+
+        ctx.expect(formManager.errors.length, 'the person is told why the signup failed').toBe(1);
+        ctx.expect(formManager.errors[0]).toMatch(/^Account creation is temporarily restricted/);
+        ctx.expect(formManager.calls, 'the form is handed back, not left disabled behind spinners').toEqual([
+          '_setDisabled(true)',
+          'showError()',
+          'ready()',
+        ]);
+      },
+    },
+
+    {
+      name: 'auth policy: the consent guard flag is gone from the source (#700)',
+      run: async (ctx) => {
+        // Behaviour alone cannot tell a deleted guard from one flipped to false, and
+        // Ian's ruling was deletion.
+        const source = fs.readFileSync(AUTH_ENTRY, 'utf8');
+
+        ctx.expect(!source.includes('ENFORCE_CONSENT_GUARD'), 'the consent guard flag must not exist at all').toBeTruthy();
+      },
+    },
+  ],
 });

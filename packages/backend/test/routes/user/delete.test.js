@@ -17,30 +17,27 @@ module.exports = defineCases({
     // --- Self-deletion tests ---
     {
       name: 'verify-delete-user-exists',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         // Get the delete test account uid
         state.deleteUid = accounts.delete.uid;
 
         // Verify the user doc exists
         const userDoc = await firestore.get(`users/${state.deleteUid}`);
 
-        assert.ok(userDoc, 'Delete user doc should exist before deletion');
-        assert.ok(userDoc?.auth?.uid === state.deleteUid, 'User doc should have correct uid');
+        expect(userDoc, 'Delete user doc should exist before deletion').toBeTruthy();
+        expect(userDoc?.auth?.uid === state.deleteUid, 'User doc should have correct uid').toBeTruthy();
       },
     },
 
     {
       name: 'delete-blocked-with-subscription',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Auth as the delete user and try to delete themselves
         // Should be blocked due to active subscription
         const deleteResponse = await http.as('delete').delete('omega/user', {});
 
-        assert.isError(deleteResponse, 400, 'Deletion should be blocked with active subscription');
-        assert.ok(
-          deleteResponse.error?.includes('paid subscription'),
-          `Error should mention paid subscription: ${deleteResponse.error}`,
-        );
+        expect(deleteResponse, 'Deletion should be blocked with active subscription').toBeError(400);
+        expect(deleteResponse.error?.includes('paid subscription'), `Error should mention paid subscription: ${deleteResponse.error}`).toBeTruthy();
       },
     },
 
@@ -62,17 +59,17 @@ module.exports = defineCases({
 
     {
       name: 'delete-user-succeeds',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // Auth as the delete user and delete themselves
         const deleteResponse = await http.as('delete').delete('omega/user', {});
 
-        assert.isSuccess(deleteResponse, `DELETE /user should succeed: ${JSON.stringify(deleteResponse, null, 2)}`);
+        expect(deleteResponse, `DELETE /user should succeed: ${JSON.stringify(deleteResponse, null, 2)}`).toBeSuccess();
       },
     },
 
     {
       name: 'verify-firestore-doc-deleted',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // on-delete handler deletes Firestore doc when Auth user is deleted
         // Wait for the deletion to complete
         const docDeleted = await waitFor(async () => {
@@ -80,40 +77,40 @@ module.exports = defineCases({
           return !userDoc;
         }, 10000, 500);
 
-        assert.ok(docDeleted, 'Firestore doc should be deleted after Auth user deletion');
+        expect(docDeleted, 'Firestore doc should be deleted after Auth user deletion').toBeTruthy();
       },
     },
 
     // --- Admin deletion tests ---
     {
       name: 'verify-admin-delete-target-exists',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         // Get the delete-by-admin test account uid
         state.adminDeleteUid = accounts['delete-by-admin'].uid;
 
         // Verify the user doc exists
         const userDoc = await firestore.get(`users/${state.adminDeleteUid}`);
 
-        assert.ok(userDoc, 'Admin delete target user doc should exist');
-        assert.ok(userDoc?.auth?.uid === state.adminDeleteUid, 'User doc should have correct uid');
+        expect(userDoc, 'Admin delete target user doc should exist').toBeTruthy();
+        expect(userDoc?.auth?.uid === state.adminDeleteUid, 'User doc should have correct uid').toBeTruthy();
       },
     },
 
     {
       name: 'admin-can-delete-other-user',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Auth as admin (using admin key) and delete another user
         const deleteResponse = await http.as('admin').delete('omega/user', {
           uid: state.adminDeleteUid,
         });
 
-        assert.isSuccess(deleteResponse, `Admin should be able to delete another user: ${JSON.stringify(deleteResponse, null, 2)}`);
+        expect(deleteResponse, `Admin should be able to delete another user: ${JSON.stringify(deleteResponse, null, 2)}`).toBeSuccess();
       },
     },
 
     {
       name: 'verify-admin-deleted-user-firestore-deleted',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         // on-delete handler deletes Firestore doc when Auth user is deleted
         // Wait for the deletion to complete
         const docDeleted = await waitFor(async () => {
@@ -121,17 +118,17 @@ module.exports = defineCases({
           return !userDoc;
         }, 10000, 500);
 
-        assert.ok(docDeleted, 'Firestore doc should be deleted after admin deletion');
+        expect(docDeleted, 'Firestore doc should be deleted after admin deletion').toBeTruthy();
       },
     },
 
     // --- Auth rejection test (at end per convention) ---
     {
       name: 'unauthenticated-rejected',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const deleteResponse = await http.as('none').delete('omega/user', {});
 
-        assert.isError(deleteResponse, 401, 'Delete should fail without authentication');
+        expect(deleteResponse, 'Delete should fail without authentication').toBeError(401);
       },
     },
   ],

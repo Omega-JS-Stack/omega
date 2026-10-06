@@ -412,26 +412,22 @@ async function bootedRun() {
 /**
  * Boot the run, signal it with `signal`, and prove nothing it started is left.
  * Every process signalled here is one this case spawned.
- * @param {object} assert - The case assertions.
+ * @param {Function} expect - The case's expect.
  * @param {string} signal - The stop signal under test.
  */
-async function stopsEverything(assert, signal) {
+async function stopsEverything(expect, signal) {
   const run = await bootedRun();
 
   try {
-    assert.equal(run.ready, true, `the run must come up before it can be stopped: ${run.output()}`);
-    assert.equal(run.stubPids.length, 2, 'the stub emulator reported its group leader and a member');
-    assert.equal(Number.isInteger(run.watcher), true, 'the run started a background watcher');
+    expect(run.ready, `the run must come up before it can be stopped: ${run.output()}`).toBe(true);
+    expect(run.stubPids.length, 'the stub emulator reported its group leader and a member').toBe(2);
+    expect(Number.isInteger(run.watcher), 'the run started a background watcher').toBe(true);
 
     process.kill(run.child.pid, signal);
 
-    assert.equal(await exitedWithin(run.child, 30000), true, `the run must take its stop path on ${signal}: ${run.output()}`);
-    assert.equal(
-      await waitUntil(() => run.stubPids.every((pid) => !isAlive(pid)), 15000),
-      true,
-      `the emulator process group must be gone after ${signal} (still alive: ${run.stubPids.filter((pid) => isAlive(pid)).join(', ')})`,
-    );
-    assert.equal(await waitUntil(() => !isAlive(run.watcher), 15000), true, `no watcher may outlive the run on ${signal}`);
+    expect(await exitedWithin(run.child, 30000), `the run must take its stop path on ${signal}: ${run.output()}`).toBe(true);
+    expect(await waitUntil(() => run.stubPids.every((pid) => !isAlive(pid)), 15000), `the emulator process group must be gone after ${signal} (still alive: ${run.stubPids.filter((pid) => isAlive(pid)).join(', ')})`).toBe(true);
+    expect(await waitUntil(() => !isAlive(run.watcher), 15000), `no watcher may outlive the run on ${signal}`).toBe(true);
   } finally {
     run.cleanup();
   }
@@ -450,7 +446,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-stop-path-terminates-the-jars-the-group-signal-missed',
-      async run({ assert }) {
+      async run({ expect }) {
         const firestore = spawnDetached(FIRESTORE_JAR);
         const pubsub = spawnDetached(PUBSUB_JAR);
         const { command, cleanup } = commandWithRecord([firestore, pubsub]);
@@ -458,8 +454,8 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ firestore: await freePort() }, NO_SHARED_SWEEP);
 
-          assert.equal(isAlive(firestore), false, 'the recorded firestore jar should be stopped');
-          assert.equal(isAlive(pubsub), false, 'the recorded pubsub jar should be stopped');
+          expect(isAlive(firestore), 'the recorded firestore jar should be stopped').toBe(false);
+          expect(isAlive(pubsub), 'the recorded pubsub jar should be stopped').toBe(false);
         } finally {
           stopAll([firestore, pubsub]);
           cleanup();
@@ -469,7 +465,7 @@ module.exports = defineCases({
 
     {
       name: 'a-recycled-pid-is-never-a-kill-order',
-      async run({ assert }) {
+      async run({ expect }) {
         // The record names pids, and the OS hands those numbers out again. A
         // recorded number now running something that is not emulator machinery
         // is a stranger, and the stop path has no port to narrow by.
@@ -479,7 +475,7 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ firestore: await freePort() }, NO_SHARED_SWEEP);
 
-          assert.equal(isAlive(stranger), true, 'a recycled pid running something else must be left alone');
+          expect(isAlive(stranger), 'a recycled pid running something else must be left alone').toBe(true);
         } finally {
           stopAll([stranger]);
           cleanup();
@@ -489,7 +485,7 @@ module.exports = defineCases({
 
     {
       name: 'a-recycled-pid-running-another-brands-jar-is-left-alone',
-      async run({ assert }) {
+      async run({ expect }) {
         // The harder recycling: the number came back as emulator machinery, so
         // "is this a jar" passes and the record's pid membership used to end
         // the question there. The jar names ITS project on its own command
@@ -500,7 +496,7 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ firestore: await freePort() }, NO_SHARED_SWEEP);
 
-          assert.equal(isAlive(neighbour), true, "another brand's live jar must survive our recorded pid");
+          expect(isAlive(neighbour), "another brand's live jar must survive our recorded pid").toBe(true);
         } finally {
           stopAll([neighbour]);
           cleanup();
@@ -510,7 +506,7 @@ module.exports = defineCases({
 
     {
       name: 'a-port-still-held-by-somebody-else-is-reported-not-killed',
-      async run({ assert }) {
+      async run({ expect }) {
         // The port check is evidence for the human, never a kill order:
         // signaling whatever answers on a port is what took down another
         // project's live stack ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
@@ -523,8 +519,8 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ hosting: port }, NO_SHARED_SWEEP);
 
-          assert.equal(server.listening, true, 'the foreign listener keeps its port');
-          assert.match(lines.join('\n'), new RegExp(`still in use after shutdown: ${port}`));
+          expect(server.listening, 'the foreign listener keeps its port').toBe(true);
+          expect(lines.join('\n')).toMatch(new RegExp(`still in use after shutdown: ${port}`));
         } finally {
           server.close();
           cleanup();
@@ -535,7 +531,7 @@ module.exports = defineCases({
     {
       name: 'a-port-lookup-that-hangs-is-bounded-and-names-nobody',
       timeout: 60000,
-      async run({ assert }) {
+      async run({ expect }) {
         // lsof is the one step with no Node primitive, and on a machine with a
         // network mount it can stall for MINUTES before it answers
         // ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)). The
@@ -547,16 +543,16 @@ module.exports = defineCases({
         const pids = await withHungLsof(() => listListeningPids(port));
         const elapsed = Date.now() - startedAt;
 
-        assert.deepEqual(pids, [], 'a lookup that never answered names nobody — no ownership, so no kill order');
-        assert.equal(elapsed >= 1000, true, `the hung stub really was reached (a missing lsof returns at once), took ${elapsed}ms`);
-        assert.equal(elapsed < PORT_LOOKUP_TIMEOUT_MS * 2, true, `the lookup must return inside its bound, took ${elapsed}ms`);
+        expect(pids, 'a lookup that never answered names nobody — no ownership, so no kill order').toEqual([]);
+        expect(elapsed >= 1000, `the hung stub really was reached (a missing lsof returns at once), took ${elapsed}ms`).toBe(true);
+        expect(elapsed < PORT_LOOKUP_TIMEOUT_MS * 2, `the lookup must return inside its bound, took ${elapsed}ms`).toBe(true);
       },
     },
 
     {
       name: 'a-stop-path-whose-lookup-hangs-still-finishes-and-kills-nothing',
       timeout: 60000,
-      async run({ assert }) {
+      async run({ expect }) {
         // The gate failure this bound exists for: a held port sends the sweep
         // to lsof, lsof stalls on the smbfs mount, and the stop path sat there
         // until the lane's whole 113s budget was gone. The verdict was never
@@ -573,9 +569,9 @@ module.exports = defineCases({
           await withHungLsof(() => command.terminateRecordedEmulatorProcesses({ hosting: port }, NO_SHARED_SWEEP));
           const elapsed = Date.now() - startedAt;
 
-          assert.equal(server.listening, true, 'a holder the sweep could not identify keeps its port');
-          assert.match(lines.join('\n'), new RegExp(`still in use after shutdown: ${port}`));
-          assert.equal(elapsed < 30000, true, `the stop path must stay bounded end to end, took ${elapsed}ms`);
+          expect(server.listening, 'a holder the sweep could not identify keeps its port').toBe(true);
+          expect(lines.join('\n')).toMatch(new RegExp(`still in use after shutdown: ${port}`));
+          expect(elapsed < 30000, `the stop path must stay bounded end to end, took ${elapsed}ms`).toBe(true);
         } finally {
           server.close();
           cleanup();
@@ -585,7 +581,7 @@ module.exports = defineCases({
 
     {
       name: 'the-orphan-sweep-runs-before-the-port-verdict',
-      async run({ assert }) {
+      async run({ expect }) {
         // A jar the record never named (spawned after the last snapshot, then
         // reparented to PID 1) is the SWEEP's case, not the record's. Polling
         // the ports first spent the whole release window waiting on a port the
@@ -610,9 +606,9 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ hosting: port }, NO_SHARED_SWEEP);
 
-          assert.equal(swept, true, 'the stop path runs the owned-orphan sweep itself');
-          assert.equal(lines.join('\n').includes('still in use'), false, `a port the sweep freed is not somebody else's: ${lines.join(' | ')}`);
-          assert.equal(Date.now() - startedAt < 2000, true, 'no full release-window stall for a port the sweep already freed');
+          expect(swept, 'the stop path runs the owned-orphan sweep itself').toBe(true);
+          expect(lines.join('\n').includes('still in use'), `a port the sweep freed is not somebody else's: ${lines.join(' | ')}`).toBe(false);
+          expect(Date.now() - startedAt < 2000, 'no full release-window stall for a port the sweep already freed').toBe(true);
         } finally {
           server.close();
           cleanup();
@@ -622,7 +618,7 @@ module.exports = defineCases({
 
     {
       name: 'the-run-that-shut-down-cleanly-reports-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         // Everything already gone (the group signal did reach them) and every
         // port free: the stop path is silent, no phantom warnings.
         const gone = spawnDetached(FIRESTORE_JAR);
@@ -634,7 +630,7 @@ module.exports = defineCases({
         try {
           await command.terminateRecordedEmulatorProcesses({ firestore: await freePort() }, NO_SHARED_SWEEP);
 
-          assert.equal(lines.length, 0, `a clean stop should say nothing, said: ${lines.join(' | ')}`);
+          expect(lines.length, `a clean stop should say nothing, said: ${lines.join(' | ')}`).toBe(0);
         } finally {
           cleanup();
         }
@@ -645,26 +641,26 @@ module.exports = defineCases({
 
     {
       name: 'a-recorded-pid-still-running-emulator-machinery-is-stoppable',
-      async run({ assert }) {
-        assert.equal(isStoppableEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [37088], projectId: OURS }), true);
-        assert.equal(isStoppableEmulatorProcess({ pid: 37088, command: 'node /Users/ian/some-other-tool/server.js' }, { pids: [37088], projectId: OURS }), false);
-        assert.equal(isStoppableEmulatorProcess({ pid: 51001, command: NEIGHBOUR_JAR }, { pids: [], projectId: OURS }), false);
+      async run({ expect }) {
+        expect(isStoppableEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [37088], projectId: OURS })).toBe(true);
+        expect(isStoppableEmulatorProcess({ pid: 37088, command: 'node /Users/ian/some-other-tool/server.js' }, { pids: [37088], projectId: OURS })).toBe(false);
+        expect(isStoppableEmulatorProcess({ pid: 51001, command: NEIGHBOUR_JAR }, { pids: [], projectId: OURS })).toBe(false);
       },
     },
 
     {
       name: 'a-command-line-that-names-another-project-outranks-the-record',
-      async run({ assert }) {
+      async run({ expect }) {
         // Pid membership short-circuited the project check, so a recorded
         // number recycled onto the neighbouring brand's jar read as ours.
-        assert.equal(isStoppableEmulatorProcess({ pid: 37088, command: NEIGHBOUR_JAR }, { pids: [37088], projectId: OURS }), false);
+        expect(isStoppableEmulatorProcess({ pid: 37088, command: NEIGHBOUR_JAR }, { pids: [37088], projectId: OURS })).toBe(false);
 
         // A jar that names NO project (pubsub never does) is still decided by
         // the record — that is the whole reason the record exists.
-        assert.equal(isStoppableEmulatorProcess({ pid: 37088, command: PUBSUB_JAR }, { pids: [37088], projectId: OURS }), true);
+        expect(isStoppableEmulatorProcess({ pid: 37088, command: PUBSUB_JAR }, { pids: [37088], projectId: OURS })).toBe(true);
 
         // And with no project id of our own there is nothing to disagree with.
-        assert.equal(isStoppableEmulatorProcess({ pid: 37088, command: NEIGHBOUR_JAR }, { pids: [37088], projectId: null }), true);
+        expect(isStoppableEmulatorProcess({ pid: 37088, command: NEIGHBOUR_JAR }, { pids: [37088], projectId: null })).toBe(true);
       },
     },
 
@@ -673,7 +669,7 @@ module.exports = defineCases({
     {
       name: 'the-exit-path-joins-the-shutdown-and-its-reaper',
       timeout: 60000,
-      async run({ assert }) {
+      async run({ expect }) {
         // Deleting the reaper call from shutdown(), or the `await shutdown()`
         // the exit path joins it with, left every other test in this file
         // green: they call the reaper directly. This one boots the real command
@@ -692,10 +688,10 @@ module.exports = defineCases({
           try {
             await command.execute();
 
-            assert.equal(reaped.length, 1, 'the run must join the shutdown it started, reaper included');
-            assert.equal(reaped[0].emulatorPorts.hosting, ports.hosting.port, 'the reaper gets this run\'s RESOLVED port map');
-            assert.equal(reaped[0].options.sweepShared, true, 'nothing bumped, so the shared hub/storage ports are this run\'s to sweep');
-            assert.equal(await exitedWithin(watchers[0], 3000), true, 'the background watcher goes down with the run');
+            expect(reaped.length, 'the run must join the shutdown it started, reaper included').toBe(1);
+            expect(reaped[0].emulatorPorts.hosting, 'the reaper gets this run\'s RESOLVED port map').toBe(ports.hosting.port);
+            expect(reaped[0].options.sweepShared, 'nothing bumped, so the shared hub/storage ports are this run\'s to sweep').toBe(true);
+            expect(await exitedWithin(watchers[0], 3000), 'the background watcher goes down with the run').toBe(true);
           } finally {
             cleanup();
           }
@@ -706,7 +702,7 @@ module.exports = defineCases({
     {
       name: 'a-boot-that-never-came-up-still-tears-down-what-it-started',
       timeout: 60000,
-      async run({ assert }) {
+      async run({ expect }) {
         // The boot-failure catch exited straight out: the watcher it had just
         // started stayed alive (a nodemon nothing else signals) and whatever
         // the spawn got as far as was never stopped.
@@ -724,9 +720,9 @@ module.exports = defineCases({
           try {
             await command.execute();
 
-            assert.deepEqual(exits, [1], 'a failed boot still exits non-zero');
-            assert.equal(reaped.length, 1, 'a failed boot runs the same stop path a normal one does');
-            assert.equal(await exitedWithin(watchers[0], 3000), true, 'the watcher does not outlive the failed boot');
+            expect(exits, 'a failed boot still exits non-zero').toEqual([1]);
+            expect(reaped.length, 'a failed boot runs the same stop path a normal one does').toBe(1);
+            expect(await exitedWithin(watchers[0], 3000), 'the watcher does not outlive the failed boot').toBe(true);
           } finally {
             process.exit = realExit;
             cleanup();
@@ -739,7 +735,7 @@ module.exports = defineCases({
 
     {
       name: 'the-record-names-the-background-watcher-the-descent-cannot-reach',
-      async run({ assert }) {
+      async run({ expect }) {
         // The record walks DOWN from the emulator child, which covers
         // firebase-tools' own tree — the jars and every functions runtime
         // worker it forks. The reload watcher hangs off the CLI process
@@ -753,10 +749,10 @@ module.exports = defineCases({
           command.backgroundWatcherPid = watcher;
           const pids = command.writeEmulatorPidRecord(root, OURS);
 
-          assert.equal(pids.includes(root), true, 'the emulator child is the record\'s root');
-          assert.equal(pids.includes(watcher), true, 'the background watcher is recorded with it');
-          assert.equal(command.readEmulatorOwnership().pids.includes(watcher), true, 'and it survives the round trip through the file');
-          assert.equal(isStoppableEmulatorProcess({ pid: watcher, command: NODEMON_WATCHER }, command.readEmulatorOwnership()), true, 'so the stop path may signal it');
+          expect(pids.includes(root), 'the emulator child is the record\'s root').toBe(true);
+          expect(pids.includes(watcher), 'the background watcher is recorded with it').toBe(true);
+          expect(command.readEmulatorOwnership().pids.includes(watcher), 'and it survives the round trip through the file').toBe(true);
+          expect(isStoppableEmulatorProcess({ pid: watcher, command: NODEMON_WATCHER }, command.readEmulatorOwnership()), 'so the stop path may signal it').toBe(true);
         } finally {
           stopAll([root, watcher]);
           cleanup();
@@ -767,23 +763,23 @@ module.exports = defineCases({
     {
       name: 'a-programmatic-stop-takes-the-whole-stack-down',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // `omega dev` stops its backend child with SIGTERM. The stop path was
         // wired to SIGINT alone, so the default action killed THIS process and
         // left the detached group — and the watcher — running.
-        await stopsEverything(assert, 'SIGTERM');
+        await stopsEverything(expect, 'SIGTERM');
       },
     },
 
     {
       name: 'a-closed-terminal-takes-the-whole-stack-down',
       timeout: 120000,
-      async run({ assert }) {
+      async run({ expect }) {
         // A closed terminal sends SIGHUP, and it orphaned the same tree: four
         // generations of parentless java emulators on one machine, one of them
         // still holding 8080 four days later
         // ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
-        await stopsEverything(assert, 'SIGHUP');
+        await stopsEverything(expect, 'SIGHUP');
       },
     },
   ],

@@ -16,8 +16,7 @@
  * sets — with the client stubbed. The assertion is the payload the intent route
  * would have received.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -103,26 +102,44 @@ async function intentFor({ trialEligibility, trialEligible, product = TRIAL_PROD
   return requests.at(-1).options.body;
 }
 
-test('#637: an UNKNOWN answer still asks the route for the trial the page did not quote', async () => {
-  const payload = await intentFor({ trialEligibility: 'unknown', trialEligible: false });
+module.exports = defineCases({
+  type: 'group',
+  description: 'checkout-trial-payload',
+  tests: [
+    {
+      name: '#637: an UNKNOWN answer still asks the route for the trial the page did not quote',
+      run: async (ctx) => {
+        const payload = await intentFor({ trialEligibility: 'unknown', trialEligible: false });
 
-  assert.strictEqual(payload.trial, true, 'the buyer keeps the offer the server can still grant them');
-});
+        ctx.expect(payload.trial, 'the buyer keeps the offer the server can still grant them').toBe(true);
+      },
+    },
 
-test('#637: an unknown answer on a product that sells no trial asks for nothing', async () => {
-  const payload = await intentFor({ trialEligibility: 'unknown', trialEligible: false, product: NO_TRIAL_PRODUCT });
+    {
+      name: '#637: an unknown answer on a product that sells no trial asks for nothing',
+      run: async (ctx) => {
+        const payload = await intentFor({ trialEligibility: 'unknown', trialEligible: false, product: NO_TRIAL_PRODUCT });
 
-  assert.strictEqual(payload.trial, false, 'there is no trial to ask for');
-});
+        ctx.expect(payload.trial, 'there is no trial to ask for').toBe(false);
+      },
+    },
 
-test('#637: a confirmed NO is sent as a no', async () => {
-  const payload = await intentFor({ trialEligibility: false, trialEligible: false });
+    {
+      name: '#637: a confirmed NO is sent as a no',
+      run: async (ctx) => {
+        const payload = await intentFor({ trialEligibility: false, trialEligible: false });
 
-  assert.strictEqual(payload.trial, false, 'the server already said this buyer has had their trial');
-});
+        ctx.expect(payload.trial, 'the server already said this buyer has had their trial').toBe(false);
+      },
+    },
 
-test('#637: a confirmed YES is sent as a yes, exactly as the page quoted it', async () => {
-  const payload = await intentFor({ trialEligibility: true, trialEligible: true });
+    {
+      name: '#637: a confirmed YES is sent as a yes, exactly as the page quoted it',
+      run: async (ctx) => {
+        const payload = await intentFor({ trialEligibility: true, trialEligible: true });
 
-  assert.strictEqual(payload.trial, true);
+        ctx.expect(payload.trial).toBe(true);
+      },
+    },
+  ],
 });

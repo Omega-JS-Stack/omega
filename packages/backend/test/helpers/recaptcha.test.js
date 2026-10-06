@@ -81,14 +81,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'no-secret-configured-passes-any-token-shape',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const original = process.env.RECAPTCHA_SECRET_KEY;
         delete process.env.RECAPTCHA_SECRET_KEY;
 
         try {
-          assert.equal(await verify(''), true, 'empty token passes without a secret');
-          assert.equal(await verify(undefined), true, 'missing token passes without a secret');
-          assert.equal(await verify('anything'), true, 'any token passes without a secret');
+          expect(await verify(''), 'empty token passes without a secret').toBe(true);
+          expect(await verify(undefined), 'missing token passes without a secret').toBe(true);
+          expect(await verify('anything'), 'any token passes without a secret').toBe(true);
         } finally {
           if (original !== undefined) process.env.RECAPTCHA_SECRET_KEY = original;
         }
@@ -96,13 +96,13 @@ module.exports = defineCases({
     },
     {
       name: 'secret-configured-rejects-a-missing-token-before-any-network-call',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const original = process.env.RECAPTCHA_SECRET_KEY;
         process.env.RECAPTCHA_SECRET_KEY = 'test-secret-never-sent';
 
         try {
-          assert.equal(await verify(''), false, 'empty token fails closed with a secret');
-          assert.equal(await verify(undefined), false, 'missing token fails closed with a secret');
+          expect(await verify(''), 'empty token fails closed with a secret').toBe(false);
+          expect(await verify(undefined), 'missing token fails closed with a secret').toBe(false);
         } finally {
           if (original === undefined) {
             delete process.env.RECAPTCHA_SECRET_KEY;
@@ -114,7 +114,7 @@ module.exports = defineCases({
     },
     {
       name: 'low-score-rejection-logs-googles-verdict-once',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         // The live 403 that opened #557: a real key, a real domain, an
         // automated browser — success: true, score: 0.2, and no reason in the
         // logs. The score IS the diagnosis, so the line must carry it.
@@ -123,43 +123,40 @@ module.exports = defineCases({
           token: 'token-that-must-never-be-logged',
         });
 
-        assert.equal(result, false, 'a score under the minimum still fails closed');
-        assert.equal(warnings.length, 1, 'a rejection prints exactly ONE warn line');
+        expect(result, 'a score under the minimum still fails closed').toBe(false);
+        expect(warnings.length, 'a rejection prints exactly ONE warn line').toBe(1);
 
         const line = warnings[0];
 
-        assert.ok(line.includes('[@omega.js/backend:recaptcha]'), `the line carries the identity tag: ${line}`);
-        assert.ok(line.includes('score=0.2'), `the line carries the score: ${line}`);
-        assert.ok(line.includes('action=contact'), `the line carries the action: ${line}`);
-        assert.ok(line.includes('hostname=omegajs.dev'), `the line carries the hostname: ${line}`);
-        assert.ok(!line.includes('token-that-must-never-be-logged'), `the line never carries the token: ${line}`);
-        assert.ok(!line.includes('test-secret-never-sent'), `the line never carries the secret: ${line}`);
+        expect(line.includes('[@omega.js/backend:recaptcha]'), `the line carries the identity tag: ${line}`).toBeTruthy();
+        expect(line.includes('score=0.2'), `the line carries the score: ${line}`).toBeTruthy();
+        expect(line.includes('action=contact'), `the line carries the action: ${line}`).toBeTruthy();
+        expect(line.includes('hostname=omegajs.dev'), `the line carries the hostname: ${line}`).toBeTruthy();
+        expect(!line.includes('token-that-must-never-be-logged'), `the line never carries the token: ${line}`).toBeTruthy();
+        expect(!line.includes('test-secret-never-sent'), `the line never carries the secret: ${line}`).toBeTruthy();
       },
     },
     {
       name: 'error-codes-rejection-logs-the-codes',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const { result, warnings } = await verifyOnStubbedSiteverify({
           answer: { success: false, 'error-codes': ['invalid-input-secret', 'timeout-or-duplicate'] },
         });
 
-        assert.equal(result, false, 'success: false fails closed');
-        assert.equal(warnings.length, 1, 'a rejection prints exactly ONE warn line');
-        assert.ok(
-          warnings[0].includes('error-codes=invalid-input-secret,timeout-or-duplicate'),
-          `the line names every code Google returned: ${warnings[0]}`
-        );
+        expect(result, 'success: false fails closed').toBe(false);
+        expect(warnings.length, 'a rejection prints exactly ONE warn line').toBe(1);
+        expect(warnings[0].includes('error-codes=invalid-input-secret,timeout-or-duplicate'), `the line names every code Google returned: ${warnings[0]}`).toBeTruthy();
       },
     },
     {
       name: 'a-passing-verify-stays-silent',
-      run: async ({ assert }) => {
+      run: async ({ expect }) => {
         const { result, warnings } = await verifyOnStubbedSiteverify({
           answer: { success: true, score: 0.9, action: 'contact', hostname: 'omegajs.dev' },
         });
 
-        assert.equal(result, true, 'a good token passes');
-        assert.equal(warnings.length, 0, 'a pass prints nothing');
+        expect(result, 'a good token passes').toBe(true);
+        expect(warnings.length, 'a pass prints nothing').toBe(0);
       },
     },
   ],

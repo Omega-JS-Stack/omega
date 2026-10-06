@@ -32,21 +32,21 @@ module.exports = defineCases({
   tests: [
     {
       name: 'covers-the-paypal-expiry-cron-query',
-      async run({ assert }) {
+      async run({ expect }) {
         // events/cron/daily/expire-paypal-cancellations.js queries users on two
         // equalities: subscription.payment.provider + subscription.cancellation.pending
         const index = findIndex('users', ['subscription.payment.provider', 'subscription.cancellation.pending']);
 
-        assert.ok(index, 'The PayPal expiry cron query needs a composite index entry');
-        assert.equal(index.queryScope, 'COLLECTION', 'The cron queries one collection, not a group');
-        assert.equal(index.fields[0].order, 'ASCENDING', 'An equality filter indexes ascending');
-        assert.equal(index.fields[1].order, 'ASCENDING', 'An equality filter indexes ascending');
+        expect(index, 'The PayPal expiry cron query needs a composite index entry').toBeTruthy();
+        expect(index.queryScope, 'The cron queries one collection, not a group').toBe('COLLECTION');
+        expect(index.fields[0].order, 'An equality filter indexes ascending').toBe('ASCENDING');
+        expect(index.fields[1].order, 'An equality filter indexes ascending').toBe('ASCENDING');
       },
     },
 
     {
       name: 'every-entry-is-unique',
-      async run({ assert }) {
+      async run({ expect }) {
         // The setup fix rewrites the required entries to the top of each brand
         // file and dedupes against them — two identical SSOT entries would make
         // its own no-duplicates check unsatisfiable
@@ -55,7 +55,7 @@ module.exports = defineCases({
         for (const index of requiredIndexes) {
           const key = `${index.collectionGroup}:${index.fields.map((f) => `${f.fieldPath}/${f.order || f.arrayConfig}`).join(',')}`;
 
-          assert.equal(seen.has(key), false, `Duplicate required index: ${key}`);
+          expect(seen.has(key), `Duplicate required index: ${key}`).toBe(false);
           seen.add(key);
         }
       },

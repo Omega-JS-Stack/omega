@@ -1,66 +1,64 @@
 /**
- * Suite converter: `node scripts/convert-suites.js <path>... [--check]`.
+ * Suite converter: `node scripts/convert-suites.js <path>... [--check] [--harness=<module>]`.
  * Rewrites plain node:test suites in place into ONE `defineCases` group:
  * describe names join with ` > `, top-level before/after become setup/cleanup,
  * every other hook opens each case it covers, the case parameter becomes `ctx`,
- * and every node:assert call becomes its `ctx.expect` matcher, as range splices
- * over the acorn-parsed source. A path is a file or a directory (its suites, as
- * the runner discovers them). A converted file is left as is; `--check` writes
- * nothing and exits 1 naming each file that would change. A construct outside
- * the map is refused by file and construct, that file unwritten (exit 2).
+ * every node:assert call becomes its `ctx.expect` matcher (a file-level `expect`
+ * outside a case; `--harness` requires both from one module), as range splices
+ * over the acorn source; a backend-style spec file has its `assert` turned into
+ * `expect`. A path is a file or a directory (its suites, as the runner finds
+ * them). `--check` writes nothing and exits 1 naming each changing file; a
+ * construct outside the map is refused by file and construct, unwritten (exit 2).
  */
 
 // Libraries
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  pad, isFn, walk, isReference, declared, requiredModule, parse, openSource,
+  pad, isFn, Refusal, refuse, walk, isReference, declared, requiredModule, parse, openSource,
 } = require('./convert-suites-source.js');
+const {
+  ASSERT_MODULES, EXPECT_MODULE, NODE_MAP, assertEdit, assertMethod, convertBackendSource, refuseOwnExpect,
+} = require('./convert-suites-assert.js');
 const { findTestFiles } = require('../packages/devkit/src/test/discovery.js');
 
 const DEFINE_CASES_LINE = "const defineCases = require('@omega.js/devkit/test/define-cases');";
-const ASSERT_MODULES = ['node:assert', 'node:assert/strict', 'assert', 'assert/strict'];
+const EXPECT_LINE = `const expect = require('${EXPECT_MODULE}');`;
 // node:test's export name -> what the converter makes of it.
 const KINDS = {
   test: 'case', it: 'case', describe: 'describe', suite: 'describe',
   before: 'before', after: 'after', beforeEach: 'beforeEach', afterEach: 'afterEach',
 };
 const CASE_OPTIONS = ['skip', 'timeout'];
-// node:assert method -> the matcher chain it becomes.
-const MATCHERS = {
-  strictEqual: '.toBe', equal: '.toBe', deepStrictEqual: '.toEqual', deepEqual: '.toEqual',
-  notStrictEqual: '.not.toBe', notEqual: '.not.toBe', notDeepStrictEqual: '.not.toEqual', notDeepEqual: '.not.toEqual',
-  match: '.toMatch', doesNotMatch: '.not.toMatch', ok: '.toBeTruthy',
-};
-const THROW_CHAINS = { throws: '.toThrow', doesNotThrow: '.not.toThrow', rejects: '.rejects.toThrow' };
-
-const isString = (node) => node.type === 'TemplateLiteral' || (node.type === 'Literal' && typeof node.value === 'string');
 const quote = (text) => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
 
-/** A construct the converter will not rewrite; the file stays unwritten. */
-class Refusal extends Error {}
-
-function refuse(construct, node) {
-  throw new Refusal(node && node.loc ? `${construct} (line ${node.loc.start.line})` : construct);
+// The require lines a converted file opens with: the devkit paths, or `--harness`'s one require.
+function harnessLines(harness, needsExpect) {
+  if (harness) return [`const { ${needsExpect ? 'defineCases, expect' : 'defineCases'} } = require(${quote(harness)});`];
+  return needsExpect ? [DEFINE_CASES_LINE, EXPECT_LINE] : [DEFINE_CASES_LINE];
 }
 
-function isConverted(ast) {
-  return ast.body.some((s) => s.type === 'ExpressionStatement'
-    && s.expression.type === 'AssignmentExpression'
-    && s.expression.left.type === 'MemberExpression'
-    && s.expression.left.object.name === 'module'
-    && s.expression.left.property.name === 'exports'
-    && s.expression.right.type === 'CallExpression'
-    && s.expression.right.callee.name === 'defineCases');
+// A backend-style file: `module.exports` is a `defineCases` call or a plain spec object.
+function isSpecFile(ast) {
+  return ast.body.some((s) => {
+    const e = s.type === 'ExpressionStatement' ? s.expression : null;
+    if (!e || e.type !== 'AssignmentExpression' || e.left.type !== 'MemberExpression'
+      || e.left.object.name !== 'module' || e.left.property.name !== 'exports') return false;
+    const { right } = e;
+    return (right.type === 'CallExpression' && right.callee.name === 'defineCases')
+      || (right.type === 'ObjectExpression' && right.properties.some((p) => p.type === 'Property' && !p.computed && ['run', 'tests'].includes(p.key.name)));
+  });
 }
 
 /**
- * Convert one plain node:test suite's source into a `defineCases` group.
+ * Convert one plain node:test suite's source into a `defineCases` group, or a
+ * backend-style file's assertions in place.
  * @param {string} source - The suite file's text.
  * @param {string} file - Its path; the group's description is its base name.
+ * @param {object} [options] - `{ harness }`: a module whose `{ defineCases, expect }` replace the devkit requires.
  * @returns {string} The converted text, or `source` itself when already converted.
  */
-function convertSource(source, file) {
+function convertSource(source, file, { harness } = {}) {
   let opened;
   try {
     opened = openSource(source);
@@ -71,7 +69,7 @@ function convertSource(source, file) {
     ast, comments, parents, fresh, isShadowed, addEdit, seal, render, renderNode,
     lineIndent, commentStart, leadingText, removeStatement,
   } = opened;
-  if (isConverted(ast)) return source;
+  if (isSpecFile(ast)) return convertBackendSource(opened, source, file);
 
   let casesName;
   let contextName;
@@ -120,9 +118,12 @@ function convertSource(source, file) {
   }
   if (!testDecl) refuse("no require('node:test')");
   if (!assertName && declared(ast).includes('assert')) refuse("an `assert` that is not a require('node:assert')");
-  addEdit(testDecl.start, testDecl.end, () => (kept.length
-    ? `${DEFINE_CASES_LINE}\nconst { ${kept.join(', ')} } = require('node:test');`
-    : DEFINE_CASES_LINE));
+  let needsExpect = false;
+  addEdit(testDecl.start, testDecl.end, () => {
+    const lines = harnessLines(harness, needsExpect);
+    if (kept.length) lines.push(`const { ${kept.join(', ')} } = require('node:test');`);
+    return lines.join('\n');
+  });
 
   // The node:test export a call reaches (`test`, `it`, `test.after`, ...), or null.
   function kindOf(call) {
@@ -153,58 +154,17 @@ function convertSource(source, file) {
     }, parents.get(scope));
   }
 
-  function enclosingFn(node) {
-    let p = parents.get(node);
-    while (p && !isFn(p) && p.type !== 'FunctionDeclaration') p = parents.get(p);
-    return p;
-  }
-
-  function assertEdit(call, method) {
-    const args = call.arguments;
-    const label = method === 'ok' && call.callee.type === 'Identifier' ? `${assertName}(...)` : `${assertName}.${method}`;
-    if (args.some((a) => a.type === 'SpreadElement')) refuse(`${label} with a spread argument`, call);
-    const expectOf = (actual, message, s) => `ctx.expect(${renderNode(actual, s)}${message ? `, ${renderNode(message, s)}` : ''})`;
-    if (MATCHERS[method]) {
-      const arity = method === 'ok' ? 1 : 2;
-      if (args.length < arity || args.length > arity + 1) refuse(`${label} with ${args.length} arguments`, call);
-      return (s) => `${expectOf(args[0], args[arity], s)}${MATCHERS[method]}(${arity === 2 ? renderNode(args[1], s) : ''})`;
-    }
-    if (THROW_CHAINS[method]) {
-      if (!args.length || args.length > 3) refuse(`${label} with ${args.length} arguments`, call);
-      // node reads a string second argument as the message, never as an error matcher.
-      const messageSecond = args[1] && isString(args[1]);
-      const matcher = messageSecond || method === 'doesNotThrow' ? null : args[1];
-      const message = messageSecond ? args[1] : args[2];
-      const parent = parents.get(call);
-      const owner = enclosingFn(call);
-      const awaitIt = method === 'rejects' && parent.type === 'ExpressionStatement' && owner && owner.async;
-      return (s) => {
-        const subject = method === 'rejects' && isFn(args[0]) ? `(${renderNode(args[0], s)})()` : renderNode(args[0], s);
-        const actual = `ctx.expect(${subject}${message ? `, ${renderNode(message, s)}` : ''})`;
-        return `${awaitIt ? 'await ' : ''}${actual}${THROW_CHAINS[method]}(${matcher ? renderNode(matcher, s) : ''})`;
-      };
-    }
-    if (method === 'fail') {
-      if (args.length > 1) refuse(`${label} with ${args.length} arguments`, call);
-      return (s) => `ctx.expect.fail(${args[0] ? renderNode(args[0], s) : ''})`;
-    }
-    return refuse(label, call);
-  }
-
-  // Rewrite every assertion under `scope`; returns how many there were.
-  function convertAsserts(scope) {
+  // Rewrite every assertion under `scope` not yet rewritten; returns how many there were.
+  function convertAsserts(scope, expectName = 'ctx.expect') {
     let count = 0;
     walk(scope, (node) => {
       if (node.type !== 'CallExpression' || !assertName) return;
       const { callee } = node;
-      let method = null;
-      if (callee.type === 'Identifier' && callee.name === assertName) method = 'ok';
-      else if (callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.object.name === assertName) {
-        method = callee.property.name;
-      }
-      if (!method || isShadowed(callee, assertName)) return;
-      addEdit(node.start, node.end, assertEdit(node, method));
-      consumed.add(callee.type === 'Identifier' ? callee : callee.object);
+      const method = assertMethod(node, assertName);
+      const id = callee.type === 'Identifier' ? callee : callee.object;
+      if (!method || consumed.has(id) || isShadowed(callee, assertName)) return;
+      addEdit(node.start, node.end, assertEdit(node, method, { table: NODE_MAP, assertName, expectName }, opened));
+      consumed.add(id);
       count += 1;
     });
     return count;
@@ -481,13 +441,19 @@ function convertSource(source, file) {
 
   planStatements(ast.body, [top], 'top', 0);
 
+  // An assertion outside every case and hook (a module-scope helper) checks through the file-level `expect`.
+  needsExpect = convertAsserts(ast, 'expect') > 0;
+  if (needsExpect) walk(ast, refuseOwnExpect);
+
   walk(ast, (node, parent) => {
     if (!isReference(node, parent) || consumed.has(node) || importIds.has(node)) return;
     if (!bindings.has(node.name) && node.name !== assertName) return;
     if (isShadowed(node, node.name)) return;
     const member = parent.type === 'MemberExpression' && parent.object === node && !parent.computed ? `.${parent.property.name}` : '';
-    const where = node.name === assertName ? ' outside a case' : '';
-    refuse(`${node.name}${member}${member ? '' : '(...)'}${where}`, node);
+    const isNew = member && parents.get(parent).type === 'NewExpression' && parents.get(parent).callee === parent;
+    if (node.name === assertName && !member) refuse(`\`${node.name}\` used as a value, not called`, node);
+    const where = node.name === assertName && !isNew ? ' outside a call' : '';
+    refuse(`${isNew ? 'new ' : ''}${node.name}${member}${member && !isNew ? '' : '(...)'}${where}`, node);
   });
 
   seal();
@@ -514,26 +480,31 @@ function convertSource(source, file) {
  * @returns {number} The exit code: 0 clean, 1 a `--check` that would change a file, 2 a refusal.
  */
 function main(argv) {
+  const usage = 'usage: node scripts/convert-suites.js <path>... [--check] [--harness=<module>]';
   const check = argv.includes('--check');
-  const targets = argv.filter((arg) => arg !== '--check');
-  if (!targets.length || targets.some((arg) => arg.startsWith('--'))) {
-    console.error('usage: node scripts/convert-suites.js <path>... [--check]');
+  const harnessArgs = argv.filter((arg) => arg.startsWith('--harness='));
+  const harness = harnessArgs.length ? harnessArgs[harnessArgs.length - 1].slice('--harness='.length) : null;
+  const targets = argv.filter((arg) => arg !== '--check' && !harnessArgs.includes(arg));
+  if (!targets.length || targets.some((arg) => arg.startsWith('--')) || harness === '') {
+    console.error(usage);
     return 2;
   }
   const missing = targets.find((target) => !fs.existsSync(target));
   if (missing) {
-    console.error(`usage: node scripts/convert-suites.js <path>... [--check] (no such path: ${missing})`);
+    console.error(`${usage} (no such path: ${missing})`);
     return 2;
   }
   // A directory is read the way the runner discovers it: `_`- and `.`-prefixed names are never suites.
-  const files = targets.flatMap((target) => (fs.statSync(target).isDirectory() ? findTestFiles(target) : [target]));
+  // A file a folder and its own subfolder both reach is read once.
+  const found = targets.flatMap((target) => (fs.statSync(target).isDirectory() ? findTestFiles(target) : [target]));
+  const files = found.filter((file, i) => found.findIndex((other) => path.resolve(other) === path.resolve(file)) === i);
   let changed = 0;
   let refused = 0;
   files.forEach((file, index) => {
     const source = fs.readFileSync(file, 'utf8');
     let output;
     try {
-      output = convertSource(source, file);
+      output = convertSource(source, file, { harness });
     } catch (e) {
       if (!(e instanceof Refusal)) throw e;
       refused += 1;

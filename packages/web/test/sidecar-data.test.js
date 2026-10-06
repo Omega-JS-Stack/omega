@@ -6,11 +6,10 @@
  * band, never replace it. `resolved` re-applies the sidecar with the engine's
  * own semantics: arrays REPLACE, objects/strings keep the cascade's merge.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -60,111 +59,130 @@ function makeConsumer(sidecar, extension = 'json') {
   return { tmp, consumerDir };
 }
 
-test('#269: a sidecar array REPLACES the shell layout default — no cascade concat', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    stats: { items: [{ label: 'Sidecar only' }] },
-    contact_methods: [{ label: 'Sidecar channel' }],
-  });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-array');
-    const html = pages.get('/');
-    assert.ok(html, 'page built');
+module.exports = defineCases({
+  type: 'group',
+  description: 'sidecar-data',
+  tests: [
+    {
+      name: '#269: a sidecar array REPLACES the shell layout default — no cascade concat',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          stats: { items: [{ label: 'Sidecar only' }] },
+          contact_methods: [{ label: 'Sidecar channel' }],
+        });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-array');
+          const html = pages.get('/');
+          ctx.expect(html, 'page built').toBeTruthy();
 
-    assert.ok(html.includes('<li>Sidecar only</li>'), 'the sidecar item renders');
-    assert.ok(!html.includes('Default one'), 'the layout default items are REPLACED, not appended to');
-    assert.ok(!html.includes('Default two'), 'neither layout default survives the replace');
+          ctx.expect(html.includes('<li>Sidecar only</li>'), 'the sidecar item renders').toBeTruthy();
+          ctx.expect(!html.includes('Default one'), 'the layout default items are REPLACED, not appended to').toBeTruthy();
+          ctx.expect(!html.includes('Default two'), 'neither layout default survives the replace').toBeTruthy();
 
-    // Top-level arrays too — the StudyMonkey `contact_methods: null` trap.
-    assert.ok(html.includes('<li>Sidecar channel</li>'), 'a top-level sidecar array renders');
-    assert.ok(!html.includes('Default channel'), 'the top-level layout default is replaced');
+          // Top-level arrays too — the StudyMonkey `contact_methods: null` trap.
+          ctx.expect(html.includes('<li>Sidecar channel</li>'), 'a top-level sidecar array renders').toBeTruthy();
+          ctx.expect(!html.includes('Default channel'), 'the top-level layout default is replaced').toBeTruthy();
 
-    assert.equal((html.match(/<li>/g) || []).length, 2, 'exactly the two sidecar items — no concat duplicates');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+          ctx.expect((html.match(/<li>/g) || []).length, 'exactly the two sidecar items — no concat duplicates').toBe(2);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('#269: object and string sidecar keys keep today\'s merge', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    stats: { headline: 'Sidecar headline' },
-    note: 'sidecar note',
-  });
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-merge');
-    const html = pages.get('/');
-    assert.ok(html, 'page built');
+    {
+      name: '#269: object and string sidecar keys keep today\'s merge',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          stats: { headline: 'Sidecar headline' },
+          note: 'sidecar note',
+        });
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-merge');
+          const html = pages.get('/');
+          ctx.expect(html, 'page built').toBeTruthy();
 
-    assert.ok(html.includes('<h2>Sidecar headline</h2>'), 'the sidecar string wins its key');
-    assert.ok(html.includes('<p>Layout eyebrow</p>'), 'the layout\'s other object keys merge underneath');
-    assert.ok(html.includes('<p>sidecar note</p>'), 'a top-level string key wins');
-    assert.ok(
-      html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'),
-      'arrays the sidecar never names keep the layout defaults',
-    );
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+          ctx.expect(html.includes('<h2>Sidecar headline</h2>'), 'the sidecar string wins its key').toBeTruthy();
+          ctx.expect(html.includes('<p>Layout eyebrow</p>'), 'the layout\'s other object keys merge underneath').toBeTruthy();
+          ctx.expect(html.includes('<p>sidecar note</p>'), 'a top-level string key wins').toBeTruthy();
+          ctx.expect(html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'), 'arrays the sidecar never names keep the layout defaults').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-// #543: the SAME contract, chosen by file extension — a `.11tydata.js` sidecar
-// concatenated where the `.json` twin replaced (found porting trusteroo: a
-// 6-item faqs.items merged with the layout default into 7 FAQs).
-for (const extension of ['js', 'cjs']) {
-  test(`#543: a .11tydata.${extension} sidecar array REPLACES the layout default too`, async () => {
-    const { tmp, consumerDir } = makeConsumer({
-      stats: { items: [{ label: 'Sidecar only' }] },
-      contact_methods: [{ label: 'Sidecar channel' }],
-    }, extension);
-    try {
-      const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, `sidecar-${extension}`);
-      const html = pages.get('/');
-      assert.ok(html, 'page built');
+    ...(() => {
+      const cases = [];
+      // #543: the SAME contract, chosen by file extension — a `.11tydata.js` sidecar
+      // concatenated where the `.json` twin replaced (found porting trusteroo: a
+      // 6-item faqs.items merged with the layout default into 7 FAQs).
+      for (const extension of ['js', 'cjs']) {
+        cases.push({
+          name: `#543: a .11tydata.${extension} sidecar array REPLACES the layout default too`,
+          run: async (ctx) => {
+            const { tmp, consumerDir } = makeConsumer({
+              stats: { items: [{ label: 'Sidecar only' }] },
+              contact_methods: [{ label: 'Sidecar channel' }],
+            }, extension);
+            try {
+              const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, `sidecar-${extension}`);
+              const html = pages.get('/');
+              ctx.expect(html, 'page built').toBeTruthy();
 
-      assert.ok(html.includes('<li>Sidecar only</li>'), 'the sidecar item renders');
-      assert.ok(!html.includes('Default one') && !html.includes('Default two'), 'the layout defaults are REPLACED, not appended to');
-      assert.ok(html.includes('<li>Sidecar channel</li>'), 'a top-level sidecar array renders');
-      assert.ok(!html.includes('Default channel'), 'the top-level layout default is replaced');
-      assert.equal((html.match(/<li>/g) || []).length, 2, 'exactly the two sidecar items — no concat duplicates');
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-}
+              ctx.expect(html.includes('<li>Sidecar only</li>'), 'the sidecar item renders').toBeTruthy();
+              ctx.expect(!html.includes('Default one') && !html.includes('Default two'), 'the layout defaults are REPLACED, not appended to').toBeTruthy();
+              ctx.expect(html.includes('<li>Sidecar channel</li>'), 'a top-level sidecar array renders').toBeTruthy();
+              ctx.expect(!html.includes('Default channel'), 'the top-level layout default is replaced').toBeTruthy();
+              ctx.expect((html.match(/<li>/g) || []).length, 'exactly the two sidecar items — no concat duplicates').toBe(2);
+            } finally {
+              fs.rmSync(tmp, { recursive: true, force: true });
+            }
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#543: object and string keys of a module sidecar keep the cascade merge', async () => {
-  const { tmp, consumerDir } = makeConsumer({
-    stats: { headline: 'Sidecar headline' },
-    note: 'sidecar note',
-  }, 'js');
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-js-merge');
-    const html = pages.get('/');
-    assert.ok(html, 'page built');
+    {
+      name: '#543: object and string keys of a module sidecar keep the cascade merge',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer({
+          stats: { headline: 'Sidecar headline' },
+          note: 'sidecar note',
+        }, 'js');
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-js-merge');
+          const html = pages.get('/');
+          ctx.expect(html, 'page built').toBeTruthy();
 
-    assert.ok(html.includes('<h2>Sidecar headline</h2>'), 'the sidecar string wins its key');
-    assert.ok(html.includes('<p>Layout eyebrow</p>'), 'the layout\'s other object keys merge underneath');
-    assert.ok(html.includes('<p>sidecar note</p>'), 'a top-level string key wins');
-    assert.ok(
-      html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'),
-      'arrays the sidecar never names keep the layout defaults',
-    );
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
+          ctx.expect(html.includes('<h2>Sidecar headline</h2>'), 'the sidecar string wins its key').toBeTruthy();
+          ctx.expect(html.includes('<p>Layout eyebrow</p>'), 'the layout\'s other object keys merge underneath').toBeTruthy();
+          ctx.expect(html.includes('<p>sidecar note</p>'), 'a top-level string key wins').toBeTruthy();
+          ctx.expect(html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'), 'arrays the sidecar never names keep the layout defaults').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('#269: a page with no sidecar keeps the layout defaults', async () => {
-  const { tmp, consumerDir } = makeConsumer(null);
-  try {
-    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-absent');
-    const html = pages.get('/');
-    assert.ok(html, 'page built');
+    {
+      name: '#269: a page with no sidecar keeps the layout defaults',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer(null);
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-absent');
+          const html = pages.get('/');
+          ctx.expect(html, 'page built').toBeTruthy();
 
-    assert.ok(html.includes('<h2>Layout headline</h2>'), 'the layout headline stands');
-    assert.ok(html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'), 'both default items render');
-    assert.ok(html.includes('<li>Default channel</li>'), 'the top-level default array renders');
-    assert.ok(html.includes('<p>layout note</p>'), 'the layout string stands');
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+          ctx.expect(html.includes('<h2>Layout headline</h2>'), 'the layout headline stands').toBeTruthy();
+          ctx.expect(html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'), 'both default items render').toBeTruthy();
+          ctx.expect(html.includes('<li>Default channel</li>'), 'the top-level default array renders').toBeTruthy();
+          ctx.expect(html.includes('<p>layout note</p>'), 'the layout string stands').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+  ],
 });

@@ -44,75 +44,75 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-recorded-pid-is-ours-whatever-it-looks-like',
-      async run({ assert }) {
+      async run({ expect }) {
         // The pid record written at spawn is the primary proof: the java
         // emulators name no project, so nothing else can vouch for them.
         const ownership = { pids: [37088, 37360, 38921], projectId: OURS };
 
-        assert.equal(isOwnedEmulatorProcess({ pid: 38921, command: PUBSUB_JAR }, ownership), true);
-        assert.equal(isOwnedEmulatorProcess({ pid: 37360, command: 'java -jar firebase-database-emulator-v4.11.2.jar --host 127.0.0.1 --port 9000' }, ownership), true);
+        expect(isOwnedEmulatorProcess({ pid: 38921, command: PUBSUB_JAR }, ownership)).toBe(true);
+        expect(isOwnedEmulatorProcess({ pid: 37360, command: 'java -jar firebase-database-emulator-v4.11.2.jar --host 127.0.0.1 --port 9000' }, ownership)).toBe(true);
       },
     },
 
     {
       name: 'an-emulator-command-naming-this-project-is-ours',
-      async run({ assert }) {
+      async run({ expect }) {
         // The second proof route, for a child this run never recorded (a
         // leftover from a previous run of the SAME project).
-        assert.equal(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [], projectId: OURS }), true);
+        expect(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [], projectId: OURS })).toBe(true);
       },
     },
 
     {
       name: 'another-projects-emulator-is-never-ours',
-      async run({ assert }) {
+      async run({ expect }) {
         // The reported case, in both shapes: a sibling brand's stack.
-        assert.equal(isOwnedEmulatorProcess({ pid: 51001, command: FOREIGN_FIRESTORE_JAR }, { pids: [], projectId: OURS }), false);
-        assert.equal(isOwnedEmulatorProcess({ pid: 51002, command: FOREIGN_EMULATOR_CLI }, { pids: [], projectId: OURS }), false);
+        expect(isOwnedEmulatorProcess({ pid: 51001, command: FOREIGN_FIRESTORE_JAR }, { pids: [], projectId: OURS })).toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 51002, command: FOREIGN_EMULATOR_CLI }, { pids: [], projectId: OURS })).toBe(false);
       },
     },
 
     {
       name: 'a-foreign-process-on-a-shared-port-is-never-ours',
-      async run({ assert }) {
+      async run({ expect }) {
         // 4400 and 9199 are shared: whatever answers there is evidence of
         // nothing. The matcher is the only gate, and it sees no ports at all.
-        assert.equal(isOwnedEmulatorProcess({ pid: 60001, command: RELOAD_WATCHER }, { pids: [], projectId: OURS }), false);
-        assert.equal(isOwnedEmulatorProcess({ pid: 60002, command: 'node /Users/ian/some-other-tool/server.js' }, { pids: [], projectId: OURS }), false);
+        expect(isOwnedEmulatorProcess({ pid: 60001, command: RELOAD_WATCHER }, { pids: [], projectId: OURS })).toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 60002, command: 'node /Users/ian/some-other-tool/server.js' }, { pids: [], projectId: OURS })).toBe(false);
       },
     },
 
     {
       name: 'an-emulator-that-names-no-project-is-not-proven-ours',
-      async run({ assert }) {
+      async run({ expect }) {
         // The firebase parent names no project — unrecorded, it is a stranger.
         // This is the row the old sweep signaled on port evidence alone.
-        assert.equal(isOwnedEmulatorProcess({ pid: 34965, command: FIREBASE_PARENT }, { pids: [], projectId: OURS }), false);
+        expect(isOwnedEmulatorProcess({ pid: 34965, command: FIREBASE_PARENT }, { pids: [], projectId: OURS })).toBe(false);
         // ...and recorded, it is ours.
-        assert.equal(isOwnedEmulatorProcess({ pid: 34965, command: FIREBASE_PARENT }, { pids: [34965], projectId: OURS }), true);
+        expect(isOwnedEmulatorProcess({ pid: 34965, command: FIREBASE_PARENT }, { pids: [34965], projectId: OURS })).toBe(true);
       },
     },
 
     {
       name: 'missing-evidence-never-reads-as-ownership',
-      async run({ assert }) {
-        assert.equal(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [], projectId: null }), false, 'no project id of our own proves nothing');
-        assert.equal(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, undefined), false, 'no evidence at all proves nothing');
-        assert.equal(isOwnedEmulatorProcess({ pid: 1, command: FIRESTORE_JAR }, { pids: [1], projectId: OURS }), false, 'init is never a candidate');
-        assert.equal(isOwnedEmulatorProcess({ pid: NaN, command: FIRESTORE_JAR }, { pids: [], projectId: OURS }), false);
+      async run({ expect }) {
+        expect(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, { pids: [], projectId: null }), 'no project id of our own proves nothing').toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, undefined), 'no evidence at all proves nothing').toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 1, command: FIRESTORE_JAR }, { pids: [1], projectId: OURS }), 'init is never a candidate').toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: NaN, command: FIRESTORE_JAR }, { pids: [], projectId: OURS })).toBe(false);
       },
     },
 
     {
       name: 'a-project-id-that-only-appears-as-a-substring-does-not-count',
-      async run({ assert }) {
+      async run({ expect }) {
         // `--project_id demo-sandbox-brand-staging` is a DIFFERENT project that
         // happens to start with ours; a path containing the brand name is not
         // a project id at all.
         const staging = FIRESTORE_JAR.replace(`--project_id ${OURS}`, `--project_id ${OURS}-staging`);
 
-        assert.equal(isOwnedEmulatorProcess({ pid: 51003, command: staging }, { pids: [], projectId: OURS }), false);
-        assert.equal(isOwnedEmulatorProcess({ pid: 51004, command: `java -jar cloud-firestore-emulator.jar --rules /repos/${OURS}/firestore.rules` }, { pids: [], projectId: OURS }), false);
+        expect(isOwnedEmulatorProcess({ pid: 51003, command: staging }, { pids: [], projectId: OURS })).toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 51004, command: `java -jar cloud-firestore-emulator.jar --rules /repos/${OURS}/firestore.rules` }, { pids: [], projectId: OURS })).toBe(false);
       },
     },
 
@@ -120,16 +120,16 @@ module.exports = defineCases({
 
     {
       name: 'a-fresh-pid-record-is-evidence',
-      async run({ assert }) {
+      async run({ expect }) {
         const record = { pids: [37088, 37360], projectId: OURS, rootPid: 34965, ports: { firestore: 8080 }, startedAt: new Date().toISOString() };
 
-        assert.deepEqual(ownershipFromRecord(record), { pids: [37088, 37360], projectId: OURS, rootPid: 34965, ports: { firestore: 8080 } });
+        expect(ownershipFromRecord(record)).toEqual({ pids: [37088, 37360], projectId: OURS, rootPid: 34965, ports: { firestore: 8080 } });
       },
     },
 
     {
       name: 'a-stale-records-pids-are-not-evidence-anymore',
-      async run({ assert }) {
+      async run({ expect }) {
         // The record is never deleted, so a run days later still read the last
         // one. Pids get RECYCLED: those numbers now name whatever the OS
         // handed them to, and the sweep SIGKILLs a recorded pid without
@@ -142,25 +142,25 @@ module.exports = defineCases({
           startedAt: new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
         };
 
-        assert.deepEqual(ownershipFromRecord(record), { pids: [], projectId: OURS, rootPid: 34965, ports: {} });
+        expect(ownershipFromRecord(record)).toEqual({ pids: [], projectId: OURS, rootPid: 34965, ports: {} });
       },
     },
 
     {
       name: 'a-record-that-cannot-date-itself-is-not-evidence',
-      async run({ assert }) {
+      async run({ expect }) {
         // A record written before startedAt existed, or a half-written one:
         // unknown age is treated as expired, never as fresh.
-        assert.deepEqual(ownershipFromRecord({ pids: [37088], projectId: OURS }).pids, []);
-        assert.deepEqual(ownershipFromRecord({ pids: [37088], projectId: OURS, startedAt: 'whenever' }).pids, []);
-        assert.deepEqual(ownershipFromRecord(null), { pids: [], projectId: null, rootPid: null, ports: {} });
-        assert.deepEqual(ownershipFromRecord({ pids: 'nope', startedAt: new Date().toISOString() }).pids, []);
+        expect(ownershipFromRecord({ pids: [37088], projectId: OURS }).pids).toEqual([]);
+        expect(ownershipFromRecord({ pids: [37088], projectId: OURS, startedAt: 'whenever' }).pids).toEqual([]);
+        expect(ownershipFromRecord(null)).toEqual({ pids: [], projectId: null, rootPid: null, ports: {} });
+        expect(ownershipFromRecord({ pids: 'nope', startedAt: new Date().toISOString() }).pids).toEqual([]);
       },
     },
 
     {
       name: 'a-stale-record-still-spares-everything-it-cannot-prove',
-      async run({ assert }) {
+      async run({ expect }) {
         // The whole point of expiring the pids: the recycled pid stops being a
         // kill order and the process is judged on its command line alone.
         const stale = ownershipFromRecord({
@@ -169,8 +169,8 @@ module.exports = defineCases({
           startedAt: new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
         });
 
-        assert.equal(isOwnedEmulatorProcess({ pid: 60001, command: RELOAD_WATCHER }, stale), false);
-        assert.equal(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, stale), true, 'the command-line proof is untouched');
+        expect(isOwnedEmulatorProcess({ pid: 60001, command: RELOAD_WATCHER }, stale)).toBe(false);
+        expect(isOwnedEmulatorProcess({ pid: 37088, command: FIRESTORE_JAR }, stale), 'the command-line proof is untouched').toBe(true);
       },
     },
   ],

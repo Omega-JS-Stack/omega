@@ -17,41 +17,41 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-provider',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/webhook', {});
 
-        assert.isError(response, 400, 'Should reject missing provider');
+        expect(response, 'Should reject missing provider').toBeError(400);
       },
     },
 
     {
       name: 'rejects-invalid-key',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/payments/webhook?provider=stripe&key=wrong-key', {});
 
-        assert.isError(response, 401, 'Should reject invalid key');
+        expect(response, 'Should reject invalid key').toBeError(401);
       },
     },
 
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post(`omega/payments/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: 'evt_test_unknown',
           type: 'test.event',
           data: { object: {} },
         });
 
-        assert.isError(response, 400, 'Should reject unknown provider');
+        expect(response, 'Should reject unknown provider').toBeError(400);
       },
     },
 
     {
       name: 'accepts-valid-stripe-webhook',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const eventId = '_test-evt-valid-webhook';
         const payload = {
           id: eventId,
@@ -70,24 +70,21 @@ module.exports = defineCases({
           payload,
         );
 
-        assert.isSuccess(response, 'Should accept valid webhook');
-        assert.equal(response.data.received, true, 'Should confirm receipt');
+        expect(response, 'Should accept valid webhook').toBeSuccess();
+        expect(response.data.received, 'Should confirm receipt').toBe(true);
 
         // Verify doc was saved to Firestore
         const doc = await firestore.get(`payments-webhooks/${eventId}`);
-        assert.ok(doc, 'Webhook doc should exist in Firestore');
-        assert.equal(doc.provider, 'stripe', 'Provider should be stripe');
-        assert.ok(
-          doc.status === 'pending' || doc.status === 'processing' || doc.status === 'completed' || doc.status === 'failed',
-          'Status should be pending, processing, completed, or failed',
-        );
+        expect(doc, 'Webhook doc should exist in Firestore').toBeTruthy();
+        expect(doc.provider, 'Provider should be stripe').toBe('stripe');
+        expect(doc.status === 'pending' || doc.status === 'processing' || doc.status === 'completed' || doc.status === 'failed', 'Status should be pending, processing, completed, or failed').toBeTruthy();
       },
     },
 
     {
       name: 'deduplicates-webhook-events',
       auth: 'none',
-      async run({ http, assert, firestore }) {
+      async run({ http, expect, firestore }) {
         const eventId = '_test-evt-duplicate';
 
         // Use the test provider so the on-write trigger doesn't require STRIPE_SECRET_KEY
@@ -107,8 +104,8 @@ module.exports = defineCases({
         await send();
         const response = await send();
 
-        assert.isSuccess(response, 'Duplicate should still return 200');
-        assert.equal(response.data.duplicate, true, 'Should indicate duplicate');
+        expect(response, 'Duplicate should still return 200').toBeSuccess();
+        expect(response.data.duplicate, 'Should indicate duplicate').toBe(true);
       },
     },
   ],

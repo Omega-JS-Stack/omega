@@ -118,23 +118,23 @@ async function captureIdentityCheck(provider) {
   return captured;
 }
 
-function assertPrivate({ assert, lines, provider }) {
+function assertPrivate({ expect, lines, provider }) {
   const joined = lines.join(' | ');
 
   for (const secret of SECRETS) {
-    assert.equal(joined.includes(secret), false, `${provider} logged a credential: ${joined}`);
+    expect(joined.includes(secret), `${provider} logged a credential: ${joined}`).toBe(false);
   }
 
   for (const value of PII) {
-    assert.equal(joined.includes(value), false, `${provider} logged the user's PII: ${joined}`);
+    expect(joined.includes(value), `${provider} logged the user's PII: ${joined}`).toBe(false);
   }
 
   const line = lines.find((l) => l.includes('identity()'));
 
-  assert.ok(line, `${provider} logged no identity-check line at all: ${joined}`);
-  assert.equal(line.includes(`provider=${provider}`), true, `the line names the provider: ${line}`);
-  assert.equal(line.includes(UID), true, `the line names the account: ${line}`);
-  assert.equal(line.includes('tokenExchange=succeeded'), true, `and whether the exchange worked: ${line}`);
+  expect(line, `${provider} logged no identity-check line at all: ${joined}`).toBeTruthy();
+  expect(line.includes(`provider=${provider}`), `the line names the provider: ${line}`).toBe(true);
+  expect(line.includes(UID), `the line names the account: ${line}`).toBe(true);
+  expect(line.includes('tokenExchange=succeeded'), `and whether the exchange worked: ${line}`).toBe(true);
 }
 
 module.exports = defineCases({
@@ -150,40 +150,40 @@ module.exports = defineCases({
     {
       name: 'google-logs-the-check-not-the-token-exchange-or-the-decoded-profile',
 
-      async run({ assert }) {
-        assertPrivate({ assert, lines: await captureIdentityCheck(google), provider: 'google' });
+      async run({ expect }) {
+        assertPrivate({ expect, lines: await captureIdentityCheck(google), provider: 'google' });
       },
     },
 
     {
       name: 'discord-logs-the-check-not-the-token-exchange-or-the-identity-response',
 
-      async run({ assert }) {
-        assertPrivate({ assert, lines: await captureIdentityCheck(discord), provider: 'discord' });
+      async run({ expect }) {
+        assertPrivate({ expect, lines: await captureIdentityCheck(discord), provider: 'discord' });
       },
     },
 
     {
       name: 'spotify-logs-the-check-not-the-token-exchange-or-the-identity-response',
 
-      async run({ assert }) {
-        assertPrivate({ assert, lines: await captureIdentityCheck(spotify), provider: 'spotify' });
+      async run({ expect }) {
+        assertPrivate({ expect, lines: await captureIdentityCheck(spotify), provider: 'spotify' });
       },
     },
 
     {
       name: 'twitch-logs-the-check-not-the-token-exchange-or-the-identity-response',
 
-      async run({ assert }) {
-        assertPrivate({ assert, lines: await captureIdentityCheck(twitch), provider: 'twitch' });
+      async run({ expect }) {
+        assertPrivate({ expect, lines: await captureIdentityCheck(twitch), provider: 'twitch' });
       },
     },
 
     {
       name: 'kick-logs-the-check-not-the-token-exchange-or-the-identity-response',
 
-      async run({ assert }) {
-        assertPrivate({ assert, lines: await captureIdentityCheck(kick), provider: 'kick' });
+      async run({ expect }) {
+        assertPrivate({ expect, lines: await captureIdentityCheck(kick), provider: 'kick' });
       },
     },
 
@@ -193,13 +193,13 @@ module.exports = defineCases({
       // the response object was being dumped in the first place.
       name: 'a-token-exchange-that-came-back-empty-says-so',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const captured = [];
         const ctx = { log: (...args) => captured.push(args.join(' ')), warn: () => {}, error: () => {} };
 
         await google.identity({ ctx, uid: UID, token: { id_token: ID_TOKEN } }).catch(() => {});
 
-        assert.equal(captured[0].includes('tokenExchange=failed'), true, `the line reports the failure: ${captured[0]}`);
+        expect(captured[0].includes('tokenExchange=failed'), `the line reports the failure: ${captured[0]}`).toBe(true);
       },
     },
   ],

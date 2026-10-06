@@ -54,11 +54,11 @@ module.exports = defineCases({
     {
       name: 'a-new-note-counts-for-its-owner-only',
 
-      async run({ http, assert, accounts, config, waitFor }) {
+      async run({ http, expect, accounts, config, waitFor }) {
         const owner = accounts['notes-owner'];
         const other = accounts['notes-other'];
 
-        assert.ok(owner.privateKey && other.privateKey, 'both personas carry an API key');
+        expect(owner.privateKey && other.privateKey, 'both personas carry an API key').toBeTruthy();
 
         // The auth hook seeds each persona's welcome note on its own schedule;
         // waiting for the other's to be counted keeps its baseline from moving
@@ -68,7 +68,7 @@ module.exports = defineCases({
         }, 20000, 500);
         const ownerBefore = await countNotes(config, owner);
 
-        assert.isSuccess(await http.as('notes-owner').post('notes', { text: 'Counted over MCP' }), 'the owner creates a note');
+        expect(await http.as('notes-owner').post('notes', { text: 'Counted over MCP' }), 'the owner creates a note').toBeSuccess();
 
         // The counter is bumped by the notesOnCreate trigger, after the write
         const ownerAfter = await waitFor(async () => {
@@ -76,8 +76,8 @@ module.exports = defineCases({
           return count >= ownerBefore + 1 ? count : null;
         }, 20000, 500);
 
-        assert.ok(ownerAfter >= 1, `the owner counts at least the new note (${ownerAfter})`);
-        assert.equal(await countNotes(config, other), otherBefore, 'the other persona\'s count is unchanged');
+        expect(ownerAfter >= 1, `the owner counts at least the new note (${ownerAfter})`).toBeTruthy();
+        expect(await countNotes(config, other), 'the other persona\'s count is unchanged').toBe(otherBefore);
       },
     },
   ],

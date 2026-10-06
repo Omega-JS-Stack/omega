@@ -106,7 +106,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup',
-      async run({ assert, config, state, skip }) {
+      async run({ expect, config, state, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -130,16 +130,16 @@ module.exports = defineCases({
         state.amountPrice = state.amountFrequency ? paidProduct.prices[state.amountFrequency] : null;
 
         // The codes this suite spends, straight from the SSOT
-        assert.equal(discountCodes.DISCOUNT_CODES[PERCENT_CODE].percent, 15, `${PERCENT_CODE} should be 15% off`);
-        assert.equal(discountCodes.DISCOUNT_CODES[ONE_TIME_CODE].percent, 20, `${ONE_TIME_CODE} should be 20% off`);
-        assert.equal(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].amount, AMOUNT_OFF, `${AMOUNT_CODE} should be $${AMOUNT_OFF} off`);
-        assert.equal(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].percent, undefined, `${AMOUNT_CODE} should be amount-based, not percent-based`);
+        expect(discountCodes.DISCOUNT_CODES[PERCENT_CODE].percent, `${PERCENT_CODE} should be 15% off`).toBe(15);
+        expect(discountCodes.DISCOUNT_CODES[ONE_TIME_CODE].percent, `${ONE_TIME_CODE} should be 20% off`).toBe(20);
+        expect(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].amount, `${AMOUNT_CODE} should be $${AMOUNT_OFF} off`).toBe(AMOUNT_OFF);
+        expect(discountCodes.DISCOUNT_CODES[AMOUNT_CODE].percent, `${AMOUNT_CODE} should be amount-based, not percent-based`).toBe(undefined);
       },
     },
 
     {
       name: 'a-percent-discount-lands-in-the-confirmation-url',
-      async run({ accounts, assert, firestore, omega, state }) {
+      async run({ accounts, expect, firestore, omega, state }) {
         const { user } = await purchaser(accounts, firestore, omega, 'percent-url');
         const expected = parseFloat((state.price * 0.85).toFixed(2));
 
@@ -151,14 +151,14 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), String(expected), `The confirmation URL should quote the discounted first charge ($${expected}), not the full $${state.price}`);
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), `The confirmation URL should quote the discounted first charge ($${expected}), not the full $${state.price}`).toBe(String(expected));
       },
     },
 
     {
       name: 'the-route-discounts-the-url-for-every-provider',
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         // WHERE this happens is the whole point. A real provider applies its
         // coupon on its own hosted page and never revisits this URL, so doing the
         // math provider-side left a discounted Stripe checkout landing on the
@@ -178,24 +178,24 @@ module.exports = defineCases({
         const discount = discountCodes.validate(PERCENT_CODE);
         const expected = parseFloat((state.price * 0.85).toFixed(2));
 
-        assert.equal(typeof handler.buildConfirmationUrl, 'function', 'The route should expose its URL builder for testing');
+        expect(typeof handler.buildConfirmationUrl, 'The route should expose its URL builder for testing').toBe('function');
 
         const discounted = handler.buildConfirmationUrl('https://example.com', { ...args, discount });
-        assert.equal(amountFromUrl(discounted), String(expected), `A Stripe checkout should quote the discounted first charge ($${expected}) too`);
+        expect(amountFromUrl(discounted), `A Stripe checkout should quote the discounted first charge ($${expected}) too`).toBe(String(expected));
 
         const undiscounted = handler.buildConfirmationUrl('https://example.com', { ...args, discount: null });
-        assert.equal(amountFromUrl(undiscounted), String(state.price), 'An undiscounted checkout should be left at the list price');
+        expect(amountFromUrl(undiscounted), 'An undiscounted checkout should be left at the list price').toBe(String(state.price));
 
         if (state.product.trial?.days) {
           const trialing = handler.buildConfirmationUrl('https://example.com', { ...args, trial: true, discount });
-          assert.equal(amountFromUrl(trialing), '0', 'A trial charges nothing today, coupon or not');
+          expect(amountFromUrl(trialing), 'A trial charges nothing today, coupon or not').toBe('0');
         }
       },
     },
 
     {
       name: 'a-percent-discount-lands-on-the-webhook-subscription',
-      async run({ accounts, assert, firestore, omega, state, waitFor }) {
+      async run({ accounts, expect, firestore, omega, state, waitFor }) {
         const { user } = await purchaser(accounts, firestore, omega, 'percent-payload');
 
         const sent = await callHandler({
@@ -206,7 +206,7 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
 
         // Stripe attaches the coupon it applied to the subscription — the synthetic
         // payload carries the same thing, so a reader of the webhook can see WHICH
@@ -214,16 +214,16 @@ module.exports = defineCases({
         const webhookDoc = await waitForWebhook(waitFor, firestore, eventIdFor(sent.body.id));
         const coupon = webhookDoc.raw?.data?.object?.discount?.coupon;
 
-        assert.ok(coupon, `The fired subscription should carry the discount, got ${JSON.stringify(webhookDoc.raw?.data?.object?.discount)}`);
-        assert.equal(coupon.percent_off, 15, 'The coupon should be 15% off');
-        assert.equal(coupon.duration, 'once', 'The coupon should apply to the first charge only');
-        assert.equal(coupon.name, PERCENT_CODE, 'The coupon should name the code that was redeemed');
+        expect(coupon, `The fired subscription should carry the discount, got ${JSON.stringify(webhookDoc.raw?.data?.object?.discount)}`).toBeTruthy();
+        expect(coupon.percent_off, 'The coupon should be 15% off').toBe(15);
+        expect(coupon.duration, 'The coupon should apply to the first charge only').toBe('once');
+        expect(coupon.name, 'The coupon should name the code that was redeemed').toBe(PERCENT_CODE);
       },
     },
 
     {
       name: 'a-declined-first-invoice-bills-the-discounted-amount',
-      async run({ accounts, assert, firestore, omega, state, waitFor }) {
+      async run({ accounts, expect, firestore, omega, state, waitFor }) {
         // The subscription event carries the coupon; the INVOICE is where Stripe
         // reports the money — and the declined checkout is the one path that fires
         // one, so it is where the discounted first charge is provable end to end
@@ -238,17 +238,17 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE, simulate: 'decline' }),
         });
 
-        assert.equal(sent.code, 200, `A declined checkout still starts, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `A declined checkout still starts, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
 
         const invoiceDoc = await waitForWebhook(waitFor, firestore, `${eventIdFor(sent.body.id)}-invoice`);
 
-        assert.equal(invoiceDoc.raw?.data?.object?.amount_due, expectedCents, `The failed first invoice should bill the discounted ${expectedCents} cents, not the full ${Math.round(state.price * 100)}`);
+        expect(invoiceDoc.raw?.data?.object?.amount_due, `The failed first invoice should bill the discounted ${expectedCents} cents, not the full ${Math.round(state.price * 100)}`).toBe(expectedCents);
       },
     },
 
     {
       name: 'a-one-time-purchase-is-discounted-in-the-url-and-the-session',
-      async run({ accounts, assert, firestore, omega, state, waitFor, skip }) {
+      async run({ accounts, expect, firestore, omega, state, waitFor, skip }) {
         if (!state.oneTimeProduct) {
           skip('No one-time product configured in this brand');
         }
@@ -269,28 +269,28 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.oneTimeProduct.id, frequency: 'annually', discount: ONE_TIME_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), String(expected), `The confirmation URL should quote $${expected}, not the full $${price}`);
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), `The confirmation URL should quote $${expected}, not the full $${price}`).toBe(String(expected));
 
         // What the caller asked for never reaches the record: the intent doc is
         // what the webhook and every reader after it read back (#668)
         const intentDoc = await firestore.get(`payments-intents/${sent.body.orderId}`);
 
-        assert.equal(intentDoc.frequency, 'once', `A one-time intent should record 'once', got '${intentDoc.frequency}'`);
-        assert.equal(new URL(sent.body.url).searchParams.get('frequency'), 'once', 'And the confirmation URL should say the same');
-        assert.equal(new URL(sent.body.url).searchParams.get('type'), 'one-time', 'The confirmation URL should name the product type outright');
+        expect(intentDoc.frequency, `A one-time intent should record 'once', got '${intentDoc.frequency}'`).toBe('once');
+        expect(new URL(sent.body.url).searchParams.get('frequency'), 'And the confirmation URL should say the same').toBe('once');
+        expect(new URL(sent.body.url).searchParams.get('type'), 'The confirmation URL should name the product type outright').toBe('one-time');
 
         const webhookDoc = await waitForWebhook(waitFor, firestore, eventIdFor(sent.body.id));
         const session = webhookDoc.raw?.data?.object;
 
-        assert.equal(session?.amount_total, Math.round(expected * 100), `The session should charge ${Math.round(expected * 100)} cents`);
-        assert.equal(session?.total_details?.amount_discount, Math.round((price - expected) * 100), 'The session should report what the coupon took off');
+        expect(session?.amount_total, `The session should charge ${Math.round(expected * 100)} cents`).toBe(Math.round(expected * 100));
+        expect(session?.total_details?.amount_discount, 'The session should report what the coupon took off').toBe(Math.round((price - expected) * 100));
       },
     },
 
     {
       name: 'no-discount-leaves-the-amounts-alone',
-      async run({ accounts, assert, firestore, omega, state, waitFor }) {
+      async run({ accounts, expect, firestore, omega, state, waitFor }) {
         const { user } = await purchaser(accounts, firestore, omega, 'none');
 
         const sent = await callHandler({
@@ -301,18 +301,18 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.frequency }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), String(state.price), 'An undiscounted checkout should still quote the full price');
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), 'An undiscounted checkout should still quote the full price').toBe(String(state.price));
 
         const webhookDoc = await waitForWebhook(waitFor, firestore, eventIdFor(sent.body.id));
 
-        assert.equal(webhookDoc.raw?.data?.object?.discount, undefined, 'An undiscounted subscription should carry no coupon');
+        expect(webhookDoc.raw?.data?.object?.discount, 'An undiscounted subscription should carry no coupon').toBe(undefined);
       },
     },
 
     {
       name: 'a-trial-with-a-discount-still-charges-nothing-now',
-      async run({ accounts, assert, firestore, omega, state, skip }) {
+      async run({ accounts, expect, firestore, omega, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
@@ -327,14 +327,14 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, trial: true, discount: PERCENT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), '0', 'A trial charges nothing today — a coupon takes its cut off nothing');
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), 'A trial charges nothing today — a coupon takes its cut off nothing').toBe('0');
       },
     },
 
     {
       name: 'an-amount-discount-lands-in-the-confirmation-url',
-      async run({ accounts, assert, firestore, omega, state, skip }) {
+      async run({ accounts, expect, firestore, omega, state, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
@@ -350,14 +350,14 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), String(expected), `The confirmation URL should quote the discounted first charge ($${expected}), not the full $${state.amountPrice}`);
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), `The confirmation URL should quote the discounted first charge ($${expected}), not the full $${state.amountPrice}`).toBe(String(expected));
       },
     },
 
     {
       name: 'an-amount-discount-lands-on-the-webhook-subscription-in-cents',
-      async run({ accounts, assert, firestore, omega, state, waitFor, skip }) {
+      async run({ accounts, expect, firestore, omega, state, waitFor, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
@@ -372,7 +372,7 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
 
         // Stripe's `amount_off` is CENTS while ours is dollars — the synthetic
         // payload has to convert, or a reader of the webhook sees a $10 coupon
@@ -380,17 +380,17 @@ module.exports = defineCases({
         const webhookDoc = await waitForWebhook(waitFor, firestore, eventIdFor(sent.body.id));
         const coupon = webhookDoc.raw?.data?.object?.discount?.coupon;
 
-        assert.ok(coupon, `The fired subscription should carry the discount, got ${JSON.stringify(webhookDoc.raw?.data?.object?.discount)}`);
-        assert.equal(coupon.amount_off, AMOUNT_OFF * 100, `The coupon should be ${AMOUNT_OFF * 100} cents off`);
-        assert.equal(coupon.percent_off, null, 'An amount-based coupon carries no percent');
-        assert.equal(coupon.duration, 'once', 'The coupon should apply to the first charge only');
-        assert.equal(coupon.name, AMOUNT_CODE, 'The coupon should name the code that was redeemed');
+        expect(coupon, `The fired subscription should carry the discount, got ${JSON.stringify(webhookDoc.raw?.data?.object?.discount)}`).toBeTruthy();
+        expect(coupon.amount_off, `The coupon should be ${AMOUNT_OFF * 100} cents off`).toBe(AMOUNT_OFF * 100);
+        expect(coupon.percent_off, 'An amount-based coupon carries no percent').toBe(null);
+        expect(coupon.duration, 'The coupon should apply to the first charge only').toBe('once');
+        expect(coupon.name, 'The coupon should name the code that was redeemed').toBe(AMOUNT_CODE);
       },
     },
 
     {
       name: 'a-trial-with-an-amount-discount-still-charges-nothing-now',
-      async run({ accounts, assert, firestore, omega, state, skip }) {
+      async run({ accounts, expect, firestore, omega, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
@@ -405,14 +405,14 @@ module.exports = defineCases({
           data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency || state.frequency, trial: true, discount: AMOUNT_CODE }),
         });
 
-        assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(amountFromUrl(sent.body.url), '0', 'A trial charges nothing today — a flat-dollar coupon comes off nothing');
+        expect(sent.code, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(amountFromUrl(sent.body.url), 'A trial charges nothing today — a flat-dollar coupon comes off nothing').toBe('0');
       },
     },
 
     {
       name: 'analytics-reports-the-amount-discount-and-a-full-price-renewal',
-      async run({ assert, state, skip }) {
+      async run({ expect, state, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
@@ -431,17 +431,17 @@ module.exports = defineCases({
         const expected = parseFloat((state.amountPrice - AMOUNT_OFF).toFixed(2));
 
         const resolved = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', unified, order);
-        assert.equal(resolved.value, expected, `Tracked revenue should be the discounted $${expected}, not the list $${state.amountPrice}`);
+        expect(resolved.value, `Tracked revenue should be the discounted $${expected}, not the list $${state.amountPrice}`).toBe(expected);
 
         // A renewal is deliberately full price — a 'once' coupon is spent
         const renewal = analytics.resolvePaymentEvent('subscription', null, 'invoice.payment_succeeded', unified, order);
-        assert.equal(renewal.value, state.amountPrice, 'Renewals still track the full price');
+        expect(renewal.value, 'Renewals still track the full price').toBe(state.amountPrice);
       },
     },
 
     {
       name: 'analytics-reports-the-discounted-amount-as-revenue',
-      async run({ assert, state }) {
+      async run({ expect, state }) {
         // The same first-charge math the URL quotes is what analytics reports as
         // revenue, and both now come from applyToAmount(). The existing analytics
         // suite only covers full-price events, so the discounted branch is pinned
@@ -458,39 +458,39 @@ module.exports = defineCases({
 
         const resolved = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', unified, order);
 
-        assert.equal(resolved.reason, 'first-purchase', 'A discounted first checkout is still a first purchase');
-        assert.equal(resolved.value, expected, `Tracked revenue should be the discounted $${expected}, not the list $${state.price}`);
+        expect(resolved.reason, 'A discounted first checkout is still a first purchase').toBe('first-purchase');
+        expect(resolved.value, `Tracked revenue should be the discounted $${expected}, not the list $${state.price}`).toBe(expected);
 
         // A renewal is deliberately full price — a 'once' coupon is spent
         const renewal = analytics.resolvePaymentEvent('subscription', null, 'invoice.payment_succeeded', unified, order);
-        assert.equal(renewal.value, state.price, 'Renewals still track the full price');
+        expect(renewal.value, 'Renewals still track the full price').toBe(state.price);
       },
     },
 
     {
       name: 'validate-returns-the-amount-a-flat-dollar-code-is-worth',
-      async run({ assert }) {
+      async run({ expect }) {
         // Everything downstream reads a validate() RESULT, never the raw table —
         // a validated amount code that reported no amount would have quietly
         // charged full price everywhere.
         const result = discountCodes.validate(AMOUNT_CODE.toLowerCase());
 
-        assert.equal(result.valid, true, 'The seeded amount code should validate');
-        assert.equal(result.code, AMOUNT_CODE, 'It should normalize to the uppercase code');
-        assert.equal(result.amount, AMOUNT_OFF, `It should report $${AMOUNT_OFF} off`);
-        assert.equal(result.duration, 'once', 'It should apply to the first charge only');
-        assert.equal(result.percent, undefined, 'It should carry no percent');
+        expect(result.valid, 'The seeded amount code should validate').toBe(true);
+        expect(result.code, 'It should normalize to the uppercase code').toBe(AMOUNT_CODE);
+        expect(result.amount, `It should report $${AMOUNT_OFF} off`).toBe(AMOUNT_OFF);
+        expect(result.duration, 'It should apply to the first charge only').toBe('once');
+        expect(result.percent, 'It should carry no percent').toBe(undefined);
 
         // A percent code is unchanged — it reports a percent and no amount
         const percent = discountCodes.validate(PERCENT_CODE);
-        assert.equal(percent.percent, 15, 'The percent code still reports its percent');
-        assert.equal(percent.amount, undefined, 'The percent code carries no amount');
+        expect(percent.percent, 'The percent code still reports its percent').toBe(15);
+        expect(percent.amount, 'The percent code carries no amount').toBe(undefined);
       },
     },
 
     {
       name: 'a-code-that-covers-the-whole-price-answers-400-and-never-calls-paypal',
-      async run({ accounts, assert, firestore, omega, state, skip }) {
+      async run({ accounts, expect, firestore, omega, state, skip }) {
         if (!state.fullCoverFrequency) {
           skip(`No configured price is small enough for the $${AMOUNT_OFF} code to cover whole`);
         }
@@ -524,26 +524,26 @@ module.exports = defineCases({
           PayPal.request = realRequest;
         }
 
-        assert.equal(sent.code, 400, `A fully covered price is the buyer's own 400, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.match(String(sent.body), new RegExp(AMOUNT_CODE), 'The answer names the code they entered');
-        assert.match(String(sent.body), new RegExp(`\\$${state.fullCoverPrice.toFixed(2)}`), `And the $${state.fullCoverPrice} price it covered`);
-        assert.match(String(sent.body), /PayPal/, 'And the payment method that cannot take it');
-        assert.ok(!/could not start your checkout/i.test(String(sent.body)), 'Never the neutral sentence a real provider fault gets');
-        assert.equal(calls.length, 0, `PayPal was never called, got ${JSON.stringify(calls)}`);
+        expect(sent.code, `A fully covered price is the buyer's own 400, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(400);
+        expect(String(sent.body), 'The answer names the code they entered').toMatch(new RegExp(AMOUNT_CODE));
+        expect(String(sent.body), `And the $${state.fullCoverPrice} price it covered`).toMatch(new RegExp(`\\$${state.fullCoverPrice.toFixed(2)}`));
+        expect(String(sent.body), 'And the payment method that cannot take it').toMatch(/PayPal/);
+        expect(!/could not start your checkout/i.test(String(sent.body)), 'Never the neutral sentence a real provider fault gets').toBeTruthy();
+        expect(calls.length, `PayPal was never called, got ${JSON.stringify(calls)}`).toBe(0);
       },
     },
 
     {
       name: 'an-amount-discount-comes-off-the-first-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         // Stripe coupons come in both shapes (percent_off, amount_off), so the math
         // the test provider runs handles both — pinned here on the pure function
         // across the edges the seeded codes do not reach.
-        assert.equal(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', amount: 15, duration: 'once' }), 84.99, '$15 off $99.99 should be $84.99');
-        assert.equal(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', percent: 15, duration: 'once' }), 84.99, '15% off $99.99 should be $84.99');
-        assert.equal(discountCodes.applyToAmount(9.99, { valid: true, code: 'X', amount: 50, duration: 'once' }), 0, 'A discount bigger than the charge should floor at $0, never go negative');
-        assert.equal(discountCodes.applyToAmount(9.99, null), 9.99, 'No discount should leave the charge alone');
-        assert.equal(discountCodes.applyToAmount(0, { valid: true, code: 'X', percent: 15 }), 0, 'A $0 charge stays $0');
+        expect(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', amount: 15, duration: 'once' }), '$15 off $99.99 should be $84.99').toBe(84.99);
+        expect(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', percent: 15, duration: 'once' }), '15% off $99.99 should be $84.99').toBe(84.99);
+        expect(discountCodes.applyToAmount(9.99, { valid: true, code: 'X', amount: 50, duration: 'once' }), 'A discount bigger than the charge should floor at $0, never go negative').toBe(0);
+        expect(discountCodes.applyToAmount(9.99, null), 'No discount should leave the charge alone').toBe(9.99);
+        expect(discountCodes.applyToAmount(0, { valid: true, code: 'X', percent: 15 }), 'A $0 charge stays $0').toBe(0);
       },
     },
   ],

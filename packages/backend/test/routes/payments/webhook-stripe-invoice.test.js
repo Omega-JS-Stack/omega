@@ -59,38 +59,38 @@ module.exports = defineCases({
     {
       name: 'supports-invoice-payment-succeeded',
       auth: 'none',
-      async run({ assert }) {
-        assert.ok(stripeProvider.isSupported('invoice.payment_succeeded'), 'A Stripe renewal must be a supported event');
+      async run({ expect }) {
+        expect(stripeProvider.isSupported('invoice.payment_succeeded'), 'A Stripe renewal must be a supported event').toBeTruthy();
       },
     },
 
     {
       name: 'does-not-support-invoice-paid',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // Stripe fires this alongside invoice.payment_succeeded for the same
         // invoice; ingesting both would double-count the renewal's revenue.
-        assert.equal(stripeProvider.isSupported('invoice.paid'), false, 'invoice.paid must stay out of the ingest');
+        expect(stripeProvider.isSupported('invoice.paid'), 'invoice.paid must stay out of the ingest').toBe(false);
       },
     },
 
     {
       name: 'maps-a-renewal-invoice-to-its-subscription',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const parsed = stripeProvider.parseWebhook({ body: renewalEvent('_test-evt-renewal-parse') });
 
-        assert.equal(parsed.category, 'subscription', 'A subscription_cycle invoice is a subscription event');
-        assert.equal(parsed.resourceType, 'subscription', 'The pipeline must re-fetch the SUBSCRIPTION, not the invoice');
-        assert.equal(parsed.resourceId, 'sub_test_renewal', 'The subscription id comes off the invoice parent');
-        assert.equal(parsed.uid, 'test-uid-sub-renewal', 'The uid comes off the subscription details');
+        expect(parsed.category, 'A subscription_cycle invoice is a subscription event').toBe('subscription');
+        expect(parsed.resourceType, 'The pipeline must re-fetch the SUBSCRIPTION, not the invoice').toBe('subscription');
+        expect(parsed.resourceId, 'The subscription id comes off the invoice parent').toBe('sub_test_renewal');
+        expect(parsed.uid, 'The uid comes off the subscription details').toBe('test-uid-sub-renewal');
       },
     },
 
     {
       name: 'maps-a-manual-invoice-as-one-time',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         // A one-off invoice carries no subscription billing_reason
         const event = {
           id: '_test-evt-renewal-manual',
@@ -100,29 +100,29 @@ module.exports = defineCases({
 
         const parsed = stripeProvider.parseWebhook({ body: event });
 
-        assert.equal(parsed.category, 'one-time', 'A manual invoice is a one-time event');
-        assert.equal(parsed.resourceType, 'invoice', 'A one-time invoice re-fetches as an invoice');
-        assert.equal(parsed.resourceId, 'in_test_manual', 'The invoice id is the resource');
+        expect(parsed.category, 'A manual invoice is a one-time event').toBe('one-time');
+        expect(parsed.resourceType, 'A one-time invoice re-fetches as an invoice').toBe('invoice');
+        expect(parsed.resourceId, 'The invoice id is the resource').toBe('in_test_manual');
       },
     },
 
     {
       name: 'a-renewal-delivery-lands-a-pipeline-doc',
       auth: 'none',
-      async run({ assert, omega, firestore }) {
+      async run({ expect, omega, firestore }) {
         const eventId = '_test-evt-renewal-ingest';
 
         const sent = await deliver(omega, renewalEvent(eventId));
 
-        assert.equal(sent.code, 200, `A renewal should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(!sent.body?.ignored, 'A renewal must not be ignored as an unsupported event type');
+        expect(sent.code, `A renewal should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(!sent.body?.ignored, 'A renewal must not be ignored as an unsupported event type').toBeTruthy();
 
         const doc = await firestore.get(`payments-webhooks/${eventId}`);
 
-        assert.ok(doc, 'The renewal should land a pipeline doc');
-        assert.equal(doc.event.type, 'invoice.payment_succeeded', 'The pipeline doc should carry the renewal event type');
-        assert.equal(doc.event.category, 'subscription', 'The pipeline doc should be categorized as a subscription event');
-        assert.equal(doc.event.resourceId, 'sub_test_renewal', 'The pipeline doc should point at the subscription');
+        expect(doc, 'The renewal should land a pipeline doc').toBeTruthy();
+        expect(doc.event.type, 'The pipeline doc should carry the renewal event type').toBe('invoice.payment_succeeded');
+        expect(doc.event.category, 'The pipeline doc should be categorized as a subscription event').toBe('subscription');
+        expect(doc.event.resourceId, 'The pipeline doc should point at the subscription').toBe('sub_test_renewal');
       },
     },
   ],

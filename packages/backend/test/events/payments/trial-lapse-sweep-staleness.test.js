@@ -25,7 +25,7 @@
  *
  * Run: npx omega test backend:events/payments/trial-lapse-sweep-staleness
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const sweep = require('../../../dist/omega/events/cron/daily/trial-lapse-sweep.js');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -104,11 +104,11 @@ module.exports = defineCases({
         // The guard's whole predicate, at the resolution the stamps actually carry.
         // Under the strict `>` this replaced, the equal case answered false — the
         // sweep called a webhook from its own second "older" and wrote over it.
-        assert.equal(sweep.isNewerThanSweep(1000, 1000), true, 'a write inside the sweep read\'s own second is NEWER, not older');
-        assert.equal(sweep.isNewerThanSweep(1001, 1000), true, 'a later write is newer');
-        assert.equal(sweep.isNewerThanSweep(999, 1000), false, 'a write from before the read is genuinely older');
-        assert.equal(sweep.isNewerThanSweep(0, 1000), false, 'a subscription nobody has stamped is not newer');
-        assert.equal(sweep.isNewerThanSweep(undefined, 1000), false, 'an unstamped subscription reads as 0, not NaN');
+        expect(sweep.isNewerThanSweep(1000, 1000), 'a write inside the sweep read\'s own second is NEWER, not older').toBe(true);
+        expect(sweep.isNewerThanSweep(1001, 1000), 'a later write is newer').toBe(true);
+        expect(sweep.isNewerThanSweep(999, 1000), 'a write from before the read is genuinely older').toBe(false);
+        expect(sweep.isNewerThanSweep(0, 1000), 'a subscription nobody has stamped is not newer').toBe(false);
+        expect(sweep.isNewerThanSweep(undefined, 1000), 'an unstamped subscription reads as 0, not NaN').toBe(false);
       },
     },
 
@@ -119,9 +119,9 @@ module.exports = defineCases({
         const { store } = await runSweep({ user: candidate() });
         const swept = store.get(`users/${UID}`);
 
-        assert.equal(swept.subscription.trial.outcome, 'lapsed', 'the provider has no such subscription — the trial lapsed');
-        assert.equal(swept.subscription.status, 'cancelled', 'a lapsed trial ends cancelled');
-        assert.equal(swept.subscription.product.id, 'basic', 'a lapsed trial ends on basic');
+        expect(swept.subscription.trial.outcome, 'the provider has no such subscription — the trial lapsed').toBe('lapsed');
+        expect(swept.subscription.status, 'a lapsed trial ends cancelled').toBe('cancelled');
+        expect(swept.subscription.product.id, 'a lapsed trial ends on basic').toBe('basic');
       },
     },
 
@@ -159,14 +159,11 @@ module.exports = defineCases({
 
         const swept = store.get(`users/${UID}`);
 
-        assert.ok(contended, 'the contending write must actually have run — otherwise this proves nothing');
-        assert.equal(swept.subscription.status, 'active', 'the webhook\'s state survives: the subscriber is still active');
-        assert.equal(swept.subscription.product.id, 'premium', 'the webhook\'s product survives — the sweep did not reset it to basic');
-        assert.equal(swept.subscription.trial.outcome, undefined, 'and no lapse was stamped over it');
-        assert.ok(
-          logs.some((line) => line.includes('a newer subscription write landed')),
-          `the re-run must SAY it skipped on staleness, got: ${logs.join(' | ')}`,
-        );
+        expect(contended, 'the contending write must actually have run — otherwise this proves nothing').toBeTruthy();
+        expect(swept.subscription.status, 'the webhook\'s state survives: the subscriber is still active').toBe('active');
+        expect(swept.subscription.product.id, 'the webhook\'s product survives — the sweep did not reset it to basic').toBe('premium');
+        expect(swept.subscription.trial.outcome, 'and no lapse was stamped over it').toBe(undefined);
+        expect(logs.some((line) => line.includes('a newer subscription write landed')), `the re-run must SAY it skipped on staleness, got: ${logs.join(' | ')}`).toBeTruthy();
       },
     },
   ],

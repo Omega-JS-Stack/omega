@@ -147,7 +147,7 @@ module.exports = defineCases({
 
     {
       name: 'returns-404-when-the-brand-belongs-to-a-company',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
@@ -156,16 +156,16 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(ctx._responses.length, 1, 'should respond once');
-          assert.equal(ctx._responses[0].code, 404, 'should return 404');
-          assert.equal(fetchCalls.length, 0, 'should NOT call fetch when gated');
+          expect(ctx._responses.length, 'should respond once').toBe(1);
+          expect(ctx._responses[0].code, 'should return 404').toBe(404);
+          expect(fetchCalls.length, 'should NOT call fetch when gated').toBe(0);
         });
       },
     },
 
     {
       name: 'allows-route-when-the-brand-is-the-company',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
@@ -174,8 +174,8 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(ctx._responses[0].code, 200, "should return 200 when company.id is 'self'");
-          assert.equal(ctx._responses[0].data.forwarded, 0, 'no brands means 0 forwarded');
+          expect(ctx._responses[0].code, "should return 200 when company.id is 'self'").toBe(200);
+          expect(ctx._responses[0].data.forwarded, 'no brands means 0 forwarded').toBe(0);
         });
       },
     },
@@ -184,7 +184,7 @@ module.exports = defineCases({
 
     {
       name: 'rejects-missing-provider',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { key: 'test-key' } }); // no provider
@@ -193,14 +193,14 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(ctx._responses[0].code, 400, 'missing provider → 400');
+          expect(ctx._responses[0].code, 'missing provider → 400').toBe(400);
         });
       },
     },
 
     {
       name: 'rejects-missing-key',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid' } }); // no key
@@ -209,14 +209,14 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(ctx._responses[0].code, 401, 'missing key → 401');
+          expect(ctx._responses[0].code, 'missing key → 401').toBe(401);
         });
       },
     },
 
     {
       name: 'rejects-wrong-key',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'real-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'wrong-key' } });
@@ -225,7 +225,7 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(ctx._responses[0].code, 401, 'wrong key → 401');
+          expect(ctx._responses[0].code, 'wrong key → 401').toBe(401);
         });
       },
     },
@@ -234,7 +234,7 @@ module.exports = defineCases({
 
     {
       name: 'derives-api-url-from-brand-url-and-fans-out',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const body = [{ sg_event_id: 'evt1', event: 'group_unsubscribe', email: 't@example.com' }];
@@ -250,26 +250,18 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 2, 'should fan out to both brands');
-          assert.equal(
-            fetchCalls[0].url,
-            'https://api.somiibo.com/omega/marketing/webhook?provider=sendgrid&key=test-key',
-            'first child URL derived correctly'
-          );
-          assert.equal(
-            fetchCalls[1].url,
-            'https://api.chatsy.com/omega/marketing/webhook?provider=sendgrid&key=test-key',
-            'second child URL derived correctly'
-          );
-          assert.deepEqual(fetchCalls[0].opts.body, body, 'raw body forwarded unchanged');
-          assert.equal(ctx._responses[0].data.succeeded, 2, '2 children succeeded');
+          expect(fetchCalls.length, 'should fan out to both brands').toBe(2);
+          expect(fetchCalls[0].url, 'first child URL derived correctly').toBe('https://api.somiibo.com/omega/marketing/webhook?provider=sendgrid&key=test-key');
+          expect(fetchCalls[1].url, 'second child URL derived correctly').toBe('https://api.chatsy.com/omega/marketing/webhook?provider=sendgrid&key=test-key');
+          expect(fetchCalls[0].opts.body, 'raw body forwarded unchanged').toEqual(body);
+          expect(ctx._responses[0].data.succeeded, '2 children succeeded').toBe(2);
         });
       },
     },
 
     {
       name: 'forwards-raw-body-unchanged-for-beehiiv',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const body = {
@@ -289,16 +281,16 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 1);
-          assert.ok(fetchCalls[0].url.includes('provider=beehiiv'), 'provider param preserved');
-          assert.deepEqual(fetchCalls[0].opts.body, body, 'raw Beehiiv body forwarded unchanged');
+          expect(fetchCalls.length).toBe(1);
+          expect(fetchCalls[0].url.includes('provider=beehiiv'), 'provider param preserved').toBeTruthy();
+          expect(fetchCalls[0].opts.body, 'raw Beehiiv body forwarded unchanged').toEqual(body);
         });
       },
     },
 
     {
       name: 'skips-brands-without-brand-url',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
@@ -311,15 +303,15 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 1, 'only the brand with a URL should be fanned to');
-          assert.ok(fetchCalls[0].url.includes('api.somiibo.com'), 'somiibo was the one called');
+          expect(fetchCalls.length, 'only the brand with a URL should be fanned to').toBe(1);
+          expect(fetchCalls[0].url.includes('api.somiibo.com'), 'somiibo was the one called').toBeTruthy();
         });
       },
     },
 
     {
       name: 'failure-isolation-one-bad-child-does-not-break-others',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           fetchMockBehavior = (url) => {
@@ -339,20 +331,20 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 3, 'all 3 children attempted');
+          expect(fetchCalls.length, 'all 3 children attempted').toBe(3);
           const response = ctx._responses[0];
-          assert.equal(response.code, 200, 'response is still 200 — provider should not retry parent');
-          assert.equal(response.data.succeeded, 2, '2 children succeeded');
-          assert.equal(response.data.failed, 1, '1 child failed');
-          assert.ok(response.data.failures, 'failures array populated');
-          assert.equal(response.data.failures[0].brandId, 'chatsy', 'failure entry names the brand');
+          expect(response.code, 'response is still 200 — provider should not retry parent').toBe(200);
+          expect(response.data.succeeded, '2 children succeeded').toBe(2);
+          expect(response.data.failed, '1 child failed').toBe(1);
+          expect(response.data.failures, 'failures array populated').toBeTruthy();
+          expect(response.data.failures[0].brandId, 'failure entry names the brand').toBe('chatsy');
         });
       },
     },
 
     {
       name: 'invalid-brand-url-counted-as-failure-not-thrown',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
@@ -365,17 +357,17 @@ module.exports = defineCases({
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           const response = ctx._responses[0];
-          assert.equal(response.code, 200, 'route still returns 200');
-          assert.equal(response.data.succeeded, 1, 'somiibo succeeded');
-          assert.equal(response.data.failed, 1, 'broken brand counted as failed');
-          assert.equal(fetchCalls.length, 1, 'only the valid URL was actually fetched');
+          expect(response.code, 'route still returns 200').toBe(200);
+          expect(response.data.succeeded, 'somiibo succeeded').toBe(1);
+          expect(response.data.failed, 'broken brand counted as failed').toBe(1);
+          expect(fetchCalls.length, 'only the valid URL was actually fetched').toBe(1);
         });
       },
     },
 
     {
       name: 'self-is-included-in-fanout',
-      async run({ assert }) {
+      async run({ expect }) {
         // The parent's own brand IS expected to be in the brands collection.
         // It should be fanned to via HTTP like any other brand, so its own
         // @omega.js/backend processes its own user updates the same way as siblings.
@@ -390,18 +382,15 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 2, 'parent fans out to ALL brands including itself');
-          assert.ok(
-            fetchCalls.some(c => c.url.includes('api.itwcreativeworks.com')),
-            'self IS in the fan-out target list'
-          );
+          expect(fetchCalls.length, 'parent fans out to ALL brands including itself').toBe(2);
+          expect(fetchCalls.some(c => c.url.includes('api.itwcreativeworks.com')), 'self IS in the fan-out target list').toBeTruthy();
         });
       },
     },
 
     {
       name: 'zero-brands-handled-gracefully',
-      async run({ assert }) {
+      async run({ expect }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
@@ -410,9 +399,9 @@ module.exports = defineCases({
 
           await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
-          assert.equal(fetchCalls.length, 0);
-          assert.equal(ctx._responses[0].code, 200, 'still 200 with no brands');
-          assert.equal(ctx._responses[0].data.forwarded, 0);
+          expect(fetchCalls.length).toBe(0);
+          expect(ctx._responses[0].code, 'still 200 with no brands').toBe(200);
+          expect(ctx._responses[0].data.forwarded).toBe(0);
         });
       },
     },

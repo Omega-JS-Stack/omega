@@ -72,12 +72,12 @@ module.exports = defineCases({
       name: 'framework-default-is-the-shipped-template-value',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const { config } = loadConfig(TEMPLATES_DIR, 'backend');
 
-        assert.equal(config.auth?.signup?.maxPerIpPerDay, 2, 'templates/config/omega.json5 ships the default cap');
-        assert.equal(resolveSignupLimit(config), 2, 'the shipped default resolves through the guard');
-        assert.equal(DEFAULT_MAX_SIGNUPS_PER_DAY, 2, 'the in-code fallback matches the shipped default');
+        expect(config.auth?.signup?.maxPerIpPerDay, 'templates/config/omega.json5 ships the default cap').toBe(2);
+        expect(resolveSignupLimit(config), 'the shipped default resolves through the guard').toBe(2);
+        expect(DEFAULT_MAX_SIGNUPS_PER_DAY, 'the in-code fallback matches the shipped default').toBe(2);
       },
     },
 
@@ -85,9 +85,9 @@ module.exports = defineCases({
       name: 'configured-value-wins',
       auth: 'none',
 
-      async run({ assert }) {
-        assert.equal(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: 25 } } }), 25);
-        assert.equal(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: 1 } } }), 1);
+      async run({ expect }) {
+        expect(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: 25 } } })).toBe(25);
+        expect(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: 1 } } })).toBe(1);
       },
     },
 
@@ -95,15 +95,15 @@ module.exports = defineCases({
       name: 'unconfigured-and-invalid-values-keep-the-default',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Nothing configured: a config with no auth block at all
-        assert.equal(resolveSignupLimit({}), DEFAULT_MAX_SIGNUPS_PER_DAY);
-        assert.equal(resolveSignupLimit(undefined), DEFAULT_MAX_SIGNUPS_PER_DAY);
+        expect(resolveSignupLimit({})).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
+        expect(resolveSignupLimit(undefined)).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
 
         // Garbage is a validation error (@omega.js/config hard-fails it); the
         // guard keeps the default rather than running the IP check unprotected
         for (const value of [0, -1, 2.5, '25', null]) {
-          assert.equal(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: value } } }), DEFAULT_MAX_SIGNUPS_PER_DAY, `${value} falls back to the default`);
+          expect(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: value } } }), `${value} falls back to the default`).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
         }
       },
     },
@@ -115,13 +115,13 @@ module.exports = defineCases({
       name: 'a failure that is not a rate limit is never sold as one',
       auth: 'none',
 
-      async run({ assert, ctx }) {
+      async run({ expect, ctx }) {
         const boom = Object.assign(new Error('Firestore unavailable'), { code: 500 });
 
         const thrown = await runBeforeCreate(async () => { throw boom; }).catch((e) => e);
 
-        assert.equal(thrown, boom, 'the original error propagates untouched');
-        assert.equal(thrown.name, 'Error', 'not converted into an auth HttpsError');
+        expect(thrown, 'the original error propagates untouched').toBe(boom);
+        expect(thrown.name, 'not converted into an auth HttpsError').toBe('Error');
       },
     },
 
@@ -129,13 +129,13 @@ module.exports = defineCases({
       name: 'a real 429 still blocks the signup as resource-exhausted',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         const refusal = Object.assign(new Error('You have used all 2 of your signups'), { code: 429 });
 
         const thrown = await runBeforeCreate(async () => { throw refusal; }).catch((e) => e);
 
-        assert.equal(thrown.name, 'HttpsError', 'a rate limit is the one thing this catch is for');
-        assert.equal(thrown.code, 'resource-exhausted');
+        expect(thrown.name, 'a rate limit is the one thing this catch is for').toBe('HttpsError');
+        expect(thrown.code).toBe('resource-exhausted');
       },
     },
   ],

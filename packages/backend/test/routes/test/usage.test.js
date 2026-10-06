@@ -17,7 +17,7 @@ module.exports = defineCases({
     // Test 1: Store initial usage state
     {
       name: 'store-initial-usage',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         // Get the basic account's current usage to track changes
         const userDoc = await firestore.get(`users/${accounts.basic.uid}`);
 
@@ -27,39 +27,31 @@ module.exports = defineCases({
         state.initialMonthly = state.initialUsage?.requests?.monthly || 0;
         state.initialDaily = state.initialUsage?.requests?.daily || 0;
 
-        assert.ok(true, 'Initial usage state captured');
+        expect(true, 'Initial usage state captured').toBeTruthy();
       },
     },
 
     // Test 2: Consume usage with default values
     {
       name: 'consume-default',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('basic').post('omega/test/usage', {});
 
-        assert.isSuccess(response, 'Usage consume should succeed');
-        assert.hasProperty(response, 'data.feature', 'Response should contain the feature name');
-        assert.hasProperty(response, 'data.amount', 'Response should contain amount');
-        assert.hasProperty(response, 'data.before', 'Response should contain before values');
-        assert.hasProperty(response, 'data.after', 'Response should contain after values');
+        expect(response, 'Usage consume should succeed').toBeSuccess();
+        expect(response, 'Response should contain the feature name').toHaveProperty('data.feature');
+        expect(response, 'Response should contain amount').toHaveProperty('data.amount');
+        expect(response, 'Response should contain before values').toHaveProperty('data.before');
+        expect(response, 'Response should contain after values').toHaveProperty('data.after');
 
         // Verify defaults
-        assert.equal(response.data.feature, 'requests', 'Feature should be requests');
-        assert.equal(response.data.amount, 1, 'Default amount should be 1');
+        expect(response.data.feature, 'Feature should be requests').toBe('requests');
+        expect(response.data.amount, 'Default amount should be 1').toBe(1);
 
         // Verify the month counter moved
-        assert.equal(
-          response.data.after.used,
-          response.data.before.used + 1,
-          'The month counter should move by 1'
-        );
+        expect(response.data.after.used, 'The month counter should move by 1').toBe(response.data.before.used + 1);
 
         // Verify the day counter moved
-        assert.equal(
-          response.data.after.day.used,
-          response.data.before.day.used + 1,
-          'The day counter should move by 1'
-        );
+        expect(response.data.after.day.used, 'The day counter should move by 1').toBe(response.data.before.day.used + 1);
 
         // Store for next test
         state.afterFirstConsume = response.data.after;
@@ -69,53 +61,37 @@ module.exports = defineCases({
     // Test 3: Verify usage persisted to Firestore
     {
       name: 'verify-usage-persisted',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         const userDoc = await firestore.get(`users/${accounts.basic.uid}`);
 
-        assert.ok(userDoc?.usage, 'User should have usage object');
-        assert.ok(userDoc?.usage?.requests, 'User should have requests usage');
+        expect(userDoc?.usage, 'User should have usage object').toBeTruthy();
+        expect(userDoc?.usage?.requests, 'User should have requests usage').toBeTruthy();
 
-        assert.equal(
-          userDoc.usage.requests.monthly,
-          state.afterFirstConsume.used,
-          'Persisted monthly should match API response'
-        );
-        assert.equal(
-          userDoc.usage.requests.daily,
-          state.afterFirstConsume.day.used,
-          'Persisted daily should match API response'
-        );
-        assert.ok(userDoc.usage.requests.total > 0, 'Total should be counted too');
+        expect(userDoc.usage.requests.monthly, 'Persisted monthly should match API response').toBe(state.afterFirstConsume.used);
+        expect(userDoc.usage.requests.daily, 'Persisted daily should match API response').toBe(state.afterFirstConsume.day.used);
+        expect(userDoc.usage.requests.total > 0, 'Total should be counted too').toBeTruthy();
 
         // Verify last timestamp exists
-        assert.ok(userDoc.usage.requests.last, 'Should have last object');
-        assert.ok(userDoc.usage.requests.last.timestamp, 'Should have last.timestamp');
-        assert.ok(userDoc.usage.requests.last.timestampUNIX, 'Should have last.timestampUNIX');
+        expect(userDoc.usage.requests.last, 'Should have last object').toBeTruthy();
+        expect(userDoc.usage.requests.last.timestamp, 'Should have last.timestamp').toBeTruthy();
+        expect(userDoc.usage.requests.last.timestampUNIX, 'Should have last.timestampUNIX').toBeTruthy();
       },
     },
 
     // Test 4: Consume a custom amount
     {
       name: 'consume-custom-amount',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         const response = await http.as('basic').post('omega/test/usage', {
           amount: 5,
         });
 
-        assert.isSuccess(response, 'Custom amount consume should succeed');
-        assert.equal(response.data.amount, 5, 'Amount should be 5');
+        expect(response, 'Custom amount consume should succeed').toBeSuccess();
+        expect(response.data.amount, 'Amount should be 5').toBe(5);
 
         // Verify both counters moved by 5
-        assert.equal(
-          response.data.after.used,
-          response.data.before.used + 5,
-          'The month counter should move by 5'
-        );
-        assert.equal(
-          response.data.after.day.used,
-          response.data.before.day.used + 5,
-          'The day counter should move by 5'
-        );
+        expect(response.data.after.used, 'The month counter should move by 5').toBe(response.data.before.used + 5);
+        expect(response.data.after.day.used, 'The day counter should move by 5').toBe(response.data.before.day.used + 5);
 
         state.afterCustomAmount = response.data.after;
       },
@@ -124,78 +100,62 @@ module.exports = defineCases({
     // Test 5: Verify custom amount persisted
     {
       name: 'verify-custom-amount-persisted',
-      async run({ firestore, assert, state, accounts }) {
+      async run({ firestore, expect, state, accounts }) {
         const userDoc = await firestore.get(`users/${accounts.basic.uid}`);
 
-        assert.ok(userDoc?.usage?.requests, 'User should have requests usage');
+        expect(userDoc?.usage?.requests, 'User should have requests usage').toBeTruthy();
 
-        assert.equal(
-          userDoc.usage.requests.monthly,
-          state.afterCustomAmount.used,
-          'Requests monthly should be persisted'
-        );
-        assert.equal(
-          userDoc.usage.requests.daily,
-          state.afterCustomAmount.day.used,
-          'Requests daily should be persisted'
-        );
+        expect(userDoc.usage.requests.monthly, 'Requests monthly should be persisted').toBe(state.afterCustomAmount.used);
+        expect(userDoc.usage.requests.daily, 'Requests daily should be persisted').toBe(state.afterCustomAmount.day.used);
       },
     },
 
     // Test 6: Multiple consumes accumulate
     {
       name: 'multiple-consumes-accumulate',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // First consume
         const response1 = await http.as('basic').post('omega/test/usage', {});
 
-        assert.isSuccess(response1, 'First consume should succeed');
+        expect(response1, 'First consume should succeed').toBeSuccess();
 
         // Second consume
         const response2 = await http.as('basic').post('omega/test/usage', {});
 
-        assert.isSuccess(response2, 'Second consume should succeed');
+        expect(response2, 'Second consume should succeed').toBeSuccess();
 
         // Third consume with a custom amount
         const response3 = await http.as('basic').post('omega/test/usage', {
           amount: 3,
         });
 
-        assert.isSuccess(response3, 'Third consume should succeed');
+        expect(response3, 'Third consume should succeed').toBeSuccess();
 
         // Verify accumulation: should be initial + 1 (test 2) + 5 (test 4) + 1 + 1 + 3 = initial + 11
         const expectedMonthly = state.initialMonthly + 11;
         const expectedDaily = state.initialDaily + 11;
 
-        assert.equal(
-          response3.data.after.used,
-          expectedMonthly,
-          `The month counter should accumulate to ${expectedMonthly}`
-        );
-        assert.equal(
-          response3.data.after.day.used,
-          expectedDaily,
-          `The day counter should accumulate to ${expectedDaily}`
-        );
+        expect(response3.data.after.used, `The month counter should accumulate to ${expectedMonthly}`).toBe(expectedMonthly);
+        expect(response3.data.after.day.used, `The day counter should accumulate to ${expectedDaily}`).toBe(expectedDaily);
       },
     },
 
     // Test 7: Unauthenticated usage tracks by IP in usage collection
     {
       name: 'unauthenticated-usage-by-ip',
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         // Unauthenticated requests use IP as key (no proxy headers in emulator, so falls back to 'unknown')
         state.unauthKey = 'unknown';
 
         const response = await http.as('none').post('omega/test/usage', {});
 
-        assert.isSuccess(response, 'Unauthenticated usage consume should succeed');
-        assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
-        assert.equal(response.data.key, state.unauthKey, 'Key should be unknown');
+        expect(response, 'Unauthenticated usage consume should succeed').toBeSuccess();
+        expect(response.data.authenticated, 'Should report as unauthenticated').toBe(false);
+        expect(response.data.key, 'Key should be unknown').toBe(state.unauthKey);
 
         // Verify both counters moved
-        assert.equal(response.data.after.used, response.data.before.used + 1, 'The month counter should move by 1');
-        assert.equal(response.data.after.day.used, response.data.before.day.used + 1, 'The day counter should move by 1');
+        expect(response.data.after.used, 'The month counter should move by 1').toBe(response.data.before.used + 1);
+        expect(response.data.after.day.used, 'The day counter should move by 1').toBe(response.data.before.day.used + 1);
 
         state.unauthMonthly = response.data.after.used;
       },
@@ -204,12 +164,12 @@ module.exports = defineCases({
     // Test 8: Verify unauthenticated usage persisted to usage collection
     {
       name: 'verify-unauthenticated-usage-persisted',
-      async run({ firestore, assert, state }) {
+      async run({ firestore, expect, state }) {
         const usageDoc = await firestore.get(`usage/${state.unauthKey}`);
 
-        assert.ok(usageDoc, 'Usage doc should exist in usage collection');
-        assert.ok(usageDoc?.requests, 'Usage doc should have the requests feature');
-        assert.equal(usageDoc.requests.monthly, state.unauthMonthly, 'Persisted monthly should match');
+        expect(usageDoc, 'Usage doc should exist in usage collection').toBeTruthy();
+        expect(usageDoc?.requests, 'Usage doc should have the requests feature').toBeTruthy();
+        expect(usageDoc.requests.monthly, 'Persisted monthly should match').toBe(state.unauthMonthly);
       },
     },
 
@@ -220,10 +180,10 @@ module.exports = defineCases({
       // the alphabetical sequence. In EXTENDED mode the real-API jobs ahead of
       // it can take ~50s combined — override the suite's 30s default.
       timeout: 75000,
-      async run({ assert, firestore, state, accounts, waitFor, pubsub }) {
+      async run({ expect, firestore, state, accounts, waitFor, pubsub }) {
         // Verify daily counter is > 0 before cron
         const beforeDoc = await firestore.get(`users/${accounts.basic.uid}`);
-        assert.ok(beforeDoc?.usage?.requests?.daily > 0, 'Daily counter should be > 0 before cron');
+        expect(beforeDoc?.usage?.requests?.daily > 0, 'Daily counter should be > 0 before cron').toBeTruthy();
 
         // Store monthly and total before cron (should NOT be reset by daily cron)
         state.monthlyBeforeCron = beforeDoc.usage.requests.monthly;
@@ -247,9 +207,9 @@ module.exports = defineCases({
             70000,
             500
           );
-          assert.ok(true, 'Daily counter was reset to 0 by cron');
+          expect(true, 'Daily counter was reset to 0 by cron').toBeTruthy();
         } catch (error) {
-          assert.fail('Daily counter should be reset to 0 within 70s');
+          expect.fail('Daily counter should be reset to 0 within 70s');
         }
       },
     },
@@ -257,7 +217,7 @@ module.exports = defineCases({
     // Test 10: Cron preserves monthly and total counters (non-1st of month)
     {
       name: 'cron-preserves-monthly-and-total',
-      async run({ assert, firestore, state, accounts }) {
+      async run({ expect, firestore, state, accounts }) {
         const afterDoc = await firestore.get(`users/${accounts.basic.uid}`);
 
         // The daily cron resets monthly counters on the 1st BY DESIGN
@@ -267,23 +227,15 @@ module.exports = defineCases({
         const boundary = new Date().getDate() === 1 || new Date().getUTCDate() === 1;
         const monthlyOk = afterDoc.usage.requests.monthly === state.monthlyBeforeCron
           || (boundary && afterDoc.usage.requests.monthly === 0);
-        assert.equal(
-          monthlyOk,
-          true,
-          'Monthly counter should be preserved after daily cron (or reset when the run crosses the 1st)'
-        );
-        assert.equal(
-          afterDoc.usage.requests.total,
-          state.totalBeforeCron,
-          'Total counter should be preserved after daily cron'
-        );
+        expect(monthlyOk, 'Monthly counter should be preserved after daily cron (or reset when the run crosses the 1st)').toBe(true);
+        expect(afterDoc.usage.requests.total, 'Total counter should be preserved after daily cron').toBe(state.totalBeforeCron);
       },
     },
 
     // Test 11: Cron deletes unauthenticated usage collection
     {
       name: 'cron-deletes-unauthenticated-usage',
-      async run({ assert, firestore, state, waitFor }) {
+      async run({ expect, firestore, state, waitFor }) {
         // The cron was already triggered in test 9, so the usage collection should be deleted
         try {
           await waitFor(
@@ -294,9 +246,9 @@ module.exports = defineCases({
             10000,
             500
           );
-          assert.ok(true, 'Usage collection doc was deleted by cron');
+          expect(true, 'Usage collection doc was deleted by cron').toBeTruthy();
         } catch (error) {
-          assert.fail('Usage collection doc should be deleted within 10s');
+          expect.fail('Usage collection doc should be deleted within 10s');
         }
       },
     },
@@ -304,22 +256,18 @@ module.exports = defineCases({
     // Test 12: Daily counter accumulates after cron reset
     {
       name: 'daily-counter-accumulates-after-reset',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         // After cron reset the day counter to 0, new consumes start from 0
         const response = await http.as('basic').post('omega/test/usage', {
           amount: 3,
         });
 
-        assert.isSuccess(response, 'Consume after cron reset should succeed');
-        assert.equal(response.data.before.day.used, 0, 'The day counter should be 0 after cron reset');
-        assert.equal(response.data.after.day.used, 3, 'The day counter should be 3 after consuming');
+        expect(response, 'Consume after cron reset should succeed').toBeSuccess();
+        expect(response.data.before.day.used, 'The day counter should be 0 after cron reset').toBe(0);
+        expect(response.data.after.day.used, 'The day counter should be 3 after consuming').toBe(3);
 
         // Monthly should have continued accumulating (not reset)
-        assert.equal(
-          response.data.after.used,
-          response.data.before.used + 3,
-          'The month counter should continue accumulating'
-        );
+        expect(response.data.after.used, 'The month counter should continue accumulating').toBe(response.data.before.used + 3);
       },
     },
 
@@ -330,24 +278,16 @@ module.exports = defineCases({
     // accumulation tests above assert on.
     {
       name: 'negative-amount-clamps-to-zero',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('basic').post('omega/test/usage', {
           amount: -5,
         });
 
-        assert.isSuccess(response, 'A negative amount should be accepted and clamped, not rejected');
-        assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
+        expect(response, 'A negative amount should be accepted and clamped, not rejected').toBeSuccess();
+        expect(response.data.amount, 'Amount should clamp to 0').toBe(0);
 
-        assert.equal(
-          response.data.after.used,
-          response.data.before.used,
-          'The month counter must not go down'
-        );
-        assert.equal(
-          response.data.after.day.used,
-          response.data.before.day.used,
-          'The day counter must not go down'
-        );
+        expect(response.data.after.used, 'The month counter must not go down').toBe(response.data.before.used);
+        expect(response.data.after.day.used, 'The day counter must not go down').toBe(response.data.before.day.used);
       },
     },
 
@@ -355,19 +295,15 @@ module.exports = defineCases({
     // keyed by IP — the exact bucket the unclamped amount let anyone reset.
     {
       name: 'negative-amount-clamps-for-unauthenticated-callers',
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.as('none').post('omega/test/usage', {
           amount: -5,
         });
 
-        assert.isSuccess(response, 'Unauthenticated consume should succeed');
-        assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
-        assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
-        assert.equal(
-          response.data.after.used,
-          response.data.before.used,
-          'The month counter must not go down'
-        );
+        expect(response, 'Unauthenticated consume should succeed').toBeSuccess();
+        expect(response.data.authenticated, 'Should report as unauthenticated').toBe(false);
+        expect(response.data.amount, 'Amount should clamp to 0').toBe(0);
+        expect(response.data.after.used, 'The month counter must not go down').toBe(response.data.before.used);
       },
     },
   ],

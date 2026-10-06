@@ -11,20 +11,16 @@
  *     redirect rule the manager's edge service reconciles, and the web build
  *     answers no redirect config at all.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { buildSite, buildWith, miniData, BARE, PKG } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
 let pages;
-before(async () => {
-  pages = await buildWith(miniData, {}, 'redirects');
-});
 
 // ─── The redirect PAGE ───────────────────────────────────────────────────────
 
@@ -62,121 +58,153 @@ function canonical(html) {
   return href[1] ?? href[2];
 }
 
-test('a redirect page emits meta-refresh, canonical and noindex — the destination, not itself', () => {
-  const account = pages.get('/account');
-  assert.ok(account, 'the framework /account shortlink ships');
+module.exports = defineCases({
+  type: 'group',
+  description: 'redirects',
+  setup: async () => {
+    pages = await buildWith(miniData, {}, 'redirects');
+  },
+  tests: [
+    {
+      name: 'a redirect page emits meta-refresh, canonical and noindex — the destination, not itself',
+      run: (ctx) => {
+        const account = pages.get('/account');
+        ctx.expect(account, 'the framework /account shortlink ships').toBeTruthy();
 
-  const refresh = metaRefresh(account);
-  assert.ok(refresh, '/account carries a meta-refresh');
-  assert.strictEqual(refresh.delay, '0', 'with JS off there is nothing to wait for');
-  assert.strictEqual(refresh.url, 'https://mini.example.com/dashboard/account', 'a site-relative destination is absolutized against the site url');
-  assert.ok(refresh.inNoscript, 'the refresh sits in <noscript> so the module keeps the querystring-forwarding hop');
+        const refresh = metaRefresh(account);
+        ctx.expect(refresh, '/account carries a meta-refresh').toBeTruthy();
+        ctx.expect(refresh.delay, 'with JS off there is nothing to wait for').toBe('0');
+        ctx.expect(refresh.url, 'a site-relative destination is absolutized against the site url').toBe('https://mini.example.com/dashboard/account');
+        ctx.expect(refresh.inNoscript, 'the refresh sits in <noscript> so the module keeps the querystring-forwarding hop').toBeTruthy();
 
-  assert.strictEqual(canonical(account), 'https://mini.example.com/dashboard/account', 'the canonical is the DESTINATION — this URL is not a page');
-  assert.ok(account.includes('<meta name="robots" content="noindex'), 'and the shortlink itself is never indexed');
-});
+        ctx.expect(canonical(account), 'the canonical is the DESTINATION — this URL is not a page').toBe('https://mini.example.com/dashboard/account');
+        ctx.expect(account.includes('<meta name="robots" content="noindex'), 'and the shortlink itself is never indexed').toBeTruthy();
+      },
+    },
 
-test('an absolute destination ships verbatim', () => {
-  const external = pages.get('/test/redirect/external');
+    {
+      name: 'an absolute destination ships verbatim',
+      run: (ctx) => {
+        const external = pages.get('/test/redirect/external');
 
-  assert.strictEqual(metaRefresh(external).url, 'https://google.com', 'another origin is already absolute');
-  assert.strictEqual(canonical(external), 'https://google.com');
-});
+        ctx.expect(metaRefresh(external).url, 'another origin is already absolute').toBe('https://google.com');
+        ctx.expect(canonical(external)).toBe('https://google.com');
+      },
+    },
 
-// #624 — the hop is a LAYOUT asset now (js/layouts/modules/utilities/redirect.js),
-// resolved from the manifest by layout name, and applied across the page's whole
-// layout CHAIN: /careers renders `blueprint/careers`, which sits ON the redirect
-// layout, so keying the lookup on the page's own `layout` alone would leave that
-// shortlink with no hop at all.
-test('the redirect hop is a layout asset, and reaches a page through the layout CHAIN', () => {
-  const SCRIPT = '/assets/js/layouts/modules/utilities/redirect-TEST.js';
+    // #624 — the hop is a LAYOUT asset now (js/layouts/modules/utilities/redirect.js),
+    // resolved from the manifest by layout name, and applied across the page's whole
+    // layout CHAIN: /careers renders `blueprint/careers`, which sits ON the redirect
+    // layout, so keying the lookup on the page's own `layout` alone would leave that
+    // shortlink with no hop at all.
+    {
+      name: 'the redirect hop is a layout asset, and reaches a page through the layout CHAIN',
+      run: (ctx) => {
+        const SCRIPT = '/assets/js/layouts/modules/utilities/redirect-TEST.js';
 
-  const account = pages.get('/account');
-  assert.ok(account.includes(SCRIPT), 'a page on the redirect layout gets its script');
-  assert.ok(account.indexOf('/assets/js/main-TEST.js') < account.indexOf(SCRIPT), 'from the foot, after the main bundle');
-  assert.ok(!account.includes('/assets/js/modules/'), 'and the fixed-URL modules lane is gone');
+        const account = pages.get('/account');
+        ctx.expect(account.includes(SCRIPT), 'a page on the redirect layout gets its script').toBeTruthy();
+        ctx.expect(account.indexOf('/assets/js/main-TEST.js') < account.indexOf(SCRIPT), 'from the foot, after the main bundle').toBeTruthy();
+        ctx.expect(!account.includes('/assets/js/modules/'), 'and the fixed-URL modules lane is gone').toBeTruthy();
 
-  assert.ok(pages.get('/careers').includes(SCRIPT), 'a blueprint sitting on the redirect layout gets it too');
-  assert.ok(!pages.get('/pricing').includes(SCRIPT), 'a page on no such layout gets nothing');
-});
+        ctx.expect(pages.get('/careers').includes(SCRIPT), 'a blueprint sitting on the redirect layout gets it too').toBeTruthy();
+        ctx.expect(!pages.get('/pricing').includes(SCRIPT), 'a page on no such layout gets nothing').toBeTruthy();
+      },
+    },
 
-test('a redirect page the framework ships is noindex — no blueprint re-opens the index', () => {
-  // /careers is the shipped default: a `blueprint/careers` layout on top of
-  // the redirect layout, forwarding to an external form. Whatever a blueprint
-  // in the chain declares, the two head signals must keep agreeing — a URL
-  // whose canonical points somewhere else is never its own indexable page.
-  const careers = pages.get('/careers');
-  assert.ok(careers, 'the framework /careers page ships');
+    {
+      name: 'a redirect page the framework ships is noindex — no blueprint re-opens the index',
+      run: (ctx) => {
+        // /careers is the shipped default: a `blueprint/careers` layout on top of
+        // the redirect layout, forwarding to an external form. Whatever a blueprint
+        // in the chain declares, the two head signals must keep agreeing — a URL
+        // whose canonical points somewhere else is never its own indexable page.
+        const careers = pages.get('/careers');
+        ctx.expect(careers, 'the framework /careers page ships').toBeTruthy();
 
-  assert.match(canonical(careers), /^https:\/\/docs\.google\.com\/forms\//, 'the canonical is the form it forwards to');
-  assert.ok(careers.includes('<meta name="robots" content="noindex'), 'and the forwarding URL itself is never indexed');
-});
+        ctx.expect(canonical(careers), 'the canonical is the form it forwards to').toMatch(/^https:\/\/docs\.google\.com\/forms\//);
+        ctx.expect(careers.includes('<meta name="robots" content="noindex'), 'and the forwarding URL itself is never indexed').toBeTruthy();
+      },
+    },
 
-test('a destination that is absolute WITHOUT a scheme ships verbatim too', async () => {
-  // `contains "://"` was the wrong test for "is this relative?": a
-  // protocol-relative destination is already absolute, and prefixing the site
-  // url built `https://bare.example.com//cdn.example.com/…`. Only a path — one
-  // leading slash — is site-relative.
-  // Inside the package, not os.tmpdir (index-posture.test.js): Eleventy matches
-  // its ignores against CWD-relative paths.
-  const consumerDir = path.join(PKG, '.omega', 'redirects-consumer-src');
-  fs.rmSync(consumerDir, { recursive: true, force: true });
-  fs.cpSync(BARE, consumerDir, { recursive: true });
-  fs.writeFileSync(path.join(consumerDir, 'pages', 'whitepaper.html'), [
-    '---',
-    'layout: modules/utilities/redirect',
-    'permalink: /whitepaper',
-    'redirect:',
-    '  url: "//cdn.example.com/whitepaper.pdf"',
-    '---',
-    '',
-  ].join('\n'));
+    {
+      name: 'a destination that is absolute WITHOUT a scheme ships verbatim too',
+      run: async (ctx) => {
+        // `contains "://"` was the wrong test for "is this relative?": a
+        // protocol-relative destination is already absolute, and prefixing the site
+        // url built `https://bare.example.com//cdn.example.com/…`. Only a path — one
+        // leading slash — is site-relative.
+        // Inside the package, not os.tmpdir (index-posture.test.js): Eleventy matches
+        // its ignores against CWD-relative paths.
+        const consumerDir = path.join(PKG, '.omega', 'redirects-consumer-src');
+        fs.rmSync(consumerDir, { recursive: true, force: true });
+        fs.cpSync(BARE, consumerDir, { recursive: true });
+        fs.writeFileSync(path.join(consumerDir, 'pages', 'whitepaper.html'), [
+          '---',
+          'layout: modules/utilities/redirect',
+          'permalink: /whitepaper',
+          'redirect:',
+          '  url: "//cdn.example.com/whitepaper.pdf"',
+          '---',
+          '',
+        ].join('\n'));
 
-  try {
-    const built = await buildSite(consumerDir, bareData, {}, 'redirects-consumer');
-    const whitepaper = built.get('/whitepaper');
-    assert.ok(whitepaper, 'the consumer redirect page builds');
+        try {
+          const built = await buildSite(consumerDir, bareData, {}, 'redirects-consumer');
+          const whitepaper = built.get('/whitepaper');
+          ctx.expect(whitepaper, 'the consumer redirect page builds').toBeTruthy();
 
-    assert.strictEqual(metaRefresh(whitepaper).url, '//cdn.example.com/whitepaper.pdf', 'protocol-relative is already absolute');
-    assert.strictEqual(canonical(whitepaper), '//cdn.example.com/whitepaper.pdf', 'and the canonical says the same thing');
-  } finally {
-    fs.rmSync(consumerDir, { recursive: true, force: true });
-  }
-});
+          ctx.expect(metaRefresh(whitepaper).url, 'protocol-relative is already absolute').toBe('//cdn.example.com/whitepaper.pdf');
+          ctx.expect(canonical(whitepaper), 'and the canonical says the same thing').toBe('//cdn.example.com/whitepaper.pdf');
+        } finally {
+          fs.rmSync(consumerDir, { recursive: true, force: true });
+        }
+      },
+    },
 
-test('a page that is not a redirect is canonical to itself and carries no refresh', () => {
-  const pricing = pages.get('/pricing');
+    {
+      name: 'a page that is not a redirect is canonical to itself and carries no refresh',
+      run: (ctx) => {
+        const pricing = pages.get('/pricing');
 
-  assert.strictEqual(metaRefresh(pricing), null, 'nothing to refresh to');
-  assert.strictEqual(canonical(pricing), 'https://mini.example.com/pricing');
-});
+        ctx.expect(metaRefresh(pricing), 'nothing to refresh to').toBe(null);
+        ctx.expect(canonical(pricing)).toBe('https://mini.example.com/pricing');
+      },
+    },
 
-// ─── The retired config lane (#466) ──────────────────────────────────────────
+    // ─── The retired config lane (#466) ──────────────────────────────────────────
 
-test('the web build carries no redirect config engine at all', () => {
-  assert.strictEqual(fs.existsSync(path.join(__dirname, '..', 'src', 'redirects.js')), false,
-    'the `targets.web.redirects` pattern engine is deleted — the edge compiles templated redirects now');
+    {
+      name: 'the web build carries no redirect config engine at all',
+      run: (ctx) => {
+        ctx.expect(fs.existsSync(path.join(__dirname, '..', 'src', 'redirects.js')), 'the `targets.web.redirects` pattern engine is deleted — the edge compiles templated redirects now').toBe(false);
 
-  for (const module of ['libs/redirect-map.js', 'modules/redirect-map.js']) {
-    assert.strictEqual(fs.existsSync(path.join(__dirname, '..', 'core', 'js', module)), false,
-      `${module} was the browser half of the 404 map and goes with it`);
-  }
-});
+        for (const module of ['libs/redirect-map.js', 'modules/redirect-map.js']) {
+          ctx.expect(fs.existsSync(path.join(__dirname, '..', 'core', 'js', module)), `${module} was the browser half of the 404 map and goes with it`).toBe(false);
+        }
+      },
+    },
 
-test('the built 404 page answers nothing but 404', () => {
-  const notFound = pages.get('/404');
+    {
+      name: 'the built 404 page answers nothing but 404',
+      run: (ctx) => {
+        const notFound = pages.get('/404');
 
-  assert.ok(notFound.includes('Error 404'), 'the page itself is unchanged');
-  assert.ok(!notFound.includes('omega-redirect-map'), 'no map rides it');
-  assert.ok(!notFound.includes('redirect-map.bundle.js'), 'and no module reads one');
-});
+        ctx.expect(notFound.includes('Error 404'), 'the page itself is unchanged').toBeTruthy();
+        ctx.expect(!notFound.includes('omega-redirect-map'), 'no map rides it').toBeTruthy();
+        ctx.expect(!notFound.includes('redirect-map.bundle.js'), 'and no module reads one').toBeTruthy();
+      },
+    },
 
-test('the dev server mounts no redirect middleware — the edge owns those routes, dev sees a 404', () => {
-  const { devServerOptions } = require('../src/commands/dev.js');
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-redirects-'));
+    {
+      name: 'the dev server mounts no redirect middleware — the edge owns those routes, dev sees a 404',
+      run: (ctx) => {
+        const { devServerOptions } = require('../src/commands/dev.js');
+        const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-redirects-'));
 
-  assert.strictEqual(devServerOptions(out).middleware.length, 3,
-    'the auth proxy, clean-urls and the image fallback are all there is');
-  assert.strictEqual(devServerOptions.length, 3,
-    'and the compiled-map parameter is gone from the signature');
+        ctx.expect(devServerOptions(out).middleware.length, 'the auth proxy, clean-urls and the image fallback are all there is').toBe(3);
+        ctx.expect(devServerOptions.length, 'and the compiled-map parameter is gone from the signature').toBe(3);
+      },
+    },
+  ],
 });

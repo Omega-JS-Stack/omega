@@ -37,15 +37,6 @@ const STANDING = new Set([
 // The files still owed by a later group. A group that converts a file deletes
 // its line here; the last group leaves the set empty.
 const ALLOWED = new Set([
-  // Backend group
-  'packages/backend/src/omega/index.js',
-  'packages/backend/src/test/run-tests.js',
-  'packages/backend/src/test/runner.js',
-  'packages/backend/test/helpers/_boot-omega.js',
-  'packages/backend/test/helpers/omega-instance.test.js',
-  'packages/backend/README.md',
-  'docs/backend/index.md',
-
   // Desktop with extension group
   'packages/desktop/src/utils/runner-env.js',
   'packages/desktop/src/commands/runner.js',

@@ -9,10 +9,9 @@
  * animation sheet to EVERY core sheet that declares a loop, roster derived
  * from the tree; #186 widens the roster again, over the theme trees.
  */
-const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const sass = require('sass');
 
 const { PKG } = require('./lib/build.js');
@@ -87,98 +86,114 @@ const parkedRules = (css) => {
   return parks;
 };
 
-test('#184: every continuous loop utility parks under reduced motion', () => {
-  const { css, warnings } = compileAnimationSheet();
+module.exports = defineCases({
+  type: 'group',
+  description: 'animations',
+  tests: [
+    {
+      name: '#184: every continuous loop utility parks under reduced motion',
+      run: (ctx) => {
+        const { css, warnings } = compileAnimationSheet();
 
-  assert.deepEqual(warnings, [], 'new core css never warns (the #16 bar)');
+        ctx.expect(warnings, 'new core css never warns (the #16 bar)').toEqual([]);
 
-  const loops = loopingSelectors(css);
-  assert.deepEqual(
-    loops.sort(),
-    [
-      '.animation-bounce',
-      '.animation-flex',
-      '.animation-pulse',
-      '.animation-pulse-right',
-      '.animation-shimmer',
-      '.animation-spin',
-      '.animation-wiggle',
-    ],
-    'the loop roster the sheet ships; a new one joins this list AND gets a park',
-  );
+        const loops = loopingSelectors(css);
+        ctx.expect(loops.sort(), 'the loop roster the sheet ships; a new one joins this list AND gets a park').toEqual([
+            '.animation-bounce',
+            '.animation-flex',
+            '.animation-pulse',
+            '.animation-pulse-right',
+            '.animation-shimmer',
+            '.animation-spin',
+            '.animation-wiggle',
+          ]);
 
-  const parks = parkedRules(css);
-  for (const loop of loops) {
-    assert.ok(parks.has(loop), `${loop} loops forever with no reduced-motion park`);
-    assert.match(parks.get(loop), /animation: none/, `${loop}'s park stops the loop outright`);
-  }
-});
+        const parks = parkedRules(css);
+        for (const loop of loops) {
+          ctx.expect(parks.has(loop), `${loop} loops forever with no reduced-motion park`).toBeTruthy();
+          ctx.expect(parks.get(loop), `${loop}'s park stops the loop outright`).toMatch(/animation: none/);
+        }
+      },
+    },
 
-test('#184: the shimmer parks at its resting frame, not on an initial background-position', () => {
-  const { css } = compileAnimationSheet();
+    {
+      name: '#184: the shimmer parks at its resting frame, not on an initial background-position',
+      run: (ctx) => {
+        const { css } = compileAnimationSheet();
 
-  // Dropping the animation hands the element back its authored
-  // background-position; the loop rests at `0 50%`, so the park says so
-  // rather than leaving a tall gradient parked off its band.
-  assert.match(parkedRules(css).get('.animation-shimmer'), /background-position: 0 50%/);
-});
+        // Dropping the animation hands the element back its authored
+        // background-position; the loop rests at `0 50%`, so the park says so
+        // rather than leaving a tall gradient parked off its band.
+        ctx.expect(parkedRules(css).get('.animation-shimmer')).toMatch(/background-position: 0 50%/);
+      },
+    },
 
-test('#184: one-shot utilities are NOT parked, because a 1s fade is not a motion hazard', () => {
-  const { css } = compileAnimationSheet();
+    {
+      name: '#184: one-shot utilities are NOT parked, because a 1s fade is not a motion hazard',
+      run: (ctx) => {
+        const { css } = compileAnimationSheet();
 
-  const parks = parkedRules(css);
-  for (const oneShot of [
-    '.animation-fade-in',
-    '.animation-fade-out',
-    '.animation-slide-up',
-    '.animation-slide-down',
-    '.animation-popup',
-    '.animation-popup-medium',
-  ]) {
-    assert.ok(!parks.has(oneShot), `${oneShot} plays once and finishes; parking it would strand its start frame`);
-  }
-});
+        const parks = parkedRules(css);
+        for (const oneShot of [
+          '.animation-fade-in',
+          '.animation-fade-out',
+          '.animation-slide-up',
+          '.animation-slide-down',
+          '.animation-popup',
+          '.animation-popup-medium',
+        ]) {
+          ctx.expect(!parks.has(oneShot), `${oneShot} plays once and finishes; parking it would strand its start frame`).toBeTruthy();
+        }
+      },
+    },
 
-test('#185: every core sheet that loops parks that loop, not just the animation sheet', () => {
-  const sheets = loopingSheets(CSS_DIR);
-  assert.ok(sheets.includes(ANIMATION_SHEET), 'the derivation finds the animation sheet at minimum');
+    {
+      name: '#185: every core sheet that loops parks that loop, not just the animation sheet',
+      run: (ctx) => {
+        const sheets = loopingSheets(CSS_DIR);
+        ctx.expect(sheets.includes(ANIMATION_SHEET), 'the derivation finds the animation sheet at minimum').toBeTruthy();
 
-  for (const sheet of sheets) {
-    const name = path.relative(PKG, sheet);
-    const { css } = compileSheet(sheet);
+        for (const sheet of sheets) {
+          const name = path.relative(PKG, sheet);
+          const { css } = compileSheet(sheet);
 
-    const loops = loopingSelectors(css);
-    assert.ok(loops.length > 0, `${name}: source declares a loop, so the compiled sheet must show one`);
+          const loops = loopingSelectors(css);
+          ctx.expect(loops.length > 0, `${name}: source declares a loop, so the compiled sheet must show one`).toBeTruthy();
 
-    const parks = parkedRules(css);
-    for (const loop of loops) {
-      assert.ok(parks.has(loop), `${name}: \`${loop}\` loops forever with no reduced-motion park`);
-      assert.match(parks.get(loop), /animation: none/, `${name}: \`${loop}\`'s park stops the loop outright`);
-    }
-  }
-});
+          const parks = parkedRules(css);
+          for (const loop of loops) {
+            ctx.expect(parks.has(loop), `${name}: \`${loop}\` loops forever with no reduced-motion park`).toBeTruthy();
+            ctx.expect(parks.get(loop), `${name}: \`${loop}\`'s park stops the loop outright`).toMatch(/animation: none/);
+          }
+        }
+      },
+    },
 
-test('#186: theme sheets loop under the same deal as core css', () => {
-  const sheets = loopingSheets(THEMES_DIR);
-  for (const theme of ['base', 'classy', 'newsflash']) {
-    assert.ok(sheets.some((sheet) => sheet.startsWith(path.join(THEMES_DIR, theme) + path.sep)),
-      `the derivation still reaches themes/${theme}`);
-  }
+    {
+      name: '#186: theme sheets loop under the same deal as core css',
+      run: (ctx) => {
+        const sheets = loopingSheets(THEMES_DIR);
+        for (const theme of ['base', 'classy', 'newsflash']) {
+          ctx.expect(sheets.some((sheet) => sheet.startsWith(path.join(THEMES_DIR, theme) + path.sep)), `the derivation still reaches themes/${theme}`).toBeTruthy();
+        }
 
-  const compiled = new Map();
-  for (const sheet of sheets) {
-    const name = path.relative(PKG, sheet);
-    const unit = compileUnitFor(sheet);
-    if (!compiled.has(unit)) compiled.set(unit, compileSheet(unit).css);
-    const css = compiled.get(unit);
+        const compiled = new Map();
+        for (const sheet of sheets) {
+          const name = path.relative(PKG, sheet);
+          const unit = compileUnitFor(sheet);
+          if (!compiled.has(unit)) compiled.set(unit, compileSheet(unit).css);
+          const css = compiled.get(unit);
 
-    const loops = loopingSelectors(css, loopNames(sheet));
-    assert.ok(loops.length > 0, `${name}: source declares a loop, so the compiled theme must show one`);
+          const loops = loopingSelectors(css, loopNames(sheet));
+          ctx.expect(loops.length > 0, `${name}: source declares a loop, so the compiled theme must show one`).toBeTruthy();
 
-    const parks = parkedRules(css);
-    for (const loop of loops) {
-      assert.ok(parks.has(loop), `${name}: \`${loop}\` loops forever with no reduced-motion park`);
-      assert.match(parks.get(loop), /animation: none/, `${name}: \`${loop}\`'s park stops the loop outright`);
-    }
-  }
+          const parks = parkedRules(css);
+          for (const loop of loops) {
+            ctx.expect(parks.has(loop), `${name}: \`${loop}\` loops forever with no reduced-motion park`).toBeTruthy();
+            ctx.expect(parks.get(loop), `${name}: \`${loop}\`'s park stops the loop outright`).toMatch(/animation: none/);
+          }
+        }
+      },
+    },
+  ],
 });

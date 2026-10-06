@@ -6,17 +6,12 @@
  * Read off the rendered /signup of the mini fixture (the checks.test.js
  * harness), so the brand name is the one the build interpolates.
  */
-const assert = require('node:assert');
-const { test, before } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 
 const { buildWith, miniData } = require('./lib/build.js');
 
 let signup;
-
-before(async () => {
-  const pages = await buildWith(miniData, {}, 'signup-age-label-test');
-  signup = pages.get('/signup');
-});
 
 /**
  * The legal consent checkbox inputs on the page.
@@ -36,25 +31,44 @@ function legalCheckboxes() {
 function legalLabel() {
   const id = legalCheckboxes()[0].match(/\sid="([^"]+)"/)[1];
   const match = signup.match(new RegExp(`<label\\b[^>]*\\sfor="${id}"[^>]*>([\\s\\S]*?)</label>`));
-  assert.ok(match, `a label is bound to #${id}`);
+  expect(match, `a label is bound to #${id}`).toBeTruthy();
 
   return match[1];
 }
 
-test('signup: the page has exactly one legal consent checkbox', () => {
-  assert.ok(signup, '/signup built');
-  assert.equal(legalCheckboxes().length, 1, 'one consentLegal checkbox');
-});
+module.exports = defineCases({
+  type: 'group',
+  description: 'signup-age-label',
+  setup: async () => {
+    const pages = await buildWith(miniData, {}, 'signup-age-label-test');
+    signup = pages.get('/signup');
+  },
+  tests: [
+    {
+      name: 'signup: the page has exactly one legal consent checkbox',
+      run: (ctx) => {
+        ctx.expect(signup, '/signup built').toBeTruthy();
+        ctx.expect(legalCheckboxes().length, 'one consentLegal checkbox').toBe(1);
+      },
+    },
 
-test('signup: the terms label states the minimum age', () => {
-  const text = legalLabel().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    {
+      name: 'signup: the terms label states the minimum age',
+      run: (ctx) => {
+        const text = legalLabel().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
-  assert.equal(text, 'I agree to MiniCo\'s Terms of Service and Privacy Policy, and I am at least 13 years old.');
-});
+        ctx.expect(text).toBe('I agree to MiniCo\'s Terms of Service and Privacy Policy, and I am at least 13 years old.');
+      },
+    },
 
-test('signup: the terms label still links the Terms and the Privacy Policy', () => {
-  const label = legalLabel();
+    {
+      name: 'signup: the terms label still links the Terms and the Privacy Policy',
+      run: (ctx) => {
+        const label = legalLabel();
 
-  assert.match(label, /<a\b[^>]*\shref="\/terms"/, 'the Terms of Service link');
-  assert.match(label, /<a\b[^>]*\shref="\/privacy"/, 'the Privacy Policy link');
+        ctx.expect(label, 'the Terms of Service link').toMatch(/<a\b[^>]*\shref="\/terms"/);
+        ctx.expect(label, 'the Privacy Policy link').toMatch(/<a\b[^>]*\shref="\/privacy"/);
+      },
+    },
+  ],
 });

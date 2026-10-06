@@ -17,19 +17,30 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const TestRunner = require('../../dist/test/runner.js');
+const { discoverSuites } = require('../../dist/vendor/devkit/test/discovery.js');
+const { FRAMEWORK_IDS } = require('../../dist/vendor/devkit/test/scope.js');
+const { declaredLanes } = require('../../dist/utils/test-lanes.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// A runner with no emulator config whatsoever, over a project that has no
-// test/ dir: every target below names the FRAMEWORK source.
-function runnerFor(testPaths) {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backend-no-match-'));
+const BACKEND_ROOT = path.join(__dirname, '..', '..');
 
-  return new TestRunner({
-    projectDir,
-    testPaths,
-    isFrameworkSelfTest: true,
-  });
+// Discovery as the backend runner configures it, over a project that has no
+// test/ dir: every target below names the FRAMEWORK source.
+function discover(testPaths) {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backend-no-match-'));
+  const config = {
+    framework: 'backend',
+    projectRoot: BACKEND_ROOT,
+    roots: [
+      { source: 'framework', dir: path.join(BACKEND_ROOT, 'test') },
+      { source: 'project', dir: path.join(projectDir, 'test') },
+    ],
+    packageName: '@omega.js/backend',
+    frameworkAliases: FRAMEWORK_IDS['@omega.js/backend'],
+    lanes: declaredLanes(),
+  };
+
+  return discoverSuites(config, { targets: testPaths });
 }
 
 
@@ -63,65 +74,64 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-named-target-that-selects-no-file-comes-back-flagged',
-      async run({ assert }) {
-        const results = await runnerFor(['backend:cli/does-not-exist']).run();
+      async run({ expect }) {
+        const { files, noMatch } = discover(['backend:cli/does-not-exist']);
 
-        assert.equal(results.noMatch, 'backend:cli/does-not-exist');
-        assert.equal(results.passed, 0);
-        assert.equal(results.failed, 0);
+        expect(noMatch).toBe('backend:cli/does-not-exist');
+        expect(files).toEqual([]);
       },
     },
 
     {
       name: 'the-guard-answers-ahead-of-the-preflight-so-a-typo-is-the-reason-given',
-      async run({ assert }) {
+      run({ expect }) {
         // No apiUrl, no adminKey: the preflight would abort this run. The typo
         // is what it reports, and it reports it before connecting to anything.
-        const results = await runnerFor(['backend:cli/does-not-exist']).run();
+        const result = runEntry({});
 
-        assert.equal(results.aborted, false);
+        expect(result.stdout).toMatch(/No test file matches "backend:cli\/does-not-exist"\./);
+        expect(`${result.stdout}${result.stderr}`).not.toMatch(/Pre-flight/);
       },
     },
 
     {
       name: 'a-target-naming-a-real-suite-still-selects-it',
-      async run({ assert }) {
-        const results = await runnerFor(['backend:cli/test-runner-env']).run();
+      async run({ expect }) {
+        const { files, noMatch } = discover(['backend:cli/test-runner-env']);
 
-        // Selected, so the run moved on to the preflight it has no config for.
-        assert.equal(results.noMatch, null);
-        assert.equal(results.aborted, true);
+        expect(noMatch).toBe(null);
+        expect(files.map(({ rel }) => rel)).toEqual([path.join('cli', 'test-runner-env.test.js')]);
       },
     },
 
     {
       name: 'a-run-that-named-no-file-is-not-a-no-match-run',
-      async run({ assert }) {
-        const results = await runnerFor([]).run();
+      async run({ expect }) {
+        const { noMatch } = discover([]);
 
-        assert.equal(results.noMatch, null);
+        expect(noMatch).toBe(null);
       },
     },
 
     {
       name: 'the-runner-entry-exits-1-on-a-no-match',
-      run({ assert }) {
+      run({ expect }) {
         // Standalone: no fan-out signal, whatever this run inherited.
         const result = runEntry({});
 
-        assert.match(result.stdout, /No test file matches "backend:cli\/does-not-exist"\./);
-        assert.equal(result.status, 1);
+        expect(result.stdout).toMatch(/No test file matches "backend:cli\/does-not-exist"\./);
+        expect(result.status).toBe(1);
       },
     },
 
     {
       name: 'in-a-brand-root-fan-out-the-same-miss-answers-with-its-own-exit-code',
-      run({ assert }) {
+      run({ expect }) {
         // The brand root forwards ONE target to every target, so a target that
         // does not carry it is a no-op there rather than a failure.
         const result = runEntry({ OMEGA_TEST_FANOUT: '1' });
 
-        assert.equal(result.status, 3);
+        expect(result.status).toBe(3);
       },
     },
   ],

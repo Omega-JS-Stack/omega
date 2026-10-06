@@ -119,80 +119,80 @@ module.exports = defineCases({
   tests: [
     {
       name: 'stripe-renewal-tracks',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('invoice.payment_succeeded');
 
-        assert.ok(resolved, 'A Stripe renewal should resolve to a trackable event');
-        assert.equal(resolved.event, 'subscription_renew', 'Recurring revenue has its own canonical name');
-        assert.equal(resolved.reason, 'renewal', 'Reason should be renewal');
-        assert.equal(resolved.value, 9.99, 'Renewals track the full price');
-        assert.ok(stripeProvider.isSupported('invoice.payment_succeeded'), 'Stripe provider should accept the same event string');
+        expect(resolved, 'A Stripe renewal should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'Recurring revenue has its own canonical name').toBe('subscription_renew');
+        expect(resolved.reason, 'Reason should be renewal').toBe('renewal');
+        expect(resolved.value, 'Renewals track the full price').toBe(9.99);
+        expect(stripeProvider.isSupported('invoice.payment_succeeded'), 'Stripe provider should accept the same event string').toBeTruthy();
 
         // `invoice.paid` stays out of the INGEST on purpose: Stripe fires it for
         // the same paid invoice, and this resolver has no per-invoice dedup, so
         // ingesting both would report a renewal's revenue twice. The resolver
         // still accepts the string for a brand that pins its endpoint to it —
         // which is exactly why the ingest side has to be the one that decides.
-        assert.equal(stripeProvider.isSupported('invoice.paid'), false, 'Only one Stripe invoice event may be ingested per renewal');
+        expect(stripeProvider.isSupported('invoice.paid'), 'Only one Stripe invoice event may be ingested per renewal').toBe(false);
       },
     },
 
     {
       name: 'paypal-renewal-tracks',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('PAYMENT.SALE.COMPLETED');
 
-        assert.ok(resolved, 'A PayPal renewal should resolve to a trackable event');
-        assert.equal(resolved.reason, 'renewal', 'Reason should be renewal');
-        assert.ok(paypalProvider.isSupported('PAYMENT.SALE.COMPLETED'), 'PayPal provider should accept the same event string');
+        expect(resolved, 'A PayPal renewal should resolve to a trackable event').toBeTruthy();
+        expect(resolved.reason, 'Reason should be renewal').toBe('renewal');
+        expect(paypalProvider.isSupported('PAYMENT.SALE.COMPLETED'), 'PayPal provider should accept the same event string').toBeTruthy();
       },
     },
 
     {
       name: 'chargebee-renewal-tracks',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('subscription_renewed');
 
-        assert.ok(resolved, 'A Chargebee renewal should resolve to a trackable event');
-        assert.equal(resolved.reason, 'renewal', 'Reason should be renewal');
-        assert.equal(resolved.isRecurring, true, 'Renewals are recurring revenue');
-        assert.ok(chargebeeProvider.isSupported('subscription_renewed'), 'Chargebee provider should accept the same event string');
+        expect(resolved, 'A Chargebee renewal should resolve to a trackable event').toBeTruthy();
+        expect(resolved.reason, 'Reason should be renewal').toBe('renewal');
+        expect(resolved.isRecurring, 'Renewals are recurring revenue').toBe(true);
+        expect(chargebeeProvider.isSupported('subscription_renewed'), 'Chargebee provider should accept the same event string').toBeTruthy();
       },
     },
 
     {
       name: 'win-back-tracks-a-purchase-not-a-renewal',
-      async run({ assert }) {
+      async run({ expect }) {
         // A returning subscriber's checkout arrives on a payment event, so before
         // the win-back transition existed this resolved as a renewal — recurring
         // revenue reported for what is a fresh purchase
         const resolved = analytics.resolvePaymentEvent('subscription', 'subscription-winback', 'invoice.payment_succeeded', renewedSubscription(), {});
 
-        assert.ok(resolved, 'A win-back should resolve to a trackable event');
-        assert.equal(resolved.event, 'purchase', 'A win-back is reported as a purchase');
-        assert.equal(resolved.reason, 'winback-purchase', 'Reason should be winback-purchase');
-        assert.equal(resolved.isRecurring, false, 'A win-back is a purchase, not recurring revenue');
-        assert.equal(resolved.value, 9.99, 'Value should be what the customer paid');
+        expect(resolved, 'A win-back should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'A win-back is reported as a purchase').toBe('purchase');
+        expect(resolved.reason, 'Reason should be winback-purchase').toBe('winback-purchase');
+        expect(resolved.isRecurring, 'A win-back is a purchase, not recurring revenue').toBe(false);
+        expect(resolved.value, 'Value should be what the customer paid').toBe(9.99);
       },
     },
 
     {
       name: 'a-declined-checkout-tracks-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         // No money moved — the transition exists to suppress the dunning email,
         // not to report revenue
         const resolved = analytics.resolvePaymentEvent('subscription', 'checkout-declined', 'invoice.payment_failed', renewedSubscription(), {});
 
-        assert.equal(resolved, null, 'A declined checkout should track nothing');
+        expect(resolved, 'A declined checkout should track nothing').toBe(null);
       },
     },
 
     {
       name: 'non-payment-event-tracks-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('subscription_changed');
 
-        assert.equal(resolved, null, 'An event where no money moved should track nothing');
+        expect(resolved, 'An event where no money moved should track nothing').toBe(null);
       },
     },
 
@@ -201,53 +201,53 @@ module.exports = defineCases({
       // native `refund` sat unused and the dashboard's user_refund_request counted a
       // UI click as if it were the outcome.
       name: 'a-subscription-refund-reports-what-went-back',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {},
           { amount: 4.99, currency: 'USD', reason: 'requested_by_customer' }
         );
 
-        assert.ok(resolved, 'A refund should resolve to a trackable event');
-        assert.equal(resolved.event, 'refund', 'The canonical name is GA4\'s own refund event');
-        assert.equal(resolved.value, 4.99, 'A partial refund reports what was actually reversed, not the price');
-        assert.equal(resolved.isRecurring, false, 'Money going back is never recurring revenue');
+        expect(resolved, 'A refund should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'The canonical name is GA4\'s own refund event').toBe('refund');
+        expect(resolved.value, 'A partial refund reports what was actually reversed, not the price').toBe(4.99);
+        expect(resolved.isRecurring, 'Money going back is never recurring revenue').toBe(false);
       },
     },
 
     {
       name: 'a-one-time-refund-reports-the-refund-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'one-time', 'purchase-refunded', 'PAYMENT.CAPTURE.REFUNDED', completedPurchase(), {},
           { amount: 99, currency: 'USD', reason: null }
         );
 
-        assert.equal(resolved.event, 'refund', 'Both categories refund through one canonical event');
-        assert.equal(resolved.value, 99);
-        assert.equal(resolved.productId, 'lifetime', 'The refund keeps the purchase it reversed');
+        expect(resolved.event, 'Both categories refund through one canonical event').toBe('refund');
+        expect(resolved.value).toBe(99);
+        expect(resolved.productId, 'The refund keeps the purchase it reversed').toBe('lifetime');
       },
     },
 
     {
       name: 'a-refund-with-no-provider-amount-falls-back-to-the-price',
-      async run({ assert }) {
+      async run({ expect }) {
         const unified = completedPurchase();
         const resolved = analytics.resolvePaymentEvent('one-time', 'purchase-refunded', 'charge.refunded', unified, {}, null);
 
-        assert.equal(resolved.value, 99, 'A provider that names no amount still reports the reversal');
+        expect(resolved.value, 'A provider that names no amount still reports the reversal').toBe(99);
       },
     },
 
     {
       // Inventory gap 3 (#328): the cancellation transitions fired nothing.
       name: 'a-cancellation-that-took-effect-is-tracked',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'customer.subscription.deleted', renewedSubscription(), {});
 
-        assert.ok(resolved, 'A cancellation should resolve to a trackable event');
-        assert.equal(resolved.event, 'subscription_cancel');
-        assert.equal(resolved.value, 9.99, 'The value is the subscription that ended');
-        assert.equal(resolved.isRecurring, false, 'Nothing was charged');
+        expect(resolved, 'A cancellation should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event).toBe('subscription_cancel');
+        expect(resolved.value, 'The value is the subscription that ended').toBe(9.99);
+        expect(resolved.isRecurring, 'Nothing was charged').toBe(false);
       },
     },
 
@@ -256,29 +256,25 @@ module.exports = defineCases({
       // trial with no card on file by CANCELLING it, so every no-card lapse was
       // booked as paid churn for a customer who had never paid a cent.
       name: 'a-trial-cancelled-with-no-card-on-file-is-a-lapse-not-churn',
-      async run({ assert }) {
+      async run({ expect }) {
         const cancelled = { ...chargebeeSubscriptionInTrial(), status: 'cancelled' };
 
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'subscription-cancelled', 'subscription_cancelled', cancelled, {}, null, chargebeeSubscriptionInTrial()
         );
 
-        assert.ok(resolved, 'a trial cancelled at its end should resolve to a trackable event');
-        assert.equal(resolved.event, 'trial_lapse', 'nobody churned: a trial ended without ever paying');
-        assert.notEqual(resolved.event, 'subscription_cancel', 'a customer who never paid cannot be paid churn');
-        assert.equal(resolved.value, 9.99, 'the value is the subscription that never started paying');
-        assert.equal(resolved.isRecurring, false, 'nothing was ever charged');
+        expect(resolved, 'a trial cancelled at its end should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'nobody churned: a trial ended without ever paying').toBe('trial_lapse');
+        expect(resolved.event, 'a customer who never paid cannot be paid churn').not.toBe('subscription_cancel');
+        expect(resolved.value, 'the value is the subscription that never started paying').toBe(9.99);
+        expect(resolved.isRecurring, 'nothing was ever charged').toBe(false);
 
         // The sweep derives this same id for a lapse, which collapses a race on the
         // two platforms that key on an event id. It is NOT what keeps GA4 honest —
         // GA4 deduplicates ecommerce on `transaction_id`, and a lapse is a CUSTOM
         // event with no such dedupe ([#656]) — a cancelled subscription simply
         // leaves the sweep's `status == active` candidate query.
-        assert.equal(
-          analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } }),
-          'trial_lapse._test-sub-analytics',
-          'the lapse keys on the SUBSCRIPTION however it was announced',
-        );
+        expect(analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } }), 'the lapse keys on the SUBSCRIPTION however it was announced').toBe('trial_lapse._test-sub-analytics');
       },
     },
 
@@ -286,21 +282,21 @@ module.exports = defineCases({
       // The rule reads the unified TERM, never a provider name: a subscriber who
       // simply quits mid-trial on Stripe or PayPal is the same story.
       name: 'a-cancellation-inside-the-trial-is-a-lapse-on-every-provider',
-      async run({ assert }) {
+      async run({ expect }) {
         const cancelled = { ...subscriptionInTrial(), status: 'cancelled' };
 
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, subscriptionInTrial()
         );
 
-        assert.equal(resolved.event, 'trial_lapse', 'quitting mid-trial is the trial\'s outcome, not a churned subscriber');
-        assert.equal(resolved.isRecurring, false);
+        expect(resolved.event, 'quitting mid-trial is the trial\'s outcome, not a churned subscriber').toBe('trial_lapse');
+        expect(resolved.isRecurring).toBe(false);
       },
     },
 
     {
       name: 'a-cancellation-after-the-trial-is-still-paid-churn',
-      async run({ assert }) {
+      async run({ expect }) {
         // The term is the only thing that moved: this subscriber converted and paid,
         // and their cancellation is the churn number it always was.
         const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
@@ -309,8 +305,8 @@ module.exports = defineCases({
           'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, subscriptionAfterTrial()
         );
 
-        assert.equal(resolved.event, 'subscription_cancel', 'subscription_cancel means a PAID subscriber left');
-        assert.equal(resolved.value, 9.99, 'the value is the subscription that ended');
+        expect(resolved.event, 'subscription_cancel means a PAID subscriber left').toBe('subscription_cancel');
+        expect(resolved.value, 'the value is the subscription that ended').toBe(9.99);
       },
     },
 
@@ -320,15 +316,15 @@ module.exports = defineCases({
       // subscription left long ago. So the cancelled payload's own evidence has the
       // last word — a term that outlived the trial's end is a subscriber who paid.
       name: 'a-paid-cancellation-is-churn-even-when-the-stored-record-arrived-degraded',
-      async run({ assert }) {
+      async run({ expect }) {
         const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
 
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, degradedPaidSubscription()
         );
 
-        assert.equal(resolved.event, 'subscription_cancel', 'a thin record on file cannot turn paid churn into a trial');
-        assert.equal(resolved.value, 9.99);
+        expect(resolved.event, 'a thin record on file cannot turn paid churn into a trial').toBe('subscription_cancel');
+        expect(resolved.value).toBe(9.99);
       },
     },
 
@@ -338,14 +334,14 @@ module.exports = defineCases({
       // second webhook used to book paid churn at full price on top of the lapse —
       // the very pollution the lapse rule exists to stop.
       name: 'the-dunning-that-exhausts-a-lapsed-trial-tells-no-second-story',
-      async run({ assert }) {
+      async run({ expect }) {
         // A1: the trial's charge declines. This is the outcome, and it is reported.
         const suspended = { ...subscriptionInTrial(), status: 'suspended' };
         const lapse = analytics.resolvePaymentEvent(
           'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionInTrial()
         );
 
-        assert.equal(lapse.event, 'trial_lapse', 'the decline is where a lapsed trial is told');
+        expect(lapse.event, 'the decline is where a lapsed trial is told').toBe('trial_lapse');
 
         // A2: dunning runs out and the provider cancels what it was holding.
         const cancelled = { ...subscriptionInTrial(), status: 'cancelled' };
@@ -353,18 +349,14 @@ module.exports = defineCases({
           'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, suspended
         );
 
-        assert.equal(resolved, null, 'the outcome was already told at the decline');
+        expect(resolved, 'the outcome was already told at the decline').toBe(null);
 
         // Chargebee suspends a mid-trial subscription with no term of its own, so the
         // same sequence has to read alike through the epoch-expiry shape.
         const chargebeeSuspended = { ...chargebeeSubscriptionInTrial(), status: 'suspended' };
         const chargebeeCancelled = { ...chargebeeSubscriptionInTrial(), status: 'cancelled' };
 
-        assert.equal(
-          analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'subscription_cancelled', chargebeeCancelled, {}, null, chargebeeSuspended),
-          null,
-          'a term that never existed never left the trial either',
-        );
+        expect(analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'subscription_cancelled', chargebeeCancelled, {}, null, chargebeeSuspended), 'a term that never existed never left the trial either').toBe(null);
       },
     },
 
@@ -372,7 +364,7 @@ module.exports = defineCases({
       // The boundary of the rule above: this subscriber converted and paid for
       // months before dunning took them, so the cancellation IS the churn number.
       name: 'the-dunning-that-exhausts-a-paying-subscriber-is-still-churn',
-      async run({ assert }) {
+      async run({ expect }) {
         const suspended = { ...subscriptionAfterTrial(), status: 'suspended' };
         const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
 
@@ -380,19 +372,19 @@ module.exports = defineCases({
           'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, suspended
         );
 
-        assert.equal(resolved.event, 'subscription_cancel', 'a subscriber who paid and then lapsed on dunning is churn');
-        assert.equal(resolved.value, 9.99, 'the value is the subscription that ended');
+        expect(resolved.event, 'a subscriber who paid and then lapsed on dunning is churn').toBe('subscription_cancel');
+        expect(resolved.value, 'the value is the subscription that ended').toBe(9.99);
       },
     },
 
     {
       name: 'requesting-a-cancellation-stays-event-less',
-      async run({ assert }) {
+      async run({ expect }) {
         // Requesting one changes a SCHEDULE, not an outcome: the subscription is
         // still active, no money moved, and it may never cancel at all.
         const resolved = analytics.resolvePaymentEvent('subscription', 'cancellation-requested', 'customer.subscription.updated', renewedSubscription(), {});
 
-        assert.equal(resolved, null, 'cancellation-requested should track nothing');
+        expect(resolved, 'cancellation-requested should track nothing').toBe(null);
       },
     },
 
@@ -400,13 +392,13 @@ module.exports = defineCases({
       // Gap 2 (#407): the uncancel was event-less too, which left a retention win
       // completely dark. The pair is not symmetric on purpose.
       name: 'withdrawing-a-cancellation-is-a-retention-win',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent('subscription', 'cancellation-removed', 'customer.subscription.updated', renewedSubscription(), {});
 
-        assert.ok(resolved, 'an uncancel should resolve to a trackable event');
-        assert.equal(resolved.event, 'subscription_uncancel');
-        assert.equal(resolved.value, 9.99, 'the value is the subscription that was kept');
-        assert.equal(resolved.isRecurring, false, 'nothing was charged');
+        expect(resolved, 'an uncancel should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event).toBe('subscription_uncancel');
+        expect(resolved.value, 'the value is the subscription that was kept').toBe(9.99);
+        expect(resolved.isRecurring, 'nothing was charged').toBe(false);
       },
     },
 
@@ -414,7 +406,7 @@ module.exports = defineCases({
       // Gap 1 (#407): a plan change sent an order email and fired nothing, so
       // every upgrade was invisible to every platform.
       name: 'a-plan-change-reports-the-plan-it-came-from',
-      async run({ assert }) {
+      async run({ expect }) {
         const before = {
           ...renewedSubscription(),
           product: { id: 'starter', name: 'Starter' },
@@ -423,26 +415,26 @@ module.exports = defineCases({
 
         const resolved = analytics.resolvePaymentEvent('subscription', 'plan-changed', 'customer.subscription.updated', renewedSubscription(), {}, null, before);
 
-        assert.ok(resolved, 'a plan change should resolve to a trackable event');
-        assert.equal(resolved.event, 'subscription_plan_change');
-        assert.equal(resolved.value, 9.99, 'the value is the plan they moved TO');
-        assert.equal(resolved.isRecurring, false, 'no money moves at the switch itself');
+        expect(resolved, 'a plan change should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event).toBe('subscription_plan_change');
+        expect(resolved.value, 'the value is the plan they moved TO').toBe(9.99);
+        expect(resolved.isRecurring, 'no money moves at the switch itself').toBe(false);
 
         const params = analytics.buildParams({ resolved, currency: 'USD', provider: 'stripe' });
 
-        assert.equal(params.items[0].item_id, 'premium', 'items[] is the new plan');
-        assert.equal(params.previous_item_id, 'starter', 'and the from-plan rides beside it');
-        assert.equal(params.previous_item_name, 'Starter');
-        assert.equal(params.previous_value, 4.99, 'so the direction of the switch is readable without a second event');
+        expect(params.items[0].item_id, 'items[] is the new plan').toBe('premium');
+        expect(params.previous_item_id, 'and the from-plan rides beside it').toBe('starter');
+        expect(params.previous_item_name).toBe('Starter');
+        expect(params.previous_value, 'so the direction of the switch is readable without a second event').toBe(4.99);
       },
     },
 
     {
       name: 'only-a-plan-change-carries-a-previous-plan',
-      async run({ assert }) {
+      async run({ expect }) {
         const params = analytics.buildParams({ resolved: resolveRenewal('invoice.payment_succeeded'), currency: 'USD', provider: 'stripe' });
 
-        assert.equal('previous_item_id' in params, false, 'a renewal has no plan it came from');
+        expect('previous_item_id' in params, 'a renewal has no plan it came from').toBe(false);
       },
     },
 
@@ -451,17 +443,17 @@ module.exports = defineCases({
       // transition, a payment event — so it resolved as subscription_renew and
       // the funnel's most valuable step was undercounted.
       name: 'the-first-charge-after-a-trial-is-a-conversion-not-a-renewal',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionInTrial()
         );
 
-        assert.ok(resolved, 'a converting trial should resolve to a trackable event');
-        assert.notEqual(resolved.event, 'subscription_renew', 'a conversion is not a routine renewal');
-        assert.equal(resolved.event, 'trial_convert');
-        assert.equal(resolved.reason, 'trial-converted');
-        assert.equal(resolved.value, 9.99, 'the first real charge is what they actually paid');
-        assert.equal(resolved.isRecurring, false, 'the FIRST payment is not recurring revenue');
+        expect(resolved, 'a converting trial should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'a conversion is not a routine renewal').not.toBe('subscription_renew');
+        expect(resolved.event).toBe('trial_convert');
+        expect(resolved.reason).toBe('trial-converted');
+        expect(resolved.value, 'the first real charge is what they actually paid').toBe(9.99);
+        expect(resolved.isRecurring, 'the FIRST payment is not recurring revenue').toBe(false);
       },
     },
 
@@ -474,22 +466,22 @@ module.exports = defineCases({
       // two webhooks race in real time, so an arbitrary share of conversions
       // mislabeled. Arrival order is no longer the signal.
       name: 'a-conversion-is-a-conversion-whichever-webhook-lands-first',
-      async run({ assert }) {
+      async run({ expect }) {
         // The prior state the racing `customer.subscription.updated` left behind: out
         // of the trial already, on the very term this charge is paying for.
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionAfterTrial()
         );
 
-        assert.ok(resolved, 'the conversion charge should still resolve to a trackable event');
-        assert.equal(resolved.event, 'trial_convert', 'a claimed trial with no recorded outcome has not had its first paid charge yet');
-        assert.equal(resolved.isRecurring, false, 'the FIRST payment is not recurring revenue, whatever order it arrived in');
+        expect(resolved, 'the conversion charge should still resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'a claimed trial with no recorded outcome has not had its first paid charge yet').toBe('trial_convert');
+        expect(resolved.isRecurring, 'the FIRST payment is not recurring revenue, whatever order it arrived in').toBe(false);
       },
     },
 
     {
       name: 'the-renewal-behind-a-conversion-is-a-renewal-again',
-      async run({ assert }) {
+      async run({ expect }) {
         // Month two: same trial.claimed, same payment event, same term on both
         // sides — the racing conversion above is INDISTINGUISHABLE from this on
         // dates alone, which is why the stored outcome is what tells them apart.
@@ -498,8 +490,8 @@ module.exports = defineCases({
           'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionConverted()
         );
 
-        assert.equal(resolved.event, 'subscription_renew', 'every charge after the conversion is an ordinary renewal');
-        assert.equal(resolved.isRecurring, true);
+        expect(resolved.event, 'every charge after the conversion is an ordinary renewal').toBe('subscription_renew');
+        expect(resolved.isRecurring).toBe(true);
       },
     },
 
@@ -509,29 +501,13 @@ module.exports = defineCases({
       // copy each ([#697]) — the same arrangement `isInsideTrial` has with the
       // trial-lapse sweep.
       name: 'the-conversion-the-pipeline-stamps-is-the-conversion-the-resolver-books',
-      async run({ assert }) {
+      async run({ expect }) {
         const charge = { transitionName: null, eventType: 'invoice.payment_succeeded' };
 
-        assert.equal(
-          analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionAfterTrial() }),
-          true,
-          'the charge that converts is the one the pipeline stamps trial.outcome on',
-        );
-        assert.equal(
-          analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionConverted() }),
-          false,
-          'and it is stamped once — a second paid charge converts nothing',
-        );
-        assert.equal(
-          analytics.isTrialConversion({ ...charge, unified: subscriptionInTrial(), before: subscriptionInTrial() }),
-          false,
-          'nor does the $0 invoice a trial STARTS with',
-        );
-        assert.equal(
-          analytics.isTrialConversion({ ...charge, unified: renewedSubscription(), before: renewedSubscription() }),
-          false,
-          'nor a renewal on a subscription that never claimed a trial at all',
-        );
+        expect(analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionAfterTrial() }), 'the charge that converts is the one the pipeline stamps trial.outcome on').toBe(true);
+        expect(analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionConverted() }), 'and it is stamped once — a second paid charge converts nothing').toBe(false);
+        expect(analytics.isTrialConversion({ ...charge, unified: subscriptionInTrial(), before: subscriptionInTrial() }), 'nor does the $0 invoice a trial STARTS with').toBe(false);
+        expect(analytics.isTrialConversion({ ...charge, unified: renewedSubscription(), before: renewedSubscription() }), 'nor a renewal on a subscription that never claimed a trial at all').toBe(false);
       },
     },
 
@@ -539,17 +515,17 @@ module.exports = defineCases({
       // Gap 3 (#407): a trial ending unpaid routed through payment-failed, which
       // sent an email and fired nothing at all.
       name: 'a-trial-that-ends-unpaid-is-a-lapse',
-      async run({ assert }) {
+      async run({ expect }) {
         const suspended = { ...subscriptionInTrial(), status: 'suspended' };
 
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionInTrial()
         );
 
-        assert.ok(resolved, 'the funnel\'s failure mode should resolve to a trackable event');
-        assert.equal(resolved.event, 'trial_lapse');
-        assert.equal(resolved.value, 9.99, 'the value is the subscription that never started paying');
-        assert.equal(resolved.isRecurring, false, 'nothing was ever charged');
+        expect(resolved, 'the funnel\'s failure mode should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event).toBe('trial_lapse');
+        expect(resolved.value, 'the value is the subscription that never started paying').toBe(9.99);
+        expect(resolved.isRecurring, 'nothing was ever charged').toBe(false);
       },
     },
 
@@ -561,24 +537,24 @@ module.exports = defineCases({
       // trial: nothing converted, nothing renewed, nothing was charged, so the
       // only honest answer is no event at all.
       name: 'the-zero-dollar-trial-invoice-books-nothing',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', subscriptionInTrial(), {}, null, subscriptionInTrial()
         );
 
-        assert.notEqual(resolved?.event, 'trial_convert', 'the trial has not converted — the customer is still inside it');
-        assert.equal(resolved, null, 'and a $0 invoice inside a trial is not recurring revenue either');
+        expect(resolved?.event, 'the trial has not converted — the customer is still inside it').not.toBe('trial_convert');
+        expect(resolved, 'and a $0 invoice inside a trial is not recurring revenue either').toBe(null);
       },
     },
 
     {
       name: 'a-chargebee-zero-dollar-trial-invoice-books-nothing-either',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', chargebeeSubscriptionInTrial(), {}, null, chargebeeSubscriptionInTrial()
         );
 
-        assert.equal(resolved, null, 'the no-term shape is inside the trial on both sides too');
+        expect(resolved, 'the no-term shape is inside the trial on both sides too').toBe(null);
       },
     },
 
@@ -587,28 +563,28 @@ module.exports = defineCases({
       // comparison cannot see a Chargebee trial at all — the conversion fell
       // straight through to the renewal branch and the funnel stayed dark.
       name: 'a-chargebee-conversion-is-a-conversion-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, chargebeeSubscriptionInTrial()
         );
 
-        assert.ok(resolved, 'a converting Chargebee trial should resolve to a trackable event');
-        assert.equal(resolved.event, 'trial_convert', 'an epoch expiry is the ABSENCE of a term, not a term that ended in 1970');
-        assert.equal(resolved.isRecurring, false);
+        expect(resolved, 'a converting Chargebee trial should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event, 'an epoch expiry is the ABSENCE of a term, not a term that ended in 1970').toBe('trial_convert');
+        expect(resolved.isRecurring).toBe(false);
       },
     },
 
     {
       name: 'a-chargebee-trial-that-ends-unpaid-is-a-lapse-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const suspended = { ...chargebeeSubscriptionInTrial(), status: 'suspended' };
 
         const resolved = analytics.resolvePaymentEvent(
           'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, chargebeeSubscriptionInTrial()
         );
 
-        assert.ok(resolved, 'a lapsing Chargebee trial should resolve to a trackable event');
-        assert.equal(resolved.event, 'trial_lapse');
+        expect(resolved, 'a lapsing Chargebee trial should resolve to a trackable event').toBeTruthy();
+        expect(resolved.event).toBe('trial_lapse');
       },
     },
 
@@ -619,30 +595,26 @@ module.exports = defineCases({
       // subscriber that is a hole in the payload, not a trial. A renewal on that path
       // matched no branch and booked nothing: silent under-reporting of real revenue.
       name: 'a-renewal-on-a-degraded-payload-still-books-its-revenue',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, subscriptionConverted()
         );
 
-        assert.ok(resolved, 'a renewal must never go unreported because its payload arrived thin');
-        assert.equal(resolved.event, 'subscription_renew');
-        assert.equal(resolved.value, 9.99, 'the money moved whatever the payload could say about the term');
-        assert.equal(resolved.isRecurring, true);
+        expect(resolved, 'a renewal must never go unreported because its payload arrived thin').toBeTruthy();
+        expect(resolved.event).toBe('subscription_renew');
+        expect(resolved.value, 'the money moved whatever the payload could say about the term').toBe(9.99);
+        expect(resolved.isRecurring).toBe(true);
 
         // The bound needs one healthy delivery behind it. Two degraded deliveries in
         // a row leave no term on either side, and that renewal still books nothing —
         // narrower than the hole it closes, and it fails toward silence.
-        assert.equal(
-          analytics.resolvePaymentEvent('subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, degradedPaidSubscription()),
-          null,
-          'nothing on either side names a term, so nothing can prove this was not a trial',
-        );
+        expect(analytics.resolvePaymentEvent('subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, degradedPaidSubscription()), 'nothing on either side names a term, so nothing can prove this was not a trial').toBe(null);
       },
     },
 
     {
       name: 'a-dunning-failure-months-after-a-trial-is-not-a-lapse',
-      async run({ assert }) {
+      async run({ expect }) {
         // The same active → suspended shape and the same trial.claimed. Only the
         // term tells them apart: this subscriber has been paying for months.
         const suspended = { ...subscriptionAfterTrial(), status: 'suspended' };
@@ -651,7 +623,7 @@ module.exports = defineCases({
           'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionAfterTrial()
         );
 
-        assert.equal(resolved, null, 'a routine payment failure is not the trial\'s outcome');
+        expect(resolved, 'a routine payment failure is not the trial\'s outcome').toBe(null);
       },
     },
 
@@ -661,19 +633,19 @@ module.exports = defineCases({
       // webhook's event id never reaches a browser. Two ids for one purchase is
       // the double count dedupe exists to prevent.
       name: 'a-purchase-keys-its-dedupe-id-on-the-order-the-browser-also-knows',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
 
         const firstPurchase = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'invoice.payment_succeeded', renewedSubscription(), {});
-        assert.equal(analytics.resolveEventId(firstPurchase, order), 'purchase._test-order', 'the id the confirmation page will send');
+        expect(analytics.resolveEventId(firstPurchase, order), 'the id the confirmation page will send').toBe('purchase._test-order');
 
         const oneTime = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
-        assert.equal(analytics.resolveEventId(oneTime, order), 'purchase._test-order', 'a one-time purchase is the same event to the platforms');
+        expect(analytics.resolveEventId(oneTime, order), 'a one-time purchase is the same event to the platforms').toBe('purchase._test-order');
 
         // A win-back is a second purchase on the same order, but it lands weeks or
         // months later — far outside Meta's and TikTok's ~48h dedupe windows.
         const winback = analytics.resolvePaymentEvent('subscription', 'subscription-winback', 'invoice.payment_succeeded', renewedSubscription(), {});
-        assert.equal(analytics.resolveEventId(winback, order), 'purchase._test-order');
+        expect(analytics.resolveEventId(winback, order)).toBe('purchase._test-order');
       },
     },
 
@@ -682,26 +654,18 @@ module.exports = defineCases({
       // a subscription renews against the same order id month after month, so an
       // order-keyed id would have the platforms discard every renewal but the first.
       name: 'every-other-payment-event-keys-its-dedupe-id-per-webhook-delivery',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('invoice.payment_succeeded');
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_september' } } } };
 
-        assert.equal(analytics.resolveEventId(resolved, order), 'subscription_renew.evt_september');
-        assert.equal(
-          analytics.resolveEventId(resolved, { id: '_test-order' }),
-          'subscription_renew._test-order',
-          'An order with no webhook stamp still gets an id'
-        );
+        expect(analytics.resolveEventId(resolved, order)).toBe('subscription_renew.evt_september');
+        expect(analytics.resolveEventId(resolved, { id: '_test-order' }), 'An order with no webhook stamp still gets an id').toBe('subscription_renew._test-order');
 
         // October's renewal must not collide with September's.
-        assert.notEqual(
-          analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }),
-          analytics.resolveEventId(resolved, order),
-          'Two renewals on one order are two conversions'
-        );
+        expect(analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }), 'Two renewals on one order are two conversions').not.toBe(analytics.resolveEventId(resolved, order));
 
         const refund = analytics.resolvePaymentEvent('subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {}, { amount: 9.99 });
-        assert.equal(analytics.resolveEventId(refund, order), 'refund.evt_september', 'a refund has no browser twin either');
+        expect(analytics.resolveEventId(refund, order), 'a refund has no browser twin either').toBe('refund.evt_september');
 
         // A trial is the one exception on this side: its outcome is keyed to the
         // SUBSCRIPTION, not the delivery, because two paths can be the one to see
@@ -709,12 +673,8 @@ module.exports = defineCases({
         // (PayPal fires no trial-end event). One outcome must never be two
         // conversions, so both paths compute the same id.
         const converted = analytics.resolvePaymentEvent('subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionInTrial());
-        assert.equal(analytics.resolveEventId(converted, order), 'trial_convert._test-sub-analytics');
-        assert.equal(
-          analytics.resolveEventId(converted, { id: '_other-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }),
-          'trial_convert._test-sub-analytics',
-          'a redelivery on another order id is still the same one conversion',
-        );
+        expect(analytics.resolveEventId(converted, order)).toBe('trial_convert._test-sub-analytics');
+        expect(analytics.resolveEventId(converted, { id: '_other-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }), 'a redelivery on another order id is still the same one conversion').toBe('trial_convert._test-sub-analytics');
       },
     },
 
@@ -724,7 +684,7 @@ module.exports = defineCases({
       // (https://support.google.com/analytics/answer/12313109), so it counted the
       // first charge of a subscription and dropped every renewal after it.
       name: 'two-renewals-of-one-subscription-are-two-transaction-ids',
-      async run({ assert }) {
+      async run({ expect }) {
         const resolved = resolveRenewal('invoice.payment_succeeded');
 
         const september = analytics.buildParams({
@@ -738,10 +698,10 @@ module.exports = defineCases({
           chargeId: 'in_october',
         });
 
-        assert.equal(september.transaction_id, 'in_september', 'the invoice IS the charge');
-        assert.equal(october.transaction_id, 'in_october');
-        assert.notEqual(september.transaction_id, october.transaction_id, 'two charges are two transactions to GA4');
-        assert.notEqual(september.transaction_id, '_test-sub-analytics', 'and neither is the subscription id');
+        expect(september.transaction_id, 'the invoice IS the charge').toBe('in_september');
+        expect(october.transaction_id).toBe('in_october');
+        expect(september.transaction_id, 'two charges are two transactions to GA4').not.toBe(october.transaction_id);
+        expect(september.transaction_id, 'and neither is the subscription id').not.toBe('_test-sub-analytics');
       },
     },
 
@@ -749,51 +709,34 @@ module.exports = defineCases({
       // The one id both halves can compute. The confirmation page holds the order
       // id and nothing else, and GA4 collapses the two halves on it ([#656]).
       name: 'a-first-purchase-and-a-trial-start-name-the-order-the-browser-also-holds',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
 
         const firstPurchase = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', renewedSubscription(), {});
-        assert.equal(
-          analytics.buildParams({ resolved: firstPurchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
-          '_test-order',
-        );
+        expect(analytics.buildParams({ resolved: firstPurchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('_test-order');
 
         const trialStart = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', subscriptionInTrial(), {});
-        assert.equal(trialStart.event, 'trial_start');
-        assert.equal(
-          analytics.buildParams({ resolved: trialStart, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
-          '_test-order',
-          'the trial checkout the browser half is about',
-        );
+        expect(trialStart.event).toBe('trial_start');
+        expect(analytics.buildParams({ resolved: trialStart, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id, 'the trial checkout the browser half is about').toBe('_test-order');
 
         // A one-time buy has exactly one charge, and the order names it.
         const oneTime = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
-        assert.equal(
-          analytics.buildParams({ resolved: oneTime, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
-          '_test-order',
-        );
+        expect(analytics.buildParams({ resolved: oneTime, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('_test-order');
       },
     },
 
     {
       name: 'a-refund-names-the-charge-it-reverses-and-a-charge-event-never-falls-back-to-the-order',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_september' } } } };
 
         const refund = analytics.resolvePaymentEvent('subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {}, { amount: 9.99 });
 
-        assert.equal(
-          analytics.buildParams({ resolved: refund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_september' }).transaction_id,
-          'in_september',
-          'GA4 nets a refund against the transaction id of the charge it reverses',
-        );
+        expect(analytics.buildParams({ resolved: refund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_september' }).transaction_id, 'GA4 nets a refund against the transaction id of the charge it reverses').toBe('in_september');
 
         // No charge id in the payload: the WEBHOOK delivery, never the order —
         // the order is the collapse [#656] exists to undo.
-        assert.equal(
-          analytics.buildParams({ resolved: resolveRenewal('invoice.payment_succeeded'), currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
-          'evt_september',
-        );
+        expect(analytics.buildParams({ resolved: resolveRenewal('invoice.payment_succeeded'), currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('evt_september');
       },
     },
 
@@ -803,7 +746,7 @@ module.exports = defineCases({
       // So the refund names the ORDER, which is the id the purchase it reverses
       // was reported under, and GA4 nets the two ([#656]).
       name: 'a-one-time-refund-nets-against-the-purchase-it-reverses',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_refund' } } } };
 
         const purchase = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
@@ -815,9 +758,9 @@ module.exports = defineCases({
         const purchaseId = analytics.buildParams({ resolved: purchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id;
         const refundId = analytics.buildParams({ resolved: refund, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id;
 
-        assert.equal(purchaseId, '_test-order');
-        assert.equal(refundId, purchaseId, 'GA4 nets a one-time refund only if it names the same transaction');
-        assert.notEqual(refundId, 'evt_refund', 'the refund webhook delivery would net against nothing');
+        expect(purchaseId).toBe('_test-order');
+        expect(refundId, 'GA4 nets a one-time refund only if it names the same transaction').toBe(purchaseId);
+        expect(refundId, 'the refund webhook delivery would net against nothing').not.toBe('evt_refund');
 
         // A SUBSCRIPTION refund keeps the charge id: its renewals are separate
         // charges, so the order id would net October's reversal against the
@@ -827,10 +770,7 @@ module.exports = defineCases({
           { amount: 9.99, currency: 'USD', reason: null }
         );
 
-        assert.equal(
-          analytics.buildParams({ resolved: renewalRefund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_october' }).transaction_id,
-          'in_october',
-        );
+        expect(analytics.buildParams({ resolved: renewalRefund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_october' }).transaction_id).toBe('in_october');
       },
     },
 
@@ -838,17 +778,14 @@ module.exports = defineCases({
       // The outcomes that are NOT charges keep naming their subject: each is a
       // GA4 custom event with no dedupe of its own.
       name: 'the-events-that-are-not-charges-still-name-the-subscription',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } };
         const cancelled = { ...renewedSubscription(), status: 'cancelled' };
 
         const resolved = analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, renewedSubscription());
 
-        assert.equal(resolved.event, 'subscription_cancel');
-        assert.equal(
-          analytics.buildParams({ resolved, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
-          '_test-sub-analytics',
-        );
+        expect(resolved.event).toBe('subscription_cancel');
+        expect(analytics.buildParams({ resolved, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('_test-sub-analytics');
       },
     },
 
@@ -856,7 +793,7 @@ module.exports = defineCases({
       // Every provider has to hand the pipeline an id for the charge, or the
       // renewal branch above has nothing to key on ([#656]).
       name: 'every-provider-exposes-its-own-per-charge-id-on-the-parsed-event',
-      async run({ assert }) {
+      async run({ expect }) {
         const stripe = stripeProvider.parseWebhook({
           body: {
             id: 'evt_stripe',
@@ -865,8 +802,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(stripe.resourceId, 'sub_1', 'the resource is still the subscription to fetch');
-        assert.equal(stripe.chargeId, 'in_september', 'and the invoice is the charge');
+        expect(stripe.resourceId, 'the resource is still the subscription to fetch').toBe('sub_1');
+        expect(stripe.chargeId, 'and the invoice is the charge').toBe('in_september');
 
         const paypal = paypalProvider.parseWebhook({
           body: {
@@ -876,8 +813,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(paypal.resourceId, 'I-1', 'the billing agreement is the subscription');
-        assert.equal(paypal.chargeId, 'SALE-september', 'and the sale is the charge');
+        expect(paypal.resourceId, 'the billing agreement is the subscription').toBe('I-1');
+        expect(paypal.chargeId, 'and the sale is the charge').toBe('SALE-september');
 
         const chargebee = chargebeeProvider.parseWebhook({
           body: {
@@ -887,8 +824,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(chargebee.resourceId, 'cb_sub_1');
-        assert.equal(chargebee.chargeId, 'inv_september', 'Chargebee names the renewal invoice');
+        expect(chargebee.resourceId).toBe('cb_sub_1');
+        expect(chargebee.chargeId, 'Chargebee names the renewal invoice').toBe('inv_september');
 
         // ONLY the renewal's. A `subscription_created` payload carries the
         // checkout's first invoice (test/fixtures/chargebee/webhook-subscription-created.json),
@@ -901,22 +838,22 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(chargebeeCreated.chargeId, null, 'a first charge is the order\'s, never the invoice\'s');
+        expect(chargebeeCreated.chargeId, 'a first charge is the order\'s, never the invoice\'s').toBe(null);
 
         // The test provider IS Stripe's parser, so it carries the same id.
-        assert.equal(testProvider.parseWebhook({
+        expect(testProvider.parseWebhook({
           body: {
             id: 'evt_test',
             type: 'invoice.payment_succeeded',
             data: { object: { id: 'in_test', billing_reason: 'subscription_cycle', parent: { subscription_details: { subscription: 'sub_1' } } } },
           },
-        }).chargeId, 'in_test');
+        }).chargeId).toBe('in_test');
 
         // A subscription's lifecycle events name no charge at all — the first
         // purchase is the order's, and that is the branch that must not guess.
-        assert.equal(stripeProvider.parseWebhook({
+        expect(stripeProvider.parseWebhook({
           body: { id: 'evt_created', type: 'customer.subscription.created', data: { object: { id: 'sub_1', metadata: { uid: 'u1' } } } },
-        }).chargeId, null);
+        }).chargeId).toBe(null);
       },
     },
 
@@ -927,18 +864,14 @@ module.exports = defineCases({
       // server's StartTrial. Both halves now say trial_start, keyed on the order —
       // the only id a browser can compute.
       name: 'a-trial-start-keys-its-dedupe-id-on-the-order-like-its-browser-twin',
-      async run({ assert }) {
+      async run({ expect }) {
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
 
         const trialStart = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', subscriptionInTrial(), {});
 
-        assert.equal(trialStart.event, 'trial_start');
-        assert.equal(analytics.resolveEventId(trialStart, order), 'trial_start._test-order', 'the id the confirmation page will send');
-        assert.notEqual(
-          analytics.resolveEventId(trialStart, order),
-          'trial_start.evt_checkout',
-          'the webhook delivery is not derivable in a browser, so it can never key a two-sided event',
-        );
+        expect(trialStart.event).toBe('trial_start');
+        expect(analytics.resolveEventId(trialStart, order), 'the id the confirmation page will send').toBe('trial_start._test-order');
+        expect(analytics.resolveEventId(trialStart, order), 'the webhook delivery is not derivable in a browser, so it can never key a two-sided event').not.toBe('trial_start.evt_checkout');
       },
     },
   ],

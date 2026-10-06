@@ -52,55 +52,55 @@ module.exports = defineCases({
     {
       name: 'an-off-brand-return-url-falls-back',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await openPortal(omega, 'https://evil.example/steal');
 
-        assert.equal(sent.code, 200, `The portal should still open, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'An off-brand host must never reach the provider');
+        expect(sent.code, `The portal should still open, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(sent.body.url, 'An off-brand host must never reach the provider').toBe(DEFAULT_RETURN(omega));
       },
     },
 
     {
       name: 'a-look-alike-host-falls-back',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         // The classic near-miss: the brand's origin as a prefix of somebody else's host
         const origin = new URL(omega.project.websiteUrl).origin;
         const sent = await openPortal(omega, `${origin}.evil.example/dashboard/account`);
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'A host that merely starts with the brand origin must not pass');
+        expect(sent.body.url, 'A host that merely starts with the brand origin must not pass').toBe(DEFAULT_RETURN(omega));
       },
     },
 
     {
       name: 'an-unparseable-return-url-falls-back',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await openPortal(omega, 'not a url at all');
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'An unparseable value must fall back, never be forwarded');
+        expect(sent.body.url, 'An unparseable value must fall back, never be forwarded').toBe(DEFAULT_RETURN(omega));
       },
     },
 
     {
       name: 'a-missing-return-url-falls-back',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const sent = await openPortal(omega, null);
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'No returnUrl should still return to the brand');
+        expect(sent.body.url, 'No returnUrl should still return to the brand').toBe(DEFAULT_RETURN(omega));
       },
     },
 
     {
       name: 'the-brands-own-return-url-passes-through',
       auth: 'none',
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const returnUrl = new URL('/dashboard/account?tab=invoices', omega.project.websiteUrl).toString();
 
         const sent = await openPortal(omega, returnUrl);
 
-        assert.equal(sent.body.url, returnUrl, "The brand's own URL should be honored exactly as asked");
+        expect(sent.body.url, "The brand's own URL should be honored exactly as asked").toBe(returnUrl);
       },
     },
   ],

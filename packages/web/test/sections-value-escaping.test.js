@@ -17,9 +17,8 @@
  * `escape_once` and not `escape`: a brand that worked around this by authoring
  * `&lt;200ms` keeps rendering `<200ms`, and the filter stays idempotent.
  */
-const assert = require('node:assert');
 const path = require('node:path');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -70,47 +69,68 @@ const VALUE_SLOTS = [
   ],
 ];
 
-for (const [name, slot, body] of VALUE_SLOTS) {
-  test(`#580: ${name} escapes its ${slot} — a literal < never opens a tag`, async () => {
-    const { engine, warnings } = makeEngine();
-    const html = await engine.parseAndRender(`{% section "${name}" %}\n${body}{% endsection %}`, {});
+module.exports = defineCases({
+  type: 'group',
+  description: 'sections-value-escaping',
+  tests: [
+    ...(() => {
+      const cases = [];
+      for (const [name, slot, body] of VALUE_SLOTS) {
+        cases.push({
+          name: `#580: ${name} escapes its ${slot} — a literal < never opens a tag`,
+          run: async (ctx) => {
+            const { engine, warnings } = makeEngine();
+            const html = await engine.parseAndRender(`{% section "${name}" %}\n${body}{% endsection %}`, {});
 
-    assert.ok(html.includes('&lt;'), 'the authored < ships as an entity');
-    assert.ok(!/<(?:200ms|5 |1s|target>|2017|38s|accent>|inc>|trimmed>)/.test(html),
-      'and never as an open tag the minifier can eat');
-    assert.deepEqual(warnings, [], 'the audited args are all declared');
-  });
-}
+            ctx.expect(html.includes('&lt;'), 'the authored < ships as an entity').toBeTruthy();
+            ctx.expect(!/<(?:200ms|5 |1s|target>|2017|38s|accent>|inc>|trimmed>)/.test(html), 'and never as an open tag the minifier can eat').toBeTruthy();
+            ctx.expect(warnings, 'the audited args are all declared').toEqual([]);
+          },
+        });
+      }
+      return cases;
+    })(),
 
-test('#580: the price card feature list escapes its catalog value too', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% component "pricing/features" %}\nfeatures:\n  - name: "Latency"\n    value: "<200ms"\n{% endcomponent %}',
-    {},
-  );
+    {
+      name: '#580: the price card feature list escapes its catalog value too',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% component "pricing/features" %}\nfeatures:\n  - name: "Latency"\n    value: "<200ms"\n{% endcomponent %}',
+          {},
+        );
 
-  assert.ok(html.includes('&lt;200ms'), 'the catalog value ships as an entity');
-  assert.ok(!html.includes('<200ms'), 'and never opens a tag');
-});
+        ctx.expect(html.includes('&lt;200ms'), 'the catalog value ships as an entity').toBeTruthy();
+        ctx.expect(!html.includes('<200ms'), 'and never opens a tag').toBeTruthy();
+      },
+    },
 
-test('#580: an already-escaped value is not double-escaped — the brand workaround keeps rendering', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/stats" %}\nitems:\n  - number: "&lt;200ms"\n    label: "Median response"\n{% endsection %}',
-    {},
-  );
+    {
+      name: '#580: an already-escaped value is not double-escaped — the brand workaround keeps rendering',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/stats" %}\nitems:\n  - number: "&lt;200ms"\n    label: "Median response"\n{% endsection %}',
+          {},
+        );
 
-  assert.ok(html.includes('>&lt;200ms<'), 'escape_once leaves the entity alone');
-  assert.ok(!html.includes('&amp;lt;'), 'no second pass over the ampersand');
-});
+        ctx.expect(html.includes('>&lt;200ms<'), 'escape_once leaves the entity alone').toBeTruthy();
+        ctx.expect(!html.includes('&amp;lt;'), 'no second pass over the ampersand').toBeTruthy();
+      },
+    },
 
-test('#580: prose args keep their authored markup — the <em> lane is untouched', async () => {
-  const { engine } = makeEngine();
-  const html = await engine.parseAndRender(
-    '{% section "marketing/stats" %}\nitems:\n  - number: "99.98%"\n    label: "Uptime <em>always</em>"\n{% endsection %}',
-    {},
-  );
+    {
+      name: '#580: prose args keep their authored markup — the <em> lane is untouched',
+      run: async (ctx) => {
+        const { engine } = makeEngine();
+        const html = await engine.parseAndRender(
+          '{% section "marketing/stats" %}\nitems:\n  - number: "99.98%"\n    label: "Uptime <em>always</em>"\n{% endsection %}',
+          {},
+        );
 
-  assert.ok(html.includes('Uptime <em>always</em>'), 'a prose label still renders its markup');
-  assert.ok(html.includes('>99.98%<'), 'while a value with nothing to escape is byte-identical');
+        ctx.expect(html.includes('Uptime <em>always</em>'), 'a prose label still renders its markup').toBeTruthy();
+        ctx.expect(html.includes('>99.98%<'), 'while a value with nothing to escape is byte-identical').toBeTruthy();
+      },
+    },
+  ],
 });

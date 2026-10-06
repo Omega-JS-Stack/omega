@@ -70,15 +70,15 @@ module.exports = defineCases({
       name: 'the-documented-job-body-executes',
       auth: 'none',
 
-      async run({ assert, omega }) {
+      async run({ expect, omega }) {
         const jobsDir = jetpack.tmpDir({ prefix: 'omega-cron-doc-' }).path();
         jetpack.write(path.join(jobsDir, 'documented-job.js'), documentedCronJob());
 
         const output = await capturingLogs(() => loadAndExecuteJobs('daily', jobsDir, omega, {}));
 
-        assert.ok(output.includes(JOB_MARKER), 'the documented job must RUN when the runner calls it — a job the runner cannot call fails silently, exactly as this one did');
-        assert.equal(output.includes('Error executing:'), false, `the documented job must not throw: ${output}`);
-        assert.ok(output.includes('Completed!'), 'the runner must report the documented job complete');
+        expect(output.includes(JOB_MARKER), 'the documented job must RUN when the runner calls it — a job the runner cannot call fails silently, exactly as this one did').toBeTruthy();
+        expect(output.includes('Error executing:'), `the documented job must not throw: ${output}`).toBe(false);
+        expect(output.includes('Completed!'), 'the runner must report the documented job complete').toBeTruthy();
 
         jetpack.remove(jobsDir);
       },
@@ -88,14 +88,14 @@ module.exports = defineCases({
       name: 'the-documented-job-is-authored-under-src',
       auth: 'none',
 
-      async run({ assert }) {
+      async run({ expect }) {
         // Consumers are src-first: `dist/` is staged output, so a doc naming
         // the runtime path teaches an edit that the next build wipes.
         const doc = jetpack.read(ROUTES_DOC);
         const heading = doc.indexOf(HEADING);
         const recipe = doc.slice(heading, doc.indexOf('```', doc.indexOf('```javascript', heading) + 3));
 
-        assert.match(recipe, /src\/hooks\/cron\/daily\//, 'the cron recipe must name the AUTHORED path (src/hooks/cron/daily/)');
+        expect(recipe, 'the cron recipe must name the AUTHORED path (src/hooks/cron/daily/)').toMatch(/src\/hooks\/cron\/daily\//);
       },
     },
   ],

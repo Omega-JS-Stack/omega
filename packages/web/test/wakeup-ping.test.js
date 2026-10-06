@@ -18,8 +18,8 @@
  * /pricing and /payment/checkout keep their pins in their own suites
  * (pricing-switch-cta.test.js, checkout-paint.test.js).
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
+const expect = require('@omega.js/devkit/test/expect');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -189,114 +189,139 @@ async function bootPage(entry, { found = false, present = [] } = {}) {
 function assertWakeup(requests, where) {
   const wakeups = requests.filter((request) => request.options.wakeup);
 
-  assert.strictEqual(wakeups.length, 1, `${where} fires the wakeup exactly once`);
-  assert.strictEqual(wakeups[0].url, WAKEUP_ROUTE, `${where} aims it at the one route every wakeup names`);
-  assert.deepStrictEqual(
-    Object.keys(wakeups[0].options),
-    ['wakeup'],
-    `${where} sends nothing else with it — no auth, no body, no timeout`,
-  );
+  expect(wakeups.length, `${where} fires the wakeup exactly once`).toBe(1);
+  expect(wakeups[0].url, `${where} aims it at the one route every wakeup names`).toBe(WAKEUP_ROUTE);
+  expect(Object.keys(wakeups[0].options), `${where} sends nothing else with it — no auth, no body, no timeout`).toEqual(['wakeup']);
 }
 
-test('#644: /signup warms the backend on load, before it boots the form', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'signup', 'index.js'));
+module.exports = defineCases({
+  type: 'group',
+  description: 'wakeup-ping',
+  tests: [
+    {
+      name: '#644: /signup warms the backend on load, before it boots the form',
+      run: async (ctx) => {
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'signup', 'index.js'));
 
-  assertWakeup(requests, '/signup');
-});
+        assertWakeup(requests, '/signup');
+      },
+    },
 
-test('#644: /signin warms the backend on load', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'signin', 'index.js'));
+    {
+      name: '#644: /signin warms the backend on load',
+      run: async (ctx) => {
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'signin', 'index.js'));
 
-  assertWakeup(requests, '/signin');
-});
+        assertWakeup(requests, '/signin');
+      },
+    },
 
-test('#644: the account dashboard warms the backend on load', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'index.js'));
+    {
+      name: '#644: the account dashboard warms the backend on load',
+      run: async (ctx) => {
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'index.js'));
 
-  assertWakeup(requests, '/account');
-});
+        assertWakeup(requests, '/account');
+      },
+    },
 
-test('#644: /token warms the backend before it waits for auth', async () => {
-  // This page's POST cannot go out until auth settles, and auth never settles
-  // in this harness — so a ping recorded here is one that did not wait for it.
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'token', 'index.js'));
+    {
+      name: '#644: /token warms the backend before it waits for auth',
+      run: async (ctx) => {
+        // This page's POST cannot go out until auth settles, and auth never settles
+        // in this harness — so a ping recorded here is one that did not wait for it.
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'token', 'index.js'));
 
-  assertWakeup(requests, '/token');
-  assert.strictEqual(requests.length, 1, 'and it is the only thing on the wire while auth is pending');
-});
+        assertWakeup(requests, '/token');
+        ctx.expect(requests.length, 'and it is the only thing on the wire while auth is pending').toBe(1);
+      },
+    },
 
-test('#644: /connections/callback warms the backend before it waits for auth', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'connections', 'callback', 'index.js'));
+    {
+      name: '#644: /connections/callback warms the backend before it waits for auth',
+      run: async (ctx) => {
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'connections', 'callback', 'index.js'));
 
-  assertWakeup(requests, '/connections/callback');
-  assert.strictEqual(requests.length, 1, 'the tokenize POST is still behind the auth settle');
-});
+        assertWakeup(requests, '/connections/callback');
+        ctx.expect(requests.length, 'the tokenize POST is still behind the auth settle').toBe(1);
+      },
+    },
 
-test('#644: /feedback warms the backend on load', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'feedback', 'index.js'));
+    {
+      name: '#644: /feedback warms the backend on load',
+      run: async (ctx) => {
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'feedback', 'index.js'));
 
-  assertWakeup(requests, '/feedback');
-});
+        assertWakeup(requests, '/feedback');
+      },
+    },
 
-test('#644: the email-preferences portal warms the backend on load', async () => {
-  // This one paints the masked address into the page as it boots, so its
-  // lookups have to answer.
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'portal', 'email-preferences', 'index.js'), { found: true });
+    {
+      name: '#644: the email-preferences portal warms the backend on load',
+      run: async (ctx) => {
+        // This one paints the masked address into the page as it boots, so its
+        // lookups have to answer.
+        const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'portal', 'email-preferences', 'index.js'), { found: true });
 
-  assertWakeup(requests, '/portal/email-preferences');
-});
+        assertWakeup(requests, '/portal/email-preferences');
+      },
+    },
 
-test('#644: /download warms the backend where its notify-me form renders, and only there', async () => {
-  const entry = path.join(CORE_DIR, 'js', 'pages', 'download', 'index.js');
+    {
+      name: '#644: /download warms the backend where its notify-me form renders, and only there',
+      run: async (ctx) => {
+        const entry = path.join(CORE_DIR, 'js', 'pages', 'download', 'index.js');
 
-  const withForm = await bootPage(entry, { present: ['.mobile-email-form'] });
-  assertWakeup(withForm.requests, '/download with the form');
+        const withForm = await bootPage(entry, { present: ['.mobile-email-form'] });
+        assertWakeup(withForm.requests, '/download with the form');
 
-  const withoutForm = await bootPage(entry);
-  assert.deepStrictEqual(
-    withoutForm.requests,
-    [],
-    'a visitor on a platform that ships gets no ping — there is no form to submit',
-  );
-});
+        const withoutForm = await bootPage(entry);
+        ctx.expect(withoutForm.requests, 'a visitor on a platform that ships gets no ping — there is no form to submit').toEqual([]);
+      },
+    },
 
-test('#644: the newsletter band warms the backend on first focus, never on load', async () => {
-  // The band rides most pages, so this one is deliberately NOT a load-time
-  // ping: a passive visitor scrolling past would warm a function they are never
-  // going to POST to. The focus is the intent.
-  const entry = path.join(THEMES_DIR, 'base', '_sections', 'marketing', 'newsletter-cta', 'section.js');
-  const bundle = await bundleOnce(entry);
+    {
+      name: '#644: the newsletter band warms the backend on first focus, never on load',
+      run: async (ctx) => {
+        // The band rides most pages, so this one is deliberately NOT a load-time
+        // ping: a passive visitor scrolling past would warm a function they are never
+        // going to POST to. The focus is the intent.
+        const entry = path.join(THEMES_DIR, 'base', '_sections', 'marketing', 'newsletter-cta', 'section.js');
+        const bundle = await bundleOnce(entry);
 
-  const requests = [];
-  const listeners = {};
+        const requests = [];
+        const listeners = {};
 
-  globalThis.window = { location: { search: '', href: 'https://brand.test/' }, addEventListener: () => {} };
-  globalThis.document = makeDocument();
-  // The section takes omega from its init argument (bootSections hands it
-  // { omega, options }); the runtime stub still serves the libs it imports.
-  const omega = {
-    config: { captcha: { providers: {} } },
-    getApiUrl: () => 'https://api.test',
-    request: async (url, options = {}) => { requests.push({ url, options }); return {}; },
-    sentry: { captureException: () => {} },
-  };
-  globalThis.__omegaClient = omega;
+        globalThis.window = { location: { search: '', href: 'https://brand.test/' }, addEventListener: () => {} };
+        globalThis.document = makeDocument();
+        // The section takes omega from its init argument (bootSections hands it
+        // { omega, options }); the runtime stub still serves the libs it imports.
+        const omega = {
+          config: { captcha: { providers: {} } },
+          getApiUrl: () => 'https://api.test',
+          request: async (url, options = {}) => { requests.push({ url, options }); return {}; },
+          sentry: { captureException: () => {} },
+        };
+        globalThis.__omegaClient = omega;
 
-  const $form = {
-    addEventListener: (event, handler) => { (listeners[event] ||= []).push(handler); },
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    reset: () => {},
-  };
+        const $form = {
+          addEventListener: (event, handler) => { (listeners[event] ||= []).push(handler); },
+          querySelector: () => null,
+          querySelectorAll: () => [],
+          reset: () => {},
+        };
 
-  delete require.cache[require.resolve(bundle)];
-  require(bundle).default({ querySelector: () => $form }, { omega, options: {} });
+        delete require.cache[require.resolve(bundle)];
+        require(bundle).default({ querySelector: () => $form }, { omega, options: {} });
 
-  assert.deepStrictEqual(requests, [], 'nothing is warmed for a visitor who only scrolled past');
+        ctx.expect(requests, 'nothing is warmed for a visitor who only scrolled past').toEqual([]);
 
-  for (const handler of listeners.focusin || []) {
-    handler();
-  }
+        for (const handler of listeners.focusin || []) {
+          handler();
+        }
 
-  assertWakeup(requests, 'the newsletter band');
+        assertWakeup(requests, 'the newsletter band');
+      },
+    },
+  ],
 });

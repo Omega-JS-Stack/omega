@@ -22,8 +22,7 @@
  * esbuild behind its bundler aliases, over a document that answers only the
  * ids the usage section writes, and the assertion is the HTML it wrote.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -146,93 +145,120 @@ async function renderUsage(account, config) {
   return elements['usage-metrics-container'].innerHTML;
 }
 
-test('usage bars: a bar per counted feature, both counters, catalog copy', async () => {
-  const html = await renderUsage(paidAccount({
-    saves: { monthly: 600, daily: 40, total: 9000 },
-    exports: { monthly: 10, daily: 10 },
-  }));
+module.exports = defineCases({
+  type: 'group',
+  description: 'billing-usage-bars',
+  tests: [
+    {
+      name: 'usage bars: a bar per counted feature, both counters, catalog copy',
+      run: async (ctx) => {
+        const html = await renderUsage(paidAccount({
+          saves: { monthly: 600, daily: 40, total: 9000 },
+          exports: { monthly: 10, daily: 10 },
+        }));
 
-  // The catalog's name, icon and definition — not a hard-coded label map
-  assert.ok(html.includes('Saves'), 'the catalog name');
-  assert.ok(html.includes('<i class="fa-brands fa-figma fa-sm me-1 text-muted">'), 'the catalog icon, emitted exactly as authored (#929)');
-  assert.ok(!html.includes('fa-solid fa-fa-'), 'and never re-wrapped by the bar');
-  assert.ok(html.includes('data-bs-title="Notes you can save each month."'), 'the catalog definition, on hover');
+        // The catalog's name, icon and definition — not a hard-coded label map
+        ctx.expect(html.includes('Saves'), 'the catalog name').toBeTruthy();
+        ctx.expect(html.includes('<i class="fa-brands fa-figma fa-sm me-1 text-muted">'), 'the catalog icon, emitted exactly as authored (#929)').toBeTruthy();
+        ctx.expect(!html.includes('fa-solid fa-fa-'), 'and never re-wrapped by the bar').toBeTruthy();
+        ctx.expect(html.includes('data-bs-title="Notes you can save each month."'), 'the catalog definition, on hover').toBeTruthy();
 
-  // BOTH counters for the paced feature: 3100/month → ceil over a 28-31 day
-  // month is 100..111 a day, so today's number is real either way
-  assert.ok(/left today/.test(html), 'the day counter is shown');
-  assert.ok(html.includes('2,500 of 3,100 left this month'), `the month counter is shown: ${html}`);
+        // BOTH counters for the paced feature: 3100/month → ceil over a 28-31 day
+        // month is 100..111 a day, so today's number is real either way
+        ctx.expect(/left today/.test(html), 'the day counter is shown').toBeTruthy();
+        ctx.expect(html.includes('2,500 of 3,100 left this month'), `the month counter is shown: ${html}`).toBeTruthy();
 
-  // A perk is not a meter
-  assert.ok(!html.includes('Priority support'), 'a perk draws no bar');
-});
+        // A perk is not a meter
+        ctx.expect(!html.includes('Priority support'), 'a perk draws no bar').toBeTruthy();
+      },
+    },
 
-test('usage bars: a feature that opted out of pacing shows only the month', async () => {
-  const html = await renderUsage(paidAccount({ exports: { monthly: 10, daily: 10 } }));
+    {
+      name: 'usage bars: a feature that opted out of pacing shows only the month',
+      run: async (ctx) => {
+        const html = await renderUsage(paidAccount({ exports: { monthly: 10, daily: 10 } }));
 
-  const exportsBlock = html.slice(html.indexOf('Exports'));
+        const exportsBlock = html.slice(html.indexOf('Exports'));
 
-  assert.ok(exportsBlock.includes('40 of 50 left this month'), `the month counter: ${exportsBlock}`);
-  assert.ok(!exportsBlock.includes('left today'), 'no day cap exists, so none is drawn');
-});
+        ctx.expect(exportsBlock.includes('40 of 50 left this month'), `the month counter: ${exportsBlock}`).toBeTruthy();
+        ctx.expect(!exportsBlock.includes('left today'), 'no day cap exists, so none is drawn').toBeTruthy();
+      },
+    },
 
-test('usage bars: override credits are IN the month number and said out loud', async () => {
-  const html = await renderUsage(paidAccount({
-    saves: { monthly: 3100, daily: 0 },
-    overrides: { saves: 5000 },
-  }));
+    {
+      name: 'usage bars: override credits are IN the month number and said out loud',
+      run: async (ctx) => {
+        const html = await renderUsage(paidAccount({
+          saves: { monthly: 3100, daily: 0 },
+          overrides: { saves: 5000 },
+        }));
 
-  assert.ok(html.includes('1,900 of 5,000 left this month'), `the override is the limit that counts: ${html}`);
-  assert.ok(html.includes('granted'), 'and the extra credits are named, not silently folded in');
-});
+        ctx.expect(html.includes('1,900 of 5,000 left this month'), `the override is the limit that counts: ${html}`).toBeTruthy();
+        ctx.expect(html.includes('granted'), 'and the extra credits are named, not silently folded in').toBeTruthy();
+      },
+    },
 
-test('usage bars: an override AT or BELOW the plan sets the limit and claims no credit', async () => {
-  // An override is not always a grant — support can also DIAL A PLAN DOWN for
-  // one account. The badge subtracts, so a lower override rendered "+-50
-  // granted": a negative number announced as a gift.
-  const lower = await renderUsage(paidAccount({
-    saves: { monthly: 100, daily: 0 },
-    overrides: { saves: 500 },
-  }));
+    {
+      name: 'usage bars: an override AT or BELOW the plan sets the limit and claims no credit',
+      run: async (ctx) => {
+        // An override is not always a grant — support can also DIAL A PLAN DOWN for
+        // one account. The badge subtracts, so a lower override rendered "+-50
+        // granted": a negative number announced as a gift.
+        const lower = await renderUsage(paidAccount({
+          saves: { monthly: 100, daily: 0 },
+          overrides: { saves: 500 },
+        }));
 
-  assert.ok(lower.includes('400 of 500 left this month'), `the override is still the limit that counts: ${lower}`);
-  assert.ok(!lower.includes('granted'), 'but nothing was granted, so nothing claims it was');
-  assert.ok(!lower.includes('+-'), 'and no negative is dressed up as a credit');
+        ctx.expect(lower.includes('400 of 500 left this month'), `the override is still the limit that counts: ${lower}`).toBeTruthy();
+        ctx.expect(!lower.includes('granted'), 'but nothing was granted, so nothing claims it was').toBeTruthy();
+        ctx.expect(!lower.includes('+-'), 'and no negative is dressed up as a credit').toBeTruthy();
 
-  const equal = await renderUsage(paidAccount({
-    saves: { monthly: 100, daily: 0 },
-    overrides: { saves: 3100 },
-  }));
+        const equal = await renderUsage(paidAccount({
+          saves: { monthly: 100, daily: 0 },
+          overrides: { saves: 3100 },
+        }));
 
-  assert.ok(!equal.includes('granted'), 'an override equal to the plan grants nothing either');
-});
+        ctx.expect(!equal.includes('granted'), 'an override equal to the plan grants nothing either').toBeTruthy();
+      },
+    },
 
-test('usage bars: unlimited says so instead of drawing a percentage of nothing', async () => {
-  const html = await renderUsage(paidAccount({ saves: { monthly: 90000, daily: 10 } }), {
-    currency: 'USD',
-    products: [{ id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10 }, features: { saves: -1 } }],
-  });
+    {
+      name: 'usage bars: unlimited says so instead of drawing a percentage of nothing',
+      run: async (ctx) => {
+        const html = await renderUsage(paidAccount({ saves: { monthly: 90000, daily: 10 } }), {
+          currency: 'USD',
+          products: [{ id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10 }, features: { saves: -1 } }],
+        });
 
-  assert.ok(html.includes('Unlimited this month'), `unlimited is stated: ${html}`);
-  assert.ok(!html.includes('left today'), 'unlimited has no day share to be refused by, so no day bar is drawn');
-  assert.ok(!html.includes('NaN') && !html.includes('Infinity'), 'and no arithmetic leaks');
-});
+        ctx.expect(html.includes('Unlimited this month'), `unlimited is stated: ${html}`).toBeTruthy();
+        ctx.expect(!html.includes('left today'), 'unlimited has no day share to be refused by, so no day bar is drawn').toBeTruthy();
+        ctx.expect(!html.includes('NaN') && !html.includes('Infinity'), 'and no arithmetic leaks').toBeTruthy();
+      },
+    },
 
-test('usage bars: a plan that meters nothing says so', async () => {
-  const html = await renderUsage(new User({
-    subscription: { product: { id: 'basic' }, status: 'active' },
-    usage: {},
-  }, { uid: 'user-647' }), { currency: 'USD', products: [{ id: 'basic', name: 'Basic', type: 'subscription', prices: {}, features: { support: true } }] });
+    {
+      name: 'usage bars: a plan that meters nothing says so',
+      run: async (ctx) => {
+        const html = await renderUsage(new User({
+          subscription: { product: { id: 'basic' }, status: 'active' },
+          usage: {},
+        }, { uid: 'user-647' }), { currency: 'USD', products: [{ id: 'basic', name: 'Basic', type: 'subscription', prices: {}, features: { support: true } }] });
 
-  assert.ok(html.includes('Usage tracking not available for this plan.'), html);
-});
+        ctx.expect(html.includes('Usage tracking not available for this plan.'), html).toBeTruthy();
+      },
+    },
 
-test('#945: the bars read the plan off the User: a cancelled paid plan draws the basic limits', async () => {
-  const html = await renderUsage(new User({
-    subscription: { product: { id: 'premium' }, status: 'cancelled' },
-    usage: { saves: { monthly: 40, daily: 5 } },
-  }, { uid: 'user-647' }));
+    {
+      name: '#945: the bars read the plan off the User: a cancelled paid plan draws the basic limits',
+      run: async (ctx) => {
+        const html = await renderUsage(new User({
+          subscription: { product: { id: 'premium' }, status: 'cancelled' },
+          usage: { saves: { monthly: 40, daily: 5 } },
+        }, { uid: 'user-647' }));
 
-  assert.ok(html.includes('60 of 100 left this month'), `the basic plan's number, not premium's: ${html}`);
-  assert.ok(!html.includes('Exports'), 'and none of the premium-only meters');
+        ctx.expect(html.includes('60 of 100 left this month'), `the basic plan's number, not premium's: ${html}`).toBeTruthy();
+        ctx.expect(!html.includes('Exports'), 'and none of the premium-only meters').toBeTruthy();
+      },
+    },
+  ],
 });

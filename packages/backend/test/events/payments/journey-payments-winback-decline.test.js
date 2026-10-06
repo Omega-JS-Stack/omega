@@ -40,7 +40,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'setup-cancelled-subscriber',
-      async run({ accounts, firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, expect, state, config, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -87,14 +87,14 @@ module.exports = defineCases({
         }, { merge: true });
 
         const userDoc = await firestore.get(`users/${state.uid}`);
-        assert.equal(userDoc.subscription.status, 'cancelled', 'Should start cancelled');
-        assert.equal(userDoc.subscription.product.id, state.productId, 'Should still carry the paid product id');
+        expect(userDoc.subscription.status, 'Should start cancelled').toBe('cancelled');
+        expect(userDoc.subscription.product.id, 'Should still carry the paid product id').toBe(state.productId);
       },
     },
 
     {
       name: 'resubscribe-through-a-declining-checkout',
-      async run({ assert, omega, state }) {
+      async run({ expect, omega, state }) {
         const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
@@ -120,8 +120,8 @@ module.exports = defineCases({
           },
         });
 
-        assert.equal(sent.code, 200, `The checkout starts — the payment is what fails, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.ok(sent.body?.orderId, `Checkout should return an orderId, got ${JSON.stringify(sent.body)}`);
+        expect(sent.code, `The checkout starts — the payment is what fails, got ${sent.code}: ${JSON.stringify(sent.body)}`).toBe(200);
+        expect(sent.body?.orderId, `Checkout should return an orderId, got ${JSON.stringify(sent.body)}`).toBeTruthy();
 
         state.orderId = sent.body.orderId;
       },
@@ -129,7 +129,7 @@ module.exports = defineCases({
 
     {
       name: 'the-declined-win-back-suspends-the-subscriber',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${state.uid}`);
           return userDoc?.subscription?.status === 'suspended';
@@ -137,15 +137,15 @@ module.exports = defineCases({
 
         const userDoc = await firestore.get(`users/${state.uid}`);
 
-        assert.equal(userDoc.subscription.status, 'suspended', 'Status should be suspended after the declined win-back');
-        assert.equal(userDoc.subscription.product.id, state.productId, 'Product should be the ATTEMPTED product');
-        assert.equal(userDoc.subscription.payment.orderId, state.orderId, 'Order ID should match the intent');
+        expect(userDoc.subscription.status, 'Status should be suspended after the declined win-back').toBe('suspended');
+        expect(userDoc.subscription.product.id, 'Product should be the ATTEMPTED product').toBe(state.productId);
+        expect(userDoc.subscription.payment.orderId, 'Order ID should match the intent').toBe(state.orderId);
       },
     },
 
     {
       name: 'checkout-declined-transition-detected',
-      async run({ firestore, assert, state, waitFor }) {
+      async run({ firestore, expect, state, waitFor }) {
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
             .where('owner', '==', state.uid)
@@ -163,8 +163,8 @@ module.exports = defineCases({
 
         const webhookDoc = snapshot.docs[0].data();
 
-        assert.equal(webhookDoc.status, 'completed', 'The declined win-back webhook should process cleanly');
-        assert.equal(webhookDoc.transition, 'checkout-declined', 'Transition should be checkout-declined — the user is at the checkout watching it fail, not a subscriber being dunned');
+        expect(webhookDoc.status, 'The declined win-back webhook should process cleanly').toBe('completed');
+        expect(webhookDoc.transition, 'Transition should be checkout-declined — the user is at the checkout watching it fail, not a subscriber being dunned').toBe('checkout-declined');
       },
     },
   ],

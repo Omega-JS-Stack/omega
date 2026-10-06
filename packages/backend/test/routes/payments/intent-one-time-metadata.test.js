@@ -97,25 +97,25 @@ module.exports = defineCases({
     {
       name: 'stamps-the-product-on-the-payment-intent',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const params = await createOneTimeIntent();
 
-        assert.equal(params.mode, 'payment', 'A one-time product checks out in payment mode');
-        assert.equal(params.payment_intent_data.metadata.productId, ONE_TIME_PRODUCT.id, 'The charge must be able to say what was bought');
-        assert.equal(params.payment_intent_data.metadata.uid, UID, 'The uid stays on the charge');
-        assert.equal(params.payment_intent_data.metadata.orderId, ORDER_ID, 'The orderId stays on the charge');
+        expect(params.mode, 'A one-time product checks out in payment mode').toBe('payment');
+        expect(params.payment_intent_data.metadata.productId, 'The charge must be able to say what was bought').toBe(ONE_TIME_PRODUCT.id);
+        expect(params.payment_intent_data.metadata.uid, 'The uid stays on the charge').toBe(UID);
+        expect(params.payment_intent_data.metadata.orderId, 'The orderId stays on the charge').toBe(ORDER_ID);
       },
     },
 
     {
       name: 'the-session-metadata-is-unchanged',
       auth: 'none',
-      async run({ assert }) {
+      async run({ expect }) {
         const params = await createOneTimeIntent();
 
-        assert.equal(params.metadata.productId, ONE_TIME_PRODUCT.id, 'The session still carries the product');
-        assert.equal(params.metadata.uid, UID, 'The session still carries the uid');
-        assert.equal(params.metadata.orderId, ORDER_ID, 'The session still carries the orderId');
+        expect(params.metadata.productId, 'The session still carries the product').toBe(ONE_TIME_PRODUCT.id);
+        expect(params.metadata.uid, 'The session still carries the uid').toBe(UID);
+        expect(params.metadata.orderId, 'The session still carries the orderId').toBe(ORDER_ID);
       },
     },
   ],

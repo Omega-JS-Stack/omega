@@ -89,43 +89,43 @@ module.exports = defineCases({
   tests: [
     {
       name: 'creates-a-hosted-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         const result = await createIntent({}, calls);
 
-        assert.equal(calls.length, 1, 'Exactly one API call');
-        assert.equal(calls[0].endpoint, '/charges', 'A charge is created at POST /charges');
-        assert.equal(calls[0].options.method, 'POST');
+        expect(calls.length, 'Exactly one API call').toBe(1);
+        expect(calls[0].endpoint, 'A charge is created at POST /charges').toBe('/charges');
+        expect(calls[0].options.method).toBe('POST');
       },
     },
 
     {
       name: 'the-redirect-is-the-hosted-url',
-      async run({ assert }) {
+      async run({ expect }) {
         const result = await createIntent({}, []);
 
-        assert.equal(result.url, 'https://commerce.coinbase.com/charges/FBHJR22R', 'The buyer is sent to the hosted charge');
-        assert.equal(result.id, '8f783fa6-eaa3-4460-af64-cac26b183ed1', 'The intent id is the charge id the webhook will name');
-        assert.equal(result.raw.code, 'FBHJR22R', 'The raw charge rides along onto the intent doc');
+        expect(result.url, 'The buyer is sent to the hosted charge').toBe('https://commerce.coinbase.com/charges/FBHJR22R');
+        expect(result.id, 'The intent id is the charge id the webhook will name').toBe('8f783fa6-eaa3-4460-af64-cac26b183ed1');
+        expect(result.raw.code, 'The raw charge rides along onto the intent doc').toBe('FBHJR22R');
       },
     },
 
     {
       name: 'charges-a-fixed-price-in-usd',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({}, calls);
 
         const body = calls[0].options.body;
 
-        assert.equal(body.pricing_type, 'fixed_price', 'The buyer pays the price we set, never a donation amount');
-        assert.deepEqual(body.local_price, { amount: '49.99', currency: 'USD' });
+        expect(body.pricing_type, 'The buyer pays the price we set, never a donation amount').toBe('fixed_price');
+        expect(body.local_price).toEqual({ amount: '49.99', currency: 'USD' });
       },
     },
 
     {
       name: 'a-validated-discount-comes-off-the-charge',
-      async run({ assert }) {
+      async run({ expect }) {
         // The charge is a FIXED price this file computes — Coinbase has no
         // coupon object — so a code the route validated has to be applied here
         // or the buyer pays full price in crypto while the confirmation page
@@ -133,48 +133,48 @@ module.exports = defineCases({
         const calls = [];
         await createIntent({ discount: { valid: true, code: 'SAVE10', percent: 10, amount: 0 } }, calls);
 
-        assert.equal(calls[0].options.body.local_price.amount, '44.99', '10% off $49.99');
+        expect(calls[0].options.body.local_price.amount, '10% off $49.99').toBe('44.99');
       },
     },
 
     {
       name: 'a-flat-discount-comes-off-too',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({ discount: { valid: true, code: 'TENOFF', percent: 0, amount: 10 } }, calls);
 
-        assert.equal(calls[0].options.body.local_price.amount, '39.99', '$10 off $49.99');
+        expect(calls[0].options.body.local_price.amount, '$10 off $49.99').toBe('39.99');
       },
     },
 
     {
       name: 'carries-the-identifiers-the-pipeline-reads-back',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({}, calls);
 
         const metadata = calls[0].options.body.metadata;
 
-        assert.deepEqual(metadata, { uid: UID, orderId: ORDER_ID, productId: 'launch-kit' });
-        assert.equal(Coinbase.getUid({ metadata }), UID, 'And the library reads its own metadata back');
-        assert.equal(Coinbase.getOrderId({ metadata }), ORDER_ID);
+        expect(metadata).toEqual({ uid: UID, orderId: ORDER_ID, productId: 'launch-kit' });
+        expect(Coinbase.getUid({ metadata }), 'And the library reads its own metadata back').toBe(UID);
+        expect(Coinbase.getOrderId({ metadata })).toBe(ORDER_ID);
       },
     },
 
     {
       name: 'carries-both-redirects',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         await createIntent({}, calls);
 
-        assert.equal(calls[0].options.body.redirect_url, CONFIRMATION_URL);
-        assert.equal(calls[0].options.body.cancel_url, CANCEL_URL);
+        expect(calls[0].options.body.redirect_url).toBe(CONFIRMATION_URL);
+        expect(calls[0].options.body.cancel_url).toBe(CANCEL_URL);
       },
     },
 
     {
       name: 'refuses-a-subscription-product',
-      async run({ assert }) {
+      async run({ expect }) {
         // Coinbase Commerce has no recurring anything. Selling one as a single
         // charge would take the money and grant a plan nothing renews.
         const calls = [];
@@ -184,17 +184,17 @@ module.exports = defineCases({
           await createIntent({ product: SUBSCRIPTION_PRODUCT, productId: 'premium', frequency: 'monthly' }, calls);
         } catch (e) {
           threw = true;
-          assert.match(e.message, /one-time payment/i, 'The refusal says why');
+          expect(e.message, 'The refusal says why').toMatch(/one-time payment/i);
         }
 
-        assert.ok(threw, 'A subscription must be refused');
-        assert.equal(calls.length, 0, 'And refused BEFORE Coinbase is called');
+        expect(threw, 'A subscription must be refused').toBeTruthy();
+        expect(calls.length, 'And refused BEFORE Coinbase is called').toBe(0);
       },
     },
 
     {
       name: 'refuses-an-archived-product',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         let threw = false;
 
@@ -202,17 +202,17 @@ module.exports = defineCases({
           await createIntent({ product: { ...ONE_TIME_PRODUCT, archived: true } }, calls);
         } catch (e) {
           threw = true;
-          assert.match(e.message, /archived/i);
+          expect(e.message).toMatch(/archived/i);
         }
 
-        assert.ok(threw, 'An archived product must be refused');
-        assert.equal(calls.length, 0, 'And refused before Coinbase is called');
+        expect(threw, 'An archived product must be refused').toBeTruthy();
+        expect(calls.length, 'And refused before Coinbase is called').toBe(0);
       },
     },
 
     {
       name: 'refuses-a-product-with-no-one-time-price',
-      async run({ assert }) {
+      async run({ expect }) {
         const calls = [];
         let threw = false;
 
@@ -220,27 +220,27 @@ module.exports = defineCases({
           await createIntent({ product: { id: 'launch-kit', name: 'Starter Library', type: 'one-time', prices: {} } }, calls);
         } catch (e) {
           threw = true;
-          assert.match(e.message, /no one-time price/i);
+          expect(e.message).toMatch(/no one-time price/i);
         }
 
-        assert.ok(threw, 'A priceless product must be refused');
-        assert.equal(calls.length, 0);
+        expect(threw, 'A priceless product must be refused').toBeTruthy();
+        expect(calls.length).toBe(0);
       },
     },
 
     {
       name: 'refuses-a-charge-that-came-back-without-a-page-to-pay-it-on',
-      async run({ assert }) {
+      async run({ expect }) {
         let threw = false;
 
         try {
           await createIntent({}, [], { data: { id: 'ch_no_url', code: 'NOURL123' } });
         } catch (e) {
           threw = true;
-          assert.match(e.message, /no hosted_url/i, 'A charge with nowhere to pay it is not an intent');
+          expect(e.message, 'A charge with nowhere to pay it is not an intent').toMatch(/no hosted_url/i);
         }
 
-        assert.ok(threw, 'A urlless charge must throw rather than redirect to undefined');
+        expect(threw, 'A urlless charge must throw rather than redirect to undefined').toBeTruthy();
       },
     },
   ],

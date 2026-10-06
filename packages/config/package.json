@@ -22,7 +22,7 @@
     "./winback": "./src/winback.js"
   },
   "scripts": {
-    "test": "node ../devkit/src/test/cli.js"
+    "test": "node ../devkit/src/test/cli.js --isolation=process"
   },
   "dependencies": {
     "@omega.js/account": "*",

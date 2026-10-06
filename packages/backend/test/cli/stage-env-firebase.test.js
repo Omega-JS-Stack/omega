@@ -8,7 +8,7 @@
  *
  * Run: npx omega test backend:cli/stage-env-firebase
  */
-const assert = require('node:assert');
+const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const { assertFirebaseEnvSafe } = require('../../dist/cli/utils/stage-functions.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -35,19 +35,16 @@ module.exports = defineCases({
     ...Object.entries(REFUSED).map(([key, value]) => ({
       name: `refuses-${key.toLowerCase().replace(/_/g, '-')}-naming-the-key-only`,
       run() {
-        assert.throws(
-          () => assertFirebaseEnvSafe({ SAFE: 'plain', [key]: value }),
-          (error) => error.message.includes(key)
+        expect(() => assertFirebaseEnvSafe({ SAFE: 'plain', [key]: value })).toThrow((error) => error.message.includes(key)
             && !error.message.includes(value)
-            && !error.message.includes('SAFE'),
-        );
+            && !error.message.includes('SAFE'));
       },
     })),
 
     {
       name: 'accepts-values-firebase-reads-back-unchanged',
       run() {
-        assert.doesNotThrow(() => assertFirebaseEnvSafe(ACCEPTED));
+        expect(() => assertFirebaseEnvSafe(ACCEPTED)).not.toThrow();
       },
     },
   ],

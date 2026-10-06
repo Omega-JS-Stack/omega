@@ -70,7 +70,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'reads-the-charge-already-in-hand',
-      async run({ assert }) {
+      async run({ expect }) {
         // The one-time refund path resolves to the charge itself — it is already the
         // provider's answer, so there is nothing to look up a second time.
         const calls = [];
@@ -79,16 +79,16 @@ module.exports = defineCases({
           return Stripe.getRefundDetails(charge(999, 'requested_by_customer'), { raw: envelope(99999, 'fraudulent') });
         });
 
-        assert.equal(details.amount, '9.99', 'The amount comes off the fetched charge');
-        assert.equal(details.currency, 'USD', 'The currency comes off the fetched charge');
-        assert.equal(details.reason, 'requested_by_customer', 'The reason comes off the fetched charge');
-        assert.equal(calls.length, 0, 'A charge already in hand is not fetched again');
+        expect(details.amount, 'The amount comes off the fetched charge').toBe('9.99');
+        expect(details.currency, 'The currency comes off the fetched charge').toBe('USD');
+        expect(details.reason, 'The reason comes off the fetched charge').toBe('requested_by_customer');
+        expect(calls.length, 'A charge already in hand is not fetched again').toBe(0);
       },
     },
 
     {
       name: 'looks-the-charge-up-when-the-resource-is-not-one',
-      async run({ assert }) {
+      async run({ expect }) {
         // The subscription refund path: the resource is the subscription, which
         // carries no refund fields at all — the envelope's charge was the only
         // thing ever read for them.
@@ -99,16 +99,16 @@ module.exports = defineCases({
           return Stripe.getRefundDetails(subscription, { raw: envelope(99999, 'fraudulent') });
         });
 
-        assert.equal(calls.length, 1, 'The charge is read back from Stripe');
-        assert.equal(calls[0], CHARGE_ID, 'By the id the payload names — an identifier, nothing more');
-        assert.equal(details.amount, '9.99', 'The amount is Stripe\'s, not the envelope\'s');
-        assert.equal(details.reason, 'requested_by_customer', 'And so is the reason');
+        expect(calls.length, 'The charge is read back from Stripe').toBe(1);
+        expect(calls[0], 'By the id the payload names — an identifier, nothing more').toBe(CHARGE_ID);
+        expect(details.amount, 'The amount is Stripe\'s, not the envelope\'s').toBe('9.99');
+        expect(details.reason, 'And so is the reason').toBe('requested_by_customer');
       },
     },
 
     {
       name: 'a-failed-charge-lookup-throws-rather-than-answering-with-the-payload',
-      async run({ assert }) {
+      async run({ expect }) {
         // An amount that cannot be verified is not written at all ([#506]).
         const error = new Error(`No such charge: '${CHARGE_ID}'`);
 
@@ -127,20 +127,20 @@ module.exports = defineCases({
           threw = e;
         }
 
-        assert.ok(threw, 'A failed lookup must throw');
-        assert.equal(threw.notFound, true, 'A charge Stripe does not have is a terminal miss, classified by the same seam');
-        assert.equal(threw.resourceType, 'charge', 'The failure names the lookup that missed');
+        expect(threw, 'A failed lookup must throw').toBeTruthy();
+        expect(threw.notFound, 'A charge Stripe does not have is a terminal miss, classified by the same seam').toBe(true);
+        expect(threw.resourceType, 'The failure names the lookup that missed').toBe('charge');
       },
     },
 
     {
       name: 'an-unrefunded-charge-reports-no-amount',
-      async run({ assert }) {
+      async run({ expect }) {
         const details = Stripe.toRefundDetails({ id: CHARGE_ID, object: 'charge', currency: 'eur' });
 
-        assert.equal(details.amount, null, 'Nothing came back, so no amount is reported');
-        assert.equal(details.currency, 'EUR', 'The charge\'s own currency still comes through');
-        assert.equal(details.reason, null, 'And no reason is invented');
+        expect(details.amount, 'Nothing came back, so no amount is reported').toBe(null);
+        expect(details.currency, 'The charge\'s own currency still comes through').toBe('EUR');
+        expect(details.reason, 'And no reason is invented').toBe(null);
       },
     },
   ],

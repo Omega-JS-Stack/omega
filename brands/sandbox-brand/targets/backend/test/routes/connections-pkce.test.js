@@ -87,21 +87,21 @@ module.exports = defineCases({
     {
       name: 'authorize-carries-the-challenge-and-stores-the-verifier',
 
-      async run({ http: request, firestore, assert, state, accounts }) {
+      async run({ http: request, firestore, expect, state, accounts }) {
         const response = await request.as('basic').get('omega/user/connections', {
           provider: PROVIDER_ID,
           action: 'authorize',
           redirect: false,
         });
 
-        assert.isSuccess(response, 'a provider only the BRAND ships is loaded by the lane');
+        expect(response, 'a provider only the BRAND ships is loaded by the lane').toBeSuccess();
 
         const url = new URL(response.data.url);
 
-        assert.equal(url.origin + url.pathname, provider.urls.authorize, "the brand provider's own authorize url");
-        assert.equal(url.searchParams.get('code_challenge_method'), 'S256', 'the declaration is enough to turn PKCE on');
-        assert.ok(url.searchParams.get('code_challenge'), 'and the challenge rides the URL');
-        assert.equal(url.searchParams.get('code_verifier'), null, 'the verifier never does');
+        expect(url.origin + url.pathname, "the brand provider's own authorize url").toBe(provider.urls.authorize);
+        expect(url.searchParams.get('code_challenge_method'), 'the declaration is enough to turn PKCE on').toBe('S256');
+        expect(url.searchParams.get('code_challenge'), 'and the challenge rides the URL').toBeTruthy();
+        expect(url.searchParams.get('code_verifier'), 'the verifier never does').toBe(null);
 
         state.encryptedState = url.searchParams.get('state');
         state.challenge = url.searchParams.get('code_challenge');
@@ -109,8 +109,8 @@ module.exports = defineCases({
         const usage = await firestore.get(`usage/${accounts.basic.uid}`);
         const session = usage?.connections?.[PROVIDER_ID];
 
-        assert.ok(session?.verifier, 'the verifier is stored server-side, beside the CSRF token');
-        assert.equal(challengeFor(session.verifier), state.challenge, 'and it is the one the published challenge hashes from');
+        expect(session?.verifier, 'the verifier is stored server-side, beside the CSRF token').toBeTruthy();
+        expect(challengeFor(session.verifier), 'and it is the one the published challenge hashes from').toBe(state.challenge);
 
         state.verifier = session.verifier;
       },
@@ -119,34 +119,34 @@ module.exports = defineCases({
     {
       name: 'tokenize-sends-the-verifier-and-lands-the-record',
 
-      async run({ http: request, firestore, assert, state, accounts }) {
+      async run({ http: request, firestore, expect, state, accounts }) {
         const response = await request.as('basic').post('omega/user/connections', {
           action: 'tokenize',
           code: 'sandbox-authorization-code',
           encryptedState: state.encryptedState,
         });
 
-        assert.isSuccess(response, 'the exchange completes');
+        expect(response, 'the exchange completes').toBeSuccess();
 
         const exchange = state.received.find((entry) => entry.url.startsWith('/token'));
 
-        assert.ok(exchange, 'the token endpoint was called');
-        assert.equal(exchange.body.code_verifier, state.verifier, 'with the verifier the authorize leg minted');
-        assert.equal(exchange.body.grant_type, 'authorization_code', 'as an authorization-code exchange');
-        assert.equal(exchange.body.code, 'sandbox-authorization-code', 'carrying the code');
+        expect(exchange, 'the token endpoint was called').toBeTruthy();
+        expect(exchange.body.code_verifier, 'with the verifier the authorize leg minted').toBe(state.verifier);
+        expect(exchange.body.grant_type, 'as an authorization-code exchange').toBe('authorization_code');
+        expect(exchange.body.code, 'carrying the code').toBe('sandbox-authorization-code');
 
         const user = await firestore.get(`users/${accounts.basic.uid}`);
         const record = user?.connections?.[PROVIDER_ID]?.[TOKEN_RESPONSE.user_id];
 
-        assert.ok(record, 'the connection is recorded under the user, keyed by its identity id');
-        assert.equal(record.token.access_token, TOKEN_RESPONSE.access_token, 'with the access token');
-        assert.equal(record.token.refresh_token, TOKEN_RESPONSE.refresh_token, 'and the refresh token');
-        assert.equal(record.identity.id, TOKEN_RESPONSE.user_id, "and the provider's own identity");
-        assert.equal(record.type, 'oauth2', 'and the KIND of connection it is (#788)');
+        expect(record, 'the connection is recorded under the user, keyed by its identity id').toBeTruthy();
+        expect(record.token.access_token, 'with the access token').toBe(TOKEN_RESPONSE.access_token);
+        expect(record.token.refresh_token, 'and the refresh token').toBe(TOKEN_RESPONSE.refresh_token);
+        expect(record.identity.id, "and the provider's own identity").toBe(TOKEN_RESPONSE.user_id);
+        expect(record.type, 'and the KIND of connection it is (#788)').toBe('oauth2');
 
         const usage = await firestore.get(`usage/${accounts.basic.uid}`);
 
-        assert.equal(usage?.connections?.[PROVIDER_ID], undefined, 'the one-time session (CSRF + verifier) is deleted');
+        expect(usage?.connections?.[PROVIDER_ID], 'the one-time session (CSRF + verifier) is deleted').toBe(undefined);
       },
     },
   ],

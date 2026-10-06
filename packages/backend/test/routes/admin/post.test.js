@@ -50,12 +50,12 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.put('omega/admin/post', {
           body: 'Test content',
         });
 
-        assert.isError(response, 400, 'Missing URL should return 400');
+        expect(response, 'Missing URL should return 400').toBeError(400);
       },
     },
 
@@ -65,12 +65,12 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
         });
 
-        assert.isError(response, 400, 'Missing body should return 400');
+        expect(response, 'Missing body should return 400').toBeError(400);
       },
     },
 
@@ -80,13 +80,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 60000,
 
-      async run({ http, assert, config }) {
+      async run({ http, expect, config }) {
         const response = await http.put('omega/admin/post', {
           url: `https://${config.domain}/blog/nonexistent-test-post-12345`,
           body: 'This is test content from @omega.js/backend test suite.',
         });
 
-        assert.isError(response, 404, 'Non-existent post should return 404');
+        expect(response, 'Non-existent post should return 404').toBeError(404);
       },
     },
 
@@ -99,13 +99,13 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.put('omega/admin/post', {
           url: `https://example.com/blog/never-created-${Date.now()}`,
           body: 'Test content',
         });
 
-        assert.isError(response, 404, 'Non-existent repo or post should return 404');
+        expect(response, 'Non-existent repo or post should return 404').toBeError(404);
       },
     },
 
@@ -116,11 +116,11 @@ module.exports = defineCases({
       timeout: 60000,
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
-      async run({ assert, state, config }) {
+      async run({ expect, state, config }) {
         const { sourceRepo } = require('../../helpers/_shared-config.js');
         const source = sourceRepo(config);
         if (!source) {
-          assert.fail('source repo not resolvable (set repo.owner + brand.id)');
+          expect.fail('source repo not resolvable (set repo.owner + brand.id)');
           return;
         }
 
@@ -167,11 +167,11 @@ module.exports = defineCases({
         }).catch(e => e);
 
         if (createResult instanceof Error) {
-          assert.fail(`Failed to create test post: ${createResult.message}`);
+          expect.fail(`Failed to create test post: ${createResult.message}`);
           return;
         }
 
-        assert.ok(createResult.data.content.sha, 'Post should be created with a SHA');
+        expect(createResult.data.content.sha, 'Post should be created with a SHA').toBeTruthy();
         state.postSha = createResult.data.content.sha;
       },
     },
@@ -183,7 +183,7 @@ module.exports = defineCases({
       timeout: 30000,
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
-      async run({ assert, state, config }) {
+      async run({ expect, state, config }) {
         if (!state.postPath) {
           return; // Previous test didn't run
         }
@@ -199,7 +199,7 @@ module.exports = defineCases({
           path: state.postPath,
         });
 
-        assert.ok(fileData.sha, 'File should exist in GitHub repo');
+        expect(fileData.sha, 'File should exist in GitHub repo').toBeTruthy();
         state.currentSha = fileData.sha;
       },
     },
@@ -213,7 +213,7 @@ module.exports = defineCases({
       timeout: 60000,
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
-      async run({ http, assert, state }) {
+      async run({ http, expect, state }) {
         if (!state.postUrl) {
           return; // Previous tests didn't run
         }
@@ -230,12 +230,12 @@ module.exports = defineCases({
         // This is a known limitation - the file exists but code search hasn't indexed it
         if (response.status === 404 && response.error?.includes('not found')) {
           state.editSkipped = true;
-          assert.ok(true, 'Edit skipped - GitHub code search has not indexed the file yet (this is expected for new files)');
+          expect(true, 'Edit skipped - GitHub code search has not indexed the file yet (this is expected for new files)').toBeTruthy();
           return;
         }
 
-        assert.isSuccess(response, 'Edit post should succeed');
-        assert.hasProperty(response, 'data.url', 'Response should have url');
+        expect(response, 'Edit post should succeed').toBeSuccess();
+        expect(response, 'Response should have url').toHaveProperty('data.url');
       },
     },
 
@@ -246,9 +246,9 @@ module.exports = defineCases({
       timeout: 90000, // waitFor polls up to 60s for GitHub content propagation
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
-      async run({ assert, state, waitFor }) {
+      async run({ expect, state, waitFor }) {
         if (!state.postPath || state.editSkipped) {
-          assert.ok(true, 'Skipping verify - edit was not performed');
+          expect(true, 'Skipping verify - edit was not performed').toBeTruthy();
           return;
         }
 
@@ -268,10 +268,7 @@ module.exports = defineCases({
           return decoded.includes('EDITED by the @omega.js/backend test suite') ? decoded : false;
         }, 60000, 3000);
 
-        assert.ok(
-          content.includes('EDITED by the @omega.js/backend test suite'),
-          'Post content should contain the edited text'
-        );
+        expect(content.includes('EDITED by the @omega.js/backend test suite'), 'Post content should contain the edited text').toBeTruthy();
       },
     },
 
@@ -281,13 +278,13 @@ module.exports = defineCases({
       auth: 'none',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
           body: 'Test content',
         });
 
-        assert.isError(response, 401, 'Edit post should fail without authentication');
+        expect(response, 'Edit post should fail without authentication').toBeError(401);
       },
     },
 
@@ -296,13 +293,13 @@ module.exports = defineCases({
       auth: 'basic',
       timeout: 15000,
 
-      async run({ http, assert }) {
+      async run({ http, expect }) {
         const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
           body: 'Test content',
         });
 
-        assert.isError(response, 403, 'Edit post should fail for non-admin user');
+        expect(response, 'Edit post should fail for non-admin user').toBeError(403);
       },
     },
 

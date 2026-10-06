@@ -14,8 +14,7 @@
  * reads the layout; the load half runs the REAL section over a FormManager stub,
  * the harness account-orders.test.js uses.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -88,54 +87,66 @@ function inputNamed(markup, name) {
   return tag ? tag[0] : null;
 }
 
-test('#663: the location block ships an optional street and postal code', () => {
-  const markup = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
+module.exports = defineCases({
+  type: 'group',
+  description: 'account-page',
+  tests: [
+    {
+      name: '#663: the location block ships an optional street and postal code',
+      run: (ctx) => {
+        const markup = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
 
-  const street = inputNamed(markup, 'personal.location.street');
-  assert.ok(street, 'the street input is on the page');
-  assert.match(street, /id="street-input"/, 'the id the label points at');
-  assert.match(street, /autocomplete="street-address"/, 'the browser can fill it');
-  assert.match(street, /placeholder="Street address"/);
+        const street = inputNamed(markup, 'personal.location.street');
+        ctx.expect(street, 'the street input is on the page').toBeTruthy();
+        ctx.expect(street, 'the id the label points at').toMatch(/id="street-input"/);
+        ctx.expect(street, 'the browser can fill it').toMatch(/autocomplete="street-address"/);
+        ctx.expect(street).toMatch(/placeholder="Street address"/);
 
-  const postalCode = inputNamed(markup, 'personal.location.postalCode');
-  assert.ok(postalCode, 'the postal code input is on the page');
-  assert.match(postalCode, /id="postal-code-input"/);
-  assert.match(postalCode, /autocomplete="postal-code"/);
-  assert.match(postalCode, /placeholder="Postal code"/);
+        const postalCode = inputNamed(markup, 'personal.location.postalCode');
+        ctx.expect(postalCode, 'the postal code input is on the page').toBeTruthy();
+        ctx.expect(postalCode).toMatch(/id="postal-code-input"/);
+        ctx.expect(postalCode).toMatch(/autocomplete="postal-code"/);
+        ctx.expect(postalCode).toMatch(/placeholder="Postal code"/);
 
-  // The schema's name is the international one, never the US-only `zip` the ad
-  // platforms call their parameter.
-  assert.equal(inputNamed(markup, 'personal.location.zip'), null, 'no zip field anywhere');
+        // The schema's name is the international one, never the US-only `zip` the ad
+        // platforms call their parameter.
+        ctx.expect(inputNamed(markup, 'personal.location.zip'), 'no zip field anywhere').toBe(null);
 
-  for (const id of ['street-input', 'postal-code-input']) {
-    assert.ok(markup.includes(`for="${id}"`), `the ${id} carries a label of its own`);
-  }
-});
+        for (const id of ['street-input', 'postal-code-input']) {
+          ctx.expect(markup.includes(`for="${id}"`), `the ${id} carries a label of its own`).toBeTruthy();
+        }
+      },
+    },
 
-test('#663: the saved address is loaded back into the form', async () => {
-  await bundleOnce();
+    {
+      name: '#663: the saved address is loaded back into the form',
+      run: async (ctx) => {
+        await bundleOnce();
 
-  globalThis.window = { location: { href: 'https://example.com/dashboard/account', origin: 'https://example.com', search: '', hash: '#profile' } };
-  globalThis.document = {
-    getElementById: () => null,
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    addEventListener: () => {},
-  };
-  // The join date reads the Firebase session's own metadata; none here
-  globalThis.__omegaClient = { firebaseAuth: { currentUser: null } };
+        globalThis.window = { location: { href: 'https://example.com/dashboard/account', origin: 'https://example.com', search: '', hash: '#profile' } };
+        globalThis.document = {
+          getElementById: () => null,
+          querySelector: () => null,
+          querySelectorAll: () => [],
+          addEventListener: () => {},
+        };
+        // The join date reads the Firebase session's own metadata; none here
+        globalThis.__omegaClient = { firebaseAuth: { currentUser: null } };
 
-  delete require.cache[require.resolve(BUNDLE)];
-  const { profile } = require(BUNDLE);
+        delete require.cache[require.resolve(BUNDLE)];
+        const { profile } = require(BUNDLE);
 
-  profile.init();
-  profile.loadData(new User({
-    personal: { location: { country: 'US', region: 'California', city: 'San Diego', postalCode: '90210', street: '123 Main Street' } },
-  }, { uid: 'uid-1', email: 'buyer@example.com' }));
+        profile.init();
+        profile.loadData(new User({
+          personal: { location: { country: 'US', region: 'California', city: 'San Diego', postalCode: '90210', street: '123 Main Street' } },
+        }, { uid: 'uid-1', email: 'buyer@example.com' }));
 
-  const location = globalThis.__profileForm.data.personal.location;
+        const location = globalThis.__profileForm.data.personal.location;
 
-  assert.equal(location.street, '123 Main Street', 'the street comes back into its input');
-  assert.equal(location.postalCode, '90210', 'and so does the postal code');
-  assert.equal(location.city, 'San Diego', 'the fields that already loaded still do');
+        ctx.expect(location.street, 'the street comes back into its input').toBe('123 Main Street');
+        ctx.expect(location.postalCode, 'and so does the postal code').toBe('90210');
+        ctx.expect(location.city, 'the fields that already loaded still do').toBe('San Diego');
+      },
+    },
+  ],
 });

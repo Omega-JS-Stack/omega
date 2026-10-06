@@ -26,84 +26,84 @@ module.exports = defineCases({
   tests: [
     {
       name: 'production-is-a-declared-boolean',
-      async run({ assert }) {
-        assert.equal(BOOLEAN_FLAGS.includes('production'), true, 'production must be in the declared boolean list');
+      async run({ expect }) {
+        expect(BOOLEAN_FLAGS.includes('production'), 'production must be in the declared boolean list').toBe(true);
       },
     },
 
     {
       name: 'flag-before-positional-keeps-the-positional',
-      async run({ assert }) {
+      async run({ expect }) {
         const argv = parse(['firestore:delete', '--production', 'users/abc123']);
-        assert.equal(argv.production, true, '--production should parse as a boolean');
-        assert.deepEqual(argv._, ['firestore:delete', 'users/abc123'], 'the doc path must survive as a positional');
+        expect(argv.production, '--production should parse as a boolean').toBe(true);
+        expect(argv._, 'the doc path must survive as a positional').toEqual(['firestore:delete', 'users/abc123']);
       },
     },
 
     {
       name: 'every-declared-flag-keeps-positionals',
-      async run({ assert }) {
+      async run({ expect }) {
         BOOLEAN_FLAGS.forEach((flag) => {
           const argv = parse(['some:command', `--${flag}`, 'positional-arg']);
-          assert.equal(argv[flag], true, `--${flag} should parse as a boolean`);
-          assert.deepEqual(argv._, ['some:command', 'positional-arg'], `--${flag} must not swallow the next positional`);
+          expect(argv[flag], `--${flag} should parse as a boolean`).toBe(true);
+          expect(argv._, `--${flag} must not swallow the next positional`).toEqual(['some:command', 'positional-arg']);
         });
       },
     },
 
     {
       name: 'an-undeclared-flag-still-takes-its-value',
-      async run({ assert }) {
+      async run({ expect }) {
         // The value rule needs no list: nothing declares --only, and
         // `omega deploy --only hosting` is a documented spelling.
         const argv = parse(['deploy', '--only', 'hosting']);
-        assert.equal(argv.only, 'hosting');
-        assert.deepEqual(argv._, ['deploy']);
-        assert.equal(BOOLEAN_FLAGS.includes('only'), false, 'declaring it value-less is what WOULD break it');
+        expect(argv.only).toBe('hosting');
+        expect(argv._).toEqual(['deploy']);
+        expect(BOOLEAN_FLAGS.includes('only'), 'declaring it value-less is what WOULD break it').toBe(false);
       },
     },
 
     {
       name: 'the-update-flags-are-value-less-and-keep-the-next-token',
-      async run({ assert }) {
+      async run({ expect }) {
         // `--dry-run`, `--major` and `--force-fresh` take no value (devkit's
         // runUpdate reads all three as booleans), so none may eat a positional.
         for (const flag of ['dry-run', 'major', 'force-fresh']) {
-          assert.equal(BOOLEAN_FLAGS.includes(flag), true, `--${flag} must be declared boolean`);
+          expect(BOOLEAN_FLAGS.includes(flag), `--${flag} must be declared boolean`).toBe(true);
         }
         const argv = parse(['update', '--dry-run', 'extra']);
-        assert.equal(argv.dryRun, true);
-        assert.deepEqual(argv._, ['update', 'extra']);
+        expect(argv.dryRun).toBe(true);
+        expect(argv._).toEqual(['update', 'extra']);
       },
     },
 
     {
       name: 'a-declared-boolean-before-a-value-flag-keeps-both',
-      async run({ assert }) {
+      async run({ expect }) {
         const argv = parse(['deploy', '--dry-run', '--only', 'functions']);
-        assert.equal(argv.dryRun, true);
-        assert.equal(argv.only, 'functions');
-        assert.deepEqual(argv._, ['deploy']);
+        expect(argv.dryRun).toBe(true);
+        expect(argv.only).toBe('functions');
+        expect(argv._).toEqual(['deploy']);
       },
     },
 
     {
       name: 'where-accumulates-and-a-single-clause-stays-a-string',
-      async run({ assert }) {
-        assert.deepEqual(parse(['firestore:query', '--where', 'a==1', '--where', 'b==2']).where, ['a==1', 'b==2']);
-        assert.equal(parse(['firestore:query', '--where', 'a==1']).where, 'a==1');
+      async run({ expect }) {
+        expect(parse(['firestore:query', '--where', 'a==1', '--where', 'b==2']).where).toEqual(['a==1', 'b==2']);
+        expect(parse(['firestore:query', '--where', 'a==1']).where).toBe('a==1');
       },
     },
 
     {
       name: 'no-negation-sets-the-positive-flag-false',
-      async run({ assert }) {
+      async run({ expect }) {
         // `argv.https !== false` / `argv.seed !== false` / `argv.merge !== false`
         // are how the emulator and firestore commands read these.
         const argv = parse(['emulator', '--no-https', '--no-seed', '--no-merge']);
-        assert.equal(argv.https, false);
-        assert.equal(argv.seed, false);
-        assert.equal(argv.merge, false);
+        expect(argv.https).toBe(false);
+        expect(argv.seed).toBe(false);
+        expect(argv.merge).toBe(false);
       },
     },
   ],

@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:events/payments/webhook-refund-envelope-shape
  */
-const assert = require('node:assert');
+const expect = require('../../../dist/vendor/devkit/test/expect.js');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
 const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -104,7 +104,7 @@ module.exports = defineCases({
 
         await runIdlessRefund(calls);
 
-        assert.ok(!calls.some((call) => call.startsWith('charge:')), 'a lookup keyed by `undefined` is not a lookup — the guard runs before the call');
+        expect(!calls.some((call) => call.startsWith('charge:')), 'a lookup keyed by `undefined` is not a lookup — the guard runs before the call').toBeTruthy();
       },
     },
 
@@ -115,9 +115,9 @@ module.exports = defineCases({
         const { store } = await runIdlessRefund();
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.equal(event.status, 'failed', 'a malformed envelope is a failure, not a decision the pipeline acknowledges');
-        assert.equal(event.deadLetter, true, 'and a terminal one: the retry sweep must never flip it back to pending');
-        assert.equal(event.retryCount, 1, 'the attempt that found it is counted, and it is the only one there will be');
+        expect(event.status, 'a malformed envelope is a failure, not a decision the pipeline acknowledges').toBe('failed');
+        expect(event.deadLetter, 'and a terminal one: the retry sweep must never flip it back to pending').toBe(true);
+        expect(event.retryCount, 'the attempt that found it is counted, and it is the only one there will be').toBe(1);
       },
     },
 
@@ -128,9 +128,9 @@ module.exports = defineCases({
         const { logs, store } = await runIdlessRefund();
         const output = logs.join('\n');
 
-        assert.match(output, /charge\.refunded/, 'the log names the event that carried it');
-        assert.match(output, /amount_refunded/, 'and the keys the envelope DID carry — the shape is what a human debugs from');
-        assert.match(store.get(`payments-webhooks/${EVENT_ID}`)?.error || '', /charge id/i, 'the stamped error says what was missing');
+        expect(output, 'the log names the event that carried it').toMatch(/charge\.refunded/);
+        expect(output, 'and the keys the envelope DID carry — the shape is what a human debugs from').toMatch(/amount_refunded/);
+        expect(store.get(`payments-webhooks/${EVENT_ID}`)?.error || '', 'the stamped error says what was missing').toMatch(/charge id/i);
       },
     },
 
@@ -140,8 +140,8 @@ module.exports = defineCases({
       async run() {
         const { store } = await runIdlessRefund();
 
-        assert.ok(!store.get(`users/${UID}`), 'no subscription lands off a refund the pipeline could not verify');
-        assert.ok(!store.get(`payments-orders/${ORDER_ID}`), 'nor an order');
+        expect(!store.get(`users/${UID}`), 'no subscription lands off a refund the pipeline could not verify').toBeTruthy();
+        expect(!store.get(`payments-orders/${ORDER_ID}`), 'nor an order').toBeTruthy();
       },
     },
   ],

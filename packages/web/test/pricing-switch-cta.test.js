@@ -20,8 +20,7 @@
  * selectors the page reads, with @omega.js/account resolving the subscription
  * exactly as the client does.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -222,111 +221,118 @@ async function loadPricingPage(account) {
   };
 }
 
-test('pricing CTA: a subscriber\'s switch button goes to the billing tab, naming the plan and cadence', async () => {
-  const page = await loadPricingPage(SUBSCRIBER);
+module.exports = defineCases({
+  type: 'group',
+  description: 'pricing-switch-cta',
+  tests: [
+    {
+      name: 'pricing CTA: a subscriber\'s switch button goes to the billing tab, naming the plan and cadence',
+      run: async (ctx) => {
+        const page = await loadPricingPage(SUBSCRIBER);
 
-  assert.equal(page.button('pro').textContent, 'Switch to This Plan', 'the other plan reads as a switch, as it already did');
-  assert.equal(
-    page.navigate('pro'),
-    'https://brand.test/dashboard/account?product=pro&frequency=monthly#billing',
-    'and the click lands on the billing tab with the plan it meant — not in checkout, which would sell a second subscription',
-  );
+        ctx.expect(page.button('pro').textContent, 'the other plan reads as a switch, as it already did').toBe('Switch to This Plan');
+        ctx.expect(page.navigate('pro'), 'and the click lands on the billing tab with the plan it meant — not in checkout, which would sell a second subscription').toBe('https://brand.test/dashboard/account?product=pro&frequency=monthly#billing');
 
-  // The cadence travels with it: whatever the pricing toggle is showing is the
-  // cadence the modal opens on.
-  page.cadence('annually');
-  assert.equal(
-    page.navigate('pro'),
-    'https://brand.test/dashboard/account?product=pro&frequency=annually#billing',
-    'the toggle\'s cadence rides along',
-  );
-});
+        // The cadence travels with it: whatever the pricing toggle is showing is the
+        // cadence the modal opens on.
+        page.cadence('annually');
+        ctx.expect(page.navigate('pro'), 'the toggle\'s cadence rides along').toBe('https://brand.test/dashboard/account?product=pro&frequency=annually#billing');
+      },
+    },
 
-test('pricing CTA: a plan switch is not a purchase — nothing is added to any cart', async () => {
-  // The switch used to fall through to the add-to-cart pair on its way out:
-  // gtag/fbq/ttq each got a cart event for a move that never reaches a
-  // checkout, so every switch click inflated the funnel with a conversion
-  // that cannot convert.
-  const page = await loadPricingPage(SUBSCRIBER);
+    {
+      name: 'pricing CTA: a plan switch is not a purchase — nothing is added to any cart',
+      run: async (ctx) => {
+        // The switch used to fall through to the add-to-cart pair on its way out:
+        // gtag/fbq/ttq each got a cart event for a move that never reaches a
+        // checkout, so every switch click inflated the funnel with a conversion
+        // that cannot convert.
+        const page = await loadPricingPage(SUBSCRIBER);
 
-  page.navigate('pro');
-  assert.deepStrictEqual(page.tracked, [], 'a switch click emits no cart event at all');
+        page.navigate('pro');
+        ctx.expect(page.tracked, 'a switch click emits no cart event at all').toEqual([]);
 
-  // A real purchase still reports itself to all three.
-  page.navigate('credits');
-  assert.deepStrictEqual(
-    page.tracked,
-    ['gtag:add_to_cart', 'fbq:AddToCart', 'ttq:AddToCart'],
-    'a genuine checkout still fires add-to-cart everywhere it did',
-  );
-});
+        // A real purchase still reports itself to all three.
+        page.navigate('credits');
+        ctx.expect(page.tracked, 'a genuine checkout still fires add-to-cart everywhere it did').toEqual(['gtag:add_to_cart', 'fbq:AddToCart', 'ttq:AddToCart']);
+      },
+    },
 
-test('#668: a one-time product is added to the cart as `once`, not as a cadence', async () => {
-  // `item_variant` was the billing toggle's cadence for EVERY product, so the
-  // funnel's first event called a one-time buy monthly while begin_checkout,
-  // add_payment_info and purchase all say `once` — the same product counted
-  // two different ways across one funnel.
-  const page = await loadPricingPage(VISITOR);
+    {
+      name: '#668: a one-time product is added to the cart as `once`, not as a cadence',
+      run: async (ctx) => {
+        // `item_variant` was the billing toggle's cadence for EVERY product, so the
+        // funnel's first event called a one-time buy monthly while begin_checkout,
+        // add_payment_info and purchase all say `once` — the same product counted
+        // two different ways across one funnel.
+        const page = await loadPricingPage(VISITOR);
 
-  page.navigate('credits');
-  const [cart] = page.payloads;
-  assert.strictEqual(cart.event, 'add_to_cart', 'the click is a cart event');
-  assert.strictEqual(cart.params.items[0].item_category, 'one-time', 'categorized by what it is');
-  assert.strictEqual(cart.params.items[0].item_variant, 'once', 'and it names no cadence it will never be billed on');
+        page.navigate('credits');
+        const [cart] = page.payloads;
+        ctx.expect(cart.event, 'the click is a cart event').toBe('add_to_cart');
+        ctx.expect(cart.params.items[0].item_category, 'categorized by what it is').toBe('one-time');
+        ctx.expect(cart.params.items[0].item_variant, 'and it names no cadence it will never be billed on').toBe('once');
 
-  // The toggle still names a plan's term.
-  page.navigate('pro');
-  assert.strictEqual(page.payloads[0].params.items[0].item_variant, 'monthly', 'a subscription still carries the cadence the toggle is on');
-});
+        // The toggle still names a plan's term.
+        page.navigate('pro');
+        ctx.expect(page.payloads[0].params.items[0].item_variant, 'a subscription still carries the cadence the toggle is on').toBe('monthly');
+      },
+    },
 
-test('pricing CTA: a cancelling subscriber is offered no switch it cannot make', async () => {
-  // While a cancellation is scheduled the backend refuses a plan change and
-  // the billing page hides its Change button — so "Switch to This Plan" was a
-  // promise ending in a modal that (correctly) refuses to open. The buttons
-  // keep the CTA they were authored with.
-  const page = await loadPricingPage(CANCELLING);
+    {
+      name: 'pricing CTA: a cancelling subscriber is offered no switch it cannot make',
+      run: async (ctx) => {
+        // While a cancellation is scheduled the backend refuses a plan change and
+        // the billing page hides its Change button — so "Switch to This Plan" was a
+        // promise ending in a modal that (correctly) refuses to open. The buttons
+        // keep the CTA they were authored with.
+        const page = await loadPricingPage(CANCELLING);
 
-  assert.equal(page.button('pro').textContent, 'Get started', 'no switch is advertised in the one state that cannot switch');
-  assert.equal(page.button('pro').dataset.planAction, undefined, 'and nothing re-routes the click to a modal that will not open');
-  assert.equal(page.button('premium').textContent, 'Current Plan', 'the plan they are on still names itself');
-  assert.equal(page.button('premium').disabled, true, 'and is still not a button');
-});
+        ctx.expect(page.button('pro').textContent, 'no switch is advertised in the one state that cannot switch').toBe('Get started');
+        ctx.expect(page.button('pro').dataset.planAction, 'and nothing re-routes the click to a modal that will not open').toBe(undefined);
+        ctx.expect(page.button('premium').textContent, 'the plan they are on still names itself').toBe('Current Plan');
+        ctx.expect(page.button('premium').disabled, 'and is still not a button').toBe(true);
+      },
+    },
 
-test('pricing CTA: the plan in force is still the locked "Current Plan"', async () => {
-  const page = await loadPricingPage(SUBSCRIBER);
-  const current = page.button('premium');
+    {
+      name: 'pricing CTA: the plan in force is still the locked "Current Plan"',
+      run: async (ctx) => {
+        const page = await loadPricingPage(SUBSCRIBER);
+        const current = page.button('premium');
 
-  assert.equal(current.textContent, 'Current Plan', 'the plan you are on names itself');
-  assert.equal(current.disabled, true, 'and is not a button at all');
-  assert.equal(current.dataset.planAction, undefined, 'so nothing re-routes it');
-});
+        ctx.expect(current.textContent, 'the plan you are on names itself').toBe('Current Plan');
+        ctx.expect(current.disabled, 'and is not a button at all').toBe(true);
+        ctx.expect(current.dataset.planAction, 'so nothing re-routes it').toBe(undefined);
+      },
+    },
 
-test('pricing CTA: a one-time product and a visitor with no subscription still check out', async () => {
-  const subscriber = await loadPricingPage(SUBSCRIBER);
+    {
+      name: 'pricing CTA: a one-time product and a visitor with no subscription still check out',
+      run: async (ctx) => {
+        const subscriber = await loadPricingPage(SUBSCRIBER);
 
-  assert.equal(subscriber.button('credits').textContent, 'Get started', 'a one-time product is a purchase, not a switch');
-  assert.equal(
-    subscriber.navigate('credits'),
-    'https://brand.test/payment/checkout?product=credits',
-    'so it goes to checkout, with no cadence to carry',
-  );
+        ctx.expect(subscriber.button('credits').textContent, 'a one-time product is a purchase, not a switch').toBe('Get started');
+        ctx.expect(subscriber.navigate('credits'), 'so it goes to checkout, with no cadence to carry').toBe('https://brand.test/payment/checkout?product=credits');
 
-  const visitor = await loadPricingPage(VISITOR);
+        const visitor = await loadPricingPage(VISITOR);
 
-  assert.equal(visitor.button('pro').textContent, 'Get started', 'nobody without a live subscription is switching anything');
-  assert.equal(
-    visitor.navigate('pro'),
-    'https://brand.test/payment/checkout?product=pro&frequency=monthly',
-    'and the checkout path is exactly what it was',
-  );
-});
+        ctx.expect(visitor.button('pro').textContent, 'nobody without a live subscription is switching anything').toBe('Get started');
+        ctx.expect(visitor.navigate('pro'), 'and the checkout path is exactly what it was').toBe('https://brand.test/payment/checkout?product=pro&frequency=monthly');
+      },
+    },
 
-test('#637: the pricing page warms the backend on load', async () => {
-  // Every plan button on this page leads to checkout, whose first call is a
-  // backend POST — so the wakeup goes out now rather than at the click.
-  const { requests } = await loadPricingPage(VISITOR);
+    {
+      name: '#637: the pricing page warms the backend on load',
+      run: async (ctx) => {
+        // Every plan button on this page leads to checkout, whose first call is a
+        // backend POST — so the wakeup goes out now rather than at the click.
+        const { requests } = await loadPricingPage(VISITOR);
 
-  const wakeup = requests.find((request) => request.options.wakeup);
-  assert.ok(wakeup, 'the page fires the shared client wakeup helper');
-  assert.equal(wakeup.url, WAKEUP_ROUTE, 'aimed at the one route every wakeup names');
+        const wakeup = requests.find((request) => request.options.wakeup);
+        ctx.expect(wakeup, 'the page fires the shared client wakeup helper').toBeTruthy();
+        ctx.expect(wakeup.url, 'aimed at the one route every wakeup names').toBe(WAKEUP_ROUTE);
+      },
+    },
+  ],
 });

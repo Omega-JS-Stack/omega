@@ -50,24 +50,24 @@ module.exports = defineCases({
   tests: [
     {
       name: 'records-the-amount-that-came-back',
-      async run({ assert }) {
+      async run({ expect }) {
         const logs = [];
 
         await handler(context(logs, []));
 
         const line = logs.find((entry) => entry.includes('one-time/purchase-refunded'));
 
-        assert.ok(line, `The handler should log the transition, got: ${logs.join(' | ')}`);
-        assert.match(line, new RegExp(`orderId=${ORDER_ID}`), 'The line should name the order refunded');
-        assert.match(line, /amount=9\.99 USD/, 'The line should say how much came back');
-        assert.match(line, /reason=requested_by_customer/, 'The line should carry the provider reason');
-        assert.match(line, /product=credits-100/, 'The line should name what was refunded');
+        expect(line, `The handler should log the transition, got: ${logs.join(' | ')}`).toBeTruthy();
+        expect(line, 'The line should name the order refunded').toMatch(new RegExp(`orderId=${ORDER_ID}`));
+        expect(line, 'The line should say how much came back').toMatch(/amount=9\.99 USD/);
+        expect(line, 'The line should carry the provider reason').toMatch(/reason=requested_by_customer/);
+        expect(line, 'The line should name what was refunded').toMatch(/product=credits-100/);
       },
     },
 
     {
       name: 'stays-readable-without-refund-details',
-      async run({ assert }) {
+      async run({ expect }) {
         // A provider library with no getRefundDetails() leaves them null — the
         // record must still say which order was refunded
         const logs = [];
@@ -78,30 +78,30 @@ module.exports = defineCases({
 
         const line = logs.find((entry) => entry.includes('one-time/purchase-refunded'));
 
-        assert.match(line, new RegExp(`orderId=${ORDER_ID}`), 'The line should still name the order');
-        assert.match(line, /amount=unknown USD/, 'An unresolved amount should read as unknown, never as undefined');
+        expect(line, 'The line should still name the order').toMatch(new RegExp(`orderId=${ORDER_ID}`));
+        expect(line, 'An unresolved amount should read as unknown, never as undefined').toMatch(/amount=unknown USD/);
       },
     },
 
     {
       name: 'sends-the-refunded-email-the-subscription-twin-sends',
-      async run({ assert }) {
+      async run({ expect }) {
         const sent = [];
 
         await handler(context([], sent));
 
-        assert.equal(sent.length, 1, `A refunded purchase owes the customer exactly one email, got ${sent.length}`);
+        expect(sent.length, `A refunded purchase owes the customer exactly one email, got ${sent.length}`).toBe(1);
 
         const email = sent[0];
 
-        assert.equal(email.template, 'order', 'It rides the one order template, like every other transition');
-        assert.deepEqual(email.categories, ['order/refunded'], 'Filed under the same category the subscription refund is');
-        assert.equal(email.data.content.event, 'refunded', 'The order template renders the refunded variant off this event');
-        assert.match(email.subject, new RegExp(ORDER_ID), 'The subject should name the order refunded');
-        assert.equal(email.data.content.id, ORDER_ID, 'The order rides the payload, so the receipt can quote it');
-        assert.equal(email.data.content._computed.refundAmount, '9.99', 'The refund amount is what the mail is about');
-        assert.equal(email.data.content._computed.refundCurrency, 'USD', 'And its currency');
-        assert.equal(email.data.content._computed.refundReason, 'requested_by_customer', 'The provider reason rides along, as the twin sends it');
+        expect(email.template, 'It rides the one order template, like every other transition').toBe('order');
+        expect(email.categories, 'Filed under the same category the subscription refund is').toEqual(['order/refunded']);
+        expect(email.data.content.event, 'The order template renders the refunded variant off this event').toBe('refunded');
+        expect(email.subject, 'The subject should name the order refunded').toMatch(new RegExp(ORDER_ID));
+        expect(email.data.content.id, 'The order rides the payload, so the receipt can quote it').toBe(ORDER_ID);
+        expect(email.data.content._computed.refundAmount, 'The refund amount is what the mail is about').toBe('9.99');
+        expect(email.data.content._computed.refundCurrency, 'And its currency').toBe('USD');
+        expect(email.data.content._computed.refundReason, 'The provider reason rides along, as the twin sends it').toBe('requested_by_customer');
       },
     },
   ],

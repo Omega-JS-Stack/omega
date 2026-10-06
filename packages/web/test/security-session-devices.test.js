@@ -12,8 +12,7 @@
  * behind its bundler aliases, over a document that answers only the ids the
  * section writes, and the assertion is the HTML it wrote.
  */
-const assert = require('node:assert');
-const { test } = require('node:test');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -97,16 +96,28 @@ async function renderSessions(client) {
   return list.innerHTML;
 }
 
-test('#929: a platform session draws the BRAND mark, the family a bare name could never reach', async () => {
-  const html = await renderSessions({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', platform: 'macOS' });
+module.exports = defineCases({
+  type: 'group',
+  description: 'security-session-devices',
+  tests: [
+    {
+      name: '#929: a platform session draws the BRAND mark, the family a bare name could never reach',
+      run: async (ctx) => {
+        const html = await renderSessions({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', platform: 'macOS' });
 
-  assert.match(html, /<i class="fa-brands fa-apple fa-xl"><\/i>/, 'the map\'s class string is emitted verbatim');
-  assert.ok(!html.includes('fa-solid fa-apple'), 'the solid family carries no apple glyph, so the old wrap drew nothing');
-});
+        ctx.expect(html, 'the map\'s class string is emitted verbatim').toMatch(/<i class="fa-brands fa-apple fa-xl"><\/i>/);
+        ctx.expect(!html.includes('fa-solid fa-apple'), 'the solid family carries no apple glyph, so the old wrap drew nothing').toBeTruthy();
+      },
+    },
 
-test('#929: an unrecognized platform keeps the solid default, class string and all', async () => {
-  const html = await renderSessions({ userAgent: 'Mozilla/5.0 (Unknown)', platform: 'FreeBSD' });
+    {
+      name: '#929: an unrecognized platform keeps the solid default, class string and all',
+      run: async (ctx) => {
+        const html = await renderSessions({ userAgent: 'Mozilla/5.0 (Unknown)', platform: 'FreeBSD' });
 
-  assert.match(html, /<i class="fa-solid fa-desktop fa-xl"><\/i>/, 'the default is one class string too');
-  assert.ok(!html.includes('fa-fa-'), 'and nothing wraps it a second time');
+        ctx.expect(html, 'the default is one class string too').toMatch(/<i class="fa-solid fa-desktop fa-xl"><\/i>/);
+        ctx.expect(!html.includes('fa-fa-'), 'and nothing wraps it a second time').toBeTruthy();
+      },
+    },
+  ],
 });

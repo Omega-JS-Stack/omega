@@ -50,7 +50,7 @@ module.exports = defineCases({
       name: 'refresh-writes-the-cache-and-dirties-nothing-under-git',
       timeout: 15000,
 
-      async run({ assert }) {
+      async run({ expect }) {
         const seedBefore = jetpack.read(dataset.SEED_PATH);
         const seedMtimeBefore = jetpack.inspect(dataset.SEED_PATH, { times: true }).modifyTime.getTime();
         const statusBefore = gitStatus();
@@ -74,13 +74,9 @@ module.exports = defineCases({
             seedMtimeAfter = jetpack.inspect(dataset.SEED_PATH, { times: true }).modifyTime.getTime();
             statusAfter = gitStatus();
 
-            assert.equal(fetchedUrl, dataset.SOURCE_URL, 'refresh fetches the upstream list');
-            assert.equal(result.path, dataset.CACHE_PATH, 'refresh reports the cache path');
-            assert.deepEqual(
-              jetpack.read(dataset.CACHE_PATH, 'json'),
-              ['aaa-stub-refresh.example', 'zzz-stub-refresh.example'],
-              'the cache holds the deduped, lowercased, sorted list',
-            );
+            expect(fetchedUrl, 'refresh fetches the upstream list').toBe(dataset.SOURCE_URL);
+            expect(result.path, 'refresh reports the cache path').toBe(dataset.CACHE_PATH);
+            expect(jetpack.read(dataset.CACHE_PATH, 'json'), 'the cache holds the deduped, lowercased, sorted list').toEqual(['aaa-stub-refresh.example', 'zzz-stub-refresh.example']);
           });
         } finally {
           global.fetch = originalFetch;
@@ -92,9 +88,9 @@ module.exports = defineCases({
           }
         }
 
-        assert.equal(seedAfter, seedBefore, 'the committed seed is byte-identical after a refresh');
-        assert.equal(seedMtimeAfter, seedMtimeBefore, 'the committed seed was not even opened for writing');
-        assert.equal(statusAfter, statusBefore, 'a refresh leaves git status unchanged');
+        expect(seedAfter, 'the committed seed is byte-identical after a refresh').toBe(seedBefore);
+        expect(seedMtimeAfter, 'the committed seed was not even opened for writing').toBe(seedMtimeBefore);
+        expect(statusAfter, 'a refresh leaves git status unchanged').toBe(statusBefore);
       },
     },
 
@@ -102,12 +98,12 @@ module.exports = defineCases({
       name: 'cache-path-is-gitignored',
       timeout: 10000,
 
-      async run({ assert }) {
+      async run({ expect }) {
         // check-ignore exits 1 when the path is NOT ignored — the whole contract
         // rests on this, so ask git rather than trusting the .gitignore text.
         const ignored = execFileSync('git', ['check-ignore', '--', dataset.CACHE_PATH], { cwd: PACKAGE_DIR, encoding: 'utf8' });
 
-        assert.ok(ignored.trim().length > 0, 'git reports the refresh cache path as ignored');
+        expect(ignored.trim().length > 0, 'git reports the refresh cache path as ignored').toBeTruthy();
       },
     },
 
@@ -115,18 +111,18 @@ module.exports = defineCases({
       name: 'lookups-serve-the-seed-when-no-cache-exists',
       timeout: 15000,
 
-      async run({ assert }) {
+      async run({ expect }) {
         await withCacheStashed(async () => {
           const seed = jetpack.read(dataset.SEED_PATH, 'json');
 
-          assert.deepEqual(dataset.load(), seed, 'load() falls back to the committed seed');
+          expect(dataset.load(), 'load() falls back to the committed seed').toEqual(seed);
 
           // The real lookup path, re-required with no cache on disk.
           delete require.cache[require.resolve('../../dist/omega/libraries/email/validation.js')];
           const { isDisposable } = require('../../dist/omega/libraries/email/validation.js');
 
-          assert.equal(isDisposable(`user@${seed[0]}`), true, 'a seed domain is still blocked with no cache present');
-          assert.equal(isDisposable('user@gmail.com'), false, 'a real provider is not blocked');
+          expect(isDisposable(`user@${seed[0]}`), 'a seed domain is still blocked with no cache present').toBe(true);
+          expect(isDisposable('user@gmail.com'), 'a real provider is not blocked').toBe(false);
         });
 
         delete require.cache[require.resolve('../../dist/omega/libraries/email/validation.js')];
@@ -137,16 +133,16 @@ module.exports = defineCases({
       name: 'a-present-cache-wins-over-the-seed',
       timeout: 15000,
 
-      async run({ assert }) {
+      async run({ expect }) {
         await withCacheStashed(async () => {
           jetpack.write(dataset.CACHE_PATH, `${JSON.stringify(['zzz-cache-wins.example'], null, 2)}\n`);
 
-          assert.deepEqual(dataset.load(), ['zzz-cache-wins.example'], 'load() prefers a usable cache');
+          expect(dataset.load(), 'load() prefers a usable cache').toEqual(['zzz-cache-wins.example']);
 
           // An unparseable cache is an expected external condition — never a throw.
           jetpack.write(dataset.CACHE_PATH, '{ not json');
 
-          assert.deepEqual(dataset.load(), jetpack.read(dataset.SEED_PATH, 'json'), 'a corrupt cache falls back to the seed');
+          expect(dataset.load(), 'a corrupt cache falls back to the seed').toEqual(jetpack.read(dataset.SEED_PATH, 'json'));
         });
       },
     },
