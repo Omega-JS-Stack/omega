@@ -78,4 +78,4 @@ Write the function in [src/utils/mode-helpers.js](../../packages/extension/src/u
 
 ## See also
 
-- [test-framework.md](test-framework.md) — `OMEGA_TEST_MODE` is set automatically by the test runners; extended mode (`--extended` / `TEST_EXTENDED_MODE=true`) gates real external APIs.
+- [test-framework.md](test-framework.md): `npx omega test` names the `testing` environment before any suite loads; extended mode (`--extended` / `TEST_EXTENDED_MODE=true`) gates real external APIs.

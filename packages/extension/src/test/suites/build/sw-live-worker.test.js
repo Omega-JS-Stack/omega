@@ -1,13 +1,37 @@
-// Build-layer test for the background lane's worker resolution, against a REAL
-// Chromium with the harness extension loaded. A worker that restarts while an
-// old client stays attached pauses on start and the old handle hangs, so every
-// background suite must attach the LIVE worker, or fail naming it.
+// Build-layer test for the background row's driver, against a REAL Chromium with
+// the harness extension loaded: it runs serialized suites inside the live service
+// worker, reports each case once by id, attaches a worker restarted under a stale
+// client, and fails every case of a suite whose worker is gone, naming it.
 
 const path = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
 
-const HARNESS_EXT = path.join(__dirname, '..', '..', 'harness', 'extension');
+const PACKAGE_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
+const VERB = path.join(__dirname, '..', '..', '..', 'commands', 'test.js');
 const SW_CONTEXT_SUITE = path.join(__dirname, '..', 'background', 'sw-context.test.js');
+const HARNESS_EXT = path.join(__dirname, '..', '..', 'harness', 'extension');
+
+// The verb's background driver over `suites`; resolves to the events it reported.
+async function driveBackground(suites) {
+  const { runnerConfig } = require(VERB);
+  const driver = runnerConfig({ projectRoot: PACKAGE_ROOT, selfTest: true }).drivers.background;
+  const events = [];
+  const handle = await driver.start({ projectRoot: PACKAGE_ROOT, options: {}, suites, hooks: [], report: (event) => { events.push(event); } });
+  try {
+    await handle.finished;
+  } finally {
+    await handle.stop();
+  }
+  return events;
+}
+
+// One spec, normalized under a file name of its own so its ids stay distinct.
+function suiteAs(spec, name) {
+  return normalizeSpec(spec, { file: path.join(path.dirname(SW_CONTEXT_SUITE), name) });
+}
+
+const statuses = (events) => events.map((event) => event.status);
 
 // Stop every service worker in the browser through the real CDP domain.
 async function stopAllWorkers(browser) {
@@ -19,49 +43,95 @@ async function stopAllWorkers(browser) {
   await page.close();
 }
 
+// A Chrome of this case's own on the harness extension, closed after the case.
+async function harnessBrowser(ctx) {
+  const { loadPuppeteer, launchChrome, waitForTarget } = require('../../runners/helpers.js');
+  const browser = await launchChrome(loadPuppeteer(), HARNESS_EXT);
+  ctx.after(() => browser.close());
+  const target = await waitForTarget(browser, (t) => t.type() === 'service_worker', 5000);
+  return { browser, target, extId: target.url().split('/')[2] };
+}
+
 module.exports = defineCases({
-  type: 'suite',
+  type: 'group',
   layer: 'build',
-  description: 'background lane attaches the live service worker',
+  description: 'background driver runs suites in the live service worker',
   timeout: 60000,
   tests: [
     {
-      name: 'the harness worker attaches and answers its own extension id',
+      name: 'a suite runs in the harness worker and answers its own extension id',
       run: async (ctx) => {
-        const puppeteer = require('puppeteer');
-        const { waitForTarget } = require('../../runners/helpers.js');
-        const { attachLiveWorker } = require('../../runners/service-worker.js');
+        const suite = suiteAs({
+          type: 'suite',
+          layer: 'background',
+          description: 'probe',
+          tests: [{ name: 'the worker has an extension id', run: async (ctx) => { ctx.expect(chrome.runtime.id).toMatch(/^[a-z]{32}$/); } }],
+        }, 'probe.test.js');
 
-        ctx.state.browser = await puppeteer.launch({
-          headless: 'new',
-          args: [`--disable-extensions-except=${HARNESS_EXT}`, `--load-extension=${HARNESS_EXT}`, '--no-sandbox'],
-        });
-        const target = await waitForTarget(ctx.state.browser, (t) => t.type() === 'service_worker', 5000);
-        ctx.expect(target).toBeTruthy();
-        ctx.state.target = target;
-        ctx.state.extId = target.url().split('/')[2];
-
-        const session = await attachLiveWorker(ctx.state.browser, ctx.state.extId, 5000);
-        const { result } = await session.send('Runtime.evaluate', { expression: 'chrome.runtime.id', returnByValue: true });
-        await session.detach();
-        ctx.expect(result.value).toBe(ctx.state.extId);
+        const events = await driveBackground([suite]);
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual([[suite.cases[0].id, 'pass']]);
       },
     },
     {
-      name: 'suites back to back in one live worker count each test once',
+      name: 'suites back to back in one live worker report each case once',
       run: async (ctx) => {
-        const { runBackgroundSuites } = require('../../runners/chromium.js');
-        const { browser, extId } = ctx.state;
+        const spec = require(SW_CONTEXT_SUITE);
+        const suites = [suiteAs(spec, 'sw-context-a.test.js'), suiteAs(spec, 'sw-context-b.test.js')];
 
-        const counts = await runBackgroundSuites({ browser, extId, suiteFiles: [SW_CONTEXT_SUITE, SW_CONTEXT_SUITE] });
-        ctx.expect(counts).toEqual({ passed: 10, failed: 0, skipped: 0 });
+        const events = await driveBackground(suites);
+        const ids = suites.flatMap((suite) => suite.cases.map((caseDef) => caseDef.id));
+        ctx.expect(events.map((event) => event.id).sort()).toEqual(ids.sort());
+        ctx.expect(statuses(events)).toEqual(ids.map(() => 'pass'));
+      },
+    },
+    {
+      name: 'a suite\'s setup, shared state and stop-on-failure travel into the worker',
+      run: async (ctx) => {
+        const suite = suiteAs({
+          type: 'suite',
+          layer: 'background',
+          description: 'state',
+          setup: async (ctx) => { ctx.state.seeded = chrome.runtime.id; },
+          tests: [
+            { name: 'reads the seeded state', run: async (ctx) => { ctx.expect(ctx.state.seeded).toBe(chrome.runtime.id); } },
+            { name: 'fails', run: async (ctx) => { ctx.expect(1).toBe(2); } },
+            { name: 'is stopped', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+          ],
+        }, 'state.test.js');
+
+        const events = await driveBackground([suite]);
+        const byId = Object.fromEntries(events.map((event) => [event.id, event]));
+        ctx.expect(suite.cases.map((caseDef) => byId[caseDef.id].status)).toEqual(['pass', 'fail', 'skip']);
+        ctx.expect(byId[suite.cases[1].id].error.name).toBe('AssertionError');
+        ctx.expect(byId[suite.cases[2].id].reason).toBe('suite stopped');
+      },
+    },
+    {
+      name: 'a body that cannot be rebuilt fails that case naming the file, and the others run',
+      run: async (ctx) => {
+        const suite = suiteAs({
+          type: 'group',
+          layer: 'background',
+          description: 'rebuild',
+          tests: [
+            // A parameter other than `ctx` cannot be rebuilt inside the worker.
+            { name: 'takes (c)', run: async (c) => { c.expect(true).toBe(true); } },
+            { name: 'takes (ctx)', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+          ],
+        }, 'rebuild.test.js');
+
+        const events = await driveBackground([suite]);
+        const byId = Object.fromEntries(events.map((event) => [event.id, event]));
+        ctx.expect(byId[suite.cases[0].id].status).toBe('fail');
+        ctx.expect(byId[suite.cases[0].id].error.message).toContain('rebuild.test.js');
+        ctx.expect(byId[suite.cases[1].id].status).toBe('pass');
       },
     },
     {
       name: 'a worker restarted under a stale attached client runs the next suite green',
       run: async (ctx) => {
-        const { runBackgroundSuites } = require('../../runners/chromium.js');
-        const { browser, target, extId } = ctx.state;
+        const { runAppSuite, inWorker } = require('../../runners/chromium.js');
+        const { browser, target, extId } = await harnessBrowser(ctx);
 
         // The stale client: a handle attached before the restart, never released.
         await target.worker();
@@ -74,31 +144,44 @@ module.exports = defineCases({
         const ping = page.evaluate(() => chrome.runtime.sendMessage({ type: 'extension:test:ping' }))
           .catch((e) => ({ error: e.message }));
 
-        const counts = await runBackgroundSuites({ browser, extId, suiteFiles: [SW_CONTEXT_SUITE] });
-        ctx.expect(counts).toEqual({ passed: 5, failed: 0, skipped: 0 });
+        const suite = suiteAs(require(SW_CONTEXT_SUITE), 'sw-context-restarted.test.js');
+        const events = [];
+        await runAppSuite(suite, { layer: 'background', report: (event) => { events.push(event); }, evaluate: inWorker(browser, extId) });
+        ctx.expect(statuses(events)).toEqual(suite.cases.map(() => 'pass'));
         ctx.expect((await ping).pong).toBe(true);
-        await page.close();
       },
     },
     {
       name: 'a worker that is gone fails the suite by name instead of an undefined read',
       run: async (ctx) => {
-        const { attachLiveWorker } = require('../../runners/service-worker.js');
-        const { runBackgroundSuites } = require('../../runners/chromium.js');
-        const { browser, extId } = ctx.state;
+        // The first suite uninstalls the harness extension, so its worker never comes back.
+        const gone = suiteAs({
+          type: 'group',
+          layer: 'background',
+          description: 'gone',
+          tests: [{ name: 'uninstalls the extension', run: async (ctx) => { chrome.management.uninstallSelf(); } }],
+        }, 'gone.test.js');
+        const next = suiteAs(require(SW_CONTEXT_SUITE), 'sw-context-after-gone.test.js');
 
+        const events = await driveBackground([gone, next]);
+        const byId = Object.fromEntries(events.map((event) => [event.id, event]));
+        const after = next.cases.map((caseDef) => byId[caseDef.id]);
+        ctx.expect(after.map((event) => event.status)).toEqual(next.cases.map(() => 'fail'));
+        after.forEach((event) => ctx.expect(event.error.message).toMatch(/^service worker for [a-z]{32} is not active$/));
+      },
+    },
+    {
+      name: 'attachLiveWorker on a worker that is gone rejects naming the extension',
+      run: async (ctx) => {
+        const { attachLiveWorker } = require('../../runners/service-worker.js');
+        const { browser, extId } = await harnessBrowser(ctx);
         await stopAllWorkers(browser);
+        await ctx.waitFor(() => !browser.targets().some((t) => t.type() === 'service_worker' && t.url().includes(extId)), 5000);
 
         let error = null;
         try { await attachLiveWorker(browser, extId, 1500); } catch (e) { error = e; }
         ctx.expect(error && error.message).toBe(`service worker for ${extId} is not active`);
-
-        const counts = await runBackgroundSuites({ browser, extId, suiteFiles: [SW_CONTEXT_SUITE] });
-        ctx.expect(counts).toEqual({ passed: 0, failed: 5, skipped: 0 });
       },
     },
   ],
-  cleanup: async (ctx) => {
-    if (ctx.state.browser) await ctx.state.browser.close();
-  },
 });

@@ -1,93 +1,81 @@
-// Electron-runner — spawns electron with the main-process harness, parses JSON-line stream,
-// renders @omega.js/backend-style output to console. Returns aggregate counts.
+/**
+ * The `main` and `renderer` drivers: each row launches its own Electron on the
+ * harness directory (harness/main-entry.js), hands it a spec file naming this
+ * row's suites, and reports every envelope line the harness writes. `main`
+ * names each suite file and its cases by id and name (the harness requires the file and
+ * normalizes it the same way); `renderer` sends the suites serialized, since
+ * their bodies run in a page.
+ */
 
 const path = require('path');
+const os = require('os');
+const jetpack = require('fs-jetpack');
 const { spawn } = require('child_process');
-const chalk = require('chalk').default;
-const { renderEvent } = require('./render-event.js');
-const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
+const { serializeSuite } = require('@omega.js/devkit/test/serialize');
+const { reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
+const {
+  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, readChildOutput, childEnded, exitError, endChild,
+} = require('./app-child.js');
 
-function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter, projectRoot }) {
-  rendererSuiteFiles = rendererSuiteFiles || [];
-  return new Promise((resolve, reject) => {
-    let electronBin;
-    try {
-      // Resolve like Node would from the project root (walks up node_modules chains),
-      // so hoisted installs (npm workspaces) are found — not just projectRoot/node_modules.
-      electronBin = require(require.resolve('electron', { paths: [projectRoot] }));
-    } catch (e) {
-      const msg = `    ○ main + renderer tests skipped (electron not installed in ${projectRoot})`;
-      console.log(chalk.yellow(msg));
-      const skipCount = (suiteFiles || []).length + rendererSuiteFiles.length;
-      return resolve({ passed: 0, failed: 0, skipped: skipCount });
-    }
+const HARNESS_DIR = path.join(__dirname, '..', 'harness');
 
-    // Pass the harness DIRECTORY (not the entry file) as the app.
-    // The harness dir has its own package.json with main: main-entry.js, which Electron uses.
-    // This avoids Electron picking up the consumer's package.json main field.
-    const harnessDir = path.dirname(harnessEntry);
-    const args = [
-      harnessDir,
-      '--',
-      '--suites',          JSON.stringify(suiteFiles || []),
-      '--renderer-suites', JSON.stringify(rendererSuiteFiles),
-    ];
-    if (filter) {
-      args.push('--filter', filter);
-    }
-
-    const childEnv = Object.assign({}, process.env, {
-      OMEGA_ENVIRONMENT:          'testing', // the one environment input (#817): this lane names it
-      ELECTRON_NO_ATTACH_CONSOLE: '1',
-      NODE_OPTIONS:              '',
-    });
-    // Defensive scrub at the spawn (friction 17c) — the CLI boundary strips it,
-    // but paths that bypass the boundary must not boot Electron as plain node.
-    delete childEnv.ELECTRON_RUN_AS_NODE;
-
-    const child = spawn(electronBin, args, {
-      cwd: projectRoot,
-      env: childEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let buffer = '';
-    const counts = { passed: 0, failed: 0, skipped: 0 };
-
-    child.stdout.on('data', (chunk) => {
-      buffer += chunk.toString();
-      let nl;
-      while ((nl = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, nl);
-        buffer = buffer.slice(nl + 1);
-        if (line.startsWith(TEST_EVENT_PREFIX)) {
-          renderEvent(JSON.parse(line.slice(TEST_EVENT_PREFIX.length)), counts);
-        } else if (line.trim().length > 0) {
-          // Pass-through other electron stdout (logger lines from @omega.js/desktop init, etc.)
-          // Indent so they don't disrupt the layout.
-          process.stdout.write(chalk.gray(`      ${line}\n`));
-        }
-      }
-    });
-
-    // Always consume stderr (otherwise the pipe fills and the child blocks).
-    // Default: silent. Set OMEGA_TEST_DEBUG=1 to see what electron is logging.
-    child.stderr.on('data', (chunk) => {
-      if (process.env.OMEGA_TEST_DEBUG) {
-        const text = chunk.toString();
-        process.stderr.write(chalk.gray(`[stderr] ${text}`));
-      }
-    });
-
-    child.on('exit', (code, signal) => {
-      if (process.env.OMEGA_TEST_DEBUG) {
-        console.log(chalk.gray(`[harness exit code=${code} signal=${signal}]`));
-      }
-    });
-
-    child.on('error', (err) => reject(err));
-    child.on('exit', (_code) => resolve(counts));
-  });
+function specSuites(layer, suites) {
+  if (layer === 'main') {
+    return suites.map((suite) => ({ file: suite.file, cases: suite.cases.map(({ id, name }) => ({ id, name })) }));
+  }
+  return suites.map(serializeSuite);
 }
 
-module.exports = { runElectronTests };
+/**
+ * The driver of one harness row.
+ * @param {'main'|'renderer'} layer - The row it drives.
+ * @returns {{start: Function}} `start({ projectRoot, suites, report })` resolves `{ finished, stop() }`.
+ */
+function electronDriver(layer) {
+  return {
+    async start({ projectRoot, suites, report }) {
+      const electronBin = resolveElectron(projectRoot);
+      if (!electronBin) {
+        reportEvery(suites.flatMap((suite) => suite.cases), report, { status: 'skip', reason: NO_ELECTRON_REASON });
+        return { finished: Promise.resolve(), stop() {} };
+      }
+
+      const specFile = path.join(os.tmpdir(), `desktop-${layer}-spec-${process.pid}-${Date.now()}.json`);
+      jetpack.write(specFile, { layer, suites: specSuites(layer, suites) });
+
+      const env = {
+        ...process.env,
+        OMEGA_ENVIRONMENT: 'testing',
+        OMEGA_TEST_SPEC: specFile,
+        ELECTRON_NO_ATTACH_CONSOLE: '1',
+        NODE_OPTIONS: '',
+      };
+      // Electron run as plain node cannot host the harness.
+      delete env.ELECTRON_RUN_AS_NODE;
+
+      // The harness DIRECTORY is the app: its package.json names main-entry.js, never the project's main.
+      const child = spawn(electronBin, [HARNESS_DIR], { cwd: projectRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const events = createEventTracker(report);
+      const output = readChildOutput(child, events.onEvent);
+      const finished = childEnded(child)
+        .finally(() => {
+          output.detach();
+          jetpack.remove(specFile);
+          events.settle(suites.flatMap((suite) => suite.cases));
+        })
+        .then((end) => {
+          if (end.code !== 0 && !end.signal) throw exitError(layer, end, output.tail());
+        });
+
+      return {
+        finished,
+        async stop() {
+          if (child.exitCode === null && child.signalCode === null) endChild(child, KILL_GRACE_MS);
+          await finished.catch(() => {});
+        },
+      };
+    },
+  };
+}
+
+module.exports = { electronDriver };

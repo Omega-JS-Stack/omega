@@ -185,19 +185,20 @@ module.exports = defineCases({
       // `.` is the build-time entry; each process imports its instance by subpath
       name: 'the package root exports { version, build } and nothing else',
       run: (ctx) => {
+        // Identity is read at run time: a suite run earlier may have purged the module cache.
         const root = require(path.join(ROOT, 'index.js'));
         ctx.expect(Object.keys(root).sort()).toEqual(['build', 'version']);
-        ctx.expect(root.build).toBe(build);
+        ctx.expect(root.build).toBe(require(path.join(ROOT, 'build.js')));
       },
     },
     {
       // A consumer case file wraps its spec in defineCases from this one door
-      name: 'the ./test door hands out { defineCases, expect }',
+      name: 'case-173 the ./test door hands out { defineCases, expect }, expect being devkit\'s own',
       run: (ctx) => {
         const door = require('@omega.js/desktop/test');
         ctx.expect(Object.keys(door).sort()).toEqual(['defineCases', 'expect']);
-        ctx.expect(door.defineCases).toBe(defineCases);
-        ctx.expect(door.expect).toBe(require(path.join(ROOT, 'test', 'assert.js')));
+        ctx.expect(door.defineCases).toBe(require('@omega.js/devkit/test/define-cases'));
+        ctx.expect(door.expect).toBe(require('@omega.js/devkit/test/expect'));
       },
     },
     {

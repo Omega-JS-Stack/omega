@@ -1020,7 +1020,7 @@ module.exports = defineCases({
 
         ctx.expect(result.status, result.stderr).toBe(0);
         ctx.expect(fs.existsSync(builtSentinel(pkgDir))).toBe(true); // rebuilt
-        ctx.expect((result.stdout.match(/rebuilding/g) || []).length).toBe(1); // one loud rebuild line
+        ctx.expect((result.stderr.match(/rebuilding/g) || []).length).toBe(1); // one loud rebuild line
         ctx.expect(result.stdout.match(/CLI_RAN reexec=\d/g)).toEqual(['CLI_RAN reexec=1']); // the command ran ONCE, in the re-exec
       },
     },

@@ -22,43 +22,44 @@ const READ_BRAND = () => (globalThis.OMEGA_BUILD_JSON || {}).config?.brand?.id ?
 module.exports = defineCases({
   type: 'group',
   layer: 'boot',
+  timeout: 45000,
   description: 'OMEGA_BUILD_JSON: one /build.js, loaded by every context (#743)',
   tests: [
     {
-      description: 'the packaged service worker resolves OMEGA_BUILD_JSON.config.brand',
-      inspect: async ({ extension, expect }) => {
-        expect(extension.swTarget).not.toBeNull();
-        const worker = await extension.swTarget.worker();
+      name: 'the packaged service worker resolves OMEGA_BUILD_JSON.config.brand',
+      run: async (ctx) => {
+        ctx.expect(ctx.extension.swTarget).not.toBeNull();
+        const worker = await ctx.extension.swTarget.worker();
 
         // `self` is what background.js reads, and globalThis is the same object
         // in a service worker: the file assigns `self`, so both answer.
         const fromSelf = await worker.evaluate(() => (self.OMEGA_BUILD_JSON || {}).config?.brand?.id ?? null);
-        expect(typeof fromSelf).toBe('string');
-        expect(fromSelf.length > 0).toBe(true);
+        ctx.expect(typeof fromSelf).toBe('string');
+        ctx.expect(fromSelf.length > 0).toBe(true);
 
         const fromGlobal = await worker.evaluate(READ_BRAND);
-        expect(fromGlobal).toBe(fromSelf);
+        ctx.expect(fromGlobal).toBe(fromSelf);
       },
     },
     {
-      description: 'the packaged popup resolves the SAME snapshot from its own bundle',
-      inspect: async ({ extension, page, expect }) => {
-        const worker = await extension.swTarget.worker();
+      name: 'the packaged popup resolves the SAME snapshot from its own bundle',
+      run: async (ctx) => {
+        const worker = await ctx.extension.swTarget.worker();
         const inWorker = await worker.evaluate(READ_BRAND);
 
-        await page.goto(extension.popupUrl, { waitUntil: 'load' });
-        const inPage = await page.evaluate(() => (window.OMEGA_BUILD_JSON || {}).config?.brand?.id ?? null);
+        await ctx.page.goto(ctx.extension.popupUrl, { waitUntil: 'load' });
+        const inPage = await ctx.page.evaluate(() => (window.OMEGA_BUILD_JSON || {}).config?.brand?.id ?? null);
 
         // ONE file, both contexts: the promise is that they cannot disagree.
-        expect(inPage).toBe(inWorker);
+        ctx.expect(inPage).toBe(inWorker);
       },
     },
     {
-      description: '/build.js is reachable on the extension origin, /build.json is not',
-      inspect: async ({ extension, page, expect }) => {
-        await page.goto(extension.popupUrl, { waitUntil: 'domcontentloaded' });
+      name: '/build.js is reachable on the extension origin, /build.json is not',
+      run: async (ctx) => {
+        await ctx.page.goto(ctx.extension.popupUrl, { waitUntil: 'domcontentloaded' });
 
-        const reachable = await page.evaluate(async (id) => {
+        const reachable = await ctx.page.evaluate(async (id) => {
           const probe = async (file) => {
             try {
               const response = await fetch(`chrome-extension://${id}/${file}`);
@@ -69,12 +70,12 @@ module.exports = defineCases({
             }
           };
           return { js: await probe('build.js'), json: await probe('build.json') };
-        }, extension.id);
+        }, ctx.extension.id);
 
         // The one file every context loads…
-        expect(reachable.js).toBe(true);
+        ctx.expect(reachable.js).toBe(true);
         // …and no sidecar describing the same build a second time.
-        expect(reachable.json).toBe(false);
+        ctx.expect(reachable.json).toBe(false);
       },
     },
   ],

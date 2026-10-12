@@ -10,6 +10,7 @@ const vm = require('node:vm');
 const defineCases = require('../../src/test/define-cases.js');
 const expect = require('../../src/test/expect.js');
 const { normalizeSpec, createContext, runSuite, waitFor, SkipError } = require('../../src/test/run-case.js');
+const { createCaseSession } = require('../../src/test/register-suite.js');
 
 const FILE = __filename;
 const SOURCE_DIR = path.join(__dirname, '..', '..', 'src', 'test');
@@ -337,6 +338,33 @@ module.exports = defineCases({
     },
 
     {
+      name: 'case-85 normalizeSpec throws naming the file and the case on a listed case with no run',
+      run: (ctx) => {
+        const spec = { type: 'group', tests: [{ name: 'fine', run: () => {} }, { name: 'old inspect form', inspect: () => {} }] };
+        ctx.expect(() => normalizeSpec(spec, { file: FILE })).toThrow(`${FILE}: case 1 (old inspect form) has no \`run\` function`);
+      },
+    },
+
+    {
+      name: 'normalizeSpec refuses a view on any layer but boot, naming the file, and keeps it on boot',
+      run: (ctx) => {
+        const rule = `${FILE}: \`view\` applies only to \`layer: 'boot'\``;
+        const run = () => {};
+        const stale = {
+          'a suite on the view layer': { layer: 'view', view: 'popup', tests: [{ name: 'a', run }] },
+          'a standalone on the renderer layer': { layer: 'renderer', view: 'main', description: 'standalone', run },
+          'a suite with no layer': { view: 'main', tests: [{ name: 'a', run }] },
+        };
+        for (const [form, spec] of Object.entries(stale)) {
+          ctx.expect(() => normalizeSpec(spec, { file: FILE }), form).toThrow(rule);
+        }
+
+        ctx.expect(normalizeSpec({ layer: 'boot', view: 'main', tests: [{ name: 'a', run }] }, { file: FILE }).view).toBe('main');
+        ctx.expect(normalizeSpec({ layer: 'boot', view: 'main', description: 'standalone', run }, { file: FILE }).cases[0].view).toBe('main');
+      },
+    },
+
+    {
       name: 'case-116 a suite keeps its own keys, and an extras function sees them on info.suite',
       run: async (ctx) => {
         const spec = { type: 'suite', description: 'admin suite', auth: 'admin', tests: [{ name: 'only', run: () => {} }] };
@@ -356,6 +384,63 @@ module.exports = defineCases({
         });
         ctx.expect(events.map((e) => e.status)).toEqual(['pass']);
         ctx.expect(seen).toEqual(['admin']);
+      },
+    },
+
+    {
+      name: 'case-157 a driver reporting one case twice throws naming the case id, and the other events stand as sent',
+      run: async (ctx) => {
+        const first = { id: 'app.test.js#0', name: 'first', status: 'pass', durationMs: 3 };
+        const second = { id: 'app.test.js#1', name: 'second', status: 'skip', durationMs: 0, reason: 'driver skip' };
+        let twice = null;
+
+        const session = createCaseSession({
+          cases: [{ id: first.id, name: first.name }, { id: second.id, name: second.name }],
+          endedMessage: 'the boot layer ended before this case reported',
+          start: async (report) => {
+            report({ ...first });
+            try {
+              report({ id: first.id, name: first.name, status: 'fail', durationMs: 1, error: { name: 'Error', message: 'late' } });
+            } catch (e) {
+              twice = e;
+            }
+            report({ ...second });
+          },
+        });
+
+        ctx.expect(await session.wait(first.id)).toEqual({ id: 'app.test.js#0', name: 'first', status: 'pass', durationMs: 3 });
+        ctx.expect(await session.wait(second.id)).toEqual({ id: 'app.test.js#1', name: 'second', status: 'skip', durationMs: 0, reason: 'driver skip' });
+        await session.finished();
+        ctx.expect(twice, 'the second report threw').toBeInstanceOf(Error);
+        ctx.expect(twice.message).toContain('Case app.test.js#0 reported twice');
+      },
+    },
+
+    {
+      name: 'case-157 with a fail sink, a duplicate reported after every case settled lands as its own failing entry',
+      run: async (ctx) => {
+        const first = { id: 'app.test.js#0', name: 'first', status: 'pass', durationMs: 3 };
+        const second = { id: 'app.test.js#1', name: 'second', status: 'pass', durationMs: 2 };
+        const failures = [];
+
+        const session = createCaseSession({
+          cases: [{ id: first.id, name: first.name }, { id: second.id, name: second.name }],
+          endedMessage: 'the boot layer ended before this case reported',
+          fail: (fields) => failures.push(fields),
+          start: async (report) => {
+            report({ ...first });
+            report({ ...second });
+            report({ ...first });
+          },
+        });
+
+        ctx.expect(await session.wait(first.id)).toEqual(first);
+        ctx.expect(await session.wait(second.id)).toEqual(second);
+        await session.finished();
+        ctx.expect(failures.length).toBe(1);
+        ctx.expect(failures[0].id).toBe('app.test.js#0#twice');
+        ctx.expect(failures[0].name).toBe('first');
+        ctx.expect(failures[0].error.message).toBe('Case app.test.js#0 reported twice');
       },
     },
   ],

@@ -1,7 +1,8 @@
 /**
- * The layer registry: every framework's test layers, in run order, and where
- * each one runs. A `host` row runs its cases in the runner process; an `app`
- * row runs them inside the app, which reports each case back to the host.
+ * The layer registry: every framework's test layers, in run order, and who
+ * runs each. A `host` row's cases run in the runner through `run-case.js`; an
+ * `app` row's driver runs them itself, wherever the bodies execute (the booted
+ * app, a page, or the runner process with handles), and reports each by id.
  * `extras` names the ctx keys the row's driver adds to every case.
  *
  * `node` is the framework of a package no framework owns: a library, the root
@@ -19,7 +20,7 @@ const LAYERS = {
     { name: 'build', kind: 'host', extras: [] },
     { name: 'background', kind: 'app', extras: [] },
     { name: 'view', kind: 'app', extras: ['page'] },
-    { name: 'boot', kind: 'host', extras: ['extension', 'page'] },
+    { name: 'boot', kind: 'app', extras: ['extension', 'page'] },
   ],
   web: [
     { name: 'build', kind: 'host', extras: [] },

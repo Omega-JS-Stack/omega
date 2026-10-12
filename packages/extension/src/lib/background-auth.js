@@ -365,7 +365,8 @@ class BackgroundAuth {
     // A TESTING build talks to the LOCAL stack, never real auth: the same
     // call getApiUrl() makes when it maps testing to localhost, and the same
     // move @omega.js/client makes for emulator runs. Only a build baked with
-    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
+    // the testing environment reaches here (`isTesting()` reads the baked
+    // environment); dev and production are untouched.
     if (this.omega.isTesting()) {
       // An extension context has no `process.env`, so the resolved map arrives
       // BAKED in OMEGA_BUILD_JSON's `config.dev.ports`

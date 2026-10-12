@@ -14,7 +14,7 @@ module.exports = defineCases({
       name: 'document is present and body has data-omega-context="popup"',
       run: async (ctx) => {
         ctx.expect(typeof document).toBe('object');
-        ctx.expect(document.body.dataset.omegaContext).toBe('popup');
+        ctx.expect(ctx.page.document.body.dataset.omegaContext).toBe('popup');
       },
     },
     {

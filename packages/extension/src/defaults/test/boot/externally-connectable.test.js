@@ -15,16 +15,24 @@
 const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
+  type: 'suite',
   layer: 'boot',
   description: 'the packaged manifest lets the brand site message the extension',
-  inspect: async ({ extension, expect }) => {
-    const build = require('@omega.js/extension/build');
-    const brandUrl = build.getConfig().brand?.url;
+  // A cold first boot of the service worker can run past the 30s default.
+  timeout: 45000,
+  tests: [
+    {
+      name: 'externally_connectable.matches carries the brand origin',
+      run: async (ctx) => {
+        const build = require('@omega.js/extension/build');
+        const brandUrl = build.getConfig().brand?.url;
 
-    // Nothing to assert until the brand declares its own site
-    if (!brandUrl) return;
+        // Nothing to assert until the brand declares its own site
+        if (!brandUrl) return;
 
-    const matches = extension.manifest.externally_connectable?.matches || [];
-    expect(matches).toContain(`${new URL(brandUrl).origin}/*`);
-  },
+        const matches = ctx.extension.manifest.externally_connectable?.matches || [];
+        ctx.expect(matches).toContain(`${new URL(brandUrl).origin}/*`);
+      },
+    },
+  ],
 });

@@ -153,7 +153,6 @@ Env vars that drive the pipeline:
 - `OMEGA_BUILD_MODE=true`: production build (minified, dev-blocks stripped; source maps beside the bundles in `dist`, as in every mode)
 - `OMEGA_IS_PUBLISH=true` — also publish to extension stores after packaging
 - `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
-- `OMEGA_TEST_MODE=true`: running in @omega.js/extension's test framework. Powers `omega.isTesting()` in the test harness (see [test-framework.md](test-framework.md)).
 - `OMEGA_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
 
 ## Live reload

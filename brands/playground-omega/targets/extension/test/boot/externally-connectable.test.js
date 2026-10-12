@@ -16,15 +16,16 @@ const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
   layer: 'boot',
+  timeout: 45000,
   description: 'the packaged manifest lets the brand site message the extension',
-  inspect: async ({ extension, expect }) => {
+  run: async (ctx) => {
     const build = require('@omega.js/extension/build');
     const brandUrl = build.getConfig().brand?.url;
 
     // Nothing to assert until the brand declares its own site
     if (!brandUrl) return;
 
-    const matches = extension.manifest.externally_connectable?.matches || [];
-    expect(matches).toContain(`${new URL(brandUrl).origin}/*`);
+    const matches = ctx.extension.manifest.externally_connectable?.matches || [];
+    ctx.expect(matches).toContain(`${new URL(brandUrl).origin}/*`);
   },
 });

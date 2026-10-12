@@ -10,7 +10,7 @@ module.exports = defineCases({
   context: 'options',
   description: 'view/options — DOM + context attribute',
   run: async (ctx) => {
-    ctx.expect(document.body.dataset.omegaContext).toBe('options');
+    ctx.expect(ctx.page.document.body.dataset.omegaContext).toBe('options');
     ctx.expect(document.title).toContain('Options');
   },
 });

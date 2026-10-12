@@ -1,6 +1,7 @@
 /**
- * Renderer-layer test: the notes panel of this project's OWN main view, in a
- * real window with the real preload and the real main process behind it.
+ * The notes panel of this project's OWN main view, in a real window of the
+ * booted app (`layer: 'boot'`, `view: 'main'`) with the real preload and the
+ * real main process behind it.
  *
  * Real events on the real DOM: a submit through FormManager, and an app-store
  * write whose change broadcast the page follows. The boot profile is signed
@@ -14,7 +15,7 @@ const { defineCases } = require('@omega.js/desktop/test');
 
 module.exports = defineCases({
   type: 'group',
-  layer: 'renderer',
+  layer: 'boot',
   view: 'main',
   description: 'the main view\'s notes panel (real page, real preload)',
   tests: [

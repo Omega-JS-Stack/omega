@@ -1,159 +1,86 @@
-// Boot harness: invoked from @omega.js/desktop's main.js (utils/boot-harness.js) after omega.initialize() resolves
-// when OMEGA_TEST_BOOT=1. Reads the spec file pointed to by OMEGA_TEST_BOOT_SPEC,
-// runs each `inspect` against the live instance, emits results, and quits.
-//
-// Why call from main.js instead of preloading via electron's --require?
-// Because Electron rejects unknown CLI flags, we can't sneak args/preload modules in.
-// So @omega.js/desktop's main.js opts into the harness when it sees OMEGA_TEST_BOOT=1, after a
-// fully-completed initialize() guarantees every lib is up.
-//
-// After the inspect tests, any `viewSuites` in the spec run too: renderer suites that named
-// a project view (`view: '<name>'`), each in a real window of this booted app. See
-// runViewSuite() below.
-//
-// Protocol matches main-entry.js, emit `__OMEGA_TEST__` JSON lines on stdout.
+// The boot harness: @omega.js/desktop's main.js requires it (utils/boot-harness.js)
+// once omega.initialize() resolves under OMEGA_TEST_BOOT=1. It reads the spec at
+// OMEGA_TEST_BOOT_SPEC, runs its main-process suites against the live instance,
+// then each view suite in a real window of this app through the page engine
+// (renderer-entry.js), writes one envelope line per case, and quits. A fatal goes to stderr.
 
 'use strict';
 
-const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
+const fs = require('fs');
+const path = require('path');
+const jetpack = require('fs-jetpack');
+const { runSuite } = require('@omega.js/devkit/test/run-case');
+const expect = require('@omega.js/devkit/test/expect');
+const { eventLine, reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
+const { engineSources } = require('./engine-sources.js');
+const { rebuildSuite } = require('./renderer-entry.js');
 
-// Belt-and-suspenders for a view suite that never emits `end` (a page that died mid-run).
-// Same 60s ceiling the harness-page renderer lane uses (harness/main-entry.js).
-const VIEW_SUITE_TIMEOUT = 60000;
+// How often a view window's queued case events are collected.
+const VIEW_POLL_MS = 50;
 
-function emit(obj) {
-  process.stdout.write(`${TEST_EVENT_PREFIX}${JSON.stringify(obj)}\n`);
+// One case event as an envelope line on stdout, for the boot driver to read back.
+function emit(event) {
+  process.stdout.write(`${eventLine(event)}\n`);
 }
 
 async function run(omega) {
   const { app } = require('electron');
-  const path = require('path');
-
-  // Give the consumer's `omega.initialize().then(() => { ... })` callback time
-  // to surface windows / wire up handlers / etc. The harness runs from setImmediate
-  // already (which flushes microtasks once), but `windows.create()` is async, so
-  // we additionally poll for the main window for up to 3s. Apps that intentionally
-  // launch hidden never create a main window — those tests should `if (!win) return`
-  // when inspecting window state.
-  await waitForMainWindow(omega, 3000);
-
-  const specPath = process.env.OMEGA_TEST_BOOT_SPEC;
-  if (!specPath) {
-    emit({ event: 'fatal', message: 'boot-entry.js: OMEGA_TEST_BOOT_SPEC env var not set' });
-    app.exit(1);
-    return;
-  }
-
-  let spec;
   try {
-    spec = require(specPath);
-  } catch (e) {
-    emit({ event: 'fatal', message: `boot-entry.js: failed to load spec ${specPath}: ${e.message}` });
-    app.exit(1);
-    return;
-  }
+    // The consumer's initialize().then() opens its windows asynchronously: give the main
+    // window up to 3s. A hidden or tray-only app never opens one, and its suites allow for that.
+    await waitForMainWindow(omega, 3000);
 
-  const projectRoot = spec.projectRoot;
-  const tests       = spec.tests || [];
+    const spec = jetpack.read(process.env.OMEGA_TEST_BOOT_SPEC, 'json');
+    const extras = {
+      omega,
+      projectRoot: spec.projectRoot,
+      appRoot: spec.appRoot,
+      frameworkDistRoot: spec.frameworkDistRoot,
+      distSnapshotBefore: spec.distSnapshotBefore,
+    };
 
-  // Everything a test needs to reach the build under test: `appRoot` is the staged app
-  // root Electron booted (its dist/ IS the isolated boot-test output — #110),
-  // `frameworkDistRoot` locates framework test utilities, `distSnapshotBefore` is the
-  // fingerprint of the project's real dist/ taken before the test build.
-  const args = {
-    projectRoot,
-    appRoot:            spec.appRoot,
-    frameworkDistRoot:  spec.frameworkDistRoot,
-    distSnapshotBefore: spec.distSnapshotBefore,
-  };
-
-  // Reconstitute each `inspect` from its serialized body string. We expose Node's
-  // `require` + `process` + `Buffer` to the inspect body so tests can require('fs'),
-  // require('electron'), etc. — `new Function(...)` creates a no-closure function so
-  // these globals must be passed in explicitly. (Module-level `require` is the harness's
-  // own; renaming it `require` inside the body restores the natural ergonomic.)
-  const inspectors = tests.map((t) => ({
-    description:  t.description,
-    timeout:      t.timeout || 15000,
-    inspect:      new Function('args', 'require', 'process', 'Buffer',
-      `return (async function ({ omega, expect, projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore }) {\n${t.inspectSource}\n})(args)`,
-    ),
-  }));
-
-  // Bring in @omega.js/desktop's expect (assert.js) — same path conventions as main-entry.js uses.
-  const expect = require(path.join(spec.frameworkDistRoot, 'test', 'assert.js'));
-
-  let passed = 0, failed = 0;
-  let skipped = 0;   // boot inspects have no skip mechanism; view suites below do
-
-  for (const t of inspectors) {
-    const start = Date.now();
-    try {
-      await Promise.race([
-        t.inspect(Object.assign({ omega, expect }, args), require, process, Buffer),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout)),
-      ]);
-      const duration = Date.now() - start;
-      emit({ event: 'result', name: t.description, passed: true, duration });
-      passed += 1;
-    } catch (e) {
-      const duration = Date.now() - start;
-      emit({ event: 'result', name: t.description, passed: false, duration, error: e.message });
-      failed += 1;
+    // A main-process body sees Node's `require`, `process` and `Buffer`, as a module would.
+    for (const suite of spec.mainSuites) {
+      await runSuite(rebuildSuite(suite, 'boot', { require, process, Buffer }), { expect, extras, report: emit });
     }
-  }
 
-  // View suites (renderer suites that named a project view) run last: they need the app
-  // fully up, and an inspect test must never see a window this harness opened.
-  const viewSuites = spec.viewSuites || [];
-  // window-manager quits the app on `window-all-closed` (win/linux). A tray-only or hidden
-  // app has no other window, so destroying a view window would end the run early with the
-  // remaining suites unreported. This harness exits through app.exit() below regardless.
-  if (viewSuites.length > 0) app.removeAllListeners('window-all-closed');
-  for (let i = 0; i < viewSuites.length; i += 1) {
-    const counts = await runViewSuite(viewSuites[i], i, omega, spec);
-    passed  += counts.passed;
-    failed  += counts.failed;
-    skipped += counts.skipped;
+    // window-manager quits on `window-all-closed` (win/linux): closing a view window must not end the run.
+    if (spec.viewSuites.length > 0) app.removeAllListeners('window-all-closed');
+    const sources = engineSources();
+    for (let i = 0; i < spec.viewSuites.length; i += 1) {
+      await runViewSuite(spec.viewSuites[i], i, omega, spec, sources, emit);
+    }
+    app.exit(0);
+  } catch (e) {
+    process.stderr.write(`boot harness: ${e.stack || e}\n`);
+    app.exit(1);
   }
-
-  emit({ event: 'end', passed, failed, skipped });
-  app.exit(failed > 0 ? 1 : 0);
 }
 
-// Run one renderer suite against a REAL project view, in a real window of the booted app.
-//
-// The window comes from the app's own window manager, so the page loads the way production
-// loads it: this project's built preload, its IPC handlers, its config. The suite loop
-// itself is the harness page's, verbatim: harness/renderer-entry.js is read from dist and
-// evaluated inside the page, with a shim standing in for the preload bridge it normally
-// talks to. There is exactly one suite loop and one `expect` in this framework, and this is
-// not a second copy of either.
-async function runViewSuite(suite, index, omega, spec) {
-  const fs   = require('fs');
-  const path = require('path');
+function failEvery(suite, message, report) {
+  reportEvery(suite.cases, report, { status: 'fail', error: new Error(message) });
+}
 
-  const counts = { passed: 0, failed: 0, skipped: 0 };
-
-  // Chromium commits an error page AT the requested file URL on ERR_FILE_NOT_FOUND, so the
-  // URL check below cannot tell a missing view from a loaded one. Check the built file first.
+// One view suite in a real window from the app's own window manager, so the page loads
+// the way production loads it: this project's built preload, IPC handlers and config.
+// A throw or a page engine error fails this suite's unreported cases; the next suite still runs.
+async function runViewSuite(suite, index, omega, spec, sources, report) {
+  // Chromium commits an error page AT a missing file's URL, so check the built file first.
   const htmlPath = path.join(spec.appRoot, 'dist', 'views', suite.view, 'index.html');
   if (!fs.existsSync(htmlPath)) {
-    const error = `view "${suite.view}" did not load (expected ${htmlPath})`;
-    for (const t of suite.tests) {
-      emit({ event: 'result', suite: suite.description, name: t.name, passed: false, duration: 0, error });
-      counts.failed += 1;
-    }
-    return counts;
+    failEvery(suite, `view "${suite.view}" did not load (expected ${htmlPath})`, report);
+    return;
   }
 
-  const win = await omega.windows.create(`omega-test-view-${index}`, {
-    view:          suite.view,
-    show:          false,
-    persistBounds: false,
-  });
-
+  const events = createEventTracker(report);
+  let win = null;
   try {
+    win = await omega.windows.create(`omega-test-view-${index}`, {
+      view:          suite.view,
+      show:          false,
+      persistBounds: false,
+    });
+
     // createNamed LOGS a load failure rather than throwing, so a missing/unbuilt view would
     // otherwise present as a page with no DOM and a pile of confusing assertion failures.
     const loaded = Boolean(win)
@@ -161,69 +88,45 @@ async function runViewSuite(suite, index, omega, spec) {
       && win.webContents.getURL().includes(`/dist/views/${suite.view}/`);
 
     if (!loaded) {
-      const error = `view "${suite.view}" did not load (expected <appRoot>/dist/views/<view>/index.html)`;
-      for (const t of suite.tests) {
-        emit({ event: 'result', suite: suite.description, name: t.name, passed: false, duration: 0, error });
-        counts.failed += 1;
-      }
-      return counts;
+      failEvery(suite, `view "${suite.view}" did not load (expected <appRoot>/dist/views/<view>/index.html)`, report);
+      return;
     }
 
-    // 1. The bridge renderer-entry.js expects. On the harness page this is a contextBridge
-    //    surface talking to main over IPC; here the page just queues events for the poll
-    //    below, since main is right here.
+    // The bridge the page engine talks to: events queue in the page for the poll below.
     await win.webContents.executeJavaScript(`
       window.__omegaTestQueue = [];
+      window.__omegaTestDone = null;
       window.__omegaTest = {
         ready() {},
-        emit(evt) { window.__omegaTestQueue.push(evt); },
+        emit(event) { window.__omegaTestQueue.push(event); },
+        done(error) { window.__omegaTestDone = { error: error || null }; },
         onSuites(handler) { window.__omegaTestDeliver = handler; },
       };
       null;
     `);
+    const entryPath = path.join(__dirname, 'renderer-entry.js');
+    await win.webContents.executeJavaScript(`${jetpack.read(entryPath)}\nnull;`);
+    await win.webContents.executeJavaScript(`window.__omegaTestDeliver(${JSON.stringify({ sources, suites: [suite], layer: 'boot' })}); null;`);
 
-    // 2. The renderer entry itself, verbatim. It is an IIFE: it registers the handler and
-    //    calls ready() as it parses.
-    const entryPath = path.join(spec.frameworkDistRoot, 'test', 'harness', 'renderer-entry.js');
-    await win.webContents.executeJavaScript(`${fs.readFileSync(entryPath, 'utf8')}\nnull;`);
-
-    // 3. Deliver this window's one suite. One suite per window, so the entry's `end` event
-    //    ends this window's run.
-    await win.webContents.executeJavaScript(`window.__omegaTestDeliver(${JSON.stringify([suite])}); null;`);
-
-    // 4. Drain the queue until the run ends. Every event is forwarded verbatim, so the
-    //    parent renders a view suite exactly like a harness-page one.
-    const deadline = Date.now() + VIEW_SUITE_TIMEOUT;
-    let ended = false;
-    while (!ended && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      const events = await win.webContents.executeJavaScript('window.__omegaTestQueue.splice(0)');
-      for (const evt of events) {
-        emit(evt);
-        if (evt.event === 'end') {
-          counts.passed  += evt.passed;
-          counts.failed  += evt.failed;
-          counts.skipped += evt.skipped;
-          ended = true;
-        } else if (evt.event === 'fatal') {
-          counts.failed += 1;
-          ended = true;
-        }
-      }
-    }
-
-    if (!ended) {
-      emit({ event: 'fatal', message: `view suite "${suite.description}" timed out (no end event in ${VIEW_SUITE_TIMEOUT / 1000}s)` });
-      counts.failed += 1;
-    }
+    const done = await collectViewEvents((code) => win.webContents.executeJavaScript(code), events.onEvent);
+    if (done.error) events.settle(suite.cases, new Error(`view suite "${suite.description || suite.file}": ${done.error}`));
   } catch (e) {
-    emit({ event: 'fatal', message: `view suite "${suite.description}": ${e.message}`, stack: e.stack });
-    counts.failed += 1;
+    events.settle(suite.cases, e);
   } finally {
     if (win && !win.isDestroyed()) win.destroy();
   }
+}
 
-  return counts;
+// A view page's case events until its engine is done. Queue and done are read in ONE round
+// trip: the page runs between two, so an event pushed in that gap would be lost. A page
+// that stops answering is the boot driver's idle budget to end.
+async function collectViewEvents(execute, onEvent) {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, VIEW_POLL_MS));
+    const { events, done } = await execute('({ events: window.__omegaTestQueue.splice(0), done: window.__omegaTestDone })');
+    events.forEach(onEvent);
+    if (done) return done;
+  }
 }
 
 // Poll for the main window for up to `timeoutMs`. Resolves when it shows up, or after
@@ -236,4 +139,4 @@ async function waitForMainWindow(omega, timeoutMs) {
   }
 }
 
-module.exports = { run };
+module.exports = { run, runViewSuite };

@@ -140,7 +140,6 @@ See [docs/extension/build-system.md](build-system.md).
 - **A declared store with a missing developer key**: the publish REFUSES, naming the key, the declaration that requires it (`platforms.edge.formats.store`), and the ONE walk that collects it, `omega manage --service publishing`. Nothing is uploaded to any store. Dropping the store (`platforms.edge.formats.store: false`) is how a brand says it does not ship there; a store that quietly fell off the run because a key was empty is what this replaced.
 - **Keys present, no listing id yet**: ONE manual step prints (create the listing at the store's console, upload `extension-<build>.zip` from the release, set `targets.<name>.listings.<browser>.id`, re-run) and the run finishes green. The zips are already on the release by then: that upload runs FIRST, so the file a human uploads by hand is published no matter which stores went through.
 
-- `OMEGA_TEST_MODE=true`: running inside @omega.js/extension's test framework. Powers `omega.isTesting()` in the test harness.
 - `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task
 - `OMEGA_LOG_FILE` — override the gulp stdout/stderr tee path, or `false` to disable it
 
@@ -186,20 +185,22 @@ Gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isD
 ### Test framework
 
 `npx omega test --target=<name>` discovers + runs:
-- `<@omega.js/extension>/dist/test/suites/**/*.js` — framework defaults
-- `<cwd>/test/**/*.js` — consumer suites
+- `<@omega.js/extension>/dist/test/suites/**/*.test.js`: framework defaults
+- `<cwd>/test/**/*.test.js`: consumer suites
+
+It runs them on devkit's one runner ([devkit/index.md](../devkit/index.md#the-case-runner)), in this process, row by row, and ends on one Results block (`--reporter=json`: one JSON document on stdout).
 
 Four layers:
 - **build**: plain Node, fast. The build module, config validation, manifest shape, lib utilities.
 - **background** — real MV3 service worker via Puppeteer + CDP. Boot sequence, `chrome.runtime` surface, storage round-trips, messaging.
-- **view**: Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html` (picked by `context:`). DOM bindings, the `omega` surface, popup ↔ background messaging. A view suite that declares `view: '<name>'` runs in the project's OWN built `views/<name>/index.html` instead, inside its packaged extension on the boot lane, the same knob as the desktop renderer's ([#959](https://github.com/Omega-JS-Stack/omega/issues/959)); the playground extension target's `test/view/` is the worked example.
-- **boot** — real headless Chromium loading the **consumer's** `packaged/<browser>/raw/` as an unpacked extension. End-to-end: does the real packaged extension boot?
+- **view**: Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html` (picked by `context:`), `ctx.page` its `window`. DOM bindings, the `omega` surface, popup ↔ background messaging.
+- **boot**: real headless Chromium loading the **consumer's** `packaged/<browser>/raw/` as an unpacked extension. End-to-end: does the real packaged extension boot? Each case is `run(ctx)` with `ctx.extension` and a fresh Puppeteer `ctx.page`. A suite that declares `layer: 'boot'` and `view: '<name>'` runs inside the project's OWN built `views/<name>/index.html`, `ctx.page` its `window`, the same pair a desktop built-view suite declares ([#959](https://github.com/Omega-JS-Stack/omega/issues/959)), and lives under `test/boot/`; the playground extension target's `test/boot/popup.test.js` and `sidepanel.test.js` are the worked example.
 
 The boot layer SKIPS when the consumer has not built: a candidate directory qualifies only when its `manifest.json` is strict JSON, so the intermediate `dist/` (JSON5, and present after any dev run or `omega clean`) is passed over and named in the skip instead of loading and failing every boot test ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). An explicitly named `OMEGA_TEST_BOOT_DIR` still fails loudly — that one is a decision, not a fallback.
 
-A boot test's per-test timeout defaults to **45000ms** — sized for the FIRST run after a fresh build, where the extension's Firebase service worker initializes cold (observed 20-30s; the old 20000 default sat right under it and consumers had to declare a timeout of their own to get a green run, [#262](https://github.com/Omega-JS-Stack/omega/issues/262)). Later runs are far quicker. Declare `timeout` on a test only when THAT test is genuinely slower — never to work around the first-run cost.
+Every case gets the runner's 30000ms unless its suite or itself declares more. A boot suite declares **`timeout: 45000`** at suite level, sized for the FIRST run after a fresh build, where the extension's Firebase service worker initializes cold (observed 20-30s, [#262](https://github.com/Omega-JS-Stack/omega/issues/262)); the scaffolded boot suite and the framework's own carry it.
 
-Test files export `defineCases({ type, layer, description, tests, cleanup })` (`defineCases` from `@omega.js/extension/test`) with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/extension/test-framework.md](test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
+Test files export `defineCases({ type, layer, description, tests, cleanup })` (`defineCases` from `@omega.js/extension/test`), every case a `{ name, run(ctx) }` on every layer. Same `ctx.expect` / `waitFor` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/extension/test-framework.md](test-framework.md)): a background or view suite travels as one payload carrying devkit's `run-case.js` and `expect.js` with its bodies inlined as literal functions, never compiled from a string inside the worker.
 
 **NEVER mock: test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a mock `omega`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --target=<name> --extended` or `TEST_EXTENDED_MODE=true`): normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/extension/test-framework.md](test-framework.md).
 

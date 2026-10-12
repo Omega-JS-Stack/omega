@@ -1,15 +1,9 @@
-// boot-harness: hands the booted main-process instance to the boot test lane's
-// harness. The runner sets OMEGA_TEST_BOOT=1 + OMEGA_TEST_BOOT_HARNESS=<absolute path>
-// + OMEGA_TEST_BOOT_SPEC=<path> before spawning electron; the harness emits
-// __OMEGA_TEST__ JSON lines on stdout (parsed by test/runners/boot.js) then
-// app.exit()s.
-//
-// A runtime env-var path, never a static `require('./test/harness/...')`:
-// @omega.js/desktop is bundled into the consumer's bundle, and a static require would
-// either get inlined (bundling test code into production) or dead-code-eliminated.
-// An env-var path stays external and can only resolve when the runner sets it.
-
-const { TEST_EVENT_PREFIX } = require('./test-events.js');
+// boot-harness: hands the booted main-process instance to the boot test lane's harness.
+// The runner sets OMEGA_TEST_BOOT=1, OMEGA_TEST_BOOT_HARNESS=<absolute path> and
+// OMEGA_TEST_BOOT_SPEC=<path>; the harness writes one envelope line per case on stdout
+// (devkit's test/events.js, read by test/runners/boot.js), then app.exit()s.
+// The harness path is a runtime env value, never a static require: this file is bundled
+// into the consumer's bundle, where a static require would inline test code or vanish.
 
 /**
  * Start the boot harness against `omega` when this process is a boot test run.
@@ -47,9 +41,9 @@ function startBootHarness(omega) {
   });
 }
 
-// Report a fatal harness event on the runner's channel and end the run
+// A harness that cannot start is a fatal on stderr; the runner fails the cases it never reported
 function fail(message) {
-  process.stdout.write(`${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'fatal', message })}\n`);
+  process.stderr.write(`${message}\n`);
   require('electron').app.exit(1);
 }
 

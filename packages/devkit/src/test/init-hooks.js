@@ -1,5 +1,5 @@
 // test/_init.js: the pre-test lifecycle hook, one loader for every runner that
-// honors it (the devkit runner, runner-core, web's test command).
+// honors it (the devkit runner, and backend's persona seed for a hook's accounts).
 //
 // A test root may carry `_init.js` exporting a factory,
 // `module.exports = ({ projectRoot, ...factoryArgs }) => ({ setup(ctx), ...data })`.

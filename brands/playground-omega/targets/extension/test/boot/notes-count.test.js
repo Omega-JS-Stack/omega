@@ -11,17 +11,18 @@ const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
   layer: 'boot',
+  timeout: 45000,
   description: 'the packaged background answers notes:count over the messenger',
-  inspect: async ({ extension, page, expect }) => {
+  run: async (ctx) => {
     // Any extension page can reach the worker: ask from the popup, the way it asks
-    await page.goto(extension.popupUrl, { waitUntil: 'domcontentloaded' });
+    await ctx.page.goto(ctx.extension.popupUrl, { waitUntil: 'domcontentloaded' });
 
-    const answer = await page.evaluate(() => chrome.runtime.sendMessage({
+    const answer = await ctx.page.evaluate(() => chrome.runtime.sendMessage({
       sender: 'popup',
       destination: 'background',
       command: 'notes:count',
     }));
 
-    expect(answer).toEqual({ ok: true, count: 0 });
+    ctx.expect(answer).toEqual({ ok: true, count: 0 });
   },
 });

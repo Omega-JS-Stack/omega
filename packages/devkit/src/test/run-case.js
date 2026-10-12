@@ -60,6 +60,9 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     if (caseDef === null || typeof caseDef !== 'object') {
       throw new Error(`${file}: case ${index} is not an object`);
     }
+    if (typeof caseDef.run !== 'function') {
+      throw new Error(`${file}: case ${index} (${name || caseDef.name || `step-${index + 1}`}) has no \`run\` function`);
+    }
     return {
       ...caseDef,
       id: `${file}#${index}`,
@@ -84,6 +87,11 @@ const { SkipError, waitFor, normalizeSpec, createContext, runCase, runSuite, err
     if (spec === null || typeof spec !== 'object') throw new Error(`${file} does not export a \`defineCases\` spec: it must be an object or an array`);
 
     const type = specType(spec, file);
+    // No framework's default row is boot, so a view with no layer is refused too.
+    if (spec.view !== undefined && spec.layer !== 'boot') {
+      const declared = spec.layer === undefined ? 'no layer' : `layer: '${spec.layer}'`;
+      throw new Error(`${file}: \`view\` applies only to \`layer: 'boot'\`, and this spec declares ${declared}`);
+    }
     const own = {};
     for (const key of Object.keys(spec)) {
       if (!SUITE_KEYS.includes(key)) own[key] = spec[key];

@@ -1,122 +1,103 @@
-// Libraries
+/**
+ * `omega test`: ONE devkit runner run, in this process. Its roots: desktop's own
+ * suites (`framework:` / `omega:` / `desktop:`) and the target's `test/`. The
+ * `build` row runs here; `main`, `renderer` and `boot` run inside Electron
+ * through the drivers in src/test/runners/. A bare run means the target's
+ * suites; a self-test (the cwd is @omega.js/desktop) means desktop's own, with
+ * its `boot/` suites booting the bundled fixture app, and skips every target step.
+ */
 const path = require('path');
-const fs = require('fs');
+const jetpack = require('fs-jetpack');
 const build = require('../build.js');
-const logger = build.logger('test');
-const { run } = require('../test/runner.js');
-const attachLogFile = require('../utils/attach-log-file.js');
-const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.js');
-const { noMatchMessage, noMatchExitCode } = require('@omega.js/devkit/test/scope');
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { createRunner } = require('@omega.js/devkit/test/runner');
+const { guardStdout } = require('@omega.js/devkit/test/guard-stdout');
+const { exitFlushed, guardEarlyExit } = require('@omega.js/devkit/test/exit');
+const { noMatchExitCode, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
+const { electronDriver } = require('../test/runners/electron.js');
+const { bootDriver } = require('../test/runners/boot.js');
+
+const logger = build.logger('test');
+
+const DESKTOP_ROOT = path.resolve(__dirname, '..', '..');
+const SUITES_DIR = path.join(__dirname, '..', 'test', 'suites');
+const FIXTURE_APP = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-app');
+
+const EXTENDED_MODE_LINES = [
+  'Tests that hit real external services (Firebase, analytics, update feeds) are ENABLED!',
+  'This will make real network calls against live backends.',
+];
+
+/**
+ * The runner config of one `omega test` run. A self-test has no project root;
+ * the framework `boot/` suites join on a self-test alone, by the runner's own discovery rule.
+ * @param {{projectRoot: string, selfTest: boolean}} options - The target root (the desktop package on a self-test).
+ * @returns {object} The `createRunner` config.
+ */
+function runnerConfig({ projectRoot, selfTest }) {
+  const roots = [{ source: 'framework', dir: SUITES_DIR }];
+  if (!selfTest) roots.push({ source: 'project', dir: path.join(projectRoot, 'test') });
+  return {
+    framework: 'desktop',
+    title: '@omega.js/desktop Tests',
+    projectRoot,
+    roots,
+    packageName: '@omega.js/desktop',
+    frameworkAliases: FRAMEWORK_IDS['@omega.js/desktop'],
+    drivers: { main: electronDriver('main'), renderer: electronDriver('renderer'), boot: bootDriver },
+    extendedModeLines: EXTENDED_MODE_LINES,
+    defaultTimeout: 30000,
+  };
+}
 
 module.exports = async function (options) {
-  // This process is a TEST RUN, and everything it spawns inherits that. The box's
-  // mutating verbs read it and refuse to touch a real runner home
-  // ([#337](https://github.com/Omega-JS-Stack/omega/issues/337): a suite once ran
-  // a real `runner install` on the signing box). Deliberately a marker about THIS
-  // process, never a word about the app under test: the environment the thing
-  // being tested RUNS in is `OMEGA_ENVIRONMENT`, and the runners name it on their
-  // own children alone (#925).
+  setEnvironment('testing');
+  // A marker about THIS process, inherited by every child: the runner verbs
+  // read it (utils/runner-env.js) and refuse to touch a real runner home.
   process.env.OMEGA_TEST_RUNNER = '1';
 
-  // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
-  // @omega.js/backend's test.log and @omega.js/desktop's own dev.log pattern.
-  const detachLog = attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
+  const cwd = process.cwd();
+  attachLogFile(path.join(cwd, 'logs', 'test.log'));
 
-  // The local half of the retired `omega setup` (#675) — idempotent, offline,
-  // and quiet on a converged target. The gulp verbs get it from the `defaults`
-  // task; test runs no gulp, so it calls it here.
-  await ensureTarget({
-    projectDir: process.cwd(),
-    log: (line) => logger.log(line),
-    warn: (line) => logger.warn(line),
-  });
+  const manifest = jetpack.read(path.join(cwd, 'package.json'), 'json');
+  const selfTest = Boolean(manifest) && manifest.name === '@omega.js/desktop';
+  const runOptions = {
+    targets: (options._ || []).slice(1),
+    filter: options.filter,
+    layer: options.layer,
+    lane: options.lane,
+    extended: options.extended,
+    reporter: options.reporter,
+  };
 
-  const layer       = options.layer    || 'all';
-  // Positional target: `npx omega test <target>` where target supports source
-  // prefixes — `project:`, `project:<path>`, `em:`, `em:<path>`, or a bare
-  // `<path>` (matches both sources). Selects which test FILES run.
-  const target      = (options._ && options._[1]) || null;
-  // `--filter` flag: substring match on test NAMES/descriptions (orthogonal to target).
-  const filter      = options.filter   || null;
-  const reporter    = options.reporter || 'pretty';
-  // Extended mode — opt into tests that hit REAL external services (Firebase, analytics,
-  // update feeds) instead of skipping them. Off by default so `npx omega test` stays fast and
-  // offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var — the
-  // SAME name on every framework (cross-framework parity); `--extended` is the CLI
-  // shorthand. Once set on process.env it propagates to every spawned child (electron
-  // main/renderer/boot, the gulp boot build) automatically via `{ ...process.env }`.
-  const extended    = options.extended === true
-    || options.extended === 'true'
-    || process.env.TEST_EXTENDED_MODE === 'true'
-    || process.env.TEST_EXTENDED_MODE === '1';
-
-  if (extended) {
-    process.env.TEST_EXTENDED_MODE = 'true';
-  }
-
-  // When @omega.js/desktop itself runs its own boot-layer tests (the cwd's package.json is @omega.js/desktop's), there's
-  // no real consumer app to boot. Point the boot runner at the fixture under
-  // dist/test/fixtures/consumer-app unless the caller has already set OMEGA_TEST_BOOT_PROJECT
-  // explicitly.
-  if (!process.env.OMEGA_TEST_BOOT_PROJECT) {
+  if (selfTest) {
+    // The self-test has no consumer app of its own: its boot suites boot the bundled fixture.
+    if (!process.env.OMEGA_TEST_BOOT_PROJECT) process.env.OMEGA_TEST_BOOT_PROJECT = FIXTURE_APP;
+  } else {
+    // Under json, stdout carries the runner's one document; the target step prints to stderr.
+    const restoreStdout = runOptions.reporter === 'json' ? guardStdout({ strict: true }) : () => {};
     try {
-      const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-      if (cwdPkg.name === '@omega.js/desktop') {
-        process.env.OMEGA_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-app');
-      }
-    } catch (_) { /* no package.json — leave unset */ }
-  }
-
-  if (reporter !== 'json') {
-    const parts = [`layer=${layer}`];
-    if (target) parts.push(`target="${target}"`);
-    if (filter) parts.push(`filter="${filter}"`);
-    if (extended) parts.push('+extended');
-    logger.log(`Running tests (${parts.join(' ')})`);
-    logger.log(`Test mode: ${extended ? 'extended (real external APIs)' : 'normal (external APIs skipped)'}`);
-    if (extended) {
-      logger.warn(EXTENDED_MODE_WARNING[0]);
-      EXTENDED_MODE_WARNING.slice(1).forEach((line) => logger.warn(line));
+      await ensureTarget({ projectDir: cwd, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
+    } finally {
+      restoreStdout();
     }
   }
 
-  const result = await run({ layer, target, filter, reporter });
+  // A case that ends the process (process.exit) before the report is written never passes.
+  guardEarlyExit();
 
-  if (reporter === 'json') {
-    // Final machine-readable summary.
-    process.stdout.write(`${JSON.stringify({
-      event:   'summary',
-      passed:  result.passed,
-      failed:  result.failed,
-      skipped: result.skipped,
-      total:   result.passed + result.failed + result.skipped,
-    })}\n`);
-  }
-
-  // A target that named files and matched none is a failed run, not an empty
-  // one: a typo'd path, or a suite renamed out from under it, used to report
-  // "0 passing" and exit 0
-  // ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
-  if (result.noMatch) {
-    logger.error(noMatchMessage(result.noMatch));
-    // Standalone that is 1. Inside a brand-root fan-out the manager forwarded
-    // ONE target to every target, so a distinct code lets it count this as a
-    // miss rather than a failure (#814).
-    process.exitCode = noMatchExitCode();
-    detachLog();
+  let results;
+  try {
+    results = await createRunner(runnerConfig({ projectRoot: selfTest ? DESKTOP_ROOT : cwd, selfTest })).run(runOptions);
+  } catch (e) {
+    console.error(e.stack || String(e));
+    exitFlushed(1);
     return;
   }
-
-  if (result.failed > 0) {
-    process.exitCode = 1;
-    detachLog();
-    throw new Error(`${result.failed} test(s) failed`);
-  }
-
-  // Close test.log before exiting. Nothing to flush: every write already went
-  // to the fd synchronously (#197), so the Results block survives the exit
-  // below whatever happens — detach() just closes the handle.
-  detachLog();
-  process.exit(0);
+  if (results.noMatch) exitFlushed(noMatchExitCode());
+  else exitFlushed(results.failed > 0 ? 1 : 0);
 };
+
+module.exports.runnerConfig = runnerConfig;

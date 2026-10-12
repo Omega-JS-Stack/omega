@@ -1,6 +1,39 @@
 /**
- * Shared helpers for the extension test runners (runner.js, boot.js, chromium.js).
+ * Shared helpers for the extension's Chrome drivers (chromium.js, boot.js):
+ * puppeteer and the launch, and the target wait.
  */
+
+/**
+ * Puppeteer, or null when it is not installed (the layers that need it skip).
+ * @returns {object|null} The puppeteer module.
+ */
+function loadPuppeteer() {
+  try {
+    return require('puppeteer');
+  } catch (e) {
+    if (e.code === 'MODULE_NOT_FOUND' && /'puppeteer'/.test(e.message)) return null;
+    throw e;
+  }
+}
+
+/**
+ * Launch headless Chrome with one unpacked extension loaded. MV3 workers
+ * start only in the new headless mode.
+ * @param {object} puppeteer - The puppeteer module.
+ * @param {string} extensionDir - The directory holding the extension's manifest.json.
+ * @returns {Promise<object>} The Puppeteer Browser.
+ */
+function launchChrome(puppeteer, extensionDir) {
+  return puppeteer.launch({
+    headless: 'new',
+    args: [
+      `--disable-extensions-except=${extensionDir}`,
+      `--load-extension=${extensionDir}`,
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+    ],
+  });
+}
 
 /**
  * Resolve a Puppeteer target matching predicate: existing targets first, then
@@ -21,9 +54,4 @@ async function waitForTarget(browser, predicate, timeoutMs) {
   });
 }
 
-// A suite file's test count: its `tests` list, or one for the standalone form.
-function suiteTestCount(mod) {
-  return Array.isArray(mod.tests) ? mod.tests.length : 1;
-}
-
-module.exports = { waitForTarget, suiteTestCount };
+module.exports = { loadPuppeteer, launchChrome, waitForTarget };

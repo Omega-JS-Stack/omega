@@ -1,14 +1,27 @@
-// Boot lane: Chromium with the project's packaged extension loaded unpacked. Each
-// `inspect({ extension, page, expect, projectRoot })` gets a fresh page against the live
-// extension; `extension` carries id, manifest, popupUrl, optionsUrl and swTarget.
-// After the inspect tests, each view suite naming `view: '<name>'` runs inside
-// `views/<name>/index.html` of this same loaded extension.
+/**
+ * The `boot` driver: Chrome with the project's built extension loaded unpacked.
+ * A suite without `view` runs here, in the runner process, each case with
+ * `ctx.extension` and a fresh `ctx.page`; a suite with `view: '<name>'` runs
+ * inside `views/<name>/index.html` of the same loaded extension.
+ */
 
 const path  = require('path');
 const fs    = require('fs');
-const { waitForTarget, suiteTestCount } = require('./helpers.js');
-const { runViewSuite } = require('./chromium.js');
-const chalk = require('chalk').default;
+const expect = require('@omega.js/devkit/test/expect');
+const { runSuite } = require('@omega.js/devkit/test/run-case');
+const { specKey } = require('@omega.js/devkit/test/serialize');
+const { reportEvery } = require('@omega.js/devkit/test/events');
+const { loadPuppeteer, launchChrome, waitForTarget } = require('./helpers.js');
+const { runAppSuite, inPage } = require('./chromium.js');
+
+// Why a loaded Chrome shows no extension target at all.
+const NOT_LOADED = [
+  'Chrome loaded but no chrome-extension target appeared: the extension failed to load. Common reasons:',
+  'manifest.json misses a required field (manifest_version: 3);',
+  'default_locale is set but _locales/<locale>/messages.json is missing;',
+  '__MSG_*__ placeholders are used without default_locale and _locales/;',
+  'a referenced file (background.service_worker, content_scripts) is not on disk.',
+].join(' ');
 
 /**
  * Locate the Chrome-loadable build of the consumer extension. The gulp pipeline
@@ -75,142 +88,139 @@ function resolveBootDir(projectRoot) {
   return { effectiveRoot, dir: null, manifestPath: null, candidates, rejected, error: null, errorPath: null };
 }
 
-async function runBootTests({ tests, suites = [], projectRoot, frameworkDistRoot, defaultTimeout }) {
-  const total = tests.length + suites.reduce((n, { mod }) => n + suiteTestCount(mod), 0);
-  if (total === 0) return { passed: 0, failed: 0, skipped: 0 };
-
-  let puppeteer;
-  try {
-    puppeteer = require('puppeteer');
-  } catch (e) {
-    console.log(chalk.yellow(`    ○ boot tests skipped (puppeteer not installed)`));
-    return { passed: 0, failed: 0, skipped: total };
-  }
-
-  const discovery = resolveBootDir(projectRoot);
-
-  // An explicitly named OMEGA_TEST_BOOT_DIR whose manifest Chrome cannot parse
-  // is the caller's own mistake — name it, fail the tests.
+/**
+ * Why the boot layer cannot run, or null when it can.
+ * @param {object} discovery - resolveBootDir()'s result.
+ * @returns {{skip?: string, error?: Error}|null} A skip reason, a failure, or null.
+ */
+function bootBlocker(discovery) {
+  // An explicitly named OMEGA_TEST_BOOT_DIR is a decision, not a fallback: a broken manifest there fails.
   if (discovery.error) {
-    console.log(chalk.red(`    ✗ boot tests aborted: ${discovery.errorPath} is not strict JSON.`));
-    console.log(chalk.gray(`      Chrome requires manifest.json to have no comments, no trailing commas, no single quotes.`));
-    console.log(chalk.gray(`      Parser error: ${discovery.error.message}`));
-    console.log(chalk.gray(`      OMEGA_TEST_BOOT_DIR names this directory explicitly — point it at a`));
-    console.log(chalk.gray(`      packaged/<browser>/raw/ output, or unset it and run \`npm run build\`.`));
-    return { passed: 0, failed: total, skipped: 0 };
+    return { error: new Error(`${discovery.errorPath} is not strict JSON (Chrome refuses comments, trailing commas and single quotes: ${discovery.error.message}). OMEGA_TEST_BOOT_DIR names this directory: point it at a packaged/<browser>/raw/ output, or unset it and run \`npm run build\`.`) };
   }
-
   if (!discovery.dir) {
-    console.log(chalk.yellow(`    ○ boot tests skipped (no strict-JSON manifest.json found in any of:`));
-    for (const c of discovery.candidates) console.log(chalk.yellow(`        ${c}`));
-    for (const r of discovery.rejected) console.log(chalk.yellow(`      ${r.manifestPath} exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)`));
-    console.log(chalk.yellow(`      - run \`npm run build\` first to produce packaged/chrome/raw/)`));
-    return { passed: 0, failed: 0, skipped: total };
+    const rejected = discovery.rejected.map((r) => `; ${r.manifestPath} is not strict JSON (the JSON5 source Chrome refuses)`).join('');
+    return { skip: `no built extension: no strict-JSON manifest.json in ${discovery.candidates.join(', ')}${rejected}; run \`npm run build\` first` };
   }
-
-  const consumerDist = discovery.dir;
-  const manifestPath = discovery.manifestPath;
-
-  if (process.env.OMEGA_TEST_DEBUG) {
-    console.log(chalk.gray(`      [boot] loading extension from ${consumerDist}`));
-  }
-
-  const expect = require('../assert.js');
-  const counts = { passed: 0, failed: 0, skipped: 0 };
-
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: [
-      `--disable-extensions-except=${consumerDist}`,
-      `--load-extension=${consumerDist}`,
-      '--no-sandbox',
-      '--disable-dev-shm-usage',
-    ],
-  });
-
-  try {
-    // Discover the loaded extension. Most consumer extensions have an MV3 SW
-    // — wait up to 5s for it. If the consumer extension is service-worker-less
-    // (rare in MV3 but allowed for action-only extensions), we still get the
-    // chrome-extension://<id> via browser targets and the manifest gives us
-    // the popup URL.
-    const swTarget = await waitForTarget(browser, (t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'), 5000);
-
-    let extId;
-    let manifest;
-    if (swTarget) {
-      extId = swTarget.url().split('/')[2];
-    } else {
-      // No SW — find any chrome-extension target.
-      const anyExtTarget = browser.targets().find((t) => t.url().startsWith('chrome-extension://'));
-      if (!anyExtTarget) {
-        console.log(chalk.red(`    ✗ Boot aborted — Chromium loaded but no chrome-extension target appeared.`));
-        console.log(chalk.gray(`      Likely cause: the extension failed to load. Common reasons:`));
-        console.log(chalk.gray(`        - manifest.json missing required field (e.g. manifest_version: 3)`));
-        console.log(chalk.gray(`        - default_locale is set but _locales/<locale>/messages.json is missing`));
-        console.log(chalk.gray(`        - __MSG_*__ placeholders used without default_locale + _locales/`));
-        console.log(chalk.gray(`        - referenced files (background.service_worker, content_scripts) don't exist on disk`));
-        return { passed: 0, failed: total, skipped: 0 };
-      }
-      extId = anyExtTarget.url().split('/')[2];
-    }
-    try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    } catch (e) {
-      console.log(chalk.red(`    ✗ Boot aborted — failed to parse manifest: ${e.message}`));
-      return { passed: 0, failed: total, skipped: 0 };
-    }
-
-    const popupRel   = (manifest.action && manifest.action.default_popup) || null;
-    const optionsRel = (manifest.options_ui && manifest.options_ui.page)  || (manifest.options_page || null);
-
-    const extension = {
-      id:         extId,
-      manifest,
-      swTarget,
-      popupUrl:   popupRel   ? `chrome-extension://${extId}/${popupRel}`   : null,
-      optionsUrl: optionsRel ? `chrome-extension://${extId}/${optionsRel}` : null,
-    };
-
-    for (const t of tests) {
-      const start = Date.now();
-      const page = await browser.newPage();
-      try {
-        await Promise.race([
-          t.inspect({ extension, page, expect, projectRoot: discovery.effectiveRoot }),
-          // The runner resolves every test's timeout before it gets here
-          // (its bootDefaultTimeout); `defaultTimeout` is the same number for a
-          // caller driving this runner directly, so the number lives in ONE
-          // place — test/runner.js's BOOT_DEFAULT_TIMEOUT (#262).
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout || defaultTimeout)),
-        ]);
-        const duration = Date.now() - start;
-        console.log(chalk.green(`      ✓ ${t.description}`) + chalk.gray(` (${duration}ms)`));
-        counts.passed += 1;
-      } catch (e) {
-        const duration = Date.now() - start;
-        console.log(chalk.red(`      ✗ ${t.description}`) + chalk.gray(` (${duration}ms)`));
-        console.log(chalk.red(`        ${(e && e.message) || String(e)}`));
-        counts.failed += 1;
-      } finally {
-        try { await page.close(); } catch (_) { /* ignore */ }
-      }
-    }
-
-    for (const { file, mod } of suites) {
-      const view = `views/${mod.view}/index.html`;
-      if (!fs.existsSync(path.join(consumerDist, view))) {
-        console.log(chalk.red(`    ✗ ${mod.description || path.basename(file)}: view "${mod.view}" is not built (no ${path.join(consumerDist, view)})`));
-        counts.failed += suiteTestCount(mod);
-        continue;
-      }
-      await runViewSuite({ browser, url: `chrome-extension://${extId}/${view}`, label: view, file, mod, filter: null, counts });
-    }
-  } finally {
-    try { await browser.close(); } catch (_) { /* ignore */ }
-  }
-
-  return counts;
+  return null;
 }
 
-module.exports = { runBootTests, resolveBootDir };
+/**
+ * The loaded extension, as every boot case sees it. Most MV3 extensions have a
+ * service worker; one without still shows a chrome-extension target.
+ * @param {object} browser - Puppeteer Browser.
+ * @param {string} manifestPath - The loaded manifest.json.
+ * @returns {Promise<{id: string, manifest: object, swTarget: object|null, popupUrl: string|null, optionsUrl: string|null}>}
+ */
+async function loadedExtension(browser, manifestPath) {
+  const swTarget = await waitForTarget(browser, (t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'), 5000);
+  const target = swTarget || browser.targets().find((t) => t.url().startsWith('chrome-extension://'));
+  if (!target) throw new Error(NOT_LOADED);
+
+  const id = target.url().split('/')[2];
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const popupRel = (manifest.action && manifest.action.default_popup) || null;
+  const optionsRel = (manifest.options_ui && manifest.options_ui.page) || manifest.options_page || null;
+  return {
+    id,
+    manifest,
+    swTarget,
+    popupUrl: popupRel ? `chrome-extension://${id}/${popupRel}` : null,
+    optionsUrl: optionsRel ? `chrome-extension://${id}/${optionsRel}` : null,
+  };
+}
+
+/**
+ * Run the boot suites on one loaded extension: the host set first, each case
+ * on its own page (closed once it reports), then each view suite in its built view.
+ * @param {{browser: object, dir: string, extension: object, suites: object[], report: Function, pages: {close: Function, open: Function}}} options
+ * @returns {Promise<void>}
+ */
+async function runBootSuites({ browser, dir, extension, suites, report, pages }) {
+  for (const suite of suites.filter((s) => typeof specKey(s, 'view') !== 'string')) {
+    await runSuite(suite, {
+      expect,
+      extras: async () => ({ extension, page: await pages.open() }),
+      report: async (event) => {
+        report(event);
+        await pages.close();
+      },
+    });
+  }
+
+  for (const suite of suites.filter((s) => typeof specKey(s, 'view') === 'string')) {
+    const name = specKey(suite, 'view');
+    const view = path.join(dir, 'views', name, 'index.html');
+    if (!fs.existsSync(view)) {
+      reportEvery(suite.cases, report, { status: 'fail', error: new Error(`${suite.file}: the view "${name}" is not built (no ${view})`) });
+      continue;
+    }
+    const url = `chrome-extension://${extension.id}/views/${name}/index.html`;
+    await runAppSuite(suite, { layer: 'boot', report, evaluate: inPage(browser, url) });
+  }
+}
+
+// One page at a time for the host cases: opening the next closes the last.
+function pageSlot(browser) {
+  let page = null;
+  const close = async () => {
+    const open = page;
+    page = null;
+    // A page the browser already lost has nothing left to close.
+    if (open) await open.close().catch(() => {});
+  };
+  return {
+    close,
+    async open() {
+      await close();
+      page = await browser.newPage();
+      return page;
+    },
+  };
+}
+
+const bootDriver = {
+  /**
+   * Load the project's built extension and run the boot row's suites on it.
+   * @param {{projectRoot: string, suites: object[], report: Function}} options - The runner's driver options.
+   * @returns {Promise<{finished: Promise<void>, stop: Function}>}
+   */
+  async start({ projectRoot, suites, report }) {
+    const cases = suites.flatMap((suite) => suite.cases);
+    const idle = { finished: Promise.resolve(), stop: async () => {} };
+
+    const discovery = resolveBootDir(projectRoot);
+    const blocker = bootBlocker(discovery);
+    if (blocker && blocker.error) reportEvery(cases, report, { status: 'fail', error: blocker.error });
+    if (blocker && blocker.skip) reportEvery(cases, report, { status: 'skip', reason: blocker.skip });
+    if (blocker) return idle;
+
+    const puppeteer = loadPuppeteer();
+    if (!puppeteer) {
+      reportEvery(cases, report, { status: 'skip', reason: 'puppeteer is not installed: the boot layer runs in Chrome' });
+      return idle;
+    }
+
+    const browser = await launchChrome(puppeteer, discovery.dir);
+    let extension;
+    try {
+      extension = await loadedExtension(browser, discovery.manifestPath);
+    } catch (e) {
+      await browser.close();
+      throw e;
+    }
+
+    const pages = pageSlot(browser);
+    const finished = runBootSuites({ browser, dir: discovery.dir, extension, suites, report, pages });
+    return {
+      finished,
+      async stop() {
+        await pages.close();
+        await browser.close();
+      },
+    };
+  },
+};
+
+module.exports = { bootDriver, resolveBootDir };
+

@@ -1751,7 +1751,7 @@ function ensureFreshLocalDist(options) {
       sleepSync(WATCH_POLL_MS);
       reason = staleness();
       if (!reason) {
-        console.log(`\x1b[2momega: local ${packageName} dist was stale — the monorepo watch rebuilt it\x1b[0m`);
+        console.error(`\x1b[2momega: local ${packageName} dist was stale — the monorepo watch rebuilt it\x1b[0m`);
         return { status: 'rebuilt', by: 'watch', packageName, dir: realDir };
       }
     }
@@ -1774,10 +1774,11 @@ function ensureFreshLocalDist(options) {
       return { status: 'rebuilt', by: 'peer', packageName, dir: realDir };
     }
 
-    console.log(`omega: local ${packageName} dist is stale (${reason}) — rebuilding…`);
+    console.error(`omega: local ${packageName} dist is stale (${reason}) — rebuilding…`);
+    // The rebuild's output goes to stderr, so a `--reporter=json` stdout stays one document.
     const result = spawnSync('npm', ['run', 'prepare'], {
       cwd: realDir,
-      stdio: 'inherit',
+      stdio: ['inherit', 2, 'inherit'],
       shell: process.platform === 'win32',
     });
 

@@ -20,11 +20,13 @@ function rebuildError(error) {
 
 /**
  * A session over a set of cases: `report(event)` settles one case by id, and
- * when `start(report)` settles, every case still unreported fails.
- * @param {{cases: Array<{id: string, name: string}>, start: Function, endedMessage: string}} options
+ * when `start(report)` settles, every case still unreported fails. A second
+ * report for a settled case is a driver bug: with `fail` given it lands as its
+ * own failing entry, so the run fails even when every case already passed.
+ * @param {{cases: Array<{id: string, name: string}>, start: Function, endedMessage: string, fail?: Function}} options
  * @returns {{wait: Function, report: Function}} `wait(id)` starts the session once and resolves to that case's event.
  */
-function createCaseSession({ cases, start, endedMessage }) {
+function createCaseSession({ cases, start, endedMessage, fail }) {
   const waiting = new Map();
   for (const caseDef of cases) {
     let resolve;
@@ -35,7 +37,12 @@ function createCaseSession({ cases, start, endedMessage }) {
   function report(event) {
     const entry = waiting.get(event.id);
     if (!entry) throw new Error(`A case event arrived for a case this run does not hold: ${event.id}`);
-    if (entry.settled) throw new Error(`Case ${event.id} reported twice`);
+    if (entry.settled) {
+      const error = new Error(`Case ${event.id} reported twice`);
+      if (!fail) throw error;
+      fail({ id: `${event.id}#twice`, name: entry.name, error });
+      return;
+    }
     entry.settled = true;
     entry.resolve(event);
   }
@@ -119,7 +126,7 @@ function createCallGate(cases) {
 function hostSession(suite, { expect, defaultTimeout, extrasFrom }) {
   const gate = createCallGate(suite.cases);
   // A case node:test filtered out reports a skip nobody waits on, and its body never runs.
-  const cases = suite.cases.map((caseDef) => (typeof caseDef.run !== 'function' ? caseDef : {
+  const cases = suite.cases.map((caseDef) => ({
     ...caseDef,
     run: async (ctx) => {
       if (!(await gate.wanted(caseDef.id))) throw new SkipError('filtered out by name');

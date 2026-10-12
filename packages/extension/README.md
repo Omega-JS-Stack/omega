@@ -56,8 +56,8 @@ Every verb (`npm start`, `npx omega build`, `npx omega test`, `npx omega deploy`
 npx omega test                   # YOUR project's tests only (C5 scoping — docs/shared/testing.md)
 npx omega test framework:        # the framework's own suite (aliases: omega:, mgr:, extension:)
 npx omega test full:             # both sources
-npx omega test --layer build     # build layer only (plain Node, fast; orthogonal to scoping)
-npx omega test --layer boot      # real-Chromium end-to-end test
+npx omega test --layer=build    # build layer only (plain Node, fast; orthogonal to scoping)
+npx omega test --layer=boot     # real-Chromium end-to-end test
 npx omega test --extended        # also run extended suites against REAL external services (Firebase, etc.)
 ```
 

@@ -37,6 +37,7 @@ const BRAND_ID = 'desktop-auth-e2e';
 const { readPortsFile } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
 const { mintPersonaToken } = require('./roster-persona');
+const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
 
 // This lane's own seeded persona, never shared with another suite
 const PERSONA_LOCALPART = '_test.desktop-auth-e2e';
@@ -209,148 +210,157 @@ function stageApp({ projectId, apiKey, ports }) {
 
 // -- The boot-layer tests (run INSIDE the spawned Electron app) --------------
 //
-// inspect bodies are serialized to the child — no closures over this file.
-// `require`, `process`, and `Buffer` are injected; everything else arrives on
-// process.env (set below, inherited by the spawn).
+// run bodies are serialized to the child: no closures over this file, and the one
+// parameter is `ctx`. `require`, `process`, and `Buffer` are injected; everything
+// else arrives on process.env (set below, inherited by the spawn).
 
-const bootTests = [
-  {
-    description: 'main-process auth is live on the emulator, not yet the persona',
-    timeout: 30000,
-    inspect: async ({ omega, expect }) => {
-      expect(omega._initialized).toBe(true);
-      // Firebase actually loaded (an empty cloud.config leaves auth in no-op
-      // mode, which would make every assertion below vacuous).
-      expect(Boolean(omega.auth._firebaseAuth)).toBe(true);
-      expect(omega.isTesting()).toBe(true);
-      const current = omega.auth._firebaseAuth.currentUser;
-      expect(current?.uid === process.env.OMEGA_E2E_UID).toBe(false);
+const bootSpec = {
+  type: 'group',
+  layer: 'boot',
+  description: 'desktop auth e2e',
+  tests: [
+    {
+      name: 'main-process auth is live on the emulator, not yet the persona',
+      timeout: 30000,
+      run: async (ctx) => {
+        const { omega, expect } = ctx;
+        expect(omega._initialized).toBe(true);
+        // Firebase actually loaded (an empty cloud.config leaves auth in no-op
+        // mode, which would make every assertion below vacuous).
+        expect(Boolean(omega.auth._firebaseAuth)).toBe(true);
+        expect(omega.isTesting()).toBe(true);
+        const current = omega.auth._firebaseAuth.currentUser;
+        expect(current?.uid === process.env.OMEGA_E2E_UID).toBe(false);
+      },
     },
-  },
 
-  {
-    description: 'a REAL second instance delivers the deep link; main signs in as the persona',
-    timeout: 150000,
-    inspect: async ({ omega, expect, appRoot }) => {
-      const { spawn } = require('child_process');
+    {
+      name: 'a REAL second instance delivers the deep link; main signs in as the persona',
+      timeout: 150000,
+      run: async (ctx) => {
+        const { omega, expect, appRoot } = ctx;
+        const { spawn } = require('child_process');
 
-      const url = `${process.env.OMEGA_E2E_SCHEME}://auth/token?authToken=${process.env.OMEGA_E2E_TOKEN}`;
+        const url = `${process.env.OMEGA_E2E_SCHEME}://auth/token?authToken=${process.env.OMEGA_E2E_TOKEN}`;
 
-      // Observe the dispatch without claiming it: a consumer handler runs BEFORE
-      // the built-in and, leaving ctx.handled false, lets the built-in do the
-      // real work. This is how we know the token arrived through the pipeline.
-      global.__omega_e2e_dispatch = null;
-      omega.deepLink.on('auth/token', (ctx) => {
-        global.__omega_e2e_dispatch = { source: ctx.source, url: ctx.url, hasToken: Boolean(ctx.query?.authToken) };
-      });
+        // Observe the dispatch without claiming it: a consumer handler runs BEFORE
+        // the built-in and, leaving ctx.handled false, lets the built-in do the
+        // real work. This is how we know the token arrived through the pipeline.
+        global.__omega_e2e_dispatch = null;
+        omega.deepLink.on('auth/token', (ctx) => {
+          global.__omega_e2e_dispatch = { source: ctx.source, url: ctx.url, hasToken: Boolean(ctx.query?.authToken) };
+        });
 
-      // The OS single-instance lock forwards this argv to US (second-instance).
-      // The duplicate quits itself the moment it loses the lock.
-      const env = Object.assign({}, process.env);
-      delete env.OMEGA_TEST_BOOT;
-      delete env.OMEGA_TEST_BOOT_HARNESS;
-      delete env.OMEGA_TEST_BOOT_SPEC;
-      // Same scrub runners/boot.js does at its own spawn — with this set, the
-      // duplicate boots as plain node, `electron.app` is undefined, and it dies
-      // before it can hand us its argv.
-      delete env.ELECTRON_RUN_AS_NODE;
-      // A testing run wipes its userData at boot — and Electron's
-      // single-instance lock LIVES there. Without this the duplicate deletes our
-      // lock, wins one of its own, and no argv is ever forwarded.
-      env.OMEGA_TEST_KEEP_USERDATA = '1';
-      const log = require('fs').openSync(process.env.OMEGA_E2E_SECOND_INSTANCE_LOG, 'w');
-      // The duplicate must boot the SAME app the primary booted: the staged
-      // test root (#110), not the project root — whose dist/ no longer exists.
-      const child = spawn(process.env.OMEGA_E2E_ELECTRON_BIN, [appRoot, url], {
-        cwd: appRoot,
-        env,
-        stdio: ['ignore', log, log],
-      });
-      const exited = new Promise((resolve) => child.on('exit', resolve));
+        // The OS single-instance lock forwards this argv to US (second-instance).
+        // The duplicate quits itself the moment it loses the lock.
+        const env = Object.assign({}, process.env);
+        delete env.OMEGA_TEST_BOOT;
+        delete env.OMEGA_TEST_BOOT_HARNESS;
+        delete env.OMEGA_TEST_BOOT_SPEC;
+        // Same scrub runners/boot.js does at its own spawn: with this set, the
+        // duplicate boots as plain node, `electron.app` is undefined, and it dies
+        // before it can hand us its argv.
+        delete env.ELECTRON_RUN_AS_NODE;
+        // A testing run wipes its userData at boot, and Electron's
+        // single-instance lock LIVES there. Without this the duplicate deletes our
+        // lock, wins one of its own, and no argv is ever forwarded.
+        env.OMEGA_TEST_KEEP_USERDATA = '1';
+        const log = require('fs').openSync(process.env.OMEGA_E2E_SECOND_INSTANCE_LOG, 'w');
+        // The duplicate must boot the SAME app the primary booted: the staged
+        // test root (#110), not the project root, whose dist/ no longer exists.
+        const child = spawn(process.env.OMEGA_E2E_ELECTRON_BIN, [appRoot, url], {
+          cwd: appRoot,
+          env,
+          stdio: ['ignore', log, log],
+        });
+        const exited = new Promise((resolve) => child.on('exit', resolve));
 
-      let user = null;
-      for (let i = 0; i < 120; i++) {
-        // Main's own Firebase session: `omega.auth.user` builds from the account a
-        // renderer pushes, which needs the Firestore read this lane does not stage
-        user = omega.auth._firebaseAuth.currentUser;
-        if (user?.uid === process.env.OMEGA_E2E_UID) break;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+        let user = null;
+        for (let i = 0; i < 120; i++) {
+          // Main's own Firebase session: `omega.auth.user` builds from the account a
+          // renderer pushes, which needs the Firestore read this lane does not stage
+          user = omega.auth._firebaseAuth.currentUser;
+          if (user?.uid === process.env.OMEGA_E2E_UID) break;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
 
-      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 15000))]);
-      // If forwarding is broken the duplicate never loses the lock and never
-      // quits on its own — reap it so a failing run leaves no orphan Electron.
-      if (child.exitCode === null) child.kill('SIGKILL');
+        await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 15000))]);
+        // If forwarding is broken the duplicate never loses the lock and never
+        // quits on its own: reap it so a failing run leaves no orphan Electron.
+        if (child.exitCode === null) child.kill('SIGKILL');
 
-      const dispatch = global.__omega_e2e_dispatch;
-      expect(Boolean(dispatch)).toBe(true);
-      expect(dispatch.source).toBe('warm-start');
-      expect(dispatch.hasToken).toBe(true);
-      expect(user?.uid).toBe(process.env.OMEGA_E2E_UID);
-      expect(user?.email).toBe(process.env.OMEGA_E2E_EMAIL);
+        const dispatch = global.__omega_e2e_dispatch;
+        expect(Boolean(dispatch)).toBe(true);
+        expect(dispatch.source).toBe('warm-start');
+        expect(dispatch.hasToken).toBe(true);
+        expect(user?.uid).toBe(process.env.OMEGA_E2E_UID);
+        expect(user?.email).toBe(process.env.OMEGA_E2E_EMAIL);
+      },
     },
-  },
 
-  {
-    description: 'the renderer reflects the same persona (own Firebase + main over IPC)',
-    timeout: 90000,
-    inspect: async ({ omega, expect }) => {
-      const { BrowserWindow } = require('electron');
+    {
+      name: 'the renderer reflects the same persona (own Firebase + main over IPC)',
+      timeout: 90000,
+      run: async (ctx) => {
+        const { omega, expect } = ctx;
+        const { BrowserWindow } = require('electron');
 
-      const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
-      expect(Boolean(win && !win.isDestroyed())).toBe(true);
+        const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
+        expect(Boolean(win && !win.isDestroyed())).toBe(true);
 
-      // The renderer learned about the sign-in ONLY through the real
-      // desktop:auth:sign-in-with-token broadcast — nothing pushes it here.
-      const read = () => win.webContents.executeJavaScript(`(async () => {
-        const instance = window.__omegaAuthE2E;
-        const rendererUid = instance?.firebaseAuth?.currentUser?.uid || null;
-        const mainUser = await window.desktop.ipc.invoke('desktop:auth:get-user').catch(() => null);
-        return { rendererUid, mainUid: mainUser?.uid || null };
-      })()`).catch(() => null);
+        // The renderer learned about the sign-in ONLY through the real
+        // desktop:auth:sign-in-with-token broadcast; nothing pushes it here.
+        const read = () => win.webContents.executeJavaScript(`(async () => {
+          const instance = window.__omegaAuthE2E;
+          const rendererUid = instance?.firebaseAuth?.currentUser?.uid || null;
+          const mainUser = await window.desktop.ipc.invoke('desktop:auth:get-user').catch(() => null);
+          return { rendererUid, mainUid: mainUser?.uid || null };
+        })()`).catch(() => null);
 
-      let state = null;
-      for (let i = 0; i < 120; i++) {
-        state = await read();
-        if (state?.rendererUid === process.env.OMEGA_E2E_UID) break;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+        let state = null;
+        for (let i = 0; i < 120; i++) {
+          state = await read();
+          if (state?.rendererUid === process.env.OMEGA_E2E_UID) break;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
 
-      expect(state?.rendererUid).toBe(process.env.OMEGA_E2E_UID);
-      expect(state?.mainUid).toBe(process.env.OMEGA_E2E_UID);
+        expect(state?.rendererUid).toBe(process.env.OMEGA_E2E_UID);
+        expect(state?.mainUid).toBe(process.env.OMEGA_E2E_UID);
+      },
     },
-  },
 
-  {
-    description: 'a sign-out ends main\'s session and the renderer follows the broadcast',
-    timeout: 60000,
-    inspect: async ({ omega, expect }) => {
-      const { BrowserWindow } = require('electron');
+    {
+      name: 'a sign-out ends main\'s session and the renderer follows the broadcast',
+      timeout: 60000,
+      run: async (ctx) => {
+        const { omega, expect } = ctx;
+        const { BrowserWindow } = require('electron');
 
-      const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
-      const readRendererUid = () => win.webContents.executeJavaScript(
-        '(window.__omegaAuthE2E?.firebaseAuth?.currentUser?.uid || null)',
-      ).catch(() => 'unreadable');
+        const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
+        const readRendererUid = () => win.webContents.executeJavaScript(
+          '(window.__omegaAuthE2E?.firebaseAuth?.currentUser?.uid || null)',
+        ).catch(() => 'unreadable');
 
-      // Both sides start on the persona, so the sign-out below cannot pass vacuously
-      expect(omega.auth._firebaseAuth.currentUser?.uid).toBe(process.env.OMEGA_E2E_UID);
-      expect(await readRendererUid()).toBe(process.env.OMEGA_E2E_UID);
+        // Both sides start on the persona, so the sign-out below cannot pass vacuously
+        expect(omega.auth._firebaseAuth.currentUser?.uid).toBe(process.env.OMEGA_E2E_UID);
+        expect(await readRendererUid()).toBe(process.env.OMEGA_E2E_UID);
 
-      const result = await omega.auth.signOut();
-      expect(result.success).toBe(true);
-      expect(omega.auth._firebaseAuth.currentUser).toBeNull();
-      expect(omega.auth.user.authenticated).toBe(false);
+        const result = await omega.auth.signOut();
+        expect(result.success).toBe(true);
+        expect(omega.auth._firebaseAuth.currentUser).toBeNull();
+        expect(omega.auth.user.authenticated).toBe(false);
 
-      // The renderer signs out ONLY on the desktop:auth:sign-out broadcast
-      let rendererUid = await readRendererUid();
-      for (let i = 0; i < 60 && rendererUid !== null; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        rendererUid = await readRendererUid();
-      }
-      expect(rendererUid).toBeNull();
+        // The renderer signs out ONLY on the desktop:auth:sign-out broadcast
+        let rendererUid = await readRendererUid();
+        for (let i = 0; i < 60 && rendererUid !== null; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          rendererUid = await readRendererUid();
+        }
+        expect(rendererUid).toBeNull();
+      },
     },
-  },
-];
+  ],
+};
 
 // ---------------------------------------------------------------------------
 
@@ -375,7 +385,8 @@ async function main() {
     console.log('   build it with `npm run prepare -w @omega.js/desktop`\n');
     process.exit(0);
   }
-  const { runBootTests } = require(bootRunnerPath);
+  const { bootDriver } = require(bootRunnerPath);
+  const suite = normalizeSpec(bootSpec, { file: __filename });
 
   let emulator = null;
   let ports = null;
@@ -431,15 +442,21 @@ async function main() {
     delete process.env.OMEGA_HTTPS_PORT;
 
     await step('the app builds + boots in a REAL Electron process, the deep link signs it in, and a sign-out reaches the renderer', async () => {
-      const counts = await runBootTests({
-        tests: bootTests,
-        projectRoot: APP_DIR,
-        frameworkDistRoot: DESKTOP_DIST,
-      });
-      if (counts.failed > 0 || counts.passed !== bootTests.length) {
-        throw new Error(`boot layer: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`);
+      const events = [];
+      const handle = await bootDriver.start({ projectRoot: APP_DIR, suites: [suite], report: (event) => events.push(event) });
+      try {
+        await handle.finished;
+      } finally {
+        await handle.stop();
       }
-      return `${counts.passed} boot assertions`;
+      const failed = suite.cases
+        .map((caseDef) => ({ caseDef, event: events.find((event) => event.id === caseDef.id) }))
+        .filter(({ event }) => !event || event.status !== 'pass')
+        .map(({ caseDef, event }) => `"${caseDef.name}": ${!event ? 'never reported' : (event.error?.message || event.reason || event.status)}`);
+      if (failed.length > 0) {
+        throw new Error(`boot layer: ${failed.length} of ${suite.cases.length} failed: ${failed.join('; ')}`);
+      }
+      return `${suite.cases.length} boot assertions`;
     });
   } finally {
     if (emulator) {

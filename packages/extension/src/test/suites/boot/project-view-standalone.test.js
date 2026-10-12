@@ -5,9 +5,10 @@
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 module.exports = defineCases({
-  layer: 'view',
+  layer: 'boot',
   view: 'popup',
-  description: 'view/project-view-standalone: a standalone suite naming a view opens the project\'s built page',
+  timeout: 45000,
+  description: 'boot/project-view-standalone: a standalone suite naming a view opens the project\'s built page',
   run: async (ctx) => {
     ctx.expect(location.pathname).toBe('/views/popup/index.html');
   },

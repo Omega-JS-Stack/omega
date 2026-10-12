@@ -49,6 +49,8 @@ async function runTestVerbUnderOuterTee({ commands, prefix, positionals }) {
     process.env.CI = 'true';
     await require(verbPath)({ _: ['test', ...positionals] });
     process.stdout.write('after the verb\n');
+    // The verb exits once both streams flush; that exit must land on the stub.
+    await new Promise((resolve) => process.stdout.write('', () => process.stderr.write('', resolve)));
   } finally {
     if (prior.CI === undefined) delete process.env.CI;
     else process.env.CI = prior.CI;

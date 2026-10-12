@@ -3,15 +3,12 @@
  * discovers them under its roots, runs the `_init.js` hooks once, then runs
  * every case on node:test in THIS process (`run()` with `isolation: 'none'`),
  * layer row by layer row (src/test/layers.js). A `host` row runs its suites
- * here through run-case.js; an `app` row's driver runs them inside the app and
- * reports each case back by id.
- *
+ * here through run-case.js; an `app` row's driver runs them itself, wherever
+ * the bodies execute, and reports each case back by id.
  * `config.isolation: 'process'` runs each file instead as the main module of
  * its own node:test child, where `defineCases` registers its cases; node's
- * events map back to the same results and the same reporters.
- *
- *   createRunner(config).run({ targets, filter, layer, lane, extended, reporter })
- *     → { passed, failed, skipped, noMatch, durationMs, tests }
+ * events map back to the same results. `createRunner(config).run(options)`
+ * resolves `{ passed, failed, skipped, noMatch, durationMs, tests }`.
  */
 
 const fs = require('fs');
@@ -96,7 +93,7 @@ function watchStrayErrors() {
 
   // The case's own settle waits one turn of the event loop, so a rejection it
   // raised in its last tick surfaces while it still counts as running.
-  const watch = (caseDef) => (typeof caseDef.run !== 'function' ? caseDef : {
+  const watch = (caseDef) => ({
     ...caseDef,
     run: (ctx) => new Promise((resolve, reject) => {
       running.set(caseDef.id, reject);
@@ -248,6 +245,7 @@ function createRunner(config) {
       const session = createCaseSession({
         cases: entries.flatMap((entry) => entry.suite.cases),
         endedMessage,
+        fail: (fields) => context.recordFailure({ ...fields, layer: row.name }),
         start: async (report) => {
           const handle = await control.start(report);
           await handle.finished;
@@ -261,8 +259,8 @@ function createRunner(config) {
     return { row, entries, stop: rowStop(row, control, context) };
   }
 
-  // A one-row framework's only row, a host row: each file loads when the run
-  // reaches it, after the previous file's cleanup.
+  // A host row: each file loads when the run reaches it, after the previous
+  // file's cleanup.
   function lazyLayerPlan(row, driver, files, context) {
     const control = driver ? rowDriver(row, driver, context) : null;
     const load = (file) => {
@@ -460,6 +458,10 @@ function createRunner(config) {
     return true;
   }
 
+  // Every file loads once up front, since only its spec names its row. An app
+  // row keeps those suites (its driver needs them all to start); a host row
+  // loads each file again when the run reaches it, so what a file saves at load
+  // time is what an earlier suite's cleanup left behind.
   function upFrontLayers(wanted, files, context) {
     const byLayer = new Map(rows.map((row) => [row.name, []]));
     for (const entry of files) {
@@ -468,7 +470,9 @@ function createRunner(config) {
     }
     return wanted
       .filter((row) => byLayer.get(row.name).length > 0 && !lacksDriver(row, context))
-      .map((row) => layerPlan(row, driverFor(row), byLayer.get(row.name), context));
+      .map((row) => (row.kind === 'app'
+        ? layerPlan(row, driverFor(row), byLayer.get(row.name), context)
+        : lazyLayerPlan(row, driverFor(row), byLayer.get(row.name).map(({ suite, label, ...file }) => file), context)));
   }
 
   function lazyLayers(wanted, files, context) {
@@ -534,7 +538,7 @@ function createRunner(config) {
     }
 
     const context = { options, hooks, stray, recordFailure: fail, load: (entry) => loadSuite(entry, results, reporter, options.filter) };
-    // An app row's driver needs every suite to start, so only a one-row framework loads lazily.
+    // A one-row framework needs no up-front load: its only row is a host row.
     const layers = rows.length === 1 ? lazyLayers(wanted, files, context) : upFrontLayers(wanted, files, context);
     if (layers.length === 0) return;
 

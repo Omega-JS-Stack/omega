@@ -1,5 +1,5 @@
 /**
- * View-layer UI test: this project's side panel, on the real DOM.
+ * Built-view UI test: this project's side panel, on the real DOM.
  *
  * The create form is wired end to end: a real submit goes through FormManager,
  * over the messenger to the real background, and background's answer lands on
@@ -11,7 +11,8 @@
 const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
-  layer: 'view',
+  layer: 'boot',
+  timeout: 45000,
   view: 'sidepanel',
   description: 'the side panel: a signed-out submit shows background\'s refusal',
   run: async (ctx) => {

@@ -42,11 +42,16 @@ Yargs parses `--foo bar` and `--foo=bar` into `options.foo`. Positional args go 
 ```js
 // src/commands/test.js
 module.exports = async function (options) {
-  const layer    = options.layer    || 'all';
-  const target   = (options._ && options._[1]) || null; // positional: `npx omega test <target>`
-  const filter   = options.filter   || null;
-  const reporter = options.reporter || 'pretty';
+  const runOptions = {
+    targets: (options._ || []).slice(1), // positional: `npx omega test <target>...`
+    filter: options.filter,
+    layer: options.layer,                 // undefined runs every row
+    lane: options.lane,
+    extended: options.extended,
+    reporter: options.reporter,
+  };
   // ...
+  const results = await createRunner(runnerConfig({ projectRoot, selfTest })).run(runOptions);
 };
 ```
 
@@ -59,11 +64,9 @@ Commands read `OMEGA_`-prefixed env vars for behavior switches (one exception: `
 | `OMEGA_BUILD_MODE=true` | gulp tasks | Production build mode |
 | `OMEGA_IS_PUBLISH=true` | gulp/package | Also publish to extension stores after packaging |
 | `OMEGA_LOG_FILE` | gulp + test runners | Override the stdout/stderr tee path, or `false` to disable (see [logging.md](logging.md)) |
-| `OMEGA_TEST_MODE=true` | test runners | Powers `omega.isTesting()` in the test harness (auto-set by `npx omega test`) |
 | `TEST_EXTENDED_MODE=true` | test runners | Run tests that hit REAL external services (`--extended` is the CLI shorthand; see [test-framework.md](test-framework.md)) |
 | `OMEGA_TEST_BOOT_PROJECT` | test/boot | Override project root for boot tests |
 | `OMEGA_TEST_BOOT_DIR` | test/boot | Override extension dir directly |
-| `OMEGA_TEST_DEBUG=1` | test runners | Pipe Chromium stderr to console |
 | `OMEGA_LIVERELOAD_PORT` | gulp/serve | WebSocket port (default 35729) |
 
 ## See also

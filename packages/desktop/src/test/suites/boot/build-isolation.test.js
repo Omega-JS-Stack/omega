@@ -19,13 +19,13 @@ module.exports = defineCases({
   timeout: 15000,
   tests: [
     {
-      description: 'the boot build left the project\'s real dist/ byte-for-byte unchanged',
-      inspect: async ({ expect, projectRoot, frameworkDistRoot, distSnapshotBefore }) => {
+      name: 'the boot build left the project\'s real dist/ byte-for-byte unchanged',
+      run: async (ctx) => {
         const path = require('path');
-        const distSnapshot = require(path.join(frameworkDistRoot, 'test', 'utils', 'dist-snapshot.js'));
+        const distSnapshot = require(path.join(ctx.frameworkDistRoot, 'test', 'utils', 'dist-snapshot.js'));
 
-        const before = distSnapshotBefore.split('\n').filter(Boolean);
-        const after  = distSnapshot(path.join(projectRoot, 'dist')).split('\n').filter(Boolean);
+        const before = ctx.distSnapshotBefore.split('\n').filter(Boolean);
+        const after  = distSnapshot(path.join(ctx.projectRoot, 'dist')).split('\n').filter(Boolean);
 
         // Compare both directions so a deletion counts as a touch too, and report the
         // file names rather than two multi-megabyte fingerprints.
@@ -34,20 +34,20 @@ module.exports = defineCases({
         const touched   = [...after.filter((line) => !beforeSet.has(line)), ...before.filter((line) => !afterSet.has(line))]
           .map((line) => line.split('\t')[0]);
 
-        expect([...new Set(touched)].sort().join(', ')).toBe('');
+        ctx.expect([...new Set(touched)].sort().join(', ')).toBe('');
       },
     },
 
     {
-      description: 'the app booted from the staged test root, whose dist/ holds the build',
-      inspect: async ({ expect, projectRoot, appRoot }) => {
+      name: 'the app booted from the staged test root, whose dist/ holds the build',
+      run: async (ctx) => {
         const fs = require('fs');
         const path = require('path');
         const { app } = require('electron');
 
-        expect(appRoot).toBe(path.join(projectRoot, '.omega', 'test-app'));
-        expect(app.getAppPath()).toBe(appRoot);
-        expect(fs.existsSync(path.join(appRoot, 'dist', 'main.bundle.js'))).toBe(true);
+        ctx.expect(ctx.appRoot).toBe(path.join(ctx.projectRoot, '.omega', 'test-app'));
+        ctx.expect(app.getAppPath()).toBe(ctx.appRoot);
+        ctx.expect(fs.existsSync(path.join(ctx.appRoot, 'dist', 'main.bundle.js'))).toBe(true);
       },
     },
   ],

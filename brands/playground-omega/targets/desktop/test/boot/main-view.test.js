@@ -1,26 +1,21 @@
 /**
- * Renderer-layer test: this project's OWN main view, in a real window.
+ * This project's OWN main view, in a real window of the booted app.
  *
- * `view: 'main'` loads `src/views/main/index.html` (built) instead of the
- * framework's harness page, so the assertions below are about what THIS brand
- * puts on screen: the heading esbuild templated from `app.productName`, the two
- * buttons `src/assets/js/components/main/index.js` wires, and the fact that this
- * project's real preload reached the page.
- *
- * A `view:` suite rides the boot lane, so the framework stages and builds the
- * app first and the page carries the project's real preload, IPC handlers and
- * config.
+ * `layer: 'boot'` with `view: 'main'` opens `src/views/main/index.html` (built)
+ * in the staged app, so the page carries this project's real preload, IPC
+ * handlers and config: the heading esbuild templated from `app.productName`,
+ * the two buttons `src/assets/js/components/main/index.js` wires, and the
+ * preload's `window.desktop`.
  *
  * NOTE: `run` bodies are serialized into the page, so they close over nothing
- * from this module. `ctx` plus the page globals (`window`, `document`) is all
- * they get.
+ * from this module: `ctx` (its `page` is the window) and the page globals.
  */
 
 const { defineCases } = require('@omega.js/desktop/test');
 
 module.exports = defineCases({
   type: 'group',
-  layer: 'renderer',
+  layer: 'boot',
   view: 'main',
   description: 'the main view (real page, real preload)',
   tests: [

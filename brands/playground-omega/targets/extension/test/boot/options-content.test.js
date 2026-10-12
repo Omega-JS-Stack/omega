@@ -16,32 +16,33 @@ const SETTLE = { timeout: 30000 };
 module.exports = defineCases({
   type: 'suite',
   layer: 'boot',
+  timeout: 45000,
   description: 'options + content: "save selection as note" (packaged)',
   tests: [
     {
-      description: 'the options switch saves notes.autoSaveSelection to the extension store',
-      inspect: async ({ extension, page, expect }) => {
-        await page.goto(extension.optionsUrl, { waitUntil: 'domcontentloaded' });
+      name: 'the options switch saves notes.autoSaveSelection to the extension store',
+      run: async (ctx) => {
+        await ctx.page.goto(ctx.extension.optionsUrl, { waitUntil: 'domcontentloaded' });
 
         // Enabled once it shows the stored value and its listener is attached
-        await page.waitForSelector('#auto-save-selection:not([disabled])', SETTLE);
-        expect(await page.$eval('#auto-save-selection', ($toggle) => $toggle.checked)).toBe(false);
+        await ctx.page.waitForSelector('#auto-save-selection:not([disabled])', SETTLE);
+        ctx.expect(await ctx.page.$eval('#auto-save-selection', ($toggle) => $toggle.checked)).toBe(false);
 
-        await page.click('#auto-save-selection');
-        await page.waitForFunction(() => document.getElementById('auto-save-status').textContent.startsWith('Saved.'), SETTLE);
+        await ctx.page.click('#auto-save-selection');
+        await ctx.page.waitForFunction(() => document.getElementById('auto-save-status').textContent.startsWith('Saved.'), SETTLE);
 
-        const stored = await page.evaluate(() => chrome.storage.sync.get('notes.autoSaveSelection'));
-        expect(stored['notes.autoSaveSelection']).toBe(true);
+        const stored = await ctx.page.evaluate(() => chrome.storage.sync.get('notes.autoSaveSelection'));
+        ctx.expect(stored['notes.autoSaveSelection']).toBe(true);
       },
     },
     {
-      description: 'on the brand site, a selection shows the button and its save reaches background',
-      inspect: async ({ page, expect }) => {
+      name: 'on the brand site, a selection shows the button and its save reaches background',
+      run: async (ctx) => {
         const build = require('@omega.js/extension/build');
         const brandUrl = `${new URL(build.getConfig().brand.url).origin}/`;
 
-        await page.setRequestInterception(true);
-        page.on('request', (request) => {
+        await ctx.page.setRequestInterception(true);
+        ctx.page.on('request', (request) => {
           if (request.url() === brandUrl) {
             request.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><p id="text">a sentence worth keeping</p>' });
           } else {
@@ -49,24 +50,24 @@ module.exports = defineCases({
           }
         });
 
-        await page.goto(brandUrl, { waitUntil: 'domcontentloaded' });
+        await ctx.page.goto(brandUrl, { waitUntil: 'domcontentloaded' });
 
         // The content script reads the setting the previous test saved, then adds its button
-        await page.waitForSelector('.notes-save-selection', SETTLE);
+        await ctx.page.waitForSelector('.notes-save-selection', SETTLE);
 
-        await page.evaluate(() => {
+        await ctx.page.evaluate(() => {
           const range = document.createRange();
           range.selectNodeContents(document.getElementById('text'));
           window.getSelection().removeAllRanges();
           window.getSelection().addRange(range);
         });
-        await page.waitForSelector('.notes-save-selection:not([hidden])', SETTLE);
+        await ctx.page.waitForSelector('.notes-save-selection:not([hidden])', SETTLE);
 
-        await page.evaluate(() => document.querySelector('.notes-save-selection')
+        await ctx.page.evaluate(() => document.querySelector('.notes-save-selection')
           .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })));
 
-        await page.waitForFunction(() => document.querySelector('.notes-save-selection').textContent === 'Sign in to use notes.', SETTLE);
-        expect(await page.$eval('.notes-save-selection', ($button) => $button.textContent)).toBe('Sign in to use notes.');
+        await ctx.page.waitForFunction(() => document.querySelector('.notes-save-selection').textContent === 'Sign in to use notes.', SETTLE);
+        ctx.expect(await ctx.page.$eval('.notes-save-selection', ($button) => $button.textContent)).toBe('Sign in to use notes.');
       },
     },
   ],

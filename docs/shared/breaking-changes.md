@@ -30,6 +30,15 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-11: desktop and extension boot suites take `run(ctx)` ([#984](https://github.com/Omega-JS-Stack/omega/issues/984))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A boot case (desktop and extension `layer: 'boot'`) | `{ description, inspect: async ({ omega, expect, projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore }) => { ... } }` on desktop, `inspect: async ({ extension, page, expect, projectRoot }) => { ... }` on extension, a standalone spec's `inspect` included | `{ name, run: async (ctx) => { ... } }`, the case every other layer takes: the old arguments are `ctx` keys (`ctx.omega`, `ctx.appRoot`, ... on desktop; `ctx.extension`, `ctx.page` on extension) beside `ctx.expect`, `ctx.waitFor`, `ctx.state` and `ctx.skip`. A standalone spec with no `run` fails its file by name, and a case with none fails ([desktop/test-boot-layer.md](../desktop/test-boot-layer.md#test-shape)) | Rename each case's `description` to `name` and its `inspect` to `run`; make the body read `ctx.<key>` for each destructured argument and `ctx.expect` for `expect` (or destructure inside: `const { omega, expect } = ctx;`). A body that runs inside the app is rebuilt from its text, so its parameter list is `(ctx)` or `()`: a destructured `({ omega })` fails that case naming the file. An extension boot suite that needs longer than the 30s default declares `timeout: 45000` at suite level |
+| A suite that runs in one of the project's own built views | `layer: 'renderer'` (desktop) or `layer: 'view'` (extension), plus `view: '<name>'`, quietly moved to the boot lane | `layer: 'boot'` plus `view: '<name>'`. `layer: 'renderer'` and `layer: 'view'` always mean the framework's harness page; a `view` left on either fails the file at load, naming it | Change the suite's `layer` to `'boot'` and keep its `view` |
+| A page body's view of the page | The page globals only (`window`, `document`); desktop's harness page ran a smaller `expect` of its own | `ctx.page` is the page's `window`, and `ctx.expect` is devkit's one `expect` in every page, every matcher, `.not` and `.rejects` included | None: `window` and `document` still work; `ctx.page` is the portable spelling |
+| `npx omega test` output and flags on desktop and extension | `--layer=all` named every layer; `--reporter=json` printed the pretty run plus a `{"event":"summary",...}` line | No `--layer` runs every row (`all` is gone); `--reporter=json` prints one JSON document on stdout, the run's result, and every other line goes to stderr. One Results block for the run | A script that passed `--layer=all` drops the flag; one that parsed the `summary` line reads the document's `passed`, `failed` and `skipped` |
+
 ## 2026-10-05: web suites are `defineCases` files ([#984](https://github.com/Omega-JS-Stack/omega/issues/984))
 
 | Contract | Old form | New form | Manual migration step |

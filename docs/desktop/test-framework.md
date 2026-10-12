@@ -7,7 +7,7 @@ Built-in test framework for both @omega.js/desktop itself and consumer projects.
 **Do NOT hand-roll fake/stub/mock objects**: no mock `omega`, fake `ipc`/`storage`/`window`/`tray`, stubbed `app`/`BrowserWindow`, or fake IPC channels. Every test gets the **real** framework context:
 
 - `build` runs real @omega.js/desktop helper code in plain Node.
-- `main` / `renderer` / `boot` run inside a **real spawned Electron process**, where `ctx.omega` (and boot's `inspect({ omega })`) is the **real booted main-process instance**: real `omega.storage`, `omega.ipc`, `omega.tray`, `omega.windows`, etc. Use them; exercise the code the way production does.
+- `main` / `renderer` / `boot` run inside a **real spawned Electron process**, where `ctx.omega` is the **real booted main-process instance**: real `omega.storage`, `omega.ipc`, `omega.tray`, `omega.windows`, etc. Use them; exercise the code the way production does.
 
 **Pure functions are the ONLY exception.** A function with zero I/O (config-defaults merge, icon-path resolver, schema validator, CLI alias resolver, a string/number transform) can be `require()`d and called directly with plain inputs — that's not mocking, there's nothing to mock. The moment a function touches `app.*` / `BrowserWindow` / `ipcMain` / `Tray` / the real bundle / an external service, it MUST run against the real harness in the appropriate layer (`main` / `renderer` / `boot`), not a stub.
 
@@ -32,7 +32,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 |---|---|---|
 | **Logic** | `build` / `main` | The feature's functions do the right thing when called directly (the real booted `omega`, real storage, real IPC) |
 | **UI** | `renderer` | The feature's interface is WIRED — a real event on the real DOM triggers the behavior and the visible result appears |
-| **End-to-end** | `boot` | The feature survives in the consumer's actual built bundle (extend the boot suite's `inspect` assertions) |
+| **End-to-end** | `boot` | The feature survives in the consumer's actual built bundle (extend the boot suite's `run(ctx)` cases) |
 
 **Skipping a layer is the exception, not the default.** A layer may be skipped ONLY when the feature genuinely has no surface there — a pure build-time utility has no UI; a CSS-only tweak has no logic to call. Convenience is never a reason: "the logic test already covers it" does NOT excuse the UI test — logic tests prove the logic, UI tests prove the wiring (a button can come unhooked while every logic test stays green), boot tests prove the packaging. When in doubt, write the test.
 
@@ -40,15 +40,14 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 ```bash
 npx omega test                          # consumer: runs YOUR project suites (bare runs never include the framework corpus)
-npx omega test --layer=main             # only main-process suites (also: build, renderer, all)
+npx omega test --layer=main             # one row only: build, main, renderer or boot (default: every row, in that order)
 npx omega test --filter="storage"       # only suites/tests whose name contains "storage"
-npx omega test --extended               # opt into extended mode — real external APIs (also: TEST_EXTENDED_MODE=true)
-npx omega test --reporter=json          # pretty output + machine-readable {"event":"summary",...} line
-OMEGA_TEST_DEBUG=1 npx omega test          # see Electron stderr (otherwise drained silently)
+npx omega test --extended               # opt into extended mode: real external APIs (also: TEST_EXTENDED_MODE=true)
+npx omega test --reporter=json          # stdout is ONE JSON document, the run's result; every other line goes to stderr
 OMEGA_TEST_BOOT_TIMEOUT_MS=120000 npx omega test   # the boot lane's budget (default 60s)
 ```
 
-In @omega.js/desktop itself, `npm test` runs the framework's own suite — the self-test context flips the no-target default.
+The verb is ONE run of devkit's runner, in the verb's own process ([devkit/index.md](../devkit/index.md#the-case-runner)): one Results block, one tee to `logs/test.log`, and the exit code `1` on a failed case, the no-match code on a path that matched nothing, else `0`. In @omega.js/desktop itself, `npm test` runs the framework's own suite: the self-test context flips the no-target default.
 
 ### Filtering tests
 
@@ -97,11 +96,12 @@ A target that names a path and matches NO file is a hard error: the run prints `
 
 ### Layers
 
-- **build** — runs in plain Node. Fast.
-- **main**  — spawns Electron and runs inside the main process. Required for anything touching `app`/`ipcMain`/`BrowserWindow`.
-- **renderer** — runs inside a hidden `BrowserWindow` spawned by the main harness. Test functions are serialized + reconstructed via `new Function('ctx', body)`, so they only have access to `ctx` and the page's globals (`window`, `document`, `window.desktop.*`). No closures over module scope.
-- **boot** — rebuilds the project and spawns Electron against the real bundle. The build goes to a staged app root of its own (`<project>/.omega/test-app/`, via `OMEGA_BUILD_OUTPUT`), never the project's `dist/` — so a boot-test run and a live `npm start` watcher never write the same tree. See [test-boot-layer.md](test-boot-layer.md).
-- **all** (default) — build, then main, then renderer in a single Electron boot.
+The rows run in this order, every row by default, one row under `--layer=<name>`:
+
+- **build**: runs in the runner's own process, plain Node. Fast.
+- **main**: its own Electron, launched on the harness app, runs inside the main process. Required for anything touching `app`/`ipcMain`/`BrowserWindow`.
+- **renderer**: a second Electron of its own, launched on the same harness app, runs inside a hidden `BrowserWindow` on the harness page. Bodies travel as text (devkit's `fnSource`) and are rebuilt in the page as `async (ctx) => { body }`, so a body sees only `ctx` and the page's globals (`window`, `document`, `window.desktop.*`): no closures over module scope, and a function whose parameters are anything but `()` or `(ctx)` fails its case naming the file.
+- **boot**: rebuilds the project and spawns Electron against the real bundle. The build goes to a staged app root of its own (`<project>/.omega/test-app/`, via `OMEGA_BUILD_OUTPUT`), never the project's `dist/`, so a boot-test run and a live `npm start` watcher never write the same tree. A boot suite with `view: '<name>'` runs in that built view's window. See [test-boot-layer.md](test-boot-layer.md).
 
 ### Extended vs normal mode
 
@@ -128,10 +128,10 @@ Then in your code, gate test-only behavior on `omega.isTesting()` instead of inv
 
 ## Test discovery
 
-- **Framework defaults**: `<@omega.js/desktop>/dist/test/suites/**/*.js`
-- **Consumer suites**: `<cwd>/test/**/*.js`
+- **Framework defaults**: `<@omega.js/desktop>/dist/test/suites/**/*.test.js`
+- **Consumer suites**: `<cwd>/test/**/*.test.js`
 
-**The underscore convention** (`DISCOVERY_IGNORE` in `src/test/runner.js`): `_`-prefixed FILES (`test/_init.js`, `test/main/_helper.js`) and everything under a `_`-prefixed DIRECTORY at **any depth** (`test/_fixtures/**`, `test/boot/_private/**`) are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in @omega.js/backend/BXM/UJM. Files load alphabetically (sorted globally per source).
+**The underscore convention** (devkit's discovery, [devkit/index.md](../devkit/index.md#the-case-runner)): `_`-prefixed FILES (`test/_init.js`, `test/main/_helper.js`) and everything under a `_`-prefixed DIRECTORY at **any depth** (`test/_fixtures/**`, `test/boot/_private/**`) are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths: e.g. `test/_fixtures/`, `test/_helpers/`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in @omega.js/backend/BXM/UJM. Files load alphabetically (sorted globally per source).
 
 **Framework boot suites are scoped to @omega.js/desktop self-test runs only.** When a consumer runs `npx omega test`, the framework's `dist/test/suites/boot/**` is excluded from discovery — those tests are meant to assert on @omega.js/desktop's own internal fixtures and would fail noisily against a real consumer app. Detection: the runner checks `cwd`'s `package.json#name === '@omega.js/desktop'`. Consumers write their own boot tests under `<cwd>/test/boot/`. Matches the same exclusion pattern in BXM and UJM. See [test-boot-layer.md](test-boot-layer.md).
 
@@ -145,7 +145,7 @@ The module **must export a function** — `module.exports = (ctx) => ({ ... })` 
 
 There is **no `cleanup` hook** and **no `accounts` field** (unlike @omega.js/backend — these frameworks have no auth/user system): tests clean up after themselves, so there is nothing project-level to tear down.
 
-A hook that fails to load, exports a non-function, whose factory throws or returns a non-object, or whose `setup` throws, fails the run before any suite: the loader (`@omega.js/devkit/test/init-hooks`) throws an `InitHookError` naming the file and carrying the cause, runner-core passes it up uncaught, and `omega test` prints it and exits 1.
+A hook that fails to load, exports a non-function, whose factory throws or returns a non-object, or whose `setup` throws, fails the run before any suite: the loader (`@omega.js/devkit/test/init-hooks`) throws an `InitHookError` naming the file and carrying the cause, the runner reports it as a failed entry with no case run, and `omega test` exits 1.
 
 ```javascript
 // <cwd>/test/_init.js
@@ -171,7 +171,7 @@ const { defineCases } = require('@omega.js/desktop/test');
 
 module.exports = defineCases({
   type: 'suite',
-  layer: 'main',                    // 'build' | 'main' | 'renderer'
+  layer: 'main',                    // 'build' | 'main' | 'renderer' | 'boot'
   description: 'storage (main)',
   cleanup: async (ctx) => {         // runs after the last test
     ctx.omega.storage.clear();
@@ -241,27 +241,31 @@ module.exports = defineCases([
 
 | Layer | Where it runs | Use for |
 |---|---|---|
-| `build` | Plain Node | CLI, package.json, config schema, gulp tasks |
-| `main` | Spawned Electron main process | `omega.initialize()`, lib modules, IPC, windows |
-| `renderer` | Hidden BrowserWindow: the framework's harness page by default, one of the project's own `src/views/` when the suite declares `view: '<name>'` | `window.desktop.*`, preload bridge, UI logic, your own views |
+| `build` | The runner's own process, plain Node | CLI, package.json, config schema, gulp tasks |
+| `main` | A spawned Electron's main process, booted on the harness app | `omega.initialize()`, lib modules, IPC, windows |
+| `renderer` | A hidden BrowserWindow on the framework's harness page, in a second spawned Electron | `window.desktop.*`, preload bridge, UI logic |
+| `boot` | The project's own built app: its main process, or one of its built views when the suite declares `view: '<name>'` | the real bundle end to end, your own views |
 
-The runner partitions test files by layer at discovery time. The build layer runs inline; the main layer spawns Electron once with all main suites and parses JSON-line stdout.
+Every suite file loads once in the runner, which hands each app row's suites to that row's driver (`src/test/runners/`). The driver runs the cases inside the app, through devkit's own `run-case.js` and `expect.js`, and each case reports back by id as one `__OMEGA_TEST__` line on the app's stdout (devkit's `./test/events`, the one envelope).
 
 ## ctx (context object)
 
 Every test fn receives a `ctx`:
 
 ```js
-ctx.expect(actual)          // Jest-compatible expect()
+ctx.expect(actual)          // devkit's expect(), below
+ctx.waitFor(condition, timeoutMs?, intervalMs?)  // poll until condition() returns a truthy value
 ctx.state                   // shared object across tests in a suite/group
-ctx.layer                   // 'build' | 'main' | 'renderer'
+ctx.layer                   // 'build' | 'main' | 'renderer' | 'boot'
 ctx.skip(reason)            // skip from inside the test
-ctx.omega                 // (main layer only) the booted @omega.js/desktop main-process instance
+ctx.omega                   // (main and boot) the booted @omega.js/desktop main-process instance
+ctx.page                    // (renderer, and a boot suite with `view`) the page's `window`
+ctx.projectRoot, ctx.appRoot, ctx.frameworkDistRoot, ctx.distSnapshotBefore   // (boot, main process)
 ```
 
 ## expect() matchers
 
-On the build, main and boot layers `ctx.expect` is devkit's one assertion library ([packages/devkit/src/test/expect.js](../../packages/devkit/src/test/expect.js), re-exported by [src/test/assert.js](../../packages/desktop/src/test/assert.js)). `expect(actual, message?)`: a failed check throws an `AssertionError`, its message prefixed `<message>: ` when you pass one.
+On every layer `ctx.expect` is devkit's one assertion library ([packages/devkit/src/test/expect.js](../../packages/devkit/src/test/expect.js)), the same `expect` the door `@omega.js/desktop/test` exports; a page receives its source text and runs it as is. `expect(actual, message?)`: a failed check throws an `AssertionError`, its message prefixed `<message>: ` when you pass one.
 
 ```js
 .toBe(expected)                         // Object.is: NaN is NaN, 0 is not -0
@@ -286,14 +290,11 @@ expect.fail(message)                    // throws
 
 `toThrow` on a function that throws synchronously checks at once and returns nothing; on a function that returns a promise it returns a promise to `await`. Its matcher is a string (a substring of the message), a RegExp (tested on the message), an Error class (`instanceof`), a validator function (passes only when it returns `true`; its own throw propagates) or an object (each key checked on the thrown error: a RegExp value is tested, any other value compared by strict deep equality). A matcher of any other type throws a usage error naming `toThrow`.
 
-The renderer layer is the exception: its hidden window still inlines a small `expect` of its own ([src/test/harness/renderer-entry.js](../../packages/desktop/src/test/harness/renderer-entry.js)) with `toBe` (`===`), `toEqual` (compared as JSON text), `toBeTruthy`, `toBeFalsy`, `toBeDefined`, `toBeNull`, `toContain` and `toMatch` (a RegExp), and no `.not`, `.rejects` or message argument.
-
 ## Output
 
 ```
-  OMEGA Desktop Tests
+  @omega.js/desktop Tests
 
-  Framework Tests
     ⤷ storage (main)
       ✓ set + get round-trip (7ms)
       ✓ has reflects presence (8ms)
@@ -301,24 +302,28 @@ The renderer layer is the exception: its hidden window still inlines a small `ex
 
   Results
     149 passing
+    1 failing
+    2 skipped
 
-    Total: 149 tests in 1850ms
+    Total: 152 tests in 1850ms
 ```
 
-All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh on each run — same pattern as `dev.log` (and @omega.js/backend's `test.log`). Grep it after a run instead of scrolling terminal output.
+One Results block for the whole run, every row included; the failing and skipped lines appear when not 0, and a failed case prints its message and stack under its line. Lines the apps print pass through as they come. Under `--reporter=json` stdout carries only the JSON document the run resolves to (`{ passed, failed, skipped, noMatch, durationMs, tests }`); everything else goes to stderr.
 
-## Test harness internals (main layer)
+All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh on each run, the same pattern as `dev.log` (and @omega.js/backend's `test.log`). Grep it after a run instead of scrolling terminal output.
 
-- `runners/electron.js` spawns Electron with `harness/main-entry.js` as the app.
-- `harness/main-entry.js` boots `omega` with `skipWindowCreation: true`, runs the suites, emits results via `__OMEGA_TEST__{json}\n` lines on stdout (`TEST_EVENT_PREFIX`, [src/utils/test-events.js](../../packages/desktop/src/utils/test-events.js), the one prefix every harness writes and every runner reads).
-- The runner parses those lines and renders @omega.js/backend-style output.
-- stderr is always drained (otherwise the pipe fills and the harness blocks); printed only when `OMEGA_TEST_DEBUG=1`.
+## Test harness internals (main and renderer rows)
+
+- `runners/electron.js` is the `main` and `renderer` driver: each row writes a spec file (`{ layer, suites }`) and spawns its own Electron on the harness directory (`harness/package.json` names `main-entry.js`) with `OMEGA_TEST_SPEC` naming the file.
+- `harness/main-entry.js` boots `omega` with `skipWindowCreation: true`. For `main` it `require`s each suite file, normalizes it with the same file path (so the case ids match the runner's), keeps the cases the spec lists (a file that fails to load reports each of them failed, by id and name), and runs `runSuite` with ctx extras `{ omega }`. For `renderer` it opens the hidden harness window and sends the page engine (`harness/renderer-entry.js`) the suites serialized by devkit's `./test/serialize` plus the text of devkit's `run-case.js` and `expect.js`; the page runs `runSuite` with ctx extras `{ page: window }`. A harness page that sends no end event in 60s, fails to load, loses its renderer, or whose page engine ends with an error fails every case it has not reported with that cause (`renderer harness timed out (no end event in 60s)` for the first), and the app exits 1 (`harness/renderer-run.js`).
+- Every case event is one `__OMEGA_TEST__{json}` line on stdout (`eventLine` and `parseEventLine` in devkit's `./test/events`, the one envelope every harness writes and every driver reads, extension's included). Every other line the app prints, stdout and stderr alike, passes through to the run's output as it comes.
+- Each driver reads its app's events through devkit's `createEventTracker(report)` (`./test/events`), which keeps the ids reported. An app that ends before reporting every case leaves the rest to the runner (`the <layer> layer ended before this case reported`); one that exits non-zero adds its last stderr lines to that message. A malformed envelope line (the prefix with no JSON after it) fails every case the app had not reported by its end, with the parse error.
 - `ELECTRON_RUN_AS_NODE` is stripped from the spawn env (would otherwise make Electron behave as Node and break the harness).
 - **Consumer-scheme containment.** The consumer's `main.js` (where the real `protocol.handle('<brand.id>', …)` lives) never runs in this harness, so `brand://` URLs loaded by main-layer suites would be UNHANDLED. Chromium treats a load on an unhandled scheme as an *external protocol* and hands it to the OS: and if an installed copy of the app owns the scheme (e.g. `/Applications/Brand.app` on macOS, registered via its `Info.plist`), Launch Services launches the installed production app mid-test-run. The harness contains this two ways after `omega` boots: (1) it registers a stub handler for the consumer's brand scheme (read from `<cwd>/config/omega.json5`) on the default session, so `brand://` loads commit in-process as a blank page; (2) it denies the `openExternal` permission on the default session and every session created after it (partitions included), so no navigation can hand ANY scheme to the OS during a test run. Suites that need real page content for `brand://` URLs belong in the boot layer, where the real app (and its real protocol handler) runs. A main-layer suite that genuinely needs its OWN handler for the brand scheme must call `protocol.unhandle(brand.id)` first: the harness stub holds the scheme on the default session.
 
 ## A test run never touches the OS keychain, and a blocked boot reports
 
-The harness resolves auth persistence to the **`none`** strategy on every layer, main and boot alike, before any config is read: a brand that declares `omega.authPersistence: 'safeStorage'` still runs its tests with Firebase auth in memory, because the lanes never sign a real user in. That is a hard rule, not a nicety. The boot lane spawns the raw, unsigned `Electron` binary, which carries no keychain ACL, so one `safeStorage` read parks the entire run behind a macOS SecurityAgent prompt ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)). ONE signal answers "is this a test run" on both layers, `omega.isTesting()`: the boot lane boots the consumer's PRODUCTION artifact, and the word baked into it no longer writes over the `OMEGA_ENVIRONMENT=testing` the runner spawned it with ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so the booted app reports the lane it is running in. And since a boot can block long before `main.js` requires the harness (where the per-test timeout lives), the boot runner carries its own budget, measured as SILENCE: every harness line rearms it, so a suite that legitimately runs longer keeps going, and a boot that produces no harness output for 60s (`OMEGA_TEST_BOOT_TIMEOUT_MS` overrides) counts its tests failed, prints `✗ boot: no harness output after 60s; last runtime.log line: "<line>"` from the booted app's `logs/runtime.log`, and ends the child instead of hanging `npx omega test`.
+The harness resolves auth persistence to the **`none`** strategy on every layer, main and boot alike, before any config is read: a brand that declares `omega.authPersistence: 'safeStorage'` still runs its tests with Firebase auth in memory, because the lanes never sign a real user in. That is a hard rule, not a nicety. The boot lane spawns the raw, unsigned `Electron` binary, which carries no keychain ACL, so one `safeStorage` read parks the entire run behind a macOS SecurityAgent prompt ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)). ONE signal answers "is this a test run" on both layers, `omega.isTesting()`: the boot lane boots the consumer's PRODUCTION artifact, and the word baked into it no longer writes over the `OMEGA_ENVIRONMENT=testing` the runner spawned it with ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so the booted app reports the lane it is running in. And since a boot can block long before `main.js` requires the harness (where the per-test timeout lives), the boot runner carries its own budget, measured as SILENCE: every harness line rearms it, so a suite that legitimately runs longer keeps going, and a boot that produces no harness output for 60s (`OMEGA_TEST_BOOT_TIMEOUT_MS` overrides) fails every case it has not reported, prints `✗ boot: no harness output after 60s; last runtime.log line: "<line>"` from the booted app's `logs/runtime.log`, and ends the child instead of hanging `npx omega test`.
 
 ## Writing consumer tests
 
@@ -347,22 +352,22 @@ module.exports = defineCases({
 
 ### Testing your own views
 
-A `renderer` suite that declares **`view: '<name>'`** runs against `src/views/<name>/` of YOUR app instead of the framework's harness page:
+A `boot` suite that declares **`view: '<name>'`** runs against `src/views/<name>/` of YOUR app, as built:
 
 ```js
-// test/renderer/main-view.test.js
+// test/boot/main-view.test.js
 const { defineCases } = require('@omega.js/desktop/test');
 
 module.exports = defineCases({
   type: 'group',
-  layer: 'renderer',
+  layer: 'boot',
   view: 'main',                       // <- src/views/main/, as built
   description: 'the main view',
   tests: [
     {
       name: 'the heading renders the product name',
       run: (ctx) => {
-        ctx.expect(document.querySelector('h1').textContent.trim()).toBe('My App');
+        ctx.expect(ctx.page.document.querySelector('h1').textContent.trim()).toBe('My App');
       },
     },
     {
@@ -375,13 +380,13 @@ module.exports = defineCases({
 });
 ```
 
-Such a suite rides the **boot lane**, because only that lane stages and builds the real app (`<project>/.omega/test-app/`) before running: the page gets the project's real `dist/preload.bundle.js`, the real IPC handlers of the booted main process, and the real config. The window is created through the app's own window manager (hidden, no bounds persistence) and destroyed when the suite ends. Cost is the boot lane's: one build (~10-30s) shared with your boot tests.
+Such a suite runs in the **boot lane**, because only that lane stages and builds the real app (`<project>/.omega/test-app/`) before running: the page gets the project's real `dist/preload.bundle.js`, the real IPC handlers of the booted main process, and the real config. The window is created through the app's own window manager (hidden, no bounds persistence) and destroyed when the suite ends. Cost is the boot lane's: one build (~10-30s) shared with your boot tests.
 
 Consequences worth knowing:
 
-- **`--layer=renderer` does NOT run a view suite** (it needs the boot). `--layer=boot` and the default `--layer=all` do.
+- **`layer: 'renderer'` always means the framework's harness page.** A `view` key on any layer but `boot` fails the file at load, naming it. A suite that tests your own view declares `layer: 'boot'`, and runs under `--layer=boot` or the default every-row run.
 - The standalone form (one `run`, no `tests`) works too: it runs as one test named for its `description`, and `--filter` matches that name.
-- The test bodies still run as `new Function` inside the page: no closures over module scope, only `ctx` (`expect`, `state`, `layer`, `skip`) and the page globals (`window`, `document`, `window.desktop.*`).
-- Without `view`, nothing changes: the suite runs on the harness page in the main test Electron, as it always has.
+- The bodies run inside the page, rebuilt from their text: no closures over module scope, only `ctx` (`expect`, `waitFor`, `state`, `layer`, `skip`, `page`) and the page globals (`window`, `document`, `window.desktop.*`). `ctx.page` is the page's `window`.
 - A view that fails to load fails every test of the suite with `view "<name>" did not load`, rather than reporting an empty page.
-- Each view suite has a hard 60 s ceiling for the whole suite (the same ceiling the harness page uses); a suite's own `timeout` applies per test underneath it.
+- A view suite that throws (a crashed page, a destroyed window) or whose page engine ends with an error fails the tests it has not reported with that error, and the next view suite still runs.
+- Each case has its own timeout (the case's, then the suite's, then 30s); a page that stops answering altogether is the boot lane's idle budget to end.

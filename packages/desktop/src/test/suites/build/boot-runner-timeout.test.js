@@ -1,11 +1,7 @@
-// Build-layer tests for the boot runner's budget
-// ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
-//
-// A boot that blocks inside initialize() never reaches the harness, so the per-test
-// timeout in harness/boot-entry.js cannot fire and the spawn (which only resolved on
-// exit) hung `npx omega test` forever. The child is INJECTED here, so both verdicts
-// are provable without booting Electron: a child that never exits, and one that exits
-// the way a healthy run does.
+// Build-layer tests for the boot driver's idle budget. A boot that blocks inside
+// initialize() never reaches the harness, so the child is INJECTED here: both
+// verdicts are provable without booting Electron. Each case event arrives through
+// `report`, and a harness line is the one envelope: `__OMEGA_TEST__` + the event.
 
 const path = require('path');
 const os = require('os');
@@ -13,11 +9,13 @@ const fs = require('fs');
 const { EventEmitter } = require('events');
 const jetpack = require('fs-jetpack');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { EVENT_PREFIX } = require('@omega.js/devkit/test/events');
 
 const { runBootChild } = require(path.join(__dirname, '..', '..', 'runners', 'boot.js'));
-const { TEST_EVENT_PREFIX } = require(path.join(__dirname, '..', '..', '..', 'utils', 'test-events.js'));
 
-// A project root the runner reads its report clue from. `logLine` null writes no
+const FILE = 'boot/budget.test.js';
+
+// A project root the driver reads its report clue from. `logLine` null writes no
 // logs/ at all, the boot that died before the logger ever opened a file.
 function seedRoot(logLine) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-boot-budget-')));
@@ -28,21 +26,32 @@ function seedRoot(logLine) {
   return root;
 }
 
-// The spawn seam's child: the surface runBootChild touches, and a record of every
-// signal it was sent.
+// The spawn seam's child: the surface runBootChild touches, a record of every
+// signal it was sent, and `end(code)` emitting `exit` then `close` as a real child does.
 function fakeChild() {
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.signals = [];
   child.kill = (signal) => { child.signals.push(signal || 'SIGTERM'); return true; };
+  child.end = (code) => { child.emit('exit', code, null); child.emit('close', code, null); };
   return child;
 }
 
-// The runner reports on console.log; collect it instead of printing it into THIS run.
-async function capture(lines, fn) {
+// `count` normalized-looking cases of one boot suite, ids `<file>#<index>`.
+function casesOf(count) {
+  return Array.from({ length: count }, (_, index) => ({ id: `${FILE}#${index}`, name: `boot case ${index + 1}` }));
+}
+
+// One harness line carrying a passing case event.
+function passLine(caseDef) {
+  return `${EVENT_PREFIX}${JSON.stringify({ id: caseDef.id, name: caseDef.name, status: 'pass', durationMs: 12 })}\n`;
+}
+
+// The driver may print its verdict too; silence it so it never lands in THIS run.
+async function quiet(fn) {
   const realLog = console.log;
-  console.log = (line) => lines.push(String(line));
+  console.log = () => {};
   try {
     return await fn();
   } finally {
@@ -54,41 +63,47 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// The runBootChild options every case shares; `overrides` carries the per-case knobs.
+function childOptions(root, specFile, child, cases, events, overrides) {
+  return {
+    electronBin:   '/not/spawned/electron',
+    args:          [root],
+    childEnv:      {},
+    effectiveRoot: root,
+    specFile,
+    cases,
+    report:        (event) => { events.push(event); },
+    spawnFn:       () => child,
+    killGraceMs:   20,
+    ...overrides,
+  };
+}
+
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
-  description: 'boot runner budget: a boot with no harness output fails with a report instead of hanging',
+  description: 'boot driver budget: a boot with no harness output fails with a report instead of hanging',
   tests: [
     {
-      name: 'the budget fires: the report quotes the last runtime.log line, every boot test counts failed, the child is ended',
+      name: 'case-161 the budget fires: every boot case reports failed quoting the last runtime.log line, and the child is ended',
       run: async (ctx) => {
         const root = seedRoot('[@omega.js/desktop:startup] isLaunchHidden: true');
         const specFile = path.join(root, 'spec.json');
         jetpack.write(specFile, '{}');
         const child = fakeChild();
-        const lines = [];
+        const cases = casesOf(3);
+        const events = [];
         const started = Date.now();
 
-        const counts = await capture(lines, () => runBootChild({
-          electronBin:   '/not/spawned/electron',
-          args:          [root],
-          childEnv:      {},
-          effectiveRoot: root,
-          specFile,
-          skipEvents:    [],
-          testCount:     3,
-          spawnFn:       () => child,
-          timeoutMs:     1000,
-          killGraceMs:   20,
-        }));
+        await quiet(() => runBootChild(childOptions(root, specFile, child, cases, events, { timeoutMs: 1000 })));
 
         // Resolved on its own timer, not at the child's leisure.
         ctx.expect(Date.now() - started).toBeLessThan(5000);
-        ctx.expect(counts).toEqual({ passed: 0, failed: 3, skipped: 0 });
-
-        const report = lines.join('\n');
-        ctx.expect(report).toMatch(/✗ boot: no harness output after 1s/);
-        ctx.expect(report).toMatch(/last runtime\.log line: "\[@omega\.js\/desktop:startup\] isLaunchHidden: true"/);
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual(cases.map((caseDef) => [caseDef.id, 'fail']));
+        for (const event of events) {
+          ctx.expect(event.error.message).toMatch(/no harness output after 1s/);
+          ctx.expect(event.error.message).toMatch(/last runtime\.log line: "\[@omega\.js\/desktop:startup\] isLaunchHidden: true"/);
+        }
 
         // The child is ended, and escalated when the grace passes without it going.
         ctx.expect(child.signals).toEqual(['SIGTERM']);
@@ -106,106 +121,68 @@ module.exports = defineCases({
         const specFile = path.join(root, 'spec.json');
         jetpack.write(specFile, '{}');
         const child = fakeChild();
-        const lines = [];
+        const events = [];
 
-        const counts = await capture(lines, () => runBootChild({
-          electronBin:   '/not/spawned/electron',
-          args:          [root],
-          childEnv:      {},
-          effectiveRoot: root,
-          specFile,
-          skipEvents:    [],
-          testCount:     1,
-          spawnFn:       () => child,
-          timeoutMs:     20,
-          killGraceMs:   20,
-        }));
+        await quiet(() => runBootChild(childOptions(root, specFile, child, casesOf(1), events, { timeoutMs: 20 })));
 
-        ctx.expect(counts.failed).toBe(1);
-        ctx.expect(lines.join('\n')).toMatch(/last runtime\.log line: "\(no runtime\.log\)"/);
+        ctx.expect(events.length).toBe(1);
+        ctx.expect(events[0].status).toBe('fail');
+        ctx.expect(events[0].error.message).toMatch(/last runtime\.log line: "\(no runtime\.log\)"/);
         jetpack.remove(root);
       },
     },
     {
-      // The budget is IDLE time, never total run time: a boot suite that
-      // legitimately runs longer than the budget keeps going as long as it
-      // keeps talking, and only SILENCE for a whole budget fails the run.
+      // The budget is IDLE time, never total run time: a boot suite that keeps
+      // talking keeps going, and only SILENCE for a whole budget fails the run.
       name: 'harness output REARMS the budget, so a run past it is never killed',
       run: async (ctx) => {
         const root = seedRoot('[@omega.js/desktop:startup] isLaunchHidden: true');
         const specFile = path.join(root, 'spec.json');
         jetpack.write(specFile, '{}');
         const child = fakeChild();
-        const lines = [];
+        const cases = casesOf(3);
+        const events = [];
         const started = Date.now();
 
-        const counts = await capture(lines, async () => {
-          const pending = runBootChild({
-            electronBin:   '/not/spawned/electron',
-            args:          [root],
-            childEnv:      {},
-            effectiveRoot: root,
-            specFile,
-            skipEvents:    [],
-            testCount:     2,
-            spawnFn:       () => child,
-            timeoutMs:     400,
-            killGraceMs:   20,
-          });
+        await quiet(async () => {
+          const pending = runBootChild(childOptions(root, specFile, child, cases, events, { timeoutMs: 400 }));
 
-          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
-          await sleep(150);
-          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'a slow suite finishes', passed: true, duration: 12 })}\n`);
-          await sleep(150);
-          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'and another', passed: true, duration: 12 })}\n`);
-          await sleep(150);
-          child.emit('exit', 0);
+          for (const caseDef of cases) {
+            child.stdout.emit('data', passLine(caseDef));
+            await sleep(150);
+          }
+          child.end(0);
 
           return pending;
         });
 
         ctx.expect(Date.now() - started).toBeGreaterThan(400);
-        ctx.expect(counts).toEqual({ passed: 3, failed: 0, skipped: 0 });
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual(cases.map((caseDef) => [caseDef.id, 'pass']));
         ctx.expect(child.signals).toEqual([]);
-        ctx.expect(lines.join('\n').includes('no harness output')).toBe(false);
         jetpack.remove(root);
       },
     },
     {
-      // The timeout hands its counts to the caller, so a line arriving while
-      // the child is being killed must reach nothing at all: the report is
-      // already printed and the numbers already reported.
+      // The timeout has settled every case, so a line arriving while the child
+      // is being killed must reach nothing at all.
       name: 'a line landing AFTER the timeout report changes nothing',
       run: async (ctx) => {
         const root = seedRoot('[@omega.js/desktop:startup] isLaunchHidden: true');
         const specFile = path.join(root, 'spec.json');
         jetpack.write(specFile, '{}');
         const child = fakeChild();
-        const lines = [];
+        const cases = casesOf(2);
+        const events = [];
 
-        const counts = await capture(lines, async () => {
-          const settled = await runBootChild({
-            electronBin:   '/not/spawned/electron',
-            args:          [root],
-            childEnv:      {},
-            effectiveRoot: root,
-            specFile,
-            skipEvents:    [],
-            testCount:     2,
-            spawnFn:       () => child,
-            timeoutMs:     30,
-            killGraceMs:   20,
-          });
+        await quiet(async () => {
+          await runBootChild(childOptions(root, specFile, child, cases, events, { timeoutMs: 30 }));
 
-          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'a late line', passed: true, duration: 12 })}\n`);
-          child.emit('exit', 0);
+          child.stdout.emit('data', passLine(cases[0]));
+          child.end(0);
           await sleep(40);
-
-          return settled;
         });
 
-        ctx.expect(counts).toEqual({ passed: 0, failed: 2, skipped: 0 });
-        ctx.expect(lines.join('\n').includes('a late line')).toBe(false);
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual(cases.map((caseDef) => [caseDef.id, 'fail']));
         jetpack.remove(root);
       },
     },
@@ -216,37 +193,22 @@ module.exports = defineCases({
         const specFile = path.join(root, 'spec.json');
         jetpack.write(specFile, '{}');
         const child = fakeChild();
-        const lines = [];
+        const cases = casesOf(1);
+        const events = [];
 
-        const counts = await capture(lines, async () => {
-          const pending = runBootChild({
-            electronBin:   '/not/spawned/electron',
-            args:          [root],
-            childEnv:      {},
-            effectiveRoot: root,
-            specFile,
-            skipEvents:    [],
-            testCount:     1,
-            spawnFn:       () => child,
-            timeoutMs:     50,
-            killGraceMs:   20,
-          });
+        await quiet(async () => {
+          const pending = runBootChild(childOptions(root, specFile, child, cases, events, { timeoutMs: 50 }));
 
-          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
-          child.emit('exit', 0);
+          child.stdout.emit('data', passLine(cases[0]));
+          child.end(0);
 
-          const settled = await pending;
+          await pending;
           // Past the budget: a timer the exit did not clear would report here.
           await sleep(120);
-          return settled;
         });
 
-        ctx.expect(counts).toEqual({ passed: 1, failed: 0, skipped: 0 });
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual([[cases[0].id, 'pass']]);
         ctx.expect(child.signals).toEqual([]);
-
-        const report = lines.join('\n');
-        ctx.expect(report).toMatch(/✓ the app boots/);
-        ctx.expect(report.includes('no harness output')).toBe(false);
         jetpack.remove(root);
       },
     },

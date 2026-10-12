@@ -1,152 +1,117 @@
-// Boot-runner — spawns electron with the consumer's actual built main bundle, runs
-// inspect functions against the live omega instance, then quits cleanly.
-//
-// Differences from runners/electron.js:
-//   - electron.js spawns electron with `harness/main-entry.js` and tests @omega.js/desktop lib code in isolation.
-//   - boot.js spawns electron with the consumer's built `main.bundle.js` (the real production
-//     boot path), then injects `harness/boot-entry.js` via --require to drive inspection.
-//
-// The build + boot happen in a STAGED target root (`<project>/.omega/test-app`), never the
-// project's own dist/ (#110) — a concurrent `npm start` watcher writes dist/, and two
-// writers on one tree means either side can load a half-written bundle. See stageTestApp().
-//
-// Why both? `main` layer tests cover individual lib behavior fast. `boot` layer covers
-// integration — does the consumer's actual main.js boot end-to-end with their config + scaffolds?
-// Replaces shell-level `npm start && sleep && kill` smoke tests with deterministic, signal-driven
-// pass/fail.
-//
-// This lane also carries the renderer suites that name a project view (`view: '<name>'`):
-// they need the built app a boot run already produces, so `harness/boot-entry.js` opens each
-// view in a real window of the booted app once the inspect tests are done. They arrive here
-// as `suites` (whole modules), never flattened into `tests`.
+// The `boot` driver: builds the project into a STAGED target root
+// (`<project>/.omega/test-app`, never the project's own dist/, which a running
+// watcher writes), boots that app in Electron with harness/boot-entry.js, and
+// reports every envelope line the booted app writes. A suite with `view: '<name>'`
+// runs in that view's window; every other boot suite runs in the app's main process.
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { spawn, spawnSync } = require('child_process');
+// Called through the module, never destructured: the json reporter's stdout guard patches it.
+const childProcess = require('child_process');
 const chalk = require('chalk').default;
+const jetpack = require('fs-jetpack');
 const distSnapshot = require('../utils/dist-snapshot.js');
-const { renderEvent } = require('./render-event.js');
-const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
+const { serializeSuite, specKey } = require('@omega.js/devkit/test/serialize');
+const { reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
+const {
+  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, readChildOutput, childEnded, exitError, endChild,
+} = require('./app-child.js');
 
 // How long a booted app gets to say anything at all before the run is declared
 // failed. Generous: the app under test is the consumer's real one, cold.
 const DEFAULT_BOOT_TIMEOUT_MS = 60000;
 
-// How long the child gets to go down politely before SIGKILL.
-const KILL_GRACE_MS = 2000;
+// The framework's dist/: the harness, the build's gulpfile and the fixture links resolve from it.
+const FRAMEWORK_DIST_ROOT = path.resolve(__dirname, '..', '..');
 
-async function runBootTests({ tests, suites, projectRoot, frameworkDistRoot }) {
-  suites = suites || [];
-
-  if (tests.length === 0 && suites.length === 0) {
-    return { passed: 0, failed: 0, skipped: 0 };
-  }
-
-  // OMEGA_TEST_BOOT_PROJECT boots a different project root than the CWD. Auto-set to the
-  // bundled fixture when @omega.js/desktop self-tests (see commands/test.js); set it explicitly
-  // to boot a real consumer (brands/playground-omega/targets/desktop) without cd-ing into it.
-  // The same switch every framework's boot runner reads.
-  const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
-    ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
-    : projectRoot;
-
-  // The bundled fixture ships as SOURCE only (no node_modules). Symlink the two deps the
-  // build + boot path resolves by EXPLICIT path: @omega.js/desktop (the gulpfile path +
-  // esbuild's `require('@omega.js/desktop/main')`) and electron (the runner's binary lookup
-  // + the spawned bundle's `require('electron')`). Everything else (gulp, esbuild,
-  // etc.) resolves through the upward node_modules walk because the fixture lives inside the
-  // @omega.js/desktop repo. No-op for a real consumer that already has its own node_modules. The links are
-  // tracked and ALWAYS removed in the finally — the @omega.js/desktop link points at the @omega.js/desktop
-  // repo root, which CONTAINS the fixture, so leaving it behind forms an infinite directory
-  // cycle inside dist/ that crashes the next prepare-package tree walk (ENAMETOOLONG) and
-  // with it `npm publish`.
-  const createdLinks = ensureFixtureDeps(effectiveRoot, path.resolve(frameworkDistRoot, '..'));
-
-  try {
-    return await bootProject({ tests, suites, effectiveRoot, frameworkDistRoot });
-  } finally {
-    removeFixtureDeps(createdLinks);
-  }
+/**
+ * Split the boot row's suites: a suite with `view` runs in that view's window,
+ * any other boot suite in the booted app's main process.
+ * @param {object[]} suites - Normalized suites.
+ * @returns {{mainSuites: object[], viewSuites: object[]}} Suites of any other layer join neither.
+ */
+function partitionBootSuites(suites) {
+  const boot = suites.filter((suite) => suite.layer === 'boot');
+  const hasView = (suite) => typeof specKey(suite, 'view') === 'string';
+  return {
+    mainSuites: boot.filter((suite) => !hasView(suite)),
+    viewSuites: boot.filter(hasView),
+  };
 }
 
-// Build + spawn + inspect — the actual boot run against effectiveRoot.
-async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) {
-  // Serialize the view suites BEFORE anything is built: a run whose every suite is skipped
-  // (and that has no inspect tests) has nothing to build an app for.
-  const { viewSuites, skipEvents } = prepareViewSuites(suites);
+const bootDriver = {
+  /**
+   * Build and boot the project, then run the row's suites inside it.
+   * @param {{projectRoot: string, suites: object[], report: Function}} options - From the runner.
+   * @returns {Promise<{finished: Promise<void>, stop: Function}>} The row's handle.
+   */
+  async start({ projectRoot, suites, report }) {
+    const { mainSuites, viewSuites } = partitionBootSuites(suites);
 
-  if (tests.length === 0 && viewSuites.length === 0) {
-    const counts = { passed: 0, failed: 0, skipped: 0 };
-    skipEvents.forEach((evt) => renderEvent(evt, counts));
-    return counts;
-  }
+    // A suite skipped whole needs no build: its cases report here.
+    const all = [...mainSuites, ...viewSuites];
+    all.filter((suite) => suite.skip).forEach((suite) => {
+      reportEvery(suite.cases, report, { status: 'skip', reason: typeof suite.skip === 'string' ? suite.skip : 'skipped' });
+    });
+    const live = { mainSuites: mainSuites.filter((suite) => !suite.skip), viewSuites: viewSuites.filter((suite) => !suite.skip) };
+    const cases = [...live.mainSuites, ...live.viewSuites].flatMap((suite) => suite.cases);
+    if (cases.length === 0) return { finished: Promise.resolve(), stop() {} };
 
-  // Every test a failed build or a missing electron accounts for: the flat inspect list plus
-  // every test inside a view suite.
-  const testCount = tests.length + viewSuites.reduce((total, suite) => total + suite.tests.length, 0);
+    // OMEGA_TEST_BOOT_PROJECT boots another project than the run's (the self-test's bundled fixture).
+    const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
+      ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
+      : projectRoot;
 
-  // Locate electron. Resolve like Node would from the project root (walks up node_modules
-  // chains), so hoisted installs (npm workspaces) are found — not just <root>/node_modules.
-  let electronBin;
-  try {
-    electronBin = require(require.resolve('electron', { paths: [effectiveRoot] }));
-  } catch (e) {
-    const msg = `    ○ boot tests skipped (electron not installed in ${effectiveRoot})`;
-    console.log(chalk.yellow(msg));
-    return { passed: 0, failed: 0, skipped: testCount };
+    // The bundled fixture ships as source only: link the two deps its build and boot
+    // resolve by explicit path (@omega.js/desktop, electron). The links are ALWAYS removed:
+    // the desktop link points at the repo that contains the fixture, a directory cycle.
+    const createdLinks = ensureFixtureDeps(effectiveRoot, path.resolve(FRAMEWORK_DIST_ROOT, '..'));
+
+    let child = null;
+    const finished = bootProject({ ...live, cases, effectiveRoot, report, onSpawn: (spawned) => { child = spawned; } })
+      .finally(() => removeFixtureDeps(createdLinks));
+
+    return {
+      finished,
+      async stop() {
+        if (child && child.exitCode === null && child.signalCode === null) endChild(child, KILL_GRACE_MS);
+        await finished.catch(() => {});
+      },
+    };
+  },
+};
+
+// Build, write the spec, and boot: the actual boot run against effectiveRoot.
+async function bootProject({ mainSuites, viewSuites, cases, effectiveRoot, report, onSpawn }) {
+  const electronBin = resolveElectron(effectiveRoot);
+  if (!electronBin) {
+    reportEvery(cases, report, { status: 'skip', reason: NO_ELECTRON_REASON });
+    return;
   }
 
   // Stage the boot-test target root and record the project's real dist/ before anything
-  // builds — the boot layer asserts that fingerprint is unchanged afterwards (#110).
+  // builds: the boot layer asserts that fingerprint is unchanged afterwards.
   const testApp = stageTestApp(effectiveRoot);
   const distSnapshotBefore = distSnapshot(path.join(effectiveRoot, 'dist'));
 
-  // Always rebuild before boot tests. Boot tests run against the consumer's actual
-  // production main bundle; if it's stale, tests pass against outdated code.
-  // Always-build is ~10s slower than a staleness check, but a staleness heuristic
-  // (mtime comparison) can be defeated by editor backdating, git restores, or
-  // file copies — and a silently-stale test is worse than a slow one.
-  // Set OMEGA_TEST_SKIP_BUILD=1 to opt out (CI scenarios where build ran in a separate step).
-  if (process.env.OMEGA_TEST_SKIP_BUILD !== '1') {
-    console.log(chalk.gray(`      Building bundle for boot tests...`));
-    // A fresh build gets a fresh output: leftovers from a prior run (a deleted
-    // view, a renamed bundle) would otherwise survive and keep existence-style
-    // assertions green. SKIP_BUILD keeps the staged output — that is its point.
-    fs.rmSync(testApp.distRoot, { recursive: true, force: true });
-    const buildResult = runGulpBuild(effectiveRoot, testApp.distRoot);
-    if (buildResult !== 0) {
-      console.log(chalk.red(`    ✗ Boot tests aborted — gulp build failed (exit ${buildResult}).`));
-      return { passed: 0, failed: testCount, skipped: 0 };
-    }
-  } else if (!fs.existsSync(testApp.bundlePath)) {
-    // Loud, not skipped: the test output is private to the boot runner, so an absent
-    // bundle means the build step the operator promised never ran. Booting anything
-    // else (the project's dist/, a stale tree) would silently test the wrong bundle.
-    console.log(chalk.red(`    ✗ Boot tests aborted — OMEGA_TEST_SKIP_BUILD=1 but no test build at ${testApp.bundlePath}. Run the boot tests once without it (or build with OMEGA_BUILD_OUTPUT=${testApp.distRoot}).`));
-    return { passed: 0, failed: testCount, skipped: 0 };
+  const buildError = buildTestApp(effectiveRoot, testApp);
+  if (buildError) {
+    reportEvery(cases, report, { status: 'fail', error: new Error(buildError) });
+    return;
   }
 
-  // Write the spec file. Each test's `inspect` function body is extracted as a string
-  // and shipped to the harness for reconstitution. Same trick as runners/electron.js
-  // uses for renderer suites.
-  const spec = {
-    projectRoot: effectiveRoot,
-    appRoot:     testApp.appRoot,
-    frameworkDistRoot,
-    distSnapshotBefore,
-    tests: tests.map((t) => ({
-      description:    t.description,
-      timeout:        t.timeout,
-      inspectSource:  extractFnBody(t.inspect),
-    })),
-    viewSuites,
-  };
-
   const specFile = path.join(os.tmpdir(), `desktop-boot-spec-${process.pid}-${Date.now()}.json`);
-  fs.writeFileSync(specFile, JSON.stringify(spec));
+  jetpack.write(specFile, {
+    projectRoot: effectiveRoot,
+    appRoot: testApp.appRoot,
+    frameworkDistRoot: FRAMEWORK_DIST_ROOT,
+    distSnapshotBefore,
+    mainSuites: mainSuites.map(serializeSuite),
+    viewSuites: viewSuites.map(serializeSuite),
+  });
 
-  const bootEntry = path.join(frameworkDistRoot, 'test', 'harness', 'boot-entry.js');
+  const bootEntry = path.join(FRAMEWORK_DIST_ROOT, 'test', 'harness', 'boot-entry.js');
 
   // Tell the consumer's main.js to publish the instance + run the boot harness.
   // Three env vars are picked up by @omega.js/desktop's main.js after init completes:
@@ -169,112 +134,110 @@ async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) 
   // but paths that bypass the boundary must not boot Electron as plain node.
   delete childEnv.ELECTRON_RUN_AS_NODE;
 
-  // Args passed to electron:
-  //   testApp.appRoot — the staged target root (package.json#main = dist/main.bundle.js,
-  //   its dist/ being the isolated test build). Electron loads it exactly the way it
-  //   loads a real project dir, so packaged-app semantics — app name/version from
-  //   package.json, appRoot-relative view/preload/icon lookups — are unchanged.
-  //
-  // We don't use `--require <bootEntry>` because Electron rejects unknown CLI flags. Instead,
-  // @omega.js/desktop's main.js detects OMEGA_TEST_BOOT and `require()`s the boot harness itself after init.
-  const args = [testApp.appRoot];
-
-  return runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, skipEvents, testCount });
+  // The staged target root is the app: Electron loads it the way it loads a real project dir.
+  await runBootChild({
+    electronBin,
+    args: [testApp.appRoot],
+    childEnv,
+    effectiveRoot,
+    specFile,
+    cases,
+    report,
+    spawnFn: (...spawnArgs) => {
+      const spawned = childProcess.spawn(...spawnArgs);
+      onSpawn(spawned);
+      return spawned;
+    },
+  });
 }
 
-// Spawn the booted app, render what its harness emits, and end the run.
-//
-// A boot that never produces harness output is a FAILED run with a report, never a
-// hung runner ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)): the child
-// can block inside initialize(), long before main.js requires the harness, so the
-// per-test timeout in harness/boot-entry.js never gets the chance to fire. The report
-// quotes the last line of the booted app's runtime.log, which is the one clue about
-// where it stopped.
-//
-// The budget is IDLE time, never total run time: every harness line rearms it, so a
-// healthy suite that legitimately runs longer than the budget is left alone and only
-// SILENCE for a whole budget fails the run.
-//
-// `spawnFn`, `timeoutMs` and `killGraceMs` are the seams the build-layer suite drives
-// (suites/build/boot-runner-timeout.test.js), the way the deploy modules take an execFn.
-function runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, skipEvents, testCount, spawnFn = spawn, timeoutMs = bootTimeoutMs(), killGraceMs = KILL_GRACE_MS }) {
-  return new Promise((resolve) => {
+/**
+ * Build the staged app, unless OMEGA_TEST_SKIP_BUILD=1 says a build already ran.
+ * @param {string} effectiveRoot - The project being booted.
+ * @param {{distRoot: string, bundlePath: string}} testApp - From stageTestApp.
+ * @returns {string|null} Why the boot cannot run, or null when the bundle is ready.
+ */
+function buildTestApp(effectiveRoot, testApp) {
+  // Always rebuild: a staleness heuristic (mtimes) is defeated by backdating, restores
+  // and copies, and a silently stale bundle is worse than a slow run.
+  if (process.env.OMEGA_TEST_SKIP_BUILD !== '1') {
+    console.log(chalk.gray('      Building bundle for boot tests...'));
+    // A fresh build gets a fresh output: a prior run's leftovers would keep existence checks green.
+    fs.rmSync(testApp.distRoot, { recursive: true, force: true });
+    const buildResult = runGulpBuild(effectiveRoot, testApp.distRoot);
+    if (buildResult !== 0) return `boot tests aborted: the gulp build failed (exit ${buildResult})`;
+    return null;
+  }
+  // Loud, not skipped: an absent test build means the build the operator promised never ran.
+  if (!fs.existsSync(testApp.bundlePath)) {
+    return `boot tests aborted: OMEGA_TEST_SKIP_BUILD=1 but no test build at ${testApp.bundlePath}. Run the boot tests once without it (or build with OMEGA_BUILD_OUTPUT=${testApp.distRoot}).`;
+  }
+  return null;
+}
+
+/**
+ * Spawn the booted app and report what its harness writes, under an IDLE budget:
+ * every envelope line rearms it, and a whole budget of silence fails every case
+ * still unreported (quoting the last runtime.log line) and ends the child.
+ * `spawnFn`, `timeoutMs` and `killGraceMs` are the seams a build suite drives.
+ * @param {object} options - `{ electronBin, args, childEnv, effectiveRoot, specFile, cases, report, spawnFn, timeoutMs, killGraceMs }`.
+ * @returns {Promise<void>} Resolves when the child exits or the budget ends it; rejects on a non-zero exit.
+ */
+function runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, cases, report, spawnFn = childProcess.spawn, timeoutMs = bootTimeoutMs(), killGraceMs = KILL_GRACE_MS }) {
+  return new Promise((resolve, reject) => {
     const child = spawnFn(electronBin, args, {
       cwd: effectiveRoot,
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    let buffer = '';
-    const counts = { passed: 0, failed: 0, skipped: 0 };
-
-    // Suites the module skipped whole: reported before the run they never join.
-    skipEvents.forEach((evt) => renderEvent(evt, counts));
-
+    const events = createEventTracker(report);
     let timer = null;
+    let ended = false;
+    let exited = false;
 
-    // Rearmed by every harness line below, so the budget measures SILENCE.
+    const output = readChildOutput(child, (event) => {
+      armBudget();
+      events.onEvent(event);
+    });
+
+    function finish() {
+      if (ended) return false;
+      ended = true;
+      clearTimeout(timer);
+      output.detach();
+      try { fs.unlinkSync(specFile); } catch (_) { /* ignore */ }
+      return true;
+    }
+
     function armBudget() {
       clearTimeout(timer);
+      if (exited) return;
       timer = setTimeout(() => {
-        console.log(chalk.red(`    ✗ boot: no harness output after ${Math.round(timeoutMs / 1000)}s; last runtime.log line: "${lastRuntimeLogLine(effectiveRoot)}"`));
-        counts.failed += testCount;
-        // Detached BEFORE the counts are handed out: a line the child emits
-        // while it is being killed must not move numbers already reported.
-        cleanup();
+        if (!finish()) return;
+        const message = `boot: no harness output after ${Math.round(timeoutMs / 1000)}s; last runtime.log line: "${lastRuntimeLogLine(effectiveRoot)}"`;
+        console.log(chalk.red(`    ✗ ${message}`));
+        events.settle(cases, new Error(message));
         endChild(child, killGraceMs);
-        resolve(counts);
+        resolve();
       }, timeoutMs);
     }
 
-    function onStdout(chunk) {
-      buffer += chunk.toString();
-      let nl;
-      while ((nl = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, nl);
-        buffer = buffer.slice(nl + 1);
-        if (line.startsWith(TEST_EVENT_PREFIX)) {
-          armBudget();
-          renderEvent(JSON.parse(line.slice(TEST_EVENT_PREFIX.length)), counts);
-        } else if (process.env.OMEGA_TEST_DEBUG && line.trim().length > 0) {
-          process.stdout.write(chalk.gray(`      ${line}\n`));
-        }
-      }
-    }
-
-    function onStderr(chunk) {
-      if (process.env.OMEGA_TEST_DEBUG) {
-        process.stderr.write(chalk.gray(`[boot:stderr] ${chunk.toString()}`));
-      }
-    }
-
-    function onError(err) {
-      console.log(chalk.red(`    ✗ Failed to spawn boot harness: ${err.message}`));
-      counts.failed += 1;
-      cleanup();
-      resolve(counts);
-    }
-
-    function onExit() {
-      cleanup();
-      resolve(counts);
-    }
-
-    child.stdout.on('data', onStdout);
-    child.stderr.on('data', onStderr);
-    child.on('error', onError);
-    child.on('exit', onExit);
+    // A child that has exited is past any budget, while its pipes drain.
+    child.once('exit', () => {
+      exited = true;
+      clearTimeout(timer);
+    });
+    childEnded(child).then((end) => {
+      if (!finish()) return;
+      events.settle(cases);
+      if (end.code !== 0 && !end.signal) reject(exitError('boot', end, output.tail()));
+      else resolve();
+    }, (error) => {
+      if (finish()) reject(error);
+    });
 
     armBudget();
-
-    function cleanup() {
-      clearTimeout(timer);
-      child.stdout.removeListener('data', onStdout);
-      child.stderr.removeListener('data', onStderr);
-      child.removeListener('error', onError);
-      child.removeListener('exit', onExit);
-      try { fs.unlinkSync(specFile); } catch (_) { /* ignore */ }
-    }
   });
 }
 
@@ -302,76 +265,6 @@ function lastRuntimeLogLine(effectiveRoot) {
   return '(runtime.log is empty)';
 }
 
-// End a child that outlived its budget. Polite first, then SIGKILL: the direct child
-// is the orphan the hang used to leave behind. The grace timer is unref'd so it never
-// holds the runner open on its own.
-function endChild(child, killGraceMs) {
-  try { child.kill(); } catch (_) { /* already gone */ }
-  const grace = setTimeout(() => {
-    try { child.kill('SIGKILL'); } catch (_) { /* already gone */ }
-  }, killGraceMs);
-  if (typeof grace.unref === 'function') grace.unref();
-}
-
-// Serialize the boot-bound renderer suites (`view: '<name>'`) for the spec file, the same
-// shape main-entry.js ships to the harness page (plus the view name). A suite the module
-// skipped whole runs nothing and reports its test count as skipped, exactly as the harness
-// renderer lane does.
-//
-// Returns { viewSuites, skipEvents }: the suites to run, and the skip events the caller
-// renders once it has a counts object.
-function prepareViewSuites(suites) {
-  const viewSuites = [];
-  const skipEvents = [];
-
-  for (const { file, mod } of suites) {
-    const description = mod.description || path.basename(file);
-
-    if (mod.skip) {
-      const reason = typeof mod.skip === 'string' ? mod.skip : 'skipped';
-      const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
-      skipEvents.push({ event: 'skip', name: description, reason, count });
-      continue;
-    }
-
-    viewSuites.push({
-      description,
-      isGroup: mod.type === 'group',
-      timeout: mod.timeout,
-      view:    mod.view,
-      tests:   (mod.tests || []).map((t) => ({
-        name:      t.name,
-        skip:      t.skip,
-        timeout:   t.timeout,
-        runSource: extractFnBody(t.run),
-      })),
-    });
-  }
-
-  return { viewSuites, skipEvents };
-}
-
-// Extract the body of a function as a string. Same impl style as main-entry.js's
-// extractFnBody — handles arrow fns, async fns, and regular fns.
-function extractFnBody(fn) {
-  // Same degradation as main-entry.js: a test without a function reports as one failed
-  // test instead of ending the whole run with a stack trace naming neither file nor test.
-  if (typeof fn !== 'function') return 'throw new Error("test has no run() function");';
-  const src = String(fn);
-  // Try arrow: `(args) => { ... }` or `args => expr`
-  let m = src.match(/^\s*(?:async\s+)?\([^)]*\)\s*=>\s*\{([\s\S]*)\}\s*$/);
-  if (m) return m[1];
-  m = src.match(/^\s*(?:async\s+)?\([^)]*\)\s*=>\s*([\s\S]*?)\s*$/);
-  if (m) return `return ${m[1]};`;
-  // Regular fn: `function (args) { ... }` or `function name(args) { ... }`
-  m = src.match(/^\s*(?:async\s+)?function[^(]*\([^)]*\)\s*\{([\s\S]*)\}\s*$/);
-  if (m) return m[1];
-  // Method shorthand: `inspect(args) { ... }`
-  m = src.match(/^[^(]*\([^)]*\)\s*\{([\s\S]*)\}\s*$/);
-  if (m) return m[1];
-  throw new Error(`Could not extract body from function: ${src.slice(0, 80)}...`);
-}
-
 // Shell out to the same gulp pipeline `npm run build` uses. This produces a fresh
 // main.bundle.js (+ preload + renderer bundles) using the consumer's current source.
 // OMEGA_BUILD_OUTPUT redirects every output path (utils/dist-root.js — the one seam) into
@@ -379,7 +272,7 @@ function extractFnBody(fn) {
 // so the user sees progress for the ~10s build cost.
 function runGulpBuild(projectRoot, outputRoot) {
   const gulpfile = path.join(projectRoot, 'node_modules', '@omega.js/desktop', 'dist', 'gulp', 'main.js');
-  const result = spawnSync('npx', ['gulp', '--cwd', projectRoot, '--gulpfile', gulpfile, 'build'], {
+  const result = childProcess.spawnSync('npx', ['gulp', '--cwd', projectRoot, '--gulpfile', gulpfile, 'build'], {
     cwd:   projectRoot,
     env:   Object.assign({}, process.env, { OMEGA_BUILD_MODE: 'true', OMEGA_BUILD_OUTPUT: outputRoot }),
     stdio: 'inherit',
@@ -429,9 +322,7 @@ function stageTestApp(projectRoot) {
     try {
       fs.symlinkSync(target, linkPath, linkType);
     } catch (e) {
-      if (process.env.OMEGA_TEST_DEBUG) {
-        console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
-      }
+      console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
     }
   }
 
@@ -471,29 +362,34 @@ function ensureFixtureDeps(effectiveRoot, emRoot) {
     if (!fs.existsSync(target))  continue;   // can't link what isn't there
 
     try {
-      // The link's PARENT, not just node_modules — a scoped name like
-      // @omega.js/desktop needs its node_modules/@omega.js dir to exist first
-      fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+      // The link's parent dirs are created too, and recorded so the removal takes them back.
+      const firstMade = fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+      if (firstMade) created.push(...dirsBetween(firstMade, path.dirname(linkPath)));
       fs.symlinkSync(target, linkPath, linkType);
       created.push(linkPath);
     } catch (e) {
-      // Best-effort — if it mattered, the gulp build / electron lookup below surfaces a
+      // Best-effort: if it mattered, the gulp build or electron lookup below surfaces a
       // far clearer error than anything we'd throw here.
-      if (process.env.OMEGA_TEST_DEBUG) {
-        console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
-      }
+      console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
     }
   }
 
   return created;
 }
 
-// Remove the symlinks ensureFixtureDeps created THIS run — never anything else, so a real
+// Every dir from `top` down to `bottom`, top first: what one recursive mkdir created.
+function dirsBetween(top, bottom) {
+  const dirs = [bottom];
+  while (dirs[0] !== top) dirs.unshift(path.dirname(dirs[0]));
+  return dirs;
+}
+
+// Remove the links and dirs ensureFixtureDeps created THIS run, newest first, and nothing else, so a real
 // consumer's node_modules is untouched (nothing was created for it). Removal is required,
 // not just tidy: a leftover @omega.js/desktop → repo-root link inside dist/ is an infinite
 // directory cycle that breaks the next prepare-package walk (`npm run prepare`/`npm publish`).
 function removeFixtureDeps(links) {
-  for (const linkPath of links) {
+  for (const linkPath of [...links].reverse()) {
     try {
       fs.unlinkSync(linkPath);                                   // POSIX symlinks
     } catch (_) {
@@ -502,4 +398,4 @@ function removeFixtureDeps(links) {
   }
 }
 
-module.exports = { runBootTests, runBootChild };
+module.exports = { bootDriver, partitionBootSuites, runBootChild };

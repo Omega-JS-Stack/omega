@@ -64,13 +64,13 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'a framework with several rows loads every file before the first case runs',
+      name: 'a framework with several rows loads every file up front to learn its row, and a host row loads each file again when its turn comes',
       run(ctx) {
         const { result, calls, error, output } = runScenario('several-rows');
 
         ctx.expect(error, output).toBeNull();
         ctx.expect(result.passed).toBe(2);
-        ctx.expect(calls).toEqual(['load A', 'load B', 'case A', 'case B']);
+        ctx.expect(calls).toEqual(['load A', 'load B', 'load A', 'case A', 'load B', 'case B']);
       },
     },
   ],

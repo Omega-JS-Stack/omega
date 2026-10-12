@@ -1,4 +1,4 @@
-// View-layer suite that names a view: it runs in the PROJECT's own built
+// A boot suite that names a view: it runs in the PROJECT's own built
 // views/popup/index.html, inside the project's loaded extension, never on the
 // harness page. Every scaffolded project builds a popup view, and every built
 // view loads the build snapshot first.
@@ -7,14 +7,15 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 
 module.exports = defineCases({
   type: 'group',
-  layer: 'view',
+  layer: 'boot',
   view: 'popup',
-  description: 'view/project-view: a suite naming a view opens the project\'s built page',
+  timeout: 45000,
+  description: 'boot/project-view: a suite naming a view opens the project\'s built page',
   tests: [
     {
       name: 'the page is the project\'s views/popup/index.html',
       run: async (ctx) => {
-        ctx.expect(location.pathname).toBe('/views/popup/index.html');
+        ctx.expect(ctx.page.location.pathname).toBe('/views/popup/index.html');
       },
     },
     {

@@ -1,17 +1,7 @@
-// The test-harness background service worker.
-//
-// This SW does ONE job: stay alive long enough for the chromium runner to attach
-// a CDP session and inject test code via Runtime.evaluate. The runner discovers
-// this SW via Puppeteer's service-worker target API, then drives test execution
-// directly from the parent Node process — this file is intentionally minimal.
-//
-// We set a couple of globals the injected test code can rely on:
-//   globalThis.OMEGA_TEST_MODE: picked up by omega.isTesting()
-//   globalThis.__omegaTestEmit — defined by the runner before each test;
-//                              used by injected code to report results
-//
-// We also publish a `chrome.runtime.onMessage` ping handler so view-layer tests
-// (running in popup/options/sidepanel tabs) can verify the SW is alive.
+// The test-harness service worker: it stays alive for the background driver to
+// attach over CDP and evaluate each suite's payload, whose cases report as
+// `__OMEGA_TEST__` console lines. It sets globalThis.OMEGA_TEST_MODE, and answers
+// a ping so a view suite can prove the worker is alive.
 
 globalThis.OMEGA_TEST_MODE = true;
 

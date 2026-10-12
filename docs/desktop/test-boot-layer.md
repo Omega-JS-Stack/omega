@@ -33,28 +33,29 @@ module.exports = defineCases({
   timeout:     20000,
   tests: [
     {
-      description: 'omega initialized end-to-end',
-      inspect: async ({ omega, expect, projectRoot }) => {
-        expect(omega._initialized).toBe(true);
-        expect(omega.config).toBeTruthy();
+      name: 'omega initialized end-to-end',
+      run: async (ctx) => {
+        ctx.expect(ctx.omega._initialized).toBe(true);
+        ctx.expect(ctx.omega.config).toBeTruthy();
       },
     },
     {
-      description: 'tray + menu rendered',
-      inspect: async ({ omega, expect }) => {
-        expect(omega.tray.has('open')).toBe(true);
-        expect(omega.menu.isRendered()).toBe(true);
+      name: 'tray + menu rendered',
+      run: async (ctx) => {
+        ctx.expect(ctx.omega.tray.has('open')).toBe(true);
+        ctx.expect(ctx.omega.menu.isRendered()).toBe(true);
       },
     },
   ],
 });
 ```
 
-The `inspect` function receives:
-| Arg | Description |
+A boot case is `{ name, run(ctx), timeout?, skip? }`, the case every other layer takes. Its `run` is rebuilt from its text inside the booted app's main process, so it sees `ctx` plus Node's `require`, `process` and `Buffer`, never a closure over the test file; its parameter list is `()` or `(ctx)`. Beside the ctx every layer gets (`expect`, `waitFor`, `state`, `layer`, `skip`), a boot case's ctx carries:
+
+| Key | Description |
 |---|---|
 | `omega` | The fully-initialized live main-process instance, the same one your consumer code uses. |
-| `expect` | devkit's assertion library ([expect.js](../../packages/devkit/src/test/expect.js)), reached through @omega.js/desktop's [src/test/assert.js](../../packages/desktop/src/test/assert.js), which re-exports it. Matchers: [test-framework.md](test-framework.md#expect-matchers). |
+| `expect` | devkit's assertion library ([expect.js](../../packages/devkit/src/test/expect.js)), the same `expect` the door `@omega.js/desktop/test` exports. Matchers: [test-framework.md](test-framework.md#expect-matchers). |
 | `projectRoot` | Absolute path to the consumer project root (its `src/`, `config/` — and the `dist/` a boot run must never write). |
 | `appRoot` | Absolute path to the staged app root Electron booted — `<projectRoot>/.omega/test-app`. Assert on built artifacts here (`<appRoot>/dist/main.bundle.js`), not under `projectRoot`. |
 | `frameworkDistRoot` | Absolute path to `<@omega.js/desktop>/dist` — where framework test utilities live. |
@@ -62,19 +63,19 @@ The `inspect` function receives:
 
 ## How it works
 
-1. Test runner discovers `test/**/*.js` files with `layer: 'boot'`.
-2. Stages `<projectRoot>/.omega/test-app`, builds into its `dist/`, and aggregates each test's `inspect` source body into a JSON spec file.
+1. The runner discovers `test/**/*.test.js` files and hands the ones with `layer: 'boot'` to the boot driver ([src/test/runners/boot.js](../../packages/desktop/src/test/runners/boot.js)). A suite skipped whole reports its cases skipped there and needs no build.
+2. Stages `<projectRoot>/.omega/test-app`, builds into its `dist/` (a failed build fails every boot case with the build's error), and writes a JSON spec file: the suites without `view` and the suites with one, each serialized with its bodies as text (devkit's `./test/serialize`, over `fnSource`).
 3. Spawns a real Electron process: `electron <projectRoot>/.omega/test-app` — an app dir with a `package.json` whose `main` is the built bundle, same shape as `npm start`'s `electron .`.
 4. Sets three env vars before spawn:
    - `OMEGA_TEST_BOOT=1` — gate
    - `OMEGA_TEST_BOOT_HARNESS=<absolute path to dist/test/harness/boot-entry.js>`
    - `OMEGA_TEST_BOOT_SPEC=<temp file with test definitions>`
-5. @omega.js/desktop's `main.js` boots normally; after `omega.initialize()` resolves, detects `OMEGA_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__OMEGA_TEST__` JSON lines on stdout (the ONE prefix, `TEST_EVENT_PREFIX` in [src/utils/test-events.js](../../packages/desktop/src/utils/test-events.js)).
-6. Test runner parses results, calls `app.exit()`. **No sleep, no kill.**
+5. @omega.js/desktop's `main.js` boots normally; after `omega.initialize()` resolves, it detects `OMEGA_TEST_BOOT=1` and hands the instance to [harness/boot-entry.js](../../packages/desktop/src/test/harness/boot-entry.js), which waits up to 3s for the main window, rebuilds each suite without `view` and runs it through devkit's `runSuite` in this main process, and writes one `__OMEGA_TEST__` line per case on stdout (the one envelope, `eventLine` in devkit's `./test/events`).
+6. The driver reports each line's case to the runner by id; the harness calls `app.exit()` once every suite has run. **No sleep, no kill.** A harness that cannot start writes its error on stderr and exits 1, and the runner fails every case it never reported.
 
 ## View suites in this lane
 
-The boot lane also carries the renderer suites that name a project view (`layer: 'renderer'` + `view: '<name>'`). They need exactly what this lane already produces: the staged, freshly built app. After the `inspect` tests finish, [harness/boot-entry.js](../../packages/desktop/src/test/harness/boot-entry.js) opens each such suite's view in a real window of the booted app (through the app's own window manager, hidden), evaluates `harness/renderer-entry.js` verbatim inside the page (one suite loop, one `expect`, no fork), runs the suite there, and destroys the window. So the page carries the project's real preload, the booted main process's real IPC handlers, and the real config. The knob and its rules are documented in [test-framework.md](test-framework.md#testing-your-own-views).
+A boot suite that names a project view (`layer: 'boot'` + `view: '<name>'`) runs in that view: it needs exactly what this lane already produces, the staged, freshly built app. After the main-process suites finish, `boot-entry.js` opens each such suite's view in a real window of the booted app (through the app's own window manager, hidden), evaluates the page engine `harness/renderer-entry.js` inside the page with the text of devkit's `run-case.js` and `expect.js` (one suite loop, one `expect`, the harness page's own engine), runs the suite there with `ctx.page` set to the page's `window`, and destroys the window. So the page carries the project's real preload, the booted main process's real IPC handlers, and the real config. A standalone spec names its `view` at the top level like any other. The knob and its rules are documented in [test-framework.md](test-framework.md#testing-your-own-views).
 
 ## Running
 
@@ -83,11 +84,13 @@ The boot lane also carries the renderer suites that name a project view (`layer:
 npx omega test
 
 # Boot only
-npx omega test --layer boot
+npx omega test --layer=boot
 
-# With debug output (shows electron's stderr + harness internals)
-OMEGA_TEST_DEBUG=1 npx omega test --layer boot
+# One JSON document on stdout, the boot cases among its tests
+npx omega test --layer=boot --reporter=json
 ```
+
+The booted app's own stdout lines pass through to the run's output as they come. Its silence is budgeted: a boot that writes no harness line for 60s (`OMEGA_TEST_BOOT_TIMEOUT_MS` overrides) fails every case it has not reported, naming the last line of its `logs/runtime.log`, and the child is ended.
 
 ## Isolated build output
 
@@ -114,7 +117,7 @@ The regression is covered end-to-end in the real run: the runner fingerprints `<
 Opt out for CI scenarios where build already ran in a separate step:
 
 ```bash
-OMEGA_TEST_SKIP_BUILD=1 npx omega test --layer boot
+OMEGA_TEST_SKIP_BUILD=1 npx omega test --layer=boot
 ```
 
 Boot then runs against whatever is already in `<project>/.omega/test-app/dist/`. If there is no bundle there, the run **fails loudly** rather than skipping or falling back to the project's `dist/` — an absent test build means the build step that was promised never ran, and booting some other bundle would silently test the wrong code.
@@ -125,7 +128,7 @@ Everything above describes a **consumer** running boot tests against their own b
 
 When `npx omega test` runs from the @omega.js/desktop repo (the cwd's `package.json` name is `@omega.js/desktop`), two complementary mechanisms engage:
 
-- **`isFrameworkSelfTest`** (in [src/test/runner.js](../../packages/desktop/src/test/runner.js)) — test discovery includes the framework's own `boot/**` suites. For a real consumer this flag is false and framework `boot/**` suites are **excluded** (they target @omega.js/desktop's fixture, not the consumer's app), so they never run in a consumer's `npx omega test`.
+- **The self-test** (devkit's discovery rule, [devkit/index.md](../devkit/index.md#the-case-runner)): test discovery includes the framework's own `boot/**` suites. For a real consumer the run is no self-test and framework `boot/**` suites are **excluded** (they target @omega.js/desktop's fixture, not the consumer's app), so they never run in a consumer's `npx omega test`.
 - **`OMEGA_TEST_BOOT_PROJECT`** — [src/commands/test.js](../../packages/desktop/src/commands/test.js) points the boot runner at the bundled fixture under `src/test/fixtures/consumer-app/` instead of the cwd.
 
 The gate decides *whether* the framework boot suite runs; the env var decides *which project* gets booted. (@omega.js/backend's `OMEGA_TEST_BOOT_PROJECT`, BXM's `OMEGA_TEST_BOOT_PROJECT`, and UJM's `UJ_TEST_BOOT_PROJECT` are the exact analogs.)
@@ -154,6 +157,6 @@ The `build`/`main`/`renderer` layers cover @omega.js/desktop's lib code fast and
 
 ## Limitations
 
-- Tests run sequentially in a single Electron process to amortize startup cost (~1s). State doesn't carry across tests: they all share one `omega` instance.
-- `inspect` function bodies are serialized via `Function.prototype.toString` and reconstituted with `new Function(...)`. Closures over the test file's outer scope **don't survive** — only the `inspect` argument bag is available inside.
+- Tests run sequentially in a single Electron process to amortize startup cost (~1s). They all share one `omega` instance; `ctx.state` carries across the cases of one suite.
+- `run` bodies travel as text (devkit's `fnSource`) and are rebuilt inside the app. Closures over the test file's outer scope **don't survive**: only `ctx` (plus `require`, `process` and `Buffer` in the main process, the page globals in a view) is available inside.
 - We can't simulate user input (clicking the tray, right-clicking, typing). For that, you'd need `nut-js` or similar — out of scope.

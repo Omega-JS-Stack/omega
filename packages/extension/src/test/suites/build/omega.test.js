@@ -339,12 +339,12 @@ module.exports = defineCases({
     },
     {
       // A consumer case file wraps its spec in defineCases from this one door
-      name: 'the ./test door hands out { defineCases, expect }',
+      name: 'case-173 the ./test door hands out { defineCases, expect }, expect being devkit\'s own',
       run: (ctx) => {
         const door = require('@omega.js/extension/test');
         ctx.expect(Object.keys(door).sort()).toEqual(['defineCases', 'expect']);
         ctx.expect(door.defineCases).toBe(defineCases);
-        ctx.expect(door.expect).toBe(require(path.join(SRC, 'test', 'assert.js')));
+        ctx.expect(door.expect).toBe(require('@omega.js/devkit/test/expect'));
       },
     },
   ],

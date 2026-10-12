@@ -1,54 +1,71 @@
-// Build-layer test for the view suites that name a project view, driven through
-// the REAL boot runner and Chromium with the fixture consumer loaded: a suite
+// Build-layer test for the boot suites that name a project view, driven through
+// the verb's REAL boot driver and Chromium with the fixture consumer loaded: a suite
 // naming a built view runs inside that page, and one naming a view the project
-// never built fails every test instead of passing on some other page.
+// never built fails every case naming the view instead of passing on some other page.
 
 const path = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
 
-const BOOT_RUNNER = path.join(__dirname, '..', '..', 'runners', 'boot.js');
-const FIXTURE_DIST = path.join(__dirname, '..', '..', 'fixtures', 'consumer-extension', 'dist');
+const VERB = path.join(__dirname, '..', '..', '..', 'commands', 'test.js');
+const FIXTURE_ROOT = path.join(__dirname, '..', '..', 'fixtures', 'consumer-extension');
+const FIXTURE_DIST = path.join(FIXTURE_ROOT, 'dist');
+
+const BUILT = {
+  type: 'group',
+  layer: 'boot',
+  view: 'popup',
+  description: 'a built view',
+  tests: [{ name: 'runs in views/popup/index.html', run: async (ctx) => { ctx.expect(ctx.page.location.pathname).toBe('/views/popup/index.html'); } }],
+};
+
+const UNBUILT = {
+  type: 'group',
+  layer: 'boot',
+  view: 'sidepanel',
+  description: 'an unbuilt view',
+  tests: [
+    { name: 'never runs (1)', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+    { name: 'never runs (2)', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+  ],
+};
 
 module.exports = defineCases({
   layer: 'build',
-  description: 'view suites naming a view ride the boot lane into the project\'s built page',
+  description: 'boot suites naming a view run in the project\'s built page',
   timeout: 60000,
   run: async (ctx) => {
-    const { runBootTests } = require(BOOT_RUNNER);
+    const { runnerConfig } = require(VERB);
+    const driver = runnerConfig({ projectRoot: FIXTURE_ROOT, selfTest: false }).drivers.boot;
     const suites = [
-      {
-        file: 'built.test.js',
-        mod: {
-          type: 'group',
-          layer: 'view',
-          view: 'popup',
-          description: 'a built view',
-          tests: [{ name: 'runs in views/popup/index.html', run: async (ctx) => { ctx.expect(location.pathname).toBe('/views/popup/index.html'); } }],
-        },
-      },
-      {
-        file: 'unbuilt.test.js',
-        mod: {
-          type: 'group',
-          layer: 'view',
-          view: 'sidepanel',
-          description: 'an unbuilt view',
-          tests: [
-            { name: 'never runs (1)', run: async () => {} },
-            { name: 'never runs (2)', run: async () => {} },
-          ],
-        },
-      },
+      normalizeSpec(BUILT, { file: path.join(FIXTURE_ROOT, 'built.test.js') }),
+      normalizeSpec(UNBUILT, { file: path.join(FIXTURE_ROOT, 'unbuilt.test.js') }),
     ];
+    const events = [];
 
-    const previous = process.env.OMEGA_TEST_BOOT_DIR;
+    const previous = { dir: process.env.OMEGA_TEST_BOOT_DIR, project: process.env.OMEGA_TEST_BOOT_PROJECT };
     process.env.OMEGA_TEST_BOOT_DIR = FIXTURE_DIST;
+    process.env.OMEGA_TEST_BOOT_PROJECT = FIXTURE_ROOT;
     try {
-      const counts = await runBootTests({ tests: [], suites, projectRoot: FIXTURE_DIST, defaultTimeout: 30000 });
-      ctx.expect(counts).toEqual({ passed: 1, failed: 2, skipped: 0 });
+      const handle = await driver.start({ projectRoot: FIXTURE_ROOT, options: {}, suites, hooks: [], report: (event) => { events.push(event); } });
+      try {
+        await handle.finished;
+      } finally {
+        await handle.stop();
+      }
     } finally {
-      if (previous === undefined) delete process.env.OMEGA_TEST_BOOT_DIR;
-      else process.env.OMEGA_TEST_BOOT_DIR = previous;
+      for (const [key, value] of [['OMEGA_TEST_BOOT_DIR', previous.dir], ['OMEGA_TEST_BOOT_PROJECT', previous.project]]) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+
+    const byId = Object.fromEntries(events.map((event) => [event.id, event]));
+    ctx.expect(events.length).toBe(3);
+    ctx.expect(byId[suites[0].cases[0].id].status).toBe('pass');
+    for (const caseDef of suites[1].cases) {
+      ctx.expect(byId[caseDef.id].status).toBe('fail');
+      ctx.expect(byId[caseDef.id].error.message).toContain('sidepanel');
     }
   },
 });

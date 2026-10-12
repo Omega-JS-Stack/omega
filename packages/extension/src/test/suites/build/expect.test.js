@@ -2,9 +2,7 @@
 // if this doesn't pass, the test framework itself is broken and downstream
 // suites can't be trusted.
 
-const path = require('path');
-
-const expect = require(path.join(__dirname, '..', '..', 'assert.js'));
+const expect = require('@omega.js/devkit/test/expect');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 module.exports = defineCases({

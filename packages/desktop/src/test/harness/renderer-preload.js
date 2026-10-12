@@ -1,12 +1,8 @@
-// Renderer test-harness preload. Bridges between the harness BrowserWindow and the parent
-// main-process harness via three channels:
-//
-//   __omegaTest:ready   : renderer signals it's ready to receive suites
-//   __omegaTest:result  : renderer emits per-test results / suite-start / fatal
-//   __omegaTest:suites  : main sends serialized renderer suites for execution
-//
-// Also exposes the production-style `window.desktop` surface (mirrors src/preload.js so renderer
-// test suites can assert on it), and builds the REAL renderer instance in this world.
+// Renderer test-harness preload: the page engine's bridge to main over four channels,
+// __omegaTest:ready (the engine can take suites), :suites (main sends the engine sources
+// and the serialized suites), :result (one case event per case) and :done (every suite
+// ran, or the engine failed with its error). It also exposes the production-style
+// `window.desktop` surface (mirrors src/preload.js) and builds the REAL renderer instance.
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -41,11 +37,13 @@ function makeForwardingLogger() {
 contextBridge.exposeInMainWorld('__omegaTest', {
   // Signal main that the harness page is loaded and ready to accept suites.
   ready: () => { instanceBuilt.then(() => ipcRenderer.send('__omegaTest:ready')); },
-  // Forward a result event up to main, which prints it.
+  // Forward a case event up to main, which writes its envelope line.
   emit:  (evt) => ipcRenderer.send('__omegaTest:result', evt),
-  // Subscribe to incoming suite payloads.
+  // Every suite ran; an error string means the engine itself failed.
+  done:  (error) => ipcRenderer.send('__omegaTest:done', error || null),
+  // Subscribe to the incoming `{ sources, suites, layer }` payload.
   onSuites: (handler) => {
-    ipcRenderer.on('__omegaTest:suites', (_e, suites) => handler(suites));
+    ipcRenderer.on('__omegaTest:suites', (_e, payload) => handler(payload));
   },
 });
 

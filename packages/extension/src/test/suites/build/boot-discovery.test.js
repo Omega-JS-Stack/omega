@@ -1,25 +1,28 @@
-// Build-layer tests for the boot layer's extension-directory discovery (#575).
-//
-// The boot layer promises a SKIP when the consumer has not built yet
-// (docs/extension/test-boot-layer.md). It discovered by existence alone, so it fell
-// through to `<consumer>/dist/` — which exists after any dev run or `omega
-// clean` — loaded the JSON5 source manifest Chrome cannot parse, and hard-failed
-// every boot test instead. A directory only qualifies when its manifest is
-// STRICT JSON; an explicitly named OMEGA_TEST_BOOT_DIR still fails loudly,
-// because that one is the caller's decision, not a fallback.
-//
-// Discovery is asserted directly (no Chromium): the skip/abort verdicts are
-// reached and returned before puppeteer ever launches.
+// Build-layer tests for the boot layer's extension-directory discovery. Only a STRICT JSON
+// manifest qualifies, so an unbuilt project skips naming `npm run build`, and an explicit
+// OMEGA_TEST_BOOT_DIR at a broken manifest fails loudly. No Chromium: the verdicts reach the
+// cases through the verb's boot driver before puppeteer would launch.
 
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
 
 const BOOT_RUNNER = path.join(__dirname, '..', '..', 'runners', 'boot.js');
+const VERB = path.join(__dirname, '..', '..', '..', 'commands', 'test.js');
 
-// One boot test, enough to make the counts meaningful.
-const TESTS = [{ description: 'boot probe', inspect: async () => {} }];
+// Two boot cases, so "every case" means more than one.
+const PROBE = {
+  type: 'group',
+  layer: 'boot',
+  timeout: 45000,
+  description: 'boot probe',
+  tests: [
+    { name: 'boot probe one', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+    { name: 'boot probe two', run: async (ctx) => { ctx.expect(true).toBe(true); } },
+  ],
+};
 
 const JSON5_MANIFEST = `{
   // the framework-authored source style Chrome refuses
@@ -59,28 +62,48 @@ function withBootEnv(vars, fn) {
     });
 }
 
+// The verb's boot driver, started on `projectRoot` with the probe suite; resolves to the events it reported.
+async function driveBoot(driver, projectRoot) {
+  const suite = normalizeSpec(PROBE, { file: path.join(projectRoot, 'probe.test.js') });
+  const events = [];
+  const handle = await driver.start({ projectRoot, options: {}, suites: [suite], hooks: [], report: (event) => { events.push(event); } });
+  try {
+    await handle.finished;
+  } finally {
+    await handle.stop();
+  }
+  return events;
+}
+
+// The consumer config's boot driver, read before a case moves the boot env.
+function bootDriver(projectRoot) {
+  const { runnerConfig } = require(VERB);
+  return runnerConfig({ projectRoot, selfTest: false }).drivers.boot;
+}
+
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'boot layer — extension-directory discovery',
   tests: [
     {
-      name: 'a JSON5 dist/ manifest never qualifies — the run SKIPS as documented (#575)',
+      name: 'case-168 a dir with no parsable manifest.json skips every boot case naming npm run build',
       run: async (ctx) => {
-        const { runBootTests, resolveBootDir } = require(BOOT_RUNNER);
+        const { resolveBootDir } = require(BOOT_RUNNER);
         const tmp = stageConsumer({ dist: JSON5_MANIFEST });
+        const driver = bootDriver(tmp);
 
         try {
-          await withBootEnv({}, async () => {
+          await withBootEnv({ OMEGA_TEST_BOOT_PROJECT: tmp }, async () => {
             const discovery = resolveBootDir(tmp);
             ctx.expect(discovery.dir).toBe(null);
             // The JSON5 copy is REPORTED, so the skip can say why it was passed over
             ctx.expect(discovery.rejected.length).toBe(1);
             ctx.expect(discovery.rejected[0].dir).toBe(path.join(tmp, 'dist'));
 
-            const counts = await runBootTests({ tests: TESTS, projectRoot: tmp });
-            ctx.expect(counts.skipped).toBe(TESTS.length);
-            ctx.expect(counts.failed).toBe(0);
+            const events = await driveBoot(driver, tmp);
+            ctx.expect(events.map((event) => event.status)).toEqual(['skip', 'skip']);
+            for (const event of events) ctx.expect(event.reason).toContain('npm run build');
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -108,22 +131,23 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'an explicitly named OMEGA_TEST_BOOT_DIR with a JSON5 manifest still FAILS loudly (#575)',
+      name: 'case-168 OMEGA_TEST_BOOT_DIR at a broken manifest fails every boot case naming the file',
       run: async (ctx) => {
-        const { runBootTests, resolveBootDir } = require(BOOT_RUNNER);
+        const { resolveBootDir } = require(BOOT_RUNNER);
         const tmp = stageConsumer({ dist: JSON5_MANIFEST });
+        const driver = bootDriver(tmp);
 
         try {
-          await withBootEnv({ OMEGA_TEST_BOOT_DIR: path.join(tmp, 'dist') }, async () => {
+          await withBootEnv({ OMEGA_TEST_BOOT_PROJECT: tmp, OMEGA_TEST_BOOT_DIR: path.join(tmp, 'dist') }, async () => {
             const discovery = resolveBootDir(tmp);
             ctx.expect(discovery.dir).toBe(null);
             // The caller named this directory — a manifest Chrome cannot parse
             // there is an error, never a candidate to walk past
             ctx.expect(discovery.error).toBeInstanceOf(Error);
 
-            const counts = await runBootTests({ tests: TESTS, projectRoot: tmp });
-            ctx.expect(counts.failed).toBe(TESTS.length);
-            ctx.expect(counts.skipped).toBe(0);
+            const events = await driveBoot(driver, tmp);
+            ctx.expect(events.map((event) => event.status)).toEqual(['fail', 'fail']);
+            for (const event of events) ctx.expect(event.error.message).toContain(path.join('dist', 'manifest.json'));
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });

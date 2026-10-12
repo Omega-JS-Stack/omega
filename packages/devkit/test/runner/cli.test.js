@@ -79,6 +79,23 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'a scoped target matches a nested suite in slash or backslash form, and a scoped directory every suite under it',
+      run(ctx) {
+        for (const target of ['project:build/runner', 'project:build\\runner', 'project:build/runner.test.js']) {
+          const run = runCli('scoped-sep', [target]);
+          removeAll(run.log);
+          ctx.expect(run.json, run.output).not.toBeNull();
+          ctx.expect(run.json.noMatch, target).toBeNull();
+          ctx.expect(names(run.json), target).toEqual(['nested runner']);
+        }
+
+        const dir = runCli('scoped-sep', ['project:build/']);
+        removeAll(dir.log);
+        ctx.expect(dir.json, dir.output).not.toBeNull();
+        ctx.expect(names(dir.json)).toEqual(['nested other', 'nested runner']);
+      },
+    },
+    {
       name: 'case-52 --filter keeps cases whose name or suite description contains the text',
       run(ctx) {
         const byDescription = runCli('basic', ['--filter=second']);

@@ -9,7 +9,7 @@ module.exports = defineCases({
   context: 'sidepanel',
   description: 'view/sidepanel — DOM + context attribute',
   run: async (ctx) => {
-    ctx.expect(document.body.dataset.omegaContext).toBe('sidepanel');
+    ctx.expect(ctx.page.document.body.dataset.omegaContext).toBe('sidepanel');
     ctx.expect(document.title).toContain('Side Panel');
     ctx.expect(typeof chrome.runtime.id).toBe('string');
   },

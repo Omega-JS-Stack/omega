@@ -4,15 +4,15 @@
 // found.", "0 passing", and exited 0: a typo'd path target, or a suite renamed
 // out from under one, ran silently green.
 //
-// The rule lives in the runner's selection step, so these drive the REAL
-// extension runner from a consumer directory with no tests of its own.
+// The rule lives in devkit's discovery, so these run it over the REAL verb's
+// runner config, from a consumer directory with no tests of its own.
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const RUNNER = path.join(__dirname, '..', '..', 'runner.js');
+const VERB = path.join(__dirname, '..', '..', '..', 'commands', 'test.js');
 
 // A consumer directory with a package.json and no test/ dir at all.
 function makeEmptyConsumer() {
@@ -21,22 +21,11 @@ function makeEmptyConsumer() {
   return dir;
 }
 
-// Run the real runner from `dir`, with its report silenced: the probe reports
-// like any run, and its report is not THIS run's.
-async function runFrom(dir, options) {
-  const { run } = require(RUNNER);
-  const previousCwd = process.cwd();
-  const realLog = console.log;
-
-  process.chdir(dir);
-  console.log = () => {};
-
-  try {
-    return await run(options);
-  } finally {
-    console.log = realLog;
-    process.chdir(previousCwd);
-  }
+// What a run from `dir` selects: devkit's discovery over the verb's own config.
+function selectFrom(dir, targets) {
+  const { runnerConfig } = require(VERB);
+  const { discoverSuites } = require('@omega.js/devkit/test/discovery');
+  return discoverSuites(runnerConfig({ projectRoot: dir, selfTest: false }), { targets });
 }
 
 module.exports = defineCases({
@@ -46,16 +35,15 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a named target that selects no file comes back flagged, not green',
-      run: async (ctx) => {
+      run: (ctx) => {
         const dir = makeEmptyConsumer();
 
         try {
           // Every spelling of a path target: bare, framework-scoped, project-scoped.
           for (const target of ['view/does-not-exist', 'extension:build/does-not-exist', 'project:does-not-exist']) {
-            const result = await runFrom(dir, { target });
+            const result = selectFrom(dir, [target]);
             ctx.expect(result.noMatch).toBe(target);
-            ctx.expect(result.passed).toBe(0);
-            ctx.expect(result.failed).toBe(0);
+            ctx.expect(result.files).toEqual([]);
           }
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
@@ -64,16 +52,16 @@ module.exports = defineCases({
     },
     {
       name: 'a run that named no file stays green with nothing to run',
-      run: async (ctx) => {
+      run: (ctx) => {
         const dir = makeEmptyConsumer();
 
         try {
           // A bare run, and a bare source prefix, ask for a source rather than
           // a file: an empty project is still an exit-0 run.
-          for (const options of [{}, { target: 'project:' }]) {
-            const result = await runFrom(dir, options);
+          for (const targets of [[], ['project:']]) {
+            const result = selectFrom(dir, targets);
             ctx.expect(result.noMatch).toBe(null);
-            ctx.expect(result.passed).toBe(0);
+            ctx.expect(result.files).toEqual([]);
           }
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
@@ -82,13 +70,13 @@ module.exports = defineCases({
     },
     {
       name: 'a target naming a real framework suite still selects it',
-      run: async (ctx) => {
+      run: (ctx) => {
         const dir = makeEmptyConsumer();
 
         try {
-          const result = await runFrom(dir, { target: 'extension:build/test-discovery' });
+          const result = selectFrom(dir, ['extension:build/test-discovery']);
           ctx.expect(result.noMatch).toBe(null);
-          ctx.expect(result.passed > 0).toBe(true);
+          ctx.expect(result.files.map((file) => path.basename(file.file))).toEqual(['test-discovery.test.js']);
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }

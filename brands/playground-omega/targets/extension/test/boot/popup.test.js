@@ -1,5 +1,5 @@
 /**
- * View-layer UI test: this project's popup, on the real DOM.
+ * Built-view UI test: this project's popup, on the real DOM.
  *
  * `view: 'popup'` opens the built views/popup/index.html inside the packaged
  * extension. A fresh test profile is signed out, which is the state asserted.
@@ -10,7 +10,8 @@ const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
   type: 'group',
-  layer: 'view',
+  layer: 'boot',
+  timeout: 45000,
   view: 'popup',
   description: 'the popup (real DOM)',
   tests: [
