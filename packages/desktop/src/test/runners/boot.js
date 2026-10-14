@@ -15,7 +15,7 @@ const distSnapshot = require('../utils/dist-snapshot.js');
 const { serializeSuite, specKey } = require('@omega.js/devkit/test/serialize');
 const { reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
 const {
-  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, readChildOutput, childEnded, exitError, endChild,
+  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, electronArgs, readChildOutput, childEnded, exitError, endChild,
 } = require('./app-child.js');
 
 // How long a booted app gets to say anything at all before the run is declared
@@ -137,7 +137,7 @@ async function bootProject({ mainSuites, viewSuites, cases, effectiveRoot, repor
   // The staged target root is the app: Electron loads it the way it loads a real project dir.
   await runBootChild({
     electronBin,
-    args: [testApp.appRoot],
+    entry: testApp.appRoot,
     childEnv,
     effectiveRoot,
     specFile,
@@ -179,13 +179,14 @@ function buildTestApp(effectiveRoot, testApp) {
  * Spawn the booted app and report what its harness writes, under an IDLE budget:
  * every envelope line rearms it, and a whole budget of silence fails every case
  * still unreported (quoting the last runtime.log line) and ends the child.
- * `spawnFn`, `timeoutMs` and `killGraceMs` are the seams a build suite drives.
- * @param {object} options - `{ electronBin, args, childEnv, effectiveRoot, specFile, cases, report, spawnFn, timeoutMs, killGraceMs }`.
+ * `spawnFn`, `platform`, `timeoutMs` and `killGraceMs` are the seams a build suite drives;
+ * `electronArgs` reads the CI check off `childEnv` and defaults `platform` to this process's.
+ * @param {object} options - `{ electronBin, entry, childEnv, effectiveRoot, specFile, cases, report, spawnFn, platform, timeoutMs, killGraceMs }`.
  * @returns {Promise<void>} Resolves when the child exits or the budget ends it; rejects on a non-zero exit.
  */
-function runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, cases, report, spawnFn = childProcess.spawn, timeoutMs = bootTimeoutMs(), killGraceMs = KILL_GRACE_MS }) {
+function runBootChild({ electronBin, entry, childEnv, effectiveRoot, specFile, cases, report, spawnFn = childProcess.spawn, platform, timeoutMs = bootTimeoutMs(), killGraceMs = KILL_GRACE_MS }) {
   return new Promise((resolve, reject) => {
-    const child = spawnFn(electronBin, args, {
+    const child = spawnFn(electronBin, electronArgs(entry, { env: childEnv, platform }), {
       cwd: effectiveRoot,
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],

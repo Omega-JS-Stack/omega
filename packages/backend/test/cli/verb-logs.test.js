@@ -22,26 +22,12 @@ const jetpack = require('fs-jetpack');
 const BaseCommand = require('../../dist/cli/commands/base-command.js');
 const attachLogFile = require('../../dist/cli/utils/attach-log-file.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { withoutCI } = require('../../dist/vendor/devkit/test/without-ci.js');
 
 // A command bound to a throwaway target root — BaseCommand reads its paths off main.
 function commandInTempApp() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-verb-logs-'));
   return { root, command: new BaseCommand({ firebaseProjectPath: root, argv: {}, options: {} }) };
-}
-
-// The tee deliberately skips under a runner; these tests are about what it does
-// when it does NOT skip, so the signal is lifted for the duration.
-function withoutCiEnv(run) {
-  const prior = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
-  delete process.env.CI;
-  delete process.env.GITHUB_ACTIONS;
-  try {
-    return run();
-  } finally {
-    for (const [key, value] of Object.entries(prior)) {
-      if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; }
-    }
-  }
 }
 
 module.exports = defineCases({
@@ -54,7 +40,8 @@ module.exports = defineCases({
       async run({ expect }) {
         const { root, command } = commandInTempApp();
 
-        const logPath = withoutCiEnv(() => {
+        // The tee deliberately skips under a runner; this asserts what it does when it does not.
+        const logPath = withoutCI(() => {
           const restoreTee = attachLogFile.mark();
           const resolved = command.attachVerbLog('test');
           console.log('\x1B[33mverb log line\x1B[0m');

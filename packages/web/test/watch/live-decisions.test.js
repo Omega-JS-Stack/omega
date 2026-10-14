@@ -22,7 +22,7 @@ const { registerTemplateWatchTargets, watchRescanTargets } = require('../../src/
 
 // The rebuild deadline scales with the lane's load knob (#211) and with this
 // machine's measured contention (#615).
-const { POLL_MS, buildRecorder, caseTimeoutMs, rebuildDeadlineMs, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, rebuildDeadlineMs, waitForRebuild, waitForWatched } = require('../lib/deadlines.js');
 const DRAIN_QUIET_POLLS = 20;
 
 const ACTIVE_THEME = 'toy-theme';
@@ -41,10 +41,13 @@ function target() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-live-')));
   const packaged = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-live-pkg-')));
   const src = path.join(root, 'src');
+  // Every file written, so startWatch can wait until the watcher arms them.
+  const files = new Set();
   const writer = (base) => (rel, contents) => {
     const abs = path.join(base, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
+    files.add(abs);
   };
   const write = writer(src);
   const writePackaged = writer(packaged);
@@ -86,6 +89,7 @@ function target() {
     themesDir: path.join(linked, 'themes'),
     coreDir: path.join(linked, 'core'),
     defaultsDir: path.join(linked, 'defaults'),
+    files,
     write,
     cleanup: () => {
       process.chdir(cwd);
@@ -136,6 +140,7 @@ async function startWatch(t, fixture) {
     }
     fixture.cleanup();
   });
+  await waitForWatched({ watcher: elev.watcher, files: [...fixture.files] });
 
   const page = (file = 'blog.html') => fs.readFileSync(path.join(fixture.out, file), 'utf8');
 

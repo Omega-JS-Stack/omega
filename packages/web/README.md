@@ -2,8 +2,8 @@
 
 The OMEGA web framework — the UJM (Jekyll) successor, built on **Eleventy 3 +
 LiquidJS + [@omega.js/template-kit](../template-kit)** per the Phase 2 bake-off
-decision ([_attic/spikes/bakeoff-shared/DECISION.md](../../_attic/spikes/bakeoff-shared/DECISION.md) — the bake-off trees retired to the local `_attic/`, out of git:
-Eleventy 4.70 vs Astro 3.55 weighted). B1 promoted the engine core from the
+decision (2026-07-06: Eleventy 4.70 vs Astro 3.55 weighted; its facts are in the
+CHANGELOG's Phase 2 Task 2.3, 2.3b, 2.4 and 2.5 entries). B1 promoted the engine core from the
 winning spike; **B2 ported the REAL UJM content** — the full blueprint layout
 set, 3 Liquid themes + the bootstrap asset layer, ~60 default pages, and the
 real core chrome (head/body/foot) — through the B4 codemod rules. **B3 added
@@ -93,10 +93,9 @@ npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme
 A bare consumer (`omega build` in an empty dir, edit brand in
 config/omega.json5) builds the full ~56-page default set in under 2 s.
 
-Corpus-scale benching lives in [_attic/spikes/bakeoff-eleventy](../../_attic/spikes/bakeoff-eleventy)
-(the promoted spike, now a thin harness). With the REAL content the corpus
-(1,135 docs → 1,397 pages incl. the full default set) builds in ~20 s total —
-see the harness README for the honest before/after numbers.
+The corpus bench harness retired with the bake-off spike trees. With the REAL
+content its corpus (1,135 docs → 1,397 pages incl. the full default set) built
+in ~20 s total.
 
 ## Module map (`src/`)
 
@@ -634,9 +633,9 @@ original, so build-time markup resolves in dev too.
     layout/blueprint sample content (jekyll-uj-powertools 1.8.1's `defaults:`
     layer; pinned in slice.test.js).
 
-The full findings log + scorecard: [RESULTS.md](../../_attic/spikes/bakeoff-shared/RESULTS.md),
-[DECISION.md](../../_attic/spikes/bakeoff-shared/DECISION.md). The codemod rule
-table (DECISION.md) is EXECUTABLE as of B4 — [src/migrate/rules.js](src/migrate/rules.js),
+The bake-off's findings and scorecard are summarized in the CHANGELOG's Phase 2
+Task 2.3, 2.3b, 2.4 and 2.5 entries. The codemod rule table from that decision
+is EXECUTABLE as of B4: [src/migrate/rules.js](src/migrate/rules.js),
 semantically proven in the suite (the capture hoist renders byte-identical to
 a literal arg; the parentloop hoist renders the right outer indexes). B4 also
 killed two real-data bugs: taxonomy terms now dedupe by slug (somiibo mixes

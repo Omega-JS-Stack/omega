@@ -29,6 +29,7 @@
  */
 const assert = require('node:assert/strict');
 const os = require('node:os');
+const path = require('node:path');
 
 // The solo floor. No derived deadline is ever shorter than this.
 const BASE_REBUILD_DEADLINE_MS = 30000;
@@ -214,6 +215,47 @@ async function waitForRebuild(options) {
   );
 }
 
+/**
+ * The files a chokidar watcher does not list yet. A file is listed the moment
+ * its own fs watcher is armed, so a listed file's next edit is seen.
+ * @param {object} watcher - a chokidar FSWatcher
+ * @param {string[]} files - absolute paths
+ * @returns {string[]} the unlisted ones
+ */
+function unwatchedFiles(watcher, files) {
+  const listed = new Set();
+  for (const [dir, children] of Object.entries(watcher.getWatched())) {
+    children.forEach((child) => listed.add(path.resolve(watcher.options.cwd || '', dir, child)));
+  }
+
+  return files.filter((file) => !listed.has(file));
+}
+
+/**
+ * Poll a chokidar watcher until it lists every file, to the derived deadline.
+ *
+ * chokidar emits `ready` before its directory walk ends whenever a watch root
+ * is missing (Eleventy always registers some), so an edit made the moment
+ * `watch()` resolves can predate its file's watcher and is never reported.
+ * @param {object} options
+ * @param {object} options.watcher - a chokidar FSWatcher (Eleventy's `elev.watcher`)
+ * @param {string[]} options.files - absolute paths the suite will edit
+ * @returns {Promise<void>}
+ */
+async function waitForWatched(options) {
+  const { watcher, files } = options;
+  const deadlineMs = rebuildDeadlineMs();
+  const startedAt = Date.now();
+  let pending = unwatchedFiles(watcher, files);
+
+  while (pending.length && Date.now() - startedAt < deadlineMs) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    pending = unwatchedFiles(watcher, files);
+  }
+
+  assert.deepEqual(pending, [], `the watcher never armed these files in ${Date.now() - startedAt}ms (deadline ${deadlineMs}ms)`);
+}
+
 module.exports = {
   BASE_REBUILD_DEADLINE_MS,
   MAX_LOAD_FACTOR,
@@ -225,4 +267,5 @@ module.exports = {
   caseTimeoutMs,
   buildRecorder,
   waitForRebuild,
+  waitForWatched,
 };

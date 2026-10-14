@@ -8,6 +8,7 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 const testCommand = require('../src/commands/test.js');
 
@@ -153,7 +154,8 @@ async function runTestCommand(cwd, targets, flags = {}) {
   const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   process.chdir(cwd);
   try {
-    await testCommand({ _: ['test', ...targets], ...flags });
+    // The tee declines under a runner; the cases read logs/test.log on every machine.
+    await withoutCI(() => testCommand({ _: ['test', ...targets], ...flags }));
     return process.exitCode;
   } finally {
     // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers

@@ -14,7 +14,7 @@ const { spawn } = require('child_process');
 const { serializeSuite } = require('@omega.js/devkit/test/serialize');
 const { reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
 const {
-  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, readChildOutput, childEnded, exitError, endChild,
+  NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, electronArgs, readChildOutput, childEnded, exitError, endChild,
 } = require('./app-child.js');
 
 const HARNESS_DIR = path.join(__dirname, '..', 'harness');
@@ -54,7 +54,7 @@ function electronDriver(layer) {
       delete env.ELECTRON_RUN_AS_NODE;
 
       // The harness DIRECTORY is the app: its package.json names main-entry.js, never the project's main.
-      const child = spawn(electronBin, [HARNESS_DIR], { cwd: projectRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(electronBin, electronArgs(HARNESS_DIR, { env }), { cwd: projectRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
       const events = createEventTracker(report);
       const output = readChildOutput(child, events.onEvent);
       const finished = childEnded(child)

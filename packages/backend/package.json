@@ -56,6 +56,11 @@
       },
       {
         "package": "@omega.js/devkit",
+        "from": "src/test/without-ci.js",
+        "to": "vendor/devkit/test/without-ci.js"
+      },
+      {
+        "package": "@omega.js/devkit",
         "from": "src/test/fixtures/esm-only-package",
         "to": "vendor/devkit/test/fixtures/esm-only-package"
       }

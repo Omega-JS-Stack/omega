@@ -67,7 +67,7 @@ function sleep(ms) {
 function childOptions(root, specFile, child, cases, events, overrides) {
   return {
     electronBin:   '/not/spawned/electron',
-    args:          [root],
+    entry:         root,
     childEnv:      {},
     effectiveRoot: root,
     specFile,

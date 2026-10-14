@@ -6,6 +6,7 @@
 
 const chalk = require('chalk').default;
 const { parseEventLine } = require('@omega.js/devkit/test/events');
+const { isCI } = require('@omega.js/devkit/ci');
 
 const NO_ELECTRON_REASON = 'Electron is not installed in this project';
 
@@ -29,6 +30,17 @@ function resolveElectron(root) {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * The args an Electron child launches with: a Linux CI runner gets `--no-sandbox`,
+ * since Electron's SUID sandbox helper aborts where unprivileged user namespaces are restricted.
+ * @param {string} entry - The app directory Electron loads.
+ * @param {{env?: object, platform?: string}} [options] - The environment and platform to read.
+ * @returns {string[]} The args.
+ */
+function electronArgs(entry, { env = process.env, platform = process.platform } = {}) {
+  return isCI(env) && platform === 'linux' ? ['--no-sandbox', entry] : [entry];
 }
 
 /**
@@ -121,4 +133,4 @@ function endChild(child, killGraceMs) {
   if (typeof grace.unref === 'function') grace.unref();
 }
 
-module.exports = { NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, readChildOutput, childEnded, exitError, endChild };
+module.exports = { NO_ELECTRON_REASON, KILL_GRACE_MS, resolveElectron, electronArgs, readChildOutput, childEnded, exitError, endChild };

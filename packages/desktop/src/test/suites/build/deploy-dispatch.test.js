@@ -22,6 +22,7 @@ const devkitDeploy = require('@omega.js/devkit/deploy');
 const devkitFollow = require('@omega.js/devkit/deploy-follow');
 const devkitRecord = require('@omega.js/devkit/deploy-record');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 // The dispatch a stub stands in for: accepted, on the ONE lane (#915).
 const LANE = { mode: 'snapshot', ref: 'omega-deploy' };
@@ -112,7 +113,8 @@ async function runRelease(follower, options = {}, token = {}) {
 
   let error = null;
   try {
-    await require(RELEASE)(options);
+    // The tee declines under a runner; the cases read logs/deploy.log on every machine.
+    await withoutCI(() => require(RELEASE)(options));
   } catch (e) {
     error = e;
   } finally {

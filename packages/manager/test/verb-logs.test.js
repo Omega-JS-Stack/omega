@@ -20,6 +20,7 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 const WALK_MARKER = 'walking the fixture brand';
 
@@ -116,20 +117,14 @@ function stageFanoutBrand() {
 async function runVerb(command, root, options = {}) {
   const cwd0 = process.cwd();
   const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
-  const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
-  delete process.env.CI;
-  delete process.env.GITHUB_ACTIONS;
 
   try {
     process.chdir(root);
-    await command(options);
+    await withoutCI(() => command(options));
   } finally {
     restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
-    for (const [key, value] of Object.entries(priorCi)) {
-      if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; }
-    }
   }
 }
 

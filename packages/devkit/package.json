@@ -85,6 +85,8 @@
     "./test/browser": "./src/test/browser.js",
     "./test/journey-harness": "./src/test/journey-harness.js",
     "./test/credential-scrub": "./src/test/credential-scrub.js",
+    "./test/without-ci": "./src/test/without-ci.js",
+    "./test/mint-cert": "./src/test/mint-cert.js",
     "./test/stdout-guard": "./src/test/stdout-guard.js",
     "./test/guard-stdout": "./src/test/guard-stdout.js",
     "./test/temp-home": "./src/test/temp-home.js",

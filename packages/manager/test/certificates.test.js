@@ -22,6 +22,7 @@ const { signJwt } = require('../src/lib/jwt.js');
 const { API_BASE } = require('../src/services/certificates/lib/apple-api.js');
 const { PORTAL_CREATE_URL } = require('../src/services/certificates/lib/manual-walkthrough.js');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
+const { mintCert } = require('@omega.js/devkit/test/mint-cert');
 const { openTtyPrompt } = require('./lib/interactive.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const service = require('../src/services/certificates/index.js');
@@ -60,11 +61,7 @@ execSync(
   `openssl req -x509 -key "${FIXTURE_DIR}/private.key" -out "${FIXTURE_DIR}/soon.cer" -days 10 -subj "/CN=Fixture Soon/C=US" -outform DER`,
   { stdio: 'pipe' },
 );
-const asn1 = (days) => `${new Date(Date.now() + days * 86400000).toISOString().replace(/[-:T]/g, '').split('.')[0]}Z`;
-execSync(
-  `openssl req -x509 -key "${FIXTURE_DIR}/private.key" -out "${FIXTURE_DIR}/expired.cer" -not_before ${asn1(-400)} -not_after ${asn1(-5)} -subj "/CN=Fixture Expired/C=US" -outform DER`,
-  { stdio: 'pipe' },
-);
+mintCert({ keyPath: join(FIXTURE_DIR, 'private.key'), certPath: join(FIXTURE_DIR, 'expired.cer'), days: -5, subject: '/CN=Fixture Expired/C=US' });
 
 const FIXTURE_KEY = jetpack.read(join(FIXTURE_DIR, 'private.key'));
 const FIXTURE_CSR = jetpack.read(join(FIXTURE_DIR, 'request.csr'));

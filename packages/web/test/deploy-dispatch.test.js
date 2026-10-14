@@ -23,6 +23,7 @@ const devkitDeploy = require('@omega.js/devkit/deploy');
 const devkitFollow = require('@omega.js/devkit/deploy-follow');
 const devkitRecord = require('@omega.js/devkit/deploy-record');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 const ensureTargetLib = require('../src/commands/lib/ensure-target.js');
 const deployPrecheckLib = require('../src/commands/lib/deploy-precheck.js');
 
@@ -104,7 +105,8 @@ async function runDeploy(follower, options = {}) {
 
   let error = null;
   try {
-    await require(DEPLOY)(options);
+    // The tee declines under a runner; the cases read logs/deploy.log on every machine.
+    await withoutCI(() => require(DEPLOY)(options));
   } catch (e) {
     error = e;
   } finally {

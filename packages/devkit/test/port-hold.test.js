@@ -6,7 +6,7 @@
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const net = require('node:net');
-const { CLASSIC_PORTS } = require('@omega.js/config');
+const { CLASSIC_PORTS, isPortFree } = require('@omega.js/config');
 
 const { holdClassicPorts, releasePorts, holdAddress, CLASSIC_HOLD_PORTS } = require('../src/test/port-hold.js');
 
@@ -59,8 +59,14 @@ module.exports = defineCases({
         try {
           ctx.expect(hold.held).toEqual(ports);
           ctx.expect(hold.busy).toEqual([]);
+          const addresses = hold.servers.map((server) => `${server.address().address}:${server.address().port}`);
+          ctx.expect(new Set(addresses).size, 'one listener per bound address').toBe(addresses.length);
+          for (const server of hold.servers) {
+            const { address } = server.address();
+            ctx.expect(['127.0.0.1', '::1'].includes(address), `${address} must be a loopback bind, never the wildcard`).toBeTruthy();
+          }
           for (const port of ports) {
-            ctx.expect(await bindable(port, '127.0.0.1'), `:${port} must be taken while held`).toBe(false);
+            ctx.expect(await isPortFree(port), `:${port} must read as taken to the allocator while held`).toBe(false);
           }
         } finally {
           releasePorts(hold.servers);
@@ -88,6 +94,28 @@ module.exports = defineCases({
           ctx.expect(await connect(port, '127.0.0.1'), 'their listener still answers').toBe(true);
           releasePorts(hold.servers);
         } finally {
+          incumbent.close();
+        }
+      },
+    },
+
+    {
+      name: "a foreign wildcard listener is busy to the default hold, and nothing is bound beside it",
+      run: async (ctx) => {
+        const port = 46059;
+        const incumbent = await new Promise((resolve, reject) => {
+          const server = net.createServer();
+          server.once('error', reject);
+          server.listen({ port }, () => resolve(server));
+        });
+        let hold = { servers: [] };
+
+        try {
+          hold = await holdClassicPorts([port]);
+          ctx.expect(hold.busy).toEqual([port]);
+          ctx.expect(hold.servers).toEqual([]);
+        } finally {
+          releasePorts(hold.servers);
           incumbent.close();
         }
       },
@@ -143,12 +171,49 @@ module.exports = defineCases({
             return { status: 'held', server: { close: () => {} } };
           };
 
-          const hold = await holdClassicPorts([46051], { bind });
+          const hold = await holdClassicPorts([46051], { bind, probe: async () => true });
           ctx.expect(hold.held, `${code} must not make the port busy`).toEqual([46051]);
           ctx.expect(hold.busy).toEqual([]);
-          ctx.expect(hold.servers.length, 'the two addresses that DO exist are held').toBe(2);
+          ctx.expect(hold.servers.length, 'the address that DOES exist is held').toBe(1);
         }
-        ctx.expect(seen.slice(0, 3), 'every address is still attempted').toEqual(['127.0.0.1', '::1', null]);
+        ctx.expect(seen.slice(0, 2), 'every address is still attempted').toEqual(['127.0.0.1', '::1']);
+      },
+    },
+
+    {
+      name: 'the hold binds the two loopback addresses only, never the bare wildcard',
+      run: async (ctx) => {
+        const seen = [];
+        const bind = async (port, host) => {
+          seen.push(host);
+          return { status: 'held', server: { close: () => {} } };
+        };
+
+        const hold = await holdClassicPorts([46054, 46055], { bind, probe: async () => true });
+
+        // On Linux a wildcard listener collides with the holder's own loopback bind.
+        ctx.expect(seen.includes(null), 'no bind carries a null (wildcard) host').toBe(false);
+        ctx.expect(seen).toEqual(['127.0.0.1', '::1', '127.0.0.1', '::1']);
+        ctx.expect(hold.held).toEqual([46054, 46055]);
+        ctx.expect(hold.servers.length, 'one listener per bound address').toBe(4);
+      },
+    },
+
+    {
+      name: 'a port the probe reads as taken is busy, and no bind is attempted on it',
+      run: async (ctx) => {
+        const bound = [];
+        const bind = async (port, host) => {
+          bound.push(port);
+          return { status: 'held', server: { close: () => {} } };
+        };
+        const probe = async (port) => port !== 46057;
+
+        const hold = await holdClassicPorts([46056, 46057], { bind, probe });
+
+        ctx.expect(hold.busy).toEqual([46057]);
+        ctx.expect(hold.held).toEqual([46056]);
+        ctx.expect(bound.includes(46057), 'a port the probe calls taken is never bound').toBe(false);
       },
     },
 
@@ -174,16 +239,16 @@ module.exports = defineCases({
       name: 'one busy address makes the whole port busy, and the partial binds are closed',
       run: async (ctx) => {
         const closed = [];
-        const bind = async (port, host) => (host === null
+        const bind = async (port, host) => (host === '::1'
           ? { status: 'busy' }
           : { status: 'held', server: { close: () => closed.push(host) } });
 
-        const hold = await holdClassicPorts([46053], { bind });
+        const hold = await holdClassicPorts([46053], { bind, probe: async () => true });
 
         ctx.expect(hold.busy).toEqual([46053]);
         ctx.expect(hold.held).toEqual([]);
         ctx.expect(hold.servers).toEqual([]);
-        ctx.expect(closed, 'SO_REUSEADDR means a kept partial bind would steal their traffic').toEqual(['127.0.0.1', '::1']);
+        ctx.expect(closed, 'SO_REUSEADDR means a kept partial bind would steal their traffic').toEqual(['127.0.0.1']);
       },
     },
   ],

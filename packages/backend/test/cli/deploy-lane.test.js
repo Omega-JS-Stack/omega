@@ -31,6 +31,7 @@ const powertools = require('node-powertools');
 const DEPLOY = require.resolve('../../dist/cli/commands/deploy.js');
 const DeployCommand = require(DEPLOY);
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { withoutCI } = require('../../dist/vendor/devkit/test/without-ci.js');
 
 // The vendored devkit the command loads: the SAME instances, by the path the
 // prepare rewrite gave its requires.
@@ -221,8 +222,6 @@ module.exports = defineCases({
         const { root, dir } = targetDir();
         const originalLog = console.log;
         const originalExecute = powertools.execute;
-        const originalCI = process.env.CI;
-        const originalActions = process.env.GITHUB_ACTIONS;
         const lines = [];
 
         // The runner's shape: a project to fix bindings on, and a gcloud that
@@ -233,24 +232,22 @@ module.exports = defineCases({
         console.log = (...args) => lines.push(args.map(String).join(' '));
         powertools.execute = async () => { throw new Error('gcloud: command not found'); };
 
+        // Both halves start from no CI flag; the shell's own come back after.
         try {
-          process.env.CI = 'true';
-          await expect((() => new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker())(), 'CI fails with what broke and what it costs').rejects.toThrow((error) => /gcloud: command not found/.test(error.message) && /403/.test(error.message));
+          await withoutCI(async () => {
+            process.env.CI = 'true';
+            await expect((() => new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker())(), 'CI fails with what broke and what it costs').rejects.toThrow((error) => /gcloud: command not found/.test(error.message) && /403/.test(error.message));
 
-          lines.length = 0;
-          delete process.env.CI;
-          delete process.env.GITHUB_ACTIONS;
-          await new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker();
+            lines.length = 0;
+            delete process.env.CI;
+            await new DeployCommand({ firebaseProjectPath: dir, argv: { _: [] }, options: {} }).ensurePublicInvoker();
+          });
           const onALaptop = lines.join('\n');
 
           expect(onALaptop, 'a laptop stays as quiet as it was').toBe('');
         } finally {
           console.log = originalLog;
           powertools.execute = originalExecute;
-          if (originalCI === undefined) delete process.env.CI;
-          else process.env.CI = originalCI;
-          if (originalActions === undefined) delete process.env.GITHUB_ACTIONS;
-          else process.env.GITHUB_ACTIONS = originalActions;
           fs.rmSync(root, { recursive: true, force: true });
         }
       },

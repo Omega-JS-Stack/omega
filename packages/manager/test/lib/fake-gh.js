@@ -110,11 +110,23 @@ function activate() {
       else delete process.env[STATE_ENV];
       return () => { delete process.env[STATE_ENV]; };
     },
-    /** Take every `gh`, this one and any real one, off PATH. Returns the undo. */
+    /**
+     * Take every `gh`, this one and any real one, off PATH, keeping the first
+     * `git` reachable through a link of its own (a dir holding `gh` often holds
+     * `git` too). Returns the undo.
+     */
     withoutGh() {
       const previous = process.env.PATH;
-      process.env.PATH = previous.split(path.delimiter).filter((entry) => !fs.existsSync(path.join(entry, 'gh'))).join(path.delimiter);
-      return () => { process.env.PATH = previous; };
+      const entries = previous.split(path.delimiter);
+      const git = entries.map((entry) => path.join(entry, 'git')).find((file) => fs.existsSync(file));
+      if (!git) throw new Error(`withoutGh: no git on PATH (${previous})`);
+      const gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-fake-gh-git-'));
+      fs.symlinkSync(git, path.join(gitDir, 'git'));
+      process.env.PATH = [gitDir, ...entries.filter((entry) => !fs.existsSync(path.join(entry, 'gh')))].join(path.delimiter);
+      return () => {
+        process.env.PATH = previous;
+        fs.rmSync(gitDir, { recursive: true, force: true });
+      };
     },
     /** Every call the PATH gh has answered, as the words after `gh`. */
     ghCalls() {

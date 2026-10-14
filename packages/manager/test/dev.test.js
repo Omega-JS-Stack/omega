@@ -9,6 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const childProcess = require('node:child_process');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 // ─── Boot-sequence instrumentation ───────────────────────────────────────────
 // Every boundary dev.js binds at load time (child_process.spawn, manage's
@@ -1127,19 +1128,12 @@ module.exports = defineCases({
 
         // The tee declines under a runner by design; this asserts what it does when
         // it does not decline, so the signal is lifted for the duration.
-        const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
-        delete process.env.CI;
-        delete process.env.GITHUB_ACTIONS;
-
         const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
         try {
-          await bootDev(root, { target: 'web' });
+          await withoutCI(() => bootDev(root, { target: 'web' }));
         } finally {
           // dev() never returns, so nothing else would restore the writers.
           restoreTee();
-          for (const [key, value] of Object.entries(priorCi)) {
-            if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; }
-          }
         }
 
         const contents = fs.readFileSync(path.join(root, 'logs', 'dev.log'), 'utf8');

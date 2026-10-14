@@ -1,23 +1,19 @@
 /**
- * Classic-port holding — how an e2e lane owns a whole stack without ever
+ * Classic-port holding: how an e2e lane owns a whole stack without ever
  * disturbing the one a developer has running.
  *
  * The N7 allocator starts from the CLASSIC defaults and bumps past anything
- * taken. So a lane that HOLDS every classic port for its own run forces both
- * of its children onto fresh numbers, and a live `omega dev` on :4000 keeps
- * serving. A classic port that is already busy is somebody else's stack: the
- * hold fails, the allocator bumps around it exactly the same, and nothing of
- * theirs is touched.
- *
- * "Held" means all THREE addresses. Node sets SO_REUSEADDR, so a wildcard
- * listener does not stop a 127.0.0.1 bind (and vice versa), and the
- * allocator's own probe composes the same set — anything less is a port that
- * still reads as free.
+ * taken, so a lane that HOLDS every classic port forces its children onto
+ * fresh numbers while a live `omega dev` keeps serving. A busy classic port
+ * is somebody else's stack: the hold declines it and the allocator bumps.
+ * "Held" means both LOOPBACK addresses, 127.0.0.1 and ::1, after the
+ * allocator's own probe has answered "no foreign listener". Never the bare
+ * wildcard: on Linux it collides with the hold's own loopback bind.
  */
 
 // Libraries
 const net = require('net');
-const { CLASSIC_PORTS } = require('@omega.js/config');
+const { CLASSIC_PORTS, isPortFree } = require('@omega.js/config');
 
 // The classics the allocator starts from, plus the two internal ports the
 // HTTPS proxies want (web's 4443, the backend's 5443) — holding those too
@@ -35,7 +31,7 @@ const FAMILY_UNAVAILABLE = ['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL'];
  * Hold one address of one port.
  *
  * @param {number} port - Port to hold
- * @param {string|null} host - Bind address (null = wildcard)
+ * @param {string} host - Bind address
  * @returns {Promise<{ status: 'held'|'busy'|'unavailable', server?: net.Server }>}
  */
 function holdAddress(port, host) {
@@ -46,7 +42,7 @@ function holdAddress(port, host) {
     server.once('error', (error) => resolve({
       status: FAMILY_UNAVAILABLE.includes(error.code) ? 'unavailable' : 'busy',
     }));
-    server.listen(host ? { port, host } : { port }, () => resolve({ status: 'held', server }));
+    server.listen({ port, host }, () => resolve({ status: 'held', server }));
   });
 }
 
@@ -56,18 +52,26 @@ function holdAddress(port, host) {
  * @param {number[]} [ports] - Ports to hold (defaults to CLASSIC_HOLD_PORTS)
  * @param {object} [options]
  * @param {Function} [options.bind] - The per-address bind (the test seam)
+ * @param {Function} [options.probe] - The foreign-listener check (the test seam)
  * @returns {Promise<{ servers: net.Server[], held: number[], busy: number[] }>}
  */
-async function holdClassicPorts(ports = CLASSIC_HOLD_PORTS, { bind = holdAddress } = {}) {
+async function holdClassicPorts(ports = CLASSIC_HOLD_PORTS, { bind = holdAddress, probe = isPortFree } = {}) {
   const servers = [];
   const held = [];
   const busy = [];
 
   for (const port of ports) {
+    // The probe binds and closes each address in turn, so it never meets the
+    // hold's own binds, and its wildcard binds see a foreign `::`/`0.0.0.0`.
+    if (!(await probe(port))) {
+      busy.push(port);
+      continue;
+    }
+
     const bound = [];
     let occupied = false;
 
-    for (const host of ['127.0.0.1', '::1', null]) {
+    for (const host of ['127.0.0.1', '::1']) {
       const result = await bind(port, host);
       if (result.status === 'held') bound.push(result.server);
       // 'unavailable' is a family this host does not have: nothing to hold

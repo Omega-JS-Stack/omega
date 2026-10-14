@@ -12,6 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { certificateExpiry } = require('../src/certificate-expiry.js');
+const { mintCert } = require('@omega.js/devkit/test/mint-cert');
 
 const PASSWORD = 'fixture-pass';
 
@@ -24,13 +25,7 @@ function stageCert(t, { days = 365 } = {}) {
   const certPath = path.join(dir, 'cert.cer');
   const p12Path = path.join(dir, 'cert.p12');
 
-  execFileSync('openssl', [
-    'req', '-x509', '-nodes', '-newkey', 'rsa:2048',
-    '-keyout', keyPath, '-out', certPath,
-    '-days', String(Math.abs(days)),
-    ...(days < 0 ? ['-not_before', formatAsn1(-2 * Math.abs(days)), '-not_after', formatAsn1(-Math.abs(days))] : []),
-    '-subj', '/CN=Expiry Fixture/C=US', '-outform', 'DER',
-  ], { stdio: 'pipe' });
+  mintCert({ keyPath, certPath, days, subject: '/CN=Expiry Fixture/C=US' });
 
   execFileSync('openssl', [
     'pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', certPath,
@@ -38,12 +33,6 @@ function stageCert(t, { days = 365 } = {}) {
   ], { stdio: 'pipe', env: { ...process.env, OMEGA_P12_PASSWORD: PASSWORD } });
 
   return { dir, certPath, p12Path };
-}
-
-// openssl's explicit validity window format (YYYYMMDDHHMMSSZ), used to stage a
-// certificate that is already expired.
-function formatAsn1(daysFromNow) {
-  return `${new Date(Date.now() + daysFromNow * 24 * 3600 * 1000).toISOString().replace(/[-:T]/g, '').split('.')[0]}Z`;
 }
 
 module.exports = defineCases({

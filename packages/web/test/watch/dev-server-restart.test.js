@@ -29,7 +29,7 @@ const { registerTemplateWatchTargets, devServerOptions } = require('../../src/co
 // fixture; the deadline is the point at which "the edit never landed" is the
 // only remaining explanation. It scales with the lane's load knob (#211) and
 // with this machine's measured contention (#615).
-const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild, waitForWatched } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done
 // — the restart, if one is coming, rides the END of the rebuild (Eleventy
 // reloads the server after write), so the assertions wait for silence first.
@@ -61,10 +61,13 @@ function app() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-restart-')));
   const src = path.join(root, 'src');
   const packaged = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-restart-pkg-')));
+  // Every file written, so startDevServer can wait until the watcher arms them.
+  const files = new Set();
   const write = (rel, contents) => {
     const abs = path.join(src, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
+    files.add(abs);
   };
 
   write('_layouts/toy.html', '<main data-layout="BEFORE">{{ content }}</main>');
@@ -90,6 +93,7 @@ function app() {
     themesDir: path.join(packaged, 'themes'),
     coreDir: path.join(packaged, 'core'),
     defaultsDir: path.join(packaged, 'defaults'),
+    files,
     write,
     cleanup: () => {
       process.chdir(cwd);
@@ -149,6 +153,7 @@ async function startDevServer(t, fixture) {
     await elev.stopWatch();
     fixture.cleanup();
   });
+  await waitForWatched({ watcher: elev.watcher, files: [...fixture.files] });
 
   const page = () => fs.readFileSync(path.join(fixture.out, 'index.html'), 'utf8');
 

@@ -1036,8 +1036,6 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   resolving) and boots firebase-tools with `--config`; the committed firebase.json never
   changes. Gitignored; removed on shutdown.
 
-Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../../_attic/plans/archive/n7-port-allocation.md).
-
 ## Validation
 
 `validateConfig(config, { target })` = shared schema + that target's refinements

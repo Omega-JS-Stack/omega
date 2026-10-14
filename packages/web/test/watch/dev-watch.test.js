@@ -25,7 +25,7 @@ const { refreshLiveManifest } = require('../../src/live-manifest.js');
 // fixture; the deadline is the point at which "the edit never landed" is the
 // only remaining explanation. It scales with the lane's load knob (#211) and
 // with this machine's measured contention (#615).
-const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild } = require('../lib/deadlines.js');
+const { POLL_MS, buildRecorder, caseTimeoutMs, waitForRebuild, waitForWatched } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done.
 const DRAIN_QUIET_POLLS = 20;
 
@@ -55,10 +55,13 @@ function app() {
   // relative watch target makes Eleventy re-root its watcher and drop EVERY
   // reset (#134 verification). In-root would hide that regression.
   const packaged = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-pkg-')));
+  // Every file written, so startWatch can wait until the watcher arms them.
+  const files = new Set();
   const writer = (base) => (rel, contents) => {
     const abs = path.join(base, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
+    files.add(abs);
   };
   const write = writer(src);
   const writePackaged = writer(packaged);
@@ -120,6 +123,7 @@ function app() {
     themesDir: path.join(linked, 'themes'),
     coreDir: path.join(linked, 'core'),
     defaultsDir: path.join(linked, 'defaults'),
+    files,
     write,
     writePackaged,
     cleanup: () => {
@@ -161,6 +165,7 @@ async function startWatch(t, fixture, options = {}) {
       });
       // What `omega dev` registers beside them (the asset manifest, #765).
       (options.watchTargets || []).forEach((target) => eleventyConfig.addWatchTarget(target));
+      if (options.chokidarConfig) eleventyConfig.setChokidarConfig(options.chokidarConfig);
       return configureOmega(eleventyConfig, {
         consumerDir: fixture.src,
         siteData: SITE_DATA,
@@ -191,6 +196,7 @@ async function startWatch(t, fixture, options = {}) {
     }
     fixture.cleanup();
   });
+  await waitForWatched({ watcher: elev.watcher, files: [...fixture.files, ...(options.watchTargets || [])] });
 
   const page = (file = 'index.html') => fs.readFileSync(path.join(fixture.out, file), 'utf8');
 
@@ -223,6 +229,21 @@ module.exports = defineCases({
         // config, and the NEXT edit must reset the rebuilt one too.
         fixture.write('_layouts/toy.html', '<main data-layout="AGAIN">{{ content }}</main>');
         await watch.pageBecomes(/data-layout="AGAIN"/, 'every later edit lands too');
+      },
+    },
+
+    // The watcher Linux gets on every platform: chokidar's directory walk, not
+    // FSEvents. Its `ready` fires before the walk ends while any watch root is
+    // missing, so an edit made the moment watch() resolves can predate the
+    // file's own watcher.
+    {
+      name: 'an edit made the moment the watch starts lands on the walk-based watcher',
+      run: async (ctx) => {
+        const fixture = app();
+        const watch = await startWatch(ctx, fixture, { chokidarConfig: { useFsEvents: false } });
+
+        fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
+        await watch.pageBecomes(/data-layout="AFTER"/, 'the first edit after watch() resolves is seen');
       },
     },
 

@@ -24,20 +24,38 @@ on:
     branches: [main]
     paths-ignore: [CHANGELOG.md]
 
+# A newer push supersedes the running verification of the same branch.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The backend suite boots the emulators; on a 2-core runner their function
+    # workers need a longer discovery leash, and a hung run must still end.
+    timeout-minutes: 60
+    env:
+      FUNCTIONS_DISCOVERY_TIMEOUT: 120
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: npm
       # A runner has no global git identity, so any test that builds a scratch
       # repo and commits into it fails at "Author identity unknown".
       - name: Configure git identity
         run: |
           git config --global user.name "checks"
           git config --global user.email "checks@ci.local"
+      - name: Install Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@15.22.4
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then
@@ -45,12 +63,11 @@ jobs:
           elif [ -f package.json ]; then
             npm install --no-audit --no-fund
           fi
-      # Repo-specific trim: root `npm test` is the full battery — its e2e lanes
-      # (test:verts, test:auth, e2e-journey) spawn Firebase emulators via
-      # `mgr emulator`, and firebase-tools is not a dependency of this repo, so
-      # the full chain cannot run on a bare runner. The package suites are the
-      # CI gate; the battery stays the local commit-gate's job.
+      # The package suites are the CI gate; the root battery's e2e lanes stay the
+      # local commit gate's job. The suites need what ci.yml provisions: Java and
+      # firebase-tools (installed above) for the backend suite's emulators, and
+      # xvfb-run for the desktop suite's Electron window.
       - name: Test
-        run: npm run test:packages
+        run: xvfb-run --auto-servernum npm run test:packages
   changelog:
     uses: itw-creative-works/workkit/.github/workflows/changelog.yml@main

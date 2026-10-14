@@ -3,6 +3,9 @@
  * `GITHUB_ACTIONS=true`, and most other runners set `CI=true`.
  */
 
+// Every flag a runner sets; either one at 'true' is a CI run.
+const CI_FLAGS = ['GITHUB_ACTIONS', 'CI'];
+
 /**
  * Whether this environment is a CI runner.
  *
@@ -10,7 +13,7 @@
  * @returns {boolean}
  */
 function isCI(env) {
-  return env.GITHUB_ACTIONS === 'true' || env.CI === 'true';
+  return CI_FLAGS.some((name) => env[name] === 'true');
 }
 
-module.exports = { isCI };
+module.exports = { CI_FLAGS, isCI };

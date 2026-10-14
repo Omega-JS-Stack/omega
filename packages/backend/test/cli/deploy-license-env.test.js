@@ -21,6 +21,7 @@ const jetpack = require('fs-jetpack');
 const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { withoutCI } = require('../../dist/vendor/devkit/test/without-ci.js');
 
 // Thrown from the license seam: the deploy stops there, so nothing is staged
 // and firebase is never spawned.
@@ -121,37 +122,32 @@ module.exports = defineCases({
         const outerPath = path.join(path.dirname(path.dirname(projectDir)), 'outer.log');
         const laneLog = path.join(projectDir, 'dist', 'deploy.log');
         const verbLog = path.join(projectDir, 'logs', 'deploy.log');
-        const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
 
         // The tee declines under a runner by design; this asserts what it does
         // when it does not decline.
-        delete process.env.CI;
-        delete process.env.GITHUB_ACTIONS;
-        const restoreOuter = attachLogFile.mark();
-        attachLogFile(outerPath);
-        const restoreTee = attachLogFile.mark();
+        await withoutCI(async () => {
+          const restoreOuter = attachLogFile.mark();
+          attachLogFile(outerPath);
+          const restoreTee = attachLogFile.mark();
 
-        try {
-          license.resolveLicenseStamp = () => { throw new ResolvedHere(); };
-          delete require.cache[deployPath];
-          const DeployCommand = require(deployPath);
-          const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: { direct: true }, options: {} });
-          command.log = () => {};
+          try {
+            license.resolveLicenseStamp = () => { throw new ResolvedHere(); };
+            delete require.cache[deployPath];
+            const DeployCommand = require(deployPath);
+            const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: { direct: true }, options: {} });
+            command.log = () => {};
 
-          await expect((() => command.execute())()).rejects.toThrow(ResolvedHere);
-          process.stdout.write('after the refusal\n');
-          restoreTee();
-          process.stdout.write('after the restore\n');
-        } finally {
-          restoreTee();
-          restoreOuter();
-          license.resolveLicenseStamp = realResolve;
-          delete require.cache[deployPath];
-          for (const [key, value] of Object.entries(priorCi)) {
-            if (value === undefined) delete process.env[key];
-            else process.env[key] = value;
+            await expect((() => command.execute())()).rejects.toThrow(ResolvedHere);
+            process.stdout.write('after the refusal\n');
+            restoreTee();
+            process.stdout.write('after the restore\n');
+          } finally {
+            restoreTee();
+            restoreOuter();
+            license.resolveLicenseStamp = realResolve;
+            delete require.cache[deployPath];
           }
-        }
+        });
 
         const outer = fs.readFileSync(outerPath, 'utf8');
         const lane = fs.readFileSync(laneLog, 'utf8');

@@ -23,6 +23,7 @@ const ensureTargetLib = require('../../../commands/lib/ensure-target.js');
 const deployPrecheckLib = require('../../../commands/lib/deploy-precheck.js');
 const packageTask = require('../../../gulp/tasks/package.js');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 /**
  * Swap exports for stubs, run, and swap them back. The verb DESTRUCTURES its
@@ -258,7 +259,8 @@ module.exports = defineCases({
         const stubs = stubsFor({ dispatch: async (args) => dispatched(args), follower });
 
         try {
-          await inTarget(targetDir, () => withStubs(stubs, (deploy) => deploy({})));
+          // The tee declines under a runner; this case reads logs/deploy.log on every machine.
+          await inTarget(targetDir, () => withStubs(stubs, (deploy) => withoutCI(() => deploy({}))));
 
           ctx.expect(followed.length).toBe(1);
           ctx.expect(followed[0].owner).toBe('Acme-Org');

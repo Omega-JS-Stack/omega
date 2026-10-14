@@ -135,7 +135,7 @@ function folder(name) {
 /** Run git in `dir`; a failure fails the test. */
 function git(dir, ...args) {
   const result = childProcess.spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
-  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.error ? result.error.message : result.stderr}`);
   return result.stdout.trim();
 }
 

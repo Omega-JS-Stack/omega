@@ -15,6 +15,7 @@
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { withoutCI } = require('@omega.js/devkit/test/without-ci');
 
 // The machine registry is per-machine state: this file's fixtures record into a temp home.
 require('@omega.js/devkit/test/temp-home');
@@ -843,7 +844,7 @@ module.exports = defineCases({
         const execFn = ghWorld(convergedWorld());
         const secretsGh = ghWorld(convergedWorld());
 
-        const result = await service.run({
+        const result = await withoutCI(() => service.run({
           brandId: 'fixture-brand',
           brandRoot: root,
           brandConfig: brandConfig(),
@@ -854,7 +855,7 @@ module.exports = defineCases({
           serviceData: {},
           githubApi: client(execFn),
           execFn: secretsGh,
-        });
+        }));
 
         ctx.expect(result.status).toBe('success');
         ctx.expect(result.output.secrets.extension.planned).toEqual(['CHROME_CLIENT_ID']);
@@ -874,7 +875,7 @@ module.exports = defineCases({
         });
         const secretsGh = ghWorld(convergedWorld());
 
-        const result = await service.run({
+        const result = await withoutCI(() => service.run({
           brandId: 'fixture-brand',
           brandRoot: root,
           brandConfig: brandConfig(),
@@ -885,7 +886,7 @@ module.exports = defineCases({
           serviceData: {},
           githubApi: client(ghWorld(convergedWorld())),
           execFn: secretsGh,
-        });
+        }));
 
         ctx.expect(result.status).toBe('error');
         ctx.expect(result.error).toMatch(/CSC_LINK/);
