@@ -153,38 +153,23 @@ surface attaches it at its entry point.
 | `omega build` / `omega clean` (the fan-outs) | `<brandRoot>/logs/build.log` · `<brandRoot>/logs/clean.log` | the walk order, every loud skip, the per-target summary |
 | `omega deploy` (the fan-out) | `<brandRoot>/logs/deploy.log` | the delivery lane, then which target published in which order and the summary. Every target additionally keeps its own `<targetRoot>/logs/deploy.log` ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), and the backend its firebase transcript `targets/backend/dist/deploy.log` |
 | `omega update` (the fan-out) | `<brandRoot>/logs/update.log` | which target was checked and what it reported/installed |
-| `omega test` (the fan-out) | `<brandRoot>/logs/test.log` | which target ran which scope, and the aggregate verdict |
+| `omega test` (the fan-out) | `<brandRoot>/logs/test.log` | which target ran which scope, the brand's own `test/e2e` suites (run in this process, so every case's line lands here), and the aggregate verdict |
 | `omega pipeline` (the live full-cycle test) | `<brandRoot>/logs/pipeline.log` | the child invocation, the deploy/verify legs, the scorecard and the PASS/FAIL verdict |
-| the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/test/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `dev.log`, `page.log` |
+| the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/test/e2e/.logs/` | `emulator.log`, `dev.log`, `page.log`; the cases' verdicts are in `logs/test.log` (one row up) |
 | **This monorepo** | | |
-| every root test lane (`npm test`, `npm run test:packages`, …) | `.temp/logs/<lane>.log` | the lane's own lines plus every child command's output — `test:packages` → `.temp/logs/test-packages.log` |
+| every root test lane (`npm test`, `npm run test:packages`, …) | `.temp/logs/<lane>.log` | a composite lane (`test`, `test:packages`, `test:corpus`): its own lines plus every child command's output, through `scripts/lane.js`. Every other lane: the runner's whole run over its suite, one line per case, through `--log` (`test:auth` → `.temp/logs/test-auth.log`) |
 | a library package's `npm test` (account, analytics, client, config, devkit, manager, mcp-router, monitoring, template-kit) | `packages/<pkg>/logs/test.log` | the devkit case runner's whole run, written by `src/test/cli.js` and truncated on each run: suite names, pass/fail, and what the suites print |
 | the root `scripts/` suites (the first command of `test:packages`) | `.temp/logs/scripts.log` | the case runner's run over `scripts/*.test.js` (`--log=.temp/logs/scripts.log`), truncated on each run |
 | `npm start` (the watcher) | `.temp/logs/watch-all.log` | is it alive, did it respawn, what did it rebuild |
-| every e2e runner's per-step verdicts | `.temp/<lane>/steps.log` | one `PASS` / `FAIL` line per step — see below |
-| every e2e runner's environment | `.temp/<lane>/` | `emulator.log`, `page.log`, `sw.log`, `screenshots/`, the journey's numbered stage logs |
+| every e2e lane's environment | `.temp/<lane>/` | `emulator.log`, `page.log`, `sw.log`, `screenshots/`, the journey's numbered stage logs |
 
 The e2e lane dirs are `.temp/flows-e2e/`, `.temp/auth-token-e2e/`, `.temp/verts-e2e/`,
-`.temp/desktop-auth-e2e/`, `.temp/extension-auth-e2e/`, and `.temp/journey/`.
-
-### steps.log — which step failed
-
-Every e2e runner writes its verdicts incrementally
-(`packages/devkit/src/test/steps-log.js`, re-exported for the root runners as
-`scripts/steps-log.js`, and used by the journey harness and the brand e2e
-harness alike), so a SIGKILLed lane still names the step it died on:
-
-```
-PASS  the playground emulator boots (hosting :5002, auth :9099)
-FAIL  the popup reaches the background SW — timed out after 30s
-FAIL  preflight — a playground emulator stack is already running (hosting :5002)
-```
-
-`preflight` is the runner dying before or outside any step — the live-stack guard, a
-harness throw on the way up. One line, same shape, so one grep finds every failure:
+`.temp/desktop-auth-e2e/`, `.temp/extension-auth-e2e/`, `.temp/plugin-lane-e2e/`, and `.temp/journey/`.
+None holds a verdict: a failed case is a `✗` line in the lane log, so one grep finds every
+failure:
 
 ```bash
-grep '^FAIL' .temp/*/steps.log brands/*/test/e2e/.logs/steps.log
+grep '✗' .temp/logs/*.log brands/*/logs/test.log
 ```
 
 ### Retention (ruled 2026-08-05)
@@ -207,6 +192,6 @@ just to see output.
 ```bash
 tail -50 targets/web/logs/dev.log                # is the dev server up, what did it last build
 grep -i error targets/backend/dist/emulator.log  # what the emulator actually served
-grep '^FAIL' .temp/*/steps.log                # which e2e step broke
+grep '✗' .temp/logs/*.log                     # which lane case broke
 tail -100 .temp/logs/test-packages.log        # what the last lane printed
 ```

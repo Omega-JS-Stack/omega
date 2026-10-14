@@ -172,9 +172,9 @@ Every verb scaffolds the target's `test/` ([#818](https://github.com/Omega-JS-St
 |---|---|---|
 | `test/build/` | Plain Node, the `build` layer | Config resolution and the built site in `dist/`: a page renders, carries the right content, links where it should |
 | `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`), imported directly, with the browser objects they touch passed in |
-| `<brandRoot>/test/e2e/run.js` | A real browser against the real local stack | End-to-end: the brand's own browser lane, run by `npx omega test` at the brand root after every target ([docs/manager/brand.md](../manager/brand.md)) |
+| `<brandRoot>/test/e2e/` | A real browser against the real local stack | End-to-end: the brand's own browser lane, `defineCases` suite files run by `npx omega test` at the brand root after every target ([docs/manager/brand.md](../manager/brand.md)) |
 
-The directory is a convention, not a layer switch: every suite runs on the one `build` layer. OMEGA Playground's website carries one suite of each (`brands/playground-omega/targets/web/test/`) plus the brand lane at `brands/playground-omega/test/e2e/run.js`.
+The directory is a convention, not a layer switch: every suite runs on the one `build` layer. OMEGA Playground's website carries one suite of each (`brands/playground-omega/targets/web/test/`) plus the brand lane at `brands/playground-omega/test/e2e/auth-return.test.js`.
 
 Every suite is a `defineCases` file, one file per concern, taking `{ defineCases, expect }` from web's public test API, `@omega.js/web/test` (the framework's own suites require `@omega.js/devkit/test/define-cases` instead):
 

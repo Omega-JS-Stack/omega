@@ -4,23 +4,23 @@
  * never the real ~/.claude. A probe plugin under the real names (`omega@omega`, `omega@omega-local`)
  * logs from its SessionStart hook which copy loaded; a row passes when exactly the expected copy did.
  * Offline: a lane-only git config sends the real GitHub source to a local repo standing in for GitHub,
- * and allows the file protocol alone, so a fetch it misses fails instead of going online. So nothing is
- * swapped: brand settings are the real writer's, both machines are set up by the real helpers (the
- * consumer install, and the switch `omega i local` runs), and the fixture monorepo carries this repo's
- * own committed omega keys. Projects sit in the OS temp dir: a session under this repo also reads its
- * .claude/settings.json. Skips, exit 0, without `claude`. Verdicts: `.temp/plugin-lane-e2e/steps.log`.
+ * and allows the file protocol alone, so a fetch it misses fails instead of going online. Brand settings
+ * are the real writer's, both machines are set up by the real helpers (the consumer install, and the
+ * switch `omega i local` runs), and the fixture monorepo carries this repo's own committed omega keys.
+ * Projects sit in the OS temp dir: a session under this repo also reads its .claude/settings.json.
+ * Skips without `claude`.
  */
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-const { ensureClaudeSettings } = require('../packages/manager/src/lib/claude-settings.js');
-const { ensureMachinePlugin, ensureLocalDefault } = require('../packages/manager/src/lib/claude-machine.js');
-const { createStepsLog } = require('./steps-log');
+const { ensureClaudeSettings } = require('../../packages/manager/src/lib/claude-settings.js');
+const { ensureMachinePlugin, ensureLocalDefault } = require('../../packages/manager/src/lib/claude-machine.js');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..', '..');
 const LANE = path.join(ROOT, '.temp', 'plugin-lane-e2e');
 const LOADS = path.join(LANE, 'loads.log');
 const HOMES = path.join(LANE, 'homes');
@@ -30,8 +30,6 @@ const PROBE_VERSION = '1.0.0';
 const PUB = 'published';
 const LOC = 'local';
 let FIXTURES = null;
-
-const stepsLog = createStepsLog(LANE);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -199,19 +197,21 @@ function session(home, dir) {
   return { loaded: labels.length ? labels.sort().join(' + ') : 'nothing', exit };
 }
 
-function walk(machine, home, rows) {
-  const results = [];
-  rows.forEach(([where, dir, expected], index) => {
-    const { loaded, exit } = session(home, dir);
-    const pass = loaded === expected;
-    results.push({ machine, row: index + 1, where, expected, loaded, exit, pass });
-    const name = `${machine} row ${index + 1}, ${where}`;
-    if (pass) stepsLog.pass(name, `loaded ${loaded}`);
-    else stepsLog.fail(name, `expected ${expected}, loaded ${loaded}, claude exit ${exit}`);
-    console.log(`  [${index + 1}/${rows.length}] ${pass ? '✓' : '✗'} ${where}: ${loaded}`);
-  });
-  return results;
-}
+// A consumer machine never runs `omega i local`, so it has no linked brand and no monorepo
+const ROWS = [
+  ['consumer', 'an empty folder', 'empty', PUB],
+  ['consumer', 'live brand 1', 'live1', PUB],
+  ['consumer', 'live brand 1 again', 'live1', PUB],
+  ['consumer', 'live brand 2', 'live2', PUB],
+  ['consumer', 'the empty folder again', 'empty', PUB],
+  ['developer', 'an empty folder', 'empty', LOC],
+  ['developer', 'live brand 1', 'live1', PUB],
+  ['developer', 'a linked brand', 'linked', LOC],
+  ['developer', 'live brand 1 again', 'live1', PUB],
+  ['developer', 'the monorepo', 'mono', LOC],
+  ['developer', 'live brand 2', 'live2', PUB],
+  ['developer', 'the empty folder again', 'empty', LOC],
+];
 
 function table(title, results) {
   console.log(`\n${title}\n`);
@@ -220,66 +220,69 @@ function table(title, results) {
   for (const r of results) console.log(`| ${r.row} | ${r.where} | ${r.expected} | ${r.pass ? r.loaded : `**${r.loaded}** (claude exit ${r.exit})`} |`);
 }
 
-async function main() {
-  if (spawnSync('claude', ['--version'], { encoding: 'utf8' }).status !== 0) {
-    console.log('⏭ SKIPPED: claude is not on this machine');
-    console.log('   install it with `npm install -g @anthropic-ai/claude-code`\n');
-    return;
-  }
-
-  // Every machine starts from a fresh config folder; the steps log is already this run's
-  fs.rmSync(HOMES, { recursive: true, force: true });
-  FIXTURES = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-plugin-lane-')));
-  console.log(`\nPlugin lane on ${spawnSync('claude', ['--version'], { encoding: 'utf8' }).stdout.trim()}, config folders in ${path.relative(ROOT, LANE)}/, projects in ${FIXTURES}`);
-
-  publishedRepo();
-  const mono = monorepo();
-  const live1 = brand('live-brand-1');
-  const live2 = brand('live-brand-2');
-  const linked = brand('linked-brand', mono);
-  const empty = path.join(FIXTURES, 'empty-folder');
-  gitRepo(empty);
-  const projects = [empty, live1, live2, linked, mono];
-
-  // A consumer machine never runs `omega i local`, so it has no linked brand and no monorepo
-  console.log('\nConsumer machine (the published copy installed for the user)');
-  const consumer = walk('consumer', await consumerMachine('consumer', projects, empty), [
-    ['an empty folder', empty, PUB],
-    ['live brand 1', live1, PUB],
-    ['live brand 1 again', live1, PUB],
-    ['live brand 2', live2, PUB],
-    ['the empty folder again', empty, PUB],
-  ]);
-
-  console.log('\nDeveloper machine (the real switch: the local copy is the user default)');
-  const developerHome = await developerMachine(await consumerMachine('developer', projects, empty), mono, empty);
-  const developer = walk('developer', developerHome, [
-    ['an empty folder', empty, LOC],
-    ['live brand 1', live1, PUB],
-    ['a linked brand', linked, LOC],
-    ['live brand 1 again', live1, PUB],
-    ['the monorepo', mono, LOC],
-    ['live brand 2', live2, PUB],
-    ['the empty folder again', empty, LOC],
-  ]);
-
-  table('Consumer machine', consumer);
-  table('Developer machine', developer);
-
-  const failed = [...consumer, ...developer].filter((r) => !r.pass);
-  if (failed.length) {
-    console.log(`\n✗ Plugin lane: ${failed.length} row(s) loaded the wrong copy:`);
-    for (const r of failed) console.log(`  ${r.machine} row ${r.row}, ${r.where}: expected ${r.expected}, loaded ${r.loaded}, claude exit ${r.exit}`);
-    console.log(`  the projects are kept for a look: ${FIXTURES}`);
-    process.exitCode = 1;
-    return;
-  }
-  fs.rmSync(FIXTURES, { recursive: true, force: true });
-  console.log('\n✓ Plugin lane: every session loaded the expected copy\n');
+function rowCase([machineName, where, dirKey, expected], index) {
+  const row = ROWS.slice(0, index + 1).filter(([name]) => name === machineName).length;
+  return {
+    name: `${machineName} row ${row}, ${where}`,
+    run: async (ctx) => {
+      const { loaded, exit } = session(ctx.state.homes[machineName], ctx.state.dirs[dirKey]);
+      const pass = loaded === expected;
+      ctx.state.results.push({ machine: machineName, row, where, expected, loaded, exit, pass });
+      ctx.expect(loaded, `expected ${expected}, loaded ${loaded}, claude exit ${exit}`).toBe(expected);
+      console.log(`    loaded ${loaded}`);
+    },
+  };
 }
 
-main().catch((error) => {
-  stepsLog.abort(error);
-  console.error(`\nPlugin lane crashed: ${error.stack}\n${FIXTURES ? `the projects are kept for a look: ${FIXTURES}\n` : ''}`);
-  process.exitCode = 1;
+module.exports = defineCases({
+  type: 'suite',
+  description: 'plugin lane (the plugin-delivery matrix on real Claude Code)',
+  timeout: 200000,
+  // Every row of the matrix reports, so one wrong copy never hides the other eleven.
+  stopOnFailure: false,
+
+  async setup(ctx) {
+    if (spawnSync('claude', ['--version'], { encoding: 'utf8' }).status !== 0) {
+      ctx.skip('claude is not on this machine (install it with `npm install -g @anthropic-ai/claude-code`)');
+    }
+    fs.mkdirSync(LANE, { recursive: true });
+
+    // Every machine starts from a fresh config folder
+    fs.rmSync(HOMES, { recursive: true, force: true });
+    FIXTURES = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-plugin-lane-')));
+    console.log(`\nPlugin lane on ${spawnSync('claude', ['--version'], { encoding: 'utf8' }).stdout.trim()}, config folders in ${path.relative(ROOT, LANE)}/, projects in ${FIXTURES}`);
+
+    publishedRepo();
+    const mono = monorepo();
+    const live1 = brand('live-brand-1');
+    const live2 = brand('live-brand-2');
+    const linked = brand('linked-brand', mono);
+    const empty = path.join(FIXTURES, 'empty-folder');
+    gitRepo(empty);
+
+    ctx.state.dirs = { empty, live1, live2, linked, mono };
+    ctx.state.results = [];
+
+    // The developer machine is a consumer one plus the real switch `omega i local` runs.
+    const projects = [empty, live1, live2, linked, mono];
+    ctx.state.homes = {
+      consumer: await consumerMachine('consumer', projects, empty),
+      developer: await developerMachine(await consumerMachine('developer', projects, empty), mono, empty),
+    };
+  },
+
+  cleanup(ctx) {
+    if (!FIXTURES) return;
+    const results = ctx.state.results || [];
+    table('Consumer machine', results.filter((r) => r.machine === 'consumer'));
+    table('Developer machine', results.filter((r) => r.machine === 'developer'));
+
+    if (results.length === ROWS.length && results.every((r) => r.pass)) {
+      fs.rmSync(FIXTURES, { recursive: true, force: true });
+      return;
+    }
+    console.log(`\n  the projects are kept for a look: ${FIXTURES}\n`);
+  },
+
+  tests: ROWS.map(rowCase),
 });

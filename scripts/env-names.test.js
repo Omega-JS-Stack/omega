@@ -2,13 +2,11 @@
  * env-names ratchet: ONE name says a test run is on, `OMEGA_ENVIRONMENT=testing`,
  * read by `isTesting()` ([#931](https://github.com/Omega-JS-Stack/omega/issues/931)).
  *
- * The three retired names (`OMEGA_TEST_MODE`, `OMEGA_TEST_RUNNER`,
- * `OMEGA_CASE_RUNNER`) leave code and docs one conversion group at a time. Every
- * file under `packages/*\/src`, `packages/*\/test`, a package README, `scripts/*.js`,
- * `brands/*\/test` and `docs/` is read; a retired name may appear only in a file the allow-list names. Each
- * group deletes its entries, and the last group empties the list. The register of
- * retired shapes and the three tests proving a retired name is ignored name them
- * for good: they stand outside the list.
+ * The three retired names (`OMEGA_TEST_MODE`, `OMEGA_TEST_RUNNER`, `OMEGA_CASE_RUNNER`)
+ * stay out of code and docs. Every file in `SCOPES` is read; a retired name may appear
+ * only in a file the allow-list names, and the list is empty. The register of retired
+ * shapes and the three tests proving a retired name is ignored name them for good: they
+ * stand outside it.
  *
  * Run: node --test scripts/env-names.test.js
  */
@@ -22,7 +20,7 @@ const SELF = path.relative(ROOT, __filename);
 
 const RETIRED = /\bOMEGA_(?:TEST_MODE|TEST_RUNNER|CASE_RUNNER)\b/;
 
-const SCOPES = ['packages/*/src/**', 'packages/*/test/**', 'packages/*/README.md', 'scripts/*.js', 'brands/*/test/**', 'docs/**'];
+const SCOPES = ['packages/*/src/**', 'packages/*/test/**', 'packages/*/README.md', 'scripts/*.js', 'brands/*/test/**', 'test/**', 'docs/**'];
 
 // The register of retired shapes names them by design, the exemption config's
 // repo.owner ratchet makes too, and the tests proving a retired name is ignored
@@ -34,28 +32,9 @@ const STANDING = new Set([
   'packages/backend/test/helpers/environment.test.js',
 ]);
 
-// The files still owed by a later group. A group that converts a file deletes
-// its line here; the last group leaves the set empty.
-const ALLOWED = new Set([
-  // Desktop with extension group
-  'packages/desktop/src/utils/runner-env.js',
-  'packages/desktop/src/commands/runner.js',
-  'packages/desktop/src/commands/test.js',
-  'packages/desktop/src/test/suites/build/runner.test.js',
-  'packages/desktop/src/test/suites/build/sign-windows.test.js',
-  'packages/desktop/src/test/suites/build/get-config.test.js',
-  'packages/desktop/src/test/suites/build/omega.test.js',
-  'packages/extension/src/test/harness/extension/background.js',
-  'packages/extension/src/test/suites/background/sw-context.test.js',
-  'packages/extension/src/test/suites/build/build-module.test.js',
-  'packages/extension/src/test/suites/build/build-json-bake.test.js',
-  'packages/extension/src/test/suites/build/auth-emulator-gate.test.js',
-  'docs/desktop/runner.md',
-
-  // Lanes group
-  'scripts/e2e-extension-auth.js',
-  'scripts/e2e-auth-token.js',
-]);
+// Empty by design: every group has converted its files. A line here would be a
+// file waiting on a conversion, and none is owed.
+const ALLOWED = new Set([]);
 
 // Every tracked or new file in the scopes, through git so ignored build output
 // and self-referencing node_modules links are never walked.

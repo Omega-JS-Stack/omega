@@ -178,8 +178,7 @@ jobs:
       # Real stack, real browser: emulator + built website (@omega.js/client bundle) +
       # puppeteer signup → @omega.js/backend onCreate → signin → session persistence → subscription
       - name: Cross-stack e2e
-        working-directory: brands/sandbox-brand
-        run: npm test
+        run: npm run test:e2e
 
       # Catch the resource spike in the act (see the suites job's twin step) —
       # always(), because cancellation ≠ failure() and cancelled runs are the

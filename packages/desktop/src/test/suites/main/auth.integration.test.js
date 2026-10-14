@@ -1,6 +1,6 @@
 // Integration tests for lib/auth.js (`omega.auth`): actually hits Firebase.
 //
-// The SIGN-IN proof is the root desktop auth lane (scripts/e2e-desktop-auth.js):
+// The SIGN-IN proof is the root desktop auth lane (test/e2e/desktop-auth.test.js):
 // a persona the backend emulator seeds, signed in through the real deep link.
 //
 // To run: `npx omega test --extended` (the cases below need a cloud.config in

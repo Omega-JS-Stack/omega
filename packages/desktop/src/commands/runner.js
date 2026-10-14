@@ -696,7 +696,7 @@ async function startServices(options) {
     if (isTestRun() && !options._install) {
       throw new Error(
         `Refusing to install onto the bare runner home ${home}: this is a test run `
-        + '(OMEGA_TEST_RUNNER / OMEGA_TEST_MODE) and the call did not inject `_install`. The real install '
+        + '(OMEGA_ENVIRONMENT=testing) and the call did not inject `_install`. The real install '
         + 'downloads actions/runner and registers every admin org against GitHub with GH_TOKEN.',
       );
     }
@@ -1560,7 +1560,7 @@ async function deregisterOrgRunners(options) {
   if (isTestRun() && (!exec || (!getRemoveToken && process.env.GH_TOKEN))) {
     throw new Error(
       `Refusing to deregister ${targets.length} runner(s) from GitHub: this is a test run `
-      + '(OMEGA_TEST_RUNNER / OMEGA_TEST_MODE) and the call did not inject `exec`, or has GH_TOKEN set '
+      + '(OMEGA_ENVIRONMENT=testing) and the call did not inject `exec`, or has GH_TOKEN set '
       + 'without `getRemoveToken`. A test run must inject both to exercise deregistration — the default '
       + "path mints a real removal token with GH_TOKEN and runs each org directory's own config.cmd.",
     );

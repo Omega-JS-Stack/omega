@@ -36,6 +36,7 @@ const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
 const { envLine, assertEnvReadsBack } = require('@omega.js/config');
+const { isTesting } = require('./mode-helpers.js');
 const { setEnvLines } = require('@omega.js/devkit/env-lines');
 
 // Runner files live under %LOCALAPPDATA%\omega-runner — a per-user path that
@@ -226,18 +227,11 @@ function runnerLogFile(home) {
   return path.join(home, 'logs', 'runner.log');
 }
 
-// Is this process a TEST run? `OMEGA_TEST_RUNNER` is set by `omega test` for the
-// whole run (and inherited by the electron/boot children); `OMEGA_TEST_MODE` is
-// the marker a sibling framework's runner or a consumer's own test script sets
-// (desktop's runners name the environment instead, #925). Either one means: no
-// command here may touch the machine's real runner home.
-//
-// It reads process.env, ALWAYS, and takes no environment argument. An injected
-// env is a fixture for the config walk — a case that passed `{}` would be
-// handing the safety check an environment with no marker in it and disarming
-// the very guard that exists because a case did something like that.
+// Is this process a TEST run (`OMEGA_ENVIRONMENT=testing`, set by `omega test` and
+// inherited by its children)? Then no command here may touch the real runner home.
+// It reads process.env, never an argument: a case passing `{}` would disarm the guard.
 function isTestRun() {
-  return process.env.OMEGA_TEST_RUNNER === '1' || process.env.OMEGA_TEST_MODE === 'true';
+  return isTesting();
 }
 
 // A home a test is allowed to act on: a `.temp` directory (the desktop suites'
@@ -295,7 +289,7 @@ function assertTestSafeRunnerHome(verb, ...surfaces) {
   if (!offender) return;
 
   throw new Error(
-    `Refusing \`runner ${verb}\` against ${offender}: this process is a test run (OMEGA_TEST_RUNNER / OMEGA_TEST_MODE), `
+    `Refusing \`runner ${verb}\` against ${offender}: this process is a test run (OMEGA_ENVIRONMENT=testing), `
     + 'and a test may only act on scratch surfaces — the runner home AND the Startup folder, each under a `.temp` directory or the OS temp dir. '
     + 'Point OMEGA_RUNNER_HOME and OMEGA_RUNNER_STARTUP_DIR at scratch ones before the command module is required.',
   );

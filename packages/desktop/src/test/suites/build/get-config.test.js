@@ -211,7 +211,7 @@ module.exports = defineCases({
           // A fresh lane each time: OMEGA_ENVIRONMENT is the ONE input (#817)
           // and src/build.js sets it at load from the build-mode flag, so each
           // sub-case starts from a process that has not been told anything.
-          const freshLane = { OMEGA_ENVIRONMENT: undefined, OMEGA_TEST_MODE: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
+          const freshLane = { OMEGA_ENVIRONMENT: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
 
           const built = withEnv({ ...freshLane, OMEGA_BUILD_MODE: 'true' }, () => loadConfigInDir(tmp));
           ctx.expect(built.app.productName).toBe('Somiibo Production');

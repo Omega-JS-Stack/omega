@@ -20,7 +20,7 @@ const { useGh, withoutGh } = activate();
 
 const SIGN_IN_LINE = 'GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env)';
 const INSTALL_LINE = 'GitHub CLI (gh) is not installed. Install from: https://cli.github.com/';
-const JOURNEY = path.join(__dirname, '..', '..', '..', 'scripts', 'e2e-journey.js');
+const JOURNEY = path.join(__dirname, '..', '..', '..', 'test', 'e2e', 'journey.test.js');
 
 /** Set (or, for undefined, delete) env keys for one test, restored after it. */
 function withEnv(t, values) {

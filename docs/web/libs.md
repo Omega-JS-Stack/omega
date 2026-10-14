@@ -216,7 +216,7 @@ returns the definition a builder would draw, without drawing it. A definition is
 renderer-neutral and DOM-free, which is what lets the package's own suite
 (`test/dataviz.test.js`) compile all four through `createChartScene` and assert
 real geometry in node. The PAINT still needs a browser: the sandbox e2e lane's
-chart step (`brands/sandbox-brand/test/e2e/run.js` → `window.__omega.drawCharts()`)
+chart case (`brands/sandbox-brand/test/e2e/cross-stack.test.js` → `window.__omega.drawCharts()`)
 fails a chart whose host holds no SVG mark with a non-zero box. An unknown kind
 is a programmer error and throws.
 

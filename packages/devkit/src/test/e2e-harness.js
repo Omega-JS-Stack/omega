@@ -21,9 +21,11 @@
  *   const browser = await harness.launchBrowser();
  *   const page = await browser.newPage();
  *   await harness.preparePage(page);
- *   // ... brand-specific steps via harness.step() ...
+ *   // ... the brand's cases drive the page ...
  *   await harness.teardown();
- *   harness.exit();
+ *
+ * A brand lane is a `defineCases` suite: `boot()` in its `setup`, `teardown()`
+ * in its `cleanup`, and each check one case.
  */
 const path = require('path');
 const fs = require('fs');
@@ -32,7 +34,6 @@ const { findTarget } = require('../omega-bin.js');
 const { startChild, stopChild } = require('./boot-child.js');
 const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('./port-hold.js');
 const { launchBrowser } = require('./browser.js');
-const { createStepsLog } = require('./steps-log.js');
 const { targetOfType } = require('./target-of-type.js');
 
 // Covers emulator boot AND persona seeding (~55 accounts) — the ready marker
@@ -49,6 +50,23 @@ const DEV_READY_TIMEOUT = 300000;
 // included, because `omega dev` serves mkcert HTTPS by default.
 const EMULATOR_READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
+
+/**
+ * Run one boot leg, printing its detail; a failure rejects naming the leg.
+ *
+ * @param {string} name - The leg, as a reader would name it
+ * @param {Function} fn - Resolves the leg's detail line
+ * @returns {Promise<void>}
+ */
+async function bootLeg(name, fn) {
+  let detail;
+  try {
+    detail = await fn();
+  } catch (error) {
+    throw new Error(`boot failed at "${name}": ${error.message}`, { cause: error });
+  }
+  console.log(`  ${name} (${detail})`);
+}
 
 /**
  * Discover the two target dirs this lane boots, by TYPE: a brand NAMES its
@@ -129,12 +147,6 @@ class E2eHarness {
     this.targets = discoverTargets(brandRoot);
     this.logDir = options.logDir || path.join(brandRoot, 'test', 'e2e', '.logs');
 
-    // Per-step verdicts on disk beside the environment logs (#197), same format
-    // the journey harness and the root e2e runners write: the emulator/dev logs
-    // say what the stack printed, this says which step broke. `grep '^FAIL'` it
-    // after a run that died, or one read back hours later.
-    this.stepsLog = createStepsLog(this.logDir);
-
     this.hold = null;
     this.emulator = null;
     this.emulatorPorts = {};
@@ -142,7 +154,6 @@ class E2eHarness {
     this.browser = null;
     this.sitePort = null;
     this._siteUrl = null;
-    this.failures = [];
     this.pageConsole = [];
   }
 
@@ -150,10 +161,10 @@ class E2eHarness {
    * Boot the full stack: hold the classic ports, start the emulator (with
    * persona seeding), then the website's real dev server. Ports self-allocate
    * (N7) past the held classics, and the emulator CLI publishes its resolved
-   * map through the ports file.
+   * map through the ports file. Rejects naming the leg that failed.
    */
   async boot() {
-    await this.step('the classic ports are held so the stack boots beside a live dev', async () => {
+    await bootLeg('the classic ports are held so the stack boots beside a live dev', async () => {
       this.hold = await holdClassicPorts();
       // The website port is allocated HERE because the emulator needs it at
       // BOOT time: the backend builds its checkout confirmation URLs from
@@ -167,7 +178,7 @@ class E2eHarness {
     // Boot the emulator (persona seeding happens inside `mgr emulator` by
     // default; the ready marker fires AFTER it, so steps never race the wipe)
     if (this.targets.backend) {
-      await this.step('emulator boots + personas seed (functions, firestore, auth, database, hosting, pubsub)', async () => {
+      await bootLeg('emulator boots + personas seed (functions, firestore, auth, database, hosting, pubsub)', async () => {
         this.emulator = startChild({
           bin: resolveLocalBin('mgr', this.targets.backend),
           args: ['emulator'],
@@ -188,7 +199,7 @@ class E2eHarness {
     }
 
     if (this.targets.web) {
-      await this.step('the website serves through the REAL `omega dev`', async () => {
+      await bootLeg('the website serves through the REAL `omega dev`', async () => {
         resolveDevTarget(this.targets.web, this.brandRoot);
 
         this.dev = startChild({
@@ -225,25 +236,6 @@ class E2eHarness {
   async launchBrowser(options) {
     this.browser = await launchBrowser({ from: this.brandRoot, ...(options || {}) });
     return this.browser;
-  }
-
-  /**
-   * Run a named step with pass/fail logging. Throws on failure (caller
-   * should wrap in try/catch if it wants to continue past failures). The
-   * verdict lands in steps.log as it happens, so a SIGKILLed run still names
-   * the step it died on.
-   */
-  async step(name, fn) {
-    try {
-      const detail = await fn();
-      this.stepsLog.pass(name, detail);
-      console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
-    } catch (error) {
-      this.failures.push({ name, error });
-      this.stepsLog.fail(name, error);
-      console.log(`  ✗ ${name}\n      ${error.message}`);
-      throw error;
-    }
   }
 
   /**
@@ -302,24 +294,9 @@ class E2eHarness {
     }
   }
 
-  /**
-   * Exit the process based on test results. Call after teardown.
-   */
-  exit() {
-    if (this.failures.length) {
-      // A failure a runner pushed itself (the deaths OUTSIDE step()) has no
-      // verdict yet; abort() records it as `preflight` and no-ops when a step
-      // already failed.
-      this.stepsLog.abort(this.failures[this.failures.length - 1].error);
-      console.log(`\n  ${this.failures.length} step(s) failed — logs: ${path.relative(this.brandRoot, this.logDir)}/\n`);
-      process.exit(1);
-    }
-    console.log('\n  Cross-stack e2e PASSED\n');
-  }
-
   get siteUrl() {
     return this._siteUrl;
   }
 }
 
-module.exports = { E2eHarness, discoverTargets, resolveLocalBin, resolveDevTarget, EMULATOR_READY_MARKER, DEV_READY_MARKER };
+module.exports = { E2eHarness, bootLeg, discoverTargets, resolveLocalBin, resolveDevTarget, EMULATOR_READY_MARKER, DEV_READY_MARKER };

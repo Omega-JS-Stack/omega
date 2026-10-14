@@ -11,7 +11,7 @@
 // the lane tore the box's runner down and registered 34 orgs for real.
 //
 // So the redirect happens HERE, at the top of the file, before any require of
-// runner.js can freeze the wrong home — and `OMEGA_TEST_RUNNER` arms the
+// runner.js can freeze the wrong home — and `OMEGA_ENVIRONMENT=testing` arms the
 // production refusal in utils/runner-env.js, which catches the same mistake in
 // any suite that forgets this. The guard case below pins both.
 
@@ -31,7 +31,7 @@ const SCRATCH_STARTUP_DIR = path.join(__dirname, '..', '..', '..', '..', '.temp'
 fs.rmSync(SCRATCH_STARTUP_DIR, { recursive: true, force: true });
 fs.mkdirSync(SCRATCH_STARTUP_DIR, { recursive: true });
 process.env.OMEGA_RUNNER_STARTUP_DIR = SCRATCH_STARTUP_DIR;
-process.env.OMEGA_TEST_RUNNER = '1';
+process.env.OMEGA_ENVIRONMENT = 'testing';
 
 module.exports = defineCases({
   type: 'suite',
@@ -88,7 +88,7 @@ module.exports = defineCases({
               await runner({ _: ['runner', sub, 'some-org'], _home: realish, _env: {}, _interactive: false });
             } catch (e) { threw = e; }
             ctx.expect(threw).toBeDefined();
-            ctx.expect(threw.message).toContain('OMEGA_TEST_RUNNER');   // names the variable
+            ctx.expect(threw.message).toContain('OMEGA_ENVIRONMENT=testing');   // names the variable
             ctx.expect(threw.message).toContain(realish);
           }
           ctx.expect(jetpack.exists(realish)).toBe(false);            // nothing was created
@@ -140,12 +140,12 @@ module.exports = defineCases({
             env: {
               ...process.env,
               OMEGA_RUNNER_HOME:  fakeProfile,     // what the box has: a real home
-              OMEGA_TEST_RUNNER:  '1',
+              OMEGA_ENVIRONMENT:  'testing',
               OMEGA_RUNNER_FORCE: '1',             // the platform gate must not be what saves us
             },
           });
 
-          ctx.expect(out.stdout).toContain('OMEGA_TEST_RUNNER');
+          ctx.expect(out.stdout).toContain('OMEGA_ENVIRONMENT=testing');
           ctx.expect(out.stdout).toContain(fakeProfile);
           ctx.expect(out.stdout.includes('RAN')).toBe(false);
           ctx.expect(jetpack.exists(fakeProfile)).toBe(false);
@@ -184,7 +184,7 @@ module.exports = defineCases({
             env: {
               ...process.env,
               OMEGA_RUNNER_HOME:  homeA,           // the home the module freezes
-              OMEGA_TEST_RUNNER:  '1',
+              OMEGA_ENVIRONMENT:  'testing',
               OMEGA_RUNNER_FORCE: '1',             // status is Windows-only otherwise
             },
           });
@@ -242,7 +242,7 @@ module.exports = defineCases({
               ...process.env,
               OMEGA_RUNNER_HOME:         homeA,
               OMEGA_RUNNER_STARTUP_DIR:  startupDir,
-              OMEGA_TEST_RUNNER:         '1',
+              OMEGA_ENVIRONMENT:         'testing',
               OMEGA_RUNNER_FORCE:        '1',
             },
           });
@@ -297,7 +297,7 @@ module.exports = defineCases({
               ...process.env,
               OMEGA_RUNNER_HOME:         scratch,       // both homes scratch…
               OMEGA_RUNNER_STARTUP_DIR:  realStartup,   // …and the third surface real
-              OMEGA_TEST_RUNNER:         '1',
+              OMEGA_ENVIRONMENT:         'testing',
               OMEGA_RUNNER_FORCE:        '1',
             },
           });
@@ -344,7 +344,7 @@ module.exports = defineCases({
             env: {
               ...process.env,
               OMEGA_RUNNER_HOME: homeA,
-              OMEGA_TEST_RUNNER: '1',
+              OMEGA_ENVIRONMENT: 'testing',
             },
           });
 

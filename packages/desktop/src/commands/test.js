@@ -53,10 +53,9 @@ function runnerConfig({ projectRoot, selfTest }) {
 }
 
 module.exports = async function (options) {
+  // Every suite and every electron/boot child reads `testing`; the runner verbs
+  // read it too (utils/runner-env.js) and refuse to touch a real runner home.
   setEnvironment('testing');
-  // A marker about THIS process, inherited by every child: the runner verbs
-  // read it (utils/runner-env.js) and refuse to touch a real runner home.
-  process.env.OMEGA_TEST_RUNNER = '1';
 
   const cwd = process.cwd();
   attachLogFile(path.join(cwd, 'logs', 'test.log'));

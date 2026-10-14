@@ -1,11 +1,10 @@
 // Unit tests for src/test/e2e-harness.js — the brand e2e harness.
 //
 // Real-execution only (no mocks of our own code): target discovery, bin
-// resolution and the dev-target refusal run against temp-dir fixtures, and
-// step() accounting runs real (throwing/passing) functions. The BOOT itself is
-// left to the lanes: it holds every classic port and starts an emulator, which
-// a unit test must never do. The pieces it stands on are proven in
-// boot-child.test.js, port-hold.test.js and browser.test.js.
+// resolution and the dev-target refusal run against temp-dir fixtures. The
+// BOOT itself is left to the lanes: it holds every classic port and starts an
+// emulator, which a unit test must never do. The pieces it stands on are proven
+// in boot-child.test.js, port-hold.test.js and browser.test.js.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
@@ -14,12 +13,14 @@ const path = require('node:path');
 
 const {
   E2eHarness,
+  bootLeg,
   discoverTargets,
   resolveLocalBin,
   resolveDevTarget,
   EMULATOR_READY_MARKER,
   DEV_READY_MARKER,
 } = require('../src/test/e2e-harness');
+const { startChild, stopChild } = require('../src/test/boot-child');
 
 function makeTempBrand(structure) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-harness-test-')));
@@ -40,30 +41,23 @@ function write(filePath, contents) {
   fs.writeFileSync(filePath, contents);
 }
 
-// ---- steps.log: the harness's verdicts on disk (#197)
-
-// exit() ends the process on failure — the ONE thing a unit test must stub (a
-// real exit would take the runner with it). The stub throws so the call site
-// behaves like the real one: it never returns.
-const EXITED = new Error('process.exit');
-function callExit(harness) {
-  const realExit = process.exit;
-  let code = null;
-  process.exit = (value) => { code = value; throw EXITED; };
-  try {
-    harness.exit();
-  } catch (error) {
-    if (error !== EXITED) { throw error; }
-  } finally {
-    process.exit = realExit;
-  }
-  return code;
-}
-
 module.exports = defineCases({
   type: 'group',
   description: 'e2e-harness',
   tests: [
+    // ---- bootLeg
+
+    {
+      name: 'a boot leg that throws rejects naming the leg, with the cause',
+      run: async (ctx) => {
+        const cause = new Error('port 9099 busy');
+        const error = await bootLeg('the emulator', async () => { throw cause; }).then(() => null, (e) => e);
+        ctx.expect(error.message).toBe('boot failed at "the emulator": port 9099 busy');
+        ctx.expect(error.cause).toBe(cause);
+        ctx.expect(await bootLeg('the hold', async () => '5 ports')).toBeUndefined();
+      },
+    },
+
     // ---- discoverTargets
 
     {
@@ -191,73 +185,33 @@ module.exports = defineCases({
       },
     },
 
-    // ---- step() accounting
+    // ---- the shape: a suite's setup boots, its cleanup tears down
 
     {
-      name: 'step records failures and rethrows; passes do not accumulate',
-      run: async (ctx) => {
-        const root = makeTempBrand([]);
-        const harness = new E2eHarness(root);
-
-        await harness.step('passing step', async () => 'detail');
-        ctx.expect(harness.failures.length).toBe(0);
-
-        await ctx.expect((() => harness.step('failing step', async () => { throw new Error('boom'); }))()).rejects.toThrow(/boom/);
-        ctx.expect(harness.failures.length).toBe(1);
-        ctx.expect(harness.failures[0].name).toBe('failing step');
-      },
-    },
-
-    {
-      name: 'the log dir is the lane folder, and every step writes its verdict as it lands',
-      run: async (ctx) => {
-        const root = makeTempBrand([]);
-        const harness = new E2eHarness(root);
-        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
-
-        await harness.step('page boots @omega.js/client against the emulators', async () => 'auth :9099');
-        await ctx.expect((() => harness.step('signup creates the auth user', async () => {
-            throw new Error('user doc not created within 90s\n      (last state: null)');
-          }))()).rejects.toThrow(/user doc not created/);
-
-        const contents = fs.readFileSync(stepsLog, 'utf8');
-        ctx.expect(contents).toMatch(/^PASS {2}page boots @omega\.js\/client against the emulators \(auth :9099\)$/m);
-        // One line per step: the multi-line failure detail collapses
-        ctx.expect(contents).toMatch(/^FAIL {2}signup creates the auth user — user doc not created within 90s \(last state: null\)$/m);
-      },
-    },
-
-    {
-      name: 'a failure recorded outside step() lands as a preflight verdict on exit',
+      name: 'the step, exit and steps-log plumbing is gone: a lane is a defineCases suite',
       run: (ctx) => {
-        const root = makeTempBrand([]);
-        const harness = new E2eHarness(root);
-        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
-
-        // What a runner does when launchBrowser()/preparePage() dies before any step
-        // ran — without this the file would hold a header and nothing else.
-        harness.failures.push({ name: 'harness setup', error: new Error('puppeteer.launch failed') });
-
-        ctx.expect(callExit(harness)).toBe(1);
-        ctx.expect(fs.readFileSync(stepsLog, 'utf8')).toMatch(/^FAIL {2}preflight — puppeteer\.launch failed$/m);
+        for (const key of ['step', 'exit', 'stepsLog']) {
+          ctx.expect(key in E2eHarness.prototype, `E2eHarness.prototype.${key}`).toBe(false);
+        }
+        const harness = new E2eHarness(makeTempBrand([]));
+        ctx.expect('failures' in harness, 'an instance keeps no failures list').toBe(false);
       },
     },
 
     {
-      name: 'exit() adds no preflight line when a step already recorded the failure',
-      run: async (ctx) => {
-        const root = makeTempBrand([]);
-        const harness = new E2eHarness(root);
-        const stepsLog = path.join(root, 'test', 'e2e', '.logs', 'steps.log');
+      name: 'boot, launchBrowser, capturePageConsole, preparePage and teardown stay',
+      run: (ctx) => {
+        for (const key of ['boot', 'launchBrowser', 'capturePageConsole', 'preparePage', 'teardown']) {
+          ctx.expect(E2eHarness.prototype[key], `E2eHarness.prototype.${key}`).toBeTypeOf('function');
+        }
+      },
+    },
 
-        await ctx.expect((() => harness.step('sign out', async () => { throw new Error('currentUser still set'); }))()).rejects.toThrow();
-
-        callExit(harness);
-
-        const contents = fs.readFileSync(stepsLog, 'utf8');
-        const verdicts = contents.split('\n').filter((line) => /^(PASS|FAIL) /.test(line));
-        ctx.expect(verdicts.length).toBe(1);
-        ctx.expect(/preflight/.test(contents)).toBe(false);
+    {
+      name: 'the harness imports no steps-log',
+      run: (ctx) => {
+        const source = fs.readFileSync(require.resolve('../src/test/e2e-harness'), 'utf8');
+        ctx.expect(/steps-log/.test(source)).toBe(false);
       },
     },
 
@@ -336,6 +290,40 @@ module.exports = defineCases({
         ctx.expect(harness.dev).toBe(null);
         ctx.expect(harness.emulator).toBe(null);
         ctx.expect(harness.hold).toBe(null);
+      },
+    },
+
+    {
+      name: 'teardown stops every child it started, the emulator and the dev server alike',
+      timeout: 60000,
+      run: async (ctx) => {
+        const root = makeTempBrand([]);
+        const harness = new E2eHarness(root);
+        const start = (leg) => startChild({
+          bin: process.execPath,
+          args: ['-e', `console.log('${leg} ready'); setInterval(() => {}, 1000);`],
+          cwd: root,
+          logFile: path.join(root, 'logs', `${leg}.log`),
+          marker: new RegExp(`(${leg}) ready`),
+          timeout: 20000,
+          relativeTo: root,
+        });
+        const emulator = start('emulator');
+        const dev = start('dev');
+        const children = [emulator.child, dev.child];
+        const running = (child) => child.exitCode === null && child.signalCode === null;
+        ctx.after(async () => {
+          for (const child of children.filter(running)) { await stopChild(child); }
+        });
+        await Promise.all([emulator.ready, dev.ready]);
+        harness.emulator = { child: emulator.child };
+        harness.dev = { child: dev.child };
+
+        await harness.teardown();
+
+        ctx.expect(children.filter(running).length, 'every child boot() started has exited').toBe(0);
+        ctx.expect(harness.emulator).toBe(null);
+        ctx.expect(harness.dev).toBe(null);
       },
     },
 

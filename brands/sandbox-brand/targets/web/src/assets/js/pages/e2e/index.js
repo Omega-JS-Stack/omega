@@ -1,6 +1,6 @@
 /**
  * The `window.__omega` hook surface the sandbox brand's cross-stack e2e lane
- * drives (test/e2e/run.js), bound to /e2e by the page-asset key — nothing
+ * drives (test/e2e/cross-stack.test.js), bound to /e2e by the page-asset key — nothing
  * declares it.
  *
  * It hangs off the REAL client the framework boots: `bootPage` awaits the main
@@ -9,7 +9,7 @@
  * is the whole point of the lane after
  * [#775](https://github.com/Omega-JS-Stack/omega/issues/775): the page under
  * test is a real @omega.js/web page served by the real `omega dev`, so the
- * steps prove the product's own boot rather than a fixture's.
+ * cases prove the product's own boot rather than a fixture's.
  *
  * The hooks are THIN on purpose — one client call each, no logic of their own.
  * A step that fails must indict the stack, never this file.

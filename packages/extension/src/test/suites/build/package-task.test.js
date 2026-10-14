@@ -745,6 +745,63 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'every manifest match pattern is checked, an illegal one fails the compile naming it (#957)',
+      run: async (ctx) => {
+        const config = `{ brand: { id: 'staged', name: 'Staged' } }`;
+        const LEGAL = ['*://*.example.com/*', 'https://example.com/*', 'http://localhost:*/*', 'file:///*', '<all_urls>'];
+        const ILLEGAL = ['htp://example.com/*', 'https://example.com'];
+        const list = (patterns) => patterns.map((p) => `'${p}'`).join(', ');
+        const HOSTS = (patterns) => MANIFEST(`host_permissions: [${list(patterns)}]`);
+        const SCRIPT = (patterns) => MANIFEST(`content_scripts: [{ matches: [${list(patterns)}], js: ['content.js'] }]`);
+        const legal = stageProject({
+          config,
+          files: { 'dist/manifest.json': MANIFEST(`host_permissions: [${list(LEGAL)}], content_scripts: [{ matches: [${list(LEGAL)}], js: ['content.js'] }]`) },
+        });
+        const illegal = {
+          host_permissions: stageProject({ config, files: { 'dist/manifest.json': HOSTS(ILLEGAL) } }),
+          'content_scripts[].matches': stageProject({ config, files: { 'dist/manifest.json': SCRIPT(ILLEGAL) } }),
+        };
+
+        try {
+          await inProject(legal, async (task) => {
+            await task.compileManifest(path.join(legal, 'out'), 'chrome');
+            const m = JSON.parse(fs.readFileSync(path.join(legal, 'out', 'manifest.json'), 'utf8'));
+            ctx.expect(m.host_permissions).toEqual(LEGAL);
+            ctx.expect(m.content_scripts[0].matches).toEqual(LEGAL);
+          });
+
+          // Chrome refuses to load a manifest carrying any of these, so the build stops first
+          for (const [where, tmp] of Object.entries(illegal)) {
+            await inProject(tmp, async (task) => {
+              let thrown = null;
+              await task.compileManifest(path.join(tmp, 'out'), 'chrome').catch((e) => { thrown = e; });
+              ctx.expect(thrown?.message, where).toContain('illegal match pattern');
+              for (const pattern of ILLEGAL) ctx.expect(thrown?.message, where).toContain(pattern);
+              ctx.expect(fs.existsSync(path.join(tmp, 'out', 'manifest.json')), where).toBe(false);
+            });
+          }
+        } finally {
+          fs.rmSync(legal, { recursive: true, force: true });
+          for (const tmp of Object.values(illegal)) fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the match-pattern check reads every key that carries one, once per distinct pattern',
+      run: async (ctx) => {
+        const { illegalMatchPatterns } = require(path.join(SRC, 'gulp', 'tasks', 'package.js'));
+        const manifest = {
+          content_scripts: [{ matches: ['https://a.example/*', 'bad-a'], exclude_matches: ['bad-b', 'bad-a'] }],
+          host_permissions: ['<all_urls>', 'bad-c'],
+          optional_host_permissions: ['*://*/foo', 'bad-d'],
+          web_accessible_resources: [{ resources: ['x.png'], matches: ['file:///*', 'bad-e'] }],
+        };
+
+        ctx.expect(illegalMatchPatterns(manifest)).toEqual(['bad-a', 'bad-b', 'bad-c', 'bad-d', 'bad-e']);
+        ctx.expect(illegalMatchPatterns({})).toEqual([]);
+      },
+    },
+    {
       name: 'externally_connectable: a build-mode default is the BRAND origin, no dev origin (#583)',
       run: async (ctx) => {
         const tmp = stageProject({

@@ -276,7 +276,7 @@ function serveDist(outDir) {
 
 /**
  * Headless Chrome, found the way every browser lane in this repo finds it:
- * puppeteer's downloaded Chrome for Testing (scripts/e2e-flows.js,
+ * puppeteer's downloaded Chrome for Testing (test/e2e/flows.test.js,
  * packages/extension's chromium runner), with CHROME_PATH — chrome-launcher's
  * own convention — winning when set. Null means "let chrome-launcher find a
  * system Chrome"; nothing here hardcodes a path.

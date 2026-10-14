@@ -11,7 +11,7 @@ Match the framework's one layer, `build`. Every suite is a `defineCases` file on
 |---|---|---|
 | `test/build/` | Plain Node, the `build` layer | Config resolution and the built site in `dist/`: a page renders, carries the right content, links where it should |
 | `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`), imported directly, with the browser objects they touch passed in |
-| `<brandRoot>/test/e2e/run.js` | A real browser against the real local stack | End-to-end: the brand's own browser lane, which `npx omega test` at the brand root runs after every target |
+| `<brandRoot>/test/e2e/` | A real browser against the real local stack | End-to-end: the brand's own browser lane, `defineCases` suite files which `npx omega test` at the brand root runs after every target |
 
 `npx omega test` builds `dist/` before the suites run, so a `build` suite reads it directly; run `npx omega build` first when calling `node --test` on one file. `test/_init.js` runs its `setup()` once before the first case, for a fixture a suite needs. A path narrows the run to the suites whose path contains it: `npx omega test build/config` builds, then runs that suite alone, no smoke case.
 
@@ -60,4 +60,4 @@ Name every file `<concern>.test.js`: the suffix is how the runner finds it, so a
 - `build/download.test.js`: /download carries the brand name and a link to every desktop installer.
 - `build/notes.test.js`: /notes as the production build ships it.
 - `pages/notes.test.js`: the /notes page module draws what GET /notes answers.
-- The browser proof is the brand lane, `test/e2e/run.js` at the brand root.
+- The browser proof is the brand lane, `test/e2e/auth-return.test.js` at the brand root.

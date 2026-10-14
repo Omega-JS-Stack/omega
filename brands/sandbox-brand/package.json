@@ -6,7 +6,6 @@
     "targets/*"
   ],
   "scripts": {
-    "test": "node test/e2e/run.js",
     "test:backend": "omega test --target=backend framework:"
   },
   "devDependencies": {

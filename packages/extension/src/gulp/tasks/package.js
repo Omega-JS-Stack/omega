@@ -201,6 +201,25 @@ function resolveManifestTokens(value) {
   return value;
 }
 
+// A legal match pattern: scheme, host, an optional port (a number or `*`) and a
+// path from `/`, where `file` alone takes an empty host. `<all_urls>` is legal beside it.
+const MATCH_PATTERN = /^(?:(?:\*|https?|wss?|ftp):\/\/(?:\*|(?:\*\.)?[^/*:]+)(?::(?:\d+|\*))?|file:\/\/)\/.*$/;
+
+// The distinct match patterns of a manifest no browser accepts, from every key
+// that carries them.
+function illegalMatchPatterns(manifest) {
+  const patterns = [
+    ...(manifest.content_scripts || []).flatMap((entry) => [...(entry.matches || []), ...(entry.exclude_matches || [])]),
+    ...(manifest.host_permissions || []),
+    ...(manifest.optional_host_permissions || []),
+    ...(manifest.web_accessible_resources || []).flatMap((entry) => entry.matches || []),
+  ];
+
+  return [...new Set(patterns.filter((pattern) => typeof pattern === 'string'
+    && pattern !== '<all_urls>'
+    && !MATCH_PATTERN.test(pattern)))];
+}
+
 // Special Compilation Task for manifest.json with default settings
 async function compileManifest(outputDir, target) {
   try {
@@ -217,6 +236,13 @@ async function compileManifest(outputDir, target) {
     if (leftover.length > 0) {
       throw new Error(`Cannot build the manifest: src/manifest.json carries config token(s) nothing in config/omega.json5 resolves: ${leftover.join(', ')}`);
     }
+
+    const illegal = illegalMatchPatterns(manifest);
+
+    if (illegal.length > 0) {
+      throw new Error(`Cannot build the manifest: src/manifest.json carries illegal match pattern(s): ${illegal.join(', ')}`);
+    }
+
     const defaultConfig = JSON5.parse(template(jetpack.read(configPath), {
       externallyConnectableOrigins: externallyConnectableOrigins()
         .map((origin) => `'${origin}'`)
@@ -691,6 +717,7 @@ module.exports = series(packageFn, packageFnWatcher);
 module.exports.packageFn = packageFn;
 module.exports.packageZip = packageZip;
 module.exports.compileManifest = compileManifest;
+module.exports.illegalMatchPatterns = illegalMatchPatterns;
 module.exports.compileLocales = compileLocales;
 module.exports.deployStoreAssets = deployStoreAssets;
 module.exports.hook = hook;

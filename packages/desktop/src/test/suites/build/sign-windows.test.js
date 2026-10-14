@@ -51,23 +51,20 @@ module.exports = defineCases({
         const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sign-home-'));
         const realish = path.join(os.homedir(), `omega-runner-fake-${process.pid}`);
         const origHome   = process.env.OMEGA_RUNNER_HOME;
-        const origMarker = process.env.OMEGA_TEST_RUNNER;
+        const origEnvironment = process.env.OMEGA_ENVIRONMENT;
         try {
           // Pure half: the decision, with the home coming from the passed env and
           // the "is this a test" answer coming from process.env, always.
-          process.env.OMEGA_TEST_RUNNER = '1';
+          process.env.OMEGA_ENVIRONMENT = 'testing';
           ctx.expect(signer.boxLogTarget({ OMEGA_RUNNER_HOME: scratch }, 'darwin')).toBe(path.join(scratch, 'logs', 'runner.log'));
           ctx.expect(signer.boxLogTarget({ OMEGA_RUNNER_HOME: realish }, 'darwin')).toBeNull();
           ctx.expect(signer.boxLogTarget({}, 'darwin')).toBeNull();                    // no box home off Windows
-          delete process.env.OMEGA_TEST_RUNNER;
+          process.env.OMEGA_ENVIRONMENT = 'production';                                // the box itself
           ctx.expect(signer.boxLogTarget({ OMEGA_RUNNER_HOME: realish }, 'darwin')).toBe(path.join(realish, 'logs', 'runner.log'));
-          process.env.OMEGA_TEST_MODE = 'true';                                        // the devkit/boot marker counts too
-          ctx.expect(signer.boxLogTarget({ OMEGA_RUNNER_HOME: realish }, 'darwin')).toBeNull();
-          delete process.env.OMEGA_TEST_MODE;
 
           // And the command itself: pointed at a real home from a test run, it
           // leaves no runner.log behind (it refuses --smoke off Windows).
-          process.env.OMEGA_TEST_RUNNER = '1';
+          process.env.OMEGA_ENVIRONMENT = 'testing';
           process.env.OMEGA_RUNNER_HOME = realish;
           let threw;
           try {
@@ -77,7 +74,7 @@ module.exports = defineCases({
           ctx.expect(jetpack.exists(path.join(realish, 'logs', 'runner.log'))).toBe(false);
         } finally {
           if (origHome === undefined) delete process.env.OMEGA_RUNNER_HOME; else process.env.OMEGA_RUNNER_HOME = origHome;
-          if (origMarker === undefined) delete process.env.OMEGA_TEST_RUNNER; else process.env.OMEGA_TEST_RUNNER = origMarker;
+          if (origEnvironment === undefined) delete process.env.OMEGA_ENVIRONMENT; else process.env.OMEGA_ENVIRONMENT = origEnvironment;
           jetpack.remove(scratch);
           jetpack.remove(realish);
         }

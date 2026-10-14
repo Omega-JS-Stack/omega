@@ -6,22 +6,18 @@
  * `<brand.id>://auth/token?authToken=` so the OS single-instance lock forwards
  * it through the real deep-link pipeline. Main's session and the renderer's own
  * Firebase must both land on the persona, and a sign-out in main must end both
- * (the renderer through the real broadcast). Offline: emulator only. The staged
- * copy (never committed) carries a cloud config and a renderer entry that parks
- * the instance on `window`. OMEGA_SKIP_E2E=1 skips; no electron is a SKIP.
+ * (the renderer through the real broadcast). Offline: emulator only.
+ * OMEGA_SKIP_E2E=1 skips; no electron, or no desktop dist, is a SKIP.
  */
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const fs = require('fs');
-const net = require('net');
-const { spawn } = require('child_process');
+const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
 
-if (process.env.OMEGA_SKIP_E2E === '1') {
-  console.log('⏭ OMEGA_SKIP_E2E=1 — skipping desktop auth e2e');
-  process.exit(0);
-}
+const { startPlaygroundEmulator, stopPlaygroundEmulator, playgroundProjectId } = require('./_emulator');
+const { mintPersonaToken } = require('../../scripts/roster-persona');
 
-const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
+const ROOT = path.join(__dirname, '..', '..');
 const DESKTOP = path.join(ROOT, 'packages', 'desktop');
 const DESKTOP_DIST = path.join(DESKTOP, 'dist');
 const FIXTURE = path.join(DESKTOP, 'src', 'test', 'fixtures', 'consumer-app');
@@ -34,109 +30,19 @@ const LOG_DIR = path.join(ROOT, '.temp', 'desktop-auth-e2e');
 
 const BRAND_ID = 'desktop-auth-e2e';
 
-const { readPortsFile } = require('@omega.js/config');
-const { createStepsLog } = require('./steps-log');
-const { mintPersonaToken } = require('./roster-persona');
-const { normalizeSpec } = require('@omega.js/devkit/test/run-case');
+// The boot case's backstop sits above the gulp build plus every in-app case's own
+// timeout, so the in-app ceilings fire first, naming the case that hung.
+const BUILD_BUDGET = 300000;
+const MARGIN = 60000;
 
 // This lane's own seeded persona, never shared with another suite
 const PERSONA_LOCALPART = '_test.desktop-auth-e2e';
-
-const EMULATOR_READY_TIMEOUT = 240000;
-const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const failures = [];
-const stepsLog = createStepsLog(LOG_DIR);
-
-// Every verdict lands in .temp/desktop-auth-e2e/steps.log as it happens, so a
-// crashed run still names the step that broke.
-async function step(name, fn) {
-  try {
-    const detail = await fn();
-    stepsLog.pass(name, detail);
-    console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
-  } catch (error) {
-    failures.push({ name, error });
-    stepsLog.fail(name, error);
-    console.log(`  ✗ ${name}\n      ${error.message}`);
-    throw error;
-  }
-}
-
-function isPortListening(port) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ port, host: '127.0.0.1' });
-    const done = (result) => {
-      socket.destroy();
-      resolve(result);
-    };
-    socket.once('connect', () => done(true));
-    socket.once('error', () => done(false));
-    socket.setTimeout(1000, () => done(false));
-  });
-}
-
-// -- Emulator lifecycle (mirrors scripts/e2e-auth-token.js) -----------------
-
-function startEmulator() {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
-  const emulatorLog = path.join(LOG_DIR, 'emulator.log');
-  const logStream = fs.createWriteStream(emulatorLog);
-
-  // Spawn the hoisted local bin DIRECTLY (not via npx) — outside an npm-script
-  // PATH the npx shim routes through the Socket Firewall proxy, which breaks
-  // firebase-tools' internal emulator REST calls.
-  // --no-https: the app resolves its API base from the OMEGA_*_PORT env channel
-  // and speaks plain http to the hosting emulator; an mkcert-fronted stack would
-  // move plain hosting off the port the child was told about.
-  const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
-  const child = spawn(mgrBin, ['emulator', '--no-https'], {
-    cwd: PLAYGROUND_BACKEND,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  });
-
-  const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`emulator not ready after ${EMULATOR_READY_TIMEOUT / 1000}s (log: ${emulatorLog})`));
-    }, EMULATOR_READY_TIMEOUT);
-
-    const watch = (chunk) => {
-      const text = chunk.toString();
-      logStream.write(text);
-      if (READY_MARKER.test(text)) {
-        clearTimeout(timer);
-        resolve();
-      }
-    };
-
-    child.stdout.on('data', watch);
-    child.stderr.on('data', watch);
-    child.on('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`emulator exited early (code ${code}, log: ${emulatorLog})`));
-    });
-  });
-
-  return { child, ready };
-}
-
-async function stopEmulator(child) {
-  if (!child || child.exitCode !== null) return;
-  const exited = new Promise((resolve) => child.once('exit', resolve));
-  try { process.kill(-child.pid, 'SIGINT'); } catch (e) { return; }
-  const result = await Promise.race([exited.then(() => 'clean'), sleep(20000)]);
-  if (result !== 'clean') {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { /* already gone */ }
-  }
-}
+const API_KEY = 'fake-api-key';
 
 // -- The staged consumer app ------------------------------------------------
 
 // Copy the bundled fixture and apply the two test-time overrides. Everything
-// else — main.js, preload, views, styles — is the fixture verbatim, so what
+// else (main.js, preload, views, styles) is the fixture verbatim, so what
 // boots here is the same consumer shape the desktop boot suite proves.
 function stageApp({ projectId, apiKey, ports }) {
   fs.rmSync(APP_DIR, { recursive: true, force: true });
@@ -150,27 +56,27 @@ function stageApp({ projectId, apiKey, ports }) {
     name: 'desktop-auth-e2e-consumer',
     version: '1.0.0',
     private: true,
-    description: 'Staged @omega.js/desktop consumer for scripts/e2e-desktop-auth.js — generated, never committed.',
+    description: 'Staged @omega.js/desktop consumer for test/e2e/desktop-auth.test.js: generated, never committed.',
     main: 'dist/main.bundle.js',
-    // A real consumer always declares its framework — ensureTarget's locality
-    // check (#675) refuses a target without it. `file:` is the linked-brand
+    // A real consumer always declares its framework: ensureTarget's locality
+    // check refuses a target without it. `file:` is the linked-brand
     // shape; from APP_DIR that path is packages/desktop itself.
     devDependencies: { '@omega.js/desktop': 'file:../../..' },
   }, null, 2)}\n`);
 
-  // JSON is valid JSON5 — the config loader reads this the same way it reads a
+  // JSON is valid JSON5: the config loader reads this the same way it reads a
   // hand-written one.
   const config = {
     brand: {
       id: BRAND_ID,
       name: 'Desktop Auth E2E',
-      // The .deb target needs a homepage and a maintainer (#872): build-config
+      // The .deb target needs a homepage and a maintainer: build-config
       // refuses the config without them, so the staged brand spells both.
       url: 'https://desktop-auth-e2e.test',
       contact: { email: 'support@desktop-auth-e2e.test' },
       images: { icon: '' },
     },
-    // The baked word. The RUNNING environment beats it (#925): the boot lane
+    // The baked word. The RUNNING environment beats it: the boot lane
     // names `testing`, main and the renderer both answer it, and the renderer's
     // @omega.js/client connects to the auth/firestore emulators in any
     // non-production environment, reading the ports from `dev.ports`.
@@ -198,7 +104,7 @@ function stageApp({ projectId, apiKey, ports }) {
   // the RENDERER's own auth state (the fixture's entry keeps no reference).
   const rendererEntry = path.join(APP_DIR, 'src', 'assets', 'js', 'components', 'main', 'index.js');
   fs.writeFileSync(rendererEntry, [
-    '// Staged for scripts/e2e-desktop-auth.js — the fixture entry plus a window',
+    '// Staged for test/e2e/desktop-auth.test.js: the fixture entry plus a window',
     '// handle, so the lane can read this renderer\'s own @omega.js/client auth state.',
     "import omega from '@omega.js/desktop/renderer';",
     '',
@@ -208,11 +114,10 @@ function stageApp({ projectId, apiKey, ports }) {
   ].join('\n'));
 }
 
-// -- The boot-layer tests (run INSIDE the spawned Electron app) --------------
-//
-// run bodies are serialized to the child: no closures over this file, and the one
-// parameter is `ctx`. `require`, `process`, and `Buffer` are injected; everything
-// else arrives on process.env (set below, inherited by the spawn).
+// The boot-layer tests, run INSIDE the spawned Electron app. Their run bodies
+// are serialized to the child: no closures over this file, and the one parameter
+// is `ctx`. `require`, `process`, and `Buffer` are injected; everything else
+// arrives on process.env (set by the last case, inherited by the spawn).
 
 const bootSpec = {
   type: 'group',
@@ -267,7 +172,7 @@ const bootSpec = {
         env.OMEGA_TEST_KEEP_USERDATA = '1';
         const log = require('fs').openSync(process.env.OMEGA_E2E_SECOND_INSTANCE_LOG, 'w');
         // The duplicate must boot the SAME app the primary booted: the staged
-        // test root (#110), not the project root, whose dist/ no longer exists.
+        // test root, not the project root, whose dist/ is gone by then.
         const child = spawn(process.env.OMEGA_E2E_ELECTRON_BIN, [appRoot, url], {
           cwd: appRoot,
           env,
@@ -362,123 +267,113 @@ const bootSpec = {
   ],
 };
 
-// ---------------------------------------------------------------------------
+module.exports = defineCases({
+  type: 'suite',
+  description: 'desktop auth e2e (real Electron app, real deep link, main + renderer)',
+  timeout: 300000,
 
-async function main() {
-  console.log('\nDesktop auth e2e (real Electron app, real deep link, main + renderer)\n');
+  setup(ctx) {
+    if (process.env.OMEGA_SKIP_E2E === '1') ctx.skip('OMEGA_SKIP_E2E=1');
 
-  let electronBin = null;
-  try {
-    electronBin = require(require.resolve('electron', { paths: [DESKTOP] }));
-    if (!electronBin || !fs.existsSync(electronBin)) {
-      throw new Error(`the electron binary is not installed at ${electronBin}`);
-    }
-  } catch (error) {
-    console.log(`⏭ SKIPPED — ${error.message}`);
-    console.log('   install it with `npm install` at the monorepo root\n');
-    process.exit(0);
-  }
-
-  const bootRunnerPath = path.join(DESKTOP_DIST, 'test', 'runners', 'boot.js');
-  if (!fs.existsSync(bootRunnerPath)) {
-    console.log(`⏭ SKIPPED — @omega.js/desktop has no dist at ${path.relative(ROOT, DESKTOP_DIST)}`);
-    console.log('   build it with `npm run prepare -w @omega.js/desktop`\n');
-    process.exit(0);
-  }
-  const { bootDriver } = require(bootRunnerPath);
-  const suite = normalizeSpec(bootSpec, { file: __filename });
-
-  let emulator = null;
-  let ports = null;
-
-  try {
-    // Never clobber a live playground stack
-    const incumbent = readPortsFile(PLAYGROUND_BACKEND);
-    if (incumbent?.hosting && await isPortListening(incumbent.hosting)) {
-      throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
-    }
-
-    await step('playground emulator boots (auth, functions, hosting) and seeds its personas', async () => {
-      emulator = startEmulator();
-      await emulator.ready;
-      ports = readPortsFile(PLAYGROUND_BACKEND);
-      if (!ports?.hosting || !ports?.auth) {
-        throw new Error(`resolved port map incomplete: ${JSON.stringify(ports)}`);
+    let electronBin = null;
+    try {
+      electronBin = require(require.resolve('electron', { paths: [DESKTOP] }));
+      if (!electronBin || !fs.existsSync(electronBin)) {
+        throw new Error(`the electron binary is not installed at ${electronBin}`);
       }
-      return `hosting :${ports.hosting}, auth :${ports.auth}`;
-    });
+    } catch (error) {
+      ctx.skip(`${error.message} (install it with \`npm install\` at the monorepo root)`);
+    }
 
-    const apiBase = `http://127.0.0.1:${ports.hosting}`;
-    const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
-    const projectId = firebaserc.projects.default;
-    const apiKey = 'fake-api-key';
+    const bootRunnerPath = path.join(DESKTOP_DIST, 'test', 'runners', 'boot.js');
+    if (!fs.existsSync(bootRunnerPath)) {
+      ctx.skip(`@omega.js/desktop has no dist at ${path.relative(ROOT, DESKTOP_DIST)} (build it with \`npm run prepare -w @omega.js/desktop\`)`);
+    }
 
-    let signIn = null;
+    ctx.state.electronBin = electronBin;
+    ctx.state.bootDriver = require(bootRunnerPath).bootDriver;
+    ctx.state.suite = normalizeSpec(bootSpec, { file: __filename });
+  },
 
-    await step('the roster\'s persona signs in with the test password and the backend mints its custom token', async () => {
-      signIn = await mintPersonaToken({ apiBase, authPort: ports.auth, firebaseConfig: { apiKey, projectId }, localpart: PERSONA_LOCALPART });
-      return `${signIn.email}, uid ${signIn.uid}`;
-    });
+  async cleanup(ctx) {
+    await stopPlaygroundEmulator(ctx.state.emulator);
+  },
 
-    await step('a consumer app is staged from the bundled fixture', async () => {
-      stageApp({ projectId, apiKey, ports });
-      return path.relative(ROOT, APP_DIR);
-    });
+  tests: [
+    {
+      name: 'playground emulator boots (auth, functions, hosting) and seeds its personas',
+      run: async (ctx) => {
+        // --no-https: the app resolves its API base from the OMEGA_*_PORT env channel
+        // and speaks plain http to the hosting emulator; an mkcert-fronted stack would
+        // move plain hosting off the port the child was told about.
+        const { child, ports } = await startPlaygroundEmulator({ logDir: LOG_DIR, args: ['--no-https'] });
+        ctx.state.emulator = child;
+        ctx.state.ports = ports;
+        console.log(`    hosting :${ports.hosting}, auth :${ports.auth}`);
+      },
+    },
 
-    // Everything the spawned Electron app needs: the boot runner passes
-    // process.env straight through to the child.
-    Object.assign(process.env, {
-      OMEGA_TEST_BOOT_PROJECT:  APP_DIR,
-      OMEGA_HOSTING_PORT:       String(ports.hosting),
-      OMEGA_AUTH_PORT:          String(ports.auth),
-      OMEGA_FUNCTIONS_PORT:     String(ports.functions),
-      OMEGA_E2E_SCHEME:         BRAND_ID,
-      OMEGA_E2E_TOKEN:          signIn.token,
-      OMEGA_E2E_UID:            signIn.uid,
-      OMEGA_E2E_EMAIL:          signIn.email,
-      OMEGA_E2E_ELECTRON_BIN:   electronBin,
-      OMEGA_E2E_SECOND_INSTANCE_LOG: path.join(LOG_DIR, 'second-instance.log'),
-    });
-    delete process.env.OMEGA_HTTPS_PORT;
+    {
+      name: 'the roster\'s persona signs in with the test password and the backend mints its custom token',
+      run: async (ctx) => {
+        const { ports } = ctx.state;
+        ctx.state.projectId = playgroundProjectId();
 
-    await step('the app builds + boots in a REAL Electron process, the deep link signs it in, and a sign-out reaches the renderer', async () => {
-      const events = [];
-      const handle = await bootDriver.start({ projectRoot: APP_DIR, suites: [suite], report: (event) => events.push(event) });
-      try {
+        const signIn = await mintPersonaToken({
+          apiBase: `http://127.0.0.1:${ports.hosting}`,
+          authPort: ports.auth,
+          firebaseConfig: { apiKey: API_KEY, projectId: ctx.state.projectId },
+          localpart: PERSONA_LOCALPART,
+        });
+        ctx.state.signIn = signIn;
+        console.log(`    ${signIn.email}, uid ${signIn.uid}`);
+      },
+    },
+
+    {
+      name: 'a consumer app is staged from the bundled fixture',
+      run: (ctx) => {
+        stageApp({ projectId: ctx.state.projectId, apiKey: API_KEY, ports: ctx.state.ports });
+        console.log(`    ${path.relative(ROOT, APP_DIR)}`);
+      },
+    },
+
+    {
+      name: 'the app builds + boots in a REAL Electron process, the deep link signs it in, and a sign-out reaches the renderer',
+      timeout: BUILD_BUDGET + bootSpec.tests.reduce((sum, caseDef) => sum + caseDef.timeout, 0) + MARGIN,
+      run: async (ctx) => {
+        const { ports, signIn, electronBin, bootDriver, suite } = ctx.state;
+        // Everything the spawned Electron app needs: the boot runner passes
+        // process.env straight through to the child.
+        Object.assign(process.env, {
+          OMEGA_TEST_BOOT_PROJECT:  APP_DIR,
+          OMEGA_HOSTING_PORT:       String(ports.hosting),
+          OMEGA_AUTH_PORT:          String(ports.auth),
+          OMEGA_FUNCTIONS_PORT:     String(ports.functions),
+          OMEGA_E2E_SCHEME:         BRAND_ID,
+          OMEGA_E2E_TOKEN:          signIn.token,
+          OMEGA_E2E_UID:            signIn.uid,
+          OMEGA_E2E_EMAIL:          signIn.email,
+          OMEGA_E2E_ELECTRON_BIN:   electronBin,
+          OMEGA_E2E_SECOND_INSTANCE_LOG: path.join(LOG_DIR, 'second-instance.log'),
+        });
+        delete process.env.OMEGA_HTTPS_PORT;
+
+        const events = [];
+        // Stopped once the case settles, a timeout included, so the app never outlives it.
+        let handle = null;
+        ctx.after(() => handle && handle.stop());
+        handle = await bootDriver.start({ projectRoot: APP_DIR, suites: [suite], report: (event) => events.push(event) });
         await handle.finished;
-      } finally {
-        await handle.stop();
-      }
-      const failed = suite.cases
-        .map((caseDef) => ({ caseDef, event: events.find((event) => event.id === caseDef.id) }))
-        .filter(({ event }) => !event || event.status !== 'pass')
-        .map(({ caseDef, event }) => `"${caseDef.name}": ${!event ? 'never reported' : (event.error?.message || event.reason || event.status)}`);
-      if (failed.length > 0) {
-        throw new Error(`boot layer: ${failed.length} of ${suite.cases.length} failed: ${failed.join('; ')}`);
-      }
-      return `${suite.cases.length} boot assertions`;
-    });
-  } finally {
-    if (emulator) {
-      await stopEmulator(emulator.child);
-    }
-  }
-
-  if (failures.length > 0) {
-    console.log(`\n✗ desktop auth e2e FAILED (${failures.length} failing step${failures.length === 1 ? '' : 's'})`);
-    console.log(`   logs: ${path.relative(ROOT, LOG_DIR)}/ — staged app: ${path.relative(ROOT, APP_DIR)}\n`);
-    process.exit(1);
-  }
-
-  console.log('\n✓ desktop auth e2e PASSED\n');
-}
-
-main().catch((error) => {
-  // A death outside step() — the live-stack preflight guard, a throw on the way
-  // up — has no verdict yet; record one so steps.log still answers "why did
-  // nothing run?". A step failure propagating out is already on file.
-  stepsLog.abort(error);
-  console.error(`\n✗ desktop auth e2e errored: ${error.message}`);
-  console.error(`   logs: ${path.relative(ROOT, LOG_DIR)}/ — staged app: ${path.relative(ROOT, APP_DIR)}\n`);
-  process.exit(1);
+        const failed = suite.cases
+          .map((caseDef) => ({ caseDef, event: events.find((event) => event.id === caseDef.id) }))
+          .filter(({ event }) => !event || event.status !== 'pass')
+          .map(({ caseDef, event }) => `"${caseDef.name}": ${!event ? 'never reported' : (event.error?.message || event.reason || event.status)}`);
+        if (failed.length > 0) {
+          throw new Error(`boot layer: ${failed.length} of ${suite.cases.length} failed: ${failed.join('; ')} (logs: ${path.relative(ROOT, LOG_DIR)}/, staged app: ${path.relative(ROOT, APP_DIR)})`);
+        }
+        console.log(`    ${suite.cases.length} boot assertions`);
+      },
+    },
+  ],
 });

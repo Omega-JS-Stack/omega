@@ -34,7 +34,7 @@ async function bakeConfig(mode) {
   const oldCwd = process.cwd();
   // Each lane the way a real run states it: `omega build` sets OMEGA_BUILD_MODE,
   // `omega test` names OMEGA_ENVIRONMENT=testing, and a dev boot names nothing.
-  const env = { OMEGA_ENVIRONMENT: null, OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: null, NODE_ENV: null };
+  const env = { OMEGA_ENVIRONMENT: null, OMEGA_BUILD_MODE: null, NODE_ENV: null };
   if (mode === 'testing')    env.OMEGA_ENVIRONMENT = 'testing';
   if (mode === 'production') env.OMEGA_BUILD_MODE  = 'true';
 
@@ -65,7 +65,7 @@ async function bakeConfig(mode) {
 // The SW's own resolution: no process.env, config-baked signals only.
 function isTestingInServiceWorker(config) {
   const originals = {};
-  for (const k of ['OMEGA_ENVIRONMENT', 'OMEGA_TEST_MODE', 'OMEGA_BUILD_MODE', 'NODE_ENV']) {
+  for (const k of ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'NODE_ENV']) {
     originals[k] = process.env[k];
     delete process.env[k];
   }

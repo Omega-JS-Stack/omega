@@ -37,11 +37,11 @@
  * a lane that does not apply there, never a failure. Path-scope flags
  * (`--layer`) stay target-level invocations.
  *
- * The BRAND E2E LANE (`<brandRoot>/test/e2e/run.js`) runs last, when it
- * exists: one browser lane driving the brand's real pages against its real
- * local stack, which is a brand-level surface no target owns. It is a runner
- * script that hears no scope vocabulary and no flags: a bare run reaches it,
- * and a scoped, picked (`--target=`) or laned run never does.
+ * The BRAND E2E LANE (the `defineCases` suites under `<brandRoot>/test/e2e/`)
+ * runs last, in this process on devkit's runner, when the folder exists: the
+ * brand's real pages against its real local stack, a surface no target owns.
+ * It hears no scope vocabulary and no flags: a bare run reaches it, and a
+ * scoped, picked (`--target=`) or laned run never does.
  *
  * Targets run sequentially with streamed output; any failing target → exit 1.
  */
@@ -51,6 +51,7 @@ const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 
 const Logger = require('@omega.js/devkit/logger');
+const { createRunner } = require('@omega.js/devkit/test/runner');
 const { UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS, FANOUT_ENV, NO_MATCH_EXIT_CODE, noMatchMessage, parseTestScope, isPathTargeted } = require('@omega.js/devkit/test/scope');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveTargetRun, resolveFrameworkPackage } = require('../lib/framework-bin.js');
@@ -69,11 +70,8 @@ const ID_TO_FRAMEWORK = Object.fromEntries(
   Object.entries(FRAMEWORK_IDS).flatMap(([pkg, ids]) => ids.map((id) => [id, pkg]))
 );
 
-// The brand's own e2e lane — ONE entry file, by convention, so the walk never
-// has to guess which of a directory's files is the runner and which are its
-// helpers (#775).
+// The brand's own e2e lane: every suite file in this folder, on devkit's runner.
 const BRAND_E2E_DIR = path.join('test', 'e2e');
-const BRAND_E2E_ENTRY = path.join(BRAND_E2E_DIR, 'run.js');
 
 // The fan-out's own verdict is a log line, not a report row: the report says
 // what each target did, this says what the RUN means (#814).
@@ -164,6 +162,31 @@ function declaresLane(entry, framework, lane) {
   const resolved = resolveFrameworkPackage(entry.path, framework);
   const lanes = resolved?.pkg?.omega?.testLanes;
   return Array.isArray(lanes) && lanes.includes(lane);
+}
+
+/**
+ * Run the brand's e2e suites in this process; the walk's tee already holds
+ * `logs/test.log`, so the runner attaches no log of its own.
+ *
+ * @param {string} brandRoot - The brand root
+ * @returns {Promise<{success: boolean, error?: string}>} runCommand's result shape
+ */
+async function runBrandLane(brandRoot) {
+  const runner = createRunner({
+    framework: 'node',
+    title: BRAND_E2E_DIR,
+    projectRoot: brandRoot,
+    roots: [{ source: 'project', dir: path.join(brandRoot, BRAND_E2E_DIR) }],
+  });
+  // A runner throw is this row's failure, never the walk's: the summary still prints.
+  let results;
+  try {
+    results = await runner.run({ targets: [], reporter: 'pretty' });
+  } catch (error) {
+    console.error(error.stack);
+    return { success: false, error: error.message };
+  }
+  return results.failed > 0 ? { success: false, error: `${results.failed} failing` } : { success: true };
 }
 
 /**
@@ -315,21 +338,15 @@ module.exports = async (options) => {
   }
 
   // ─── The brand's own e2e lane, after the targets ───────────────────────────
-  // A bare run only: it is a runner script with no scope vocabulary and no
-  // flags, so a scoped, picked or laned run is asking for something else.
-  const brandLane = path.join(brandRoot, BRAND_E2E_ENTRY);
+  // A bare run only: the lane hears no scope vocabulary and no flags, so a
+  // scoped, picked or laned run is asking for something else.
   if (runAllBare && !lane && picked.tokens.length === 0 && fs.existsSync(path.join(brandRoot, BRAND_E2E_DIR))) {
-    if (fs.existsSync(brandLane)) {
-      runs.push({
-        entry: { name: BRAND_E2E_DIR, path: brandRoot },
-        framework: 'brand',
-        command: process.execPath,
-        args: [brandLane],
-        label: `node ${BRAND_E2E_ENTRY}`,
-      });
-    } else {
-      console.log(chalk.dim(`  ⊘ ${BRAND_E2E_DIR}: no ${path.basename(BRAND_E2E_ENTRY)} entry — skipped`));
-    }
+    runs.push({
+      entry: { name: BRAND_E2E_DIR, path: brandRoot },
+      framework: 'brand',
+      inProcess: true,
+      label: 'its suites, in this process',
+    });
   }
 
   if (runs.length === 0) {
@@ -363,7 +380,9 @@ module.exports = async (options) => {
     }
 
     console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — ${run.label}`.trimEnd()} ───`));
-    const result = await runCommand(run.command, run.args, run.entry.path, run.env);
+    const result = run.inProcess
+      ? await runBrandLane(brandRoot)
+      : await runCommand(run.command, run.args, run.entry.path, run.env);
 
     // The distinct no-match code (#814): this target does not carry the path
     // the brand root forwarded, which is a no-op here, not a failure. The run

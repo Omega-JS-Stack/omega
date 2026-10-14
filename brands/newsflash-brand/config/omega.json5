@@ -85,7 +85,7 @@
   // COMPANY-MODE ADS (ads step 6 proof): no AdSense (offline brand) — house
   // units fill from the PARENT company's inventory (the resolved company.url,
   // api.playground.omegajs.dev in production; the offline proof pairs it with
-  // the playground's local emulator: scripts/e2e-verts-company.js). tags =
+  // the playground's local emulator: test/e2e/verts-company.test.js). tags =
   // this brand's contextual targeting input on every serve request.
   advertising: {
     providers: {

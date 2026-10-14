@@ -88,9 +88,9 @@ const ALLOWED_GLOBALS = {
   __OMEGA_REVERSING_SIGNUP: 'auth flow coordination across modules, production behaviour',
   __OMEGA_CUSTOM_TOKEN_SIGNIN: 'auth flow coordination across modules, production behaviour',
   // Kept deliberately (#342): the e2e flows lane reads `window._checkout.state`
-  // to assert the checkout bound the URL's product (scripts/e2e-flows.js). It
+  // to assert the checkout bound the URL's product (test/e2e/flows.test.js). It
   // is a machine seam behind omega.isDevelopment(), not a console helper.
-  _checkout: 'the e2e flows lane\'s read seam, dev-gated (scripts/e2e-flows.js)',
+  _checkout: 'the e2e flows lane\'s read seam, dev-gated (test/e2e/flows.test.js)',
 };
 
 // Modules that are themselves dev-only — nothing outside a `@dev-only` block

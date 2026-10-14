@@ -42,7 +42,7 @@ const DESKTOP_KEYS = ['environment', 'ipc', 'storage', 'theme', 'fontawesome', '
 
 // The one input and the two lane flags that decide it, saved and restored
 // around every case that touches them (#817).
-const LANE_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV'];
+const LANE_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'NODE_ENV'];
 
 /**
  * Run `fn` with exactly `vars` set on the lane keys (null clears them all).
@@ -224,7 +224,7 @@ module.exports = defineCases({
       // The environment reads ONE input, `OMEGA_ENVIRONMENT`
       // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and the
       // lane that boots or builds this app sets it (src/build.js does, at load).
-      // Nothing sniffs NODE_ENV, app.isPackaged or OMEGA_TEST_MODE any more.
+      // Nothing sniffs NODE_ENV or app.isPackaged any more.
       name: 'getEnvironment answers the one input, for each of the three names',
       run: (ctx) => {
         withEnvironment(null, () => {

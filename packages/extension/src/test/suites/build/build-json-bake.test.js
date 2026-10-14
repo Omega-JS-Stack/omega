@@ -375,7 +375,7 @@ module.exports = defineCases({
         // OMEGA_LICENSE_KEY rides the list because a production bake runs the
         // license check (#320): the suite stays offline on a machine that has
         // a real key exported.
-        const ENV_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV', 'OMEGA_LICENSE_KEY'];
+        const ENV_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'NODE_ENV', 'OMEGA_LICENSE_KEY'];
         const bake = async (mode) => {
           const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
           ENV_KEYS.forEach((key) => delete process.env[key]);

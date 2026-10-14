@@ -96,11 +96,13 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
     linkTargetBin(brand, short, pkg);
   }
 
-  // The brand's OWN e2e lane (#775): test/e2e/run.js, recording like a bin
-  // (two levels up to the brand root, not three — it is not in node_modules).
-  if (brandE2e === 'entry' || brandE2e === 'failing') {
-    write(path.join(brand, 'test', 'e2e', 'run.js'), fakeBinSource('brand-e2e').replace("'..', '..', '..'", "'..', '..'"));
+  // The brand's OWN e2e lane: a defineCases suite in test/e2e/, run in-process,
+  // so its first case records this process's pid; FAIL-brand-e2e fails its second.
+  if (brandE2e === 'suite' || brandE2e === 'failing') {
+    write(path.join(brand, 'test', 'e2e', 'a.test.js'), BRAND_SUITE_SOURCE);
     if (brandE2e === 'failing') write(path.join(brand, 'FAIL-brand-e2e'), '');
+  } else if (brandE2e === 'run-js') {
+    write(path.join(brand, 'test', 'e2e', 'run.js'), fakeBinSource('brand-e2e').replace("'..', '..', '..'", "'..', '..'"));
   } else if (brandE2e === 'dir-only') {
     write(path.join(brand, 'test', 'e2e', 'helpers.js'), '');
   }
@@ -108,10 +110,41 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
   return { scratch, brand };
 }
 
+const BRAND_SUITE_SOURCE = `const defineCases = require(${JSON.stringify(require.resolve('@omega.js/devkit/test/define-cases'))});
+const fs = require('fs');
+const path = require('path');
+const brandRoot = path.join(__dirname, '..', '..');
+module.exports = defineCases({
+  type: 'suite',
+  description: 'brand e2e fixture',
+  tests: [
+    {
+      name: 'records its run',
+      run: () => {
+        fs.appendFileSync(path.join(brandRoot, 'calls.log'), JSON.stringify({ name: 'brand-e2e', cwd: process.cwd(), pid: process.pid }) + '\\n');
+      },
+    },
+    {
+      name: 'fails when the brand asks it to',
+      run: (ctx) => {
+        ctx.expect(fs.existsSync(path.join(brandRoot, 'FAIL-brand-e2e')), 'FAIL-brand-e2e').toBe(false);
+      },
+    },
+  ],
+});
+`;
+
 function readCalls(brand) {
   const logPath = path.join(brand, 'calls.log');
   if (!fs.existsSync(logPath)) return [];
   return fs.readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+}
+
+/** The walk summary's `✓`/`✗` row for `name` in the brand's logs/test.log, or null. */
+function summaryRow(brand, name) {
+  const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
+  const lines = log.split('\n').map((line) => line.trim());
+  return lines.find((line) => line.startsWith(`✓ ${name}`) || line.startsWith(`✗ ${name}`)) || null;
 }
 
 /** Run the command from `cwd` with positional targets, restoring cwd + exitCode. */
@@ -534,58 +567,86 @@ module.exports = defineCases({
       },
     },
 
-    // ─── The brand's own e2e lane (#775) ─────────────────────────────────────────
+    // ─── The brand's own e2e lane: suite files in test/e2e/ ───────────────────────
 
     {
-      name: 'a bare run walks <brandRoot>/test/e2e/run.js LAST, from the brand root',
+      name: 'a bare run runs the test/e2e/ suite in-process after every target, its Results block in the log',
       run: async (ctx) => {
-        const { brand } = stageBrand({ brandE2e: 'entry' });
+        const { brand } = stageBrand({ brandE2e: 'suite' });
         const code = await runTestCommand(brand, []);
 
         const calls = readCalls(brand);
-        ctx.expect(calls.map((c) => c.name).slice(-1), 'after every target').toEqual(['brand-e2e']);
-        ctx.expect(calls.length).toBe(3);
-        const lane = calls[2];
-        ctx.expect(lane.cwd).toBe(brand);
-        ctx.expect(lane.argv, 'a runner script hears no scope ids and no flags').toEqual([]);
+        ctx.expect(calls.map((c) => c.name), 'after every target').toEqual(['backend', 'web', 'brand-e2e']);
+        ctx.expect(calls[2].pid, 'in this process, not a spawned child').toBe(process.pid);
         ctx.expect(code).toBe(undefined);
+
+        const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
+        ctx.expect(log, 'the runner reports through the walk\'s own tee').toMatch(/Results\s+2 passing/);
+        ctx.expect(log).toMatch(/Total: 2 tests in \d+ms/);
       },
     },
 
     {
-      name: 'a failing brand e2e lane fails the whole run',
+      name: 'the walk\'s summary carries a test/e2e row beside the targets',
+      run: async (ctx) => {
+        const green = stageBrand({ brandE2e: 'suite' }).brand;
+        await runTestCommand(green, []);
+        ctx.expect(summaryRow(green, 'test/e2e'), 'a green suite').toMatch(/^✓ /);
+
+        const red = stageBrand({ brandE2e: 'failing' }).brand;
+        await runTestCommand(red, []);
+        ctx.expect(summaryRow(red, 'test/e2e'), 'a failing suite').toMatch(/^✗ /);
+      },
+    },
+
+    {
+      name: 'a failing case in the test/e2e/ suite fails the whole run',
       run: async (ctx) => {
         const { brand } = stageBrand({ brandE2e: 'failing' });
         const code = await runTestCommand(brand, []);
 
+        ctx.expect(readCalls(brand).map((c) => c.name), 'the targets still ran first').toEqual(['backend', 'web', 'brand-e2e']);
         ctx.expect(code).toBe(1);
+        const log = fs.readFileSync(path.join(brand, 'logs', 'test.log'), 'utf8');
+        ctx.expect(log).toMatch(/1 failing/);
       },
     },
 
     {
-      name: 'a scoped, picked or laned run never addresses the brand e2e lane',
+      name: 'a scoped, picked or laned run never runs the test/e2e/ suite',
       run: async (ctx) => {
-        const scoped = stageBrand({ brandE2e: 'entry' }).brand;
+        const scoped = stageBrand({ brandE2e: 'suite' }).brand;
         await runTestCommand(scoped, ['framework:']);
         ctx.expect(readCalls(scoped).some((c) => c.name === 'brand-e2e')).toBe(false);
 
-        const picked = stageBrand({ brandE2e: 'entry' }).brand;
+        const picked = stageBrand({ brandE2e: 'suite' }).brand;
         await runTestCommand(picked, [], { target: 'web' });
         ctx.expect(readCalls(picked).some((c) => c.name === 'brand-e2e')).toBe(false);
 
-        const laned = stageBrand({ brandE2e: 'entry', lanes: { '@omega.js/backend': ['stripe-live'] } }).brand;
+        const laned = stageBrand({ brandE2e: 'suite', lanes: { '@omega.js/backend': ['stripe-live'] } }).brand;
         await runTestCommand(laned, [], { lane: 'stripe-live' });
         ctx.expect(readCalls(laned).some((c) => c.name === 'brand-e2e')).toBe(false);
       },
     },
 
     {
-      name: 'a test/e2e/ directory with no run.js is skipped loudly, never failed',
+      name: 'a test/e2e/ directory with no suite file runs empty and green',
       run: async (ctx) => {
         const { brand } = stageBrand({ brandE2e: 'dir-only' });
         const code = await runTestCommand(brand, []);
 
         ctx.expect(readCalls(brand).map((c) => c.name).sort()).toEqual(['backend', 'web']);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
+      name: 'a run.js left in test/e2e/ is ignored, never run',
+      run: async (ctx) => {
+        const { brand } = stageBrand({ brandE2e: 'run-js' });
+        const code = await runTestCommand(brand, []);
+
+        ctx.expect(readCalls(brand).map((c) => c.name).sort(), 'no brand-e2e call: run.js never ran').toEqual(['backend', 'web']);
         ctx.expect(code).toBe(undefined);
       },
     },

@@ -166,7 +166,7 @@ module.exports = defineCases({
           // src/build.js sets it at LOAD from the build-mode flag, so each
           // sub-case re-enters inDir (which busts the module cache) inside its
           // own env rather than reusing a build module loaded under the other lane.
-          const freshLane = { OMEGA_ENVIRONMENT: undefined, OMEGA_TEST_MODE: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
+          const freshLane = { OMEGA_ENVIRONMENT: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
 
           withEnv({ ...freshLane, OMEGA_BUILD_MODE: 'true' }, () => {
             inDir(tmp, (build) => {
@@ -244,11 +244,11 @@ module.exports = defineCases({
       // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and
       // src/build.js sets it at LOAD from the lane: OMEGA_BUILD_MODE means a
       // production bake, an inherited variable is kept, and a bare dev boot is
-      // development. The manifest / NODE_ENV / OMEGA_TEST_MODE sniffs are gone.
+      // development. The manifest / NODE_ENV sniffs are gone.
       name: 'getEnvironment answers the one input the lane set',
       run: (ctx) => {
         const buildPath = path.join(__dirname, '..', '..', '..', 'build.js');
-        const lane = (vars) => withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_BUILD_MODE: undefined, OMEGA_TEST_MODE: undefined, NODE_ENV: undefined, ...vars }, () => {
+        const lane = (vars) => withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_BUILD_MODE: undefined, NODE_ENV: undefined, ...vars }, () => {
           for (const key of Object.keys(require.cache)) {
             if (key.includes('/build.js')) delete require.cache[key];
           }

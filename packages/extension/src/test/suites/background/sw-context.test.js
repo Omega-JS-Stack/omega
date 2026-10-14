@@ -32,9 +32,11 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'OMEGA_TEST_MODE is wired on globalThis (harness sets it on boot)',
+      // A test run is named by OMEGA_ENVIRONMENT=testing and read by isTesting();
+      // the harness wires no test-mode global of its own beside it.
+      name: 'the harness sets no OMEGA_TEST_* global on boot',
       run: async (ctx) => {
-        ctx.expect(globalThis.OMEGA_TEST_MODE).toBe(true);
+        ctx.expect(Object.getOwnPropertyNames(globalThis).filter((key) => key.startsWith('OMEGA_TEST_'))).toEqual([]);
       },
     },
     {
