@@ -1,7 +1,8 @@
 /**
  * The one bounded pool: run an async worker over a list with at most `size`
  * items in flight, taking them in order, and hand back the results in the
- * items' order, never completion order.
+ * items' order, never completion order. A rejection stops the pool from
+ * starting later items.
  */
 
 /**
@@ -14,11 +15,17 @@
 async function mapLimited(items, size, worker) {
   const results = new Array(items.length);
   let next = 0;
+  let failed = false;
 
   const drain = async () => {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const index = next++;
-      results[index] = await worker(items[index]);
+      try {
+        results[index] = await worker(items[index]);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
     }
   };
 

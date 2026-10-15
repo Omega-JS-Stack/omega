@@ -123,9 +123,13 @@ async function seed({ admin, domain, config, hooks, quiet }) {
 
   // 3. Create test accounts
   log(chalk.gray('  Creating test accounts... '));
-  const result = await testAccounts.createTestAccounts(
-    admin, domain, config, extraAccounts,
-  );
+  let result;
+  try {
+    result = await testAccounts.createTestAccounts(admin, domain, config, extraAccounts);
+  } catch (error) {
+    logLn(chalk.red(`✗ ${error.message}`));
+    throw error;
+  }
 
   if (!result.success) {
     logLn(chalk.red(`\n  ✗ Failed to setup accounts: ${result.errors?.map((e) => e.error).join(', ')}`));

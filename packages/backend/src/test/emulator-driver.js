@@ -16,6 +16,7 @@ const HttpClient = require('./utils/http-client.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const connectTrap = require('./connect-trap.js');
 const { seed } = require('./seed.js');
+const { ON_CREATE_NEVER_COMPLETED } = require('./test-accounts.js');
 const { createFirestoreHelper } = require('./firestore-helper.js');
 const { createPubSubHelper } = require('./pubsub-helper.js');
 const { paymentsMeta } = require('./payments-meta.js');
@@ -153,7 +154,13 @@ async function startDriver({ config, admin, omega, ctx, hooks }) {
   if (!config.custom) {
     await checkHealth(config, timeout);
 
-    const seeded = await seed({ admin, domain: config.domain, config, hooks });
+    let seeded;
+    try {
+      seeded = await seed({ admin, domain: config.domain, config, hooks });
+    } catch (error) {
+      if (error.code !== ON_CREATE_NEVER_COMPLETED) throw error;
+      throw preflightError('accounts', error.message);
+    }
     if (!seeded.accounts) {
       throw preflightError('accounts', 'the persona seed failed (its reason is above)');
     }

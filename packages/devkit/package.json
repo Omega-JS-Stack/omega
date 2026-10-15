@@ -12,6 +12,7 @@
     "./safe-install": "./src/safe-install.js",
     "./npm-registry": "./src/npm-registry.js",
     "./reads": "./src/reads.js",
+    "./map-limited": "./src/map-limited.js",
     "./attach-log-file": "./src/attach-log-file.js",
     "./ci": "./src/ci.js",
     "./stop-signals": "./src/stop-signals.js",

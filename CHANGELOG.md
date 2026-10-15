@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#1106](../../issues/1106) - The three web watch suites wait for the watcher to list their file before the first edit, through `waitForWatched`. chokidar fires ready before every root is walked when a root is missing, so an early edit was lost on Linux.
 - [#1107](../../issues/1107) - devkit's port hold binds the two loopback addresses only and asks the allocator's own `isPortFree` first. On Linux the wildcard bind collided with the hold's own loopback bind, so a held port read as free.
 - [#1108](../../issues/1108) - The manager's fake-gh helper symlinks the real git into its temp bin, so hiding `gh` no longer hides `git`. On a runner both share one bin folder, and the PATH filter dropped git with gh.
+- [#1117](../../issues/1117) - The backend self-test seeds personas four at a time instead of all 91 at once, since the functions emulator starts one uncapped worker per in-flight auth trigger and a 7 GB CI runner ran out of memory. The seed also stops on the first persona whose `auth:on-create` never completes.
 
 ## [0.56.0] - 2026-10-13
 

@@ -1,6 +1,7 @@
 const uuid = require('uuid');
 const { envPort, CLASSIC_PORTS, isDemoProject } = require('@omega.js/config');
 const { isCountedFeature, isPacedFeature, dayShare } = require('@omega.js/account/features');
+const { mapLimited } = require('@omega.js/devkit/map-limited');
 const { LANE_ACCOUNTS } = require('./lane-accounts.js');
 
 // Deterministic password for EVERY seeded persona (N6) — makes manual dev signin
@@ -8,6 +9,12 @@ const { LANE_ACCOUNTS } = require('./lane-accounts.js');
 // as any persona with email + this password. Personas only ever exist in the
 // emulator (seeding wipes + recreates them), so a fixed password is safe.
 const TEST_ACCOUNT_PASSWORD = 'omega-test-password';
+
+// The most persona auth writes in flight at once. The functions emulator spawns
+// one runtime worker per in-flight auth trigger and never caps the pool, so the
+// runner's memory bounds how many it can hold.
+const SEED_CONCURRENCY = 4;
+const ON_CREATE_NEVER_COMPLETED = 'seed/on-create-never-completed';
 
 /**
  * Resolve the first paid subscription product from config
@@ -2062,9 +2069,11 @@ async function createAccount(admin, account) {
     }
   }
 
-  // Exhausted retries — return anyway so the runner reports the downstream failure with a
-  // meaningful test assertion rather than a setup throw.
-  return { uid: account.uid, email: account.email };
+  // A persona that never completed means the trigger is not running: reporting it
+  // created would hide a dead backend behind a green seed.
+  const error = new Error(`auth:on-create never completed for ${account.email} after ${maxAttempts} attempts: the functions emulator loaded no functions, or the trigger failed (see dist/emulator.log)`);
+  error.code = ON_CREATE_NEVER_COMPLETED;
+  throw error;
 }
 
 /**
@@ -2299,39 +2308,37 @@ async function deleteTestUsers(admin, extraAccounts) {
 }
 
 async function _deleteAccountsIndividually(admin, allAccounts, results) {
-  await Promise.all(
-    Object.values(allAccounts).map(async (account) => {
-      try {
-        await admin.auth().deleteUser(account.uid);
+  await mapLimited(Object.values(allAccounts), SEED_CONCURRENCY, async (account) => {
+    try {
+      await admin.auth().deleteUser(account.uid);
 
-        const maxWait = 10000;
-        const interval = 200;
-        let waited = 0;
+      const maxWait = 10000;
+      const interval = 200;
+      let waited = 0;
 
-        while (waited < maxWait) {
-          const doc = await admin.firestore().doc(`users/${account.uid}`).get();
-          if (!doc.exists) {
-            break;
-          }
-          await new Promise(resolve => setTimeout(resolve, interval));
-          waited += interval;
+      while (waited < maxWait) {
+        const doc = await admin.firestore().doc(`users/${account.uid}`).get();
+        if (!doc.exists) {
+          break;
         }
-
-        if (waited >= maxWait) {
-          await admin.firestore().doc(`users/${account.uid}`).delete().catch(() => {});
-        }
-
-        results.deleted.push(account.uid);
-      } catch (error) {
-        if (error.code === 'auth/user-not-found') {
-          await admin.firestore().doc(`users/${account.uid}`).delete().catch(() => {});
-          results.skipped.push(account.uid);
-        } else {
-          results.failed.push({ uid: account.uid, error: error.message });
-        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+        waited += interval;
       }
-    })
-  );
+
+      if (waited >= maxWait) {
+        await admin.firestore().doc(`users/${account.uid}`).delete().catch(() => {});
+      }
+
+      results.deleted.push(account.uid);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        await admin.firestore().doc(`users/${account.uid}`).delete().catch(() => {});
+        results.skipped.push(account.uid);
+      } else {
+        results.failed.push({ uid: account.uid, error: error.message });
+      }
+    }
+  });
 }
 
 /**
@@ -2347,30 +2354,29 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
   const definitions = getAccountDefinitions(domain, config, extraAccounts);
   const results = { created: [], failed: [] };
 
-  // Create all accounts in parallel
-  await Promise.all(
-    Object.entries(definitions).map(async ([key, account]) => {
-      try {
-        await createAccount(admin, account);
-        results.created.push({ id: key, uid: account.uid, email: account.email });
-      } catch (error) {
-        results.failed.push({ id: key, uid: account.uid, email: account.email, error: error.message });
+  await mapLimited(Object.entries(definitions), SEED_CONCURRENCY, async ([key, account]) => {
+    try {
+      await createAccount(admin, account);
+      results.created.push({ id: key, uid: account.uid, email: account.email });
+    } catch (error) {
+      // The first dead trigger aborts the seed; a second persona only repeats its window.
+      if (error.code === ON_CREATE_NEVER_COMPLETED) {
+        throw error;
       }
-    })
-  );
+      results.failed.push({ id: key, uid: account.uid, email: account.email, error: error.message });
+    }
+  });
 
   // Google picker personas — import-only (fresh uids; see GOOGLE_ACCOUNTS)
-  await Promise.all(
-    Object.values(GOOGLE_ACCOUNTS).map(async (account) => {
-      const email = account.email.replace('{domain}', domain);
-      try {
-        await importGoogleAccount(admin, { ...account, email });
-        results.created.push({ id: account.id, uid: account.uid, email });
-      } catch (error) {
-        results.failed.push({ id: account.id, uid: account.uid, email, error: error.message });
-      }
-    })
-  );
+  await mapLimited(Object.values(GOOGLE_ACCOUNTS), SEED_CONCURRENCY, async (account) => {
+    const email = account.email.replace('{domain}', domain);
+    try {
+      await importGoogleAccount(admin, { ...account, email });
+      results.created.push({ id: account.id, uid: account.uid, email });
+    } catch (error) {
+      results.failed.push({ id: account.id, uid: account.uid, email, error: error.message });
+    }
+  });
 
   return {
     success: results.failed.length === 0,
@@ -2633,6 +2639,8 @@ module.exports = {
   TEST_ACCOUNTS,
   TEST_DATA,
   TEST_ACCOUNT_PASSWORD,
+  SEED_CONCURRENCY,
+  ON_CREATE_NEVER_COMPLETED,
   getFirstPaidProduct,
   getPlanPricing,
   getAccountTable,
@@ -2640,6 +2648,7 @@ module.exports = {
   fetchPrivateKeys,
   resolveWipeProjectId,
   deleteTestUsers,
+  _deleteAccountsIndividually,
   createAccount,
   createTestAccounts,
   importGoogleAccount,
