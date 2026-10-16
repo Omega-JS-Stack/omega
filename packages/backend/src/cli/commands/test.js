@@ -185,6 +185,8 @@ class TestCommand extends BaseCommand {
     // they cannot. Skipped on the framework self-test — the bundled fixture is
     // not a consumer target to heal, and the checks would rewrite it.
     if (!isSelfTest) {
+      // The scaffold first: a fresh target's firebase.json does not exist until it runs.
+      this.runEnsureTarget();
       this.ui.section('Target checks');
       await runTargetChecks(self);
     }

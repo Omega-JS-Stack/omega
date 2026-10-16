@@ -10,7 +10,7 @@ Match the framework's one layer, `build`. Every suite is a `defineCases` file on
 | Directory | Runtime | Use for |
 |---|---|---|
 | `test/build/` | Plain Node, the `build` layer | Config resolution and the built site in `dist/`: a page renders, carries the right content, links where it should |
-| `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`), imported directly, with the browser objects they touch passed in |
+| `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`): one that imports framework code loads through `loadModule` from `@omega.js/web/test`, with the browser objects it touches passed in |
 | `<brandRoot>/test/e2e/` | A real browser against the real local stack | End-to-end: the brand's own browser lane, `defineCases` suite files which `npx omega test` at the brand root runs after every target |
 
 `npx omega test` builds `dist/` before the suites run, so a `build` suite reads it directly; run `npx omega build` first when calling `node --test` on one file. `test/_init.js` runs its `setup()` once before the first case, for a fixture a suite needs. A path narrows the run to the suites whose path contains it: `npx omega test build/config` builds, then runs that suite alone, no smoke case.

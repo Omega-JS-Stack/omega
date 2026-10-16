@@ -4,6 +4,8 @@
  * renders every note escaped, with its delete button, and the empty state
  * follows the list.
  *
+ * The module loads through loadModule, bundled the way the asset build bundles
+ * it, so its FormManager import resolves to the client as on the page.
  * Two stand-ins, both for things node does not have: `omega.request` (no
  * backend runs in this lane; the backend's own suites prove the route) and the
  * two elements the module writes (node has no DOM and this target pulls in no
@@ -13,11 +15,10 @@
  *
  * Run (from this target): npx omega test pages/notes
  */
-const { defineCases } = require('@omega.js/web/test');
+const { defineCases, loadModule } = require('@omega.js/web/test');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 
-const MODULE = pathToFileURL(path.join(__dirname, '..', '..', 'src', 'assets', 'js', 'pages', 'notes.js')).href;
+const MODULE_PATH = path.join(__dirname, '..', '..', 'src', 'assets', 'js', 'pages', 'notes.js');
 
 const ENTITIES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
 
@@ -47,11 +48,11 @@ module.exports = defineCases({
     {
       name: 'loadNotes draws what GET /notes answers, escaped',
       run: async (ctx) => {
-        const { loadNotes, NOTES_ROUTE } = await import(MODULE);
         const { omega, calls, $list, $empty } = harness([
           note('n1', 'Buy milk'),
           note('n2', '<img src=x onerror=alert(1)>'),
         ]);
+        const { loadNotes, NOTES_ROUTE } = await loadModule(MODULE_PATH, { omega });
 
         const drawn = await loadNotes({ omega, $list, $empty });
 
@@ -73,8 +74,8 @@ module.exports = defineCases({
     {
       name: 'an empty answer clears the list and shows the empty state',
       run: async (ctx) => {
-        const { loadNotes } = await import(MODULE);
         const { omega, $list, $empty } = harness([]);
+        const { loadNotes } = await loadModule(MODULE_PATH, { omega });
 
         await loadNotes({ omega, $list, $empty });
 

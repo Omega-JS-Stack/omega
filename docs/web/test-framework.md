@@ -171,7 +171,7 @@ Every verb scaffolds the target's `test/` ([#818](https://github.com/Omega-JS-St
 | Directory | Runtime | Use for |
 |---|---|---|
 | `test/build/` | Plain Node, the `build` layer | Config resolution and the built site in `dist/`: a page renders, carries the right content, links where it should |
-| `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`), imported directly, with the browser objects they touch passed in |
+| `test/pages/` | Plain Node, the `build` layer | Page modules (`src/assets/js/pages/`): one that imports framework code loads through `loadModule` from `@omega.js/web/test`, with the browser objects it touches passed in |
 | `<brandRoot>/test/e2e/` | A real browser against the real local stack | End-to-end: the brand's own browser lane, `defineCases` suite files run by `npx omega test` at the brand root after every target ([docs/manager/brand.md](../manager/brand.md)) |
 
 The directory is a convention, not a layer switch: every suite runs on the one `build` layer. OMEGA Playground's website carries one suite of each (`brands/playground-omega/targets/web/test/`) plus the brand lane at `brands/playground-omega/test/e2e/auth-return.test.js`.
@@ -202,9 +202,13 @@ module.exports = defineCases({
 
 - `npx omega test` runs the production build **before** your suites, so `dist/` is fresh: assert against it directly. Run `npx omega build` first when calling `node --test` on one file; a `defineCases` file loaded that way runs its own cases.
 - **Assert with `ctx.expect`**, devkit's one assertion library: `toBe`, `toEqual` (strict), `toBeTruthy`, `toMatch`, `toContain`, `toHaveProperty`, `toThrow`, `.not`, `.rejects`, `expect.fail` and the rest ([devkit/index.md](../devkit/index.md#the-case-runner)). A helper outside a case asserts with the file-level `expect`: `const { defineCases, expect } = require('@omega.js/web/test')`. `node:test` and `node:assert` have no place in a web suite.
+- **`require(name)`** answers a module from `@omega.js/web`'s own module context, the twin of backend's `omega.require(name)`: `require('@omega.js/web/test').require('esbuild')` is web's copy, whether or not the brand installs one. A name web does not carry throws Node's own `MODULE_NOT_FOUND`.
+- **`loadModule(modulePath, { omega, document, window })`** bundles one module (a page module under `src/assets/js/`, a path absolute or relative to the cwd) the way the asset build does, with `__main_assets__/`, `@omega.js/client` and web's own dependencies resolved as in a build, then evaluates it in-process and resolves to its exports (`default` carries the default export). `import omega from '@omega.js/web/runtime'` answers the `omega` you pass, and `document` and `window` are your objects while the module evaluates and are put back after, so every key is optional and every load is fresh.
 - A `type: 'group'` runs every case whatever fails; a `type: 'suite'` shares `state` and skips every later case after a failure. `setup(ctx)` and `cleanup` run once per suite, and `ctx.after(fn)` runs once its case settles.
 - **Name files `*.test.js`**: the suffix is the discovery signal across every OMEGA package ([docs/shared/testing.md](../shared/testing.md)). A `_`-prefixed file or directory is never a suite, and neither is a file without the suffix, so helpers and fixtures under `test/` are safe (`test/_helper.js`, `test/fixtures/data.js`).
 - There are no ctx extras and no boot harness on web: a browser proof goes in the brand's e2e lane.
+
+**A brand's test never names a framework dependency; it asks web for it.** A library web carries reaches a page through the framework-deps hook in every bundle web builds, and reaches a suite through `require(name)` on the test door, so the brand declares no copy of its own and never leans on npm happening to hoist web's. A page module that imports framework code loads through `loadModule`, never through an esbuild call and alias list of the brand's own: the aliases live once, in web.
 
 ## `test/_init.js`: pre-test lifecycle hook
 

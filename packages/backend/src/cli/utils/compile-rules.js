@@ -661,7 +661,7 @@ function compileFirestoreRules(options) {
   const brandSource = seededFallback ? jetpack.read(BRAND_RULES_SEED) : jetpack.read(sourcePath);
 
   // Which command actually moves this tree forward: the target checks
-  // (`omega test`) migrate a source whose brand already deploys the compiled
+  // (`omega test`, `omega dev`) migrate a source whose brand already deploys the compiled
   // artifact, but a brand still pointing firebase.json at its own file has
   // deferred, and only the run-alone verb touches it
   // ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).

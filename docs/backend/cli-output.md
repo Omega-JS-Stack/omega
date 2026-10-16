@@ -85,10 +85,10 @@ lines with their detail arrays indented beneath.
 ## How the target checks use it
 
 The AUDIT half of the retired `omega setup` — [`src/cli/utils/target-checks.js`](../../packages/backend/src/cli/utils/target-checks.js),
-the lane `omega test` runs before it boots anything — builds its whole run from
+the lane `omega test` and `omega dev` run before they boot anything — builds its whole run from
 these helpers:
 
-1. `ui.section('Target checks')` (printed by the test command) opens the lane.
+1. `ui.section('Target checks')` (printed by the test and dev commands) opens the lane.
 2. the per-check status lines (printed by the check runner — see below), with
    `✓ fixed` / `✗ Could not fix` sub-lines.
 3. `main.setupSummary.print()` when the lane finishes.

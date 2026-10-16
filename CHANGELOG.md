@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#1116](../../issues/1116) - `@omega.js/web/test` gains the Node half of the framework-deps rule: `require(name)` answers from web's own module context, the twin of backend's `omega.require`, and `loadModule(modulePath, { omega, document, window })` bundles one page module through the asset build's alias plugin. A brand's test never names a framework dependency.
 - [#709](../../issues/709) - Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value - an explicit `data-omega-copy-value`/property, a selector, else the sibling input - copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) - `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
 - [#212](../../issues/212) - A test dispute provider, so a chargeback is provable end to end: an alert matches by amount and card against the emulator's records, then issues the cancel as the `customer.subscription.deleted` event Stripe's own cancel produces. Refuses in production.
@@ -17,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
 ### Fixed
+- [#1118](../../issues/1118) - `omega dev` runs the target checks before it boots, offline (as `omega test --offline` does), so a fresh brand's first `npm start` installs the `firebase-functions` and `firebase-admin` peers its `file:` link left out. The journey lane now waits for the seeded line and fails on a seed warning.
+- [#1119](../../issues/1119) - The backend's overlay watch test touches an input and waits for the watcher's own re-stage line before it writes the edit it asserts on, closing the one-time miss where the edit landed before the directory's event stream armed.
 - [#769](../../issues/769) - Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#212](../../issues/212) - The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) - The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.

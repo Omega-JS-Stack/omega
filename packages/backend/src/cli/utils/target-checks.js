@@ -4,9 +4,9 @@
  *
  * The setup command had two halves: write the local files if missing (now
  * `ensureTarget()`, which every verb runs through `ensureStaged`) and CHECK
- * the target, healing what it can. The checks are a test lane, so they ride
- * `omega test`: the registry under cli/commands/setup-tests runs before the
- * emulator suite, and a check nothing can fix halts the run.
+ * the target, healing what it can. The checks ride `omega test` and, offline,
+ * `omega dev`: the registry under cli/commands/setup-tests runs before the
+ * emulator boots, and a check nothing can fix halts the run.
  *
  * The registry reads its state off the `main` object (`self.package`,
  * `self.gitignore`, `self.omegaConfigJSON`, `self.projectId`, the generated

@@ -89,6 +89,37 @@ async function waitForStaged(targetDir, key, value, timeoutMs = 5000) {
   return false;
 }
 
+/**
+ * Wait until the watcher's log reports the re-stage a touch of `touchFile`
+ * causes: proof that the FSEvents stream behind that directory is delivering.
+ * A write landing before the stream arms is lost, not delayed, so the touch is
+ * re-written every 250 ms until the line arrives.
+ *
+ * @param {string[]} lines - The array the watcher's `log` sink pushes into.
+ * @param {string} touchFile - A stage input the watcher filters in.
+ * @param {string} contents - Its current contents, so nothing staged changes.
+ * @param {{ reason: string, timeoutMs?: number }} options - The reason the re-stage line names, and the window.
+ */
+async function waitUntilArmed(lines, touchFile, contents, { reason, timeoutMs = 5000 }) {
+  const expected = `Re-staged dist/ (${reason} changed)`;
+  const start = lines.length;
+  const deadline = Date.now() + timeoutMs;
+  let touchedAt = 0;
+
+  while (Date.now() < deadline) {
+    if (lines.slice(start).includes(expected)) return;
+
+    if (Date.now() - touchedAt >= 250) {
+      jetpack.write(touchFile, contents);
+      touchedAt = Date.now();
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  throw new Error(`The watcher never logged "${expected}" for ${touchFile} within ${timeoutMs} ms; it logged: ${JSON.stringify(lines.slice(start))}`);
+}
+
 module.exports = defineCases({
   description: 'Stage composes dist/.env from the cascade (brand root ← target override)',
   type: 'group',
@@ -368,6 +399,7 @@ module.exports = defineCases({
         const { root, brandRoot, targetDir } = seedBrand({
           brandEnv: 'GH_TOKEN="brand-gh"\n',
           brandEnvOverlays: { development: 'GH_TOKEN="dev-first"\n' },
+          targetEnv: 'SAFE_KEY="plain"\n',
         });
 
         stageFunctions({ projectDir: targetDir, environment: 'development' });
@@ -377,17 +409,41 @@ module.exports = defineCases({
         // replays recent FSEvents to a fresh recursive watcher, and a re-stage
         // from those would read the edit below without ever watching for it.
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const watcher = watchAndStage({ projectDir: targetDir, environment: 'development', debounceMs: 20 });
+        const lines = [];
+        const watcher = watchAndStage({ projectDir: targetDir, environment: 'development', debounceMs: 20, log: (line) => lines.push(line) });
 
         try {
+          await waitUntilArmed(lines, path.join(brandRoot, '.env'), 'GH_TOKEN="brand-gh"\n', { reason: 'brand .env' });
           jetpack.write(path.join(brandRoot, '.env.development'), 'GH_TOKEN="dev-second"\n');
           expect(await waitForStaged(targetDir, 'GH_TOKEN', 'dev-second'), 'a brand-root .env.development edit re-stages').toBe(true);
 
+          await waitUntilArmed(lines, path.join(targetDir, '.env'), 'SAFE_KEY="plain"\n', { reason: '.env' });
           jetpack.write(path.join(targetDir, '.env.development'), 'GH_TOKEN="target-dev"\n');
           expect(await waitForStaged(targetDir, 'GH_TOKEN', 'target-dev'), "the target root's own .env.development is a stage input too").toBe(true);
         } finally {
           watcher.close();
           jetpack.remove(root);
+        }
+      },
+    },
+
+    {
+      name: 'the-armed-handshake-throws-when-nothing-ever-re-stages',
+      auth: 'none',
+
+      // An empty target fails every re-stage, so the watcher logs only
+      // `Re-stage failed: ...`: the handshake has to throw, never return.
+      async run({ expect }) {
+        const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-stage-env-dead-')));
+        const lines = [];
+        const watcher = watchAndStage({ projectDir: dir, environment: 'development', debounceMs: 20, log: (line) => lines.push(line) });
+
+        try {
+          await expect(waitUntilArmed(lines, path.join(dir, 'package.json'), '{}\n', { reason: 'package.json', timeoutMs: 800 }), 'a watcher that never re-stages fails the handshake by name')
+            .rejects.toThrow((error) => error.message.includes(path.join(dir, 'package.json')));
+        } finally {
+          watcher.close();
+          jetpack.remove(dir);
         }
       },
     },

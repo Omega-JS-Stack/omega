@@ -44,6 +44,13 @@ const TARGET_ORDER = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // Lockstep with @omega.js/backend cli/commands/emulator.js (same marker the
 // devkit e2e-harness waits for — it fires AFTER persona seeding).
 const EMULATOR_READY = /Emulator ready\. Press Ctrl\+C/i;
+// The backend's persona seed (cli/commands/emulator.js): a boot whose functions
+// never loaded cannot print the seeded line, and the journey brand has a
+// brand.url, so a skipped or broken seed is a broken boot.
+const PERSONAS_SEEDED = /✓ Personas seeded \(\d+ accounts\)/;
+const PERSONA_SEED_FAILED = /Persona seeding (failed|completed with errors)|Skipping persona seeding/;
+// The manager's line when one target's leg exits under a brand-root `omega dev`.
+const LEG_EXITED = /✖ \w+ exited \(code \d+\)/;
 // The web dev server's announce line (packages/web src/commands/dev.js).
 const DEV_SERVER_URL = /Dev server: (https?:\/\/localhost:\d+)/;
 // The two template files a clone carries the marker in and onboard replaces.
@@ -253,20 +260,27 @@ class JourneyRun {
     return { web: targetOfType(this.brandRoot, 'web'), backend: targetOfType(this.brandRoot, 'backend') };
   }
 
-  /** `omega dev` at the brand root, ready once every booted target announces itself. */
+  /** `omega dev` at the brand root, ready once every booted target announces itself and a backend seeds its personas. */
   async bootDev() {
     const { web, backend } = this.bootTargets();
     if (!web && !backend) return 'no web or backend target: nothing to boot';
     this.orphansAtBoot = emulatorOrphans();
 
     const readyPatterns = {};
+    // Any leg that exits is a failed boot, whichever target it was.
+    const failPatterns = { leg: LEG_EXITED };
     if (web) readyPatterns.web = DEV_SERVER_URL;
-    if (backend) readyPatterns.backend = EMULATOR_READY;
+    if (backend) {
+      readyPatterns.backend = EMULATOR_READY;
+      readyPatterns.seeded = PERSONAS_SEEDED;
+      failPatterns.seed = PERSONA_SEED_FAILED;
+    }
 
     this.devStack = this.startServer('dev', this.dispatcherBin(this.brandRoot), ['dev'], {
       cwd: this.brandRoot,
       env: this.childEnv({ OMEGA_NON_INTERACTIVE: '1' }, { scrub: true }),
       readyPatterns,
+      failPatterns,
       timeout: TIMEOUTS.bootReady,
     });
     await this.devStack.ready;
@@ -454,7 +468,8 @@ class JourneyRun {
 
   /**
    * Spawn a long-lived server child and resolve once every ready pattern
-   * has matched a line of its output. Returns { child, matches, stop }.
+   * has matched a line of its output; a fail pattern's match stops the child
+   * and rejects at once. Returns { child, matches, stop }.
    */
   startServer(stage, command, args, options) {
     const logFile = this.logFile(stage);
@@ -468,7 +483,9 @@ class JourneyRun {
 
     const matches = {};
     const pending = new Map(Object.entries(options.readyPatterns));
+    const failPatterns = Object.entries(options.failPatterns || {});
     let buffered = '';
+    let failed = false; // later chunks still match: stop the group once
 
     const ready = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -485,6 +502,21 @@ class JourneyRun {
           if (match) {
             matches[name] = match;
             pending.delete(name);
+          }
+        }
+        // Only while the boot is pending: once ready settled, the stack is the stages' to stop.
+        for (const [key, pattern] of (pending.size ? failPatterns : [])) {
+          const match = buffered.match(pattern);
+          if (match && !failed) {
+            failed = true;
+            clearTimeout(timer);
+            stopGroup(child);
+            // The whole line the pattern sat on: the text after the match is the detail.
+            const lineStart = buffered.lastIndexOf('\n', match.index) + 1;
+            const lineEnd = buffered.indexOf('\n', match.index);
+            const line = buffered.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
+            reject(new Error(`${stage} failed on ${key}: ${line} (log: ${logFile})`));
+            return;
           }
         }
         if (pending.size === 0) {
@@ -541,13 +573,16 @@ function killGroup(child, signal = 'SIGKILL') {
  * window.
  */
 async function stopGroup(child, graceMs = 20000) {
-  if (child.exitCode !== null) return;
+  // A child taken by a signal has no exitCode; it is just as gone.
+  if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise((resolve) => child.once('exit', resolve));
+  // Unref'd grace timers: a child that exits first must not hold the process open for the rest.
+  const grace = (ms) => new Promise((resolve) => setTimeout(resolve, ms).unref());
   killGroup(child, 'SIGINT');
-  const outcome = await Promise.race([exited.then(() => 'clean'), sleep(graceMs)]);
+  const outcome = await Promise.race([exited.then(() => 'clean'), grace(graceMs)]);
   if (outcome !== 'clean') {
     killGroup(child, 'SIGKILL');
-    await Promise.race([exited, sleep(5000)]);
+    await Promise.race([exited, grace(5000)]);
   }
 }
 

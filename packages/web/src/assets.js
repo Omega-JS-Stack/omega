@@ -66,6 +66,7 @@ const { resolvePathPrefix, prefixCss } = require('./path-prefix.js');
 const { checkThemeVocabulary } = require('./theme-vocabulary.js');
 const { readFontMetricsFile, systemFontMetrics } = require('./font-metrics.js');
 const { readEntryOutputs } = require('./entry-outputs.js');
+const { consumerAliasPlugin } = require('./consumer-aliases.js');
 
 // Variables
 const logger = new Logger('assets');
@@ -350,14 +351,6 @@ async function buildAssets(options) {
           return null;
         });
 
-        // Asset aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (base fallback)
-        build.onResolve({ filter: /^__main_assets__\// }, (args) => {
-          const rest = args.path.slice('__main_assets__/'.length);
-          const target = rest.startsWith('themes/')
-            ? path.join(options.themesDir, rest.slice('themes/'.length))
-            : path.join(options.coreDir, rest);
-          return { path: target };
-        });
         // The walk includes each shadowed packaged theme (withShadowedTwins,
         // #773): a consumer theme standing in for `classy` and shipping no
         // `_theme.js` means to INHERIT the skin — Bootstrap on window, the
@@ -365,6 +358,7 @@ async function buildAssets(options) {
         // the sheet. Base's floor still answers for a theme with a NEW id,
         // which shadows nothing.
         const themeResolveRoots = withShadowedTwins(themeRoots, options);
+        // Asset alias: __theme__ → active theme (base fallback)
         build.onResolve({ filter: /^__theme__\// }, (args) => {
           const rest = args.path.slice('__theme__/'.length);
           for (const root of themeResolveRoots) {
@@ -391,14 +385,7 @@ async function buildAssets(options) {
       outdir: path.join(options.outDir, 'assets', 'js'),
       entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
       chunkNames: 'chunks/[name]-[hash]',
-      // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js).
-      // `@omega.js/web/runtime` is this package's own file, pinned here so it
-      // resolves the same in the monorepo and in a published install.
-      alias: {
-        '@omega.js/client': path.dirname(options.clientEntry),
-        '@omega.js/web/runtime': path.join(FRAMEWORK_ROOT, 'runtime', 'omega.js'),
-      },
-      plugins: [bootPlugin],
+      plugins: [bootPlugin, consumerAliasPlugin({ coreDir: options.coreDir, themesDir: options.themesDir, clientEntry: options.clientEntry })],
       define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
     });
 

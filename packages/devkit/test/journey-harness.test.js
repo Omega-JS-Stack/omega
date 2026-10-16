@@ -1,6 +1,6 @@
 /**
- * Unit pins for the journey harness: the JourneyRun shape and its pure helpers.
- * The stages themselves are the root `test:journey` lane, a real
+ * Unit pins for the journey harness: the JourneyRun shape, its pure helpers, and
+ * startServer's ready/fail scan on a plain node child. The stages themselves are the root `test:journey` lane, a real
  * outside-monorepo brand birth, and are exercised there, not here.
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
@@ -40,6 +40,28 @@ function runWithClonedBrand(options = {}) {
   fs.mkdirSync(made.run.brandRoot);
   fs.writeFileSync(path.join(made.run.brandRoot, 'package.json'), '{}');
   return { ...made, tempRoot };
+}
+
+/** Has `child` not exited yet? A signal exit leaves exitCode null, so both are read. */
+function running(child) {
+  return child.exitCode === null && child.signalCode === null;
+}
+
+/** Resolves once `child` has exited, rejecting past `ms`. */
+function exitWithin(child, ms) {
+  if (!running(child)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`child still running after ${ms} ms`)), ms);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+/** A node child that prints `lines`, then stays alive until stopped. */
+function printThenSleep(lines) {
+  return `${lines.map((line) => `console.log(${JSON.stringify(line)});`).join(' ')} setTimeout(() => {}, 30000);`;
 }
 
 /** `YYYY-MM-DD`, `days` before today in UTC. */
@@ -160,6 +182,54 @@ module.exports = defineCases({
       run: (ctx) => {
         const source = fs.readFileSync(HARNESS_PATH, 'utf8');
         ctx.expect(/steps-log/.test(source), 'a steps-log mention').toBe(false);
+      },
+    },
+
+    // --- startServer: ready lines resolve, a fail line rejects at once ---
+
+    {
+      name: 'startServer rejects ready on a failPatterns match, naming the stage, the key and the line',
+      timeout: 20000,
+      run: async (ctx) => {
+        const { run, logDir } = runInTempLogDir();
+        const server = run.startServer('dev', process.execPath, ['-e', printThenSleep(['booting', 'Persona seeding failed: no trigger'])], {
+          cwd: os.tmpdir(),
+          env: process.env,
+          readyPatterns: { ready: /never printed/ },
+          failPatterns: { seed: /Persona seeding failed/ },
+          timeout: 10000,
+        });
+        try {
+          await ctx.expect(server.ready).rejects.toThrow(/^dev failed on seed: Persona seeding failed: no trigger/);
+          await exitWithin(server.child, 5000);
+        } finally {
+          if (running(server.child)) await server.stop();
+          fs.rmSync(logDir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'startServer resolves ready when every ready pattern prints and no fail pattern does',
+      timeout: 20000,
+      run: async (ctx) => {
+        const { run, logDir } = runInTempLogDir();
+        const server = run.startServer('dev', process.execPath, ['-e', printThenSleep(['Emulator ready. Press Ctrl+C', '✓ Personas seeded (91 accounts)'])], {
+          cwd: os.tmpdir(),
+          env: process.env,
+          readyPatterns: { backend: /Emulator ready\. Press Ctrl\+C/i, seeded: /✓ Personas seeded \(\d+ accounts\)/ },
+          failPatterns: { seed: /Persona seeding failed/ },
+          timeout: 10000,
+        });
+        try {
+          await server.ready;
+          ctx.expect(server.matches.seeded[0]).toBe('✓ Personas seeded (91 accounts)');
+          await server.stop();
+          await exitWithin(server.child, 5000);
+        } finally {
+          if (running(server.child)) await server.stop();
+          fs.rmSync(logDir, { recursive: true, force: true });
+        }
       },
     },
 
