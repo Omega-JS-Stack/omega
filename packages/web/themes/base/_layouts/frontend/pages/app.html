@@ -2,7 +2,7 @@
 layout: frontend/core/cover
 
 app:
-  protocol: "{{ resolved.config.brand.id | default: resolved.config.brand.name | slugify }}://"
+  protocol: "{{ resolved.config.brand.id | default: resolved.config.brand.name | omega_slugify }}://"
 ---
 
 <!-- Self-contained, token-driven (mirrors the redirect interstitial) -->

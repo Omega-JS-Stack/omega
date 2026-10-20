@@ -18,7 +18,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { ICONS_DIR } = require('@omega.js/devkit/icons');
+const { LANGUAGE_NAMES } = require('@omega.js/devkit/translate');
 const { LANGUAGE_TO_COUNTRY } = require('@omega.js/template-kit');
+
+// The neutral glyph a supported language gets when its country has no flag
+const FALLBACK_FLAG = 'lang-fallback.svg';
 
 /**
  * Write the language-named flag aliases into an emitted icon set. Runs AFTER
@@ -35,16 +39,25 @@ function emitLanguageFlags(options) {
   // No flag set in this output (a build with no core icons dir) — nothing to alias
   if (!fs.existsSync(flags)) return { files: 0, dest };
 
+  const fallback = path.join(flags, FALLBACK_FLAG);
+
+  // emitIcons copies the core flag set wholesale, fallback glyph included
+  if (!fs.existsSync(fallback)) {
+    throw new Error(`[@omega.js/web:language-flags] missing ${fallback}: the emitted flag set has no fallback glyph`);
+  }
+
+  // Every language the translation engine supports, plus the source language
+  // and any extra the map carries, so the switcher never requests a missing file
+  const languages = new Set(['en', ...Object.keys(LANGUAGE_NAMES), ...Object.keys(LANGUAGE_TO_COUNTRY)]);
   let files = 0;
 
-  for (const [language, country] of Object.entries(LANGUAGE_TO_COUNTRY)) {
-    const source = path.join(flags, `${country}.svg`);
+  fs.mkdirSync(dest, { recursive: true });
 
-    // The set covers 47 countries, the map 46 languages — a language whose
-    // country has no flag simply gets none, and the row drops its <img>
-    if (!fs.existsSync(source)) continue;
+  for (const language of languages) {
+    const country = LANGUAGE_TO_COUNTRY[language];
+    const flag = country && path.join(flags, `${country}.svg`);
+    const source = flag && fs.existsSync(flag) ? flag : fallback;
 
-    fs.mkdirSync(dest, { recursive: true });
     fs.copyFileSync(source, path.join(dest, `${language}.svg`));
     files += 1;
   }
@@ -52,4 +65,4 @@ function emitLanguageFlags(options) {
   return { files, dest };
 }
 
-module.exports = { emitLanguageFlags };
+module.exports = { emitLanguageFlags, FALLBACK_FLAG };

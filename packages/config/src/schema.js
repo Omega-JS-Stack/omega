@@ -562,7 +562,7 @@ const SHARED_SCHEMA = [
     path:        'features',
     type:        'object',
     required:    false,
-    description: "The feature catalog: every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon (the full Font Awesome class string) and definition, plus, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
+    description: "The feature catalog: every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon (the full Font Awesome class string) and definition, plus, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage cards.",
   },
 
   // ── payment (role: billing; provider-discriminated) ──────────────────────
@@ -1351,7 +1351,7 @@ const TARGET_SCHEMAS = {
       type:        'boolean',
       required:    false,
       default:     true,
-      description: "false takes the WHOLE site out of search: every page emits noindex and sitemap.xml, llms.txt and pages.json list nothing. It is the site-wide DEFAULT of the one flag every signal reads, so a page's own `meta.index: true` still exempts it. Case 2 (docs/shared/config.md): default ON, and the literal false is the only OFF.",
+      description: "false takes the WHOLE site out of search: every page emits noindex, sitemap.xml and pages.json list nothing, and llms.txt keeps its brand summary but links nothing. It is the site-wide DEFAULT of the one flag every signal reads, so a page's own `meta.index: true` still exempts it. Case 2 (docs/shared/config.md): default ON, and the literal false is the only OFF.",
     },
     {
       path:        'imagemin',

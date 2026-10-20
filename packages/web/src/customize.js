@@ -26,6 +26,7 @@ const path = require('node:path');
 const yaml = require('js-yaml');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { permalinkOf } = require('./consumer-scan.js');
+const { pageUrlFromPath } = require('./page-url.js');
 const { PATHS } = require('./paths.js');
 
 // Marker + inner-extraction for composition-wrapped layouts (sections.js
@@ -128,7 +129,7 @@ function normalizeUrl(url) {
 }
 
 /**
- * The URL a page's SOURCE PATH names: `blog.md` → `/blog`,
+ * The URL a page's SOURCE PATH names (page-url.js): `blog.md` → `/blog`,
  * `blog/tags/tag.html` → `/blog/tags/tag`. This is how a GENERATOR page — one
  * whose permalink is a pagination/term template, so no URL can ever equal it —
  * is addressed by the customize index (#458). Suppression still keys on the
@@ -138,8 +139,7 @@ function normalizeUrl(url) {
  * @returns {string}
  */
 function sourceUrl(rel) {
-  const posix = rel.split(path.sep).join('/');
-  return normalizeUrl(`/${posix}`.replace(/\.(md|html)$/, '').replace(/\/index$/, '/'));
+  return pageUrlFromPath(path.join('pages', rel));
 }
 
 /**
@@ -183,7 +183,7 @@ function consumerPagesByUrl(consumerDir) {
   for (const entry of fs.readdirSync(pagesDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !/\.(md|html)$/.test(entry.name)) continue;
     const file = path.join(entry.parentPath, entry.name);
-    const permalink = permalinkOf(fs.readFileSync(file, 'utf8'));
+    const permalink = permalinkOf(fs.readFileSync(file, 'utf8'), path.relative(consumerDir, file));
     if (!permalink) continue;
     const url = permalink.includes('{') ? sourceUrl(path.relative(pagesDir, file)) : permalink;
     if (!map.has(url)) map.set(url, file);

@@ -67,8 +67,8 @@ In the event of a change of control, if we sell or otherwise transfer part or th
 
 ### Your Choices About Your Information:
 Your account information and profile privacy settings can be updated or changed by visiting your account profile at [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account) or by contacting {{ brand }} directly at [{{ resolved.config.url }}/contact]({{ resolved.config.url }}/contact).
-- You may request a copy of your personal data by visiting [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account#data-request).
-- You may request to have your account deleted by visiting your account profile at [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account#delete).
+- You may request a copy of your personal data by visiting [{{ resolved.config.url }}/account]({{ resolved.config.url }}/dashboard/account#data-request).
+- You may request to have your account deleted by visiting your account profile at [{{ resolved.config.url }}/account]({{ resolved.config.url }}/dashboard/account#delete).
 - You may request to unsubscribe from emails by clicking the "unsubscribe" link inside the email.
 
 ## Children’s Privacy:
@@ -80,7 +80,7 @@ By opting in to receive SMS communications from {{ brand }}, you agree to receiv
 ## Request Your Data to Be Removed or Deleted
 Under applicable data protection regulations including the General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA), you have the right to request the deletion of the personal data we hold about you. Account deletion is a permanent, irreversible action that cannot be undone under any circumstances.
 
-To request deletion, visit your account page here: [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account#delete). Please read the following important information before proceeding:
+To request deletion, visit your account page here: [{{ resolved.config.url }}/account]({{ resolved.config.url }}/dashboard/account#delete). Please read the following important information before proceeding:
 
 * **Permanent and irreversible:** Once your account is deleted, all personal data associated with your account will be permanently removed from our systems. This includes your profile information, subscription and billing history, activity logs, API keys, OAuth2 connections, referral data, and all other stored information. There is no mechanism to recover any data after deletion.
 * **Active subscriptions:** You must cancel any active paid subscriptions before deleting your account. Accounts with active or suspended paid subscriptions cannot be deleted until the subscription is cancelled or expires.
@@ -91,7 +91,7 @@ To request deletion, visit your account page here: [{{ resolved.config.url }}/ac
 ## Request a Copy of Your Data
 Under applicable data protection regulations including the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and other similar legislative frameworks, you may have the right to request a copy of the personal data we hold about you. This is commonly referred to as a Subject Access Request (SAR) or a Data Portability Request.
 
-To submit a data request, visit your account page here: [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account#data-request). Please read the following important information before submitting your request:
+To submit a data request, visit your account page here: [{{ resolved.config.url }}/account]({{ resolved.config.url }}/dashboard/account#data-request). Please read the following important information before submitting your request:
 
 * **Processing time:** Data requests may take up to **14 business days** to process. The compilation and verification of your data is performed manually by our data processing team to ensure accuracy, completeness, and security.
 * **Download only, no email delivery:** For security purposes, your data will **not** be sent via email or any other communication channel. You must return to your account page to download your data once it is ready. We do not consider email to be a sufficiently secure medium for the transmission of personally identifiable information.

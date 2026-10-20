@@ -54,7 +54,7 @@ config:
               <a href="/blog">Blog</a>
               {% if resolved.post.categories[0] %}
                 <span>/</span>
-                <a href="/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | omega_title_case }}</a>
+                <a href="/blog/categories/{{ resolved.post.categories[0] | omega_slugify }}">{{ resolved.post.categories[0] | omega_title_case }}</a>
               {% endif %}
             </div>
 
@@ -91,7 +91,7 @@ config:
                   <span>{{ resolved.config.brand.name }}</span>
                 {% endif %}
                 <span>·</span>
-                <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
+                <time datetime="{{ page.date | omega_date_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
                 <span>·</span>
                 <span>{% omega_readtime content %} min read</span>
               </div>
@@ -128,7 +128,7 @@ config:
             </a>
           {% endif %}
           <div class="omega-article-rail__meta omega-quiet small">
-            <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
+            <time datetime="{{ page.date | omega_date_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
             <span>{% omega_readtime content %} min read</span>
           </div>
           <div data-social-share
@@ -176,7 +176,7 @@ config:
         <div class="col-xl-7 col-lg-8 col-md-12 col-12">
           <div class="omega-chip-cloud justify-content-start">
             {% for tag in tags %}
-              <a href="/blog/tags/{{ tag | slugify }}" class="omega-chip">{{ tag }}</a>
+              <a href="/blog/tags/{{ tag | omega_slugify }}" class="omega-chip">{{ tag }}</a>
             {% endfor %}
           </div>
         </div>

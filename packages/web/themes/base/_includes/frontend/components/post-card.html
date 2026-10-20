@@ -24,10 +24,10 @@
   <div class="omega-post-card__body">
     <div class="omega-post-card__eyebrow">
       {% if _p.post.categories[0] %}
-        <a href="/blog/categories/{{ _p.post.categories[0] | slugify }}">{{ _p.post.categories[0] | omega_title_case }}</a>
+        <a href="/blog/categories/{{ _p.post.categories[0] | omega_slugify }}">{{ _p.post.categories[0] | omega_title_case }}</a>
         <span>·</span>
       {% endif %}
-      <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
+      <time datetime="{{ _p.date | omega_date_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
 
       {% comment %} Generated-content tell (#208): sample content renders on the
         real posts lane, so every listing row of a `generated` document says so.
@@ -45,7 +45,7 @@
     {%- capture _excerpt -%}{{ _p.post.description }}{%- endcapture -%}
     {%- assign _excerpt = _excerpt | strip -%}
     {%- if _excerpt == '' -%}
-      {%- capture _excerpt -%}{{ _p.content | strip_html | strip_newlines | truncate: 150 }}{%- endcapture -%}
+      {%- capture _excerpt -%}{{ _p.content | omega_strip_html | strip_newlines | truncate: 150 }}{%- endcapture -%}
     {%- endif -%}
     {% if _excerpt != '' %}
       <p class="omega-post-card__excerpt">{{ _excerpt }}</p>

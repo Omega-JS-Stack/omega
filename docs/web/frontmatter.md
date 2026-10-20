@@ -92,7 +92,7 @@ back to when nothing sets a value.
 | `description` | the description meta + `og:description`. Unset → `brand.description` |
 | `image` | `og:image` / `twitter:image`. Unset → `brand.images.social`, then `brand.images.brandmark` |
 | `keywords` | the keywords meta (comma-separated). Unset emits none |
-| `index` | `false` marks the page `noindex` AND drops it from `sitemap.xml`, `pages.json` and `llms.txt`: ONE decision, every signal ([#564](https://github.com/Omega-JS-Stack/omega/issues/564)). The site-wide default is the SAME key one level up, `targets.web.meta.index` in omega.json5 (Ian's same-name ruling 2026-09-09): its literal `false` seeds every page, and this key still wins BOTH directions, so `true` here indexes one page of an otherwise dark site. There is no separate sitemap opt-out: the sitemap follows this flag |
+| `index` | `false` marks the page `noindex` AND drops it from `sitemap.xml`, `pages.json` and the Pages and Posts sections of `llms.txt`: ONE decision, every signal ([#564](https://github.com/Omega-JS-Stack/omega/issues/564)). The site-wide default is the SAME key one level up, `targets.web.meta.index` in omega.json5 (Ian's same-name ruling 2026-09-09): its literal `false` seeds every page, and this key still wins BOTH directions, so `true` here indexes one page of an otherwise dark site. A dark site's `llms.txt` keeps its brand summary and links nothing, its Social and Downloads sections included. There is no separate sitemap opt-out: the sitemap follows this flag |
 | `viewport` | overrides the framework viewport meta |
 | `referrer` | overrides the framework referrer policy meta |
 | `twitter_card` | the card type (`summary_large_image` by default) |
@@ -140,7 +140,7 @@ reads. A collection entry (`_posts/`, `_team/`) may still carry `sitemap.lastmod
 keys and nothing else from the block. The framework's own automatic exclusions (drafts, the `/test` dev
 surfaces, `/admin/`, redirect-layout pages, a listing's pages 2..N) are the
 ENGINE's: it resolves one `meta.index` per page and the robots tag, the
-sitemap, `pages.json` and `llms.txt` all print that same value.
+sitemap, `pages.json` and the page lists of `llms.txt` all print that same value.
 
 ## What is NOT frontmatter
 

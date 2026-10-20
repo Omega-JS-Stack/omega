@@ -890,7 +890,7 @@ const STATIC_ACCOUNTS = {
   },
   // The USAGE persona ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
   // — the ONE exception to "one persona, one purpose" that Ian asked for, and
-  // it is a deliberate one: a usage bar is only worth previewing beside its
+  // it is a deliberate one: a usage card is only worth previewing beside its
   // neighbours, so the spread lives on DIFFERENT features of ONE account and
   // each feature still tells exactly one story. Sign in as it from the website
   // like any other persona and the account page shows every state at once:
@@ -901,7 +901,7 @@ const STATIC_ACCOUNTS = {
   //   - one whose MONTH is gone (the "upgrade" refusal),
   //   - one carrying admin-granted override credits on top of the plan.
   // The feature ids are the brand catalog's, so a brand whose catalog names
-  // other features simply seeds fewer bars — never a bar with no definition.
+  // other features simply seeds fewer cards, never a card with no definition.
   'usage-spread': {
     id: 'usage-spread',
     uid: '_test-usage-spread',

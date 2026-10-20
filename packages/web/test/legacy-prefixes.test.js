@@ -31,6 +31,12 @@ const RETIRED = [
 
 const SURFACES = ['core', 'defaults', 'runtime', 'src', 'themes', KIT];
 
+// The Jekyll-era filters retired behind omega_* names; each old name throws at
+// render, so a shipped template still calling one breaks every consumer build.
+const JEKYLL_FILTERS = Object.keys(require(path.join(KIT, 'jekyll-compat.js')).COMPAT_REPLACEMENTS);
+const JEKYLL_FILTER_CALL = new RegExp(`\\|\\s*(${JEKYLL_FILTERS.join('|')})\\b`);
+const TEMPLATE_SURFACES = ['core', 'defaults', 'themes', 'scaffold'];
+
 // The ONE file that must still spell the retired names: `omega migrate`'s
 // codemod reads them out of a legacy consumer and writes the omega spellings.
 const EXEMPT = path.join(PKG, 'src', 'migrate', 'rules.js');
@@ -75,6 +81,24 @@ module.exports = defineCases({
         }
 
         ctx.expect(sightings, `retired prefixes are back:\n${sightings.join('\n')}`).toEqual([]);
+      },
+    },
+
+    {
+      name: '#830: no retired Jekyll filter name survives on a shipped template surface',
+      run: (ctx) => {
+        const sightings = [];
+
+        for (const surface of TEMPLATE_SURFACES) {
+          for (const file of walk(path.join(PKG, surface))) {
+            fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+              const hit = line.match(JEKYLL_FILTER_CALL);
+              if (hit) sightings.push(`${path.relative(PKG, file)}:${index + 1}: | ${hit[1]}`);
+            });
+          }
+        }
+
+        ctx.expect(sightings, `retired Jekyll filters are back (use the omega_* name):\n${sightings.join('\n')}`).toEqual([]);
       },
     },
   ],

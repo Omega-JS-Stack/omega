@@ -7,7 +7,10 @@ const os = require('node:os');
 const path = require('node:path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
+const reads = require('@omega.js/devkit/reads');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { permalinkOf, scanConsumerPages } = require('../src/consumer-scan.js');
+const { createDecisions } = require('../src/decisions.js');
 
 module.exports = defineCases({
   type: 'group',
@@ -122,7 +125,7 @@ module.exports = defineCases({
     // name the FILES that claim a URL, not just the URL.
 
     {
-      name: 'scanConsumerPages: one entry per permalinked page, recursively',
+      name: 'scanConsumerPages: one entry per page, recursively',
       run: (ctx) => {
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-scan-')));
         ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -140,6 +143,7 @@ module.exports = defineCases({
         ctx.expect(scanConsumerPages(root).map((page) => ({ file: path.relative(root, page.file), url: page.url })).sort((a, b) => a.file.localeCompare(b.file))).toEqual([
           { file: path.join('pages', 'about.md'), url: '/about' },
           { file: path.join('pages', 'company', 'team.html'), url: '/team' },
+          { file: path.join('pages', 'no-permalink.md'), url: '/no-permalink' },
         ]);
       },
     },
@@ -151,6 +155,49 @@ module.exports = defineCases({
         ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
         ctx.expect(scanConsumerPages(root)).toEqual([]);
+      },
+    },
+
+    {
+      name: '#954: a permalink-less page claims its file path and suppresses the default at it',
+      run: (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-scan-')));
+        const savedEnvironment = process.env.OMEGA_ENVIRONMENT;
+        setEnvironment('development');
+        ctx.after(() => {
+          reads.closeScope();
+          if (savedEnvironment === undefined) delete process.env.OMEGA_ENVIRONMENT;
+          else process.env.OMEGA_ENVIRONMENT = savedEnvironment;
+          fs.rmSync(root, { recursive: true, force: true });
+        });
+        fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'pages', 'pricing.md'), '---\nmeta:\n  title: Plans\n---\nour pricing');
+
+        ctx.expect(scanConsumerPages(root).map((page) => ({ file: path.relative(root, page.file), url: page.url }))).toEqual([
+          { file: path.join('pages', 'pricing.md'), url: '/pricing' },
+        ]);
+
+        reads.openScope({ consumerDir: root });
+        const logged = [];
+        const decisions = createDecisions({ consumerDir: root, collectionDirs: [], log: (message) => logged.push(message) });
+        decisions.framework([{ label: 'defaults/pages/pricing.md', url: '/pricing' }]);
+
+        ctx.expect(decisions.suppressedUrls(), 'the default pricing page steps aside').toEqual(['/pricing']);
+        ctx.expect(logged, 'an override, never a collision').toEqual([]);
+      },
+    },
+
+    {
+      name: '#954: a paginated page with no permalink claims its file path',
+      run: (ctx) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-scan-')));
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+        fs.mkdirSync(path.join(root, 'pages'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'pages', 'chapters.md'), '---\npagination:\n  data: chapters\n  size: 1\nmeta:\n  title: Chapters\n---\nchapter');
+
+        ctx.expect(scanConsumerPages(root).map((page) => ({ file: path.relative(root, page.file), url: page.url })), 'its first page really serves there').toEqual([
+          { file: path.join('pages', 'chapters.md'), url: '/chapters' },
+        ]);
       },
     },
   ],

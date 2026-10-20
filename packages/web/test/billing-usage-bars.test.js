@@ -1,36 +1,38 @@
 /**
- * The account page's USAGE BARS (`core/js/pages/dashboard/account/sections/
- * billing.js`) — what a customer is told about what they have left
- * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+ * The account page's USAGE CARDS (`core/js/pages/dashboard/account/sections/
+ * billing.js`): what a customer is told about what they have left
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647),
+ * [#833](https://github.com/Omega-JS-Stack/omega/issues/833)).
  *
  * The promises, all of them things a customer can be misled by:
- *  - a bar exists per COUNTED feature the catalog defines and the plan prices —
- *    a perk is not a meter and never draws one;
- *  - each counted feature shows BOTH numbers, today's and this month's, because
- *    either one can be the thing standing in the user's way: a paced feature
- *    refuses on the day's share long before the month runs out;
- *  - a feature that opted out of pacing shows only the month, since no day cap
- *    exists to be refused by;
- *  - override credits an admin granted are INCLUDED in the month's number and
- *    said out loud — the number beside the bar is not the number /pricing
- *    quotes, and a silent difference reads as a bug;
+ *  - one `.omega-usage-card` per COUNTED feature the catalog defines and the
+ *    plan prices; a perk is not a meter and never draws one;
+ *  - the month figure is the headline (`used of limit`), with a fill sized to
+ *    the share used, warned at half and in danger past 80%;
+ *  - a paced feature adds a day row, because a paced feature refuses on the
+ *    day's share long before the month runs out; `pace: false` shows none;
+ *  - each counter says WHEN it resets: the cron's UTC boundary, in local time;
+ *  - override credits an admin granted are IN the headline's limit and named
+ *    in a chip; a silent difference from /pricing reads as a bug;
  *  - unlimited says "Unlimited" instead of drawing a percentage of nothing;
- *  - the name, icon and definition come from the CATALOG, so a brand renames a
- *    feature in one place.
+ *  - theme tokens only: no Bootstrap progress, no color class, no inline color.
  *
  * Same harness as billing-plan-switcher.test.js: the REAL module through
  * esbuild behind its bundler aliases, over a document that answers only the
- * ids the usage section writes, and the assertion is the HTML it wrote.
+ * ids the usage section writes, and the assertion is the HTML it wrote. The
+ * accounts are the usage persona's five states (`USAGE_SPREAD_STATES` in
+ * @omega.js/backend's test-accounts.js), on a 3,100-a-month feature.
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { User } = require('@omega.js/account');
+const { User, dayShare } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
+const ACCOUNT_LAYOUT = path.join(__dirname, '..', 'themes', 'base', '_layouts', 'frontend', 'pages', 'account', 'index.html');
 
 const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-billing-usage-'));
 const BUNDLE = path.join(BUNDLE_DIR, 'billing.cjs');
@@ -145,99 +147,192 @@ async function renderUsage(account, config) {
   return elements['usage-metrics-container'].innerHTML;
 }
 
+/** Every opening tag in the HTML, with its class tokens and its style attribute. */
+function tags(html) {
+  return [...html.matchAll(/<[a-z][a-z0-9]*\b[^>]*>/g)].map((match) => {
+    const cls = match[0].match(/\bclass="([^"]*)"/);
+    const style = match[0].match(/\bstyle="([^"]*)"/);
+    return {
+      index: match.index,
+      classes: cls ? cls[1].split(/\s+/).filter(Boolean) : [],
+      style: style ? style[1] : null,
+    };
+  });
+}
+
+/** Each `.omega-usage-card`: its class tokens, its markup up to the next card, and the text it reads as. */
+function cards(html) {
+  const starts = tags(html).filter((tag) => tag.classes.includes('omega-usage-card'));
+  return starts.map((tag, i) => {
+    const markup = html.slice(tag.index, i + 1 < starts.length ? starts[i + 1].index : html.length);
+    return { classes: tag.classes, html: markup, text: markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ') };
+  });
+}
+
+/** The one card naming a feature; fails loudly when there is none or several. */
+function cardFor(html, name) {
+  const found = cards(html).filter((card) => card.html.includes(name));
+  if (found.length !== 1) {
+    throw new Error(`expected one usage card for ${name}, found ${found.length}: ${html}`);
+  }
+  return found[0];
+}
+
+/** The fill's width in percent, or null when the card draws no fill. */
+function fillWidth(card) {
+  const fill = tags(card.html).find((tag) => tag.classes.includes('omega-usage-card__fill'));
+  if (!fill) return null;
+  const width = (fill.style || '').match(/width:\s*([\d.]+)%/);
+  return width ? Number(width[1]) : NaN;
+}
+
+// The cron's UTC boundaries, formatted the way the viewer's browser shows them
+const nextUtcDay = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+};
+const nextUtcMonth = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+};
+const dayResetText = () => `Day resets ${nextUtcDay().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`.replace(/\s+/g, ' ');
+const monthResetText = () => `Month resets ${nextUtcMonth().toLocaleDateString([], { month: 'short', day: 'numeric' })}`.replace(/\s+/g, ' ');
+
+// The usage persona's five states on `saves` (3,100 a month); `exports` stays
+// untouched beside it
+const SAVES_LIMIT = 3100;
+const PERSONA_STATES = {
+  'untouched': { saves: { monthly: 0, daily: 0 } },
+  'half spent': { saves: { monthly: 1550, daily: 0 } },
+  'day cap hit': { saves: { monthly: 775, daily: dayShare(SAVES_LIMIT) } },
+  'month cap hit': { saves: { monthly: 3100, daily: 0 } },
+  'override credits': { saves: { monthly: 3100, daily: 0 }, overrides: { saves: 6200 } },
+};
+
 module.exports = defineCases({
   type: 'group',
   description: 'billing-usage-bars',
   tests: [
     {
-      name: 'usage bars: a bar per counted feature, both counters, catalog copy',
+      name: 'usage cards: a card per counted feature, named and iconed from the catalog',
       run: async (ctx) => {
-        const html = await renderUsage(paidAccount({
-          saves: { monthly: 600, daily: 40, total: 9000 },
-          exports: { monthly: 10, daily: 10 },
-        }));
+        const html = await renderUsage(paidAccount(PERSONA_STATES['untouched']));
 
-        // The catalog's name, icon and definition — not a hard-coded label map
-        ctx.expect(html.includes('Saves'), 'the catalog name').toBeTruthy();
-        ctx.expect(html.includes('<i class="fa-brands fa-figma fa-sm me-1 text-muted">'), 'the catalog icon, emitted exactly as authored (#929)').toBeTruthy();
-        ctx.expect(!html.includes('fa-solid fa-fa-'), 'and never re-wrapped by the bar').toBeTruthy();
-        ctx.expect(html.includes('data-bs-title="Notes you can save each month."'), 'the catalog definition, on hover').toBeTruthy();
+        ctx.expect(cards(html).length, `saves and exports, never the perk: ${html}`).toBe(2);
+        ctx.expect(cardFor(html, 'Saves').html.includes('class="fa-brands fa-figma'), 'the catalog icon, emitted exactly as authored (#929)').toBeTruthy();
+        ctx.expect(!html.includes('fa-solid fa-fa-'), 'and never re-wrapped by the card').toBeTruthy();
+        ctx.expect(!html.includes('Priority support'), 'a perk draws no card').toBeTruthy();
 
-        // BOTH counters for the paced feature: 3100/month → ceil over a 28-31 day
-        // month is 100..111 a day, so today's number is real either way
-        ctx.expect(/left today/.test(html), 'the day counter is shown').toBeTruthy();
-        ctx.expect(html.includes('2,500 of 3,100 left this month'), `the month counter is shown: ${html}`).toBeTruthy();
-
-        // A perk is not a meter
-        ctx.expect(!html.includes('Priority support'), 'a perk draws no bar').toBeTruthy();
+        // The real layout lays the cards out: the container the section writes into is the grid
+        const container = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8').match(/<[a-z][a-z0-9]*\b[^>]*\bid="usage-metrics-container"[^>]*>/);
+        const containerClasses = container ? tags(container[0])[0].classes : [];
+        ctx.expect(containerClasses.includes('omega-usage-grid'), `the layout's usage container: ${container && container[0]}`).toBeTruthy();
       },
     },
 
     {
-      name: 'usage bars: a feature that opted out of pacing shows only the month',
+      name: '#833 case 1: half spent on a paced feature: the month headline, a 50% warn fill, a day row',
       run: async (ctx) => {
-        const html = await renderUsage(paidAccount({ exports: { monthly: 10, daily: 10 } }));
+        const saves = cardFor(await renderUsage(paidAccount(PERSONA_STATES['half spent'])), 'Saves');
 
-        const exportsBlock = html.slice(html.indexOf('Exports'));
-
-        ctx.expect(exportsBlock.includes('40 of 50 left this month'), `the month counter: ${exportsBlock}`).toBeTruthy();
-        ctx.expect(!exportsBlock.includes('left today'), 'no day cap exists, so none is drawn').toBeTruthy();
+        ctx.expect(saves.text.includes('1,550 of 3,100'), `the month figure is the headline: ${saves.html}`).toBeTruthy();
+        ctx.expect(fillWidth(saves), 'the fill is the share used').toBe(50);
+        ctx.expect(saves.classes.includes('omega-usage-card--warn'), `half spent warns: ${saves.classes}`).toBeTruthy();
+        ctx.expect(!saves.classes.includes('omega-usage-card--danger'), 'and is not yet danger').toBeTruthy();
+        ctx.expect(/left today/.test(saves.text), 'a paced feature carries a day row').toBeTruthy();
+        ctx.expect(saves.text.includes(dayResetText()), `with the day's reset: ${saves.html}`).toBeTruthy();
       },
     },
 
     {
-      name: 'usage bars: override credits are IN the month number and said out loud',
+      name: '#833 case 2: a feature that opted out of pacing has no day row and no day reset',
       run: async (ctx) => {
-        const html = await renderUsage(paidAccount({
-          saves: { monthly: 3100, daily: 0 },
-          overrides: { saves: 5000 },
-        }));
+        const exports_ = cardFor(await renderUsage(paidAccount({ exports: { monthly: 10, daily: 10 } })), 'Exports');
 
-        ctx.expect(html.includes('1,900 of 5,000 left this month'), `the override is the limit that counts: ${html}`).toBeTruthy();
-        ctx.expect(html.includes('granted'), 'and the extra credits are named, not silently folded in').toBeTruthy();
+        ctx.expect(exports_.text.includes('10 of 50'), `the month headline: ${exports_.html}`).toBeTruthy();
+        ctx.expect(!exports_.text.includes('left today'), 'no day cap exists, so no day row').toBeTruthy();
+        ctx.expect(!exports_.text.includes('Day resets'), 'and no day reset').toBeTruthy();
       },
     },
 
     {
-      name: 'usage bars: an override AT or BELOW the plan sets the limit and claims no credit',
+      name: "#833 case 3: day cap hit: nothing left today, and when the day resets in the viewer's time",
       run: async (ctx) => {
-        // An override is not always a grant — support can also DIAL A PLAN DOWN for
-        // one account. The badge subtracts, so a lower override rendered "+-50
-        // granted": a negative number announced as a gift.
-        const lower = await renderUsage(paidAccount({
+        const saves = cardFor(await renderUsage(paidAccount(PERSONA_STATES['day cap hit'])), 'Saves');
+
+        // 3,100 a month over a 28-31 day month is 100..111 a day
+        const day = saves.text.match(/(\d[\d,]*) of (\d[\d,]*) left today/);
+        ctx.expect(day && day[1], `the day row: ${saves.html}`).toBe('0');
+        ctx.expect(Number(day[2]) >= 100 && Number(day[2]) <= 111, `today's share: ${day[2]}`).toBeTruthy();
+        ctx.expect(saves.text.includes(dayResetText()), `expected "${dayResetText()}": ${saves.html}`).toBeTruthy();
+        ctx.expect(saves.text.includes('775 of 3,100'), 'the month still has room').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#833 case 4: month cap hit: a full danger fill and the month reset date',
+      run: async (ctx) => {
+        const saves = cardFor(await renderUsage(paidAccount(PERSONA_STATES['month cap hit'])), 'Saves');
+
+        ctx.expect(saves.text.includes('3,100 of 3,100'), `the headline: ${saves.html}`).toBeTruthy();
+        ctx.expect(fillWidth(saves), 'the fill is full').toBe(100);
+        ctx.expect(saves.classes.includes('omega-usage-card--danger'), `a spent month is danger: ${saves.classes}`).toBeTruthy();
+        ctx.expect(saves.text.includes(monthResetText()), `expected "${monthResetText()}": ${saves.html}`).toBeTruthy();
+      },
+    },
+
+    {
+      name: '#833 case 5: override credits are IN the headline limit and named in a chip',
+      run: async (ctx) => {
+        const saves = cardFor(await renderUsage(paidAccount(PERSONA_STATES['override credits'])), 'Saves');
+
+        ctx.expect(saves.text.includes('3,100 of 6,200'), `the override is the limit that counts: ${saves.html}`).toBeTruthy();
+        ctx.expect(saves.text.includes('+3,100 credits'), 'and the extra credits are named, not silently folded in').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'usage cards: an override AT or BELOW the plan sets the limit and claims no credit',
+      run: async (ctx) => {
+        // An override is not always a grant: support can also DIAL A PLAN DOWN for
+        // one account, and a negative difference must never read as a gift.
+        const lower = cardFor(await renderUsage(paidAccount({
           saves: { monthly: 100, daily: 0 },
           overrides: { saves: 500 },
-        }));
+        })), 'Saves');
 
-        ctx.expect(lower.includes('400 of 500 left this month'), `the override is still the limit that counts: ${lower}`).toBeTruthy();
-        ctx.expect(!lower.includes('granted'), 'but nothing was granted, so nothing claims it was').toBeTruthy();
-        ctx.expect(!lower.includes('+-'), 'and no negative is dressed up as a credit').toBeTruthy();
+        ctx.expect(lower.text.includes('100 of 500'), `the override is still the limit that counts: ${lower.html}`).toBeTruthy();
+        ctx.expect(!lower.text.includes('credits'), 'but nothing was granted, so no chip claims it was').toBeTruthy();
+        ctx.expect(!lower.text.includes('+-'), 'and no negative is dressed up as a credit').toBeTruthy();
 
-        const equal = await renderUsage(paidAccount({
+        const equal = cardFor(await renderUsage(paidAccount({
           saves: { monthly: 100, daily: 0 },
           overrides: { saves: 3100 },
-        }));
+        })), 'Saves');
 
-        ctx.expect(!equal.includes('granted'), 'an override equal to the plan grants nothing either').toBeTruthy();
+        ctx.expect(!equal.text.includes('credits'), 'an override equal to the plan grants nothing either').toBeTruthy();
       },
     },
 
     {
-      name: 'usage bars: unlimited says so instead of drawing a percentage of nothing',
+      name: '#833 case 6: unlimited says so, with no fill and no reset rows',
       run: async (ctx) => {
         const html = await renderUsage(paidAccount({ saves: { monthly: 90000, daily: 10 } }), {
           currency: 'USD',
           products: [{ id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10 }, features: { saves: -1 } }],
         });
+        const saves = cardFor(html, 'Saves');
 
-        ctx.expect(html.includes('Unlimited this month'), `unlimited is stated: ${html}`).toBeTruthy();
-        ctx.expect(!html.includes('left today'), 'unlimited has no day share to be refused by, so no day bar is drawn').toBeTruthy();
+        ctx.expect(saves.text.includes('Unlimited'), `unlimited is stated: ${saves.html}`).toBeTruthy();
+        ctx.expect(fillWidth(saves), 'no percentage of nothing').toBe(null);
+        ctx.expect(!saves.text.includes('Day resets') && !saves.text.includes('Month resets'), 'nothing to reset').toBeTruthy();
+        ctx.expect(!saves.text.includes('left today'), 'and no day share to be refused by').toBeTruthy();
         ctx.expect(!html.includes('NaN') && !html.includes('Infinity'), 'and no arithmetic leaks').toBeTruthy();
       },
     },
 
     {
-      name: 'usage bars: a plan that meters nothing says so',
+      name: '#833 case 7: a plan that meters nothing says so',
       run: async (ctx) => {
         const html = await renderUsage(new User({
           subscription: { product: { id: 'basic' }, status: 'active' },
@@ -249,14 +344,34 @@ module.exports = defineCases({
     },
 
     {
-      name: '#945: the bars read the plan off the User: a cancelled paid plan draws the basic limits',
+      name: '#833 case 9: every persona state renders from theme tokens: no Bootstrap progress, no color class, no inline color',
+      run: async (ctx) => {
+        const FORBIDDEN = ['bg-success', 'bg-warning', 'bg-danger', 'progress', 'progress-bar'];
+
+        for (const [state, usage] of Object.entries(PERSONA_STATES)) {
+          const html = await renderUsage(paidAccount(usage));
+          ctx.expect(cards(html).length, `${state}: the cards rendered`).toBe(2);
+
+          for (const tag of tags(html)) {
+            const bad = tag.classes.filter((name) => FORBIDDEN.includes(name));
+            ctx.expect(bad, `${state}: a forbidden class`).toEqual([]);
+            if (tag.style === null) continue;
+            ctx.expect(/^\s*width:\s*[\d.]+%;?\s*$/.test(tag.style), `${state}: the fill's width is the one inline value, not "${tag.style}"`).toBeTruthy();
+            ctx.expect(tag.classes.includes('omega-usage-card__fill'), `${state}: only the fill carries a style`).toBeTruthy();
+          }
+        }
+      },
+    },
+
+    {
+      name: '#945: the cards read the plan off the User: a cancelled paid plan draws the basic limits',
       run: async (ctx) => {
         const html = await renderUsage(new User({
           subscription: { product: { id: 'premium' }, status: 'cancelled' },
           usage: { saves: { monthly: 40, daily: 5 } },
         }, { uid: 'user-647' }));
 
-        ctx.expect(html.includes('60 of 100 left this month'), `the basic plan's number, not premium's: ${html}`).toBeTruthy();
+        ctx.expect(cardFor(html, 'Saves').text.includes('40 of 100'), `the basic plan's number, not premium's: ${html}`).toBeTruthy();
         ctx.expect(!html.includes('Exports'), 'and none of the premium-only meters').toBeTruthy();
       },
     },

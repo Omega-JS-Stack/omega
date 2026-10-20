@@ -158,6 +158,9 @@ rewritten to `/{lang}/...`, and hreflang + `og:locale:alternate` tags
 stitched into BOTH the copy and the original — naming only the languages
 actually PRODUCED for that page (a pair left untranslated, cold or failed, is never
 advertised, on the copies as on the originals), so hreflang never lies.
+A rerun over the same dist/ replaces the set rather than adding to it: every
+alternate an earlier pass stitched (all but the build's own `x-default` and
+source-language tags) is stripped first, on the copies as on the originals.
 `og:locale` carries Open Graph's `language_TERRITORY` form (`en_US`,
 `es_ES`) from the devkit language SSOT's locale map — on translated copies
 and on the source pages the head include renders. Cache namespace:

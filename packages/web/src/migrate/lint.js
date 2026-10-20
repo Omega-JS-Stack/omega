@@ -9,7 +9,7 @@
  * so the lists can't drift.
  */
 const { Liquid } = require('liquidjs');
-const { registerLiquid } = require('@omega.js/template-kit');
+const { registerLiquid, jekyllCompat: { COMPAT_REPLACEMENTS } } = require('@omega.js/template-kit');
 const { registerSectionTags } = require('../sections.js');
 
 // Jekyll-only tags with no LiquidJS/engine equivalent — hard findings
@@ -93,6 +93,14 @@ function lintText(text, filePath) {
     for (const span of line.matchAll(/\{\{.*?\}\}|\{%.*?%\}/g)) {
       const unquoted = span[0].replace(/"[^"]*"|'[^']*'/g, '""');
       for (const [, name] of unquoted.matchAll(/\|\s*([a-z_][\w]*)/g)) {
+        // A retired Jekyll-era name is registered (it throws), so it is named here first
+        if (Object.hasOwn(COMPAT_REPLACEMENTS, name)) {
+          findings.push({
+            file: filePath, line: index + 1, check: 'jekyll-filter', severity: 'error',
+            message: `${name} is a Jekyll filter: use ${COMPAT_REPLACEMENTS[name]}`,
+          });
+          continue;
+        }
         if (filters.has(name)) continue;
         findings.push({
           file: filePath, line: index + 1, check: 'unknown-filter', severity: 'warning',

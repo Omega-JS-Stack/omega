@@ -279,5 +279,36 @@ module.exports = defineCases({
         }
       },
     },
+
+    {
+      name: '#954: a permalink-less consumer page owns its file-path URL',
+      run: (ctx) => {
+        const consumer = path.join(PKG, '.omega', 'customize-path-owned');
+        fs.rmSync(consumer, { recursive: true, force: true });
+        fs.mkdirSync(path.join(consumer, 'pages'), { recursive: true });
+        const pricing = path.join(consumer, 'pages', 'pricing.md');
+        fs.writeFileSync(pricing, '---\nmeta:\n  title: Plans\n---\nour pricing\n');
+
+        const plan = resolveCustomization({ url: '/pricing', consumerDir: consumer, siteData: miniData });
+        ctx.expect(plan.status, 'pages/pricing.md serves /pricing, so the default is already taken over').toBe('owned');
+        ctx.expect(plan.ownedFile).toBe(pricing);
+      },
+    },
+
+    {
+      name: '#954: a generator index page is addressed by its folder, no trailing slash',
+      run: (ctx) => {
+        const consumer = path.join(PKG, '.omega', 'customize-index-owned');
+        fs.rmSync(consumer, { recursive: true, force: true });
+        fs.mkdirSync(path.join(consumer, 'pages', 'blog'), { recursive: true });
+        const hub = path.join(consumer, 'pages', 'blog', 'index.md');
+        // The packaged blog hub's pagination permalink, so the page is a generator.
+        fs.writeFileSync(hub, '---\npermalink: "/blog{% if pagination.pageNumber > 0 %}/page/{{ pagination.pageNumber | plus: 1 }}{% endif %}.html"\n---\nmy hub\n');
+
+        const plan = resolveCustomization({ url: '/blog', consumerDir: consumer, siteData: miniData });
+        ctx.expect(plan.status, 'pages/blog/index.md is addressed as /blog, never /blog/ or /blog/index').toBe('owned');
+        ctx.expect(plan.ownedFile).toBe(hub);
+      },
+    },
   ],
 });

@@ -75,6 +75,19 @@ function daysInMonth(date) {
 }
 
 /**
+ * When a counter next resets: the reset cron runs at midnight UTC, clearing the
+ * day counters every day and the month counters on the 1st.
+ * @param {'day'|'month'} period - which counter
+ * @param {Date} [now] - the moment to count from, defaults to now
+ * @returns {Date} the next 00:00 UTC (day) or the 1st of next month 00:00 UTC (month)
+ */
+function nextReset(period, now = new Date()) {
+  if (period === 'day') return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  if (period === 'month') return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  throw new Error(`nextReset: unknown period "${period}"; expected 'day' or 'month'`);
+}
+
+/**
  * A month limit's share of ONE day: ceil(limit / days in this month), so a
  * quota of 100 in a 31-day month allows 4 a day and never 100 on the 1st.
  * Unlimited stays unlimited; nothing stays nothing.
@@ -196,7 +209,7 @@ function resolveFeature(id, options) {
 
 /**
  * Resolve every feature the catalog defines, in CATALOG order — the row order
- * every surface renders (pricing rows, account bars).
+ * every surface renders (pricing rows, account cards).
  * @param {object} options - same options as resolveFeature
  * @returns {object[]} one resolved feature per catalog entry
  */
@@ -215,6 +228,7 @@ module.exports = {
   productFeatureValue,
   daysInMonth,
   dayShare,
+  nextReset,
   resolveFeature,
   resolveFeatures,
 };

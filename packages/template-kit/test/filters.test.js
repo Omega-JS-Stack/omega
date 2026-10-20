@@ -8,10 +8,27 @@
  * Documented divergence: Ruby's omega_commaify groups DECIMAL digits too
  * ('1234.5678' => '1,234.5,678' — a latent bug); ours commas only the whole
  * part ('1,234.5678') per the best-implementation-wins rule.
+ *
+ * The helpers that replaced the Jekyll-era names (omega_slugify, the dates,
+ * the url joins, omega_where / omega_group_by) are pinned through a real engine
+ * by their registered names: those names are what templates are written against.
  */
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { Liquid } = require('liquidjs');
 const filters = require('../src/filters.js');
+const { registerLiquid } = require('../src/register-liquid.js');
+
+// strictFilters: an unregistered name throws instead of passing its input through.
+function render(template, scope = {}, options = {}) {
+  const engine = new Liquid({ strictFilters: true });
+  registerLiquid(engine, { site: options.site || {}, markdown: options.markdown });
+  return engine.parseAndRender(template, scope);
+}
+
+// One line per group, `name:size=titles;`, so order inside and across groups shows.
+const GROUPS = '{% assign groups = items | omega_group_by: "item", expr %}{% for group in groups %}{{ group.name }}:{{ group.size }}={{ group.items | map: "title" | join: "," }};{% endfor %}';
+const WHERE_VIEWS = '{% assign kept = items | omega_where: "item", expr %}{{ kept | map: "views" | join: "," }}';
 
 module.exports = defineCases({
   type: 'group',
@@ -67,10 +84,17 @@ module.exports = defineCases({
     },
 
     {
-      name: 'omegaJsonify pretty-prints with configurable indent',
+      name: 'omegaJsonify is compact by default and pretty-prints with an indent (#830)',
       run: (ctx) => {
-        ctx.expect(filters.omegaJsonify({ a: 1 })).toBe('{\n  "a": 1\n}');
+        ctx.expect(filters.omegaJsonify({ a: 1, b: [2, 3] })).toBe('{"a":1,"b":[2,3]}');
+        ctx.expect(filters.omegaJsonify('hi')).toBe('"hi"');
+        ctx.expect(filters.omegaJsonify({ a: 1 }, 2)).toBe('{\n  "a": 1\n}');
         ctx.expect(filters.omegaJsonify({ a: 1 }, 4)).toBe('{\n    "a": 1\n}');
+
+        // It took over jsonify's call sites, JSON feeds among them: an absent
+        // value emits null (Ruby nil.to_json parity), never an empty slot.
+        ctx.expect(filters.omegaJsonify(null)).toBe('null');
+        ctx.expect(filters.omegaJsonify(undefined)).toBe('null');
       },
     },
 
@@ -162,6 +186,203 @@ module.exports = defineCases({
         ctx.expect(forHtml('hello')).toBe('hello');
 
         ctx.expect(forMd(null)).toBe('');
+      },
+    },
+
+    {
+      name: 'omega_slugify downcases and collapses non-alphanumeric runs',
+      run: async (ctx) => {
+        const slug = (s) => render('{{ s | omega_slugify }}', { s });
+
+        ctx.expect(await slug('Hello World & Friends')).toBe('hello-world-friends');
+        ctx.expect(await slug('  Leading and trailing  ')).toBe('leading-and-trailing');
+        ctx.expect(await slug('Top 10 Products (2025)')).toBe('top-10-products-2025');
+        ctx.expect(await slug('already-a-slug')).toBe('already-a-slug');
+        ctx.expect(await slug('---')).toBe('');
+        ctx.expect(await slug('')).toBe('');
+      },
+    },
+
+    {
+      name: 'omega_slugify DELETES an apostrophe instead of separating on it (#597)',
+      run: async (ctx) => {
+        const slug = (s) => render('{{ s | omega_slugify }}', { s });
+
+        // UJM deleted apostrophes, so a migrating brand's "Beginner's Guides"
+        // category lives at /beginners-guides. Separating on it moved every such
+        // URL (soundgrail lost two live category pages to `beginner-s-guides`).
+        ctx.expect(await slug("Beginner's Guides")).toBe('beginners-guides');
+        ctx.expect(await slug('Beginner’s Music Guide')).toBe('beginners-music-guide');
+        ctx.expect(await slug("Don't & Won't")).toBe('dont-wont');
+        ctx.expect(await slug("'Tis the season'")).toBe('tis-the-season');
+      },
+    },
+
+    {
+      name: 'omega_date_xmlschema and omega_date_rfc822 render in UTC regardless of the builder timezone',
+      run: async (ctx) => {
+        const xml = (d) => render('{{ d | omega_date_xmlschema }}', { d });
+        const rfc = (d) => render('{{ d | omega_date_rfc822 }}', { d });
+        const date = new Date('2008-11-07T13:07:54Z');
+
+        ctx.expect(await xml(date)).toBe('2008-11-07T13:07:54+00:00');
+        ctx.expect(await rfc(date)).toBe('Fri, 07 Nov 2008 13:07:54 +0000');
+
+        // A UTC midnight must not shift a day: the dated-filename convention.
+        ctx.expect(await xml('2024-01-15T00:00:00Z')).toBe('2024-01-15T00:00:00+00:00');
+        ctx.expect(await rfc('2024-01-15T00:00:00Z')).toBe('Mon, 15 Jan 2024 00:00:00 +0000');
+      },
+    },
+
+    {
+      name: 'an unparseable date passes through the omega_date_* filters untouched',
+      run: async (ctx) => {
+        ctx.expect(await render('{{ d | omega_date_xmlschema }}', { d: 'not a date' })).toBe('not a date');
+        ctx.expect(await render('{{ d | omega_date_rfc822 }}', { d: 'not a date' })).toBe('not a date');
+
+        // An invalid Date OBJECT is unparseable too, never "NaN-NaN-NaN" in a page.
+        const invalid = new Date('not a date');
+        ctx.expect(await render('{{ d | omega_date_xmlschema }}', { d: invalid })).toBe('Invalid Date');
+        ctx.expect(await render('{{ d | omega_date_rfc822 }}', { d: invalid })).toBe('Invalid Date');
+      },
+    },
+
+    {
+      name: 'omega_strip_html drops tags and removes script/style/comment contents entirely',
+      run: async (ctx) => {
+        const strip = (s) => render('{{ s | omega_strip_html }}', { s });
+
+        ctx.expect(await strip('<b>hi</b> there')).toBe('hi there');
+        ctx.expect(await strip('a<script>var x = 1;</script>b')).toBe('ab');
+        ctx.expect(await strip('a<style>.x { color: red }</style>b')).toBe('ab');
+        ctx.expect(await strip('a<!-- secret -->b')).toBe('ab');
+        ctx.expect(await strip('<p>multi\nline</p>')).toBe('multi\nline');
+      },
+    },
+
+    {
+      name: 'omega_number_of_words counts whitespace-separated words',
+      run: async (ctx) => {
+        const count = (s) => render('{{ s | omega_number_of_words }}', { s });
+
+        ctx.expect(await count('one two three')).toBe('3');
+        ctx.expect(await count('  padded   words  ')).toBe('2');
+        ctx.expect(await count('one\ntwo\tthree four')).toBe('4');
+        ctx.expect(await count('')).toBe('0');
+        ctx.expect(await count('   ')).toBe('0');
+      },
+    },
+
+    {
+      name: 'omega_relative_url prefixes the baseurl and always yields a rooted path',
+      run: async (ctx) => {
+        const rel = (url, site) => render('{{ url | omega_relative_url }}', { url }, { site });
+
+        ctx.expect(await rel('/blog', { baseurl: '/docs' })).toBe('/docs/blog');
+        ctx.expect(await rel('blog', { baseurl: '/docs' })).toBe('/docs/blog');
+        ctx.expect(await rel('/', { baseurl: '/docs' })).toBe('/docs/');
+
+        // A trailing slash on the baseurl must not double up.
+        ctx.expect(await rel('/blog', { baseurl: '/docs/' })).toBe('/docs/blog');
+
+        // No baseurl at all is the common case.
+        ctx.expect(await rel('blog', {})).toBe('/blog');
+      },
+    },
+
+    {
+      name: 'omega_absolute_url prefixes site.url, and leaves already-absolute URLs alone',
+      run: async (ctx) => {
+        const site = { url: 'https://example.com/', baseurl: '/docs' };
+        const abs = (url) => render('{{ url | omega_absolute_url }}', { url }, { site });
+
+        ctx.expect(await abs('/blog')).toBe('https://example.com/docs/blog');
+        ctx.expect(await abs('blog')).toBe('https://example.com/docs/blog');
+        ctx.expect(await abs('https://cdn.example.com/x.png')).toBe('https://cdn.example.com/x.png');
+        ctx.expect(await abs('http://cdn.example.com/x.png')).toBe('http://cdn.example.com/x.png');
+      },
+    },
+
+    {
+      name: 'omega_markdownify passes through without a converter and renders with one',
+      run: async (ctx) => {
+        const markdown = (md) => `<p>${md}</p>`;
+
+        ctx.expect(await render('{{ s | omega_markdownify }}', { s: '**bold**' })).toBe('**bold**');
+        ctx.expect(await render('{{ s | omega_markdownify }}', { s: 'hi' }, { markdown })).toBe('<p>hi</p>');
+
+        // Absent input renders empty, never "null"/"undefined" text in the page.
+        ctx.expect(await render('{{ s | omega_markdownify }}', { s: null })).toBe('');
+        ctx.expect(await render('{{ s | omega_markdownify }}')).toBe('');
+      },
+    },
+
+    {
+      name: 'omega_where supports the comparison subset, literals, and bare truthiness',
+      run: async (ctx) => {
+        const items = [
+          { type: 'post', views: 10, tags: ['a', 'b'], draft: true },
+          { type: 'page', views: 3, tags: ['c'], draft: false },
+          { type: 'post', views: 25, tags: [] },
+        ];
+        const views = (expr, list = items) => render(WHERE_VIEWS, { items: list, expr });
+
+        ctx.expect(await views("item.type == 'post'")).toBe('10,25');
+        ctx.expect(await views("item.type != 'post'")).toBe('3');
+        ctx.expect(await views('item.views > 5')).toBe('10,25');
+        ctx.expect(await views('item.views >= 10')).toBe('10,25');
+        ctx.expect(await views('item.views < 10')).toBe('3');
+        ctx.expect(await views('item.views <= 10')).toBe('10,3');
+        ctx.expect(await views("item.tags contains 'b'")).toBe('10');
+
+        // Bare path: truthiness. `false` and a missing key both fail.
+        ctx.expect(await views('item.draft')).toBe('10');
+
+        // A path on some OTHER variable name never resolves.
+        ctx.expect(await views("other.type == 'post'")).toBe('');
+
+        // Absent input is an empty list, and a single item is treated as a list.
+        const size = '{% assign kept = items | omega_where: "item", expr %}{{ kept | size }}';
+        ctx.expect(await render(size, { items: null, expr: 'item.draft' })).toBe('0');
+        ctx.expect(await render(size, { items: items[0], expr: 'item.draft' })).toBe('1');
+      },
+    },
+
+    {
+      name: 'omega_group_by buckets by the stringified expression value with sizes',
+      run: async (ctx) => {
+        const items = [
+          { type: 'post', title: 'a' },
+          { type: 'page', title: 'b' },
+          { type: 'post', title: 'c' },
+        ];
+
+        ctx.expect(await render(GROUPS, { items, expr: "item.type == 'post'" })).toBe('true:2=a,c;false:1=b;');
+      },
+    },
+
+    {
+      name: 'omega_group_by on a BARE path buckets by VALUE, one group per distinct value',
+      run: async (ctx) => {
+        const items = [
+          { type: 'post', title: 'a' },
+          { type: 'page', title: 'b' },
+          { title: 'c' },
+          { type: 'post', title: 'd' },
+        ];
+
+        // Groups appear in first-seen order; an absent value groups under '' so a
+        // rendered group name is never the text "undefined".
+        ctx.expect(await render(GROUPS, { items, expr: 'item.type' })).toBe('post:2=a,d;page:1=b;:1=c;');
+      },
+    },
+
+    {
+      name: 'omega_group_by keeps input order inside a group and buckets numbers by value',
+      run: async (ctx) => {
+        const items = [{ n: 2, title: 'a' }, { n: 1, title: 'b' }, { n: 2, title: 'c' }];
+
+        ctx.expect(await render(GROUPS, { items, expr: 'item.n' })).toBe('2:2=a,c;1:1=b;');
       },
     },
   ],

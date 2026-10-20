@@ -26,6 +26,14 @@ module.exports = defineCases({
     },
 
     {
+      name: '#830 a retired Jekyll filter name in a frontmatter value throws naming its replacement',
+      run: (ctx) => {
+        const resolver = createFrontmatterResolver({ site });
+        ctx.expect(() => resolver.render('{{ site.brand.name | slugify }}'), 'LiquidJS has a slugify of its own; the thrower must win').toThrow(/omega_slugify/);
+      },
+    },
+
+    {
       name: 'legacy bracket refs are NOT accepted — the value renders untouched (#148)',
       run: (ctx) => {
         const resolver = createFrontmatterResolver({ site });

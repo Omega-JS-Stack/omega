@@ -109,7 +109,7 @@ in ~20 s total.
 | [limit-collections.js](src/limit-collections.js) | Dev-mode collection sampling (`targets.web.dev.limitCollections`, the jekyll-uj-powertools limit-collections successor): first-N in collection order, or a random sample with `randomize: true`; the sampled-out documents are skipped before render, so they cost no pages, collection entries or taxonomy terms. Development builds only, loud on every build; the config is validated in production too, where nothing is ever sampled |
 | [layouts.js](src/layouts.js) | Layered layout delivery, zero copying: virtual templates (build) / symlink farm (dev, watchable) |
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) — over `collectProviders()`, which keeps every layer that provides a path (what the override map reports as shadowed) |
-| [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/icons/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code — the language→country map stays `@omega.js/template-kit`'s |
+| [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/icons/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code. Every supported language gets one; a language whose country has no flag gets the neutral `lang-fallback.svg` — the language→country map stays `@omega.js/template-kit`'s |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid — a value's variable ROOTS pick its lane (cached site-scope renders; page-scoped values, the page's pagination alias included, defer to a per-page copy-on-write pass; everything else renders uncached against the template's own cascade, so the consumer's `_data` globals resolve; a `meta:` ref with an undefined root fails the build; the context-free `omega_*` filters are registered, since LiquidJS drops an unknown filter silently) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/web/sections.md in the Omega repo) |
@@ -228,7 +228,9 @@ in ~20 s total.
 
 Pages write **flat files** (`/signin` → `signin.html`, never
 `signin/index.html`) and `page.url` is **extensionless with no trailing
-slash** (`/signin`) — exactly legacy UJM/Jekyll. Mechanics: the computed
+slash** (`/signin`) — exactly legacy UJM/Jekyll. A page under `src/pages/`
+with no `permalink` serves at its file path (`pages/guides/intro.md` is
+`/guides/intro`, an `index` file its folder); an explicit permalink wins. Mechanics: the computed
 `permalink` appends `.html` to extensionless permalinks (a REAL-extension
 whitelist, not `path.extname` — dotted slugs like `/updates/v1.0.0` are page
 URLs), an Eleventy `addUrlTransform` strips `.html` back off `page.url`, and

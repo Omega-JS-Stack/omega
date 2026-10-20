@@ -202,7 +202,7 @@ function formatValue(value, format = {}) {
 
 // What a hover says. The library's own default names the CHANNELS a mark rode
 // in on — "x" and "y" — and a reader wants the thing being read, so every
-// builder carries one of these lines instead.
+// kind carries one of these lines instead.
 const labelLine = (datum, format) => `${datum.label}: ${formatValue(datum.value, format)}`;
 const seriesLine = (datum, format) => `${datum.series} · ${labelLine(datum, format)}`;
 // A share of one whole is read as a percentage, so the slice says its own.
@@ -211,7 +211,7 @@ const shareLine = (datum, format) => `${labelLine(datum, format)} (${(datum.frac
 
 /**
  * The tooltip a definition mounts: the author's own line when they passed one,
- * else the builder's, with the value in the data's own unit.
+ * else the kind's, with the value in the data's own unit.
  */
 const tooltipFor = (data, line) => ({
   use: lib.tooltip.tooltip,
@@ -401,15 +401,15 @@ const DEFINITIONS = {
 };
 
 /**
- * The chart definition a builder would draw, without drawing it.
+ * The definition a kind compiles its data into, without drawing it.
  *
  * A definition is renderer-neutral and DOM-free: it is what `mountChart`
  * mounts in a browser and what `createChartScene` compiles into geometry in
- * node, which is how the four builders are pinned by the package's own suite
+ * node, which is how every kind is pinned by the package's own suite
  * (`test/dataviz.test.js`) rather than only in a real browser.
  *
- * @param {'bar'|'stacked'|'doughnut'|'line'} kind - which builder's shape
- * @param {object} data - that builder's data argument
+ * @param {'bar'|'stacked'|'doughnut'|'line'} kind - which shape the data draws as
+ * @param {object} data - that kind's data (see `chart`)
  * @returns {object|null} the definition, or null when the library is not here
  */
 export function chartDefinition(kind, data) {
@@ -425,8 +425,37 @@ export function chartDefinition(kind, data) {
   return DEFINITIONS[kind](data, chartColors());
 }
 
-/** Draw into `id`, replacing whatever chart was there (every poll repaints). */
-function draw(id, kind, data, ariaLabel) {
+/**
+ * The definition `chart` mounts: the page's own when it composed one, else the
+ * kind's. `options.definition(lib, colors, data)` receives the loaded library
+ * parts and the theme's colors, so call this only after `loadCharts` resolves.
+ *
+ * @param {'bar'|'stacked'|'doughnut'|'line'|null} kind - ignored when `options.definition` is given
+ * @param {object} data - the chart's data
+ * @param {{definition?: (lib: object, colors: object, data: object) => object}} options
+ * @returns {object|null} the definition; a kind's is null when the library is not here
+ */
+export function resolveDefinition(kind, data, options) {
+  if (options.definition) {
+    return options.definition(lib, chartColors(), data);
+  }
+
+  return chartDefinition(kind, data);
+}
+
+/**
+ * Draw a chart into `id`, replacing whatever was there (every poll repaints).
+ * A shape the kinds lack is an `options.definition` on the page, never a new
+ * helper. `data` is the kind's grammar: `{labels, values, colors?, horizontal?}`
+ * for bar and doughnut, `{labels, series}` for stacked and line.
+ *
+ * @param {string} id - the host element id from `chartSlot`
+ * @param {'bar'|'stacked'|'doughnut'|'line'|null} kind - null when `options.definition` draws
+ * @param {{labels: string[], values?: number[], series?: Array<{label: string, values: number[], color?: string}>, colors?: string[], horizontal?: boolean, label?: string, format?: ChartFormat, tooltip?: (point: object) => string}} data
+ * @param {{ariaLabel?: string, definition?: (lib: object, colors: object, data: object) => object}} [options]
+ * @returns {object|null} the chart host, or null when nothing was drawn
+ */
+export function chart(id, kind, data, options = {}) {
   if (!chartsReady()) {
     return null;
   }
@@ -445,72 +474,16 @@ function draw(id, kind, data, ariaLabel) {
     return null;
   }
 
+  const name = kind ? `${kind[0].toUpperCase()}${kind.slice(1)} chart` : 'Chart';
+
   // The host follows its container's WIDTH on its own; the height is ours to
   // give, and the box the slot wrote is where it comes from.
   const host = lib.charts.mountChart(container, {
-    definition: chartDefinition(kind, data),
+    definition: resolveDefinition(kind, data, options),
     height: container.clientHeight || DEFAULT_HEIGHT,
-    ariaLabel,
+    ariaLabel: options.ariaLabel || data.label || name,
   });
 
   hosts.set(id, host);
   return host;
-}
-
-/**
- * A bar chart. `horizontal` turns it into a ranked-rows shape; the default
- * vertical shape is for a series over time.
- *
- * `format` is the data's own unit: it prints in the tooltip and on the value
- * axis, and being JSON it travels with data-only chart data. `tooltip` takes
- * the whole line over instead, and needs a page with JS to pass a function.
- * @param {string} id - the host element id from `chartSlot`
- * @param {{labels: string[], values: number[], colors?: string[], horizontal?: boolean, label?: string, format?: ChartFormat, tooltip?: (point: object) => string}} data
- * @returns {object|null} the chart host, or null when nothing was drawn
- */
-export function barChart(id, data) {
-  return draw(id, 'bar', data, data.label || 'Bar chart');
-}
-
-/**
- * A stacked bar chart — one bar per label, one color per series.
- *
- * `format` is the data's own unit: it prints in the tooltip and on the value
- * axis, and being JSON it travels with data-only chart data. `tooltip` takes
- * the whole line over instead, and needs a page with JS to pass a function.
- * @param {string} id - the host element id from `chartSlot`
- * @param {{labels: string[], series: Array<{label: string, values: number[], color?: string}>, format?: ChartFormat, tooltip?: (point: object) => string}} data
- * @returns {object|null} the chart host, or null when nothing was drawn
- */
-export function stackedBarChart(id, data) {
-  return draw(id, 'stacked', data, 'Stacked bar chart');
-}
-
-/**
- * A doughnut — for a split that is a share of one whole.
- *
- * `format` is the data's own unit, printed in the tooltip beside the slice's
- * share (a doughnut has no axis to carry it), and being JSON it travels with
- * data-only chart data. `tooltip` takes the whole line over instead, and needs
- * a page with JS to pass a function.
- * @param {string} id - the host element id from `chartSlot`
- * @param {{labels: string[], values: number[], colors?: string[], format?: ChartFormat, tooltip?: (point: object) => string}} data
- * @returns {object|null} the chart host, or null when nothing was drawn
- */
-export function doughnutChart(id, data) {
-  return draw(id, 'doughnut', data, 'Doughnut chart');
-}
-
-/**
- * A line chart over time.
- *
- * `format` is the data's own unit: it prints in the tooltip and on the value
- * axis, and being JSON it travels with data-only chart data. `tooltip` takes
- * the whole line over instead, and needs a page with JS to pass a function.
- * @param {string} id - the host element id from `chartSlot`
- * @param {{labels: string[], series: Array<{label: string, values: number[], color?: string}>, format?: ChartFormat, tooltip?: (point: object) => string}} data
- * @returns {object|null} the chart host, or null when nothing was drawn
- */
-export function lineChart(id, data) {
-  return draw(id, 'line', data, 'Line chart');
 }

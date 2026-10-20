@@ -25,7 +25,8 @@
      `targets.web.meta.index`, then the layout's, then the page's own, then the
      framework's automatic exclusions (drafts, the /test dev surfaces, /admin/,
      redirect stubs, a listing's pages 2..N). sitemap.xml, pages.json and
-     llms.txt filter on that very same value, so no signal keeps a rule list of
+     llms.txt (a brand summary whose Pages and Posts sections follow the same
+     flag) filter on that very same value, so no signal keeps a rule list of
      its own and none of them can disagree. -->
 {% assign page-robots = "index" %}
 {%- if resolved.meta.index == false -%}
@@ -188,7 +189,7 @@
 {% if page-build-config %}
 <!-- This page's own `config:` block (#607), over the site's snapshot: the chat
      widget and every other runtime reader sees what THIS page declared. -->
-<script>Object.assign(self.OMEGA_BUILD_JSON.config, {{ page-build-config | jsonify }});</script>
+<script>Object.assign(self.OMEGA_BUILD_JSON.config, {{ page-build-config | omega_jsonify }});</script>
 {% endif %}
 
 <!-- Motion gate: reveal styles (core/css/motion) only hide content under this
@@ -336,8 +337,8 @@
 <meta property="article:publisher" content="{{ resolved.config.url }}"/>
 <meta name="twitter:creator" content="@{{ resolved.config.socials.twitter.handle | default: resolved.config.socials.twitter }}"/>
 {%- iftruthy resolved.post.id -%}
-<meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}"/>
-<meta property="article:modified_time" content="{{ site.time | date_to_xmlschema }}"/>
+<meta property="article:published_time" content="{{ page.date | omega_date_xmlschema }}"/>
+<meta property="article:modified_time" content="{{ site.time | omega_date_xmlschema }}"/>
 {%- endiftruthy -%}
 
 <!-- Main Feed -->

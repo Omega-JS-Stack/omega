@@ -399,6 +399,7 @@ class Omega extends EventEmitter {
 
     functions.omega_cronDaily = fn({memory: '256MB', timeoutSeconds: 60 * 5})
       .pubsub.schedule('0 0 * * *')
+      .timeZone('Etc/UTC')
       .onRun((context) => events.run(this, `${CRON_DIR}/daily.js`, { context }));
 
     // Frequent cron runs the inline newsletter generator (AI structure + section

@@ -4,7 +4,7 @@
  *
  * The derivations live ONCE, in `@omega.js/account` — the same module
  * @omega.js/backend's `consume` gate reads — so the number that refuses a
- * request and the number a usage bar draws can never be two different numbers:
+ * request and the number a usage card draws can never be two different numbers:
  * the effective limit (a per-user `usage.overrides.<feature>` wins over the
  * plan's), the day's share of a month limit, and what is left of each.
  *
@@ -25,6 +25,7 @@ export {
   productFeatureValue,
   daysInMonth,
   dayShare,
+  nextReset,
   resolveFeature,
   resolveFeatures,
 } from '@omega.js/account/features';

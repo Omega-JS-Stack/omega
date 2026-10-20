@@ -9,7 +9,7 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES, getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
-import { resolveFeatures } from '@omega.js/client/modules/features.js';
+import { resolveFeatures, nextReset } from '@omega.js/client/modules/features.js';
 
 const logger = createLogger('account:billing');
 
@@ -1460,16 +1460,9 @@ function populateCancelReasons() {
 
 // ─── Usage Metrics ───────────────────────────────────────────
 
-// A bar per COUNTED feature the catalog defines: what is left today, what is
-// left this month, and the override credits included in the month's number when
-// an admin granted any ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
-//
-// Both numbers are shown because either one can be the thing standing in the
-// user's way: a paced feature refuses on the day's share long before the month
-// runs out, and a bar that only drew the month would leave "why did that fail?"
-// unanswered. The arithmetic is @omega.js/account's, the same module the
-// backend's gate reads, so a bar can never draw a limit the gate would not
-// enforce. Names, icons and definitions come from the catalog.
+// A card per COUNTED feature the catalog defines. The arithmetic is
+// @omega.js/account's, the same module the backend's gate reads, so a card can
+// never draw a limit the gate would not enforce.
 function updateUsageInfo(account) {
   const $container = document.getElementById('usage-metrics-container');
 
@@ -1492,82 +1485,74 @@ function updateUsageInfo(account) {
     return;
   }
 
-  $container.innerHTML = features.map(renderUsageFeature).join('');
+  $container.innerHTML = features.map(renderUsageCard).join('');
 
   initializeTooltips($container);
 }
 
-// One feature's block: its name (with the catalog's definition on hover), the
-// day bar when the feature is paced, and the month bar always.
-function renderUsageFeature(feature) {
+// One feature's card: the month figure as the headline, a bar filled to the
+// share used, and a foot row with the day figure (paced features only) and the
+// moment each counter resets, in the viewer's local time. A limit of -1 is
+// unlimited: no share can be honest about it, so it gets no bar and no resets.
+function renderUsageCard(feature) {
   const escape = omega.utilities.escapeHTML;
+  const format = (value) => escape(formatMetricValue(feature.id, value));
+  const isUnlimited = feature.limit < 0;
+  const percent = isUnlimited ? 0 : Math.min(100, Math.round((feature.used / feature.limit) * 100));
+
   // The catalog's `icon` IS the class string (#929), emitted verbatim.
   const icon = feature.icon
-    ? `<i class="${escape(feature.icon)} fa-sm me-1 text-muted"></i>`
+    ? `<i class="${escape(feature.icon)} fa-sm omega-usage-card__icon"></i>`
     : '';
   const name = feature.definition
     ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${escape(feature.definition)}">${escape(feature.name)}</span>`
       + `<span class="visually-hidden"> &mdash; ${escape(feature.definition)}</span>`
     : escape(feature.name);
 
-  // The override is EXTRA credits an admin granted ON TOP of the plan — say so,
-  // because the number beside it is not the number the pricing page quotes.
-  // Only when it is genuinely extra: an override can also dial a plan DOWN for
-  // one account, and subtracting unconditionally announced that as "+-50
-  // granted". A lower override is still the limit the bar draws; it just has no
-  // gift to claim.
+  // Only an override ABOVE the plan is a gift worth naming; a lower one is
+  // still the limit the card draws, with nothing to claim.
   const extra = feature.override !== null ? feature.override - feature.planLimit : 0;
-  const granted = extra > 0
-    ? `<span class="badge text-bg-success-subtle ms-2">+${escape(formatMetricValue(feature.id, extra))} granted</span>`
+  const credits = extra > 0
+    ? `<span class="omega-chip omega-usage-card__credits">+${format(extra)} credits</span>`
     : '';
 
-  const bars = [
-    feature.day.limit >= 0 ? renderUsageBar(feature, feature.day.limit, feature.day.used, feature.day.left, 'today') : '',
-    renderUsageBar(feature, feature.limit, feature.used, feature.left, 'this month'),
+  let modifier = '';
+  if (percent >= 80) {
+    modifier = ' omega-usage-card--danger';
+  } else if (percent >= 50) {
+    modifier = ' omega-usage-card--warn';
+  }
+
+  const headline = isUnlimited
+    ? 'Unlimited'
+    : `${format(feature.used)} of ${format(feature.limit)}`;
+
+  const bar = isUnlimited
+    ? ''
+    : `
+          <div class="omega-usage-card__bar" role="progressbar"
+               aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"
+               aria-label="${escape(`${feature.name} used this month`)}">
+            <div class="omega-usage-card__fill" style="width: ${percent}%"></div>
+          </div>`;
+
+  const foot = [
+    feature.day.limit >= 0
+      ? `<span>${format(feature.day.left)} of ${format(feature.day.limit)} left today</span>`
+        + `<span>Day resets ${escape(nextReset('day').toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}</span>`
+      : '',
+    isUnlimited
+      ? ''
+      : `<span>Month resets ${escape(nextReset('month').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span>`,
   ].join('');
 
   return `
-      <div class="mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <small class="text-muted fw-semibold">${icon}${name}${granted}</small>
-        </div>
-        ${bars}
-      </div>
-    `;
-}
-
-// One bar. `limit` of -1 is unlimited: no percentage can be honest about a
-// number with no ceiling, so the bar stays empty and the label says so.
-function renderUsageBar(feature, limit, used, left, period) {
-  const escape = omega.utilities.escapeHTML;
-  const isUnlimited = limit < 0;
-  const usagePercent = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
-
-  let progressClass = 'bg-success';
-  if (!isUnlimited && usagePercent >= 80) {
-    progressClass = 'bg-danger';
-  } else if (!isUnlimited && usagePercent >= 50) {
-    progressClass = 'bg-warning';
-  }
-
-  const label = isUnlimited
-    ? `Unlimited ${period}`
-    : `${formatMetricValue(feature.id, left)} of ${formatMetricValue(feature.id, limit)} left ${period}`;
-
-  return `
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <small class="text-muted">${escape(period)}</small>
-          <small class="text-muted">${escape(label)}</small>
-        </div>
-        <div class="progress mb-2" style="height: 20px;">
-          <div class="progress-bar ${progressClass}" role="progressbar"
-               style="width: ${usagePercent}%"
-               aria-valuenow="${usagePercent}"
-               aria-valuemin="0"
-               aria-valuemax="100"
-               aria-label="${escape(`${feature.name} used ${period}`)}">
-            ${usagePercent}%
+        <div class="omega-usage-card${modifier}">
+          <div class="omega-usage-card__head">
+            <span class="omega-usage-card__name">${icon}${name}</span>${credits}
           </div>
+          <div class="omega-usage-card__figure">${headline}</div>${bar}
+          ${foot ? `<div class="omega-usage-card__foot">${foot}</div>` : ''}
         </div>
       `;
 }

@@ -290,7 +290,7 @@ function validateAuthDomain(config) {
  *   - a value on an id the catalog does not define reads as NOTHING (the same
  *     silence a retired key used to buy), so the row simply vanishes;
  *   - a NUMBER on a perk claims a meter that will never count, and the account
- *     page would draw a usage bar against a limit no gate enforces;
+ *     page would draw a usage card against a limit no gate enforces;
  *   - a PERK value (true / a string) on a counted feature leaves the gate with
  *     no number, which reads as zero — the plan advertises the feature and
  *     every call refuses it.
@@ -320,7 +320,7 @@ function validateFeatures(config) {
     }
 
     if (typeof entry.name !== 'string' || !entry.name.trim()) {
-      errors.push(`config.features.${id}.name is required — it is the label every surface prints (pricing rows, comparison matrix, account usage bars)`);
+      errors.push(`config.features.${id}.name is required — it is the label every surface prints (pricing rows, comparison matrix, account usage cards)`);
     }
 
     if (entry.usage === undefined) {

@@ -196,7 +196,7 @@
   },
 
   // The FEATURE CATALOG (#647) — every feature defined ONCE, in the order every
-  // surface renders it (pricing rows, comparison matrix, account usage bars).
+  // surface renders it (pricing rows, comparison matrix, account usage cards).
   // A `usage` block makes a feature COUNTED (metered per user; day pacing is
   // the default, `pace: false` opts out, `mirror` names the document kinds its
   // counters also land on). No `usage` block = a perk. The products below name
@@ -628,11 +628,11 @@
       // (docs/web/frontmatter.md). `index` is the only key defined today,
       // because everything else already falls back to the brand block.
       meta: {
-        // false takes the WHOLE site out of search: every page emits noindex
-        // and sitemap.xml, llms.txt and pages.json list nothing. It is the
-        // site-wide DEFAULT of the one flag every signal reads, so a page's own
-        // `meta.index: true` still exempts it. Case 2 (docs/shared/config.md):
-        // default ON, and the literal false is the only OFF.
+        // false takes the WHOLE site out of search: every page emits noindex,
+        // sitemap.xml and pages.json list nothing, and llms.txt keeps its brand
+        // summary but links nothing. It is the site-wide DEFAULT of the one flag
+        // every signal reads, so a page's own `meta.index: true` still exempts
+        // it. Case 2 (docs/shared/config.md): default ON, the literal false OFF.
         index: true,
       },
     },

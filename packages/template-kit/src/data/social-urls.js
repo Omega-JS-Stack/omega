@@ -1,8 +1,8 @@
 /**
  * social-urls.js — social platform => profile URL pattern (%s = handle).
  *
- * Machine-extracted verbatim from jekyll-uj-powertools lib/tags/social.rb
- * (SOCIAL_URLS) — do not hand-edit; regenerate from the Ruby source.
+ * The one home of the map: edit it here. The `omega_social` tag and the
+ * machine files read it.
  */
 
 const SOCIAL_URLS = {

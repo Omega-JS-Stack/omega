@@ -40,7 +40,7 @@ bands below keep the reveal lane. {% endcomment %}
         {% break %}
       {% endif %}
       {% for category in post.post.categories %}
-        {% assign cat_slug = category | slugify %}
+        {% assign cat_slug = category | omega_slugify %}
         {% if cat_slug == category_slug %}
           {% assign filtered_posts = filtered_posts | push: post %}
           {% break %}

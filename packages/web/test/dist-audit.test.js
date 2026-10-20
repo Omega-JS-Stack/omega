@@ -12,7 +12,7 @@ const path = require('node:path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const jetpack = require('fs-jetpack');
 
-const { auditDist } = require('../src/dist-audit.js');
+const { auditDist, FRAMEWORK_HASH_ROUTES } = require('../src/dist-audit.js');
 const { loadExceptions, loadLinkExceptions, EXCEPTIONS_FILE } = require('../src/link-resolver.js');
 const { auditCheckFailures } = require('../src/test/smoke.js');
 
@@ -215,6 +215,30 @@ module.exports = defineCases({
         });
 
         ctx.expect(auditDist({ distDir: out }).fragments.offenders).toEqual([]);
+      },
+    },
+
+    {
+      name: '#974: the legal blueprint links the account page at /dashboard/account, on hashes it routes',
+      run: (ctx) => {
+        // `/account` is the redirect page; the account layout builds to
+        // dashboard/account.html, whose hashes the page routes in JS. A target with no
+        // legal or account page of its own builds both as-is, with zero exceptions.
+        const legalDir = path.join(__dirname, '..', 'core', '_layouts', 'blueprint', 'legal');
+        const routes = FRAMEWORK_HASH_ROUTES['dashboard/account.html'];
+
+        const links = [];
+        for (const file of ['privacy.md', 'terms.md']) {
+          for (const match of jetpack.read(path.join(legalDir, file)).matchAll(/((?:\/[\w-]+)*)\/account#([\w-]+)/g)) {
+            links.push({ file, prefix: match[1], fragment: match[2] });
+          }
+        }
+
+        const fragments = [...new Set(links.map((link) => link.fragment))].sort();
+        ctx.expect(fragments, 'the account fragments the blueprint links').toEqual(['data-request', 'delete', 'refund']);
+        ctx.expect(links.filter((link) => link.prefix !== '/dashboard').map((link) => `${link.file} → ${link.prefix}/account#${link.fragment}`),
+          'links that miss /dashboard/account').toEqual([]);
+        ctx.expect(fragments.filter((fragment) => !routes.includes(`#${fragment}`)), 'fragments the account page does not route').toEqual([]);
       },
     },
 

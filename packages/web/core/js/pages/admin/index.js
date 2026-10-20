@@ -5,7 +5,7 @@
 // Libraries
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
-import { loadCharts, barChart, doughnutChart } from '__main_assets__/js/libs/charts.js';
+import { loadCharts, chart } from '__main_assets__/js/libs/charts.js';
 import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
@@ -228,11 +228,9 @@ async function loadSubscriberData() {
 }
 
 // ============================================
-// Charts
+// Charts: drawn through the framework's helper (core/js/libs/charts.js), so
+// this page never names the library
 // ============================================
-// Both charts go through the framework's chart helper
-// (core/js/libs/charts.js): it owns the lazy @tanstack/charts chunks, the token
-// reads, and the four builders, so this page never names the library (#74).
 
 async function renderPlanChart(plans) {
   const $loading = document.getElementById('chart-plans-loading');
@@ -263,7 +261,7 @@ async function renderPlanChart(plans) {
   }
   $host.parentElement.classList.remove('d-none');
 
-  doughnutChart('chart-plans', {
+  chart('chart-plans', 'doughnut', {
     labels: labels.map(capitalize),
     values,
     colors: PLAN_HUES.slice(0, labels.length),
@@ -289,7 +287,7 @@ async function renderSignupsChart(labels, values) {
   }
   $host.parentElement.classList.remove('d-none');
 
-  barChart('chart-signups', { labels, values, label: 'Signups' });
+  chart('chart-signups', 'bar', { labels, values, label: 'Signups' });
 }
 
 // ============================================

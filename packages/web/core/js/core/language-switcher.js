@@ -20,9 +20,10 @@
  * (core/icons/flags), reached at its emitted path: src/language-flags.js writes
  * language-named copies into the `lang/` namespace beside the country-named set
  * (their own space — `ar` is Arabic AND Argentina), so a row needs only its own
- * code and this module carries no language→country map. A language the set has
- * no flag for 404s, and the failed <img> removes itself — a missing flag is a
- * content problem, never a broken-image glyph (docs/shared/icons.md).
+ * code and this module carries no language→country map. Every supported
+ * language has an alias (a country flag or the neutral lang-fallback.svg); the
+ * failed-<img> removal below is a last-resort net no supported language hits
+ * (docs/shared/icons.md).
  */
 // Relative, not the __main_assets__ alias: the alias only resolves inside the
 // esbuild pass, and this module's logic is unit-tested by loading the file
@@ -119,8 +120,9 @@ export function switcherHtml(entries) {
 }
 
 /**
- * Drop the flags the emitted set has no file for. The switcher renders before
- * any fetch resolves, so the miss can only be known here.
+ * Drop a flag whose file is missing: a last-resort net, since every supported
+ * language has an alias. The switcher renders before any fetch resolves, so
+ * the miss can only be known here.
  * @param {Element} list - the filled <ul>
  * @returns {number} the number of flags wired
  */

@@ -64,7 +64,7 @@ bands below keep the reveal lane. {% endcomment %}
       <nav class="omega-tabs mt-5" aria-label="Post categories">
         <a href="/blog" class="active">All</a>
         {% for category in categories %}
-          <a href="/blog/categories/{{ category | slugify }}">{{ category }}</a>
+          <a href="/blog/categories/{{ category | omega_slugify }}">{{ category }}</a>
         {% endfor %}
         <a href="/blog/categories">All categories</a>
       </nav>
@@ -113,10 +113,10 @@ bands below keep the reveal lane. {% endcomment %}
         <div class="omega-featured-post__body">
           <div class="omega-post-card__eyebrow">
             {% if _featured.post.categories[0] %}
-              <a href="/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | omega_title_case }}</a>
+              <a href="/blog/categories/{{ _featured.post.categories[0] | omega_slugify }}">{{ _featured.post.categories[0] | omega_title_case }}</a>
               <span>·</span>
             {% endif %}
-            <time datetime="{{ _featured.date | date_to_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
+            <time datetime="{{ _featured.date | omega_date_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
             <span>·</span>
             <span>{% omega_readtime _featured.content %} min read</span>
 

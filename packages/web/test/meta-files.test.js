@@ -18,6 +18,12 @@ const { buildSite, buildWith, miniData, BARE, MINI, PKG } = require('./lib/build
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
+// The link lines under one `## <heading>` of llms.txt, or null when the heading is absent.
+const llmsSection = (llms, heading) => {
+  const section = llms.split(/^## /m).find((part) => part.split('\n')[0].trim() === heading);
+  return section === undefined ? null : section.split('\n').slice(1).filter((line) => line.startsWith('- '));
+};
+
 let pages;
 
 module.exports = defineCases({
@@ -27,7 +33,8 @@ module.exports = defineCases({
     pages = await buildWith({
       ...miniData,
       advertising: { providers: { adsense: { client: 'ca-pub-1234567890' } } },
-      socials: { twitter: 'https://twitter.com/minico' },
+      // The string form is a HANDLE: omega_social derives the profile URL from it.
+      socials: { twitter: 'minico' },
     }, {}, 'meta-files');
   },
   tests: [
@@ -205,7 +212,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const humans = pages.get('/humans.txt');
         ctx.expect(humans.includes('Website: MiniCo')).toBeTruthy();
-        ctx.expect(humans.includes('Twitter: https://twitter.com/minico'), 'socials render when configured').toBeTruthy();
+        ctx.expect(humans.includes('Twitter: minico'), 'socials render when configured').toBeTruthy();
         ctx.expect(humans.includes('OMEGA (@omega.js/web)'), 'honest framework credit').toBeTruthy();
 
         const opensearch = pages.get('/opensearch.xml');
@@ -242,6 +249,106 @@ module.exports = defineCases({
         ctx.expect(!llms.includes('/admin/'), 'admin pages excluded').toBeTruthy();
         ctx.expect(!llms.includes('robots.txt') && !llms.includes('sitemap.xml'), 'machine files excluded').toBeTruthy();
         ctx.expect(!llms.includes('llms.txt'), 'llms.txt does not list itself').toBeTruthy();
+      },
+    },
+
+    // #821: the file is a brand summary, not a sitemap: name, summary, then a
+    // free-text paragraph with the tagline and the contact email, then the links.
+    {
+      name: 'llms.txt: opens on the brand name, the summary, then a paragraph with the tagline and contact email (#821)',
+      run: async (ctx) => {
+        const built = await buildWith({
+          ...miniData,
+          brand: { ...miniData.brand, tagline: 'Tiny tools for tiny teams', contact: { email: 'hello@mini.example.com' } },
+        }, {}, 'meta-files-llms-summary');
+        const llms = built.get('/llms.txt');
+        const blocks = llms.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+
+        ctx.expect(llms, 'the file opens on the H1').toMatch(/^# MiniCo\n/);
+        ctx.expect(blocks[0], 'the H1 is the brand name').toBe('# MiniCo');
+        ctx.expect(blocks[1], 'then the blockquote summary from the description').toBe('> Mini test brand');
+        ctx.expect(blocks[2], 'then a free-text paragraph, not a heading, quote or list').toMatch(/^[^#>\-\s]/);
+        ctx.expect(blocks[2].includes('Tiny tools for tiny teams'), 'the paragraph carries the tagline').toBeTruthy();
+        ctx.expect(blocks[2].includes('hello@mini.example.com'), 'and the contact email').toBeTruthy();
+        ctx.expect(blocks[3].split('\n')[0], 'then the Pages section').toBe('## Pages');
+      },
+    },
+
+    {
+      name: 'llms.txt: each configured social is one line under `## Social`; no socials, no heading (#821)',
+      run: async (ctx) => {
+        const social = llmsSection(pages.get('/llms.txt'), 'Social');
+        ctx.expect(social, 'the suite\'s twitter social prints a Social section').toBeTruthy();
+        ctx.expect(social.length, 'one line per configured social').toBe(1);
+        ctx.expect(social[0], 'the line links the profile URL, with a note').toMatch(/^- \[[^\]]+\]\(https:\/\/twitter\.com\/minico\): \S/);
+
+        const bare = await buildWith(miniData, {}, 'meta-files-llms-no-socials');
+        ctx.expect(bare.get('/llms.txt'), 'no socials, no Social heading').not.toMatch(/^## Social/m);
+      },
+    },
+
+    {
+      name: 'llms.txt: a desktop download is one line under `## Downloads`; no downloads, no heading (#821)',
+      run: async (ctx) => {
+        // One platform and format: the shortlink suite's desktop staging, with
+        // windows and linux switched off so only mac/dmg derives.
+        const built = await buildWith({
+          ...miniData,
+          repo: { provider: 'github', owner: 'mini-org' },
+          targets: {
+            web: { type: 'web' },
+            desktop: { type: 'desktop', releases: {}, platforms: { windows: false, linux: false } },
+          },
+        }, {}, 'meta-files-llms-downloads');
+
+        const downloads = llmsSection(built.get('/llms.txt'), 'Downloads');
+        ctx.expect(downloads, 'a declared download prints a Downloads section').toBeTruthy();
+        ctx.expect(downloads.length, 'one line for the one platform and format').toBe(1);
+        ctx.expect(downloads[0].startsWith('- ['), 'a markdown link line').toBeTruthy();
+        ctx.expect(downloads[0], 'linking the download, with a note').toMatch(/\]\(https:\/\/github\.com\/mini-org\/mini-releases\/releases\/latest\/download\/MiniCo-mac-dmg\.dmg\): \S/);
+
+        ctx.expect(pages.get('/llms.txt'), 'no desktop target, no Downloads heading').not.toMatch(/^## Downloads/m);
+      },
+    },
+
+    {
+      name: 'llms.txt: an extension store listing is one line under `## Downloads` (#821)',
+      run: async (ctx) => {
+        // One store, staged as the shortlink suite stages its listings.
+        const built = await buildWith({
+          ...miniData,
+          targets: {
+            web: { type: 'web' },
+            extension: { type: 'extension', listings: { chrome: { url: 'https://chromewebstore.google.com/detail/abc', state: 'live' } } },
+          },
+        }, {}, 'meta-files-llms-listings');
+
+        const downloads = llmsSection(built.get('/llms.txt'), 'Downloads');
+        ctx.expect(downloads, 'a store listing prints a Downloads section').toBeTruthy();
+        ctx.expect(downloads.length, 'one line for the one store').toBe(1);
+        ctx.expect(downloads[0].startsWith('- ['), 'a markdown link line').toBeTruthy();
+        ctx.expect(downloads[0], 'linking the store listing, with a note').toMatch(/\]\(https:\/\/chromewebstore\.google\.com\/detail\/abc\): \S/);
+      },
+    },
+
+    {
+      name: 'llms.txt: site-level `meta.index: false` empties every section, socials and downloads included (#821/#564)',
+      run: async (ctx) => {
+        const built = await buildWith({
+          ...miniData,
+          meta: { index: false },
+          socials: { twitter: 'minico' },
+          repo: { provider: 'github', owner: 'mini-org' },
+          targets: {
+            web: { type: 'web' },
+            desktop: { type: 'desktop', releases: {}, platforms: { windows: false, linux: false } },
+          },
+        }, {}, 'meta-files-llms-site-off');
+        const llms = built.get('/llms.txt');
+
+        ctx.expect(llms, 'the brand heading still opens the file').toMatch(/^# MiniCo$/m);
+        ctx.expect(llms, 'no section heading of any kind').not.toMatch(/^## /m);
+        ctx.expect(llms, 'and no link line at all').not.toMatch(/^- \[/m);
       },
     },
 

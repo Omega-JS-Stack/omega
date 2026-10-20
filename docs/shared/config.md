@@ -1161,7 +1161,7 @@ definition can be written:
 
 | Key | Type | What it does |
 |-----|------|--------------|
-| `features.<id>.name` | string, **required** | The label every surface prints: pricing rows, the comparison matrix, the account's usage bars |
+| `features.<id>.name` | string, **required** | The label every surface prints: pricing rows, the comparison matrix, the account's usage cards |
 | `features.<id>.icon` | string | Font Awesome icon name ([icons.md](icons.md)) |
 | `features.<id>.definition` | string | The dotted-underline tooltip. Authored ONCE — every card, row and bar renders this one |
 | `features.<id>.usage` | object | Its presence makes the feature **counted** (metered per user). Absent = a **perk**, never counted |
@@ -1169,7 +1169,7 @@ definition can be written:
 | `features.<id>.usage.mirror` | string[] | Document KINDS this feature's counters also land on, resolved from `user.owns.<kind>` — declared here, never at a call site |
 
 **Key order is row order.** The pricing page's rows, the comparison matrix and the
-account's usage bars all render the catalog in the order it is written.
+account's usage cards all render the catalog in the order it is written.
 
 ### A product's values
 
@@ -1183,7 +1183,7 @@ account's usage bars all render the catalog in the order it is written.
 | Perk | a string | `24/7 Support` |
 | Either | `false` (or absent) | nothing — the tier does not include it |
 
-The validator fails **a number on a perk** (it would draw a usage bar against a limit no
+The validator fails **a number on a perk** (it would draw a usage card against a limit no
 gate enforces) and **a perk value on a counted feature** (the gate would read it as zero,
 so the plan advertises the feature and every call refuses it). It also fails a value on an
 id the catalog does not define, because nothing reads it — the same silence a retired key

@@ -177,11 +177,11 @@ Untrusted text as safe markup — an escape-first mini renderer for API answers 
 ## Features (`features.js`) — the features contract in the browser
 
 - **Shape**: a plain re-export, not a class — `import { resolveFeatures } from '@omega.js/client/modules/features.js'`
-- **Exposes**: `isCountedFeature`, `isPacedFeature`, `featureMirrors`, `featureOverride`, `featureCounters`, `productFeatureValue`, `daysInMonth`, `dayShare`, `resolveFeature`, `resolveFeatures`
-- **Why it exists**: the derivations live ONCE, in `@omega.js/account` — the same module @omega.js/backend's `consume` gate reads — so the number that refuses a request and the number a usage bar draws can never be two different numbers. `@omega.js/account` is a private package a consumer's install never resolves by name, and this package's dist carries it vendored, so this module is the DOOR a frontend goes through. Same idiom as `analytics.js` fronting `@omega.js/analytics` ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
+- **Exposes**: `isCountedFeature`, `isPacedFeature`, `featureMirrors`, `featureOverride`, `featureCounters`, `productFeatureValue`, `daysInMonth`, `dayShare`, `nextReset`, `resolveFeature`, `resolveFeatures`
+- **Why it exists**: the derivations live ONCE, in `@omega.js/account` — the same module @omega.js/backend's `consume` gate reads — so the number that refuses a request and the number a usage card draws can never be two different numbers. `@omega.js/account` is a private package a consumer's install never resolves by name, and this package's dist carries it vendored, so this module is the DOOR a frontend goes through. Same idiom as `analytics.js` fronting `@omega.js/analytics` ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
 - **The catalog is config**, not a module export: `omega.config.features`, which the embedding framework's build bridges in beside `omega.config.payment`
 - **`resolveFeature(id, { catalog, product, account, now })`** returns everything a surface needs to speak about one feature: `{ id, name, icon, definition, counted, paced, mirror, value, limit, planLimit, override, used, left, total, day: { limit, used, left } }`. `-1` is the unlimited sentinel wherever a limit or a remainder can appear
-- **Callers**: @omega.js/web's `payment-config.js` (`getProductLimits` is the catalog-aware read) and the account page's billing panel (plan bullets and usage bars); `auth.js`'s `_resolveUsage` reaches the same functions directly
+- **Callers**: @omega.js/web's `payment-config.js` (`getProductLimits` is the catalog-aware read) and the account page's billing panel (plan bullets and usage cards); `auth.js`'s `_resolveUsage` reaches the same functions directly
 
 ## Motion (`motion.js`)
 

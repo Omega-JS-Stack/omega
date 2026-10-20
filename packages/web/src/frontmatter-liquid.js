@@ -20,6 +20,7 @@
  */
 const { Liquid } = require('liquidjs');
 const { FILTER_NAMES } = require('@omega.js/template-kit/filters');
+const { jekyllCompat: { COMPAT_REPLACEMENTS, jekyllFilter } } = require('@omega.js/template-kit');
 
 // Engine-machinery keys the frontmatter walker must never enter: dynamic
 // permalinks belong to Eleventy, and the rest hold globals or other
@@ -54,6 +55,8 @@ const PER_PAGE_RE = /\b(?:page|resolved)\./;
 function createFrontmatterResolver(options) {
   const engine = new Liquid();
   for (const [name, fn] of Object.entries(FILTER_NAMES)) engine.registerFilter(name, fn);
+  // LiquidJS ships its own slugify and jsonify: a retired name throws here too.
+  for (const old of Object.keys(COMPAT_REPLACEMENTS)) engine.registerFilter(old, jekyllFilter(old));
   const scope = { site: options.site };
   const cache = new Map();
   const rootsCache = new Map();

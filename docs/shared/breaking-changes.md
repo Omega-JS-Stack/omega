@@ -30,6 +30,19 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-19: the Jekyll-era filters take `omega_*` names ([#830](https://github.com/Omega-JS-Stack/omega/issues/830))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The template helper filters (web) | `slugify`, `date_to_xmlschema`, `date_to_rfc822`, `jsonify`, `strip_html`, `number_of_words`, `where_exp`, `group_by_exp`, `relative_url`, `absolute_url`, `markdownify` | `omega_slugify`, `omega_date_xmlschema`, `omega_date_rfc822`, `omega_jsonify`, `omega_strip_html`, `omega_number_of_words`, `omega_where`, `omega_group_by`, `omega_relative_url`, `omega_absolute_url`, `omega_markdownify`, the same behavior. An old name throws at render naming its replacement, so the build fails naming the file and the replacement ([web/template-kit.md](../web/template-kit.md)) | Run `npx omega migrate --target=<name> --execute` at the brand root: its `compat-filters` rule rewrites each `\| <old>` to `\| <new>`, and the report's `jekyll-filter` errors name any leftover. By hand, rename each call from the old form to the new |
+| `omega_jsonify`'s default output | Pretty-printed at an indent of 2 | Compact; `omega_jsonify: 2` pretty-prints, and an absent value is `null`. A legacy `uj_jsonify` lands on it through `legacy-prefix`, so it is compact now too | A call that wants pretty output passes the indent: `\| omega_jsonify: 2` |
+
+## 2026-10-19: the chart builders are one `chart()` entry ([#828](https://github.com/Omega-JS-Stack/omega/issues/828))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The charts helper (`__main_assets__/js/libs/charts.js`) | Four builders, `barChart(id, data)`, `stackedBarChart(id, data)`, `doughnutChart(id, data)` and `lineChart(id, data)`, each a function of its own | One entry, `chart(id, kind, data, options)`, `kind` one of `bar`, `stacked`, `doughnut`, `line`; the data grammar is unchanged. A shape the four kinds lack is an `options.definition(lib, colors, data)` function on the page, never a new builder ([web/libs.md](../web/libs.md)) | Replace `barChart(id, data)` with `chart(id, 'bar', data)`; `stackedBarChart` becomes kind `stacked`, `doughnutChart` kind `doughnut` and `lineChart` kind `line` |
+
 ## 2026-10-12: a brand's e2e lane is `defineCases` suite files ([#984](https://github.com/Omega-JS-Stack/omega/issues/984))
 
 | Contract | Old form | New form | Manual migration step |
@@ -584,7 +597,7 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 | Client bootstrap | `import webManager from 'web-manager'`; `window.Manager` global | `import omega from '@omega.js/web/runtime'`, the web instance; no window global | Replace the import in every module and delete `window.Manager` references. The accessor and auth shapes are in [one runtime shape](#2026-09-25-one-runtime-shape-on-every-package-945) |
 | Deploy | `npu sync --message='Deploy'` shell-out | `omega deploy` (plain git sync + `workflow_dispatch`, or the direct lane) | Replace the script; contract in [deploys.md](deploys.md) |
 | Version maintenance | Setup-time `ensureManagerVersion()` + peer-dependency auto-install | The explicit `omega update` verb | Stop expecting self-updates; run `npx omega update` (`--dry-run` to only report) — [updates.md](updates.md) |
-| Charts | A page imported `chart.js` bare (it was a `@omega.js/web` dependency) and built its own `new Chart(canvas, config)` | `chart.js` is gone — the framework draws with TanStack Charts ([#772](https://github.com/Omega-JS-Stack/omega/issues/772)), reached ONLY through `__main_assets__/js/libs/charts.js` (`loadCharts`, `chartSlot`, `barChart`/`stackedBarChart`/`doughnutChart`/`lineChart`) | Replace the bare import and the hand-built config with the helpers, and the page's `<canvas>` with `chartSlot`'s markup (an SVG chart has no canvas). A page that genuinely needs the raw grammar imports `@tanstack/charts` bare instead — same framework-resolution rule, new name |
+| Charts | A page imported `chart.js` bare (it was a `@omega.js/web` dependency) and built its own `new Chart(canvas, config)` | `chart.js` is gone — the framework draws with TanStack Charts ([#772](https://github.com/Omega-JS-Stack/omega/issues/772)), reached ONLY through `__main_assets__/js/libs/charts.js` (`loadCharts`, `chartSlot`, `chart`) | Replace the bare import and the hand-built config with the helpers, and the page's `<canvas>` with `chartSlot`'s markup (an SVG chart has no canvas). A page that genuinely needs the raw grammar imports `@tanstack/charts` bare instead — same framework-resolution rule, new name |
 
 ## `backend-manager` → `@omega.js/backend`
 

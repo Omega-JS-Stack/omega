@@ -360,25 +360,25 @@ config:
     "@type": "Recipe",
     "@id": "{{ resolved.config.url }}{{ page.url }}#Recipe",
     "url": "{{ resolved.config.url }}{{ page.url }}",
-    "name": {{ recipe.title | jsonify }},
-    "description": {{ recipe.description | jsonify }},
-    "image": [{{ recipe_image | absolute_url | jsonify }}],
+    "name": {{ recipe.title | omega_jsonify }},
+    "description": {{ recipe.description | omega_jsonify }},
+    "image": [{{ recipe_image | omega_absolute_url | omega_jsonify }}],
     "author": {
       "@type": "Person",
-      "name": {{ author_name | jsonify }},
-      "url": {{ author_url | jsonify }}
+      "name": {{ author_name | omega_jsonify }},
+      "url": {{ author_url | omega_jsonify }}
     },
-    "datePublished": "{{ page.date | date_to_xmlschema }}",
+    "datePublished": "{{ page.date | omega_date_xmlschema }}",
     "prepTime": "PT{{ recipe.time.prep }}M",
     "cookTime": "PT{{ recipe.time.cook }}M",
     "totalTime": "PT{{ total_time }}M",
-    "recipeCategory": {{ recipe.course | jsonify }},
-    "recipeCuisine": {{ recipe.cuisine | jsonify }},
-    "recipeYield": {{ recipe_yield | jsonify }},
-    "keywords": {{ recipe.keywords | join: ', ' | jsonify }},
+    "recipeCategory": {{ recipe.course | omega_jsonify }},
+    "recipeCuisine": {{ recipe.cuisine | omega_jsonify }},
+    "recipeYield": {{ recipe_yield | omega_jsonify }},
+    "keywords": {{ recipe.keywords | join: ', ' | omega_jsonify }},
     "nutrition": {
       "@type": "NutritionInformation",
-      "calories": {{ recipe_calories | jsonify }}
+      "calories": {{ recipe_calories | omega_jsonify }}
     },
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -390,7 +390,7 @@ config:
         {%- assign group_last = forloop.last -%}
         {%- for item in group.items -%}
           {%- capture ingredient_text -%}{% if item.amount %}{{ item.amount }} {% endif %}{% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}{%- endcapture -%}
-          {{ ingredient_text | jsonify }}{% unless forloop.last and group_last %},{% endunless %}
+          {{ ingredient_text | omega_jsonify }}{% unless forloop.last and group_last %},{% endunless %}
         {%- endfor -%}
       {%- endfor -%}
     ],
@@ -403,7 +403,7 @@ config:
           {
             "@type": "HowToStep",
             "position": {{ step_counter }},
-            "text": {{ step | strip_newlines | jsonify }}
+            "text": {{ step | strip_newlines | omega_jsonify }}
           }{% unless forloop.last and group_last %},{% endunless %}
         {%- endfor -%}
       {%- endfor -%}

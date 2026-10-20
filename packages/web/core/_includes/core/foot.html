@@ -304,8 +304,8 @@
       "name": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
       "description": "{{ resolved.post.description | omega_liquify | omega_json_escape }} ",
       "headline": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
-      "datePublished": "{{ page.date | date_to_xmlschema }}",
-      "dateModified": "{{ site.time | date_to_xmlschema }}",
+      "datePublished": "{{ page.date | omega_date_xmlschema }}",
+      "dateModified": "{{ site.time | omega_date_xmlschema }}",
       "author": {
         "@type": "Person",
         "name": "{%- omega_member resolved.post.author, "name" -%}",
@@ -427,7 +427,7 @@
       },
       "image": "{% omega_external resolved.config.brand.images.brandmark %}",
       {% iftruthy sa.features %}
-      "featureList": {{ sa.features | jsonify }},
+      "featureList": {{ sa.features | omega_jsonify }},
       {% endiftruthy %}
       "aggregateRating": {
         "@type": "AggregateRating",
@@ -473,8 +473,8 @@
   {%- comment -%} An answerless item is a DERIVED one whose condition didn't
   hold (#273 — the pricing trial FAQ on a catalog with no trial). It renders
   nowhere on the page, so it never enters the schema either. The test is `!= ''`
-  on purpose — `!= blank` does not filter inside where_exp here. {%- endcomment -%}
-  {% assign faq_items = faq_items | where_exp: "item", "item.answer != ''" %}
+  on purpose — `!= blank` does not filter inside omega_where here. {%- endcomment -%}
+  {% assign faq_items = faq_items | omega_where: "item", "item.answer != ''" %}
   {% assign faq_size = faq_items | size %}
   {% if faq_size > 0 %}
     <script id="omega-schema-faq-page" type="application/ld+json">

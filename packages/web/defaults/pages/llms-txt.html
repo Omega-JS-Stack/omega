@@ -4,43 +4,111 @@ meta:
   index: false
 ---
 {%- comment -%}
-llms.txt (llmstxt.org) — the markdown brief an LLM reads instead of crawling
-the site. Generated from site metadata + the same URL-sorted page collection
-sitemap.xml and pages.json walk, filtered by the same one resolved index flag
-(#564), so the machine files can never disagree about a page.
-A consumer file at /llms.txt suppresses this one like any default page.
+llms.txt (llmstxt.org): the brand summary an LLM reads instead of crawling the
+site. Pages and Posts walk the sitemap's collection and its one resolved index
+flag; a site-wide noindex empties every section. A section with no lines prints
+no heading, and a consumer file at /llms.txt suppresses this one.
 {%- endcomment -%}
-# {{ resolved.config.brand.name }}
+{%- assign brand = resolved.config.brand -%}
+{%- assign site_dark = false -%}
+{%- if resolved.config.meta.index == false -%}{%- assign site_dark = true -%}{%- endif -%}
 
-> {{ resolved.config.brand.description | default: resolved.config.brand.name }}
+{%- capture intro -%}
+{%- if brand.tagline -%}{{ brand.tagline }}{%- endif -%}
+{%- if brand.tagline and brand.contact.email %}
+{% endif -%}
+{%- if brand.contact.email -%}Contact: {{ brand.contact.email }}{%- endif -%}
+{%- endcapture -%}
 
-## Pages
-{% for item in collections.allByUrl -%}
+{%- capture page_lines -%}
+{%- for item in collections.allByUrl -%}
   {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-  {%- comment -%}#564: the ONE resolved flag, the only test this file makes. A page the
-  site tells crawlers to skip is not a page an LLM should be handed either. The rule and
-  its rationale live in sitemap.html.{%- endcomment -%}
+  {%- comment -%}The ONE resolved flag per page; the site-wide read above gates
+  the sections no page owns. The rule and its rationale live in sitemap.html.{%- endcomment -%}
   {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
   {%- if item.data.post.id -%}{%- continue -%}{%- endif -%}
-  {%- comment -%} omega_rendered: layout-contributed meta holds raw Liquid
-      until the owning page renders it (#141) {%- endcomment -%}
+  {%- comment -%}omega_rendered: layout-contributed meta holds raw Liquid
+  until the owning page renders it.{%- endcomment -%}
   {%- assign entry_title = item | omega_rendered: 'meta.title' | default: item.url -%}
-  {%- assign entry_desc = item | omega_rendered: 'meta.description' -%}
+  {%- assign entry_desc = item | omega_rendered: 'meta.description' %}
 - [{{ entry_title }}]({{ resolved.config.url }}{{ item.url }}){% if entry_desc %}: {{ entry_desc }}{% endif %}
-{% endfor -%}
+{%- endfor -%}
+{%- endcapture -%}
+
+{%- capture post_lines -%}
 {%- assign posts = collections.posts | default: empty -%}
-{%- if posts.size > 0 %}
-## Posts
-{% for item in posts -%}
+{%- for item in posts -%}
   {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-  {%- comment -%}The same one flag the Pages walk reads (#564): a post is indexed by
-  the posture, but a draft, or a site-wide `targets.web.meta.index: false`, noindexes it
-  like everything else, and this file follows the flag.{%- endcomment -%}
   {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
   {%- assign post_meta_title = item | omega_rendered: 'meta.title' -%}
   {%- assign post_meta_desc = item | omega_rendered: 'meta.description' -%}
   {%- assign post_title = item | omega_rendered: 'post.title' | default: post_meta_title | default: item.url -%}
-  {%- assign post_desc = item | omega_rendered: 'post.description' | default: post_meta_desc -%}
+  {%- assign post_desc = item | omega_rendered: 'post.description' | default: post_meta_desc %}
 - [{{ post_title }}]({{ resolved.config.url }}{{ item.url }}){% if post_desc %}: {{ post_desc }}{% endif %}
-{% endfor -%}
+{%- endfor -%}
+{%- endcapture -%}
+
+{%- capture social_lines -%}
+{%- unless site_dark -%}
+{%- for social in resolved.config.socials -%}
+  {%- assign platform = social[0] -%}
+  {%- capture social_url -%}{% omega_social platform %}{%- endcapture -%}
+  {%- if social_url == '' -%}{%- continue -%}{%- endif -%}
+  {%- assign platform_name = platform | capitalize %}
+- [{{ platform_name }}]({{ social_url }}): {{ brand.name }} on {{ platform_name }}.
+{%- endfor -%}
+{%- endunless -%}
+{%- endcapture -%}
+
+{%- comment -%}The first target declaring each fact owns it, as the
+download and extension shortlinks read the curated site.targets view.{%- endcomment -%}
+{%- capture download_lines -%}
+{%- unless site_dark -%}
+{%- for target in site.targets -%}
+  {%- unless target[1].downloads -%}{%- continue -%}{%- endunless -%}
+  {%- for platform in target[1].downloads -%}
+    {%- assign platform_name = platform[0] | capitalize -%}
+    {%- for format in platform[1] %}
+- [{{ brand.name }} for {{ platform_name }} ({{ format[0] }})]({{ format[1] }}): Download the {{ brand.name }} desktop app for {{ platform_name }}.
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- break -%}
+{%- endfor -%}
+{%- for target in site.targets -%}
+  {%- unless target[1].listings -%}{%- continue -%}{%- endunless -%}
+  {%- for listing in target[1].listings -%}
+    {%- unless listing[1].url -%}{%- continue -%}{%- endunless -%}
+    {%- assign store_name = listing[0] | capitalize %}
+- [{{ brand.name }} for {{ store_name }}]({{ listing[1].url }}): Install the {{ brand.name }} browser extension from the {{ store_name }} store.
+  {%- endfor -%}
+  {%- break -%}
+{%- endfor -%}
+{%- endunless -%}
+{%- endcapture -%}
+# {{ brand.name }}
+
+> {{ brand.description | default: brand.name }}
+{%- if intro != '' %}
+
+{{ intro }}
 {%- endif -%}
+{%- if page_lines != '' %}
+
+## Pages
+{{ page_lines | strip }}
+{%- endif -%}
+{%- if post_lines != '' %}
+
+## Posts
+{{ post_lines | strip }}
+{%- endif -%}
+{%- if social_lines != '' %}
+
+## Social
+{{ social_lines | strip }}
+{%- endif -%}
+{%- if download_lines != '' %}
+
+## Downloads
+{{ download_lines | strip }}
+{%- endif %}

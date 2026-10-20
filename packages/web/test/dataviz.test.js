@@ -5,7 +5,7 @@
  * categorical tone tokens/utilities, and the `.omega-interactive` card
  * affordance.
  *
- * The four chart BUILDERS (bar/stacked/doughnut/line) ARE pinned here (#772):
+ * The four chart KINDS (bar/stacked/doughnut/line) ARE pinned here:
  * a TanStack definition is renderer-neutral, so `createChartScene` compiles
  * one into real geometry with no DOM at all. Around them sit the load lane,
  * the token reads, and the slot markup write-on-change rendering depends on.
@@ -50,6 +50,22 @@ function markers(scene) {
   walk(scene.nodes);
   return found.length;
 }
+
+/** A definition with each function swapped for its source, so two compiles compare deep. */
+function comparable(value) {
+  if (typeof value === 'function') {
+    return `[Function ${value.toString()}]`;
+  }
+  if (Array.isArray(value)) {
+    return value.map(comparable);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, comparable(entry)]));
+  }
+  return value;
+}
+
+const BUILDERS = ['barChart', 'stackedBarChart', 'doughnutChart', 'lineChart'];
 
 module.exports = defineCases({
   type: 'group',
@@ -142,11 +158,72 @@ module.exports = defineCases({
       },
     },
 
+    // ONE entry draws every chart. A kind compiles the grammar; a page that
+    // needs a shape the grammar lacks hands `chart` its own definition instead.
+    {
+      name: '#828: resolveDefinition compiles a kind exactly as chartDefinition does',
+      run: async (ctx) => {
+        stubTokens({ '--omega-accent': '#3b5bdb', '--omega-chart-1': '#3b5bdb' });
+        ctx.expect(await charts.loadCharts(), 'the library is loaded').toBe(true);
+
+        const data = { labels: ['Mon', 'Tue', 'Wed'], values: [3, 7, 5] };
+        const resolved = charts.resolveDefinition('bar', data, {});
+
+        ctx.expect(comparable(resolved), 'no escape hatch → the grammar compiles the kind').toEqual(comparable(charts.chartDefinition('bar', data)));
+      },
+    },
+
+    {
+      name: '#828: a page\'s own definition is mounted as given, and the grammar is never consulted',
+      run: async (ctx) => {
+        stubTokens({ '--omega-accent': '#3b5bdb', '--omega-chart-1': '#3b5bdb' });
+        ctx.expect(await charts.loadCharts(), 'the library is loaded').toBe(true);
+
+        const data = { labels: ['Mon', 'Tue'], values: [1, 2] };
+        const custom = { marks: [], data: [] };
+        const seen = [];
+        // A null kind is no kind at all, so the grammar would throw had it been asked.
+        const resolved = charts.resolveDefinition(null, data, {
+          definition: (lib, colors, given) => {
+            seen.push({ lib, colors, given });
+            return custom;
+          },
+        });
+
+        ctx.expect(resolved === custom, 'the page\'s definition comes back untouched').toBe(true);
+        ctx.expect(seen.length, 'the hatch is called once').toBe(1);
+        ctx.expect(seen[0].lib !== null && typeof seen[0].lib === 'object', 'it is handed the loaded library').toBe(true);
+        ctx.expect(seen[0].colors, 'and the live token colors').toEqual(charts.chartColors());
+        ctx.expect(seen[0].given === data, 'and the data the page passed').toBe(true);
+      },
+    },
+
+    {
+      name: '#828: an unknown kind with no escape hatch is a programmer error',
+      run: (ctx) => {
+        ctx.expect(() => charts.resolveDefinition('radar', { labels: [], values: [] }, {}))
+          .toThrow('[charts] chartDefinition: "radar" is not a chart kind');
+      },
+    },
+
+    {
+      name: '#828: the module exports one chart entry and no builder per kind',
+      run: (ctx) => {
+        const exported = Object.keys(charts);
+
+        ctx.expect(typeof charts.chart, 'the one entry').toBe('function');
+        ctx.expect(typeof charts.resolveDefinition, 'and the one place the hatch is decided').toBe('function');
+        for (const name of BUILDERS) {
+          ctx.expect(exported.includes(name), `${name} is retired`).toBe(false);
+        }
+      },
+    },
+
     // #772: a TanStack definition is renderer-neutral — `createChartScene` turns
     // one into real scales, points and geometry with no DOM at all — so the four
-    // builders are pinned right here instead of only in a real browser.
+    // kinds are pinned right here instead of only in a real browser.
     {
-      name: '#772: all four builders compile a scene with the geometry their data implies',
+      name: '#772: all four kinds compile a scene with the geometry their data implies',
       run: async (ctx) => {
         stubTokens({
           '--omega-ink-muted': '#6d6d6c',
@@ -258,7 +335,7 @@ module.exports = defineCases({
     },
 
     // #800: a hover named the CHANNELS — "x" and "y", the library's own default —
-    // instead of the thing being read. Every builder formats its own line now, and
+    // instead of the thing being read. Every kind formats its own line now, and
     // the data argument carries the unit (`format`) or the whole line (`tooltip`),
     // so a page whose chart data is nothing but JSON still reads correctly.
     {
@@ -322,7 +399,7 @@ module.exports = defineCases({
         ctx.expect(!/\bmountChart\b/.test(source), 'and never mounts one').toBeTruthy();
         ctx.expect(!/getChartColors/.test(source), 'no second copy of the token reads').toBeTruthy();
         ctx.expect(source, 'the lazy load goes through the helper').toMatch(/import \{[^}]*loadCharts[^}]*\} from '__main_assets__\/js\/libs\/charts\.js'/);
-        ctx.expect(source, 'and it is awaited before a builder is called').toMatch(/await loadCharts\(\)/);
+        ctx.expect(source, 'and it is awaited before a chart is drawn').toMatch(/await loadCharts\(\)/);
 
         // Status hues, passed as tokens so the helper's resolveColor reads the live
         // sheet — the categorical ramp would trade the meaning for "different".
@@ -330,6 +407,18 @@ module.exports = defineCases({
           ctx.expect(source.includes(`'var(${token})'`), `the plan doughnut keeps its ${token} slice`).toBeTruthy();
         }
         ctx.expect(!/colors\.palette/.test(source), 'nothing reaches for the categorical ramp').toBeTruthy();
+      },
+    },
+
+    {
+      name: '#828: the admin dashboard draws through the one chart entry, never a builder',
+      run: (ctx) => {
+        const source = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'admin', 'index.js'), 'utf8');
+
+        ctx.expect(source, 'it imports chart from the helper').toMatch(/import \{[^}]*\bchart\b[^}]*\} from '__main_assets__\/js\/libs\/charts\.js'/);
+        for (const name of BUILDERS) {
+          ctx.expect(!new RegExp(`\\b${name}\\b`).test(source), `the page never names ${name}`).toBeTruthy();
+        }
       },
     },
 
@@ -358,7 +447,7 @@ module.exports = defineCases({
         fs.mkdirSync(path.join(layer, 'js', 'pages'), { recursive: true });
         fs.writeFileSync(
           path.join(layer, 'js', 'pages', 'index.js'),
-          "import { loadCharts, barChart } from '__main_assets__/js/libs/charts.js';\nexport default async () => { await loadCharts(); barChart('chart-x', { labels: [], values: [] }); };\n",
+          "import { loadCharts, chart } from '__main_assets__/js/libs/charts.js';\nexport default async () => { await loadCharts(); chart('chart-x', 'bar', { labels: [], values: [] }); };\n",
         );
 
         const outDir = path.join(PKG, '.omega', 'dataviz-test-assets');

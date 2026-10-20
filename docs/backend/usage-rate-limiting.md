@@ -81,7 +81,7 @@ Pacing by day is the **default**. `usage: { pace: false }` on the catalog entry 
 
 `options.limit` is for the counters that are **not plan features** — a per-IP signup gate is a security control with its own declared config key (`targets.backend.auth.signup.maxPerIpPerDay`), not a tier anybody buys. An explicit limit supplies the definition the catalog would have, so the catalog lookup and the product read are skipped and the counter is a plain period counter with no day share. The framework's own anti-abuse gates use it: signup-by-IP, `marketing/contact`, `marketing/email-preferences`.
 
-Every derivation — the effective limit, the day share, what is left — lives in `@omega.js/account`'s features module, the SAME one the browser's account page reads through `@omega.js/client/modules/features.js`. The number that refuses a request and the number a usage bar draws can never be two different numbers.
+Every derivation — the effective limit, the day share, what is left — lives in `@omega.js/account`'s features module, the SAME one the browser's account page reads through `@omega.js/client/modules/features.js`. The number that refuses a request and the number a usage card draws can never be two different numbers.
 
 ## Anonymous counting is explicit
 
@@ -117,5 +117,7 @@ It writes **that feature's counters only**, never the whole usage object, so two
 | User doc `usage.overrides` | Never | Untouched — a reset is not a revoke |
 
 The daily cron (`events/cron/daily/reset-usage.js`) runs at midnight UTC, and performs a single write per user.
+
+The account page's usage cards show when each counter next resets ("Day resets 5:00 PM", "Month resets Nov 1"): these same UTC boundaries, read from `nextReset(period)` in `@omega.js/account`'s features module and shown in the viewer's local time.
 
 **Which counters reset is a question of SHAPE, not of catalog membership.** The cron QUERIES on the counted features the catalog defines plus the framework's own gates (a Firestore query has to name a field path), but once it has the document it clears every counter-shaped key under `usage` — so a counter run against an explicit limit, which by definition has no catalog entry, resets like any other. Sweeping only the catalog left those growing forever, which permanently refused the user after their first few uses.

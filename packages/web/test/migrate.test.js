@@ -1453,7 +1453,7 @@ module.exports = defineCases({
         const findings = lintText([
           '{% post_url 2020-01-01-hello %}',
           '{% assign related = site.posts | where_exp: "p", "p.url" | limit: 3 %}',
-          '{% omega_logo "star" %} {{ title | omega_title_case | markdownify }}',
+          '{% omega_logo "star" %} {{ title | omega_title_case | omega_markdownify }}',
           '{% iftruthy site.brand %}x{% endiftruthy %}',
         ].join('\n'), 'lint.html');
         ctx.expect(findings.some((finding) => finding.check === 'jekyll-only-tag' && finding.line === 1), 'post_url flagged').toBeTruthy();

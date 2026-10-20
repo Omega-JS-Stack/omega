@@ -55,7 +55,7 @@ bands below keep the reveal lane. {% endcomment %}
       <div class="col-lg-10" data-omega-reveal>
         <div class="omega-chip-cloud">
           {% for tag in tags %}
-            <a href="/blog/tags/{{ tag | slugify }}" class="omega-chip">
+            <a href="/blog/tags/{{ tag | omega_slugify }}" class="omega-chip">
               {{ tag }}
               <span class="text-muted">{{ tag_counts[forloop.index0] }}</span>
             </a>

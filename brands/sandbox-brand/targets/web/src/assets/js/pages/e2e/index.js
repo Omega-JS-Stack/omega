@@ -17,7 +17,7 @@
 
 // Libraries
 import omega from '@omega.js/web/runtime';
-import { loadCharts, barChart, stackedBarChart, doughnutChart, lineChart } from '__main_assets__/js/libs/charts.js';
+import { loadCharts, chart } from '__main_assets__/js/libs/charts.js';
 
 function setStatus(text) {
   const element = document.getElementById('status');
@@ -34,11 +34,11 @@ function setStatus(text) {
 const authState = () => omega.auth.reload();
 
 /**
- * Draw one of each chart the framework's helper builds (#74) and report what
- * actually landed in the slot. The helper mounts an SVG host (#772), so the
+ * Draw one of each chart kind the framework's helper draws and report what
+ * actually landed in the slot. The helper mounts an SVG host, so the
  * claim is MARKS with real geometry: node compiles a scene, but only a real
  * browser lays a host out, measures its guides and paints the result — and
- * "the builder returned a host" is not the same claim as "a chart drew".
+ * "`chart` returned a host" is not the same claim as "a chart drew".
  */
 async function drawCharts() {
   const box = document.createElement('div');
@@ -51,22 +51,22 @@ async function drawCharts() {
 
   const labels = ['Mon', 'Tue', 'Wed'];
   const values = [3, 7, 5];
-  const builders = {
-    bar: (id) => barChart(id, { labels, values, label: 'Signups' }),
-    stacked: (id) => stackedBarChart(id, { labels, series: [{ label: 'A', values }, { label: 'B', values: [1, 2, 3] }] }),
-    doughnut: (id) => doughnutChart(id, { labels, values, colors: ['var(--omega-ok)', 'var(--omega-warn)', 'var(--omega-danger)'] }),
-    line: (id) => lineChart(id, { labels, series: [{ label: 'A', values }] }),
+  const samples = {
+    bar: { labels, values, label: 'Signups' },
+    stacked: { labels, series: [{ label: 'A', values }, { label: 'B', values: [1, 2, 3] }] },
+    doughnut: { labels, values, colors: ['var(--omega-ok)', 'var(--omega-warn)', 'var(--omega-danger)'] },
+    line: { labels, series: [{ label: 'A', values }] },
   };
 
   const drew = {};
-  for (const [name, build] of Object.entries(builders)) {
+  for (const [name, data] of Object.entries(samples)) {
     const id = `chart-probe-${name}`;
     const slot = document.createElement('div');
     slot.style.cssText = 'position: relative; width: 400px; height: 200px;';
     slot.innerHTML = `<div id="${id}" style="height: 100%;"></div>`;
     box.appendChild(slot);
 
-    const host = build(id);
+    const host = chart(id, name, data);
     // A mark the reader can see: a rect/path/circle the browser gives a real
     // box. An empty axis pair, or a bar of zero width, counts for nothing.
     const marks = [...document.getElementById(id).querySelectorAll('rect, path, circle')]

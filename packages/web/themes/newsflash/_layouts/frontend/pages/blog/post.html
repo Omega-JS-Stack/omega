@@ -87,7 +87,7 @@ config:
                 {% iftruthy resolved.author_section.author_position %}
                   {{ resolved.author_section.author_position }} ·
                 {% endiftruthy %}
-                <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
+                <time datetime="{{ page.date | omega_date_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
               </span>
             </div>
           </div>
@@ -150,7 +150,7 @@ config:
               {% endunless %}
             {% endfor %}
           {% for tag in tags %}
-            <a href="{{ resolved.config.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm"><i class="fa-solid fa-tag me-1"></i>{{ tag }}</a>
+            <a href="{{ resolved.config.url }}/blog/tags/{{ tag | omega_slugify }}" class="btn btn-outline-dark btn-sm"><i class="fa-solid fa-tag me-1"></i>{{ tag }}</a>
           {% endfor %}
         </div>
       </div>

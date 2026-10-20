@@ -6,7 +6,6 @@
 # so the page itself never waits on auth to decide what to draw. A page nobody
 # signed out can see stays out of the index and the machine files.
 layout: frontend/core/base
-permalink: /notes
 meta:
   title: "Notes - {{ resolved.config.brand.name }}"
   description: "One small feature wired through every surface: a route, a schema, a trigger, a rule, and the page you are reading."

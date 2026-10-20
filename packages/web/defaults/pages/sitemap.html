@@ -17,7 +17,8 @@ meta:
     default `targets.web.meta.index`, then the layout's `meta.index`, then the page's own,
     then the framework's automatic exclusions (drafts, the /test dev surfaces, /admin/,
     redirect stubs, a listing's pages 2..N). No template keeps a rule list of its own, so
-    the robots tag, sitemap.xml, llms.txt and pages.json can never disagree.{%- endcomment -%}
+    the robots tag, sitemap.xml, llms.txt and pages.json can never disagree; llms.txt also
+    reads the resolved site default for the sections no page owns.{%- endcomment -%}
     {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif %}
   <url>
     {%- if item.url == '/' %}

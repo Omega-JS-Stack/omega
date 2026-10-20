@@ -24,7 +24,7 @@ Two consumption paths (plan §4 A0):
 | `omega_random` | pure | `Math.floor(random * n)` |
 | `omega_hash` | pure | **byte-parity with Ruby verified**: full 128-bit MD5 as BigInt, mod max (`'hello'→994@1000`, `'somiibo'→305@360`, checked against ruby 4.0.0) |
 | `omega_title_case` | pure | Ruby per-word `capitalize` parity ("hello WORLD" → "Hello World") |
-| `omega_jsonify` | pure | pretty JSON, configurable indent |
+| `omega_jsonify` | pure | compact JSON; `omega_jsonify: 2` pretty-prints at that indent; an absent value is `null` |
 | `omega_append_param` | pure | `?`/`&`-aware query param append |
 | `omega_cachebreak` | pure | appends `cb=<process-consistent ms timestamp>` |
 | `omega_pluralize` | pure | singular only for exactly 1; default plural = singular+`s` |
@@ -63,29 +63,47 @@ text unless the context has it (`class=card` works), a dotted path always
 resolves, and a missing path yields `null` so a typo never renders its own
 name into the page.
 
-## Jekyll-style helper pack (`src/jekyll-compat.js`)
+## Helper filters, and the retired Jekyll names (`src/jekyll-compat.js`)
 
-These are omega's own template helpers under the familiar Jekyll-style names —
-the names are the authoring surface Ian writes in, and the contract is CORRECT
-BEHAVIOR, not emulation of Jekyll internals. Where Jekyll's own semantics are
-surprising, these do the sane thing and the tests pin it ([#102](https://github.com/Omega-JS-Stack/omega/issues/102)).
+omega's own template helpers live in the filter pack (`src/filters.js`) under
+`omega_*` names. The contract is CORRECT BEHAVIOR, not emulation of Jekyll
+internals: where Jekyll's own semantics are surprising, these do the sane thing
+and the tests pin it ([#102](https://github.com/Omega-JS-Stack/omega/issues/102)).
 
-`slugify` is the ONE slugifier ([#488](https://github.com/Omega-JS-Stack/omega/issues/488)):
-downcase, non-alphanumeric runs become `-`. It is what LINKS a taxonomy term
-and what the term's page is GENERATED at (`src/collections.js`), so `A&R` is
-`a-r` on both sides. Eleventy ships a universal `slugify` of its own (`&` →
-"and") that used to shadow it in templates — `src/engine.js` claims the name
-back through a plugin, because a term whose link and page disagree is a
-guaranteed 404 the framework's own link check fails the build on.
+| Name (registered) | Replaces | Notes |
+|---|---|---|
+| `omega_slugify` | `slugify` | the ONE slugifier (below) |
+| `omega_date_xmlschema` | `date_to_xmlschema` | ISO-8601 in UTC; unparseable input passes through |
+| `omega_date_rfc822` | `date_to_rfc822` | RFC-822 in UTC; unparseable input passes through |
+| `omega_jsonify` | `jsonify` | compact by default (the filter table above) |
+| `omega_strip_html` | `strip_html` | strips tags; script/style contents removed entirely |
+| `omega_number_of_words` | `number_of_words` | whitespace-separated word count |
+| `omega_where` | `where_exp` | keeps the items whose expression is truthy |
+| `omega_group_by` | `group_by_exp` | buckets by the expression's VALUE, one group per distinct value in first-seen order (an absent value groups under `''`) |
+| `omega_relative_url` | `relative_url` | prefixes `site.baseurl` |
+| `omega_absolute_url` | `absolute_url` | prefixes `site.url` + `site.baseurl`; an absolute URL passes through |
+| `omega_markdownify` | `markdownify` | renders with the injected markdown converter |
 
-Implemented: `slugify`, `date_to_xmlschema`, `date_to_rfc822`, `jsonify`,
-`strip_html`, `markdownify`, `relative_url`, `absolute_url`,
-`number_of_words`, `where_exp`, `group_by_exp` (`push` comes from LiquidJS).
-The `*_exp` filters read the SIMPLE expression subset (`item.path <op>
-literal`, contains, bare paths) — extend it when a site needs more.
-`where_exp` keeps the items whose expression is truthy; `group_by_exp` buckets
-by the expression's VALUE, one group per distinct value in first-seen order
-(an absent value groups under `''`).
+`push` comes from LiquidJS. `omega_where` and `omega_group_by` read the SIMPLE
+expression subset (`item.path <op> literal`, contains, bare paths); extend it
+when a site needs more.
+
+`omega_slugify` is the ONE slugifier ([#488](https://github.com/Omega-JS-Stack/omega/issues/488)):
+downcase, non-alphanumeric runs become `-`, and an apostrophe is deleted. It is
+what LINKS a taxonomy term and what the term's page is GENERATED at
+(`src/collections.js`), so `A&R` is `a-r` on both sides.
+
+**The old names throw.** Each Jekyll-era name in `COMPAT_REPLACEMENTS` (old
+name to new, exported from `src/jekyll-compat.js`) stays registered as a filter
+that throws `[@omega.js/template-kit] <old> is a Jekyll filter: use <new> (npx
+omega migrate --target=<name> --execute rewrites it)`, so an unmigrated
+template fails its build with the file and replacement in the message.
+Eleventy ships a universal `slugify` of its own that outranks the filters
+template-kit registers; `src/engine.js` claims that name back through a plugin
+as the same thrower. `omega migrate`'s `compat-filters` rule rewrites `| <old>`
+to `| <new>` from the same table, inside `{{ }}`/`{% %}` spans and outside
+quoted args only (prose about a filter keeps its text), and the liquid-lint names a leftover
+as a `jekyll-filter` error with its replacement.
 
 ## Adapter contract (`registerLiquid(engine, options)`)
 

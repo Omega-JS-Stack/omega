@@ -85,8 +85,12 @@ Web's `src/language-flags.js` additionally writes language-named copies into
 their own namespace (`assets/icons/flags/lang/en.svg` = the us flag — language
 and country codes collide, so `ar` is Arabic there and Argentina one level up),
 so the client-side footer language switcher fetches a flag by the row's own
-hreflang code with no map in the browser; a language the set has no flag for
-drops its `<img>` rather than showing a broken glyph.
+hreflang code with no map in the browser. It writes one alias for every
+language the translation engine supports (devkit's `LANGUAGE_NAMES`, plus `en`,
+plus every key in template-kit's map): a language whose country has no file in
+the set gets the neutral globe `flags/lang-fallback.svg` under its own code, so
+the switcher never requests a file that is not there. The row's `<img>` error
+handler stays as a last-resort net no supported language hits.
 
 ## Missing icons
 

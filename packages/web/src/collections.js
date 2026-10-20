@@ -12,9 +12,9 @@
  * synthesized listing/category pages paginate (src/dynamic-pages.js).
  */
 
-// Jekyll-default slugify — taxonomy slugs must match what templates' slugify
-// filter produces, so both come from the same template-kit implementation.
-const { slugify } = require('@omega.js/template-kit/jekyll-compat');
+// Taxonomy slugs must match what templates' `omega_slugify` filter produces,
+// so both come from the same template-kit implementation.
+const { omegaSlugify: slugify } = require('@omega.js/template-kit/filters');
 
 // Deterministic post order shared by the posts collection AND taxonomy
 // aggregation: date desc, slug asc tie-break — same-date posts must order

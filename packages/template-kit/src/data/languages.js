@@ -1,8 +1,7 @@
 /**
  * languages.js — ISO 639-1 code => [English name, Native name].
  *
- * Machine-extracted verbatim from jekyll-uj-powertools lib/tags/language.rb
- * (LANGUAGE_MAPPINGS) — do not hand-edit; regenerate from the Ruby source.
+ * The one home of the map: edit it here. The `omega_language` tag reads it.
  */
 
 const LANGUAGES = {

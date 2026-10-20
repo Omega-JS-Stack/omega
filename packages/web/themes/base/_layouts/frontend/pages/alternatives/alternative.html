@@ -303,9 +303,9 @@ bands below keep the reveal lane. {% endcomment %}
 {% comment %} An answerless item is a DERIVED one whose condition didn't hold
 (#273 — the trial FAQ on a catalog with no trial): it drops out of the
 accordion here and out of the FAQPage schema in core/foot.html. The test is
-`!= ''` on purpose — `!= blank` does not filter inside where_exp here.
+`!= ''` on purpose — `!= blank` does not filter inside omega_where here.
 {% endcomment %}
-{% assign _faqs = alt.faqs.items | where_exp: "faq", "faq.answer != ''" %}
+{% assign _faqs = alt.faqs.items | omega_where: "faq", "faq.answer != ''" %}
 {% assign faqs_size = _faqs | size %}
 {% if faqs_size > 0 %}
   {% section "marketing/faq", data: alt.faqs, items: _faqs, variant: "center" %}

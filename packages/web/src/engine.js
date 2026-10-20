@@ -14,7 +14,7 @@ const yaml = require('js-yaml');
 const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
-const { slugify } = require('@omega.js/template-kit/jekyll-compat');
+const { jekyllCompat: { jekyllFilter } } = require('@omega.js/template-kit');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
 const { clientConfig } = require('@omega.js/config');
 const Logger = require('@omega.js/devkit/logger');
@@ -25,6 +25,7 @@ const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { applyMarkdownImages } = require('./markdown-images.js');
 const { permalinkOf } = require('./consumer-scan.js');
+const { pageUrlFromPath } = require('./page-url.js');
 const { createDecisions } = require('./decisions.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
@@ -410,7 +411,7 @@ function buildConfig(eleventyConfig, options) {
     registerSectionTags(engine, { baseDirs: [options.consumerDir, ...themeLayers] });
     registerLiquid(engine, {
       // template-kit's `site` slot is the CONFIG it reads (url, baseurl,
-      // icons.style, translation) — `relative_url`/`absolute_url` and every
+      // icons.style, translation) — `omega_relative_url`/`omega_absolute_url` and every
       // tag's ctx.site.config. The build-fact global is not its business.
       site: config,
       getCollection: (name) => collectionsHolder.get(name) || [],
@@ -421,16 +422,11 @@ function buildConfig(eleventyConfig, options) {
     });
   });
 
-  // ONE slugifier (#488): Eleventy ships a universal `slugify` filter of its
-  // own, and it OUTRANKS the template-kit one amendLibrary registers (the
-  // Liquid engine applies universal filters after the amendments) — so a term
-  // containing `&` was linked at `a-and-r` while the taxonomy page it pointed
-  // at was generated at `a-r` (src/collections.js slugifies with template-kit).
-  // Every term with an `&` shipped a guaranteed dead link. template-kit's is
-  // the authority — Jekyll-parity, so a migrating brand's taxonomy URLs never
-  // move — and a PLUGIN is where it has to be claimed: this config callback
-  // runs BEFORE Eleventy's own defaults, plugins run after.
-  eleventyConfig.addPlugin((config) => config.addFilter('slugify', slugify));
+  // Eleventy's universal `slugify` OUTRANKS the filters amendLibrary registers,
+  // so it would silently answer the retired name with its own slug rule. The
+  // name is claimed back as template-kit's thrower (use `omega_slugify`) in a
+  // PLUGIN: this config callback runs BEFORE Eleventy's defaults, plugins after.
+  eleventyConfig.addPlugin((config) => config.addFilter('slugify', jekyllFilter('slugify')));
 
   // ---- Layered layouts (zero copying): virtual templates or symlink farm.
   // Layer order: consumer-local _layouts (sweet-saucy ships src/_layouts/
@@ -1407,7 +1403,12 @@ function jekyllPermalink(data, collections) {
   // an empty-string proxy, and that probe value persists into the data.
   if (permalink === undefined || permalink === '') {
     const collection = collections.find((entry) => inputPath.includes(`/${entry.dir}/`));
+    // Any other page under pages/ serves at its file path; a paginated one's
+    // later pages follow it as `<path>/<number>` (page 2 onward).
+    const pageUrl = pageUrlFromPath(inputPath);
+    const pageNumber = data.pagination ? data.pagination.pageNumber : 0;
     if (collection) permalink = `${collection.base}/${data.page.fileSlug}`;
+    else if (pageUrl) permalink = pageNumber > 0 ? `${pageUrl.replace(/\/$/, '')}/${pageNumber + 1}` : pageUrl;
   }
   // Jekyll flat URLs: `/about` writes `about.html`,
   // NOT `about/index.html` — site URLs carry no trailing slash. page.url

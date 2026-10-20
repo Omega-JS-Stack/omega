@@ -9,12 +9,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const { emitIcons } = require('@omega.js/devkit/icons');
+const { LANGUAGE_NAMES } = require('@omega.js/devkit/translate');
 
-const { emitLanguageFlags } = require('../src/language-flags.js');
+const { emitLanguageFlags, FALLBACK_FLAG } = require('../src/language-flags.js');
 const { PATHS } = require('../src/paths.js');
 const { PKG } = require('./lib/build.js');
 
 const OUT = path.join(PKG, '.omega', 'language-flags-test-out');
+const FALLBACK = path.join(PATHS.core, 'icons', 'flags', FALLBACK_FLAG);
 
 /** Emit the icon set (flags included) into a clean output dir. */
 function emitInto(outDir) {
@@ -72,27 +74,55 @@ module.exports = defineCases({
     },
 
     {
-      name: 'a language whose country has no flag gets none — the row drops its <img>',
+      name: '#827 fa and el alias their country flags: lang/fa → ir, lang/el → gr, byte for byte',
+      run: (ctx) => {
+        const flagsDir = emitInto(OUT);
+        emitLanguageFlags({ outDir: OUT });
+
+        ctx.expect(fs.readFileSync(path.join(flagsDir, 'lang', 'fa.svg')), 'a Farsi row gets Iran').toEqual(fs.readFileSync(path.join(flagsDir, 'ir.svg')));
+        ctx.expect(fs.readFileSync(path.join(flagsDir, 'lang', 'el.svg')), 'a Greek row gets Greece').toEqual(fs.readFileSync(path.join(flagsDir, 'gr.svg')));
+      },
+    },
+
+    {
+      name: '#827 a language whose country has no flag gets the neutral fallback glyph',
       run: (ctx) => {
         const flagsDir = emitInto(OUT);
         emitLanguageFlags({ outDir: OUT });
 
         ctx.expect(!fs.existsSync(path.join(flagsDir, 'il.svg')), 'the set carries no Israeli flag to alias').toBeTruthy();
-        ctx.expect(!fs.existsSync(path.join(flagsDir, 'lang', 'he.svg')), 'so Hebrew stays absent rather than 0 bytes').toBeTruthy();
-        ctx.expect(!fs.existsSync(path.join(flagsDir, 'lang', 'uk.svg')), 'Ukrainian likewise — ua.svg is not in the set').toBeTruthy();
+        ctx.expect(fs.existsSync(path.join(flagsDir, 'lang', 'he.svg')), 'yet a Hebrew row still has a file to fetch').toBeTruthy();
+        ctx.expect(fs.readFileSync(path.join(flagsDir, 'lang', 'he.svg')), 'and it IS lang-fallback.svg, byte for byte').toEqual(fs.readFileSync(FALLBACK));
       },
     },
 
     {
-      name: 'the pass is idempotent — a second run rewrites the same aliases, never doubles',
+      name: '#827 every supported language (LANGUAGE_NAMES plus en) has an alias after one emit',
       run: (ctx) => {
         const flagsDir = emitInto(OUT);
+        emitLanguageFlags({ outDir: OUT });
+
+        const missing = [...Object.keys(LANGUAGE_NAMES), 'en']
+          .filter((code) => !fs.existsSync(path.join(flagsDir, 'lang', `${code}.svg`)));
+
+        ctx.expect(missing, 'no supported code is left for the switcher to 404 on').toEqual([]);
+      },
+    },
+
+    {
+      name: '#827 the pass is idempotent: a second run over the same output changes nothing',
+      run: (ctx) => {
+        const flagsDir = emitInto(OUT);
+        const snapshot = () => fs.readdirSync(path.join(flagsDir, 'lang')).sort()
+          .map((name) => [name, fs.readFileSync(path.join(flagsDir, 'lang', name)).toString('base64')]);
         const first = emitLanguageFlags({ outDir: OUT });
         const afterFirst = fs.readdirSync(flagsDir, { recursive: true }).sort();
+        const aliasesAfterFirst = snapshot();
         const second = emitLanguageFlags({ outDir: OUT });
 
         ctx.expect(second.files, 'the same alias count').toBe(first.files);
         ctx.expect(fs.readdirSync(flagsDir, { recursive: true }).sort(), 'the same files').toEqual(afterFirst);
+        ctx.expect(snapshot(), 'the same bytes in every alias').toEqual(aliasesAfterFirst);
       },
     },
 

@@ -2,7 +2,7 @@
  * Unit tests for the features contract
  * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)) — the shared
  * derivation the backend's gate and the browser's account page BOTH read, so
- * the number that refuses a request and the number a usage bar draws can never
+ * the number that refuses a request and the number a usage card draws can never
  * be two different numbers.
  *
  * The promises:
@@ -23,6 +23,7 @@ const {
   daysInMonth,
   resolveFeature,
   resolveFeatures,
+  nextReset,
 } = require('../src/index.js');
 
 const CATALOG = {
@@ -177,6 +178,17 @@ module.exports = defineCases({
         const rows = resolveFeatures({ catalog: CATALOG, product: PRODUCT, account: {}, now: IN_MARCH });
 
         ctx.expect(rows.map((row) => row.id)).toEqual(['saves', 'exports', 'support']);
+      },
+    },
+
+    {
+      name: '#833: nextReset names the UTC boundary each counter resets at',
+      run: (ctx) => {
+        const now = new Date('2026-10-19T03:00:00.000Z');
+
+        ctx.expect(nextReset('day', now) instanceof Date, 'a Date, for the page to format locally').toBe(true);
+        ctx.expect(nextReset('day', now).toISOString(), 'the next 00:00 UTC').toBe('2026-10-20T00:00:00.000Z');
+        ctx.expect(nextReset('month', now).toISOString(), 'the 1st of next month, 00:00 UTC').toBe('2026-11-01T00:00:00.000Z');
       },
     },
   ],

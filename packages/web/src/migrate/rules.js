@@ -13,7 +13,7 @@
 // Tags whose quoted args template-kit resolves as variables — the rule-3
 // capture hoist is scoped to these (interpolation inside OTHER tags' quoted
 // strings is a Jekyll silent no-op we only report).
-const { TAGS, filters: { FILTER_NAMES } } = require('@omega.js/template-kit');
+const { TAGS, filters: { FILTER_NAMES }, jekyllCompat: { COMPAT_REPLACEMENTS } } = require('@omega.js/template-kit');
 
 // The config namespace (#607): a page's frontmatter overrides omega.json5
 // under `config:`, and nothing that is not a config section may sit there.
@@ -21,6 +21,7 @@ const {
   CONFIG_SECTIONS, RANDOM_ID_ASSIGN_IDIOM,
   templateReads, randomIdReads, assignsRandomId,
 } = require('../config-sections.js');
+const { toLines, fromLines, replacePerLine } = require('./lines.js');
 
 /** Does this bare frontmatter key belong under `config:`? */
 const isMovableSection = (key) => CONFIG_SECTIONS.has(key);
@@ -37,45 +38,6 @@ const VALID_PAGE_PROPS = [
 
 // Jekyll page props with NO mechanical equivalent — flagged, never rewritten
 const MANUAL_PAGE_PROPS = ['next', 'previous', 'collection'];
-
-/**
- * Split text into lines preserving the trailing-newline state.
- * @param {string} text
- * @returns {{ lines: string[], trailingNewline: boolean }}
- */
-function toLines(text) {
-  const trailingNewline = text.endsWith('\n');
-  const lines = text.split('\n');
-  if (trailingNewline) lines.pop();
-  return { lines, trailingNewline };
-}
-
-/**
- * Reassemble lines into text.
- */
-function fromLines(lines, trailingNewline) {
-  return lines.join('\n') + (trailingNewline ? '\n' : '');
-}
-
-/**
- * Line-by-line regex replace helper: applies `pattern` → `replacement` per
- * line and records one edit per changed line.
- * @param {string} id - rule id for the edit records
- * @param {string} text
- * @param {RegExp} pattern - must carry the g flag
- * @param {string|function} replacement
- * @returns {{ text: string, edits: object[] }}
- */
-function replacePerLine(id, text, pattern, replacement) {
-  const { lines, trailingNewline } = toLines(text);
-  const edits = [];
-  const out = lines.map((line, index) => {
-    const replaced = line.replace(pattern, replacement);
-    if (replaced !== line) edits.push({ rule: id, line: index + 1, before: line.trim(), after: replaced.trim() });
-    return replaced;
-  });
-  return { text: fromLines(out, trailingNewline), edits };
-}
 
 // ---------------------------------------------------------------------------
 // Rule 0 — legacy `uj_`/`uj-`/`site.uj` spellings → the `omega` names
@@ -117,6 +79,22 @@ const legacyPrefix = {
       return replaced;
     });
     return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 28: retired Jekyll-era filters to their omega_* names (template-kit's table),
+// only in `{{ }}`/`{% %}` spans outside quoted args, as the liquid-lint reads them
+// ---------------------------------------------------------------------------
+const COMPAT_FILTER_PATTERN = new RegExp(`("[^"]*"|'[^']*')|(\\|\\s*)(${Object.keys(COMPAT_REPLACEMENTS).join('|')})\\b`, 'g');
+
+const compatFilters = {
+  id: 'compat-filters',
+  title: 'the retired Jekyll-era filters (`| slugify`, `| jsonify`, ...) to their `omega_*` names',
+  apply(text) {
+    const rename = (span) => span.replace(COMPAT_FILTER_PATTERN, (whole, quoted, pipe, name) => quoted || `${pipe}${COMPAT_REPLACEMENTS[name]}`);
+    const { text: out, edits } = replacePerLine('compat-filters', text, /\{\{.*?\}\}|\{%.*?%\}/g, rename);
+    return { text: out, edits, findings: [] };
   },
 };
 
@@ -1850,6 +1828,7 @@ const RULES = [
                        //      neither the uj_→omega_ rename nor the tag-arg
                        //      hoist may see one
   legacyPrefix,        // 0 — must precede every rule that matches tag names
+  compatFilters,       // 28
   pageResolved,        // 1
   bracketLayout,       // 2
   tagArgInterpolation, // 3
@@ -1900,6 +1879,7 @@ const JS_RULES = [
 const JSON_RULES = [
   clientMarkup,        // 10 — the same class/attribute names, spelled in a descriptor
   configReads,         // 24 — a binding that emits config renders empty too (#611)
+  compatFilters,       // a binding piping an old filter name would throw unrewritten
 ];
 
 module.exports = {

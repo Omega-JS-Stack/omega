@@ -11,7 +11,7 @@ runtime, and consumer page modules all reach them the same way.
 
 ```js
 import { createLogger } from '__main_assets__/js/libs/logger.js';
-import { loadCharts, chartSlot, barChart } from '__main_assets__/js/libs/charts.js';
+import { loadCharts, chartSlot, chart } from '__main_assets__/js/libs/charts.js';
 ```
 
 `__main_assets__/` is a build-time specifier resolved by the esbuild plugin in
@@ -85,7 +85,7 @@ diagram, and do not add @tanstack/charts or mermaid to a target's dependencies.
 | `admin-helpers.js` | Formatting and stat-cell helpers for the admin pages: relative timestamps, capitalization, and writing a settled Firestore count-aggregation result (or an inline error) into a stat element | `formatTimeAgo`, `capitalize`, `setStatValue`, `setStatSubValue` |
 | `alert-dismiss.js` | The site alerts' × ([#719](https://github.com/Omega-JS-Stack/omega/issues/719)): one delegated `document` click handler hiding the `.main-alert` a pressed `.main-alert-close` sits in. `core/js/main.js` calls it, so every banner `core/_includes/core/body.html` ships is dismissible on every page, an alert injected after boot included | `setupAlertDismiss` |
 | `analytics.js` | The web HOST of the analytics facade ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)): it wires the page's three seams into `@omega.js/analytics` and is the ONE way core code counts anything. Detail below | `event`, `identify`, `reset`, `configureAnalytics`, `readPlatformCookies`, `PLATFORM_COOKIES` |
-| `charts.js` | TanStack Charts behind framework helpers: lazy load, token colors, a slot to draw into, four chart builders. Detail below | `loadCharts`, `chartsReady`, `chartColors`, `resolveColor`, `chartSlot`, `chartDefinition`, `barChart`, `stackedBarChart`, `doughnutChart`, `lineChart` |
+| `charts.js` | TanStack Charts behind framework helpers: lazy load, token colors, a slot to draw into, one `chart` entry for every kind. Detail below | `loadCharts`, `chartsReady`, `chartColors`, `resolveColor`, `chartSlot`, `chartDefinition`, `resolveDefinition`, `chart` |
 | `dev.js` | Development-only helpers, imported by `runtime/boot.js` only when `omega.isDevelopment()`: a click logger, a breakpoint logger on resize, and the palette's **Tools** section ("Log opening tags" and "Toggle theme"), the one home of those dev actions | default export: a function that installs all of it |
 | `graph.js` | mermaid behind framework helpers, on the charts contract: a definition in, an SVG out. Detail below | `loadGraph`, `graphReady`, `graphTheme`, `graphSlot`, `drawGraph` |
 | `initialize-tooltips.js` | Initializes every `[data-bs-toggle="tooltip"]` element as a Bootstrap tooltip, and exits early when the page has none. The ONE home for the behavior ([#99](https://github.com/Omega-JS-Stack/omega/issues/99)): each theme's `_theme.js` calls it from its DOM-ready handler instead of shipping its own copy | default export: `initializeTooltips()` |
@@ -182,9 +182,20 @@ The lifecycle is load, slot, draw:
    write-on-change `swap` (`modules/live-page`) sees a data-only change and
    redraws; a host carries no data of its own, so without the stamp the old
    picture would stand.
-3. One of `barChart` (with `horizontal` for ranked rows), `stackedBarChart`,
-   `doughnutChart`, `lineChart` draws into that id and returns the chart host,
-   or `null` when nothing was drawn.
+3. `chart(id, kind, data, options = {})` draws into that id and returns the
+   chart host, or `null` when nothing was drawn. `kind` is `'bar'` (with
+   `horizontal` for ranked rows) or `'doughnut'`, whose `data` is
+   `{ labels, values, colors? }`, or `'stacked'` or `'line'`, whose `data` is
+   `{ labels, series: [{ label, values, color? }] }`. `options.ariaLabel` names
+   the chart for assistive tech, defaulting to `data.label`, else `'<Kind> chart'`.
+
+A shape the four kinds lack is never a new helper: the page passes
+`options.definition(lib, colors, data)`, which returns a TanStack definition it
+composed itself from the loaded library parts (`charts`, `polar`, `tooltip`,
+`band`, `linear`, `point`) and `chartColors()`, and `chart` mounts that instead
+of compiling a kind (`kind` may then be `null`). `resolveDefinition(kind, data,
+options)` is the one place that choice is made; the slot, the repaint and the
+host bookkeeping stay the helper's either way.
 
 `chartsReady()` is the synchronous check for a render path. Every draw destroys
 the host already mounted on that id first (the module keeps a Map of id → host),
@@ -202,7 +213,7 @@ A tooltip names the THING being read, never the channel it rode in on
 ([#800](https://github.com/Omega-JS-Stack/omega/issues/800)): a bar says
 `label: value`, a stacked segment and a line reading say `series · label: value`,
 and a doughnut slice adds its share of the whole. The unit travels with the
-data — `format: { prefix?, suffix?, decimals? }` on any builder's data argument,
+data — `format: { prefix?, suffix?, decimals? }` on any kind's data argument,
 plain JSON so a page carrying chart data alone can hold it — and it prints in
 the tooltip AND on the value axis, so a money chart says `$` in both places.
 Stated `decimals` are exact (`$7.00`); unstated, a count prints as itself and a
@@ -212,7 +223,7 @@ the row the mark drew (`{label, value}`, plus `series` on a stacked or line
 chart, plus `fraction` on a doughnut).
 
 `chartDefinition(kind, data)` — `'bar'`, `'stacked'`, `'doughnut'`, `'line'` —
-returns the definition a builder would draw, without drawing it. A definition is
+returns the definition `chart` would draw for that kind, without drawing it. A definition is
 renderer-neutral and DOM-free, which is what lets the package's own suite
 (`test/dataviz.test.js`) compile all four through `createChartScene` and assert
 real geometry in node. The PAINT still needs a browser: the sandbox e2e lane's

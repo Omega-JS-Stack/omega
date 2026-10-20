@@ -3,14 +3,16 @@
  *
  * Proves the whole surface works through an actual engine render: filters in
  * templates, block/inline tags, context-coupled filters (liquify /
- * content_format / increment_return), the Jekyll-compat pack, and the
- * collection-backed tags — the exact wiring the Eleventy spike will use.
+ * content_format / increment_return), the omega_* helper pack and the retired
+ * Jekyll names that throw, and the collection-backed tags: the exact wiring
+ * the Eleventy spike will use.
  */
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('../src/register-liquid.js');
+const { COMPAT_REPLACEMENTS } = require('../src/jekyll-compat.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
 
@@ -20,6 +22,11 @@ const SITE = {
   brand: { name: 'Bakeoff' },
   translation: { default: 'en', languages: ['en', 'es'] },
 };
+
+// The thrower's whole message, the `<name>` placeholder included.
+function jekyllThrow(old, successor) {
+  return new RegExp(`\\[@omega\\.js/template-kit\\] ${old} is a Jekyll filter: use ${successor} \\(npx omega migrate --target=<name> --execute rewrites it\\)`);
+}
 
 function makeEngine(overrides = {}) {
   const engine = new Liquid();
@@ -163,25 +170,66 @@ module.exports = defineCases({
     },
 
     {
-      name: 'Jekyll-compat pack renders through the engine',
+      name: '#830: omega_slugify deletes an apostrophe through the engine (#597)',
+      run: async (ctx) => {
+        const engine = makeEngine();
+
+        ctx.expect(await engine.parseAndRender('{{ "Ian\'s Title" | omega_slugify }}')).toBe('ians-title');
+      },
+    },
+
+    {
+      name: '#830: each renamed helper renders through the engine as its Jekyll name did',
       run: async (ctx) => {
         const engine = makeEngine({ markdown: (str) => `<p>${str.trim()}</p>` });
 
-        ctx.expect(await engine.parseAndRender('{{ "Hello World & Friends" | slugify }}')).toBe('hello-world-friends');
-        ctx.expect(await engine.parseAndRender('{{ "# Hi" | markdownify }}')).toBe('<p># Hi</p>');
-        ctx.expect(await engine.parseAndRender('{{ "/about" | relative_url }}')).toBe('/about');
-        ctx.expect(await engine.parseAndRender('{{ "/about" | absolute_url }}')).toBe('https://bakeoff.example.com/about');
-        ctx.expect(await engine.parseAndRender('{{ obj | jsonify }}', { obj: { a: 1 } })).toBe('{"a":1}');
-        ctx.expect(await engine.parseAndRender('{{ "<b>hi</b> there" | strip_html }}')).toBe('hi there');
+        ctx.expect(await engine.parseAndRender('{{ "Hello World & Friends" | omega_slugify }}')).toBe('hello-world-friends');
+        ctx.expect(await engine.parseAndRender('{{ "# Hi" | omega_markdownify }}')).toBe('<p># Hi</p>');
+        ctx.expect(await engine.parseAndRender('{{ "/about" | omega_relative_url }}')).toBe('/about');
+        ctx.expect(await engine.parseAndRender('{{ "/about" | omega_absolute_url }}')).toBe('https://bakeoff.example.com/about');
+        ctx.expect(await engine.parseAndRender('{{ "<b>hi</b> there" | omega_strip_html }}')).toBe('hi there');
+        ctx.expect(await engine.parseAndRender('{{ "one two three" | omega_number_of_words }}')).toBe('3');
 
         const scope = { items: [{ type: 'post', n: 1 }, { type: 'page', n: 2 }, { type: 'post', n: 3 }] };
         const filtered = await engine.parseAndRender(
-          '{% assign posts = items | where_exp: "item", "item.type == \'post\'" %}{{ posts | size }}',
+          '{% assign posts = items | omega_where: "item", "item.type == \'post\'" %}{{ posts | size }}',
           scope
         );
         ctx.expect(filtered).toBe('2');
+        const grouped = await engine.parseAndRender(
+          '{% assign groups = items | omega_group_by: "item", "item.type" %}{% for group in groups %}{{ group.name }}:{{ group.size }};{% endfor %}',
+          scope
+        );
+        ctx.expect(grouped).toBe('post:2;page:1;');
 
-        ctx.expect(await engine.parseAndRender('{{ date | date_to_xmlschema }}', { date: new Date('2024-01-15T12:00:00Z') })).toBe('2024-01-15T12:00:00+00:00');
+        const date = { date: new Date('2024-01-15T12:00:00Z') };
+        ctx.expect(await engine.parseAndRender('{{ date | omega_date_xmlschema }}', date)).toBe('2024-01-15T12:00:00+00:00');
+        ctx.expect(await engine.parseAndRender('{{ date | omega_date_rfc822 }}', date)).toBe('Mon, 15 Jan 2024 12:00:00 +0000');
+      },
+    },
+
+    {
+      name: '#830: jsonify throws naming omega_jsonify; omega_jsonify is compact, and pretty with an indent',
+      run: async (ctx) => {
+        const engine = makeEngine();
+        const scope = { obj: { a: 1 } };
+
+        await ctx.expect(engine.parseAndRender('{{ obj | jsonify }}', scope)).rejects.toThrow(jekyllThrow('jsonify', 'omega_jsonify'));
+        ctx.expect(await engine.parseAndRender('{{ obj | omega_jsonify }}', scope)).toBe('{"a":1}');
+        ctx.expect(await engine.parseAndRender('{{ obj | omega_jsonify: 2 }}', scope)).toBe('{\n  "a": 1\n}');
+      },
+    },
+
+    {
+      name: '#830: every retired Jekyll name throws through the engine, naming its successor and the migrate fix',
+      run: async (ctx) => {
+        const engine = makeEngine({ markdown: (str) => str });
+        const retired = Object.entries(COMPAT_REPLACEMENTS);
+
+        ctx.expect(retired.length, 'the whole table is walked').toBe(11);
+        for (const [old, successor] of retired) {
+          await ctx.expect(engine.parseAndRender(`{{ "x" | ${old} }}`), `${old} fails the render`).rejects.toThrow(jekyllThrow(old, successor));
+        }
       },
     },
 

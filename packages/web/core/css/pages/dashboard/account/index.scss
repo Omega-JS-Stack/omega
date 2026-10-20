@@ -74,16 +74,94 @@
     user-select: none;
   }
 
-  .progress {
-    background-color: var(--bs-tertiary-bg);
-  }
-
   #cancel-subscription-btn {
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
   }
+}
+
+// Usage cards: one per counted feature, drawn from theme tokens only so both
+// color modes follow the skin. The fill's width is the one inline value; the
+// fill turns warn at half spent and danger at 80%.
+.omega-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+
+  // The loading and "not available" lines span the grid instead of one cell
+  > :not(.omega-usage-card) {
+    grid-column: 1 / -1;
+  }
+}
+
+.omega-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  color: var(--omega-ink);
+}
+
+.omega-usage-card__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--omega-ink-muted);
+}
+
+.omega-usage-card__icon {
+  margin-right: 0.375rem;
+  color: var(--omega-ink-muted);
+}
+
+.omega-usage-card__credits {
+  margin-left: auto;
+}
+
+.omega-usage-card__figure {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.omega-usage-card__bar {
+  height: 0.5rem;
+  overflow: hidden;
+  background: var(--omega-line);
+  border-radius: var(--omega-radius-m);
+}
+
+.omega-usage-card__fill {
+  height: 100%;
+  background: var(--omega-accent);
+  border-radius: inherit;
+  transition: width var(--omega-speed) var(--omega-ease);
+}
+
+.omega-usage-card--warn .omega-usage-card__fill {
+  background: var(--omega-warn);
+}
+
+.omega-usage-card--danger .omega-usage-card__fill {
+  background: var(--omega-danger);
+}
+
+.omega-usage-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-size: 0.75rem;
+  color: var(--omega-ink-muted);
 }
 
 // Billing details row — the price, the cadence and the date line, one slot

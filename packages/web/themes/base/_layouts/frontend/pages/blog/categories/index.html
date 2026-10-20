@@ -55,7 +55,7 @@ bands below keep the reveal lane. {% endcomment %}
       <div class="col-lg-8">
         <div class="omega-rowlist" data-omega-reveal-stagger="50">
           {% for category in categories %}
-            <a href="/blog/categories/{{ category | slugify }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
+            <a href="/blog/categories/{{ category | omega_slugify }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
               <span>{{ category }}</span>
               <span class="omega-rowlist__meta">
                 {{ category_counts[forloop.index0] }} {{ category_counts[forloop.index0] | omega_pluralize: 'post', 'posts' }}

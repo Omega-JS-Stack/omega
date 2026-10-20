@@ -4,7 +4,8 @@
  * cache in <consumer>/translations/, provider from config), and writes
  * /{lang}/... copies with localized <html lang|dir>, canonical/og tags,
  * rewritten internal links, and hreflang alternates stitched into both the
- * copies and the originals (only the languages actually produced — hreflang
+ * copies and the originals, replacing any set an earlier pass left there
+ * (only the languages actually produced — hreflang
  * never lies; a pair with no translation, cold or failed, ships the source
  * page unadvertised at its path rather than a mixed-language copy). No GitHub-branch cache, no separate
  * credentials: the cache is part of the repo, and the default claude provider
@@ -181,19 +182,45 @@ function rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix) {
 }
 
 /**
- * Insert hreflang + og:locale:alternate tags for the given languages
- * (idempotent — existing tags are kept, missing ones added).
+ * Remove every language-chrome tag a translate pass stitches: each hreflang
+ * alternate but the two head.html emits (x-default and the source language),
+ * and every og:locale:alternate. A rerun over the same dist/ starts clean.
+ * @param {object} $ - cheerio root
+ * @param {string} defaultLang - source language code
+ * @returns {boolean} whether anything was removed
+ */
+function stripAlternates($, defaultLang) {
+  const stale = $('link[rel="alternate"][hreflang]')
+    .filter((_, el) => !['x-default', defaultLang].includes($(el).attr('hreflang')))
+    .add('meta[property="og:locale:alternate"]');
+
+  // Each stitched tag went in behind its own newline: drop it too, so a
+  // rerun is byte-equal to one pass
+  stale.each((_, el) => {
+    if (el.prev && el.prev.type === 'text' && !el.prev.data.trim()) {
+      $(el.prev).remove();
+    }
+  });
+  stale.remove();
+
+  return stale.length > 0;
+}
+
+/**
+ * Set the hreflang + og:locale:alternate tags for the given languages: it
+ * replaces the set (stripAlternates first), so a rerun never accumulates
+ * tags for languages this pass did not produce.
  * @param {object} $ - cheerio root
  * @param {string[]} languages - translated languages for THIS page
  * @param {string} defaultLang - source language code
  * @param {string} route - the page's route
  * @param {string} baseUrl - site origin (on a MOUNTED site brand.url carries
  *   the base path already — absolute URLs are never prefixed a second time)
- * @returns {boolean} whether anything was inserted
+ * @returns {boolean} whether anything was stripped or inserted
  */
 function insertAlternates($, languages, defaultLang, route, baseUrl) {
   const urlFor = (lang) => `${baseUrl}/${lang}${route ? `/${route}` : ''}`;
-  let changed = false;
+  let changed = stripAlternates($, defaultLang);
 
   const anchor = $('head link[rel="alternate"][hreflang]').last();
   for (const lang of languages) {
@@ -210,8 +237,9 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
     changed = true;
   }
 
+  // A page with no produced language advertises no other locale either
   const ogLocaleTag = $('head meta[property="og:locale"]');
-  if (ogLocaleTag.length) {
+  if (ogLocaleTag.length && languages.length) {
     const currentLocale = ogLocaleTag.attr('content');
     for (const lang of [defaultLang, ...languages]) {
       const locale = ogLocale(lang);
@@ -236,6 +264,7 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  * @param {Array<string|undefined>} options.translated - translations aligned with
  *   collectTextNodes order; undefined leaves that node in the source language
  * @param {string} options.lang - target language
+ * @param {string} options.defaultLang - source language code
  * @param {string} options.route - the page's route
  * @param {string} options.baseUrl - site origin (carries the base path when mounted)
  * @param {Function} options.isExcluded - route exclusion test
@@ -246,9 +275,13 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  * @returns {object} cheerio root, ready for alternates + write
  */
 function renderCopy(options) {
-  const { sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix } = options;
+  const { sourceHtml, translated, lang, defaultLang, route, baseUrl, isExcluded, pathPrefix } = options;
   const textLang = options.textLang || lang;
   const $ = cheerio.load(sourceHtml);
+
+  // An original an earlier pass stitched carries its alternates; a copy
+  // starts from only the build's own
+  stripAlternates($, defaultLang);
 
   collectTextNodes($).forEach((n, i) => {
     const value = translated[i];
@@ -372,7 +405,7 @@ function translateDefaultPages(options) {
 
       copies.push({
         targetRel: copyTargetRel(relPath, lang),
-        $: renderCopy({ sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix }),
+        $: renderCopy({ sourceHtml, translated, lang, defaultLang: settings.default, route, baseUrl, isExcluded, pathPrefix }),
       });
       producedLangs.push(lang);
     }
@@ -488,7 +521,7 @@ async function translateSite(options) {
     // `translated: []` leaves every node untouched (the collector normalizes
     // whitespace, so writing `strings` back would reflow the source)
     const writeUntranslated = (lang) => {
-      const $ = renderCopy({ sourceHtml, translated: [], lang, textLang: settings.default, route, baseUrl, isExcluded, pathPrefix });
+      const $ = renderCopy({ sourceHtml, translated: [], lang, defaultLang: settings.default, textLang: settings.default, route, baseUrl, isExcluded, pathPrefix });
       jetpack.write(path.join(outDir, copyTargetRel(relPath, lang)), $.html());
     };
 
@@ -557,7 +590,7 @@ async function translateSite(options) {
 
       copies.push({
         targetRel: copyTargetRel(relPath, lang),
-        $: renderCopy({ sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix }),
+        $: renderCopy({ sourceHtml, translated, lang, defaultLang: settings.default, route, baseUrl, isExcluded, pathPrefix }),
       });
       producedLangs.push(lang);
     }
@@ -601,10 +634,13 @@ async function translateSite(options) {
     logger.log(`Default pages: ${defaults.pages} translated from the packaged cache (${defaults.strings} strings${defaults.misses ? `, ${defaults.misses} not packaged` : ''})`);
   }
 
-  // Stitch alternates into the ORIGINALS — only for pages actually translated
-  for (const [relPath, langs] of translatedRoutes) {
+  // Stitch alternates into the ORIGINALS of every page this pass covered: one
+  // that produced nothing keeps only the build's own tags, so an earlier
+  // pass's alternates never name a copy that is now untranslated
+  for (const relPath of [...files, ...defaultFiles]) {
     const file = path.join(outDir, relPath);
     const $ = cheerio.load(jetpack.read(file));
+    const langs = translatedRoutes.get(relPath) || [];
 
     if (insertAlternates($, langs, settings.default, routeOf(relPath), baseUrl)) {
       jetpack.write(file, $.html());

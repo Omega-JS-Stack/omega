@@ -33,8 +33,8 @@ function makeConsumer() {
     'layout: frontend/core/base',
     'permalink: /filtered',
     '---',
-    '<div id="apostrophe">{{ "It\'s here" | markdownify }}</div>',
-    '<div id="quotes">{{ \'He said "hi"\' | markdownify }}</div>',
+    '<div id="apostrophe">{{ "It\'s here" | omega_markdownify }}</div>',
+    '<div id="quotes">{{ \'He said "hi"\' | omega_markdownify }}</div>',
     '',
   ].join('\n'));
   return { tmp, consumerDir };

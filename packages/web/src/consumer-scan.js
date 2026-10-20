@@ -12,22 +12,27 @@
  */
 const path = require('node:path');
 const reads = require('@omega.js/devkit/reads');
+const { pageUrlFromPath } = require('./page-url.js');
 
 /**
  * Extract and normalize the `permalink:` value from a page's leading
  * frontmatter block. Only the block is scanned — a `permalink:` line in the
  * BODY (docs prose, fenced code samples) must never claim a URL, because a
- * bogus claim silently suppresses the framework default at that URL.
+ * bogus claim silently suppresses the framework default at that URL. A page
+ * whose frontmatter names no permalink serves at its file path, so with
+ * `file` given that path's URL is the answer (page-url.js).
  * @param {string} raw - full page source
+ * @param {string} [file] - the page's path; omitted, only a frontmatter permalink counts
  * @returns {string|null} normalized URL (`/about/` → `/about`, the canonical
  *   slash-free shape) or null
  */
-function permalinkOf(raw) {
+function permalinkOf(raw, file) {
+  const fromPath = file === undefined ? null : pageUrlFromPath(file);
   const fm = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fm) return null;
+  if (!fm) return fromPath;
 
   const match = fm[1].match(/^permalink:\s*(.+?)\s*$/m);
-  if (!match) return null;
+  if (!match) return fromPath;
 
   // Quoted values win verbatim; unquoted values lose any trailing YAML comment
   const quoted = match[1].match(/^"([^"]*)"|^'([^']*)'/);
@@ -51,7 +56,7 @@ function scanConsumerPages(consumerDir) {
     if (!entry.isFile() || !/\.(md|html)$/.test(entry.name)) continue;
 
     const file = path.join(entry.parentPath, entry.name);
-    const url = permalinkOf(reads.read(file));
+    const url = permalinkOf(reads.read(file), path.relative(consumerDir, file));
     if (url) pages.push({ file, url });
   }
 

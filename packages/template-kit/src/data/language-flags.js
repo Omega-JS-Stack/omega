@@ -1,8 +1,9 @@
 /**
  * language-flags.js — ISO 639-1 language code => ISO 3166 country code for flag icons.
  *
- * Machine-extracted verbatim from jekyll-uj-powertools lib/tags/icon.rb
- * (LANGUAGE_TO_COUNTRY) — do not hand-edit; regenerate from the Ruby source.
+ * The one home of the map: edit it here. Web's alias writer gives every
+ * supported language whose country has no file in the flag set the neutral
+ * fallback glyph instead.
  */
 
 const LANGUAGE_TO_COUNTRY = {
@@ -26,6 +27,9 @@ const LANGUAGE_TO_COUNTRY = {
   "da": "dk", // Danish -> Denmark
   "fi": "fi", // Finnish -> Finland
   "he": "il", // Hebrew -> Israel
+  "fa": "ir", // Persian (Farsi) -> Iran
+  "el": "gr", // Greek -> Greece
+  "ms": "my", // Malay -> Malaysia
   "th": "th", // Thai -> Thailand
   "vi": "vn", // Vietnamese -> Vietnam
   "ur": "pk", // Urdu -> Pakistan

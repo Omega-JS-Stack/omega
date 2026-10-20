@@ -129,6 +129,19 @@ function danglingLanguageLinks(dist, langs) {
     .filter(({ file }) => !fs.existsSync(path.join(dist, file))));
 }
 
+/**
+ * The language chrome a page advertises, every occurrence kept so a duplicate
+ * shows: its hreflang codes and its og:locale:alternate locales, each sorted.
+ */
+function alternatesOf(dist, rel) {
+  const html = fs.readFileSync(path.join(dist, rel), 'utf8');
+  const hreflang = [...html.matchAll(/<link\b[^>]*\bhreflang="([^"]+)"[^>]*>/g)].map((m) => m[1]).sort();
+  const locales = [...html.matchAll(/<meta\b[^>]*property="og:locale:alternate"[^>]*>/g)]
+    .map(([tag]) => tag.match(/content="([^"]*)"/)[1])
+    .sort();
+  return { hreflang, locales };
+}
+
 module.exports = defineCases({
   type: 'group',
   description: 'translate',
@@ -343,6 +356,123 @@ module.exports = defineCases({
         ctx.expect(copy.includes('hreflang="es"'), 'the copy advertises itself').toBeTruthy();
         ctx.expect(!copy.includes('hreflang="ar"'), 'the copy never advertises a language that was not produced').toBeTruthy();
         ctx.expect(!copy.includes('og:locale:alternate" content="ar_AR"'), 'no og:locale alternate for a skipped language').toBeTruthy();
+
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'translateSite: a warm second pass leaves every copy one alternate per language (#964)',
+      run: async (ctx) => {
+        const { root, dist } = stage();
+        const warm = async () => { throw new Error('a warm cache never calls the provider'); };
+
+        await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+        const rerun = await translate({ root, outDir: dist, config: CONFIG, send: warm });
+        ctx.expect(rerun.failures, 'es and ar are produced on the second pass too').toEqual([]);
+
+        const others = { es: ['ar_AR', 'en_US'], ar: ['en_US', 'es_ES'] };
+        for (const lang of ['es', 'ar']) {
+          for (const rel of [`${lang}.html`, path.join(lang, 'about', 'index.html')]) {
+            const { hreflang, locales } = alternatesOf(dist, rel);
+            ctx.expect(hreflang, `${rel}: x-default, en, es and ar exactly once each`).toEqual(['ar', 'en', 'es', 'x-default']);
+            ctx.expect(locales, `${rel}: one og:locale:alternate per other locale, exactly once`).toEqual(others[lang]);
+          }
+        }
+
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'translateSite: a second pass with ar gone cold leaves its untranslated copy unadvertised (#964)',
+      run: async (ctx) => {
+        const { root, dist } = stage();
+        const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
+
+        await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+        const first = alternatesOf(dist, 'index.html').hreflang;
+        ctx.expect(first.includes('es') && first.includes('ar'), 'the original carries es and ar after the first pass').toBeTruthy();
+
+        // ar's cache is gone, so the cachedOnly pass ships ar untranslated
+        fs.rmSync(path.join(root, 'translations', 'ar'), { recursive: true, force: true });
+        const stats = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+        ctx.expect(stats.skippedCold.includes('ar /'), 'ar is cold for the home').toBeTruthy();
+        ctx.expect(stats.skippedCold.includes('ar /about'), 'ar is cold for about').toBeTruthy();
+
+        for (const rel of ['ar.html', path.join('ar', 'about', 'index.html')]) {
+          const { hreflang, locales } = alternatesOf(dist, rel);
+          ctx.expect(hreflang, `${rel}: only the x-default and en tags the build emits`).toEqual(['en', 'x-default']);
+          ctx.expect(locales, `${rel}: no og:locale:alternate`).toEqual([]);
+        }
+
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'translateSite: a second pass whose config dropped ar advertises ar nowhere (#964)',
+      run: async (ctx) => {
+        const { root, dist } = stage();
+        const warm = async () => { throw new Error('a warm cache never calls the provider'); };
+
+        await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+        ctx.expect(alternatesOf(dist, 'index.html').hreflang.includes('ar'), 'the original carries ar after the first pass').toBeTruthy();
+
+        await translate({ root, outDir: dist, config: { ...CONFIG, translation: { ...CONFIG.translation, languages: ['es'] } }, send: warm });
+
+        for (const rel of ['index.html', 'es.html']) {
+          const { hreflang, locales } = alternatesOf(dist, rel);
+          ctx.expect(!hreflang.includes('ar'), `${rel}: no hreflang="ar"`).toBeTruthy();
+          ctx.expect(!locales.includes('ar_AR'), `${rel}: no og:locale:alternate for ar`).toBeTruthy();
+          ctx.expect(hreflang.includes('es'), `${rel}: es is still advertised`).toBeTruthy();
+        }
+
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'translateSite: a second pass with every language cold leaves the originals advertising only x-default and en (#964)',
+      run: async (ctx) => {
+        const { root, dist } = stage();
+        const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
+
+        await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+        const first = alternatesOf(dist, 'index.html').hreflang;
+        ctx.expect(first.includes('es') && first.includes('ar'), 'the original carries es and ar after the first pass').toBeTruthy();
+
+        // Both caches gone, so the cachedOnly pass produces no language at all
+        for (const lang of ['es', 'ar']) {
+          fs.rmSync(path.join(root, 'translations', lang), { recursive: true, force: true });
+        }
+        const stats = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+        ctx.expect(stats.pages, 'nothing translated on the cold pass').toBe(0);
+
+        for (const rel of ['index.html', path.join('about', 'index.html')]) {
+          const { hreflang, locales } = alternatesOf(dist, rel);
+          ctx.expect(hreflang, `${rel}: only the x-default and en tags the build emits`).toEqual(['en', 'x-default']);
+          ctx.expect(locales, `${rel}: no og:locale:alternate`).toEqual([]);
+        }
+
+        fs.rmSync(root, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'translateSite: a warm third pass leaves the pages byte-identical to the second (#964)',
+      run: async (ctx) => {
+        const { root, dist } = stage();
+        const warm = async () => { throw new Error('a warm cache never calls the provider'); };
+        const read = (rel) => fs.readFileSync(path.join(dist, rel), 'utf8');
+
+        await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+        await translate({ root, outDir: dist, config: CONFIG, send: warm });
+        const second = { original: read('index.html'), es: read('es.html') };
+
+        await translate({ root, outDir: dist, config: CONFIG, send: warm });
+        ctx.expect(read('index.html'), 'index.html: a rerun changes nothing').toBe(second.original);
+        ctx.expect(read('es.html'), 'es.html: a rerun changes nothing').toBe(second.es);
 
         fs.rmSync(root, { recursive: true, force: true });
       },
