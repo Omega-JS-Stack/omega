@@ -1,30 +1,60 @@
 /**
  * Ensure Workers + routes match `edge.providers.cloudflare.workers`
- * [{ name, route, script, env }] — script is a filename in this service's
- * workers/ dir; route supports `{ domain }` templating.
+ * [{ name, route, script, env, secrets }]. script resolves in the brand's
+ * workers/ first, then the company tree's, then this service's; secrets
+ * names brand .env keys; route supports `{ domain }` templating.
  *
- * 1. Reads existing workers + zone routes + account ID.
- * 2. For each configured worker: load script from disk, mark create/update;
+ * 1. Resolves every script and secret; a missing one throws before any request.
+ * 2. Reads existing workers + zone routes + account ID.
+ * 3. For each configured worker: mark create/update;
  *    for each route: ensure it exists and points at the right script.
  *    Unconfigured workers/routes are removed.
- * 3. PUTs worker scripts as multipart form data, POSTs/PUTs/DELETEs routes.
+ * 4. PUTs worker scripts as multipart form data, POSTs/PUTs/DELETEs routes.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { resolveCompany } = require('@omega.js/config');
 const { templateObject } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
 const { accountId: resolveAccountId } = require('../lib/account-id.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
-function buildScriptFormData(scriptContent, env) {
+function resolveScript(brandRoot, script) {
+  const brandPath = join(brandRoot, 'workers', script);
+  const companyPath = resolveCompany(brandRoot).file(join('workers', script));
+  const frameworkPath = join(__dirname, '..', 'workers', script);
+  const found = [brandPath, companyPath, frameworkPath].find((p) => p && jetpack.exists(p) === 'file');
+  if (!found) {
+    throw new Error(`Worker script not found: ${script} (looked in ${brandPath}, the company tree, and ${frameworkPath})`);
+  }
+  return jetpack.read(found);
+}
+
+// Values come from the manage run's environment, the brand .env cascade
+function resolveSecrets(workerConfig) {
+  return Object.fromEntries((workerConfig.secrets || []).map((name) => {
+    const value = process.env[name];
+    if (!value) {
+      throw new Error(`Worker ${workerConfig.name}: secret ${name} is not set in the brand .env`);
+    }
+    return [name, value];
+  }));
+}
+
+function buildScriptFormData(scriptContent, env, secrets) {
   const formData = new FormData();
   formData.append('metadata', JSON.stringify({
     main_module: 'index.js',
-    bindings: Object.entries(env || {}).map(([key, value]) => ({
-      type: 'plain_text', name: key, text: value,
-    })),
+    bindings: [
+      ...Object.entries(env || {}).map(([key, value]) => ({
+        type: 'plain_text', name: key, text: value,
+      })),
+      ...Object.entries(secrets).map(([key, value]) => ({
+        type: 'secret_text', name: key, text: value,
+      })),
+    ],
   }));
   formData.append('index.js', new Blob([scriptContent], { type: 'application/javascript+module' }), 'index.js');
   return formData;
@@ -42,6 +72,12 @@ module.exports = async function ensureWorkers(context) {
     console.log(`      ${chalk.dim('⊘ No workers configured')}`);
     return;
   }
+
+  // Scripts and secrets are local inputs: a missing one fails before any request
+  const resolved = new Map(workersConfig.map((workerConfig) => [workerConfig, {
+    script: resolveScript(brandRoot, workerConfig.script),
+    secrets: resolveSecrets(workerConfig),
+  }]));
 
   // === READ ===
   const accountId = await resolveAccountId(context);
@@ -66,20 +102,15 @@ module.exports = async function ensureWorkers(context) {
 
   for (const workerConfig of workersConfig) {
     const route = templateObject(workerConfig.route, { domain });
-    const scriptPath = join(__dirname, '..', 'workers', workerConfig.script);
-    const scriptContent = jetpack.read(scriptPath);
-
-    if (!scriptContent) {
-      console.error(`      ${chalk.red('✗')} Worker script not found: ${chalk.cyan(scriptPath)}`);
-      continue;
-    }
+    const { script, secrets } = resolved.get(workerConfig);
+    const worker = { name: workerConfig.name, script, env: workerConfig.env || {}, secrets };
 
     const existingWorker = existingWorkers.find((w) => w.id === workerConfig.name);
     if (existingWorker) {
-      workersToUpdate.push({ name: workerConfig.name, script: scriptContent, env: workerConfig.env || {} });
+      workersToUpdate.push(worker);
     } else {
       console.log(`      ${chalk.dim('·')} create worker ${chalk.cyan(workerConfig.name)}`);
-      workersToCreate.push({ name: workerConfig.name, script: scriptContent, env: workerConfig.env || {} });
+      workersToCreate.push(worker);
     }
 
     const existingRoute = existingRoutes.find((r) => r.pattern === route);
@@ -145,7 +176,7 @@ module.exports = async function ensureWorkers(context) {
     try {
       await api.makeRequest(`/accounts/${accountId}/workers/scripts/${worker.name}`, {
         method: 'PUT',
-        body: buildScriptFormData(worker.script, worker.env),
+        body: buildScriptFormData(worker.script, worker.env, worker.secrets),
       });
       (isCreate ? output.workersCreated : output.workersUpdated).push(worker.name);
       console.log(`      ${chalk.green('✓')} ${isCreate ? 'Created' : 'Updated'} worker: ${chalk.cyan(worker.name)}`);

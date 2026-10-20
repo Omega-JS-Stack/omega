@@ -23,7 +23,7 @@ read step is cached to `.omega/cache/cloudflare/{op}.json` as a debugging aid.
 | `rules-security` | Custom firewall rules in `http_request_firewall_custom`. |
 | `speed-scheduled-tests` | The homepage's Speed Test schedule (a create-or-replace POST on the custom Speed API endpoint). |
 | `web-analytics` | Cloudflare Web Analytics, the beacon Cloudflare injects at the edge. It is ACCOUNT-level: the operation lists the account's RUM sites, finds the one for this zone, and makes its `enabled` match `webAnalytics.enabled` (a missing site is created with automatic install only when the key is `true`). A 403 (a token without "Account Settings Write") returns **warned** naming that permission, and the walk goes on; any other error, on the list or a write, fails the walk. |
-| `workers` | Worker scripts + routes from `edge.providers.cloudflare.workers` — `script` names a file in the service's own `workers/` dir, `route` supports `{ domain }` templating. Unconfigured workers and routes are removed. |
+| `workers` | Worker scripts + routes from `edge.providers.cloudflare.workers` — `script` names a file in the brand's `workers/` folder, else the company tree's `workers/`, else the service's own `workers/` dir (a name in none fails the walk, naming where it looked); `env` becomes `plain_text` bindings, and `secrets[]` names brand `.env` keys sent as `secret_text` bindings (a key with no value fails the walk before any request; values are never logged). A key named here is a brand-root custom `.env` key, and the env delivery sends every custom key to every target's deploy ([config.md's custom-key rule](../shared/config.md#the-env-schema-srcenv-schemajs--581)): the worker's secret also lands in the web and backend deploy secrets, which never read it. Nothing filters it today. `route` supports `{ domain }` templating. Every run re-uploads each worker and the upload replaces its bindings, so a secret set outside omega is dropped unless `secrets[]` names it. Unconfigured workers and routes are removed. |
 
 ## Config
 
@@ -37,7 +37,9 @@ Everything sits under `edge.providers.cloudflare`:
   ([#692](https://github.com/Omega-JS-Stack/omega/issues/692), below).
 - `settings` — the zone-settings map, keyed by Cloudflare's setting IDs exactly.
 - `cacheRules[]`, `rules.{managedTransforms,redirect,configuration,responseHeaders,security}`,
-  `speedTest.{frequency,region}`, `workers[]`.
+  `speedTest.{frequency,region}`, `workers[]` (`{ name, route, script, env, secrets }`: `script`
+  from the brand's `workers/` folder, else the company tree's, else the service's; `secrets`
+  names brand `.env` keys).
 - `webAnalytics.enabled`: default `true`, so the zone carries the beacon unless a brand or
   company layer says `false`. The beacon sits outside the consent gate
   ([docs/shared/analytics.md](../shared/analytics.md)). So the first manage run of a brand

@@ -129,8 +129,9 @@ const { BOOT_SERVICES } = require('../src/config.js');
  * Fake framework bin: appends { name, phase, cwd, argv } to <brand>/calls.log
  * on the way in and on the way out, holds the process between the two, and
  * exits 1 when this run's sentinel exists (`FAIL-<name>`). The two phases are
- * what makes concurrency observable (#901): three targets that ran together
- * all START before the first of them ENDS.
+ * what makes concurrency observable (#901): the names in a `GROUP` sentinel
+ * wait for one another's START before they END, so a sequential fan-out
+ * leaves the first of them waiting alone to its deadline.
  *
  * `SKIP-<name>` is the other sentinel: the verb prints ONE line and exits 0,
  * which is what a framework verb does when it steps aside on purpose (the
@@ -148,11 +149,20 @@ const record = (phase) => fs.appendFileSync(path.join(brandRoot, 'calls.log'), J
   argv: process.argv.slice(2),
 }) + '\\n');
 record('start');
-// Long enough that a SEQUENTIAL fan-out could not interleave these; a HOLD-MS
-// sentinel stretches it past each npm-run start-up for the concurrency cases.
-const holdFile = path.join(brandRoot, 'HOLD-MS');
-const hold = fs.existsSync(holdFile) ? Number(fs.readFileSync(holdFile, 'utf8')) : 120;
-Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, hold);
+const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const groupFile = path.join(brandRoot, 'GROUP');
+const group = fs.existsSync(groupFile) ? fs.readFileSync(groupFile, 'utf8').trim().split(',') : [];
+const started = () => fs.readFileSync(path.join(brandRoot, 'calls.log'), 'utf8').split('\\n')
+  .filter(Boolean).map((row) => JSON.parse(row)).filter((row) => row.phase === 'start').map((row) => row.name);
+// A group member ends only once every member has started (or the deadline
+// passes): no machine speed can make a sequential fan-out pass this.
+const deadline = Date.now() + 8000;
+if (group.includes(${JSON.stringify(name)})) {
+  while (Date.now() < deadline && !group.every((member) => started().includes(member))) pause(50);
+  if (!group.every((member) => started().includes(member))) console.error(${JSON.stringify(name)} + ': gave up waiting for the group to start');
+} else {
+  pause(120);
+}
 record('end');
 if (fs.existsSync(path.join(brandRoot, 'SKIP-' + ${JSON.stringify(name)}))) {
   console.log('  Skipping the ' + ${JSON.stringify(name)} + ' deploy: cloud.shared is true');
@@ -657,7 +667,7 @@ module.exports = defineCases({
       name: 'web, desktop and extension deploy CONCURRENTLY, after the backend (#901)',
       run: async (ctx) => {
         const { brand } = stageBrand(['desktop', 'extension']);
-        fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
+        fs.writeFileSync(path.join(brand, 'GROUP'), 'web,desktop,extension');
         const code = await runDeployCommand(brand);
 
         const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
@@ -701,7 +711,7 @@ module.exports = defineCases({
       name: '--target=web,desktop: no backend, and the two run together (#901)',
       run: async (ctx) => {
         const { brand } = stageBrand(['desktop', 'extension']);
-        fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
+        fs.writeFileSync(path.join(brand, 'GROUP'), 'web,desktop');
         await runDeployCommand(brand, { target: 'web,desktop' });
 
         const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');

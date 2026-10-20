@@ -115,6 +115,7 @@ Today's consumers, all of them through that one function:
 | The config layer | `company/config/omega.json5` | the merge chain: schema defaults, framework defaults, **company**, brand, `targets.<name>`, local ([../shared/config.md](../shared/config.md)) |
 | The shared secrets | `company/.env` | the env chain: shell, local `.env`, brand `.env`, **company `.env`** |
 | Owner hooks | `company/config/hooks/<point>.js` | the brand's own hook first, then the company's |
+| Worker scripts | `company/workers/<script>` | the edge service's `workers` operation: the brand's own `workers/` first, then the company's, then the framework's ([edge.md](edge.md)) |
 | The Apple signing tree | `company/.omega/certificates/apple/` | the certificates walk and every desktop reader: ONE two-tier resolution ([#892](https://github.com/Omega-JS-Stack/omega/issues/892)) that READS the company tree first and the brand's own second, and WRITES every new CSR, `.cer` and `.p12` into the company tree. Nothing COPIES it out ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the desktop env load derives `CSC_LINK` and `APPLE_API_KEY` as absolute paths INTO the tree |
 
 **Resolved, never copied** (Ian: "RESOLVED at runtime, right? similar with certs"): the child's `.env` never receives company values, and the loaded environment has them.

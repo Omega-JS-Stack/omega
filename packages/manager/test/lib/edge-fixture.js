@@ -48,7 +48,8 @@ class Page {
 /**
  * Recording fake CloudflareAPI. `responses` maps "METHOD endpoint" to a
  * result (or a function: throw inside it to simulate API errors). Missing
- * keys throw, so any unexpected call fails loudly.
+ * keys throw, so any unexpected call fails loudly. A FormData body is kept
+ * on the call as `form`, so a test can read its parts.
  */
 function fakeApi({ zones = [], responses = {} } = {}) {
   const api = { calls: [], responses };
@@ -60,6 +61,7 @@ function fakeApi({ zones = [], responses = {} } = {}) {
       method,
       endpoint,
       body: options.body ? (isFormData ? '[form-data]' : JSON.parse(options.body)) : undefined,
+      ...(isFormData && { form: options.body }),
     });
 
     const responder = api.responses[`${method} ${endpoint}`];

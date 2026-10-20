@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#1120](../../issues/1120) - A brand ships its own Cloudflare Worker: `script` resolves in the brand's `workers/` folder, then the company tree's, then the framework's, and a worker entry's `secrets: ['KEY']` sends brand `.env` values as `secret_text` bindings. A missing script or secret fails the walk before the workers step sends any request.
 - [#1116](../../issues/1116) - `@omega.js/web/test` gains the Node half of the framework-deps rule: `require(name)` answers from web's own module context, the twin of backend's `omega.require`, and `loadModule(modulePath, { omega, document, window })` bundles one page module through the asset build's alias plugin. A brand's test never names a framework dependency.
 - [#709](../../issues/709) - Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value - an explicit `data-omega-copy-value`/property, a selector, else the sibling input - copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) - `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
