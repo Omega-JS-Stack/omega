@@ -285,12 +285,14 @@ module.exports = defineCases({
           transactionDate: '2026-03-07',
         });
 
-        expect(response, 'Should accept retry of failed alert').toBeSuccess();
+        expect(response.status, 'Should accept retry of failed alert with 200').toBe(200);
         expect(!response.data.duplicate, 'Should not indicate duplicate for failed retry').toBeTruthy();
 
-        // Verify doc was updated
+        // The on-write trigger may already have moved `status` on, so only the retry's rewrite is asserted
         const doc = await firestore.get(`payments-disputes/${alertId}`);
-        expect(doc.status === 'pending' || doc.status === 'processing', 'Status should be pending or processing after retry').toBeTruthy();
+        expect(doc.alert.card.last4, 'The retry should save the posted card').toBe('4242');
+        expect(doc.alert.amount, 'The retry should save the posted amount').toBe(29.99);
+        expect(doc.error, 'The retry should replace the seeded error').not.toBe('Previous error');
       },
     },
 

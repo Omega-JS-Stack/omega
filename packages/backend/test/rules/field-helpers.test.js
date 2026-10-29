@@ -289,12 +289,12 @@ module.exports = defineCases({
           await assertFails(db.doc(`users/${UID}`).set({ roles: { admin: true } }));
           await assertFails(db.doc(`users/${UID}`).set({ subscription: { status: 'active' } }));
           // A user's own document, carrying only its own keys, is theirs.
-          await assertSucceeds(db.doc(`users/${UID}`).set({ profile: { displayName: 'Mine' } }));
+          await assertSucceeds(db.doc(`users/${UID}`).set({ streak: { days: 1 } }));
           // Somebody else's is not.
-          await assertFails(db.doc('users/another-user').set({ profile: { displayName: 'Theirs' } }));
+          await assertFails(db.doc('users/another-user').set({ streak: { days: 1 } }));
           // …and the guard still holds on the update that follows.
           await assertFails(db.doc(`users/${UID}`).set({ roles: { admin: true } }, { merge: true }));
-          await assertSucceeds(db.doc(`users/${UID}`).set({ profile: { displayName: 'Still mine' } }, { merge: true }));
+          await assertSucceeds(db.doc(`users/${UID}`).set({ streak: { days: 2 } }, { merge: true }));
           // DELETE is not an op the users rule declares: an owner deleting
           // their own document falls through to the admin catch-all and is
           // denied by the RULE, never by an evaluation error (deleting carries

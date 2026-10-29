@@ -33,8 +33,7 @@ Both transactional and marketing paths share the same preparation layer:
 | `resolveBrand(omega)` | Clones brand config, sanitizes images (SVG→PNG via CDN naming) |
 | `resolveSender({ sender, from, group }, brand, brandDomain, omega)` | Resolves sender from/display-name by category key, and the ASM group id from config (`marketing.campaigns.providers.sendgrid.groups.<key>`); see [Unsubscribe groups](#unsubscribe-groups) |
 | `renderContent({ content, html, trusted }, utmOptions)` | Markdown→HTML via markdown-it, applies UTM link tagging. Raw HTML in `content` is DISABLED unless `trusted` is set — see [Content trust](#content-trust) |
-| `resolvePerson(brand)` | The `brand.contact.person` identity for personal email. Throws 400 when unconfigured — see [Identity is config, or it is an error](#identity-is-config-or-it-is-an-error) |
-| `resolveSignoff(signoff, brand)` | Fills personal signoff details (name, headshot, URL) from `brand.contact.person` when `type: 'personal'` |
+| `resolveSignoff(signoff)` | The caller's signoff, passed through untouched; none is the team signoff (`{ type: 'team' }`). Nothing is filled from config |
 | `buildCategories(type, brandId, extra)` | Builds categories array: `['transactional', brandId, ...extra]` |
 | `buildUnsubscribeUrl({ email, groupId, template, websiteUrl })` | HMAC-signed one-click unsubscribe URL |
 | `buildTemplateData({ brand, subject, ... })` | Deep-merges system defaults with caller data into the template data tree |
@@ -42,19 +41,17 @@ Both transactional and marketing paths share the same preparation layer:
 
 ### Identity is config, or it is an error
 
-Nothing in the email path carries a built-in human or company identity. Every name, face, link and audit address comes from the merged config, and a missing one **fails loudly instead of falling back** — a silent default would sign a brand's mail as someone else.
+Nothing in the email path carries a built-in human or company identity. Every name, logo and audit address comes from the merged config, and a missing one **fails loudly instead of falling back**: a silent default would sign a brand's mail as someone else.
 
 | Surface | Config key | Missing behavior |
 |---|---|---|
-| Personal signoff (name, headshot, link) | `brand.contact.person.{name,image,url,urlText}` | `prepare.resolvePerson()` **throws 400** when `name` is unset and a `personal` signoff was requested |
-| Personal copy in email bodies ("I'm Jane, the founder…") | `brand.contact.person.firstName` | Defaults to the first word of the configured `person.name` — derived from the brand's own value, never a framework one |
 | Email footer parent entity | `company.name` (RESOLVED from `company: { id }`, [#677](https://github.com/Omega-JS-Stack/omega/issues/677)) | Falls back to `brand.name`, and a brand with no company resolves to its own name anyway |
 | Email footer parent wordmark | `company.images.wordmark` (RESOLVED from the parent's own `brand.images.wordmark`) | The wordmark block is **omitted**: never another company's logo |
 | Audit BCCs on `copy: true` sends | `brand.contact.carbonCopy` (`[{ email, name }]`) | No BCCs. A listed entry missing `email` throws 400 |
 
 `copy: true` still CCs the brand's own `brand.contact.email` — that is the brand copying itself and needs no extra config.
 
-A team signoff (the default) needs none of this. Only `signoff.type: 'personal'` requires a configured person; the signup welcome/nudge/checkup emails are the in-framework users of that path, and each one's send is individually caught and logged, so an unconfigured brand logs a loud error per email rather than failing signup.
+No config names a person. Every send signs off as the brand's team ("The {Brand} Team") unless its caller passes its own `data.signoff`: a `personal` one carries its own `name`, `image`, `url` and `urlText`, and passes through untouched. The signup welcome, discount-nudge and checkup emails speak as the brand's team and sign off as it.
 
 ### Content trust
 
@@ -180,7 +177,6 @@ await email.send({
   categories: ['account/welcome'],
   data: {
     content: { title: 'Welcome!', message: '# Hello!\n\nMarkdown here.' },
-    signoff: { type: 'personal' },
   },
 });
 ```
@@ -381,7 +377,7 @@ above — and nothing else; the id of each lives in the brand's own config at
 
 ### The testing-mode capture (the SendGrid stand-in)
 
-Outside extended mode, `Transactional.send()` **records** the email instead of delivering it and returns `{ status: 'captured' }` ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). The seam sits past `build()` — after the brand, the recipients, the template data and the MJML render, before SendGrid is even required — so a broken template or an unconfigured signoff fails a test rather than reaching production, and the audit trail and the `admin/email` analytics event (both facts about a DELIVERY) are not written.
+Outside extended mode, `Transactional.send()` **records** the email instead of delivering it and returns `{ status: 'captured' }` ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). The seam sits past `build()` (after the brand, the recipients, the template data and the MJML render, before SendGrid is even required), so a broken template or a config hole fails a test rather than reaching production, and the audit trail and the `admin/email` analytics event (both facts about a DELIVERY) are not written.
 
 **The gate is the mailer's, not the caller's.** `ctx.isTesting() && !TEST_EXTENDED_MODE` is asked in exactly one place (`isCapturing()`), the way the marketing library gates `add`/`sync`/`remove` at the SSOT level. Do not add an `isTesting()` check around a new `send()` call — the seam already covers it. What the seam does NOT cover: a send scheduled past `SEND_AT_LIMIT` is queued to `emails-queue` before the seam is reached (assert it there), and extended mode still sends real mail.
 

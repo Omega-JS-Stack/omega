@@ -50,7 +50,7 @@ module.exports = defineCases({
         const root = folder('acme');
 
         await omega(root, [
-          'onboard', '--id=acme', '--name=Acme', '--url=https://acme.test', '--targets=web', '--contactName=Jane Doe',
+          'onboard', '--id=acme', '--name=Acme', '--url=https://acme.test', '--targets=web',
           '--company=acme-co', '--admins=a@x.com,b@x.com', '--no-manage', '--no-dev',
         ]);
 

@@ -12,7 +12,7 @@ const path = require('node:path');
 const JSON5 = require('json5');
 
 // Before the source loads: no real npm install, dev stack or GitHub call
-const { driveWizard, emptyGitConfig } = require('./lib/onboard-seams.js');
+const { driveWizard } = require('./lib/onboard-seams.js');
 const { recordBrand } = require('@omega.js/config');
 
 // The machine registry is per-machine state: this file's fixtures write into a
@@ -104,9 +104,6 @@ const WIZARD_ANSWERS = {
   'Company brand id': '\r',
   'Brand description': '\r',
   'Brand tagline': '\r',
-  'Contact person (': 'Jane Doe\r',
-  'Contact person headshot URL': '\r',
-  'Contact person link URL': '\r',
   'Keep this account list?': '\r',
 };
 
@@ -180,9 +177,6 @@ module.exports = defineCases({
           url: 'https://acme.io',
           description: 'Rockets and anvils',
           tagline: 'Beep beep',
-          contactName: 'Wile E. Coyote, CEO',
-          contactImage: 'https://acme.io/wile.jpg',
-          contactUrl: 'https://acme.io/wile',
           targets: 'web,backend,desktop',
           manage: false,
           execFn: toolProbe(),
@@ -213,12 +207,7 @@ module.exports = defineCases({
           description: 'Rockets and anvils',
           tagline: 'Beep beep',
           url: 'https://acme.io',
-          contact: {
-            email: 'support@acme.io',
-            // The human who signs the personal sends — flags answer it
-            // non-interactively; the optionals ride along (#770)
-            person: { name: 'Wile E. Coyote, CEO', image: 'https://acme.io/wile.jpg', url: 'https://acme.io/wile' },
-          },
+          contact: { email: 'support@acme.io' },
         });
         ctx.expect(config.theme).toEqual({ id: 'classy', appearance: 'system' });
         // Socials seed EMPTY (#462): every surface that reads the block (the footer
@@ -332,10 +321,20 @@ module.exports = defineCases({
     },
 
     {
+      name: 'non-interactive: --contactName is no longer a flag: no person is written',
+      run: async (ctx) => {
+        const root = tempDir();
+
+        const report = await runOnboard(root, { id: 'flagged', url: 'https://flagged.test', contactName: 'Wile E. Coyote, CEO', manage: false });
+
+        ctx.expect(report.valid).toBe(true);
+        ctx.expect(readConfig(root).brand.contact).toEqual({ email: 'support@flagged.test' });
+      },
+    },
+
+    {
       name: 'non-interactive: underivable id is a clear error, bad flag values throw',
       run: async (ctx) => {
-        // No git user name anywhere, so nothing fills the contact person in
-        emptyGitConfig(ctx);
         const parent = tempDir();
         const root = path.join(parent, '№∆');
         fs.mkdirSync(root);
@@ -344,10 +343,6 @@ module.exports = defineCases({
         await ctx.expect((() => runOnboard(root, { id: 'Bad_Id', manage: false }))()).rejects.toThrow(/Invalid brand id/);
         await ctx.expect((() => runOnboard(root, { id: 'ok', url: 'ftp://x', manage: false }))()).rejects.toThrow(/Invalid brand url/);
         await ctx.expect((() => runOnboard(root, { id: 'ok', targets: 'web,gopher', manage: false }))()).rejects.toThrow(/Unknown target\(s\): gopher/);
-        // A contact flag with nobody to belong to fails loudly instead of vanishing
-        await ctx.expect((() => runOnboard(root, { id: 'ok', contactImage: 'https://x/y.jpg', manage: false }))()).rejects.toThrow(/need a --contactName/);
-        // A bare --contactName parses to boolean true; that is not a name
-        await ctx.expect((() => runOnboard(root, { id: 'ok', contactName: true, manage: false }))()).rejects.toThrow(/Invalid --contactName/);
 
         // Nothing was written by any failed attempt
         ctx.expect(fs.readdirSync(root)).toEqual([]);
@@ -371,9 +366,6 @@ module.exports = defineCases({
           await tty.answer('Company brand id', '\r');               // blank → standalone, no company key
           await tty.answer('Brand description', 'A wizard-made brand\r');
           await tty.answer('Brand tagline', '\r');                  // empty → omitted
-          await tty.answer('Contact person (', 'Jane Doe, CEO\r');
-          await tty.answer('Contact person headshot URL', '\r');    // empty → omitted
-          await tty.answer('Contact person link URL', '\r');        // empty → omitted
           await tty.answer('Targets (', '\r');                      // accept the checked default: web
           await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
           await tty.answer('Run manage now?', 'n\r');
@@ -390,9 +382,9 @@ module.exports = defineCases({
           ctx.expect(config.brand.url).toBe('https://wizardbrand.com');
           ctx.expect(config.brand.description).toBe('A wizard-made brand');
           ctx.expect(!('tagline' in config.brand)).toBeTruthy();
-          // The person signs the personal sends (#770); the skipped optionals stay
-          // out of the config rather than landing as empty strings
-          ctx.expect(config.brand.contact).toEqual({ email: 'support@wizardbrand.com', person: { name: 'Jane Doe, CEO' } });
+          // No contact person is asked for, and none is written
+          await ctx.expect(tty.waitFor('Contact person', 0)).rejects.toThrow(/Timed out/);
+          ctx.expect(config.brand.contact).toEqual({ email: 'support@wizardbrand.com' });
           ctx.expect(Object.keys(config.targets)).toEqual(['web']);
           // Inherited account list stays unwritten — the source layer keeps owning it
           ctx.expect(!('account' in config)).toBeTruthy();
@@ -416,9 +408,6 @@ module.exports = defineCases({
           await tty.answer('Company brand id', '\r');
           await tty.answer('Brand description', '\r');
           await tty.answer('Brand tagline', '\r');
-          await tty.answer('Contact person (', 'Boss Person\r');
-          await tty.answer('Contact person headshot URL', '\r');
-          await tty.answer('Contact person link URL', '\r');
           await tty.answer('Keep this account list?', 'n\r');
           await tty.answer('Account email', 'boss@{domain}\r');
           await tty.answer('Manage the Firebase Auth account', '\r');   // yes (default)
@@ -532,31 +521,6 @@ module.exports = defineCases({
       },
     },
 
-    {
-      name: 'resume: an existing contact person survives a rerun untouched (#770)',
-      run: async (ctx) => {
-        const root = tempDir();
-        fs.mkdirSync(path.join(root, 'config'));
-        const authored = `{
-    brand: {
-      id: 'personful',
-      name: 'Personful',
-      url: 'https://personful.test',
-      contact: { email: 'support@personful.test', person: { name: 'Jane Doe, CEO' } },
-    },
-    targets: { web: { type: 'web' } },
-  }`;
-        fs.writeFileSync(path.join(root, 'config', 'omega.json5'), authored);
-
-        const report = await runOnboard(root, { manage: false });
-
-        ctx.expect(report.mode).toBe('resume');
-        // The person is the brand's own answer — a rerun never rewrites it
-        ctx.expect(readConfig(root).brand.contact.person).toEqual({ name: 'Jane Doe, CEO' });
-        ctx.expect(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8')).toBe(authored);
-      },
-    },
-
     // ─── Legacy port ─────────────────────────────────────────────────────────────
 
     {
@@ -620,9 +584,6 @@ module.exports = defineCases({
         await tty.answer('Company brand id', 'fixture-co\r');
         await tty.answer('Brand description', '\r');
         await tty.answer('Brand tagline', '\r');
-        await tty.answer('Contact person (', 'Boss Person\r');
-        await tty.answer('Contact person headshot URL', '\r');
-        await tty.answer('Contact person link URL', '\r');
         await tty.answer('Keep this account list?', '\r');
 
         const report = await run;

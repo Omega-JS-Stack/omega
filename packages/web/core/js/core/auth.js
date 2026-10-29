@@ -39,8 +39,8 @@ export default function ({ omega }) {
     omega.auth.listen({}, async (state) => {
       const user = state.user;
       const url = new URL(window.location.href);
-      const authReturnUrlRaw = url.searchParams.get('authReturnUrl');
-      const authReturnUrl = authReturnUrlRaw && omega.isValidRedirectUrl(authReturnUrlRaw) ? authReturnUrlRaw : null;
+      const returnUrlRaw = url.searchParams.get('returnUrl');
+      const returnUrl = returnUrlRaw && omega.isValidRedirectUrl(returnUrlRaw) ? returnUrlRaw : null;
       const authSignout = url.searchParams.get('authSignout');
 
       // Log
@@ -49,7 +49,7 @@ export default function ({ omega }) {
       // Short-circuit if a reverse-signup is in progress (libs/auth/oauth.js#reverseAccidentalSignup
       // sets this synchronously before .delete() + signOut()). Without this, the brief
       // window where Firebase shows user=<about-to-be-deleted-account> would trigger the
-      // policy-based redirect to /account (or authReturnUrl) BEFORE the user sees the
+      // policy-based redirect to /account (or returnUrl) BEFORE the user sees the
       // inline error on /signin. Flag is cleared at the end of reverseAccidentalSignup.
       if (window.__OMEGA_REVERSING_SIGNUP) {
         logger.warn('Skipping state-change processing — reverse-signup in progress');
@@ -57,7 +57,7 @@ export default function ({ omega }) {
       }
 
       // Same courtesy for custom-token sign-ins (libs/auth/session-params.js):
-      // that handler owns the post-signin navigation (authReturnUrl), and this
+      // that handler owns the post-signin navigation (returnUrl), and this
       // listener's authenticated-default redirect must not race it.
       if (window.__OMEGA_CUSTOM_TOKEN_SIGNIN) {
         logger.warn('Skipping state-change processing — custom-token sign-in owns navigation');
@@ -88,7 +88,7 @@ export default function ({ omega }) {
         }
 
         // The signed-out event we were waiting for: clear the flag and fall through
-        // to the normal unauthenticated handling (justSignedOut + authReturnUrl).
+        // to the normal unauthenticated handling (justSignedOut + returnUrl).
         window.__OMEGA_SIGNOUT_IN_PROGRESS = false;
       }
 
@@ -139,9 +139,9 @@ export default function ({ omega }) {
 
         // Check if page requires user to be unauthenticated (e.g., signin page)
         if (policy === 'unauthenticated') {
-          // Check for authReturnUrl first (takes precedence)
-          if (authReturnUrl) {
-            redirect(authReturnUrl);
+          // Check for returnUrl first (takes precedence)
+          if (returnUrl) {
+            redirect(returnUrl);
             return;
           }
 
@@ -159,8 +159,8 @@ export default function ({ omega }) {
       } else {
         // User is not authenticated
 
-        // If we just signed out and have authReturnUrl, stay on the page
-        if (justSignedOut && authReturnUrl) {
+        // If we just signed out and have returnUrl, stay on the page
+        if (justSignedOut && returnUrl) {
           justSignedOut = false; // Reset flag
           return; // Stay on current page to allow re-authentication
         }
@@ -170,7 +170,7 @@ export default function ({ omega }) {
           redirect(unauthenticated, window.location.href);
         }
 
-        // Append authReturnUrl to all signup/signin links so users return here after auth
+        // Append returnUrl to all signup/signin links so users return here after auth
         updateAuthLinks();
       }
     });
@@ -194,14 +194,14 @@ function redirect(url, returnUrl) {
     return;
   }
 
-  // Set the authReturnUrl to the current URL
+  // Set the returnUrl to the current URL
   // The policy's routes are site-relative ('/signin'), so they resolve against
   // the path the site is mounted under, not the domain root (#355)
   const newURL = new URL(siteUrl(url), window.location.origin);
 
   // Attach return URL
   if (returnUrl) {
-    newURL.searchParams.set('authReturnUrl', returnUrl);
+    newURL.searchParams.set('returnUrl', returnUrl);
   }
 
   // Log
@@ -214,7 +214,7 @@ function redirect(url, returnUrl) {
   window.location.href = newURL;
 }
 
-// Add authReturnUrl to all signup/signin links so users return to the current page after auth
+// Add returnUrl to all signup/signin links so users return to the current page after auth
 // Uses click handler so the return URL always reflects the *current* location (e.g. after chat ID is added)
 function updateAuthLinks() {
   // Mounted: a link's pathname carries the site's base path, so the routes
@@ -230,12 +230,12 @@ function updateAuthLinks() {
       $link.addEventListener('click', (e) => {
         const url = new URL($link.href, window.location.origin);
         const currentUrl = new URL(window.location.href);
-        const existingReturnUrl = currentUrl.searchParams.get('authReturnUrl');
+        const existingReturnUrl = currentUrl.searchParams.get('returnUrl');
 
         if (existingReturnUrl) {
-          url.searchParams.set('authReturnUrl', existingReturnUrl);
+          url.searchParams.set('returnUrl', existingReturnUrl);
         } else if (!authPaths.includes(currentUrl.pathname)) {
-          url.searchParams.set('authReturnUrl', window.location.href);
+          url.searchParams.set('returnUrl', window.location.href);
         }
 
         $link.href = url.toString();
@@ -422,7 +422,7 @@ export async function sendUserSignupMetadata(omega, user) {
 
 // LEGACY: Translate older desktop app auth params to this page's format
 // Legacy apps send: ?destination=appscheme://page&source=app&signout=true&cb=timestamp
-// This page reads: ?authReturnUrl=...&authSignout=true
+// This page reads: ?returnUrl=...&authSignout=true
 // TODO: Remove this function AND its call above when legacy desktop app support is no longer needed
 function _legacyTranslateAppAuth() {
   const url = new URL(window.location.href);
@@ -435,8 +435,8 @@ function _legacyTranslateAppAuth() {
 
   // Chain through /token page to generate a custom token before redirecting to the app
   const tokenPageUrl = new URL(siteUrl('/token'), window.location.origin);
-  tokenPageUrl.searchParams.set('authReturnUrl', destination);
-  url.searchParams.set('authReturnUrl', tokenPageUrl.toString());
+  tokenPageUrl.searchParams.set('returnUrl', destination);
+  url.searchParams.set('returnUrl', tokenPageUrl.toString());
 
   // Translate signout param
   if (url.searchParams.get('signout') === 'true') {

@@ -15,20 +15,24 @@ const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
+/** The vendored devkit module whose peer installer base-command requires on each verb. */
+const TARGET_DEPENDENCIES = path.join(__dirname, '..', '..', 'dist', 'vendor', 'devkit', 'target-dependencies.js');
+
 const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
 const BuildCommand = require('../../dist/cli/commands/build.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-/** A virgin backend target: a manifest and nothing else. */
+/** A virgin backend target: a manifest and nothing else. Its peers are declared, so a verb run here installs nothing. */
 function seedTarget() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-ensure-target-')));
-  jetpack.write(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }, null, 2));
+  jetpack.write(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0', dependencies: frameworkPackage.peerDependencies }, null, 2));
   return dir;
 }
 
 /** The scripts both writers derive: the verb table's, the manifest's declarations over them. */
 const frameworkPackage = require('../../package.json');
 const { verbScripts, projectScripts } = require('../../dist/vendor/devkit/verb-scripts.js');
+const { getTests } = require('../../dist/cli/commands/setup-tests/index.js');
 const { CUSTOM_OWNED_SCRIPTS: CUSTOM_OWNED } = require('../../dist/cli/utils/project-type.js');
 const PROJECT_SCRIPTS = projectScripts(frameworkPackage);
 
@@ -42,6 +46,42 @@ function run(dir) {
   const lines = [];
   const result = ensureTarget({ projectDir: dir, log: (message) => lines.push(message) });
   return { ...result, lines };
+}
+
+/** runEnsureTarget as a verb runs it, every line it prints captured. */
+async function runVerb(dir) {
+  const command = new BuildCommand({ firebaseProjectPath: dir, argv: {}, options: {} });
+  const lines = [];
+  command.log = (message) => lines.push(String(message));
+  command.logWarning = (message) => lines.push(String(message));
+  await command.runEnsureTarget();
+  return lines;
+}
+
+/**
+ * runVerb with devkit's peer installer stubbed for that ONE call: the options
+ * it was handed come back instead of an npm install, and the real installer
+ * is restored before the next case, so no other file inherits the stub.
+ */
+async function runVerbRecordingPeers(dir) {
+  const module = require(TARGET_DEPENDENCIES);
+  const real = module.ensurePeerDependencies;
+  const calls = [];
+  module.ensurePeerDependencies = async (options) => { calls.push(options); };
+  try {
+    await runVerb(dir);
+  } finally {
+    module.ensurePeerDependencies = real;
+  }
+  return calls;
+}
+
+/** A target whose src/index.js requires fs-jetpack, its manifest declaring `dependencies`. */
+function seedRequiringTarget(dependencies) {
+  const dir = seedTarget();
+  jetpack.write(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0', dependencies: { ...frameworkPackage.peerDependencies, ...dependencies } }, null, 2));
+  jetpack.write(path.join(dir, 'src', 'index.js'), "const jetpack = require('fs-jetpack');\n\nmodule.exports = { jetpack };\n");
+  return dir;
 }
 
 module.exports = defineCases({
@@ -332,7 +372,7 @@ module.exports = defineCases({
 
         try {
           jetpack.write(path.join(brand, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-          jetpack.write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-backend', version: '0.0.0' }, null, 2));
+          jetpack.write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-backend', version: '0.0.0', dependencies: frameworkPackage.peerDependencies }, null, 2));
           jetpack.write(path.join(targetDir, 'AGENTS.md'),
             '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
 
@@ -340,7 +380,7 @@ module.exports = defineCases({
           const warnings = [];
           command.log = () => {};
           command.logWarning = (message) => warnings.push(message);
-          command.runEnsureTarget();
+          await command.runEnsureTarget();
 
           expect(warnings.some((message) => message.includes('Kept AGENTS.md')), 'the scaffold warning reaches the verb output').toBeTruthy();
           expect(jetpack.read(path.join(targetDir, 'AGENTS.md')), 'the notes stay').toMatch(/VPN/);
@@ -414,6 +454,96 @@ module.exports = defineCases({
           expect(result.changed, 'the manifest is left alone').toEqual([]);
           expect(result.lines, 'and it says nothing — a normal state, not a broken one').toEqual([]);
           expect(jetpack.exists(path.join(dir, 'firebase.json')), 'no consumer artifact appears').toBe(false);
+
+          // The verb aligns no peers either: the framework's own manifest is not a consumer's
+          expect(await runVerbRecordingPeers(dir), 'no peer install runs on the framework\'s own tree').toEqual([]);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'an-undeclared-framework-dependency-gets-one-warning-naming-the-door',
+      auth: 'none',
+
+      async run({ expect }) {
+        // The require keeps working by hoisting: the verb never errors, it
+        // names the two fixes once, declare it or load the framework's copy.
+        const dir = seedRequiringTarget({});
+
+        try {
+          const lines = await runVerb(dir);
+          const nudges = lines.filter((line) => line.includes("omega.require('fs-jetpack')"));
+
+          expect(nudges.length, `one warning line for the one package: ${lines.join(' | ')}`).toBe(1);
+          expect(nudges[0], 'and it names the other fix too').toMatch(/npm install fs-jetpack/);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'a-declared-framework-dependency-gets-no-warning',
+      auth: 'none',
+
+      async run({ expect }) {
+        const dir = seedRequiringTarget({ 'fs-jetpack': '^5.1.0' });
+
+        try {
+          const lines = await runVerb(dir);
+
+          expect(lines.filter((line) => line.includes('fs-jetpack')), 'a consumer-declared version always wins, silently').toEqual([]);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'every-verb-aligns-the-backends-peer-dependencies',
+      auth: 'none',
+
+      async run({ expect }) {
+        // The one peer mechanism desktop and extension already run: devkit's
+        // ensurePeerDependencies, handed the backend's own peer set.
+        const peers = frameworkPackage.peerDependencies;
+        expect(Object.keys(peers).sort(), 'the backend peers on the two firebase packages').toEqual(['firebase-admin', 'firebase-functions']);
+
+        const dir = seedTarget();
+
+        try {
+          const calls = await runVerbRecordingPeers(dir);
+
+          expect(calls.length, 'runEnsureTarget calls ensurePeerDependencies once').toBe(1);
+          expect(calls[0].projectDir, 'on the verb\'s target').toBe(dir);
+          expect(calls[0].package.peerDependencies, 'with the backend\'s peer set').toEqual(peers);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'the-setup-checks-no-longer-carry-the-firebase-version-checks',
+      auth: 'none',
+
+      async run({ expect }) {
+        // `using updated firebase-admin` and its firebase-functions twin were a
+        // second peer mechanism; the verb's alignment is the one left.
+        const dir = seedTarget();
+
+        try {
+          jetpack.write(path.join(dir, 'config', 'omega.json5'), JSON.stringify({
+            brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
+            targets: { backend: { type: 'backend' } },
+          }));
+          const roster = getTests({ main: { firebaseProjectPath: dir } }).map((test) => test.constructor.name);
+
+          expect(roster.includes('OmegaBackendTest'), 'the roster is read: the framework version check stays').toBe(true);
+          expect(roster.includes('FirebaseAdminTest'), 'no `using updated firebase-admin` check').toBe(false);
+          expect(roster.includes('FirebaseFunctionsTest'), 'no `using updated firebase-functions` check').toBe(false);
         } finally {
           jetpack.remove(dir);
         }

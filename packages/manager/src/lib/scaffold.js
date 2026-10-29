@@ -88,20 +88,6 @@ function renderOmegaConfig(answers) {
     `    url: ${JSON.stringify(answers.url)},`,
     '    contact: {',
     `      email: ${JSON.stringify(answers.email)},`,
-  );
-
-  // The human who signs the personal sends (welcome, nudge, checkup) — asked
-  // for at onboarding, never derived, so an unanswered person writes no key
-  // at all instead of a placeholder identity (#770).
-  if (answers.person) {
-    lines.push('      person: {');
-    for (const [key, value] of Object.entries(answers.person)) {
-      lines.push(`        ${key}: ${JSON.stringify(value)},`);
-    }
-    lines.push('      },');
-  }
-
-  lines.push(
     '    },',
     '  },',
     '',
@@ -376,7 +362,7 @@ function renderTargetPackageJson(answers, entry) {
 /**
  * Build the scaffold plan for a brand.
  *
- * @param {Object} answers - { id, name, description, tagline, url, email, person, targets: [{ name, type }] }
+ * @param {Object} answers - { id, name, description, tagline, url, email, targets: [{ name, type }] }
  * @returns {Array<{ path: string, contents: string }>} - Brand-root-relative file plan
  */
 function buildScaffoldPlan(answers) {

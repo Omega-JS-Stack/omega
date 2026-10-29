@@ -257,9 +257,13 @@ module.exports = defineCases({
         ctx.expect(tt.payload.value).toBe(49.99);
         ctx.expect(tt.payload.currency).toBe('USD');
         ctx.expect(tt.payload.content_type).toBe('product');
-        ctx.expect(tt.payload.contents, 'TikTok speaks a contents array of product objects — the shape its pixel reference documents').toEqual([{ content_id: 'pro', content_name: 'Pro Plan', price: 49.99, quantity: 1 }]);
+        ctx.expect(tt.payload.contents, 'TikTok speaks a contents array of product objects, the shape its pixel reference documents').toEqual([{ content_id: 'pro', content_name: 'Pro Plan', content_category: 'subscription', price: 49.99, quantity: 1 }]);
         ctx.expect(tt.payload.content_id, 'and the flat single-item shape is gone').toBe(undefined);
         ctx.expect(tt.payload.price).toBe(undefined);
+
+        // The product type is the category; an item that names none sends no key.
+        const uncategorized = tiktok.resolve('purchase', { ...PURCHASE_PARAMS, items: [{ item_id: 'pro', item_name: 'Pro Plan', price: 49.99, quantity: 1 }] });
+        ctx.expect('content_category' in uncategorized.payload.contents[0], 'an item with no item_category carries no content_category').toBe(false);
       },
     },
 
@@ -412,7 +416,7 @@ module.exports = defineCases({
 
           ctx.expect(tt.payload.value).toBe(0);
           ctx.expect(tt.payload.content_ids).toEqual(['pro']);
-          ctx.expect(tt.payload.contents, 'TikTok has no other id carrier, minus the money').toEqual([{ content_id: 'pro', content_name: 'Pro Plan' }]);
+          ctx.expect(tt.payload.contents, 'TikTok has no other id carrier, minus the money').toEqual([{ content_id: 'pro', content_name: 'Pro Plan', content_category: 'subscription' }]);
         }
       },
     },
@@ -497,7 +501,7 @@ module.exports = defineCases({
         ctx.expect(tt.name).toBe('Purchase');
         ctx.expect(tt.kind).toBe('standard');
         ctx.expect(tt.payload.value).toBe(49.99);
-        ctx.expect(tt.payload.contents).toEqual([{ content_id: 'pro', content_name: 'Pro Plan', price: 49.99, quantity: 1 }]);
+        ctx.expect(tt.payload.contents).toEqual([{ content_id: 'pro', content_name: 'Pro Plan', content_category: 'subscription', price: 49.99, quantity: 1 }]);
       },
     },
 
@@ -519,7 +523,7 @@ module.exports = defineCases({
           ctx.expect(tt.name, `${name} → TikTok ${native}`).toBe(native);
           ctx.expect(tt.kind).toBe('custom');
           ctx.expect(tt.payload.value, 'TikTok cannot subtract revenue either').toBe(0);
-          ctx.expect(tt.payload.contents, 'who and which plan is the whole point of the audience').toEqual([{ content_id: 'pro', content_name: 'Pro Plan' }]);
+          ctx.expect(tt.payload.contents, 'who and which plan is the whole point of the audience').toEqual([{ content_id: 'pro', content_name: 'Pro Plan', content_category: 'subscription' }]);
           ctx.expect(tt.payload.contents[0].price, 'the per-item price would put the amount back on the wire').toBe(undefined);
           ctx.expect(tt.payload.contents[0].quantity, 'and Meta\'s signal carries neither, by construction').toBe(undefined);
         }

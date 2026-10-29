@@ -1,14 +1,9 @@
 /**
- * Test: cli/commands/setup-tests manifest discipline (cp195 journey catches)
+ * Test: cli/commands/setup-tests manifest discipline
  *
- * 1. Fixes that WRITE the target manifest fresh-read it first — an npm-driven
- *    fix earlier in the run rewrote the file, and writing the boot-time
- *    snapshot erased those installs (the project-scripts fix clobbered
- *    firebase-admin/firebase-functions; the next setup's re-install then
- *    raced the monorepo watch through the file: link and killed the boot).
- * 2. Dependency-install fixes run npm with --ignore-scripts — a bare
- *    install in a file:-linked brand re-runs the LINKED framework's prepare
- *    inside the monorepo (it rmdir'd @omega.js/backend's own dist mid-run).
+ * Fixes that WRITE the target manifest fresh-read it first: a fix earlier in
+ * the run may have rewritten the file, and writing the boot-time snapshot
+ * would erase what it added.
  */
 const path = require('path');
 const os = require('os');
@@ -27,7 +22,7 @@ function makeInstance(TestClass, dir, stale) {
 }
 
 module.exports = defineCases({
-  description: 'Setup manifest sync (fresh-read writes, --ignore-scripts installs)',
+  description: 'Setup manifest sync (fresh-read writes)',
   type: 'group',
 
   tests: [
@@ -70,16 +65,6 @@ module.exports = defineCases({
         expect(bytes.endsWith('\n\n'), 'exactly one, never a growing tail').toBe(false);
 
         fs.rmSync(dir, { recursive: true, force: true });
-      },
-    },
-
-    {
-      name: 'install-command-carries-ignore-scripts',
-      async run({ expect }) {
-        const instance = makeInstance(BaseTest, os.tmpdir(), {});
-
-        expect(instance.buildInstallCommand('firebase-functions', '@^7.2.5')).toBe('npm i firebase-functions@^7.2.5 --ignore-scripts');
-        expect(instance.buildInstallCommand('some-tool', null, 'dev')).toBe('npm i some-tool@latest --save-dev --ignore-scripts');
       },
     },
 

@@ -46,12 +46,10 @@ module.exports = [
       type: 'object',
       properties: {},
     },
-    handler: async ({ omega, user }) => {
-      // notes-stats/{uid}.created is the counter src/events/notes/on-create.js bumps
-      const stats = await omega.firebase.admin.firestore().doc(`notes-stats/${user.uid}`).get();
-
-      // A user who never created a note has no counter doc yet
-      return { count: stats.exists ? stats.data().created : 0 };
+    handler: async ({ user }) => {
+      // users/{uid}.notes.created is the counter src/events/notes/on-create.js
+      // bumps; a user who never created a note has none yet
+      return { count: user.notes?.created || 0 };
     },
   },
 ];

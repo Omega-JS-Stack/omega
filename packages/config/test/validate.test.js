@@ -95,7 +95,6 @@ module.exports = defineCases({
             ...VALID.brand,
             contact: {
               email: 'hello@sandbox.example',
-              person: { name: 'Jane Doe, CEO', firstName: 'Jane', image: 'https://x.com/j.jpg', url: 'https://jane.example', urlText: '@jane' },
               carbonCopy: [{ email: 'audit@sandbox.example', name: 'Audit' }],
             },
             images: { wordmark: 'https://x.com/wordmark.png' },
@@ -103,17 +102,26 @@ module.exports = defineCases({
         });
 
         ctx.expect(configured.errors).toEqual([]);
-        // Absence is fine — a brand that sends no personal email configures none of it.
         ctx.expect(validateConfig(VALID).errors).toEqual([]);
 
         const { errors } = validateConfig({
           ...VALID,
-          brand: { ...VALID.brand, contact: { person: { name: 42, url: 'ftp://nope' }, carbonCopy: 'not-an-array' } },
+          brand: { ...VALID.brand, contact: { carbonCopy: 'not-an-array' } },
         });
 
-        ctx.expect(errors.some((e) => e.includes('config.brand.contact.person.name has wrong type'))).toBeTruthy();
-        ctx.expect(errors.some((e) => e.includes('config.brand.contact.person.url') && e.includes('does not match'))).toBeTruthy();
         ctx.expect(errors.some((e) => e.includes('config.brand.contact.carbonCopy has wrong type'))).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'brand.contact.person is not a key: a config carrying it fails the load',
+      run: (ctx) => {
+        const { errors } = validateConfig({
+          ...VALID,
+          brand: { ...VALID.brand, contact: { email: 'hello@sandbox.example', person: { name: 'Jane Doe, CEO' } } },
+        });
+
+        ctx.expect(errors).toEqual([`config.brand.contact.person.name ${UNDECLARED}`]);
       },
     },
 

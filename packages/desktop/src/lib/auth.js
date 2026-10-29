@@ -288,7 +288,7 @@ const auth = {
       return { success: true };
     } catch (e) {
       logger.error('sign-out failed:', e.message);
-      return { success: false, error: e.message };
+      throw e;
     }
   },
 
@@ -362,7 +362,7 @@ const auth = {
 
   /**
    * Sign main out and broadcast the sign-out to every renderer.
-   * @returns {Promise<{ success: boolean, error?: string }>}
+   * @returns {Promise<{ success: true }>} rejects with the Firebase error when the sign-out fails.
    */
   async signOut() {
     return auth._handleSignOut();

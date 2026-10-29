@@ -142,6 +142,7 @@ function tiktokCommerce(params) {
     contents: items.length ? items.map((item) => compact({
       content_id: item.item_id,
       content_name: item.item_name,
+      content_category: item.item_category,
       price: item.price,
       quantity: item.quantity,
     })) : undefined,

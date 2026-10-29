@@ -256,7 +256,7 @@ function migrateTarget(targetDir, options = {}) {
 
   byHand.push(...report.lint.map((finding) => `${finding.file}:${finding.line}: ${finding.message}`));
   byHand.push(...report.legacyTests.map((rel) => `${rel}: a legacy harness file \`omega test\` never discovers (it runs test/**/*.test.js), port it to node:test`));
-  byHand.push(...report.bareRequires.map(formatBareRequire));
+  byHand.push(...report.bareRequires.map((entry) => formatBareRequire(entry)));
 
   return execute
     ? { due: byHand, changed: writes, errors }

@@ -14,6 +14,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
    - File loads + invokes the function and the function throws → **throws**, build fails.
 
    In other words: a hook that doesn't exist is fine (you'll see one log line), but a hook that's broken in any way fails loudly. You should never silently ship a malformed hook to production.
+5. **A hook runs under plain node, outside the bundle**, so a `require` of a framework dependency the target never declared resolves only by hoisting: every verb's scaffold warns on it (the dependency nudge, never an error), and the two fixes are declaring it or loading the framework's copy with `require('@omega.js/desktop').require(name)` ([the shared rule](../shared/local-dev.md#using-what-the-framework-depends-on)).
 
 ## Hooks reference
 

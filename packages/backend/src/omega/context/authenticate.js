@@ -45,9 +45,11 @@ async function resolveCaller(self, options) {
   const req = self.req;
   const data = self.request ? self.request.data : {};
 
-  // The caller as the lanes below build it: the document, plus the
-  // authenticated verdict and the sign-in's identity
-  let user = { ...self.user.toJSON(), authenticated: self.user.authenticated };
+  // The caller as the lanes below build it: the document, the authenticated
+  // verdict beside it (never on it: User derives `authenticated` and refuses a
+  // key that shadows it), and the sign-in's identity
+  let user = self.user.toJSON();
+  let authenticated = self.user.authenticated;
   let identity = null;
 
   // Get stored admin key
@@ -64,9 +66,6 @@ async function resolveCaller(self, options) {
   function _resolve(user) {
     // Resolve the properties
     user = user || {};
-    user.authenticated = typeof user.authenticated === 'undefined'
-      ? false
-      : user.authenticated;
 
     // Validate OMEGA_ADMIN_KEY (constant-time — a plain === leaks match length via timing)
     if (safeCompare(adminKey, OMEGA_ADMIN_KEY)) {
@@ -75,13 +74,12 @@ async function resolveCaller(self, options) {
       user.roles.admin = true;
 
       // Set authenticated
-      user.authenticated = true;
+      authenticated = true;
     }
 
     // Resolve the user
     if (options.resolve) {
       const resolved = new User(user, identity);
-      const authenticated = user.authenticated || false;
 
       // The verdict the lanes reached wins over the getter's uid rule: the
       // admin key authenticates a request that carries no account at all
@@ -186,7 +184,7 @@ async function resolveCaller(self, options) {
       // Set the user — a healed/real doc, or the pre-heal rule: a doc existed
       if (isUserDoc(userDoc) || existed) {
         user = Object.assign({}, user, userDoc);
-        user.authenticated = true;
+        authenticated = true;
         user.auth.uid = decodedIdToken.user_id;
         user.auth.email = decodedIdToken.email;
 
@@ -221,7 +219,7 @@ async function resolveCaller(self, options) {
       .then((querySnapshot) => {
         querySnapshot.forEach((doc) => {
           user = Object.assign({}, user, doc.data());
-          user.authenticated = true;
+          authenticated = true;
         });
       })
       .catch((error) => {

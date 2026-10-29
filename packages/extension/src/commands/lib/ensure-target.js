@@ -6,9 +6,11 @@
  * anything can throw), the derived AMO add-on id pinned into the brand config
  * when it declares none, a node-version WARNING, peer dependencies (a satisfied
  * target installs nothing), the defaults tree (the gulp task's scaffoldDefaults,
- * the ONE scaffold implementation), and a WARNING for a `file:` link. Nothing
- * here needs the network: freshness is a deploy precheck (deploy-precheck.js),
- * and the hook-layout move is a leg of the brand root's `omega migrate`.
+ * the ONE scaffold implementation), and a WARNING per bare require under hooks/
+ * the target never declared (the dependency nudge, docs/shared/local-dev.md).
+ * Nothing here needs the network: freshness is a deploy precheck
+ * (deploy-precheck.js), and the hook-layout move is a leg of the brand root's
+ * `omega migrate`.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -16,6 +18,7 @@ const version = require('wonderful-version');
 const build = require('../../build.js');
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 const { listingId, deriveFirefoxId, listingConfigPath } = require('../../lib/listings.js');
 
@@ -202,6 +205,16 @@ async function ensureTarget(options) {
   }
 
   checkLocality(projectDir);
+
+  // Consumer hooks run under plain node outside the bundle, so a framework
+  // dependency they never declared resolves only by hoisting: name both fixes.
+  nudgeBareRequires({
+    root: projectDir,
+    srcDir: 'hooks',
+    frameworkRoot: build.getRootPath('main'),
+    door: (name) => `require('@omega.js/extension').require('${name}')`,
+    warn,
+  });
 
   for (const [label, files] of [['Created', result.written], ['Merged', result.merged], ['Synced', result.changed]]) {
     if (files.length > 0) log(`${label} ${files.join(', ')}`);

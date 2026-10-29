@@ -591,11 +591,11 @@ module.exports = defineCases({
       console.log(`    ${authPage.url().replace(siteUrl, '')}`);
     }),
 
-    flowCase('the authReturnUrl leg returns a Google sign-in to its destination', async (ctx) => {
+    flowCase('the returnUrl leg returns a Google sign-in to its destination', async (ctx) => {
       const { state } = ctx;
       const { siteUrl, areaPage: authPage } = state;
       const destination = `${siteUrl}/pricing`;
-      await authPage.goto(`${siteUrl}/signin?authReturnUrl=${encodeURIComponent(destination)}`, { waitUntil: 'networkidle2' });
+      await authPage.goto(`${siteUrl}/signin?returnUrl=${encodeURIComponent(destination)}`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(authPage);
       await clickElement(authPage, 'button[data-provider="google.com"]');
       await pickGoogleAccount(authPage, state.persona('googleTwo'));
@@ -608,14 +608,14 @@ module.exports = defineCases({
       console.log(`    ${authPage.url().replace(siteUrl, '')}`);
     }),
 
-    flowCase('a RELATIVE authReturnUrl is honored the same as the absolute form (#160)', async (ctx) => {
+    flowCase('a RELATIVE returnUrl is honored the same as the absolute form (#160)', async (ctx) => {
       const { state } = ctx;
       const { siteUrl, areaPage: authPage } = state;
       const destination = '/pricing';
       await authPage.goto(`${siteUrl}/signin?authSignout=true`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(authPage);
 
-      await authPage.goto(`${siteUrl}/signin?authReturnUrl=${encodeURIComponent(destination)}`, { waitUntil: 'networkidle2' });
+      await authPage.goto(`${siteUrl}/signin?returnUrl=${encodeURIComponent(destination)}`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(authPage);
       await clickElement(authPage, 'button[data-provider="google.com"]');
       await pickGoogleAccount(authPage, state.persona('googleTwo'));

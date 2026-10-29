@@ -292,37 +292,6 @@ const SHARED_SCHEMA = [
     description: "Support phone number as it should read. @omega.js/web publishes it as the JSON-LD brand node's `telephone`; unset renders empty.",
   },
   {
-    path:        'brand.contact.person.name',
-    type:        'string',
-    required:    false,
-    description: 'The human who signs "personal" emails, as it should read ("Jane Doe, CEO"). Required only when something sends a personal-signoff email; that path fails loudly rather than substituting a framework identity.',
-  },
-  {
-    path:        'brand.contact.person.firstName',
-    type:        'string',
-    required:    false,
-    description: 'Conversational short name for personal email copy ("Jane" in "I\'m Jane, the founder"). Defaults to the first word of brand.contact.person.name.',
-  },
-  {
-    path:        'brand.contact.person.image',
-    type:        'string',
-    required:    false,
-    description: 'Headshot URL for the personal email signoff. Omitted from the signoff when unset.',
-  },
-  {
-    path:        'brand.contact.person.url',
-    type:        'string',
-    required:    false,
-    match:       /^https?:\/\//,
-    description: 'Personal URL linked from the email signoff. Omitted when unset.',
-  },
-  {
-    path:        'brand.contact.person.urlText',
-    type:        'string',
-    required:    false,
-    description: 'Link text for brand.contact.person.url (e.g. a social handle). Falls back to the URL itself.',
-  },
-  {
     path:        'brand.contact.carbonCopy',
     type:        'array',
     required:    false,

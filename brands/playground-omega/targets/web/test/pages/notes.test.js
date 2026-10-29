@@ -2,16 +2,20 @@
  * The /notes page module (src/assets/js/pages/notes.js) draws the list the
  * backend answers: loadNotes() asks omega.request() for GET /notes and
  * renders every note escaped, with its delete button, and the empty state
- * follows the list.
+ * follows the list. The page itself follows the signed-in user's document live
+ * (users/{uid}) and binds its notes.created counter, 0 when the key is absent,
+ * and stops the follow when the user signs out.
  *
  * The module loads through loadModule, bundled the way the asset build bundles
  * it, so its FormManager import resolves to the client as on the page.
- * Two stand-ins, both for things node does not have: `omega.request` (no
- * backend runs in this lane; the backend's own suites prove the route) and the
- * two elements the module writes (node has no DOM and this target pulls in no
- * jsdom, the web framework's own convention). escapeHTML is the client's
- * DOM-based one in the browser, so the stand-in escapes the same five
- * characters.
+ * The stand-ins are all for things node does not have: `omega.request` (no
+ * backend runs in this lane; the backend's own suites prove the route), the
+ * elements the module touches (node has no DOM and this target pulls in no
+ * jsdom, the web framework's own convention), and for the page itself the
+ * `document`/`window` its FormManager reads plus `omega.auth.listen` and
+ * `omega.firestore` (the auth and Firestore SDKs need a browser and a project;
+ * the e2e lane drives them). escapeHTML is the client's DOM-based one in the
+ * browser, so the stand-in escapes the same five characters.
  *
  * Run (from this target): npx omega test pages/notes
  */
@@ -39,6 +43,42 @@ function harness(notes) {
   };
 
   return { omega, calls, $list: { innerHTML: 'stale' }, $empty: { hidden: false } };
+}
+
+// An element as much as the page and its FormManager touch: listeners, the
+// state attribute, no controls, and the two properties renderNotes writes
+function element(id) {
+  return { id, innerHTML: '', hidden: false, setAttribute: () => {}, addEventListener: () => {}, querySelector: () => null, querySelectorAll: () => [] };
+}
+
+// The page's default export run against stand-ins that record the auth
+// listener, every users/{uid} follow and its stop, and every bindings update
+async function bootPage(ctx) {
+  const elements = { 'notes-form': element('notes-form'), 'notes-list': element('notes-list'), 'notes-empty': element('notes-empty') };
+  const { omega } = harness([]);
+  const page = { listeners: [], follows: [], stops: 0, bindings: [] };
+
+  omega.utilities.showNotification = () => {};
+  omega.bindings = { update: (payload) => page.bindings.push(payload) };
+  omega.auth = { listen: (callback) => page.listeners.push(callback) };
+  omega.firestore = {
+    doc: (docPath) => ({
+      onSnapshot: (callback) => {
+        page.follows.push({ docPath, callback });
+        return () => { page.stops += 1; };
+      },
+    }),
+  };
+
+  const saved = { document: globalThis.document, window: globalThis.window };
+  globalThis.document = { readyState: 'complete', getElementById: (id) => elements[id], addEventListener: () => {} };
+  globalThis.window = { location: { search: '' }, addEventListener: () => {} };
+  ctx.after(() => Object.assign(globalThis, saved));
+
+  const { default: start } = await loadModule(MODULE_PATH, { omega });
+  await start({ omega });
+
+  return page;
 }
 
 module.exports = defineCases({
@@ -81,6 +121,39 @@ module.exports = defineCases({
 
         ctx.expect($list.innerHTML, 'nothing left from the last draw').toBe('');
         ctx.expect($empty.hidden, 'the empty state shows').toBe(false);
+      },
+    },
+
+    {
+      name: 'the page binds notes.created from a live follow of users/{uid}, 0 with no notes key',
+      run: async (ctx) => {
+        const page = await bootPage(ctx);
+
+        ctx.expect(page.listeners.length, 'the page listens to auth once').toBe(1);
+        page.listeners[0]({ user: { authenticated: true, uid: 'uid-1' } });
+
+        ctx.expect(page.follows.map((follow) => follow.docPath), 'it follows the user\'s own document').toEqual(['users/uid-1']);
+
+        page.follows[0].callback({ data: () => ({ notes: { created: 4 } }) });
+        ctx.expect(page.bindings[page.bindings.length - 1]).toEqual({ notes: { created: 4 } });
+
+        page.follows[0].callback({ data: () => ({ auth: { uid: 'uid-1' } }) });
+        ctx.expect(page.bindings[page.bindings.length - 1], 'no notes key binds 0').toEqual({ notes: { created: 0 } });
+      },
+    },
+
+    {
+      name: 'signing out stops the follow and starts no other',
+      run: async (ctx) => {
+        const page = await bootPage(ctx);
+
+        page.listeners[0]({ user: { authenticated: true, uid: 'uid-1' } });
+        ctx.expect(page.stops, 'nothing stopped while signed in').toBe(0);
+
+        page.listeners[0]({ user: { authenticated: false, uid: null } });
+
+        ctx.expect(page.stops, 'the follow stops on sign-out').toBe(1);
+        ctx.expect(page.follows.length, 'and no new follow starts').toBe(1);
       },
     },
   ],

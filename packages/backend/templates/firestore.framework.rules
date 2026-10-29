@@ -178,8 +178,10 @@ service cloud.firestore {
     // `activity` is the sign-in/security trail (IP, user agent, locale) the
     // before-signin auth event writes; a client that could write it would be
     // editing its own audit record.
+    // The names User derives or defines on itself (`authenticated` through `profile`):
+    // a stored key named like one makes User throw on every request for that account.
     function isWritingFrameworkField() {
-      return isWritingAny(['auth', 'connections', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'activity', 'usage', 'owns', 'consent', 'trackingConsent', 'attribution', 'verifications']);
+      return isWritingAny(['auth', 'connections', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'activity', 'usage', 'owns', 'consent', 'trackingConsent', 'attribution', 'verifications', 'authenticated', 'uid', 'email', 'plan', 'active', 'trialing', 'cancelling', 'everPaid', 'toJSON', 'profile']);
     }
 
     // ========== Resources ==========

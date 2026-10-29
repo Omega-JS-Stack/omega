@@ -20,7 +20,7 @@ const APP_DIR = path.join(__dirname, '..', '..');
 //   ];
 const AUTHORED_FIRESTORE_PATHS = [
   '/notes/{id}',          // a user's own notes: owner-only read, write and delete
-  '/notes-stats/{uid}',   // the notes counter: its owner reads, only the server writes
+  '/users/{userId}',      // tightens the framework's user rule: the notes counter is server-written only
 ];
 const EXPOSED_STORAGE_PATHS = [];
 // ────────────────────────────────────────────────────────────────────────────

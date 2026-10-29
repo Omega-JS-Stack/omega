@@ -99,7 +99,6 @@ const OPERATIONS = {
     { name: 'custom-fields', ensure: true },   // @omega.js/backend custom fields (@omega.js/backend's marketing SSOT)
     { name: 'segments', ensure: true },        // @omega.js/backend segments (query_dsl diffed; __temp_ orphans swept)
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent @omega.js/backend forwarder (min-diff PATCH)
-    { name: 'contact-person', ensure: true },  // brand.contact.person.name — @omega.js/backend's personal sends fail at runtime without it (#694)
   ],
 
   newsletter: [

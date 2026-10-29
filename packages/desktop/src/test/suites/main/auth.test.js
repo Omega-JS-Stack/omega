@@ -233,6 +233,42 @@ module.exports = defineCases({
       },
     },
     {
+      // A signed-in session whose Firebase signOut fails: the failure reaches the
+      // renderer's invoke, and no window is told to sign itself out.
+      name: 'sign-out IPC rejects with the Firebase error when signOut throws',
+      run: async (ctx) => {
+        const auth = ctx.omega.auth;
+        const ipc = ctx.omega.ipc;
+        const saved = {
+          firebaseAuth: auth._firebaseAuth,
+          module:       auth._firebaseModule,
+          broadcast:    ipc.broadcast,
+          user:         auth.user,
+          state:        auth.state,
+        };
+        const broadcasts = [];
+        auth._firebaseAuth = { currentUser: { uid: 'uid-signed-in' } };
+        auth._firebaseModule = { signOut: async () => { throw new Error('boom'); } };
+        ipc.broadcast = (channel, payload) => {
+          broadcasts.push(channel);
+          return saved.broadcast.call(ipc, channel, payload);
+        };
+        try {
+          let threw;
+          try { await ipc.invoke('desktop:auth:sign-out'); } catch (e) { threw = e; }
+          ctx.expect(threw).toBeDefined();
+          ctx.expect(threw.message).toMatch(/boom/);
+          ctx.expect(broadcasts.includes('desktop:auth:sign-out')).toBe(false);
+        } finally {
+          auth._firebaseAuth = saved.firebaseAuth;
+          auth._firebaseModule = saved.module;
+          ipc.broadcast = saved.broadcast;
+          auth.user = saved.user;
+          auth.state = saved.state;
+        }
+      },
+    },
+    {
       name: 'get-user IPC answers the signed-out account and no identity when no current user',
       run: async (ctx) => {
         const result = await ctx.omega.ipc.invoke('desktop:auth:get-user');

@@ -556,7 +556,7 @@ async function _sendCampaignSendGrid(omega, settings, contentHtml) {
     omega,
   );
   const categories = prepare.buildCategories('marketing', brand.id, settings.categories);
-  const signoff = prepare.resolveSignoff(settings.signoff, brand);
+  const signoff = prepare.resolveSignoff(settings.signoff);
 
   // --- Render ---
   // Marketing Single Sends can't use per-recipient HMAC links (one HTML for all recipients).

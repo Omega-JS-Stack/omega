@@ -207,8 +207,6 @@ const ENTER_THE_REST = {
   'Company brand id': '\r',
   'Brand description': '\r',
   'Brand tagline': '\r',
-  'Contact person headshot URL': '\r',
-  'Contact person link URL': '\r',
   'Keep this account list?': '\r',
 };
 

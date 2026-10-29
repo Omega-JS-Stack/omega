@@ -3,7 +3,7 @@
  * decides, on every auth state change, whether the current page keeps the user
  * or navigates them away: the kick-out on a `policy: 'authenticated'` page, the
  * bounce off a `policy: 'unauthenticated'` page, the one sanctioned skip
- * (`?authSignout=true` + `authReturnUrl`), and the full opt-out (`disabled`).
+ * (`?authSignout=true` + `returnUrl`), and the full opt-out (`disabled`).
  *
  * The module is browser code behind two bundler aliases (`@omega.js/client`,
  * `__main_assets__/*`), so the harness drives the REAL file through esbuild —
@@ -325,7 +325,7 @@ module.exports = defineCases({
         await fire({ user: new User(), denied: false });
 
         ctx.expect(navigations).toEqual([
-          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+          'https://brand.test/signin?returnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
         ]);
       },
     },
@@ -347,10 +347,10 @@ module.exports = defineCases({
     },
 
     {
-      name: 'auth policy: signed in on an unauthenticated page prefers authReturnUrl over the default',
+      name: 'auth policy: signed in on an unauthenticated page prefers returnUrl over the default',
       run: async (ctx) => {
         const { navigations, fire } = await boot({
-          href: 'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fpricing',
+          href: 'https://brand.test/signin?returnUrl=https%3A%2F%2Fbrand.test%2Fpricing',
           policy: 'unauthenticated',
           redirects: REDIRECTS,
           pagePath: '/signin',
@@ -363,10 +363,10 @@ module.exports = defineCases({
     },
 
     {
-      name: 'auth policy: a signout in flight with an authReturnUrl keeps the user on the page',
+      name: 'auth policy: a signout in flight with a returnUrl keeps the user on the page',
       run: async (ctx) => {
         const { navigations, fire } = await boot({
-          href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+          href: 'https://brand.test/dashboard/account?authSignout=true&returnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
           policy: 'authenticated',
           redirects: REDIRECTS,
         });
@@ -384,7 +384,7 @@ module.exports = defineCases({
       name: 'auth policy: the suppression is one-shot — the next signed-out state still kicks out',
       run: async (ctx) => {
         const { navigations, fire } = await boot({
-          href: 'https://brand.test/dashboard/account?authSignout=true&authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+          href: 'https://brand.test/dashboard/account?authSignout=true&returnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
           policy: 'authenticated',
           redirects: REDIRECTS,
         });
@@ -394,7 +394,7 @@ module.exports = defineCases({
         await fire({ user: new User(), denied: false });
 
         ctx.expect(navigations).toEqual([
-          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26authReturnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
+          'https://brand.test/signin?returnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26returnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
         ]);
       },
     },
@@ -440,8 +440,8 @@ module.exports = defineCases({
         await fire({ user: new User(), denied: false });
 
         ctx.expect(window.__OMEGA_SIGNOUT_IN_PROGRESS).toBe(false);
-        ctx.expect(navigations, 'no authReturnUrl to stay for — the authenticated page still kicks the user out').toEqual([
-          'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+        ctx.expect(navigations, 'no returnUrl to stay for — the authenticated page still kicks the user out').toEqual([
+          'https://brand.test/signin?returnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
         ]);
       },
     },
@@ -504,7 +504,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const signIns = [];
         const { navigations, client, sessionParams } = await boot({
-          href: 'https://brand.test/signin?authPrivateKey=pk-live-abc123&authReturnUrl=%2Fdashboard%2Fstream',
+          href: 'https://brand.test/signin?authPrivateKey=pk-live-abc123&returnUrl=%2Fdashboard%2Fstream',
           policy: 'unauthenticated',
           redirects: REDIRECTS,
           pagePath: '/signin',
@@ -531,7 +531,7 @@ module.exports = defineCases({
           },
         }]);
         ctx.expect(signIns, 'the MINTED token signs the user in').toEqual(['minted-custom-token']);
-        ctx.expect(window.location.href, 'the key is stripped from the address bar before the page moves').toBe('https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream');
+        ctx.expect(window.location.href, 'the key is stripped from the address bar before the page moves').toBe('https://brand.test/signin?returnUrl=%2Fdashboard%2Fstream');
         ctx.expect(navigations).toEqual(['/dashboard/stream']);
         ctx.expect(!printed.join(' ').includes('pk-live-abc123'), 'a credential must never be printed').toBeTruthy();
       },
@@ -542,7 +542,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const signIns = [];
         const { navigations, client, sessionParams } = await boot({
-          href: 'https://brand.test/signin?authPrivateKey=pk-live-revoked&authReturnUrl=%2Fdashboard%2Fstream',
+          href: 'https://brand.test/signin?authPrivateKey=pk-live-revoked&returnUrl=%2Fdashboard%2Fstream',
           policy: 'unauthenticated',
           redirects: REDIRECTS,
           pagePath: '/signin',
@@ -564,7 +564,7 @@ module.exports = defineCases({
 
         ctx.expect(handled, 'nobody was signed in — the page keeps its own form').toBe(false);
         ctx.expect(signIns, 'a 401 never reaches firebase').toEqual([]);
-        ctx.expect(window.location.href, 'the dead key is stripped either way').toBe('https://brand.test/signin?authReturnUrl=%2Fdashboard%2Fstream');
+        ctx.expect(window.location.href, 'the dead key is stripped either way').toBe('https://brand.test/signin?returnUrl=%2Fdashboard%2Fstream');
         ctx.expect(navigations, 'and the visitor stays on /signin').toEqual([]);
         ctx.expect(window.__OMEGA_CUSTOM_TOKEN_SIGNIN, 'navigation control goes back to the policy listener').toBe(false);
         ctx.expect(client.notificationsShown.length, 'the visitor is told why').toBe(1);

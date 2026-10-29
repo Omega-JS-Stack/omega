@@ -95,6 +95,8 @@ module.exports = async function ({ build }) {
 
 Hooks are awaited — the build waits for them to resolve before continuing. Throw or reject to fail the build (and abort packaging / publishing).
 
+A hook runs under plain node, outside the bundle, so a `require` of a framework dependency the target never declared resolves only by hoisting: every verb's scaffold warns on it (the dependency nudge, never an error), and the two fixes are declaring it or loading the framework's copy with `require('@omega.js/extension').require(name)` ([the shared rule](../shared/local-dev.md#using-what-the-framework-depends-on)).
+
 ## Where hooks are invoked
 
 [src/gulp/tasks/package.js](../../packages/extension/src/gulp/tasks/package.js) loads and runs them. Search for `hook(` in that file to see the exact wiring.

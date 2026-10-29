@@ -813,7 +813,7 @@ class EmulatorCommand extends BaseCommand {
     // The local lane's pin (#586): a boot nobody named an environment for is
     // `development`, so the composed dist/.env can never follow the shell.
     const environment = options?.environment || 'development';
-    this.ensureStaged({ environment });
+    await this.ensureStaged({ environment });
 
     // N7 port allocation: firebase.json values (classic defaults) when free,
     // bump-if-taken — a second brand's stack relocates instead of the old

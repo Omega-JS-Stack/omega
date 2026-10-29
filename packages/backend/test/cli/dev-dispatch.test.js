@@ -13,6 +13,7 @@ const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
 const DevCommand = require('../../dist/cli/commands/dev.js');
 const attachLogFile = require('../../dist/cli/utils/attach-log-file.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const package = require('../../package.json');
 
 /** The command a token dispatches to: the table's first match, the dispatcher's own rule. */
 const dispatched = (token) => COMMANDS.find((command) => matchCommand(command, { [token]: true }));
@@ -51,7 +52,7 @@ module.exports = defineCases({
         // secret-shaped key: the scaffold makes the target whole, then the checks'
         // own config load refuses it, before any boot
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-checks-'));
-        fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({ name: 'dev-checks-backend', version: '0.0.1', dependencies: { '@omega.js/backend': '*' } }));
+        fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({ name: 'dev-checks-backend', version: '0.0.1', dependencies: { '@omega.js/backend': '*', ...package.peerDependencies } }));
         fs.mkdirSync(path.join(tempDir, 'config'));
         fs.writeFileSync(path.join(tempDir, 'config', 'omega.json5'), '{ payment: { secretKey: "sk_test_x" } }\n');
         const command = new DevCommand({ firebaseProjectPath: tempDir, default: {}, argv: { _: [] }, options: {} });

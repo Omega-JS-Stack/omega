@@ -25,7 +25,7 @@ pluginInstalled();
 /** brandState with every machine tool present unless `options` hands in its own probe. */
 const brandState = (cwd, options = {}) => readBrandState(cwd, { execFn: toolProbe(), ...options });
 
-const FLAGS = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, execFn: toolProbe() };
+const FLAGS = { id: 'acme', name: 'Acme', url: 'https://acme.test', manage: false, dev: false, execFn: toolProbe() };
 
 // Keys only the backend reads, so a brand with no backend never lacks one
 const BACKEND_ONLY_KEYS = [

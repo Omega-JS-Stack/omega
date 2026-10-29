@@ -442,7 +442,7 @@ class Omega extends ClientOmega {
    * Sign out through main, so main and every renderer sign out together (the
    * desktop:auth:sign-out broadcast). The `.omega-signout` trigger runs this;
    * `omega.auth.signOut()` signs out this renderer alone.
-   * @returns {Promise<{ success: boolean, error?: string }>}
+   * @returns {Promise<{ success: true }>} rejects with the Firebase error when the sign-out fails.
    */
   signOut() {
     return this.desktop.ipc.invoke('desktop:auth:sign-out');

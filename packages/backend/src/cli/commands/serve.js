@@ -61,7 +61,7 @@ class ServeCommand extends BaseCommand {
     // the hot reload. Closed when the firebase child exits below.
     // `development` is PINNED (#586), the same local lane as the emulator: the
     // composed dist/.env follows the LANE, never the shell's environment.
-    this.ensureStaged({ environment: 'development' });
+    await this.ensureStaged({ environment: 'development' });
     const stageWatch = this.startStageWatch({ environment: 'development' });
 
     // Start @omega.js/backend watcher in background

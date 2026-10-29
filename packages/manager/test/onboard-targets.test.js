@@ -20,7 +20,7 @@ const { toolProbe } = require('./lib/tool-probe.js');
 
 pluginInstalled();
 
-const FLAGS = { name: 'Target Brand', url: 'https://targetbrand.test', contactName: 'Jane Doe', manage: false };
+const FLAGS = { name: 'Target Brand', url: 'https://targetbrand.test', manage: false };
 const REMOVAL_LINE = 'Removing a target is by hand: delete targets/web and its entry in config/omega.json5.';
 
 const TOOLS_PRESENT = toolProbe();
@@ -57,8 +57,7 @@ module.exports = defineCases({
           capture.restore();
         });
 
-        // The contact name is flagged so no machine's git identity decides whether Enter can pass it
-        const report = await pressEnterThrough(tty, runOnboard(root, { contactName: 'Jane Doe', manage: false }));
+        const report = await pressEnterThrough(tty, runOnboard(root, { manage: false }));
 
         ctx.expect(report.valid).toBe(true);
         ctx.expect(Object.keys(readConfig(root).targets)).toEqual(['web']);
@@ -147,7 +146,7 @@ module.exports = defineCases({
         recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixtureco.com' });
         const capture = captureConsole();
         ctx.after(() => capture.restore());
-        const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false };
+        const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', manage: false };
         const answers = { ...ENTER_THE_REST, 'Company brand id': 'fixture-co\r' };
         const prefixOf = (root) => readConfig(root).certificates?.providers?.apple?.bundleIdPrefix;
 

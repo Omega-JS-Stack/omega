@@ -39,7 +39,7 @@ function status(cwd, args = [], overrides = {}) {
 /** A finished website-alone brand: onboarded with flags and no terminal, installed, its .env empty. */
 async function websiteBrand() {
   const root = folder('acme');
-  await quietly(() => runOnboard(root, { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, targets: 'web' }));
+  await quietly(() => runOnboard(root, { id: 'acme', name: 'Acme', url: 'https://acme.test', manage: false, dev: false, targets: 'web' }));
   fs.writeFileSync(path.join(root, '.env'), '');
   return install(root);
 }
@@ -139,7 +139,7 @@ module.exports = defineCases({
       name: '#1032 case 9: on a brand whose backend misses the Firebase CLI, status lists it under Machine tools',
       run: async (ctx) => {
         const root = folder('acme');
-        const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', contactName: 'Jane Doe', manage: false, dev: false, targets: 'web,backend' };
+        const flags = { id: 'acme', name: 'Acme', url: 'https://acme.test', manage: false, dev: false, targets: 'web,backend' };
         // The onboarding itself finds every tool present, so it never probes this machine's own
         await quietly(() => runOnboard(root, { ...flags, execFn: toolProbe() }));
         install(root);

@@ -327,10 +327,9 @@ module.exports = async ({ ctx, omega }) => {
     }
 
     // sendCampaign() never throws a provider's error — it converts each one to
-    // { success: false, error, code }. A carried 400 is the same permanent
-    // config hole as a thrown one (missing brand.contact.email, missing
-    // brand.contact.person.name) and must not ride the success:false path,
-    // which would advance a recurring campaign into the identical failure.
+    // { success: false, error, code }. A carried 400 is the same permanent config
+    // hole as a thrown one (missing brand.contact.email) and must not ride the
+    // success:false path, which would advance a recurring campaign into the same failure.
     const configFault = findConfigFault(campaignResults);
 
     if (configFault) {

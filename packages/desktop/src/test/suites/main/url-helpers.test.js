@@ -340,10 +340,10 @@ module.exports = defineCases({
             const url = new URL(omega.getAuthUrl('development'));
             ctx.expect(url.origin).toBe('https://localhost:4000');
             ctx.expect(url.pathname).toBe('/signin');
-            const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+            const tokenUrl = new URL(url.searchParams.get('returnUrl'));
             ctx.expect(tokenUrl.origin).toBe('https://localhost:4000');
             ctx.expect(tokenUrl.pathname).toBe('/token');
-            ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
+            ctx.expect(tokenUrl.searchParams.get('returnUrl')).toBe('demo://auth/token');
           });
         } finally {
           if (origId !== undefined) omega.config.brand.id = origId; else delete omega.config.brand.id;
@@ -363,9 +363,9 @@ module.exports = defineCases({
           const url = new URL(omega.getAuthUrl('production'));
           ctx.expect(url.origin).toBe('https://example.com');
           ctx.expect(url.pathname).toBe('/signin');
-          const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+          const tokenUrl = new URL(url.searchParams.get('returnUrl'));
           ctx.expect(tokenUrl.origin).toBe('https://example.com');
-          ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
+          ctx.expect(tokenUrl.searchParams.get('returnUrl')).toBe('demo://auth/token');
         } finally {
           if (origId !== undefined) omega.config.brand.id = origId; else delete omega.config.brand.id;
           if (origUrl !== undefined) omega.config.brand.url = origUrl; else delete omega.config.brand.url;
@@ -384,9 +384,9 @@ module.exports = defineCases({
           const loopback = 'http://127.0.0.1:49152/auth/token?state=abc';
           withClassicBakedPorts(omega, () => {
             const url = new URL(omega.getAuthUrl('development', loopback));
-            const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+            const tokenUrl = new URL(url.searchParams.get('returnUrl'));
             ctx.expect(tokenUrl.pathname).toBe('/token');
-            ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe(loopback);
+            ctx.expect(tokenUrl.searchParams.get('returnUrl')).toBe(loopback);
           });
         } finally {
           if (origId !== undefined) omega.config.brand.id = origId; else delete omega.config.brand.id;

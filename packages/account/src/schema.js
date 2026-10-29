@@ -4,6 +4,9 @@
  * Extracted verbatim from @omega.js/backend's former user helper, which was
  * the authoritative shape (@omega.js/client's DEFAULT_ACCOUNT had drifted from it).
  *
+ * The root is $passthrough: a brand's own top-level key (users/{uid}.notes) rides
+ * through into User untouched, while every framework key below is still resolved.
+ *
  * Each leaf field is { type, default, nullable }
  * Special keys:
  *   $passthrough  — preserve all existing keys from input, don't strip unknowns
@@ -33,6 +36,7 @@ const ATTRIBUTION_TOUCH = {
 };
 
 const USER_SCHEMA = {
+  $passthrough: true,
   auth: {
     uid: { type: 'string', default: null, nullable: true },
     email: { type: 'string', default: null, nullable: true },

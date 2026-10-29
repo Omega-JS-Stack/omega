@@ -377,7 +377,7 @@ function setupForm() {
   const $switchAccountLink = document.getElementById('switch-account');
   if ($switchAccountLink) {
     const currentUrl = encodeURIComponent(window.location.href);
-    $switchAccountLink.href = siteUrl(`/signin?authSignout=true&authReturnUrl=${currentUrl}`);
+    $switchAccountLink.href = siteUrl(`/signin?authSignout=true&returnUrl=${currentUrl}`);
   }
 
   // Help button — the pay-stack capture renders once per viewport (#374), so

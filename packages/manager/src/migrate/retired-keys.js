@@ -365,6 +365,10 @@ const RETIRED_PATHS = {
     replacement: 'company.images.wordmark (resolved from `company: { id }`)',
     why: "the parent's wordmark is the parent's own `brand.images.wordmark` (#677), resolved through `company: { id }` for every sub-brand instead of pasted into each one",
   },
+  'brand.contact.person': {
+    replacement: 'nothing: the sends sign off as the brand',
+    why: 'the welcome, discount-nudge and checkup emails speak as the brand\'s team and sign off as it (#824), so no human identity is configured anywhere',
+  },
 
   'platforms.win': {
     replacement: 'platforms.windows (with its formats inside: platforms.windows.formats.nsis)',

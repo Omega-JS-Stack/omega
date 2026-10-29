@@ -305,6 +305,7 @@ function resolveTrialOutcomeConversion(sub, outcome, currency) {
       items: [{
         item_id: sub.product?.id,
         item_name: sub.product?.name,
+        item_category: 'subscription',
         price: price,
         quantity: 1,
       }],

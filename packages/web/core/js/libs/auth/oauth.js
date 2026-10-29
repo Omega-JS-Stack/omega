@@ -75,7 +75,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
   // Without this, Firebase's redirect-result-success path triggers an auth
   // state change with user=<the-about-to-be-deleted-account> BEFORE we
   // finish .delete() + signOut(), and the listener redirects to /account
-  // (or authReturnUrl) before the user ever sees the inline error.
+  // (or returnUrl) before the user ever sees the inline error.
   // Cleared in the finally block after signOut() has fired the followup
   // auth-state-change with user=null.
   window.__OMEGA_REVERSING_SIGNUP = true;
@@ -100,10 +100,10 @@ export async function reverseAccidentalSignup(ctx, newUser) {
     logger.error('Failed to sign out after accidental signup:', e);
   }
 
-  // Strip authReturnUrl so the next attempt doesn't redirect them away from /signin
+  // Strip returnUrl so the next attempt doesn't redirect them away from /signin
   const url = new URL(window.location.href);
-  if (url.searchParams.has('authReturnUrl')) {
-    url.searchParams.delete('authReturnUrl');
+  if (url.searchParams.has('returnUrl')) {
+    url.searchParams.delete('returnUrl');
     window.history.replaceState({}, document.title, url.toString());
   }
 
@@ -227,9 +227,9 @@ export async function handleRedirectResult(ctx) {
     // In simulation mode, handle the redirect ourselves since the auth
     // state listener won't fire (no real Firebase login happened).
     if (simulateRedirect) {
-      const authReturnUrl = url.searchParams.get('authReturnUrl');
-      const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
-        ? authReturnUrl
+      const returnUrl = url.searchParams.get('returnUrl');
+      const redirectTo = returnUrl && omega.isValidRedirectUrl(returnUrl)
+        ? returnUrl
         : '/dashboard/account';
       logger.log('Simulated redirect to:', redirectTo);
       await new Promise(resolve => setTimeout(resolve, 1500));

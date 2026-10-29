@@ -183,11 +183,11 @@ module.exports = defineCases({
     },
     {
       // `.` is the build-time entry; each process imports its instance by subpath
-      name: 'the package root exports { version, build } and nothing else',
+      name: 'the package root exports { version, build, require } and nothing else',
       run: (ctx) => {
         // Identity is read at run time: a suite run earlier may have purged the module cache.
         const root = require(path.join(ROOT, 'index.js'));
-        ctx.expect(Object.keys(root).sort()).toEqual(['build', 'version']);
+        ctx.expect(Object.keys(root).sort()).toEqual(['build', 'require', 'version']);
         ctx.expect(root.build).toBe(require(path.join(ROOT, 'build.js')));
       },
     },

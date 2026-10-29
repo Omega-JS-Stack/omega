@@ -186,7 +186,7 @@ class TestCommand extends BaseCommand {
     // not a consumer target to heal, and the checks would rewrite it.
     if (!isSelfTest) {
       // The scaffold first: a fresh target's firebase.json does not exist until it runs.
-      this.runEnsureTarget();
+      await this.runEnsureTarget();
       this.ui.section('Target checks');
       await runTargetChecks(self);
     }
@@ -198,7 +198,7 @@ class TestCommand extends BaseCommand {
     // A test lane composes its .env for TESTING (#586): the run's own
     // OMEGA_ENVIRONMENT=testing is set on the emulator child, not on this
     // process, so the environment is named here rather than sniffed.
-    this.ensureStaged({ environment: 'testing' });
+    await this.ensureStaged({ environment: 'testing' });
 
     // Get test paths from CLI args (e.g., "bem test admin/" or "bem test general/generate-uuid")
     const testPaths = (argv._ || []).slice(1); // Remove 'test' from args

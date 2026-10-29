@@ -11,9 +11,8 @@
  * The four split two ways, by the mailer's own scheduling limit (`SEND_AT_LIMIT`,
  * 71 hours):
  *   - welcome (immediate) and the 24-hour discount nudge are built, rendered and
- *     CAPTURED — a broken template or an unconfigured signoff fails right here,
- *     which is exactly how the [#640](https://github.com/Omega-JS-Stack/omega/issues/640)
- *     signoff crash reached production unnoticed,
+ *     CAPTURED, so a broken template fails right here; each signs off as the
+ *     brand's team, since the route passes no signoff of its own,
  *   - the 5-day checkup and the 10-day feedback request are past the limit, so they
  *     land in `emails-queue` for the frequent cron to send later.
  *

@@ -19,7 +19,7 @@ const { createMachine } = require('./lib/fake-claude.js');
 
 pluginInstalled();
 
-const FLAGS = { name: 'Acme', url: 'https://acme.test', targets: 'web', contactName: 'Jane Doe', manage: false };
+const FLAGS = { name: 'Acme', url: 'https://acme.test', targets: 'web', manage: false };
 const CREATE_ORG_URL = 'https://github.com/account/organizations/new';
 const SKIP_LINE = 'GitHub CLI is not signed in, so the repo owner was not set. Set repo.owner in config/omega.json5 later.';
 

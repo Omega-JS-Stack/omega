@@ -23,16 +23,13 @@ function writeJSON(file, data) {
 }
 
 // A check instance around a target dir whose manifest pins `pinned`, with the
-// registry lookup stubbed to `latest` and every side effect armed to throw.
+// registry lookup stubbed to `latest`.
 function makeInstance(targetDir, pinned, latest) {
   const manifest = { name: 'version-app', dependencies: { [PKG]: pinned } };
   writeJSON(path.join(targetDir, 'package.json'), manifest);
 
   const instance = new OmegaBackendTest({ main: { package: manifest, firebaseProjectPath: targetDir }, package: manifest });
   instance.getPkgVersion = async () => latest;
-  instance.installPkg = async () => {
-    throw new Error('the version check must never install');
-  };
   return instance;
 }
 

@@ -702,6 +702,7 @@ module.exports = defineCases({
         expect(october.transaction_id).toBe('in_october');
         expect(september.transaction_id, 'two charges are two transactions to GA4').not.toBe(october.transaction_id);
         expect(september.transaction_id, 'and neither is the subscription id').not.toBe('_test-sub-analytics');
+        expect(september.items[0].item_category, 'a renewal is a subscription product').toBe('subscription');
       },
     },
 
@@ -713,7 +714,9 @@ module.exports = defineCases({
         const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
 
         const firstPurchase = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', renewedSubscription(), {});
-        expect(analytics.buildParams({ resolved: firstPurchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('_test-order');
+        const firstPurchaseParams = analytics.buildParams({ resolved: firstPurchase, currency: 'USD', provider: 'stripe', order, chargeId: null });
+        expect(firstPurchaseParams.transaction_id).toBe('_test-order');
+        expect(firstPurchaseParams.items[0].item_category, 'a first charge is not recurring, but the product is still a subscription').toBe('subscription');
 
         const trialStart = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', subscriptionInTrial(), {});
         expect(trialStart.event).toBe('trial_start');
@@ -721,7 +724,9 @@ module.exports = defineCases({
 
         // A one-time buy has exactly one charge, and the order names it.
         const oneTime = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
-        expect(analytics.buildParams({ resolved: oneTime, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id).toBe('_test-order');
+        const oneTimeParams = analytics.buildParams({ resolved: oneTime, currency: 'USD', provider: 'stripe', order, chargeId: null });
+        expect(oneTimeParams.transaction_id).toBe('_test-order');
+        expect(oneTimeParams.items[0].item_category, 'a one-time buy is a one-time product').toBe('one-time');
       },
     },
 

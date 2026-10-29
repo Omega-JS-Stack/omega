@@ -1,9 +1,10 @@
 /**
  * User: the OMEGA account as one class, the same on the backend and in the browser.
  *
- * The own enumerable fields are the resolved stored document (every schema
- * branch, in schema order), so `user.auth.uid` and `user.subscription.status`
- * read as they always have and `toJSON()` is the one stored shape a Firestore
+ * The own enumerable fields are the resolved stored document: every schema
+ * branch, in schema order, plus the brand's own top-level keys as stored. So
+ * `user.auth.uid` and `user.subscription.status` read as they always have,
+ * `user.notes` reads a brand's key, and `toJSON()` is the one stored shape a Firestore
  * write or an API response carries. Everything derived lives on the prototype
  * as getters, computed on every read, so it never reaches the stored shape and
  * never goes stale when code mutates `user.subscription` in place.
@@ -35,7 +36,15 @@ class User {
    * @param {object|null} [identity] - { uid, email, displayName, photoURL, emailVerified }; a Firebase user satisfies it as-is
    */
   constructor(document = {}, identity = null) {
-    Object.assign(this, resolveAccount(document, { generators: User.generators, user: identity }));
+    const account = resolveAccount(document, { generators: User.generators, user: identity });
+
+    const shadowed = Object.keys(account).find((key) => USER_PROPERTIES.includes(key));
+
+    if (shadowed) {
+      throw new Error(`User: the document key '${shadowed}' shadows a User property; a brand key cannot shadow one`);
+    }
+
+    Object.assign(this, account);
 
     // Non-enumerable so it never reaches toJSON() or Object.keys(): the profile
     // comes from the sign-in, never from the stored document
@@ -95,5 +104,12 @@ class User {
     return { ...this };
   }
 }
+
+// Every name User defines on itself (its getters, its methods, the per-instance
+// profile): a brand key passes through the schema root, but never over one
+const USER_PROPERTIES = [
+  ...Object.getOwnPropertyNames(User.prototype).filter((name) => name !== 'constructor'),
+  'profile',
+];
 
 module.exports = User;

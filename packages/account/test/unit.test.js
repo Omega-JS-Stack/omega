@@ -3,9 +3,15 @@
  * the frontend auth-user overlay, and resolveSubscription derivations.
  * (Byte-parity with @omega.js/backend's live user.js is covered by golden-master.test.js.)
  */
+const fs = require('fs');
+const path = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const { USER_SCHEMA, resolveAccount, resolveSubscription } = require('../src/index.js');
+const { USER_SCHEMA, User, resolveAccount, resolveSubscription } = require('../src/index.js');
+
+// The framework half of the Firestore rules, whose user rule denies client writes
+// to the keys its isWritingFrameworkField() list names
+const FRAMEWORK_RULES = path.join(__dirname, '..', '..', 'backend', 'templates', 'firestore.framework.rules');
 
 module.exports = defineCases({
   type: 'group',
@@ -129,17 +135,61 @@ module.exports = defineCases({
     // ─── Passthrough & template ───
 
     {
-      name: '$passthrough keeps unknown keys; plain branches strip them',
+      name: '$passthrough keeps unknown keys, the root included; plain branches strip them',
       run: (ctx) => {
         const account = resolveAccount({
           roles: { admin: true, customRole: true },
           connections: { google: { 'google-sub-1': { token: 'tok' } } },
-          unknownTopLevel: { stripped: true },
+          unknownTopLevel: { kept: true },
+          auth: { unknownNested: { stripped: true } },
         });
 
         ctx.expect(account.roles.customRole).toBe(true);
         ctx.expect(account.connections).toEqual({ google: { 'google-sub-1': { token: 'tok' } } });
-        ctx.expect('unknownTopLevel' in account).toBe(false);
+        ctx.expect(account.unknownTopLevel).toEqual({ kept: true });
+        ctx.expect('unknownNested' in account.auth).toBe(false);
+      },
+    },
+
+    {
+      name: 'a brand\'s own top-level key rides through resolveAccount and User, framework keys still defaulted',
+      run: (ctx) => {
+        const account = resolveAccount({ notes: { created: 3 } });
+
+        ctx.expect(account.notes.created).toBe(3);
+        ctx.expect(account.subscription.product.id).toBe('basic');
+        ctx.expect(account.auth.uid).toBe(null);
+        ctx.expect(account.flags.signupProcessed).toBe(false);
+
+        const stored = new User({ notes: { created: 3 } }).toJSON();
+
+        ctx.expect(stored.notes.created).toBe(3);
+        ctx.expect(stored.subscription.product.id).toBe('basic');
+        ctx.expect(stored.consent.legal.status).toBe('revoked');
+      },
+    },
+
+    {
+      name: 'a brand key cannot shadow one of User\'s derived getters: new User throws naming it',
+      run: (ctx) => {
+        ctx.expect(() => new User({ plan: {} })).toThrow(Error);
+        ctx.expect(() => new User({ plan: {} })).toThrow(/plan/);
+      },
+    },
+
+    {
+      name: 'the framework rules deny client writes to every key the User guard blocks',
+      run: (ctx) => {
+        const rules = fs.readFileSync(FRAMEWORK_RULES, 'utf8');
+        const list = rules.match(/function isWritingFrameworkField\(\)\s*\{\s*return isWritingAny\(\[([^\]]*)\]\)/);
+
+        ctx.expect(list, 'isWritingFrameworkField() is no longer one isWritingAny([...]) list').toBeTruthy();
+
+        const denied = [...list[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+        const guarded = [...Object.getOwnPropertyNames(User.prototype).filter((name) => name !== 'constructor'), 'profile'];
+        const open = guarded.filter((name) => !denied.includes(name));
+
+        ctx.expect(open, 'a client could write a key new User() refuses to build from').toEqual([]);
       },
     },
 

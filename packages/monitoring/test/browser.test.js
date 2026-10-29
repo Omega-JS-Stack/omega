@@ -164,12 +164,12 @@ module.exports = defineCases({
       name: 'the auth params that ARE credentials never survive a url (#661)',
       run: (ctx) => {
         ctx.expect(scrubAuthParams('https://brand.test/signin?authPrivateKey=pk-test-abc'), 'the only param goes, and the empty query with it').toBe('https://brand.test/signin');
-        ctx.expect(scrubAuthParams('https://brand.test/signin?authReturnUrl=%2Fdashboard&authPrivateKey=pk-test-abc&utm_source=dock'), 'its neighbours stay put').toBe('https://brand.test/signin?authReturnUrl=%2Fdashboard&utm_source=dock');
+        ctx.expect(scrubAuthParams('https://brand.test/signin?returnUrl=%2Fdashboard&authPrivateKey=pk-test-abc&utm_source=dock'), 'its neighbours stay put').toBe('https://brand.test/signin?returnUrl=%2Fdashboard&utm_source=dock');
         ctx.expect(scrubAuthParams('https://brand.test/signin?authCustomToken=tok-test-abc'), 'the custom-token lane has the identical exposure').toBe('https://brand.test/signin');
         ctx.expect(scrubAuthParams('https://brand.test/signin?authPrivateKey=pk-test-abc&authCustomToken=tok-test-abc'), 'both names, one pass').toBe('https://brand.test/signin');
         ctx.expect(scrubAuthParams('https://brand.test/dashboard/account?tab=billing'), 'a url carrying neither comes back byte-identical').toBe('https://brand.test/dashboard/account?tab=billing');
         // Sentry's history breadcrumbs record same-origin urls RELATIVE.
-        ctx.expect(scrubAuthParams('/signin?authPrivateKey=pk-test-abc&authReturnUrl=%2Fdashboard'), 'a relative url is scrubbed and stays relative').toBe('/signin?authReturnUrl=%2Fdashboard');
+        ctx.expect(scrubAuthParams('/signin?authPrivateKey=pk-test-abc&returnUrl=%2Fdashboard'), 'a relative url is scrubbed and stays relative').toBe('/signin?returnUrl=%2Fdashboard');
       },
     },
 

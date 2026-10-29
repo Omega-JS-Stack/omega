@@ -23,6 +23,8 @@
  *                     .env/.gitignore, workflows re-rendered
  *   AGENTS.md         standalone only, through devkit's one builder
  *   locality          a WARNING when the framework is a `file:` link
+ *   dependency nudge  a WARNING per bare require under hooks/ the target
+ *                     never declared (docs/shared/local-dev.md)
  *
  * Everything here is copy-if-missing, marker-merge or write-if-changed. What
  * needs the network is NOT here — cert validation, repo provisioning, secret
@@ -37,6 +39,7 @@ const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
 const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
@@ -347,6 +350,16 @@ async function ensureTarget(options) {
   }
 
   checkLocality(projectDir);
+
+  // Consumer hooks run under plain node outside the bundle, so a framework
+  // dependency they never declared resolves only by hoisting: name both fixes.
+  nudgeBareRequires({
+    root: projectDir,
+    srcDir: 'hooks',
+    frameworkRoot: build.getRootPath('main'),
+    door: (name) => `require('@omega.js/desktop').require('${name}')`,
+    warn,
+  });
 
   for (const [label, files] of [['Created', result.written], ['Merged', result.merged], ['Synced', result.changed]]) {
     if (files.length > 0) log(`${label} ${files.join(', ')}`);

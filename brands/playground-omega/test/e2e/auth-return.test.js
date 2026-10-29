@@ -53,15 +53,15 @@ module.exports = defineCases({
         if (landed.pathname !== '/signup') {
           throw new Error(`still on ${landed.pathname} after ${REDIRECT_TIMEOUT / 1000}s: the auth policy never redirected (see page.log)`);
         }
-        const back = landed.searchParams.get('authReturnUrl');
+        const back = landed.searchParams.get('returnUrl');
         if (!back || new URL(back).pathname !== '/notes') {
-          throw new Error(`authReturnUrl is ${back}, not the /notes page the visitor asked for`);
+          throw new Error(`returnUrl is ${back}, not the /notes page the visitor asked for`);
         }
         // Auth connects at boot; Firestore connects inside its loader, on first use
         if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Connecting the auth emulator'))) {
           throw new Error('the verdict did not come from this stack: the client never connected to the emulators');
         }
-        console.log(`      ${landed.pathname}?authReturnUrl=${new URL(back).pathname}`);
+        console.log(`      ${landed.pathname}?returnUrl=${new URL(back).pathname}`);
       },
     },
   ],

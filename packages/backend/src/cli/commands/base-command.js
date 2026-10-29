@@ -110,14 +110,32 @@ class BaseCommand {
   /**
    * The local scaffold every verb runs first (ensure-target.js): its lines
    * print gray, its warnings yellow, so a kept or converged file is never silent.
+   * Then the peers (`firebase-admin`, `firebase-functions`) are aligned to the
+   * framework's peer range through devkit's one installer, the step desktop and
+   * the extension run from their own ensure-target; a satisfied target installs nothing.
    */
-  runEnsureTarget() {
-    const { ensureTarget } = require('../utils/ensure-target');
+  async runEnsureTarget() {
+    const { ensureTarget, isFrameworkTree } = require('../utils/ensure-target');
+    const { ensurePeerDependencies } = require('@omega.js/devkit/target-dependencies');
+    const { safeInstall } = require('../utils/safe-install');
+    const projectDir = this.main.firebaseProjectPath;
+    const log = (message) => this.log(chalk.gray(`  ${message}`));
 
     ensureTarget({
-      projectDir: this.main.firebaseProjectPath,
-      log: (message) => this.log(chalk.gray(`  ${message}`)),
+      projectDir,
+      log,
       warn: (message) => this.logWarning(`  ${message}`),
+    });
+
+    if (isFrameworkTree(projectDir)) {
+      return;
+    }
+
+    await ensurePeerDependencies({
+      projectDir,
+      package: require('../../../package.json'),
+      log,
+      safeInstall,
     });
   }
 
@@ -144,10 +162,10 @@ class BaseCommand {
    *   ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)). ONLY the
    *   deploy lane resolves one; every local lane stages without it.
    */
-  ensureStaged({ environment, licenseStatus } = {}) {
+  async ensureStaged({ environment, licenseStatus } = {}) {
     const { stageFunctions } = require('../utils/stage-functions');
 
-    this.runEnsureTarget();
+    await this.runEnsureTarget();
 
     stageFunctions({
       projectDir: this.main.firebaseProjectPath,

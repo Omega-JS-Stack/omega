@@ -3,8 +3,9 @@
  * through the real dispatcher (omega.events.run), and the deployed trigger
  * (notesOnCreate in src/index.js) running it on a real Firestore write.
  *
- * Owners here are fabricated uids with no account behind them: the counter is
- * keyed by the note's owner and nothing else, so no persona is touched.
+ * The counter lives on the owner's own user document (`users/{owner}.notes`).
+ * Owners here are fabricated uids with a bare user document and no account
+ * behind it, so no persona's counter moves.
  *
  * Run (from this target): npx omega test events/notes-on-create
  */
@@ -19,6 +20,11 @@ function noteSnapshot(id, note) {
   return { id, data: () => note };
 }
 
+// A real owner always has a user document before their first note
+async function seedOwner(firestore, uid) {
+  await firestore.set(`users/${uid}`, { auth: { uid } });
+}
+
 module.exports = defineCases({
   description: 'Notes: the on-create event counts each new note for its owner',
   type: 'group',
@@ -29,6 +35,8 @@ module.exports = defineCases({
       name: 'the-handler-bumps-the-owners-counter',
 
       async run({ omega, firestore, expect }) {
+        await seedOwner(firestore, DIRECT_OWNER);
+
         for (const id of ['direct-1', 'direct-2']) {
           await omega.events.run('notes/on-create', {
             snapshot: noteSnapshot(id, { id, owner: DIRECT_OWNER, text: 'Counted' }),
@@ -36,10 +44,10 @@ module.exports = defineCases({
           });
         }
 
-        const stats = await firestore.get(`notes-stats/${DIRECT_OWNER}`);
+        const user = await firestore.get(`users/${DIRECT_OWNER}`);
 
-        expect(stats.created, 'one count per note').toBe(2);
-        expect(stats.owner, 'on the owner\'s own stats doc').toBe(DIRECT_OWNER);
+        expect(user.notes?.created, 'one count per note, on the owner\'s own user document').toBe(2);
+        expect(await firestore.exists(`notes-stats/${DIRECT_OWNER}`), 'no sibling stats doc is written').toBe(false);
       },
     },
 
@@ -67,6 +75,8 @@ module.exports = defineCases({
       name: 'the-deployed-trigger-runs-the-handler',
 
       async run({ firestore, expect, waitFor }) {
+        await seedOwner(firestore, TRIGGER_OWNER);
+
         await firestore.set('notes/trigger-1', {
           id: 'trigger-1',
           owner: TRIGGER_OWNER,
@@ -74,12 +84,13 @@ module.exports = defineCases({
           metadata: { created: { timestamp: new Date().toISOString(), timestampUNIX: Math.round(Date.now() / 1000) } },
         });
 
-        const stats = await waitFor(async () => {
-          const doc = await firestore.get(`notes-stats/${TRIGGER_OWNER}`);
-          return doc?.created === 1 ? doc : null;
+        const user = await waitFor(async () => {
+          const doc = await firestore.get(`users/${TRIGGER_OWNER}`);
+          return doc?.notes?.created === 1 ? doc : null;
         }, 20000, 500);
 
-        expect(stats, 'the notesOnCreate trigger counted the write').toBeTruthy();
+        expect(user, 'the notesOnCreate trigger counted the write').toBeTruthy();
+        expect(await firestore.exists(`notes-stats/${TRIGGER_OWNER}`), 'no sibling stats doc is written').toBe(false);
       },
     },
   ],

@@ -10,7 +10,7 @@ class McpCommand extends BaseCommand {
     // is PINNED (#586): mcp is a LOCAL lane like emulator/serve, and the stage
     // and the read below must name the same environment or this process would
     // read an overlay its own stage never composed.
-    this.ensureStaged({ environment: 'development' });
+    await this.ensureStaged({ environment: 'development' });
     const functionsDir = path.join(self.firebaseProjectPath, 'dist');
 
     // Load the .env cascade so OMEGA_ADMIN_KEY is available

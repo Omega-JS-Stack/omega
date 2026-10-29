@@ -3,7 +3,6 @@ const _ = require('lodash');
 const { inferContact } = require('../../../libraries/infer-contact.js');
 const { trackSignup } = require('../../../libraries/analytics/signup.js');
 const { validate: validateEmail, isDisposable, ALL_CHECKS } = require('../../../libraries/email/validation.js');
-const prepare = require('../../../libraries/email/prepare.js');
 const { User } = require('../../../helpers/account.js');
 
 const MAX_POLL_TIME_MS = 30000;
@@ -488,9 +487,6 @@ async function sendWelcomeEmail(ctx, uid, firstName) {
   const omega = ctx.omega;
   const mailer = ctx.email;
   const greeting = firstName ? `Hey ${firstName}, welcome` : 'Welcome';
-  // Throws when brand.contact.person is unconfigured — the send is individually
-  // caught + logged by sendWelcomeEmails(), so signup still succeeds.
-  const person = prepare.resolvePerson(omega.config.brand);
 
   return mailer.send({
     to: uid,
@@ -501,21 +497,17 @@ async function sendWelcomeEmail(ctx, uid, firstName) {
     copy: false,
     data: {
       email: {
-        preview: `Welcome aboard! I'm ${person.firstName}, the CEO and founder of ${omega.config.brand.name}. I'm here to ensure your journey with us gets off to a great start.`,
+        preview: `Welcome aboard! The ${omega.config.brand.name} team is here to make sure your journey with us gets off to a great start.`,
       },
       content: {
         title: `Welcome to ${omega.config.brand.name}!`,
         message: `${greeting} aboard!
 
-I'm ${person.firstName}, the founder and CEO of **${omega.config.brand.name}**, and I'm thrilled to have you with us. Your journey begins today, and we are committed to supporting you every step of the way.
+All of us at **${omega.config.brand.name}** are thrilled to have you with us. Your journey begins today, and we are committed to supporting you every step of the way.
 
 We are dedicated to ensuring your experience is exceptional. Feel free to reply directly to this email with any questions you may have.
 
 Thank you for choosing **${omega.config.brand.name}**. Here's to new beginnings!`,
-      },
-      // Identity comes from brand.contact.person via prepare.resolveSignoff().
-      signoff: {
-        type: 'personal',
       },
     },
   })
@@ -528,14 +520,14 @@ Thank you for choosing **${omega.config.brand.name}**. Here's to new beginnings!
 /**
  * Send discount-nudge email (24 hours after signup)
  *
- * A warm, personal check-in that offers a discount code in exchange for a reply.
+ * A warm check-in from the brand's team that offers a discount code in exchange for a reply.
  * Scheduled fire-and-forget via sendAt (same pattern as checkup/feedback) — there is
  * intentionally no premium check at send time, so a user who upgrades within 24h may
  * still receive it. The copy is deliberately worded as a friendly thank-you (not "you
  * haven't upgraded") so it reads fine regardless of the recipient's current plan.
  *
  * The reply itself is the goal: replies are a strong positive sender-reputation signal,
- * and a real human check-in lands in the Primary tab rather than Promotions. Inbound
+ * and a conversational check-in lands in the Primary tab rather than Promotions. Inbound
  * reply handling (auto-issuing the code) is out of scope here — replies are handled
  * separately.
  *
@@ -548,10 +540,8 @@ async function sendDiscountNudgeEmail(ctx, uid, firstName) {
   const mailer = ctx.email;
   const greeting = firstName ? `Hey ${firstName}` : 'Hey there';
   const subject = firstName
-    ? `${firstName}, I've got something for you 🎁`
-    : `I've got something for you 🎁`;
-  // Throws when brand.contact.person is unconfigured — caught per-send by the caller.
-  const person = prepare.resolvePerson(omega.config.brand);
+    ? `${firstName}, we've got something for you 🎁`
+    : `We've got something for you 🎁`;
 
   return mailer.send({
     to: uid,
@@ -563,23 +553,19 @@ async function sendDiscountNudgeEmail(ctx, uid, firstName) {
     sendAt: moment().add(24, 'hours').unix(),
     data: {
       email: {
-        preview: `Just checking in from ${omega.config.brand.name} — and I've got a little thank-you for you.`,
+        preview: `Just checking in from ${omega.config.brand.name}, with a little thank-you for you.`,
       },
       content: {
         title: `How's it going?`,
         message: `${greeting},
 
-It's ${person.firstName}, the founder of **${omega.config.brand.name}**.
+It's the team at **${omega.config.brand.name}**.
 
-As a thank-you for giving us a try, I'd love to send you a code for a **premium upgrade**.
+As a thank-you for giving us a try, we'd love to send you a code for a **premium upgrade**.
 
-**Just reply to this email** and I'll get one over to you.
+**Just reply to this email** and we'll get one over to you.
 
-I read every reply and I'm looking forward to hearing from you!`,
-      },
-      // Identity comes from brand.contact.person via prepare.resolveSignoff().
-      signoff: {
-        type: 'personal',
+We read every reply and we're looking forward to hearing from you!`,
       },
     },
   })
@@ -596,8 +582,6 @@ async function sendCheckupEmail(ctx, uid, firstName) {
   const omega = ctx.omega;
   const mailer = ctx.email;
   const greeting = firstName ? `Hey ${firstName}` : 'Hi there';
-  // Throws when brand.contact.person is unconfigured — caught per-send by the caller.
-  const person = prepare.resolvePerson(omega.config.brand);
 
   return mailer.send({
     to: uid,
@@ -615,17 +599,13 @@ async function sendCheckupEmail(ctx, uid, firstName) {
         title: `How's everything going?`,
         message: `${greeting},
 
-It's ${person.firstName} again from **${omega.config.brand.name}**. Just checking in to see how things are going for you.
+It's the **${omega.config.brand.name}** team again. Just checking in to see how things are going for you.
 
 Have you had a chance to explore all our features? Any questions or feedback for us?
 
 We're always here to help, so don't hesitate to reach out. Just reply to this email and we'll get back to you as soon as possible.
 
 Thank you for choosing **${omega.config.brand.name}**. Here's to new beginnings!`,
-      },
-      // Identity comes from brand.contact.person via prepare.resolveSignoff().
-      signoff: {
-        type: 'personal',
       },
     },
   })

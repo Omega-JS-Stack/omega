@@ -1,31 +1,36 @@
 /**
  * Firestore rules for the notes feature (firestore.rules, compiled with the
  * framework half into dist/firestore.rules): a note is its owner's alone, and
- * the notes-stats counter is read-only to its owner.
+ * the counter on the owner's user document (`users/{uid}.notes`) is
+ * server-written only, while the rest of the user document stays the owner's.
  *
  * Seeded through the Admin SDK (rules bypassed), then exercised as the notes
  * personas test/_init.js declares.
  *
  * Run (from this target): npx omega test rules/notes
  */
+const fs = require('node:fs');
+const path = require('node:path');
 const { defineCases } = require('@omega.js/backend/test');
 
 const NOTE = 'notes/rules-note';
 
+// The compiled artifact firebase.json points the emulator at
+const COMPILED_RULES = path.join(__dirname, '..', '..', 'dist', 'firestore.rules');
+
 module.exports = defineCases({
-  description: 'Firestore rules for notes and notes-stats',
+  description: 'Firestore rules for notes and the user notes counter',
   type: 'suite',
   timeout: 30000,
 
   tests: [
     {
-      name: 'seed-a-note-and-its-counter',
+      name: 'seed-a-note',
 
       async run({ firestore, accounts }) {
         const owner = accounts['notes-owner'].uid;
 
         await firestore.set(NOTE, { id: 'rules-note', owner, text: 'Rules' });
-        await firestore.set(`notes-stats/${owner}`, { owner, created: 1 });
       },
     },
 
@@ -104,23 +109,32 @@ module.exports = defineCases({
     },
 
     {
-      name: 'the-owner-reads-their-counter-and-nobody-else-does',
+      name: 'the-owner-cannot-write-their-notes-counter',
 
       async run({ rules, accounts }) {
-        const path = `notes-stats/${accounts['notes-owner'].uid}`;
+        const userPath = `users/${accounts['notes-owner'].uid}`;
 
-        await rules.expectSuccess(rules.asAccount('notes-owner').doc(path).get());
-        await rules.expectFailure(rules.asAccount('notes-other').doc(path).get());
+        await rules.expectFailure(rules.asAccount('notes-owner').doc(userPath).update({ notes: { created: 999 } }));
       },
     },
 
     {
-      name: 'the-counter-is-server-written-only',
+      name: 'the-owner-still-writes-another-own-field',
 
       async run({ rules, accounts }) {
-        const path = `notes-stats/${accounts['notes-owner'].uid}`;
+        const userPath = `users/${accounts['notes-owner'].uid}`;
 
-        await rules.expectFailure(rules.asAccount('notes-owner').doc(path).set({ created: 999 }));
+        await rules.expectSuccess(rules.asAccount('notes-owner').doc(userPath).update({ 'personal.name.first': 'Noted' }));
+      },
+    },
+
+    {
+      name: 'notes-stats-is-gone-from-the-compiled-rules',
+
+      async run({ expect }) {
+        const compiled = fs.readFileSync(COMPILED_RULES, 'utf8');
+
+        expect(/match\s+\/notes-stats\//.test(compiled), 'the sibling counter collection still has a rule').toBe(false);
       },
     },
   ],

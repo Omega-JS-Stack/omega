@@ -1,9 +1,10 @@
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
+const { stageDependencies } = require('../../utils/stage-functions');
 
 /**
  * The TARGET MANIFEST (target-root package.json — scripts + runtime deps; src/dist
- * pillar) is well-formed, and the STAGED functions/package.json derives from
+ * pillar) is well-formed, and the STAGED dist/package.json derives from
  * it correctly (Cloud Functions reads main/engines/dependencies from the
  * staged copy).
  */
@@ -18,13 +19,14 @@ class FunctionsPackageTest extends BaseTest {
       return false;
     }
 
-    // The staged derivation (written by the stage step that ran before the
-    // checks): main + engines + the target's runtime deps, nothing else
-    const staged = jetpack.read(`${this.self.firebaseProjectPath}/functions/package.json`, 'json');
+    // The staged derivation: main + engines + the target's runtime deps, nothing
+    // else. An earlier verb's stage wrote it (test and dev run the checks before
+    // their own stage), so a fresh target fails here once and heals by restaging
+    const staged = jetpack.read(`${this.self.firebaseProjectPath}/dist/package.json`, 'json');
     return !!staged
       && staged.main === 'index.js'
       && !!(staged.engines && staged.engines.node)
-      && JSON.stringify(staged.dependencies) === JSON.stringify(manifest.dependencies)
+      && JSON.stringify(staged.dependencies) === JSON.stringify(stageDependencies(manifest.dependencies))
       && staged.scripts === undefined;
   }
 

@@ -113,6 +113,12 @@ scan itself is `@omega.js/devkit`'s `src/bare-requires.js`, the SAME one the
 web leg of `omega migrate` runs, so a brand's two ported targets cannot get
 different answers.
 
+The same scan runs after the port, on every verb: the backend scaffold warns
+once per undeclared package under `src/`, and a package @omega.js/backend
+declares also names the second fix, `omega.require('<module>')`, which loads
+the framework's copy. Never an error, and a version the target declares itself
+wins. The rule: [docs/shared/local-dev.md](../shared/local-dev.md#using-what-the-framework-depends-on).
+
 The one-time CONVERSIONS stay their own run-alone verbs, `omega migrate:rules`
 and `omega migrate:markers` (at the brand root, `--target=<name>` picks the
 backend), because those change what the project enforces.

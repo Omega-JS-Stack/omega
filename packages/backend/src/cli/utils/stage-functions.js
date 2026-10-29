@@ -81,6 +81,22 @@ function assertFirebaseEnvSafe(values) {
 }
 
 /**
+ * The staged dependency map: the target's runtime deps as dist/package.json
+ * carries them. dist/ sits one level below the target root, so a relative
+ * `file:` spec gains a `../`; every other spec rides as is.
+ *
+ * @param {Object<string, string>} [dependencies] - The target manifest's dependencies.
+ * @returns {Object<string, string>} The dependencies the staged manifest carries.
+ */
+function stageDependencies(dependencies) {
+  const staged = {};
+  for (const [dep, spec] of Object.entries(dependencies || {})) {
+    staged[dep] = /^file:(?!\/)/.test(spec) ? `file:../${spec.slice('file:'.length)}` : spec;
+  }
+  return staged;
+}
+
+/**
  * Stage the authored target tree into dist/.
  * @param {object} options
  * @param {string} options.projectDir - The target root (firebaseProjectPath).
@@ -163,10 +179,7 @@ function stageFunctions(options) {
   staged.push('public/ (defaults + consumer overrides)');
 
   // ─── Derived manifest (name/engines/runtime deps only) ────────────────────
-  const dependencies = {};
-  for (const [dep, spec] of Object.entries(targetPackage.dependencies || {})) {
-    dependencies[dep] = /^file:(?!\/)/.test(spec) ? `file:../${spec.slice('file:'.length)}` : spec;
-  }
+  const dependencies = stageDependencies(targetPackage.dependencies);
 
   const name = String(targetPackage.name || path.basename(projectDir));
   const manifest = {
@@ -357,4 +370,4 @@ function watchAndStage(options) {
   };
 }
 
-module.exports = { stageFunctions, watchAndStage, envWatchInputs, assertFirebaseEnvSafe, resolveServiceAccountPath, PRESERVE };
+module.exports = { stageFunctions, stageDependencies, watchAndStage, envWatchInputs, assertFirebaseEnvSafe, resolveServiceAccountPath, PRESERVE };

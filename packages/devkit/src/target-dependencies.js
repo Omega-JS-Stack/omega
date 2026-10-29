@@ -53,7 +53,8 @@ function install({ projectDir, project, log, safeInstall, pkg, ver, location }) 
   const command = `npm install ${pkg}@${ver} ${location || '--save'}`;
   log(`Installing: ${command}`);
 
-  return safeInstall(command)
+  // The target, never the process cwd: a brand-root fan-out scaffolds targets in-process.
+  return safeInstall(command, { log: true, config: { cwd: projectDir } })
     .then(() => {
       const projectUpdated = readProject(projectDir);
       project.dependencies = projectUpdated.dependencies;

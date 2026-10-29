@@ -140,13 +140,15 @@ server halves send the SAME payload for one event, because that is what they ded
   `content_name` only on an event with exactly ONE product, since Meta documents it as the
   singular name of the page/product.
 - **TikTok** `properties` carries `content_ids` AND `contents`
-  (`{ content_id, content_name, price, quantity }`), `content_type: 'product'` at the
-  PROPERTIES level where Events API 2.0 documents it (its `contents` object has no per-item
-  `content_type`; the older Pixel SDK model's does), `currency`, `value` (the order total,
-  where a `price` is one item's) and `order_id`.
+  (`{ content_id, content_name, content_category, price, quantity }`, `content_category`
+  filled from the item's `item_category` and left out when it has none),
+  `content_type: 'product'` at the PROPERTIES level where Events API 2.0 documents it (its
+  `contents` object has no per-item `content_type`; the older Pixel SDK model's does),
+  `currency`, `value` (the order total, where a `price` is one item's) and `order_id`.
 - A churn moment's exclusion signal keeps neither platform's priced fields: Meta's `contents`
   comes off whole (its `item_price` IS the amount, and the object requires `id` + `quantity`),
-  TikTok's keeps the array minus `price`/`quantity`, and `content_ids` names the plan on both.
+  TikTok's keeps the array minus `price`/`quantity` (its `content_category` stays), and
+  `content_ids` names the plan on both.
 
 **The three mapping kinds** — and the third one is an absence:
 

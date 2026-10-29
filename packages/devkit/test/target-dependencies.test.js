@@ -21,7 +21,8 @@ function tmpTarget(manifest) {
 
 function installer() {
   const calls = [];
-  return { calls, safeInstall: async (command) => { calls.push(command); } };
+  const configs = [];
+  return { calls, configs, safeInstall: async (command, config) => { calls.push(command); configs.push(config); } };
 }
 
 module.exports = defineCases({
@@ -88,7 +89,7 @@ module.exports = defineCases({
       name: 'ensurePeerDependencies: a behind version reinstalls, either section counts',
       run: async (ctx) => {
         const dir = tmpTarget({ name: 'consumer', dependencies: { gulp: '4.0.0' } });
-        const { calls, safeInstall } = installer();
+        const { calls, configs, safeInstall } = installer();
 
         await ensurePeerDependencies({
           projectDir: dir,
@@ -99,6 +100,8 @@ module.exports = defineCases({
         });
 
         ctx.expect(calls).toEqual(['npm install gulp@5.0.0 --save']);
+        // The install lands in the target, never in whatever folder the verb was typed from.
+        ctx.expect(configs.map((config) => config?.config?.cwd), 'every install runs in the target').toEqual([dir]);
       },
     },
 

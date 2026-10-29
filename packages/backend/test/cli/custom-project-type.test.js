@@ -38,6 +38,7 @@ const powertools = require('node-powertools');
 const { baseMissingKeys } = require('../../dist/vendor/config/index.js');
 
 const { resolveProjectType, isCustomProject, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS } = require('../../dist/cli/utils/project-type.js');
+const frameworkPackage = require('../../package.json');
 const BuildCommand = require('../../dist/cli/commands/build.js');
 const DeployCommand = require('../../dist/cli/commands/deploy.js');
 const DevCommand = require('../../dist/cli/commands/dev.js');
@@ -60,7 +61,8 @@ function targetDir({ projectType }) {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-project-type-')));
   const backend = projectType ? { type: 'backend', projectType } : { type: 'backend' };
 
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
+  // The peers declared, so the verb's alignment step installs nothing here
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0', dependencies: frameworkPackage.peerDependencies }));
   fs.mkdirSync(path.join(dir, 'config'));
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
@@ -415,7 +417,6 @@ module.exports = defineCases({
         // both read. It is DERIVED knowledge: a script key is the brand's in
         // custom mode precisely because the verb it runs refuses, so it must
         // never drift from the verb table beside it.
-        const frameworkPackage = require('../../package.json');
         const { CUSTOM_OWNED_SCRIPTS: projectScriptsCustomOwned, verbOfCommand: verbOf } = require('../../dist/cli/utils/project-type.js');
         const projectScripts = require('../../dist/vendor/devkit/verb-scripts.js').projectScripts(frameworkPackage);
         expect(frameworkPackage.projectScriptsCustomOwned, 'derived from FIREBASE_ONLY_VERBS, never hand-kept').toBe(undefined);

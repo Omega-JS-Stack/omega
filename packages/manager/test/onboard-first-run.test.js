@@ -1,6 +1,6 @@
 /**
  * The first run from a brand-template copy: the marked folder becomes the
- * brand, the id comes from the repo name, the contact name from git, and the
+ * brand, the id comes from the repo name, no contact person is asked for, and the
  * run installs and starts the dev stack itself unless told `--no-dev`. Outside
  * a first run, onboard prints the next steps and offers manage as it always has.
  * The install and the dev stack go through the process seam and never really run.
@@ -140,7 +140,7 @@ module.exports = defineCases({
           capture.restore();
         });
 
-        const run = runOnboard(root, { id: 'plain', name: 'Plain', url: 'https://plain.test', targets: 'web', contactName: 'Jane Doe' });
+        const run = runOnboard(root, { id: 'plain', name: 'Plain', url: 'https://plain.test', targets: 'web' });
         const { report, asked } = await driveWizard(tty, run, { ...ENTER_THE_REST, 'Run manage now?': 'n\r' });
 
         ctx.expect(report.firstRun).toBe(false);
@@ -151,27 +151,24 @@ module.exports = defineCases({
       },
     },
 
-    // ─── The contact name ────────────────────────────────────────────────────────
+    // ─── No contact person ───────────────────────────────────────────────────────
 
     {
-      name: '#1023 case 11: the contact name defaults to the git user name, in a terminal and without one; no name leaves it out',
+      name: 'a git user name writes no contact person, in a terminal and without one, and nothing asks for one',
       run: async (ctx) => {
         const flags = { name: 'Graceful', url: 'https://graceful.test', targets: 'web', manage: false };
 
         const typed = gitIdentity(ctx, folder('typed'), 'Grace Hopper');
         const tty = openTtyPrompt();
         ctx.after(() => tty.close());
-        await driveWizard(tty, runOnboard(typed, { id: 'typed', ...flags }), { ...ENTER_THE_REST, 'Contact person (': '\r' });
+        await driveWizard(tty, runOnboard(typed, { id: 'typed', ...flags }), ENTER_THE_REST);
+        await ctx.expect(tty.waitFor('Contact person', 0), 'the wizard asks for no contact person').rejects.toThrow(/Timed out/);
         tty.close();
-        ctx.expect(readConfig(typed).brand.contact.person, 'Enter takes the git user name').toEqual({ name: 'Grace Hopper' });
+        ctx.expect(readConfig(typed).brand.contact).toEqual({ email: 'support@graceful.test' });
 
         const headless = gitIdentity(ctx, folder('headless'), 'Grace Hopper');
         await quietly(() => runOnboard(headless, { id: 'headless', ...flags }));
-        ctx.expect(readConfig(headless).brand.contact.person, 'no terminal takes it too').toEqual({ name: 'Grace Hopper' });
-
-        const nameless = gitIdentity(ctx, folder('nameless'));
-        await quietly(() => runOnboard(nameless, { id: 'nameless', ...flags }));
-        ctx.expect(!('person' in readConfig(nameless).brand.contact), 'no git user name, no contact person').toBeTruthy();
+        ctx.expect(readConfig(headless).brand.contact, 'no terminal writes none either').toEqual({ email: 'support@graceful.test' });
       },
     },
 

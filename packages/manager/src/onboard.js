@@ -93,17 +93,6 @@ function idFromRepoName(name) {
   return deriveId(String(name).replace(/-omega$/i, ''));
 }
 
-/**
- * The git user name, the contact person's default.
- *
- * @param {string} cwd - Where git runs
- * @returns {string|null} `git config user.name`, or null when unset
- */
-function gitUserName(cwd) {
-  const result = spawnSync('git', ['config', 'user.name'], { cwd, encoding: 'utf8' });
-  return (result.status === 0 && result.stdout.trim()) || null;
-}
-
 /** 'acme-demo' → 'Acme Demo' */
 function deriveName(id) {
   return id
@@ -120,29 +109,6 @@ function deriveUrl(id) {
 function deriveEmail(url) {
   const host = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   return `support@${host}`;
-}
-
-/**
- * The brand.contact.person block from the wizard's answers (#770): the NAME
- * is the whole block's condition — a headshot or a link with nobody to sign
- * is not a person, and no name at all writes nothing at all, because a human
- * fact can never be derived (the manage walk's own gate is what catches the
- * gap later, rather than a framework identity signing the brand's email).
- *
- * @returns {Object|null} - { name, image?, url? }, or null when unanswered
- */
-function buildPerson({ name, image, url }) {
-  const clean = (value) => (typeof value === 'string' ? value.trim() : '');
-
-  if (!clean(name)) {
-    return null;
-  }
-
-  return {
-    name: clean(name),
-    ...(clean(image) ? { image: clean(image) } : {}),
-    ...(clean(url) ? { url: clean(url) } : {}),
-  };
 }
 
 /**
@@ -371,37 +337,6 @@ async function collectAnswers(options, interactive, brandRoot, origin) {
     tagline = (await input({ message: 'Brand tagline (optional, ~3 words):' })).trim();
   }
 
-  // contact person: the human who signs the personal sends. The support email
-  // derives from the url; the name defaults to the git user name, and with
-  // neither a run writes no person rather than inventing one. The headshot
-  // and the link are optional garnish on the same signoff.
-  let contactName = options.contactName ?? null;
-  if (contactName != null && (typeof contactName !== 'string' || !contactName.trim())) {
-    throw new Error('Invalid --contactName: pass the person\'s name (--contactName="Jane Doe")');
-  }
-  if (contactName == null) {
-    const gitName = gitUserName(brandRoot);
-    contactName = interactive
-      ? (await input({
-        message: 'Contact person (signs the personal emails: welcome, nudges, checkups):',
-        ...(gitName ? { default: gitName } : {}),
-      })).trim()
-      : gitName;
-  }
-  if (!contactName && (options.contactImage != null || options.contactUrl != null)) {
-    throw new Error('--contactImage/--contactUrl need a --contactName to belong to: nothing would be written');
-  }
-
-  let contactImage = options.contactImage ?? null;
-  if (contactImage == null && interactive && contactName) {
-    contactImage = await input({ message: 'Contact person headshot URL (optional):' });
-  }
-
-  let contactUrl = options.contactUrl ?? null;
-  if (contactUrl == null && interactive && contactName) {
-    contactUrl = await input({ message: 'Contact person link URL (optional):' });
-  }
-
   // targets: the flag, else the checkbox in a TTY, else the default
   let targetTypes = options.targets != null ? parseTargetsFlag(options.targets) : null;
   if (!targetTypes) {
@@ -423,7 +358,6 @@ async function collectAnswers(options, interactive, brandRoot, origin) {
     description: description || null,
     tagline: tagline || null,
     email: deriveEmail(url),
-    person: buildPerson({ name: contactName, image: contactImage, url: contactUrl }),
     targets: targetEntriesFromTypes(targetTypes),
     repo: owner ? { owner } : null,
     accountAdmins,
@@ -475,9 +409,6 @@ function answersFromBrand(brand) {
     description: brand.config.brand?.description || null,
     tagline: brand.config.brand?.tagline || null,
     email: brand.config.brand?.contact?.email || deriveEmail(url),
-    // The brand's own answer, kept as it stands — the scaffold never rewrites
-    // an existing config, so a rerun leaves the person byte-identical (#770)
-    person: brand.config.brand?.contact?.person || null,
     // The brand's own declarations, name AND type: a target named `admin`
     // scaffolds targets/admin around whichever framework it declares (#886)
     // A brand with none keeps none: a rerun never writes default targets.
@@ -664,7 +595,7 @@ function printNextSteps(answers) {
  * Main onboard runner.
  *
  * @param {string} cwd - Where the command ran
- * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, owner, company, admins, dryRun, manage, dev, execFn (the `gh`, `claude` and machine-tool runner, `(file, args, options) => stdout`; tests inject it) }
+ * @param {Object} options - { id, name, url, description, tagline, targets, owner, company, admins, dryRun, manage, dev, execFn (the `gh`, `claude` and machine-tool runner, `(file, args, options) => stdout`; tests inject it) }
  * @returns {Object} - { brandRoot, mode, firstRun, created, kept, replaced, planned, valid, added, installed, manageExitCode, devExitCode }
  */
 async function runOnboard(cwd, options = {}) {
@@ -785,6 +716,5 @@ module.exports = {
   deriveName,
   deriveUrl,
   idFromRepoName,
-  gitUserName,
   spawnDev,
 };

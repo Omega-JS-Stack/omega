@@ -2,12 +2,11 @@
  * `omega onboard [id]`: create (or converge) a brand monorepo.
  *
  * Flags pre-answer the wizard: --id/--name/--url/--description/--tagline,
- * --contactName (plus --contactImage/--contactUrl), --targets=web,backend (or
- * `none`), --owner=<GitHub owner>, --company=<company brand id>,
- * --admins=a@x.com,b@x.com. Prompts fill the gaps in a TTY; without one
- * the rest derives. --dry-run prints the file plan without writing or
- * prompting; --manage/--no-manage forces the manage handoff, and --no-dev
- * stops a first run before its install and dev stack.
+ * --targets=web,backend (or `none`), --owner=<GitHub owner>,
+ * --company=<company brand id>, --admins=a@x.com,b@x.com. Prompts fill the
+ * gaps in a TTY; without one the rest derives. --dry-run prints the file plan
+ * without writing or prompting; --manage/--no-manage forces the manage
+ * handoff, and --no-dev stops a first run before its install and dev stack.
  */
 const { runOnboard } = require('../onboard.js');
 
@@ -18,9 +17,6 @@ module.exports = async (options) => {
     url: options.url,
     description: options.description,
     tagline: options.tagline,
-    contactName: options.contactName,
-    contactImage: options.contactImage,
-    contactUrl: options.contactUrl,
     targets: options.targets,
     owner: options.owner,
     company: options.company,

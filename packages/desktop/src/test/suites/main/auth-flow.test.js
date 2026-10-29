@@ -79,9 +79,9 @@ module.exports = defineCases({
           // Decompose: /signin → /token → http://127.0.0.1:<port>/auth/token?state=<nonce>
           const signin = new URL(url);
           ctx.expect(signin.pathname).toBe('/signin');
-          const tokenUrl = new URL(signin.searchParams.get('authReturnUrl'));
+          const tokenUrl = new URL(signin.searchParams.get('returnUrl'));
           ctx.expect(tokenUrl.pathname).toBe('/token');
-          const returnUrl = new URL(tokenUrl.searchParams.get('authReturnUrl'));
+          const returnUrl = new URL(tokenUrl.searchParams.get('returnUrl'));
           ctx.expect(returnUrl.hostname).toBe('127.0.0.1');
           ctx.expect(Number(returnUrl.port)).toBe(port);
           ctx.expect(returnUrl.pathname).toBe('/auth/token');
@@ -194,8 +194,8 @@ module.exports = defineCases({
           ctx.expect(stubs.opened[0]).toBe(url);
           // Prod URL must ride the custom scheme, not a loopback return.
           const signin = new URL(url);
-          const tokenUrl = new URL(signin.searchParams.get('authReturnUrl'));
-          const finalHop = tokenUrl.searchParams.get('authReturnUrl');
+          const tokenUrl = new URL(signin.searchParams.get('returnUrl'));
+          const finalHop = tokenUrl.searchParams.get('returnUrl');
           ctx.expect(finalHop).toBe(`${omega.config.brand.id}://auth/token`);
         } finally {
           omega.isProduction = origIsProd;

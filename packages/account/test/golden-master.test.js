@@ -139,7 +139,7 @@ const FIXTURES = {
     metadata: { created: { timestamp: 999, timestampUNIX: 'nope' } },
   },
 
-  'passthrough branches ($passthrough + $template + strip unknowns)': {
+  'passthrough branches ($passthrough + $template + root keeps unknowns)': {
     roles: { admin: 'true', customRole: true, another: 'yes' },
     flags: { signupProcessed: true, promoSeen: 'twice' },
     usage: {
@@ -150,7 +150,7 @@ const FIXTURES = {
     attribution: {
       utm: { tags: { source: 'newsletter', campaign: 'summer' }, url: 'https://x.example' },
     },
-    unknownTopLevel: { should: 'be stripped' },
+    unknownTopLevel: { should: 'be kept' },
     anotherUnknown: 42,
   },
 };

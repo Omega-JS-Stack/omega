@@ -30,7 +30,7 @@ export default function () {
 
   // Get URL params
   const url = new URL(window.location.href);
-  const authReturnUrl = url.searchParams.get('authReturnUrl');
+  const returnUrl = url.searchParams.get('returnUrl');
   const mcpRedirectUri = url.searchParams.get('redirect_uri');
   const mcpState = url.searchParams.get('state');
   const isMcp = url.searchParams.get('mcp') === 'true';
@@ -39,10 +39,10 @@ export default function () {
   omega.dom.ready()
   .then(async () => {
     // Log
-    logger.log('Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'authReturnUrl:', authReturnUrl);
+    logger.log('Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'returnUrl:', returnUrl);
 
     // Validate redirect URLs
-    if (authReturnUrl && !omega.isValidRedirectUrl(authReturnUrl)) {
+    if (returnUrl && !omega.isValidRedirectUrl(returnUrl)) {
       showError('Invalid redirect URL');
       return;
     }
@@ -96,17 +96,17 @@ export default function () {
         updateStatus('Token generated successfully!');
 
         // Handle redirect or URL update
-        if (authReturnUrl) {
+        if (returnUrl) {
           // Redirect to return URL with token
           updateStatus('Redirecting...');
-          const returnUrl = new URL(authReturnUrl, window.location.origin);
-          returnUrl.searchParams.set('authToken', token);
+          const destinationUrl = new URL(returnUrl, window.location.origin);
+          destinationUrl.searchParams.set('authToken', token);
 
           // LEGACY: Add the legacy payload shape for old desktop app deep links
           // TODO: Remove this block when legacy desktop app support is no longer needed
-          _legacyTranslateTokenRedirect(returnUrl, token);
+          _legacyTranslateTokenRedirect(destinationUrl, token);
 
-          const redirectUrl = returnUrl.toString();
+          const redirectUrl = destinationUrl.toString();
           logger.log('Redirecting to:', redirectUrl);
 
           // Show retry button after a delay in case the redirect was cancelled (e.g. custom protocol dialog)

@@ -1,18 +1,20 @@
 /**
- * "Does this project declare everything its sources require?" The migrate
- * report's dependency-resolution scan. Under the legacy FLAT install a ported
- * file could `require('fs-jetpack')` and be right; under OMEGA a bare require
- * of something the consumer never declared resolves only by HOISTING, and the
- * LAZY ones load fine and 500 the first time they run. REPORT ONLY, by the
- * consumer's own manifest: every bare specifier that is neither a Node
- * built-in, nor an alias the caller's framework resolves, nor a declared
- * dependency, named file:line with the fix, never installed. It lives HERE so
- * the web and backend legs of the brand root's `omega migrate` read the same
- * verdict, each passing its own alias list. Stdlib-only, like every vendorable module.
+ * "Does this project declare everything its sources require?" Under the legacy
+ * FLAT install a ported file could `require('fs-jetpack')` and be right; under
+ * OMEGA a bare require of something the consumer never declared resolves only
+ * by HOISTING, and the LAZY ones load fine and 500 the first time they run.
+ * REPORT ONLY, by the consumer's own manifest: every bare specifier that is
+ * neither a Node built-in, nor an alias the caller's framework resolves, nor a
+ * declared dependency, named file:line with the fix, never installed. Two
+ * readers share it: the web and backend legs of the brand root's `omega
+ * migrate`, and `nudgeBareRequires`, the warning each framework's scaffold
+ * prints on every verb, where a package the framework itself declares also
+ * names the framework's door to its own copy. Stdlib-only, like every vendorable module.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { builtinModules } = require('node:module');
+const { frameworkDependencyNames } = require('./framework-deps.js');
 
 // Both spellings of every built-in: `require('fs')` and `require('node:fs')`.
 const BUILTINS = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
@@ -102,13 +104,17 @@ function declaredPackages(root) {
  *   dependency a consumer may declare, so naming one would hand the report a
  *   fix that breaks the project.
  * @param {string} [options.srcDir] - The tree to scan, relative to root. Defaults to `src`.
- * @returns {Array<{ file: string, line: number, module: string, fix: string }>}
+ * @param {string} [options.frameworkRoot] - The calling framework's package root:
+ *   a finding its declared set carries is marked `framework: true`.
+ * @returns {Array<{ file: string, line: number, module: string, fix: string, framework: boolean }>}
  *   One entry per file+package, at its first sighting.
  */
 function collectBareRequires(root, options = {}) {
   const aliases = options.aliases || [];
   const declared = declaredPackages(root);
   if (!declared) return [];
+
+  const frameworkDeps = new Set(options.frameworkRoot ? frameworkDependencyNames(options.frameworkRoot) : []);
 
   const found = [];
   for (const filePath of collectScriptFiles(path.join(root, options.srcDir || 'src'))) {
@@ -132,6 +138,7 @@ function collectBareRequires(root, options = {}) {
         line: source.slice(0, match.index).split('\n').length,
         module: name,
         fix: `add it to this project's package.json (\`npm install ${name}\`), it resolved through the legacy flat install and resolves under OMEGA only by hoisting`,
+        framework: frameworkDeps.has(name),
       });
     }
   }
@@ -140,12 +147,39 @@ function collectBareRequires(root, options = {}) {
 }
 
 /**
- * One finding as the one report line every migrate leg prints.
- * @param {{ file: string, line: number, module: string, fix: string }} entry - a collectBareRequires finding
+ * One finding as its one line. A package the framework declares names both
+ * fixes when the caller hands its door; every other finding is declare-only.
+ * @param {{ file: string, line: number, module: string, fix: string, framework: boolean }} entry - a collectBareRequires finding
+ * @param {function(string): string} [door] - The framework's call form for a module, `omega.require('<module>')` on the backend.
  * @returns {string}
  */
-function formatBareRequire(entry) {
+function formatBareRequire(entry, door) {
+  if (entry.framework && door) {
+    return `${entry.file}:${entry.line}: \`${entry.module}\` is not declared in this project's package.json: declare it (\`npm install ${entry.module}\`), or load the framework's copy with ${door(entry.module)}`;
+  }
+
   return `${entry.file}:${entry.line}: \`${entry.module}\` is not declared: ${entry.fix}`;
 }
 
-module.exports = { collectBareRequires, formatBareRequire, packageName };
+/**
+ * The scaffold's dependency nudge: one warning per undeclared bare require,
+ * never an error, because a consumer may declare its own version and it wins.
+ *
+ * @param {object} input
+ * @param {string} input.root - Consumer project root.
+ * @param {string} [input.srcDir] - The tree to scan, relative to root.
+ * @param {string} input.frameworkRoot - The calling framework's package root.
+ * @param {string[]} [input.aliases] - Names the framework resolves itself.
+ * @param {function(string): string} input.door - The framework's call form for a module.
+ * @param {function(string): void} input.warn - Warning logger, one call per finding.
+ * @returns {Array<object>} The findings, as collectBareRequires returns them.
+ */
+function nudgeBareRequires({ root, srcDir, frameworkRoot, aliases, door, warn }) {
+  const findings = collectBareRequires(root, { aliases, srcDir, frameworkRoot });
+
+  for (const entry of findings) warn(formatBareRequire(entry, door));
+
+  return findings;
+}
+
+module.exports = { collectBareRequires, formatBareRequire, nudgeBareRequires, packageName };

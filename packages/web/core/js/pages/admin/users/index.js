@@ -427,7 +427,7 @@ async function signInAsUser(uid, email) {
     const signinUrl = new URL(siteUrl('/signin'), window.location.origin);
     signinUrl.searchParams.set('authSignout', 'true');
     signinUrl.searchParams.set('authCustomToken', token);
-    signinUrl.searchParams.set('authReturnUrl', siteUrl('/dashboard/account'));
+    signinUrl.searchParams.set('returnUrl', siteUrl('/dashboard/account'));
 
     showSignInAsModalReady(email, signinUrl.toString());
   } catch (error) {

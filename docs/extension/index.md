@@ -105,6 +105,8 @@ Each component has three parts at conventional paths:
 - Styles: `src/assets/css/components/<component>/index.scss`
 - Script: `src/assets/js/components/<component>/index.js`
 
+On web a page is a file under `src/pages/` and on backend a route is a file under `src/routes/`, so dropping the file is the whole declaration. An extension view folder under `src/views/` is built, but nothing opens it until `src/manifest.json` (popup, options, side panel) or a runtime call (`tabs.create` for a page, `offscreen.createDocument`) names it, because an MV3 surface is a manifest entry or a call, never a bare file, and nothing auto-registers a view.
+
 Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/components/<component>.bundle.css`, `dist/assets/js/components/<component>.bundle.js`. See [docs/extension/components.md](components.md).
 
 ### Cross-context auth sync
@@ -233,6 +235,7 @@ See [docs/extension/cli.md](cli.md).
 - **Consumer code can `require()` any @omega.js/extension dependency** — the bundler's framework-deps resolve hook re-resolves every name the framework DECLARES from the framework's own installation. Consumer projects do NOT need to `npm install firebase`, `@omega.js/client`, or any other @omega.js/extension dep. If a dep doesn't resolve, the fix is in @omega.js/extension's `package.json` — not the consumer's.
 - **The framework's copy wins ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** A consumer that declares its own version of a framework dependency still bundles ONE copy — the framework's — the same guarantee @omega.js/web and @omega.js/desktop give, through the same @omega.js/devkit hook since [#738](https://github.com/Omega-JS-Stack/omega/issues/738). The DECLARED set is the list, so — unlike webpack's `resolve.modules` order, which this replaced — a package the framework merely carries TRANSITIVELY no longer wins: it resolves the way node resolves it. Same shape in [docs/desktop/index.md](../desktop/index.md); pinned by `src/test/suites/build/framework-deps.test.js` in both.
 - **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use the context's instance: `omega.auth`, `omega.firestore`. Same rule on every OMEGA browser surface.
+- **Hooks run outside the bundle, so they get the dependency nudge.** A consumer `hooks/**/*.js` file loads under plain node, where a framework dependency the target never declared resolves only by hoisting. Every verb's scaffold scans `hooks/` and prints one warning per such require, at file:line: declare it, or load the framework's copy with `require('@omega.js/extension').require('<module>')`, the same door @omega.js/desktop's build-time entry carries. Never an error, and a version the target declares itself wins. The one rule: [docs/shared/local-dev.md](../shared/local-dev.md#using-what-the-framework-depends-on).
 
 ## Development Workflow
 

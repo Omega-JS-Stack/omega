@@ -5,8 +5,9 @@
  * What it consumes, one of each: FormManager for the composer, omega.request()
  * against the backend's /notes routes (GET, POST, DELETE, its own function),
  * omega.auth.listen() to load the list once a user lands, omega.firestore for a
- * live read of the counter the backend's notes/on-create event keeps, and
- * omega.bindings to publish that counter into the section's data-omega-bind.
+ * live read of the counter the backend's notes/on-create event keeps on the
+ * user document (users/{uid}.notes.created), and omega.bindings to publish
+ * that counter into the section's data-omega-bind.
  */
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 
@@ -65,10 +66,10 @@ export default async ({ omega }) => {
     loadNotes({ omega, ...elements })
       .catch((error) => omega.utilities.showNotification(error.message, { type: 'danger' }));
 
-    // The counter is written by the backend event a moment after each create,
-    // so it is followed live rather than read once
-    stopCounter = omega.firestore.doc(`notes-stats/${user.uid}`).onSnapshot((snapshot) => {
-      omega.bindings.update({ notes: { created: snapshot.data()?.created || 0 } });
+    // The counter is a brand key on the user document, bumped by the on-create
+    // trigger a moment after each POST, so it is followed live, not read once
+    stopCounter = omega.firestore.doc(`users/${user.uid}`).onSnapshot((snapshot) => {
+      omega.bindings.update({ notes: { created: snapshot.data()?.notes?.created || 0 } });
     });
   });
 };

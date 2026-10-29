@@ -21,6 +21,24 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const DIR = path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'setup-tests');
 
+// Runs the functions-package check over a temp target whose staged manifest sits at dist/package.json
+async function runFunctionsPackage(targetDependencies, stagedDependencies) {
+  const FunctionsPackageTest = require(path.join(DIR, 'functions-package.js'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-functions-package-'));
+  const manifest = { name: 'app', version: '1.0.0', private: true, dependencies: targetDependencies };
+
+  fs.mkdirSync(path.join(root, 'dist'));
+  fs.writeFileSync(path.join(root, 'dist', 'package.json'), JSON.stringify({
+    main: 'index.js',
+    engines: { node: '22' },
+    dependencies: stagedDependencies,
+  }));
+
+  const check = new FunctionsPackageTest({ package: manifest, main: { firebaseProjectPath: root, package: manifest } });
+
+  return check.run();
+}
+
 module.exports = defineCases({
   description: 'Setup-tests relative requires resolve',
   type: 'group',
@@ -50,20 +68,27 @@ module.exports = defineCases({
     {
       name: 'functions-package-compares-the-staged-deps-against-the-target-manifest',
       async run({ expect }) {
-        const FunctionsPackageTest = require(path.join(DIR, 'functions-package.js'));
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-functions-package-'));
-        const manifest = { name: 'app', version: '1.0.0', private: true, dependencies: { 'firebase-admin': '^13.0.0' } };
+        const dependencies = { 'firebase-admin': '^13.0.0' };
 
-        fs.mkdirSync(path.join(root, 'functions'));
-        fs.writeFileSync(path.join(root, 'functions', 'package.json'), JSON.stringify({
-          main: 'index.js',
-          engines: { node: '22' },
-          dependencies: manifest.dependencies,
-        }));
+        expect(await runFunctionsPackage(dependencies, dependencies), 'a staged manifest carrying the target deps passes').toBe(true);
+      },
+    },
+    {
+      name: 'functions-package-passes-an-already-staged-linked-brand',
+      async run({ expect }) {
+        const target = { 'firebase-admin': '^13.0.0', '@omega.js/backend': 'file:../../packages/backend' };
+        const staged = { 'firebase-admin': '^13.0.0', '@omega.js/backend': 'file:../../../packages/backend' };
 
-        const check = new FunctionsPackageTest({ package: manifest, main: { firebaseProjectPath: root, package: manifest } });
+        expect(await runFunctionsPackage(target, staged), 'a staged manifest carrying the rewritten file: spec passes').toBe(true);
+      },
+    },
+    {
+      name: 'functions-package-fails-when-the-staged-deps-differ',
+      async run({ expect }) {
+        const target = { 'firebase-admin': '^13.0.0' };
+        const staged = { 'firebase-admin': '^12.0.0' };
 
-        expect(await check.run(), 'a staged manifest carrying the target deps passes').toBe(true);
+        expect(await runFunctionsPackage(target, staged), 'a staged manifest whose deps drifted from the target fails').toBe(false);
       },
     },
   ],

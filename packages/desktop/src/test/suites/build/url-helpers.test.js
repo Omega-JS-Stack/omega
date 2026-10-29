@@ -246,10 +246,10 @@ module.exports = defineCases({
           const url = new URL(helpers.getAuthUrl(omega));
           ctx.expect(url.origin).toBe('https://localhost:4000');
           ctx.expect(url.pathname).toBe('/signin');
-          const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+          const tokenUrl = new URL(url.searchParams.get('returnUrl'));
           ctx.expect(tokenUrl.origin).toBe('https://localhost:4000');
           ctx.expect(tokenUrl.pathname).toBe('/token');
-          ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
+          ctx.expect(tokenUrl.searchParams.get('returnUrl')).toBe('demo://auth/token');
         });
       },
     },

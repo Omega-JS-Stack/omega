@@ -18,7 +18,7 @@ const { collectBareRequires, formatBareRequire } = require('@omega.js/devkit/bar
  * @returns {{ due: string[], changed: string[], errors: string[] }}
  */
 function migrateTarget(targetDir, options = {}) {
-  const due = collectBareRequires(targetDir).map(formatBareRequire);
+  const due = collectBareRequires(targetDir).map((entry) => formatBareRequire(entry));
 
   if (options.execute === true && due.length > 0) {
     due.push('--execute installs nothing here: declare each package above in this target\'s package.json by hand');

@@ -10,12 +10,6 @@
     url: 'https://sandbox-brand.example.com',
     contact: {
       email: 'support@sandbox-brand.example.com',
-      // The human who signs the personal-signoff emails (welcome, nudge, checkup).
-      // The corpus RENDERS those for real now that a testing send is captured
-      // rather than delivered ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)), and a missing person fails the send loudly.
-      person: {
-        name: 'Sandy Sandbox',
-      },
     },
     address: {
       line1: '123 Main St',

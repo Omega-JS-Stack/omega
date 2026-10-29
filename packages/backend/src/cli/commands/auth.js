@@ -51,7 +51,7 @@ class AuthCommand extends BaseCommand {
   /**
    * Mint a custom token for a user and print the one-click sign-in URL —
    * the QA "log in as anyone" surface. The auth pages already consume
-   * ?authCustomToken= (+ optional authReturnUrl), so the printed URL signs
+   * ?authCustomToken= (+ optional returnUrl), so the printed URL signs
    * the browser in directly. Emulator by default; --production is explicit.
    * Usage: npx omega auth:token _test.admin@playground.omegajs.dev
    *        npx omega auth:token <uid> [--production] --url http://localhost:4000 --return /account
@@ -69,7 +69,7 @@ class AuthCommand extends BaseCommand {
       const token = await admin.auth().createCustomToken(user.uid);
       const base = String(argv.url || 'http://localhost:4000').replace(/\/+$/, '');
       const returnUrl = String(argv.return || '/dashboard/account');
-      const signinUrl = `${base}/signin?authCustomToken=${encodeURIComponent(token)}&authReturnUrl=${encodeURIComponent(returnUrl)}`;
+      const signinUrl = `${base}/signin?authCustomToken=${encodeURIComponent(token)}&returnUrl=${encodeURIComponent(returnUrl)}`;
 
       this.log(chalk.bold(`\n  Custom token for ${user.email || user.uid}${isEmulator ? chalk.gray(' (emulator)') : chalk.red(' (PRODUCTION)')}`));
       this.log(`  ${chalk.gray('Sign-in URL:')}`);

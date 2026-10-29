@@ -21,6 +21,7 @@ const jetpack = require('fs-jetpack');
 const expect = require('../../dist/vendor/devkit/test/expect.js');
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const frameworkPackage = require('../../package.json');
 const { withoutCI } = require('../../dist/vendor/devkit/test/without-ci.js');
 
 // Thrown from the license seam: the deploy stops there, so nothing is staged
@@ -45,7 +46,8 @@ function makeBrand() {
   // refuses a target that drifted, so the fixture carries the number at both
   // levels the way a real brand does.
   jetpack.write(path.join(brandRoot, 'package.json'), JSON.stringify({ name: 'lane-brand', version: '0.0.0', private: true }, null, 2));
-  jetpack.write(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'lane-backend', version: '0.0.0', private: true }, null, 2));
+  // The peers declared, so the verb's alignment step installs nothing here
+  jetpack.write(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'lane-backend', version: '0.0.0', private: true, dependencies: frameworkPackage.peerDependencies }, null, 2));
 
   return { projectDir, cleanup: () => jetpack.remove(brandRoot) };
 }

@@ -232,6 +232,42 @@ module.exports = defineCases({
       },
     },
     {
+      // Main's REAL sign-out handler on a signed-in session whose Firebase
+      // signOut fails: the click shows the failure notice, never the success one.
+      name: 'the client\'s signout trigger shows the failure notice when main\'s sign-out rejects',
+      run: async (ctx) => {
+        const saved = { firebaseAuth: mainAuth._firebaseAuth, module: mainAuth._firebaseModule, omega: mainAuth._omega, user: mainAuth.user, state: mainAuth.state };
+        mainAuth._firebaseAuth = { currentUser: { uid: 'uid-abc' } };
+        mainAuth._firebaseModule = { signOut: async () => { throw new Error('boom'); } };
+        mainAuth._omega = { ipc: { broadcast: () => {} } };
+
+        try {
+          const { omega } = makeRenderer({ uid: 'uid-abc' }, (channel) => (channel === 'desktop:auth:sign-out' ? mainAuth._handleSignOut() : { needsSync: false }));
+          const notices = [];
+          omega.utilities.showNotification = (message, type) => notices.push([message, type]);
+
+          await omega._wireAuthBridge();
+          omega.auth.setupEventListeners();
+
+          globalThis.confirm = () => true;
+          try {
+            clickTrigger(omega, 'omega-signout');
+            await new Promise((resolve) => setImmediate(resolve));
+          } finally {
+            delete globalThis.confirm;
+          }
+
+          ctx.expect(notices).toEqual([['Failed to sign out. Please try again.', 'danger']]);
+        } finally {
+          mainAuth._firebaseAuth = saved.firebaseAuth;
+          mainAuth._firebaseModule = saved.module;
+          mainAuth._omega = saved.omega;
+          mainAuth.user = saved.user;
+          mainAuth.state = saved.state;
+        }
+      },
+    },
+    {
       name: 'a signed-out state pushes nothing',
       run: async (ctx) => {
         const { omega, invokes, deliver } = makeRenderer(null, () => ({ needsSync: false }));

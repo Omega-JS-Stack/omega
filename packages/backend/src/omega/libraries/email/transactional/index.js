@@ -56,7 +56,7 @@ Transactional.prototype.build = async function (settings) {
   const { brand, brandDomain, company } = prepare.resolveBrand(omega);
   const { from, groupId } = prepare.resolveSender(settings, brand, brandDomain, omega);
   const categories = prepare.buildCategories('transactional', brand.id, settings.categories);
-  const signoff = prepare.resolveSignoff(settings?.data?.signoff, brand);
+  const signoff = prepare.resolveSignoff(settings?.data?.signoff);
 
   const templateName = resolveTemplateName(settings);
 

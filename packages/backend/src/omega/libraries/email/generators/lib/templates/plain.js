@@ -32,9 +32,8 @@ function build({ data }) {
 
   // Signoff
   const signoffGreeting = content.signoff || 'Best';
-  // A personal signoff always arrives named — prepare.resolveSignoff() fills it from
-  // brand.contact.person and fails loudly when that is not configured, so there is no
-  // personal-identity fallback to make here.
+  // A name arrives only when the caller passed its own signoff; every other send
+  // signs off as the brand's team.
   const signoffName = signoffData.name || `The ${brandName} Team`;
 
   // Hidden tags

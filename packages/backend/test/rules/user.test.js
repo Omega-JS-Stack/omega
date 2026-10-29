@@ -7,6 +7,7 @@
  * - Users can create/update their own document (non-protected fields only)
  * - Users cannot read/write other users' documents
  * - Protected fields (auth, connections, roles, flags, subscription, affiliate, api, metadata, activity, usage, owns, consent, trackingConsent, attribution, verifications) cannot be written by users
+ * - Neither can a key that would shadow one of User's derived members (plan, profile, ...)
  *
  * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
@@ -78,9 +79,8 @@ module.exports = defineCases({
         // Should succeed - writing allowed fields
         await rules.expectSuccess(
           db.doc(`users/${uid}`).set({
-            profile: {
-              displayName: 'Test User',
-              bio: 'This is my bio',
+            personal: {
+              name: { first: 'Test' },
             },
             preferences: {
               theme: 'dark',
@@ -372,6 +372,34 @@ module.exports = defineCases({
             attribution: { affiliate: { code: 'FORGED' } },
           }, { merge: true })
         );
+      },
+    },
+
+    // Test 11.8: a key named like one of User's derived members would make
+    // new User() throw on every read of the doc, so a client may not write one
+    {
+      name: 'user-cannot-write-a-derived-user-key',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        await rules.expectFailure(db.doc(`users/${uid}`).update({ plan: 1 }));
+        await rules.expectFailure(db.doc(`users/${uid}`).update({ profile: {} }));
+      },
+    },
+
+    // Test 11.9: the owner still updates their own personal fields
+    {
+      name: 'user-can-update-own-personal-name',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        await rules.expectSuccess(db.doc(`users/${uid}`).update({ 'personal.name.first': 'Rules' }));
       },
     },
 

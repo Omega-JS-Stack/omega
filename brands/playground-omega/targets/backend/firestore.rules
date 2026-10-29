@@ -60,10 +60,10 @@ service cloud.firestore {
       allow create, update: if isOwner() && isUser(getIncomingData().get('owner', null));
     }
 
-    // The per-user counter the notes/on-create event keeps. Server-written only
-    // (the Admin SDK bypasses rules); its owner may read it.
-    match /notes-stats/{uid} {
-      allow read: if isUser(uid);
+    // users/{uid}.notes is the counter the notes/on-create event keeps: server-
+    // written only (the Admin SDK bypasses rules), so the owner may not write it.
+    match /users/{userId} {
+      allow create, update: if !isWritingAny(['notes']);
     }
   }
 }

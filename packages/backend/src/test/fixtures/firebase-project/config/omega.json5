@@ -10,6 +10,26 @@
       email: 'fixture@example.com',
     },
   },
+  // Fake ASM group ids: every transactional send resolves its unsubscribe group
+  // from config and fails without one, and this offline fixture never runs the
+  // manage walk that would write real ones.
+  marketing: {
+    campaigns: {
+      providers: {
+        sendgrid: {
+          groups: {
+            orders: 900001,
+            hello: 900002,
+            account: 900003,
+            marketing: 900004,
+            security: 900005,
+            newsletter: 900006,
+            internal: 900007,
+          },
+        },
+      },
+    },
+  },
   // The feature catalog (#647): every feature is defined ONCE here, and the
   // products below name only their value.
   features: {

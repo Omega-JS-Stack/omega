@@ -34,6 +34,7 @@ const { user } = omega.auth;
 - `cancelling`: Cancellation pending (status `'active'` + `cancellation.pending` + NOT trialing)
 - `everPaid`: A payment start date exists
 - `toJSON()`: the stored document alone, never the getters or the profile
+- A brand's own top-level keys ride through: the account schema's root is passthrough, so a key the brand stores on `users/{uid}` (`notes`) lands on `auth.user` as stored, on every surface (`ctx.user` on the backend, desktop main, the extension background). A stored key named like a `User` property (a getter, `toJSON`, `profile`) throws, naming the key; the framework rules refuse a client write of one
 
 ### One State Per Auth Change
 

@@ -23,6 +23,8 @@
  *   src/defaults/**         the defaults tree (copy-if-missing; .gitignore
  *                           live-syncs its Default section)
  *   AGENTS.md               standalone only, through devkit's one builder
+ *   dependency nudge        a WARNING per bare require under src/ the target
+ *                           never declared (docs/shared/local-dev.md)
  *
  * Everything here is copy-if-missing or merge-in-place — the one exception is
  * the standard scripts above, which the framework owns outright in every
@@ -36,6 +38,7 @@ const JSON5 = require('json5');
 const omegaConfig = require('@omega.js/config');
 
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
 
 const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
 const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD, CUSTOM_OWNED_SCRIPTS } = require('./project-type');
@@ -48,6 +51,7 @@ const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD, CUSTOM_O
 const frameworkPackage = require('../../../package.json');
 
 const TEMPLATES_DIR = path.resolve(__dirname, '../../../templates');
+const FRAMEWORK_ROOT = path.resolve(__dirname, '../../..');
 
 /** Read a JSON5 file, `{}` when it is missing or empty. */
 function loadJSON(filePath) {
@@ -287,6 +291,18 @@ function cleanupGeneratedArtifacts(projectDir) {
 }
 
 /**
+ * The framework's own tree is not a consumer target: running the framework's
+ * suite from packages/backend puts the framework at the cwd, and neither the
+ * scaffold nor the peer install may land in the package itself.
+ *
+ * @param {string} projectDir - The target root.
+ * @returns {boolean}
+ */
+function isFrameworkTree(projectDir) {
+  return loadJSON(path.join(projectDir, 'package.json')).name === frameworkPackage.name;
+}
+
+/**
  * Make the target whole — idempotent, offline, and quiet when there is
  * nothing to do.
  *
@@ -303,12 +319,9 @@ function ensureTarget(options) {
   const warn = options.warn || (() => {});
   const result = { written: [], merged: [], changed: [] };
 
-  // The framework's own tree is not a consumer target. Running the framework's
-  // suite from packages/backend puts the framework at the cwd, and a verb that
-  // scaffolds unconditionally would scatter the consumer defaults through the
-  // package. Refuse, quietly: this is a normal state, not a broken one.
+  // Refuse the framework's own tree quietly: a normal state, not a broken one.
   // (Sibling of the same guard in @omega.js/desktop's ensure-target.)
-  if (loadJSON(path.join(projectDir, 'package.json')).name === frameworkPackage.name) {
+  if (isFrameworkTree(projectDir)) {
     return result;
   }
 
@@ -321,6 +334,16 @@ function ensureTarget(options) {
   copyDefaults(projectDir, result, warn);
   cleanupGeneratedArtifacts(projectDir);
 
+  // Functions run under plain node, so a framework dependency the target never
+  // declared resolves only by hoisting: name both fixes, never fail the verb.
+  nudgeBareRequires({
+    root: projectDir,
+    srcDir: 'src',
+    frameworkRoot: FRAMEWORK_ROOT,
+    door: (name) => `omega.require('${name}')`,
+    warn,
+  });
+
   for (const [label, files] of [['Created', result.written], ['Merged', result.merged], ['Synced', result.changed]]) {
     if (files.length > 0) log(`${label} ${files.join(', ')}`);
   }
@@ -330,4 +353,4 @@ function ensureTarget(options) {
 
 // The brand-owned scripts ride the entry the manager already loads, so its
 // workspace walk reads them without a second home
-module.exports = { ensureTarget, resolveProjectId, CUSTOM_OWNED_SCRIPTS };
+module.exports = { ensureTarget, isFrameworkTree, resolveProjectId, CUSTOM_OWNED_SCRIPTS };

@@ -1,8 +1,9 @@
 /**
- * The count_notes MCP handler tool (src/mcp.js) end to end: a note POSTed over
- * the real HTTP surface bumps its owner's notes-stats counter
- * (src/events/notes/on-create.js), and `tools/call count_notes` on /omega/mcp,
- * with a persona's `privateKey` as its Bearer, answers THAT caller's count.
+ * The count_notes MCP handler tool (src/mcp.js) end to end: `tools/call
+ * count_notes` on /omega/mcp, with a persona's `privateKey` as its Bearer,
+ * answers THAT caller's `notes.created` off their own user document, 0 when
+ * they have none, and a note POSTed over the real HTTP surface moves the owner's
+ * answer alone (the counter src/events/notes/on-create.js keeps).
  *
  * The suite writes notes, so it runs as the two personas test/_init.js declares
  * for the notes suites (`notes-owner`, `notes-other`) and never as a shared one.
@@ -45,6 +46,15 @@ async function countNotes(config, account) {
   return JSON.parse(result.content[0].text).count;
 }
 
+// The auth hook seeds each persona's welcome note on its own schedule; waiting
+// for it to be counted keeps a later trigger from moving a value a case set
+function welcomeCounted(firestore, waitFor, account) {
+  return waitFor(async () => {
+    const user = await firestore.get(`users/${account.uid}`);
+    return user?.notes?.created >= 1 ? user : null;
+  }, 20000, 500);
+}
+
 module.exports = defineCases({
   description: 'MCP: count_notes answers the calling user\'s own note count',
   type: 'suite',
@@ -52,32 +62,52 @@ module.exports = defineCases({
 
   tests: [
     {
+      name: 'answers-the-callers-own-counter',
+
+      async run({ expect, accounts, config, firestore, waitFor }) {
+        const owner = accounts['notes-owner'];
+
+        expect(owner.privateKey, 'the persona carries an API key').toBeTruthy();
+
+        await welcomeCounted(firestore, waitFor, owner);
+        await firestore.set(`users/${owner.uid}`, { notes: { created: 7 } }, { merge: true });
+
+        expect(await countNotes(config, owner), 'the count is the caller\'s notes.created').toBe(7);
+      },
+    },
+
+    {
+      name: 'answers-zero-for-a-user-with-none',
+
+      async run({ expect, accounts, config, firestore, waitFor, admin }) {
+        const other = accounts['notes-other'];
+
+        expect(other.privateKey, 'the persona carries an API key').toBeTruthy();
+
+        await welcomeCounted(firestore, waitFor, other);
+        await firestore.set(`users/${other.uid}`, { notes: admin.firestore.FieldValue.delete() }, { merge: true });
+
+        expect(await countNotes(config, other), 'no notes counter reads as zero').toBe(0);
+      },
+    },
+
+    {
       name: 'a-new-note-counts-for-its-owner-only',
 
       async run({ http, expect, accounts, config, waitFor }) {
         const owner = accounts['notes-owner'];
         const other = accounts['notes-other'];
 
-        expect(owner.privateKey && other.privateKey, 'both personas carry an API key').toBeTruthy();
-
-        // The auth hook seeds each persona's welcome note on its own schedule;
-        // waiting for the other's to be counted keeps its baseline from moving
-        const otherBefore = await waitFor(async () => {
-          const count = await countNotes(config, other);
-          return count >= 1 ? count : null;
-        }, 20000, 500);
-        const ownerBefore = await countNotes(config, owner);
-
         expect(await http.as('notes-owner').post('notes', { text: 'Counted over MCP' }), 'the owner creates a note').toBeSuccess();
 
         // The counter is bumped by the notesOnCreate trigger, after the write
         const ownerAfter = await waitFor(async () => {
           const count = await countNotes(config, owner);
-          return count >= ownerBefore + 1 ? count : null;
+          return count >= 8 ? count : null;
         }, 20000, 500);
 
-        expect(ownerAfter >= 1, `the owner counts at least the new note (${ownerAfter})`).toBeTruthy();
-        expect(await countNotes(config, other), 'the other persona\'s count is unchanged').toBe(otherBefore);
+        expect(ownerAfter, 'the owner counts the new note on top of the 7').toBe(8);
+        expect(await countNotes(config, other), 'the other persona\'s count is unchanged').toBe(0);
       },
     },
   ],

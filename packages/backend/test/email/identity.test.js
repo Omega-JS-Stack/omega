@@ -1,6 +1,6 @@
 /**
- * Email identity test — every human/company identity in outbound email comes from
- * config, and a missing one fails LOUDLY.
+ * Email identity test: every company identity in outbound email comes from
+ * config, a missing one fails LOUDLY, and a signoff names no one the caller did not.
  *
  * The framework used to ship its author's name, headshot, personal links and the
  * parent company's wordmark/BCC addresses as hardcoded fallbacks, so any brand that
@@ -11,7 +11,9 @@
  * Plain-node unit test (no emulator, no network).
  */
 const expect = require('../../dist/vendor/devkit/test/expect.js');
-const { resolvePerson, resolveSignoff } = require('../../dist/omega/libraries/email/prepare.js');
+const prepare = require('../../dist/omega/libraries/email/prepare.js');
+
+const { resolveSignoff } = prepare;
 const { footer } = require('../../dist/omega/libraries/email/generators/lib/templates/base.js');
 const feedbackTemplate = require('../../dist/omega/libraries/email/generators/lib/templates/feedback.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -19,18 +21,10 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 // The identity the framework used to hardcode. Nothing may ever emit these again.
 const FRAMEWORK_IDENTITY = /Ian Wiedenman|ianwiedenman|ianwieds|ITW Creative Works|itwcreativeworks/i;
 
-const brandWithPerson = {
+const BRAND = {
   name: 'Acme',
   url: 'https://acme.example',
-  contact: {
-    email: 'support@acme.example',
-    person: {
-      name: 'Jane Doe, CEO',
-      image: 'https://acme.example/jane.jpg',
-      url: 'https://jane.example',
-      urlText: '@janedoe',
-    },
-  },
+  contact: { email: 'support@acme.example' },
   images: {},
 };
 
@@ -38,8 +32,6 @@ const brandWithPerson = {
 // a brand with no company resolves to its own name, so the footer never
 // carries a fallback of its own.
 const COMPANY = { id: 'acme-holdings', name: 'Acme Holdings Inc', url: 'https://acmeholdings.example', images: { wordmark: 'https://acme.example/holdings-wordmark.png' } };
-
-const brandWithoutPerson = { name: 'Acme', contact: { email: 'support@acme.example' } };
 
 // The audit-BCC checks go through the REAL transactional build — a resolver-only test
 // would still pass if build() stopped reading the config. Each build runs once and is
@@ -71,9 +63,9 @@ function buildWith(brand, settings) {
 
 let configuredBuild;
 const buildConfigured = () => (configuredBuild = configuredBuild || buildWith({
-  ...brandWithPerson,
+  ...BRAND,
   contact: {
-    ...brandWithPerson.contact,
+    ...BRAND.contact,
     carbonCopy: [
       { email: 'audit@acme.example', name: 'Acme Audit' },
       { email: 'archive@acme.example' },
@@ -82,119 +74,59 @@ const buildConfigured = () => (configuredBuild = configuredBuild || buildWith({
 }));
 
 let unconfiguredBuild;
-const buildUnconfigured = () => (unconfiguredBuild = unconfiguredBuild || buildWith(brandWithPerson));
+const buildUnconfigured = () => (unconfiguredBuild = unconfiguredBuild || buildWith(BRAND));
 
 let malformedBuild;
 const buildMalformed = () => (malformedBuild = malformedBuild || buildWith({
-  ...brandWithPerson,
-  contact: { ...brandWithPerson.contact, carbonCopy: [{ name: 'No Address' }] },
+  ...BRAND,
+  contact: { ...BRAND.contact, carbonCopy: [{ name: 'No Address' }] },
 }).catch((error) => error));
 
 module.exports = defineCases({
-  description: 'Email identity (person, company, audit BCCs come from config)',
+  description: 'Email identity (signoff, company, audit BCCs come from config)',
   type: 'group',
   tests: [
-    // ---------- Personal signoff: config-driven ----------
+    // ---------- Signoff: the caller's, or the team ----------
 
     {
-      name: 'personal signoff is filled from brand.contact.person',
+      name: 'an explicit caller signoff passes through as given',
 
       run() {
-        const out = resolveSignoff({ type: 'personal' }, brandWithPerson);
+        const out = resolveSignoff({ type: 'personal', name: 'Sam Smith, CTO' });
 
-        expect(out.name).toBe('Jane Doe, CEO');
-        expect(out.image).toBe('https://acme.example/jane.jpg');
-        expect(out.url).toBe('https://jane.example');
-        expect(out.urlText).toBe('@janedoe');
-      },
-    },
-
-    {
-      name: 'an explicit caller signoff still wins over config',
-
-      run() {
-        const out = resolveSignoff({ type: 'personal', name: 'Sam Smith, CTO' }, brandWithPerson);
-
+        expect(out.type).toBe('personal');
         expect(out.name).toBe('Sam Smith, CTO');
-        // Unspecified fields still come from config.
-        expect(out.url).toBe('https://jane.example');
+        // Nothing the caller left out is filled in from anywhere
+        expect([out.image, out.url, out.urlText].every((value) => value == null), `filled a field the caller left out: ${JSON.stringify(out)}`).toBeTruthy();
       },
     },
 
     {
-      name: 'firstName is derived from the brand OWN configured name',
+      name: 'no signoff is the team default',
 
       run() {
-        expect(resolvePerson(brandWithPerson).firstName).toBe('Jane');
-      },
-    },
-
-    {
-      name: 'an explicit firstName wins over the derivation',
-
-      run() {
-        const brand = { contact: { person: { name: 'Jonathan Doe, CEO', firstName: 'Jon' } } };
-
-        expect(resolvePerson(brand).firstName).toBe('Jon');
-      },
-    },
-
-    {
-      name: 'optional person fields are omitted, not substituted',
-
-      run() {
-        const brand = { contact: { person: { name: 'Jane Doe' } } };
-        const out = resolveSignoff({ type: 'personal' }, brand);
-
-        expect(out.image, 'a missing headshot must be null, not a stand-in face').toBe(null);
-        expect(out.url).toBe(null);
-        expect(out.urlText).toBe(null);
-      },
-    },
-
-    // ---------- Personal signoff: loud failure ----------
-
-    {
-      name: 'personal signoff with NO configured person throws',
-
-      run() {
-        expect(() => resolveSignoff({ type: 'personal' }, brandWithoutPerson), 'a missing person must fail loudly').toThrow((error) => error.code === 400 && /brand\.contact\.person\.name/.test(error.message));
-      },
-    },
-
-    {
-      name: 'personal signoff with no brand at all throws',
-
-      run() {
-        expect(() => resolveSignoff({ type: 'personal' }, undefined)).toThrow((error) => error.code === 400);
-      },
-    },
-
-    {
-      name: 'the loud failure never leaks the framework identity',
-
-      run() {
-        // The whole point: refuse, rather than sign the mail as someone else.
-        let thrown;
-        try {
-          resolveSignoff({ type: 'personal' }, brandWithoutPerson);
-        } catch (error) {
-          thrown = error;
+        for (const out of [resolveSignoff(), resolveSignoff({})]) {
+          expect(out.type).toBe('team');
+          expect(out.name).toBe(undefined);
         }
-
-        expect(thrown, 'expected a throw').toBeTruthy();
-        expect(!FRAMEWORK_IDENTITY.test(thrown.message), `error message leaked an identity: ${thrown.message}`).toBeTruthy();
       },
     },
 
     {
-      name: 'a team signoff needs no person config (unchanged default path)',
+      name: 'the team default never carries the framework identity',
 
       run() {
-        const out = resolveSignoff({}, brandWithoutPerson);
+        const out = resolveSignoff();
 
-        expect(out.type).toBe('team');
-        expect(out.name).toBe(undefined);
+        expect(!FRAMEWORK_IDENTITY.test(JSON.stringify(out)), `team signoff leaked an identity: ${JSON.stringify(out)}`).toBeTruthy();
+      },
+    },
+
+    {
+      name: 'resolvePerson is not exported: no person is resolved from config',
+
+      run() {
+        expect('resolvePerson' in prepare, 'prepare.js still exports resolvePerson').toBe(false);
       },
     },
 
@@ -204,7 +136,7 @@ module.exports = defineCases({
       name: 'footer renders the resolved company name + wordmark',
 
       run() {
-        const out = footer(brandWithPerson, {}, COMPANY);
+        const out = footer(BRAND, {}, COMPANY);
 
         expect(out.includes('Acme Holdings Inc'), `company name missing: ${out}`).toBeTruthy();
         expect(out.includes('https://acme.example/holdings-wordmark.png'), 'company wordmark missing').toBeTruthy();
@@ -240,7 +172,7 @@ module.exports = defineCases({
 
       run() {
         const out = feedbackTemplate.build({
-          data: { brand: brandWithPerson, email: { subject: 'Hi' } },
+          data: { brand: BRAND, email: { subject: 'Hi' } },
           theme: {},
         });
 
@@ -254,7 +186,7 @@ module.exports = defineCases({
 
       run() {
         const out = feedbackTemplate.build({
-          data: { brand: brandWithPerson, email: { subject: 'Hi' } },
+          data: { brand: BRAND, email: { subject: 'Hi' } },
           theme: {},
         });
 

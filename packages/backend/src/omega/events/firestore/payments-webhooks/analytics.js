@@ -141,6 +141,7 @@ function buildParams({ resolved, currency, provider, order, chargeId }) {
     items: [{
       item_id: resolved.productId,
       item_name: resolved.productName,
+      item_category: resolved.category,
       price: resolved.value,
       quantity: 1,
     }],
@@ -306,7 +307,8 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
 
   // `category` rides along: a refund's transaction id turns on it (a one-time
   // order names one charge, a subscription names many —
-  // [#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+  // [#656](https://github.com/Omega-JS-Stack/omega/issues/656)). It also feeds
+  // each item's `item_category`.
   const base = { category, productId, productName, frequency, resourceId, isTrial };
 
   // --- Refunds (both categories) ---

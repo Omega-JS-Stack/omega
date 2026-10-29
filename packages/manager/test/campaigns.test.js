@@ -44,10 +44,6 @@ const TYPE_MAP = { text: 'Text', number: 'Number', date: 'Date' };
 
 const ADDRESS = { line1: '123 Fixture St', line2: 'Unit 4', city: 'Testville', region: 'CA', postalCode: '00000', country: 'USA' };
 
-// The human every transactional send signs off as (#694) — a configured brand
-// always has one, so it rides the default fixture
-const PERSON = { name: 'Fixture Founder' };
-
 const DNS_FIXTURE = {
   mail_cname: { type: 'cname', host: `emailauth.${DOMAIN}`, data: 'u123.wl001.sendgrid.net' },
   dkim1: { type: 'cname', host: `s1._domainkey.${DOMAIN}`, data: 's1.domainkey.u123.wl001.sendgrid.net' },
@@ -77,13 +73,13 @@ const VALIDATION_PENDING = { validation_results: { mail_cname: { valid: false },
 
 // `company` is the RESOLVED section (#677): a brand with no company of its own
 // resolves to its OWN url, which is what the retired `parent: 'self'` said.
-function brandConfig({ url = `https://${DOMAIN}`, company = null, webhooks = true, address = ADDRESS, person = PERSON, listId = null, groups = null, campaigns = {} } = {}) {
+function brandConfig({ url = `https://${DOMAIN}`, company = null, webhooks = true, address = ADDRESS, listId = null, groups = null, campaigns = {} } = {}) {
   return {
     brand: {
       id: 'fixture-brand',
       name: BRAND_NAME,
       url,
-      contact: { email: `support@${DOMAIN}`, ...(person ? { person } : {}) },
+      contact: { email: `support@${DOMAIN}` },
       ...(address ? { address } : {}),
     },
     company: { ...(company || { id: null, url, images: {} }), webhooks },
@@ -1073,26 +1069,18 @@ module.exports = defineCases({
       },
     },
 
-    // ─── contact-person (#694) ───────────────────────────────────────────────────
+    // ─── no person ───────────────────────────────────────────────────────────────
 
     {
-      name: 'campaigns: no brand.contact.person.name FAILS the walk, naming the key (#694)',
+      name: 'campaigns: the walk has no contact-person operation and converges without a person',
       run: async (ctx) => {
-        // Live bug: the first real signup returned 200 while sendWelcomeEmail,
-        // sendDiscountNudgeEmail and sendCheckupEmail ALL threw "Missing
-        // brand.contact.person.name" — and the walk that provisioned SendGrid for
-        // them stayed green. The walk is the launch gate, so it fails here instead.
+        ctx.expect(OPERATIONS.campaigns.map((operation) => operation.name).includes('contact-person')).toBe(false);
+
         const api = fakeSendgrid(convergedResponses());
+        const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
 
-        const result = await runService(brandConfig({ person: null }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
-
-        ctx.expect(result.status).toBe('error');
-        ctx.expect(result.error).toMatch(/brand\.contact\.person\.name/);
-        ctx.expect(result.failed.map((entry) => entry.operation)).toEqual(['contact-person']);
-
-        // A name configured → the same walk is clean
-        const configured = await runService(brandConfig(), { sendgrid: fakeSendgrid(convergedResponses()), serviceData: { listId: 'lst_1' } });
-        ctx.expect(configured.status).toBe('success');
+        ctx.expect(result.status, result.error).toBe('success');
+        ctx.expect(api.mutations()).toEqual([]);
       },
     },
 

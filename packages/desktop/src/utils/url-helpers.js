@@ -152,10 +152,10 @@ function getAuthUrl(context, environment, returnUrl) {
   }
 
   const tokenUrl = new URL('/token', site);
-  tokenUrl.searchParams.set('authReturnUrl', returnUrl || `${brandId}://auth/token`);
+  tokenUrl.searchParams.set('returnUrl', returnUrl || `${brandId}://auth/token`);
 
   const signinUrl = new URL('/signin', site);
-  signinUrl.searchParams.set('authReturnUrl', tokenUrl.toString());
+  signinUrl.searchParams.set('returnUrl', tokenUrl.toString());
   return signinUrl.toString();
 }
 

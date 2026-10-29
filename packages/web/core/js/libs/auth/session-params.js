@@ -1,5 +1,5 @@
 // URL-parameter session behaviors: ?authSignout=true, ?authCustomToken=…,
-// ?authPrivateKey=…, and authReturnUrl propagation into the page's auth links.
+// ?authPrivateKey=…, and returnUrl propagation into the page's auth links.
 
 // Libraries
 import omega from '@omega.js/web/runtime';
@@ -69,7 +69,7 @@ export async function handleCustomTokenSignin() {
 
     // This handler owns the post-signin navigation. Without the flag, the
     // core/auth.js listener races us on the same state-change and can win
-    // with its authenticated-default redirect ('/' instead of authReturnUrl).
+    // with its authenticated-default redirect ('/' instead of returnUrl).
     // Same pattern as __OMEGA_REVERSING_SIGNUP; no clear needed on success —
     // the page navigates away.
     window.__OMEGA_CUSTOM_TOKEN_SIGNIN = true;
@@ -82,9 +82,9 @@ export async function handleCustomTokenSignin() {
 
     trackLogin('custom-token', userCredential.user);
 
-    const authReturnUrl = url.searchParams.get('authReturnUrl');
-    const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
-      ? authReturnUrl
+    const returnUrl = url.searchParams.get('returnUrl');
+    const redirectTo = returnUrl && omega.isValidRedirectUrl(returnUrl)
+      ? returnUrl
       : siteUrl('/dashboard/account');
 
     window.location.href = redirectTo;
@@ -159,9 +159,9 @@ export async function handlePrivateKeySignin() {
     // durable by design, so the key must not ride along into history or a referer.
     stripPrivateKey();
 
-    const authReturnUrl = url.searchParams.get('authReturnUrl');
-    const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
-      ? authReturnUrl
+    const returnUrl = url.searchParams.get('returnUrl');
+    const redirectTo = returnUrl && omega.isValidRedirectUrl(returnUrl)
+      ? returnUrl
       : siteUrl('/dashboard/account');
 
     window.location.href = redirectTo;
@@ -194,16 +194,16 @@ function stripPrivateKey() {
 }
 
 /**
- * Propagate ?authReturnUrl into every auth-related link on the page so the
+ * Propagate ?returnUrl into every auth-related link on the page so the
  * signin ↔ signup ↔ reset hops keep the destination.
  */
-export function updateAuthReturnUrl() {
+export function updateReturnUrl() {
   const url = new URL(window.location.href);
-  const authReturnUrl = url.searchParams.get('authReturnUrl');
+  const returnUrl = url.searchParams.get('returnUrl');
 
-  // Quit if no authReturnUrl is provided
-  if (!authReturnUrl) {
-    logger.warn('No authReturnUrl provided in URL parameters.');
+  // Quit if no returnUrl is provided
+  if (!returnUrl) {
+    logger.warn('No returnUrl provided in URL parameters.');
     return;
   }
 
@@ -214,9 +214,9 @@ export function updateAuthReturnUrl() {
       return;
     }
 
-    // Update href to include authReturnUrl
+    // Update href to include returnUrl
     const href = new URL(link.href, window.location.origin);
-    href.searchParams.set('authReturnUrl', authReturnUrl);
+    href.searchParams.set('returnUrl', returnUrl);
     link.href = href.toString();
   });
 }

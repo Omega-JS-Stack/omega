@@ -59,6 +59,8 @@ Main code calls `omega.auth.signOut()`; a renderer calls `omega.signOut()`, whic
 2. Main broadcasts `desktop:auth:sign-out` IPC to all renderers.
 3. Each renderer signs out its own Firebase, on that broadcast alone (the clicked window included), so nothing signs out twice.
 
+A failed sign-out stops at step 1: nothing is broadcast, `omega.auth.signOut()` and `omega.signOut()` reject with the Firebase error, and the `.omega-signout` trigger shows its failure notice.
+
 ## Public API
 
 ### Main process (`omega.auth`)
@@ -90,7 +92,8 @@ await omega.auth.getIdToken();
 // attaches that token itself (the renderer's and the extension's shape).
 await omega.request('/notes', { method: 'POST', body: { text: 'hi' } });
 
-// Sign main out and broadcast the sign-out to every renderer.
+// Sign main out and broadcast the sign-out to every renderer. Rejects with the
+// Firebase error when the sign-out fails, and nothing is broadcast.
 await omega.auth.signOut();
 ```
 
@@ -106,8 +109,9 @@ omega.auth.listen(({ user, denied }) => { });
 // Main's authoritative account: { uid, document, identity }
 const main = await omega.getMainUser();
 
-// Sign out through main (broadcasts to every renderer). omega.auth.signOut()
-// signs out this renderer alone.
+// Sign out through main (broadcasts to every renderer). Rejects with the
+// Firebase error when the sign-out fails, and the .omega-signout trigger shows
+// its failure notice. omega.auth.signOut() signs out this renderer alone.
 await omega.signOut();
 ```
 
@@ -205,9 +209,13 @@ tray.item({
     const { user } = omega.auth;
     return user.authenticated ? `Signed in as ${user.email}` : 'Sign in';
   },
-  click: () => {
+  click: async () => {
     if (omega.auth.user.authenticated) {
-      omega.auth.signOut();
+      try {
+        await omega.auth.signOut();
+      } catch (e) {
+        omega.logger.error('sign-out failed:', e.message);
+      }
     } else {
       omega.openAuthFlow();
     }

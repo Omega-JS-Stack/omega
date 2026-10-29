@@ -30,11 +30,6 @@
       // sender derives offers@<this domain> and auto-verifies off the
       // subdomain's own domain authentication.
       email: "support@playground.omegajs.dev",
-      // The human who signs the personal-signoff emails (welcome, nudge,
-      // checkup). Schema-declared; #640 moves it to email.signoff.person.
-      person: {
-        name: "Ian Wiedenman",
-      },
     },
     // PLACEHOLDER address (CAN-SPAM footer) — Ian's real business address at launch.
     address: {

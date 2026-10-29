@@ -184,6 +184,26 @@ module.exports = defineCases({
       });
 
       cases.push({
+        name: 'Auth Module: the User state (#945) > should carry a brand\'s own key of the stored document onto auth.user',
+        run: async (ctx) => {
+          await beforeEachHook();
+          const { auth, omega, states } = createHarness();
+
+          auth._getAccountData = async () => ({ ...PRO_DOC, notes: { created: 3 } });
+          auth.listen((state) => states.push(state));
+
+          omega.firebaseAuth.currentUser = IDENTITY;
+          auth._handleAuthStateChange(IDENTITY);
+          await flush();
+
+          ctx.expect(states.length).toBe(1);
+          ctx.expect(auth.user.notes).toEqual({ created: 3 });
+          ctx.expect(states[0].user.notes.created).toBe(3);
+          ctx.expect(auth.user.plan, 'the framework keys still resolve beside it').toBe('pro');
+        },
+      });
+
+      cases.push({
         name: 'Auth Module: the User state (#945) > should enrich a missing displayName and photoURL from the provider entries',
         run: async (ctx) => {
           await beforeEachHook();

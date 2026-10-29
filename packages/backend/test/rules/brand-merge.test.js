@@ -36,7 +36,7 @@ async function seedUser(env) {
       auth: { uid: UID, email: `${UID}@test.com` },
       roles: {},
       xp: { total: 0 },
-      profile: { displayName: 'Before' },
+      streak: { days: 0 },
     });
   });
 
@@ -61,7 +61,7 @@ module.exports = defineCases({
           const db = await seedUser(env);
 
           await assertSucceeds(db.doc(`users/${UID}`).set({ xp: { total: 500 } }, { merge: true }));
-          await assertSucceeds(db.doc(`users/${UID}`).set({ profile: { displayName: 'After' } }, { merge: true }));
+          await assertSucceeds(db.doc(`users/${UID}`).set({ streak: { days: 1 } }, { merge: true }));
           // The framework's own keys stay the framework's
           await assertFails(db.doc(`users/${UID}`).set({ roles: { admin: true } }, { merge: true }));
         } finally {
@@ -90,7 +90,7 @@ module.exports = defineCases({
           // Fields are TOP-LEVEL: naming `xp` protects everything under it
           await assertFails(db.doc(`users/${UID}`).update({ 'xp.total': 500 }));
           // …and nothing else tightened: an untouched field still writes
-          await assertSucceeds(db.doc(`users/${UID}`).set({ profile: { displayName: 'After' } }, { merge: true }));
+          await assertSucceeds(db.doc(`users/${UID}`).set({ streak: { days: 1 } }, { merge: true }));
           // Reads are a different op — the brand said nothing about them
           await assertSucceeds(db.doc(`users/${UID}`).get());
         } finally {
@@ -115,7 +115,7 @@ module.exports = defineCases({
         try {
           const db = await seedUser(env);
 
-          await assertFails(db.doc(`users/${UID}`).set({ profile: { displayName: 'After' } }, { merge: true }));
+          await assertFails(db.doc(`users/${UID}`).set({ streak: { days: 1 } }, { merge: true }));
           await assertSucceeds(db.doc(`users/${UID}`).get());
         } finally {
           await env.cleanup();
@@ -145,7 +145,7 @@ module.exports = defineCases({
 
           // The renamed `userId` still resolves — a broken rename would error
           // and deny every write, so this succeeding IS the rename proof.
-          await assertSucceeds(db.doc(`users/${UID}`).set({ profile: { displayName: 'After' } }, { merge: true }));
+          await assertSucceeds(db.doc(`users/${UID}`).set({ streak: { days: 1 } }, { merge: true }));
           await assertFails(db.doc(`users/${UID}`).set({ xp: { total: 500 } }, { merge: true }));
           // The nested block spliced in and reads the renamed variable too
           await assertSucceeds(db.doc(`users/${UID}/journal/today`).set({ text: 'hello' }));
@@ -185,7 +185,7 @@ module.exports = defineCases({
           // Brand-only op: the framework declares no `delete`, so this grants it
           await assertSucceeds(db.doc(`users/${UID}`).delete());
           // …and the ops the framework DOES declare are untouched by it
-          await assertFails(db.doc('users/somebody-else').set({ profile: {} }, { merge: true }));
+          await assertFails(db.doc('users/somebody-else').set({ streak: {} }, { merge: true }));
         } finally {
           await env.cleanup();
         }

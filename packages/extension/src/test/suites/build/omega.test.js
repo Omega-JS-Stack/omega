@@ -14,10 +14,9 @@
 // aliases) only load in a browser, so those are pinned by source, the model the
 // rest of this suite uses.
 //
-// The one runtime seam Node lacks is `chrome.runtime`: lib/extension.js reads it
-// once at load, so it is present while these modules load, and it records
-// nothing and answers nothing (wave5-messenger.test.js drives the messaging).
-// background.js adds the worker's two globals, `importScripts` and `self`.
+// The one runtime seam Node lacks is `chrome.runtime`, present while these
+// modules load (utils/chrome-runtime.js). background.js adds the worker's two
+// globals, `importScripts` and `self`.
 
 const path = require('path');
 const fs = require('fs');
@@ -25,6 +24,7 @@ const http = require('http');
 const { pathToFileURL } = require('url');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const { User } = require('@omega.js/account');
+const { RUNTIME, withRuntime, importWithRuntime } = require('../../utils/chrome-runtime.js');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 const read = (...segments) => fs.readFileSync(path.join(SRC, ...segments), 'utf8');
@@ -33,38 +33,6 @@ const url = (...segments) => pathToFileURL(path.join(SRC, ...segments)).href;
 const PAGE_CONTEXTS = ['popup', 'options', 'sidepanel', 'page'];
 const BASE_CONTEXTS = ['background', 'content', 'offscreen'];
 const ALL_CONTEXTS = [...BASE_CONTEXTS, ...PAGE_CONTEXTS];
-
-const RUNTIME = {
-  onMessage: { addListener: () => {} },
-  onInstalled: { addListener: () => {} },
-  sendMessage: async () => undefined,
-  getManifest: () => ({ version: '1.2.3' }),
-};
-
-// Run `fn` with `chrome.runtime` present, the way every context runs
-function withRuntime(fn) {
-  global.chrome = { runtime: RUNTIME };
-  try {
-    return fn();
-  } finally {
-    delete global.chrome;
-  }
-}
-
-// Import an extension module with the runtime present. The first load of
-// lib/extension.js binds the runtime, so a copy another suite required without
-// one is dropped first.
-async function importWithRuntime(...segments) {
-  global.chrome = { runtime: RUNTIME };
-  for (const file of [['lib', 'extension.js'], ['lib', 'messaging.js']]) {
-    delete require.cache[require.resolve(path.join(SRC, ...file))];
-  }
-  try {
-    return await import(url(...segments));
-  } finally {
-    delete global.chrome;
-  }
-}
 
 // Run `fn` with the env vars in `vars` set (undefined = deleted); the
 // originals come back after.
@@ -171,7 +139,9 @@ module.exports = defineCases({
           ctx.expect(members.context).toBe(name);
           ctx.expect(members.logger.name).toBe(name);
           ctx.expect(members.messenger.sender).toBe(name);
-          ctx.expect(members.extension.runtime).toBe(RUNTIME);
+          // Compared by shape: an earlier suite's cache sweep may have reloaded
+          // the helper, and the lib bound the first stub at its one ESM load
+          ctx.expect(Object.keys(members.extension.runtime).sort()).toEqual(Object.keys(RUNTIME).sort());
         }
       },
     },
@@ -230,7 +200,7 @@ module.exports = defineCases({
         const { syncWithBackground } = await import(url('lib', 'auth-helpers.js'));
 
         const auth = new BackgroundAuth(withRuntime(() => new Omega('background')));
-        ctx.expect(auth.user).toBeInstanceOf(User);
+        ctx.expect(auth.user.constructor.name).toBe('User');
         ctx.expect(auth.user.authenticated).toBe(false);
         ctx.expect(auth.user.plan).toBe('basic');
 
@@ -255,7 +225,7 @@ module.exports = defineCases({
         auth.listen((state) => heard.push(state.user));
 
         ctx.expect(await auth.handleSyncAuth(pushed.payload)).toEqual({ needsSync: false });
-        ctx.expect(auth.user).toBeInstanceOf(User);
+        ctx.expect(auth.user.constructor.name).toBe('User');
         ctx.expect(auth.user.uid).toBe('user-1');
         ctx.expect(auth.user.plan).toBe('premium');
         ctx.expect(auth.user.profile.displayName).toBe('One');
@@ -328,10 +298,10 @@ module.exports = defineCases({
     },
     {
       // `.` is the build-time entry; each context imports its instance by subpath
-      name: 'the package root exports { version, build } and nothing else',
+      name: 'the package root exports { version, build, require } and nothing else',
       run: (ctx) => {
         const root = require('@omega.js/extension');
-        ctx.expect(Object.keys(root).sort()).toEqual(['build', 'version']);
+        ctx.expect(Object.keys(root).sort()).toEqual(['build', 'require', 'version']);
         ctx.expect(root.version).toBe(require(path.join(SRC, '..', 'package.json')).version);
         // Compared by shape: an earlier suite may have reloaded the build module
         ctx.expect(Object.keys(root.build).sort()).toEqual(Object.keys(require(path.join(SRC, 'build.js'))).sort());

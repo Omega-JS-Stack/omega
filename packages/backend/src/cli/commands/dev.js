@@ -10,13 +10,13 @@ class DevCommand extends EmulatorCommand {
     if (refuseWhenCustom(this.main.firebaseProjectPath, 'dev')) return;
     if (refuseWhenToolsMissing(this.main.firebaseProjectPath, 'dev', ['java', 'firebase'])) return;
 
-    // The brand's `start` is this verb, so the first boot heals the target's missing
-    // peers here (`omega emulator` stays check-free for the harness and the self-test),
+    // The brand's `start` is this verb, so the first boot audits the target here
+    // (`omega emulator` stays check-free for the harness and the self-test),
     // offline as `omega test --offline`: a drift is reported, never deployed.
     this.attachVerbLog('dev');
     // The scaffold first: the checks audit a whole target, and a fresh brand's
     // firebase.json does not exist until ensureTarget writes it.
-    this.runEnsureTarget();
+    await this.runEnsureTarget();
     this.main.argv.offline = true;
     this.ui.section('Target checks');
     await runTargetChecks(this.main);

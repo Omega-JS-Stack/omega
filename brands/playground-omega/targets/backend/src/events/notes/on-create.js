@@ -14,12 +14,11 @@ module.exports = async ({ ctx, omega, snapshot }) => {
     throw new Error(`notes/on-create: note ${snapshot.id} has no owner`);
   }
 
-  // The counter lives beside the user doc, not on it: the account schema
-  // resolves only the fields it declares, so a users/{uid}.notes key would never
-  // reach the User a route or the browser reads
-  await omega.firebase.admin.firestore().doc(`notes-stats/${note.owner}`).set({
-    owner: note.owner,
-    created: FieldValue.increment(1),
+  // The counter rides on the user doc: the account schema passes a brand's own
+  // top-level key through, so users/{uid}.notes reaches the User every surface
+  // reads, and the rules keep the owner from writing it
+  await omega.firebase.admin.firestore().doc(`users/${note.owner}`).set({
+    notes: { created: FieldValue.increment(1) },
   }, { merge: true });
 
   ctx.log(`notes/on-create: counted note ${snapshot.id} for ${note.owner}`);

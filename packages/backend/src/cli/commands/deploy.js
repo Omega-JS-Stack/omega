@@ -73,7 +73,7 @@ class DeployCommand extends BaseCommand {
     // target, and the step that COMPOSES the workflow a dispatch names, so a
     // `--direct` run scaffolds exactly as the dispatch does rather than
     // skipping the half of the verb its own header promises.
-    this.runEnsureTarget();
+    await this.runEnsureTarget();
 
     // The brand's ONE version ([#869](https://github.com/Omega-JS-Stack/omega/issues/869)):
     // a target whose version drifted from the brand root's is refused here, before
@@ -214,7 +214,7 @@ class DeployCommand extends BaseCommand {
       // composed config + public/ hosting boilerplate across the upload boundary.
       // The upload is composed for PRODUCTION: base .env + `.env.production`,
       // and no other environment's overlay ever rides along (#586).
-      this.ensureStaged({ environment: 'production', licenseStatus });
+      await this.ensureStaged({ environment: 'production', licenseStatus });
 
       // --only above passes through (e.g. `omega deploy --only hosting` deploys
       // hosting on Spark plans where functions would demand Blaze).

@@ -5,7 +5,7 @@
 //   forms.js           FormManager wiring, validation, consent UI
 //   email.js           email/password signin, signup, reset
 //   oauth.js           provider popup/redirect flows + accidental-signup reversal
-//   session-params.js  ?authSignout / ?authCustomToken / ?authPrivateKey / authReturnUrl / subdomain policy
+//   session-params.js  ?authSignout / ?authCustomToken / ?authPrivateKey / returnUrl / subdomain policy
 //   errors.js          Firebase error translation (pure)
 //   tracking.js        GA4/FB/TikTok auth events
 //
@@ -16,7 +16,7 @@
 import omega from '@omega.js/web/runtime';
 import { initializeSigninForm, initializeSignupForm, initializeResetForm } from '__main_assets__/js/libs/auth/forms.js';
 import { handleRedirectResult, shouldUseAuthPopup } from '__main_assets__/js/libs/auth/oauth.js';
-import { handleAuthSignout, handleCustomTokenSignin, handlePrivateKeySignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
+import { handleAuthSignout, handleCustomTokenSignin, handlePrivateKeySignin, updateReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 /* @dev-only:start */
@@ -104,7 +104,7 @@ export default function () {
     ctx.formManager.ready();
 
     // Update auth return URL in all auth-related links
-    updateAuthReturnUrl();
+    updateReturnUrl();
   });
 
   /* @dev-only:start */

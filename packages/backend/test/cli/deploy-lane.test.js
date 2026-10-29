@@ -27,6 +27,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const powertools = require('node-powertools');
+const frameworkPackage = require('../../package.json');
 
 const DEPLOY = require.resolve('../../dist/cli/commands/deploy.js');
 const DeployCommand = require(DEPLOY);
@@ -76,7 +77,8 @@ function targetDir({ brandRoot, version = '0.0.0', shared } = {}) {
   }
 
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
+  // The peers declared, so the verb's alignment step installs nothing here
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0', dependencies: frameworkPackage.peerDependencies }));
   fs.writeFileSync(path.join(dir, 'src', 'index.js'), '// fixture backend entry\n');
 
   return { root, dir };

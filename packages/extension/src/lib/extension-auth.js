@@ -14,7 +14,7 @@ class ExtensionAuth extends Auth {
    * so background.js can restore it after the sign-in.
    * @param {object} [options]
    * @param {string} [options.path] - the path to open (default '/token').
-   * @param {string} [options.authReturnUrl] - a return URL for electron/deep links.
+   * @param {string} [options.returnUrl] - a return URL for electron/deep links.
    * @returns {void}
    */
   openPage(options = {}) {
@@ -35,8 +35,8 @@ class ExtensionAuth extends Auth {
     const authUrl = new URL(path, brandUrl);
 
     // Add return URL if provided (for electron/deep links)
-    if (options.authReturnUrl) {
-      authUrl.searchParams.set('authReturnUrl', options.authReturnUrl);
+    if (options.returnUrl) {
+      authUrl.searchParams.set('returnUrl', options.returnUrl);
     }
 
     // Log

@@ -34,14 +34,14 @@ npx omega auth:token <uid-or-email>                     # Mint a custom token + 
 ### `auth:token` — log in as anyone (QA)
 
 Mints a custom token for the user and prints a URL the auth pages consume
-directly (`/signin?authCustomToken=…&authReturnUrl=…`) — open it and the
+directly (`/signin?authCustomToken=…&returnUrl=…`) — open it and the
 browser IS that user. Like every subcommand it targets the
 **emulator by default**; pass `--production` deliberately.
 
 | Flag | Description |
 |------|-------------|
 | `--url <base>` | Website base URL for the printed link (default `http://localhost:4000`) |
-| `--return <path>` | `authReturnUrl` after sign-in (default `/dashboard`) |
+| `--return <path>` | `returnUrl` after sign-in (default `/dashboard/account`) |
 | `--production` | Mint against production instead of the emulator |
 
 ## Shared Flags

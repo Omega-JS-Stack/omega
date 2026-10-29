@@ -194,58 +194,14 @@ function internalOnlyFieldFault(settings) {
 }
 
 /**
- * Resolve the human who fronts "personal" emails, from `brand.contact.person`.
- *
- * There is no fallback identity. A brand that sends personal-signoff email and has
- * not configured a person is a config hole, and the only safe outcome is a loud
- * failure — silently signing the mail with the framework author's name, face and
- * links is worse than not sending.
- *
- * @param {object} brand - Resolved brand object
- * @returns {{ name: string, firstName: string, image: ?string, url: ?string, urlText: ?string }}
- * @throws {Error} 400 when brand.contact.person.name is missing
- */
-function resolvePerson(brand) {
-  const person = brand?.contact?.person || {};
-
-  if (!person.name) {
-    throw errorWithCode(
-      'Missing brand.contact.person.name in config/omega.json5 — required to send an email with a personal signoff',
-      400,
-    );
-  }
-
-  return {
-    name: person.name,
-    // Derived from the brand's OWN configured name, never a framework default.
-    firstName: person.firstName || String(person.name).split(/[\s,]+/)[0],
-    image: person.image || null,
-    url: person.url || null,
-    urlText: person.urlText || null,
-  };
-}
-
-/**
- * Build signoff defaults. Fills in personal signoff details when type is 'personal'.
+ * Build signoff defaults: the team signoff unless the caller passed its own,
+ * which passes through untouched.
  *
  * @param {object} [signoff] - Caller-provided signoff (or empty)
- * @param {object} [brand] - Resolved brand object (source of the personal identity)
  * @returns {object} Complete signoff object
- * @throws {Error} 400 when a personal signoff is requested with no configured person
  */
-function resolveSignoff(signoff, brand) {
-  const resolved = { type: 'team', ...signoff };
-
-  if (resolved.type === 'personal') {
-    const person = resolvePerson(brand);
-
-    resolved.image = resolved.image || person.image;
-    resolved.name = resolved.name || person.name;
-    resolved.url = resolved.url || person.url;
-    resolved.urlText = resolved.urlText || person.urlText;
-  }
-
-  return resolved;
+function resolveSignoff(signoff) {
+  return { type: 'team', ...signoff };
 }
 
 /**
@@ -366,7 +322,6 @@ module.exports = {
   resolveSender,
   renderContent,
   internalOnlyFieldFault,
-  resolvePerson,
   resolveSignoff,
   buildCategories,
   buildUnsubscribeUrl,

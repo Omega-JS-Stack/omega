@@ -33,6 +33,25 @@ module.exports = defineCases({
       },
     },
 
+    // Test 2b: a brand's own key on the stored document reaches ctx.user,
+    // the stored document this route answers with
+    {
+      name: 'brand-key-on-ctx-user',
+      auth: 'basic',
+      async run({ http, expect, accounts, firestore, admin, after }) {
+        const docPath = `users/${accounts.basic.uid}`;
+
+        await firestore.set(docPath, { notes: { created: 3 } }, { merge: true });
+        after(() => firestore.set(docPath, { notes: admin.firestore.FieldValue.delete() }, { merge: true }));
+
+        const response = await http.as('basic').get('omega/test/authenticate');
+
+        expect(response, 'Should succeed with privateKey').toBeSuccess();
+        expect(response.data.user.notes, 'the brand key rides through').toEqual({ created: 3 });
+        expect(response.data.user.auth.uid, 'the framework keys still resolve').toBe(accounts.basic.uid);
+      },
+    },
+
     // Test 3: Invalid private key
     {
       name: 'invalid-private-key',

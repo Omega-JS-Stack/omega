@@ -439,6 +439,43 @@ module.exports = defineCases({
     },
 
     {
+      name: 'brand.contact.person is retired outright: one row for the block, deleted',
+      run: (ctx) => {
+        const config = { ...VALID, brand: { ...VALID.brand, contact: { email: 'support@acme.test', person: { name: 'Jane Doe, CEO', image: 'https://acme.test/jane.jpg' } } } };
+
+        ctx.expect(fired(config, 'brand.contact.person'), lines(config).join(' | ')).toBeTruthy();
+        ctx.expect(findRetiredKeys(config).length, 'one row for the block, never one per leaf').toBe(1);
+
+        // The contact block itself stays live
+        ctx.expect(findRetiredKeys({ ...VALID, brand: { ...VALID.brand, contact: { email: 'support@acme.test' } } })).toEqual([]);
+      },
+    },
+
+    {
+      name: 'migrate --execute: brand.contact.person is deleted, and the contact email it sat beside survives',
+      run: async (ctx) => {
+        const brand = stageBrand(`{
+  brand: {
+    id: 'fixture-brand',
+    name: 'Fixture Brand',
+    url: 'https://fixture-brand.test',
+    contact: { email: 'support@fixture-brand.test', person: { name: 'Jane Doe, CEO' } },
+  },
+  targets: { web: { type: 'web' } },
+}
+`);
+        const report = await runMigrate(brand);
+        ctx.expect(block(report.text, 'config/omega.json5'), report.text).toMatch(/due\s+remove brand\.contact\.person → /);
+        ctx.expect(report.code, 'a due step is a loud exit').toBe(1);
+
+        const converted = await runMigrate(brand, { execute: true });
+        const parsed = JSON5.parse(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'));
+        ctx.expect(parsed.brand.contact, `the person is gone: ${converted.text}`).toEqual({ email: 'support@fixture-brand.test' });
+        ctx.expect(converted.code, converted.text).toBe(undefined);
+      },
+    },
+
+    {
       name: 'the top-level adsense section and download map are rows too (#859)',
       run: (ctx) => {
         const config = {
