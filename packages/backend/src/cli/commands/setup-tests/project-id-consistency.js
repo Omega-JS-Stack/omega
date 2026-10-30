@@ -1,19 +1,19 @@
 const BaseTest = require('./base-test');
-const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const chalk = require('chalk').default;
 const { hasOmegaConfig, loadConfig, writeConfigValues, findBrandRoot } = require('@omega.js/config');
-const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
+const { resolveServiceAccountPath } = require('@omega.js/devkit/service-account');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { buildDemoServiceAccount } = require('./service-account');
 
 /**
  * Ensures projectId is consistent across all configuration files:
- * - functions/config/omega.json5 (cloud.config.projectId — resolved, so a
+ * - config/omega.json5 (cloud.config.projectId, resolved, so a
  *   brand-level cloud.config in a brand monorepo counts) — THE SOURCE OF
  *   TRUTH: config carries user choices, everything else is derived
  * - .firebaserc (projects.default) — derived artifact, rewritten from config
- * - functions/service-account.json (project_id) — derived for demo-*
+ * - service-account.json (project_id): derived for demo-*
  *   (regenerated fake), downloaded for real projects
  *
  * Mismatches cause tests to fail when running emulator in separate terminals
@@ -113,14 +113,10 @@ class ProjectIdConsistencyTest extends BaseTest {
       }
     }
 
-    // service-account.json — source chain: target root (standalone) → brand
-    // secrets (the path SERVICE_ACCOUNT_REL names; src/dist pillar, the stage
-    // step reads the same chain)
-    const brandRoot = findBrandRoot(projectPath);
-    const serviceAccountPath = [
-      `${projectPath}/service-account.json`,
-      brandRoot ? path.join(brandRoot, SERVICE_ACCOUNT_REL) : null,
-    ].filter(Boolean).find((candidate) => jetpack.exists(candidate)) || `${projectPath}/service-account.json`;
+    // service-account.json: devkit's one lookup (target root, then the brand's
+    // secrets), the same chain the stage reads; the target root when neither
+    // exists, which is where a fix writes
+    const serviceAccountPath = resolveServiceAccountPath(projectPath) || `${projectPath}/service-account.json`;
     const serviceAccountContent = jetpack.read(serviceAccountPath);
     const serviceAccountData = serviceAccountContent ? JSON5.parse(serviceAccountContent) : null;
 
@@ -167,7 +163,7 @@ class ProjectIdConsistencyTest extends BaseTest {
       const firebasercData = sources.firebaserc.exists ? JSON5.parse(jetpack.read(firebasercPath)) : {};
       firebasercData.projects = firebasercData.projects || {};
       firebasercData.projects.default = expectedProjectId;
-      jetpack.write(firebasercPath, `${JSON.stringify(firebasercData, null, 2)}\n`);
+      writeJson(firebasercPath, firebasercData);
       console.log(chalk.green(`Fixed: .firebaserc → projects.default = ${expectedProjectId}`));
     }
 
@@ -175,7 +171,7 @@ class ProjectIdConsistencyTest extends BaseTest {
     if (sources.serviceAccount.exists && sources.serviceAccount.projectId !== expectedProjectId) {
       if (this.isDemoProject) {
         const saPath = `${projectPath}/service-account.json`;
-        jetpack.write(saPath, `${JSON.stringify(buildDemoServiceAccount(expectedProjectId), null, 2)}\n`);
+        writeJson(saPath, buildDemoServiceAccount(expectedProjectId));
         this.restage();
         console.log(chalk.green(`Fixed: regenerated fake service-account.json for ${expectedProjectId}`));
       } else {

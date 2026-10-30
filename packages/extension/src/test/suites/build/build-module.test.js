@@ -1,63 +1,31 @@
 // Build-layer tests for build.getConfig() / getManifest() / getPackage() / getEnvironment().
 // Stages a temp project dir with config/omega.json5 + src/manifest.json
-// + package.json, sets process.cwd() to it, then exercises the build module's getters.
+// + package.json, then loads the build module fresh inside it (utils/package-project.js):
+// build.getConfig() / getManifest() resolve their files against process.cwd() at CALL
+// time, so each body runs while the project is still the cwd.
 
 const path    = require('path');
 const fs      = require('fs');
-const os      = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-function stageProject(opts = {}) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-getconfig-'));
-  if (opts.config !== undefined) {
-    fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), opts.config);
-  }
-  for (const [environment, contents] of Object.entries(opts.overlays || {})) {
-    fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'config', `omega.${environment}.json5`), contents);
-  }
-  if (opts.manifest !== undefined) {
-    fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'src', 'manifest.json'), opts.manifest);
-  }
-  if (opts.pkg !== undefined) {
-    fs.writeFileSync(path.join(tmp, 'package.json'), opts.pkg);
-  }
-  return tmp;
-}
+const BUILD_PATH = path.join(SRC, 'build.js');
 
 // Runs `fn` with the env vars in `vars` set (undefined = deleted); the
-// originals come back after.
-function withEnv(vars, fn) {
+// originals come back after `fn` settles.
+async function withEnv(vars, fn) {
   const saved = Object.keys(vars).map((key) => [key, process.env[key]]);
   try {
     for (const [key, value] of Object.entries(vars)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
-    return fn();
+    return await fn();
   } finally {
     for (const [key, value] of saved) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
-  }
-}
-
-// Runs `fn` with process.cwd() pinned to `dir`. build.getConfig() / getManifest()
-// resolve their files against process.cwd() at CALL time, so we hold the chdir until
-// after the test body runs (not just during require()).
-function inDir(dir, fn) {
-  const oldCwd = process.cwd();
-  for (const k of Object.keys(require.cache)) {
-    if (k.includes('/build.js')) delete require.cache[k];
-  }
-  try {
-    process.chdir(dir);
-    return fn(require(path.join(__dirname, '..', '..', '..', 'build.js')));
-  } finally {
-    process.chdir(oldCwd);
   }
 }
 
@@ -68,7 +36,7 @@ module.exports = defineCases({
   tests: [
     {
       name: 'getConfig resolves config/omega.json5 with the targets.extension overlay',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({ config: `{
           // JSON5 comment on purpose
           brand: { id: 'somiibo', name: 'Somiibo' },
@@ -77,7 +45,7 @@ module.exports = defineCases({
           targets: { extension: { type: 'extension', theme: { id: 'custom' } } },
         }` });
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             const cfg = build.getConfig();
             ctx.expect(cfg.brand.id).toBe('somiibo');
             ctx.expect(cfg.brand.name).toBe('Somiibo');
@@ -85,7 +53,7 @@ module.exports = defineCases({
             ctx.expect(cfg.theme.id).toBe('custom');
             // a shared section the overlay does not touch passes through
             ctx.expect(cfg.ports.livereload).toBe(40000);
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -93,12 +61,12 @@ module.exports = defineCases({
     },
     {
       name: 'getConfig returns {} when no omega.json5 exists',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({});
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             ctx.expect(build.getConfig()).toEqual({});
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -106,14 +74,14 @@ module.exports = defineCases({
     },
     {
       name: 'getConfig hard-fails on secret-shaped keys',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, analytics: { providers: { google: { id: '', secret: 'leak' } } }, targets: { extension: { type: 'extension' } } }` });
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             let threw = null;
             try { build.getConfig(); } catch (e) { threw = e; }
             ctx.expect(threw ? threw.message : '').toMatch(/[Ss]ecret/);
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -128,10 +96,10 @@ module.exports = defineCases({
       // require time, one after another, and a warn-once flag left calls 2..n
       // reading the broken config in silence.
       name: 'getConfig hard-fails on a retired key — every call, not once per process',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, payment: { processors: { stripe: {} } }, targets: { extension: { type: 'extension' } } }` });
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             let first = null;
             try { build.getConfig(); } catch (e) { first = e; }
             ctx.expect(first ? first.message : '').toMatch(/payment\.processors\.stripe is not a key the schema declares/);
@@ -139,7 +107,7 @@ module.exports = defineCases({
             let second = null;
             try { build.getConfig(); } catch (e) { second = e; }
             ctx.expect(second ? second.message : '').toMatch(/payment\.processors\.stripe is not a key the schema declares/);
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -153,34 +121,34 @@ module.exports = defineCases({
       // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). Same rule,
       // same shape, in @omega.js/desktop.
       name: 'getConfig composes the PRODUCTION overlay in a build, the ambient one in a dev boot (#856)',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({
           config: `{ brand: { id: 'somiibo', name: 'Somiibo' }, theme: { id: 'base' }, targets: { extension: { type: 'extension' } } }`,
-          overlays: {
-            production: `{ theme: { id: 'production' } }`,
-            development: `{ theme: { id: 'development' } }`,
+          files: {
+            'config/omega.production.json5': `{ theme: { id: 'production' } }`,
+            'config/omega.development.json5': `{ theme: { id: 'development' } }`,
           },
         });
         try {
           // A fresh lane each time: OMEGA_ENVIRONMENT is the ONE input (#817) and
           // src/build.js sets it at LOAD from the build-mode flag, so each
-          // sub-case re-enters inDir (which busts the module cache) inside its
+          // sub-case re-enters inProject (which loads the module fresh) inside its
           // own env rather than reusing a build module loaded under the other lane.
           const freshLane = { OMEGA_ENVIRONMENT: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
 
-          withEnv({ ...freshLane, OMEGA_BUILD_MODE: 'true' }, () => {
-            inDir(tmp, (build) => {
+          await withEnv({ ...freshLane, OMEGA_BUILD_MODE: 'true' }, async () => {
+            await inProject(tmp, (build) => {
               ctx.expect(build.getConfig().theme.id).toBe('production');
               ctx.expect(build.getEnvironment()).toBe('production');
-            });
+            }, BUILD_PATH);
           });
           // A dev boot names nothing and resolves development, rather than the
           // machine-sniffed answer the old copy gave (#817).
-          withEnv({ ...freshLane, OMEGA_BUILD_MODE: undefined }, () => {
-            inDir(tmp, (build) => {
+          await withEnv({ ...freshLane, OMEGA_BUILD_MODE: undefined }, async () => {
+            await inProject(tmp, (build) => {
               ctx.expect(build.getConfig().theme.id).toBe('development');
               ctx.expect(build.getEnvironment()).toBe('development');
-            });
+            }, BUILD_PATH);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -189,15 +157,15 @@ module.exports = defineCases({
     },
     {
       name: 'getManifest returns parsed JSON5 from src/manifest.json',
-      run: (ctx) => {
-        const tmp = stageProject({ manifest: `{ manifest_version: 3, name: 'Test', version: '1.0.0' }` });
+      run: async (ctx) => {
+        const tmp = stageProject({ files: { 'src/manifest.json': `{ manifest_version: 3, name: 'Test', version: '1.0.0' }` } });
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             const m = build.getManifest();
             ctx.expect(m.manifest_version).toBe(3);
             ctx.expect(m.name).toBe('Test');
             ctx.expect(m.version).toBe('1.0.0');
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -205,12 +173,12 @@ module.exports = defineCases({
     },
     {
       name: 'getManifest returns {} when src/manifest.json is absent',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({});
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             ctx.expect(build.getManifest()).toEqual({});
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -218,14 +186,14 @@ module.exports = defineCases({
     },
     {
       name: 'getPackage("project") reads cwd package.json',
-      run: (ctx) => {
+      run: async (ctx) => {
         const tmp = stageProject({ pkg: `{ "name": "test-ext", "version": "2.0.0" }` });
         try {
-          inDir(tmp, (build) => {
+          await inProject(tmp, (build) => {
             const pkg = build.getPackage('project');
             ctx.expect(pkg.name).toBe('test-ext');
             ctx.expect(pkg.version).toBe('2.0.0');
-          });
+          }, BUILD_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -246,7 +214,7 @@ module.exports = defineCases({
       // production bake, an inherited variable is kept, and a bare dev boot is
       // development. The manifest / NODE_ENV sniffs are gone.
       name: 'getEnvironment answers the one input the lane set',
-      run: (ctx) => {
+      run: async (ctx) => {
         const buildPath = path.join(__dirname, '..', '..', '..', 'build.js');
         const lane = (vars) => withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_BUILD_MODE: undefined, NODE_ENV: undefined, ...vars }, () => {
           for (const key of Object.keys(require.cache)) {
@@ -255,26 +223,26 @@ module.exports = defineCases({
           return require(buildPath).getEnvironment();
         });
 
-        ctx.expect(lane({ OMEGA_BUILD_MODE: 'true' })).toBe('production');
-        ctx.expect(lane({})).toBe('development');
-        ctx.expect(lane({ OMEGA_ENVIRONMENT: 'testing' })).toBe('testing');
+        ctx.expect(await lane({ OMEGA_BUILD_MODE: 'true' })).toBe('production');
+        ctx.expect(await lane({})).toBe('development');
+        ctx.expect(await lane({ OMEGA_ENVIRONMENT: 'testing' })).toBe('testing');
         // A production build spawned from a test run still bakes production.
-        ctx.expect(lane({ OMEGA_ENVIRONMENT: 'testing', OMEGA_BUILD_MODE: 'true' })).toBe('production');
+        ctx.expect(await lane({ OMEGA_ENVIRONMENT: 'testing', OMEGA_BUILD_MODE: 'true' })).toBe('production');
       },
     },
     {
       name: 'the three checks derive from it, and a missing input is a loud error',
-      run: (ctx) => {
+      run: async (ctx) => {
         const build = require(path.join(__dirname, '..', '..', '..', 'build.js'));
         for (const name of ['development', 'testing', 'production']) {
-          withEnv({ OMEGA_ENVIRONMENT: name }, () => {
+          await withEnv({ OMEGA_ENVIRONMENT: name }, () => {
             ctx.expect(build.getEnvironment()).toBe(name);
             ctx.expect(build.isDevelopment()).toBe(name === 'development');
             ctx.expect(build.isTesting()).toBe(name === 'testing');
             ctx.expect(build.isProduction()).toBe(name === 'production');
           });
         }
-        withEnv({ OMEGA_ENVIRONMENT: undefined }, () => {
+        await withEnv({ OMEGA_ENVIRONMENT: undefined }, () => {
           ctx.expect(() => build.getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
         });
       },

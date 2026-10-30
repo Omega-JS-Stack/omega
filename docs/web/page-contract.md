@@ -97,6 +97,20 @@ calls fail loudly on a mistake: a gate added after the form armed throws, and so
 does resolving a name that opened no gate (a typo would otherwise leave the form
 gated forever).
 
+## The page-loading flag
+
+`<html data-page-loading="true">` is part of the page's contract with its
+consumer code. The root layout (`core/_layouts/core/root.html`) ships every
+page with it set, and the global module's last step (`core/js/core/complete.js`,
+after the theme script) removes it once the document has loaded, at the next
+frame, so it is never set on a page a visitor can use. While it is set, every
+`.btn` button and `.btn-action` is disabled: `_utilities.scss` draws them in
+Bootstrap's disabled look, and `core/_includes/core/body.html` swallows their
+clicks, so nothing runs before the page modules that answer it. The
+lazy-loader (`core/js/core/lazy-loading.js`) reads the same flag to skip the
+entrance animation on anything already in the first viewport. A consumer page
+never sets or clears it; it reads it, the way these three do.
+
 ## Reading a page against the contract
 
 Four questions, in order:

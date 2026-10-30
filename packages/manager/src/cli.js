@@ -4,27 +4,21 @@
  * service and reconciles the brand to its omega.json5, `omega dev` boots the
  * local stack, and a bare `omega` prints help and touches nothing — a CLI
  * that silently rewrites a brand because it was called with no arguments is
- * the wrong default. `manage` has no alias: one walk, one name.
+ * the wrong default. `manage` has no alias: one walk, one name. The alias
+ * table is devkit's verb registry, never typed here.
  */
 const path = require('node:path');
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
+const { MANAGER } = require('@omega.js/devkit/omega-bin');
+const { VERBS } = require('@omega.js/devkit/verbs');
 const { passThroughRow, runPassThrough } = require('./lib/verb-passthrough.js');
 
-// Command name → positional/flag aliases
-const ALIASES = {
-  onboard: ['-o', '--onboard', 'create', 'new'],
-  dev: ['--dev', 'serve'], // brand-root local stack (web + backend by default)
-  deploy: ['--deploy'], // brand-root deliberate publish fan-out (backend first)
-  build: ['--build'], // brand-root build fan-out, every target type (#603)
-  clean: ['--clean'], // brand-root clean fan-out, every target type (#603)
-  update: ['--update'], // brand-root dependency-freshness fan-out (devkit update per target)
-  test: ['--test'],
-  bump: ['--bump'], // brand-root version writer: the root and every target move together (#869)
-  install: ['-i', 'i', '--install'], // brand-wide link flip: `i local` / `i live`, once for the whole tree
-  migrate: ['-m', '--migrate', 'migration'], // brand-wide legacy conversion: the config, then every target's migrate leg
-  version: ['-v', '--version'],
-};
+// Command name → positional/flag aliases, read off every registry row the manager owns.
+// A `passThrough` alias stays unclaimed, so it reaches the fallback below.
+const ALIASES = Object.fromEntries(VERBS
+  .filter((entry) => entry.owners.includes(MANAGER))
+  .map((entry) => [entry.name, entry.aliases.filter((alias) => !entry.passThrough.includes(alias))]));
 
 module.exports = createCliRouter({
   commandsDir: path.join(__dirname, 'commands'),

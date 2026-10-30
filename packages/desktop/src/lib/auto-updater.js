@@ -87,7 +87,6 @@ const SIMULATED_VERSION = '999.0.0';
 // rate. Restored as separate timers in 1.3.1.
 const DEFAULTS = {
   enabled:               true,
-  channel:               'latest',
   startupDelayMs:           10 * 1000,           // 10s after whenReady
   feedCheckIntervalMs:      60 * 60 * 1000,      // 1h — feed poll cadence
   idleEvalIntervalMs:        1 * 60 * 1000,      // 1m — idle-install evaluator cadence

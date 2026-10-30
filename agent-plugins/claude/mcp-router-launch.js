@@ -33,7 +33,7 @@ function resolveRouter() {
  * Code closes the input.
  */
 function serveNoTools() {
-  process.stderr.write(`[mcp-router] no ${ROUTER_BIN} beside the plugin or in ${process.cwd()}: serving no tools\n`);
+  process.stderr.write(`[@omega.js/mcp-router:launch] warn: no ${ROUTER_BIN} beside the plugin or in ${process.cwd()}: serving no tools\n`);
   const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`);
   const results = {
     initialize: (params) => ({

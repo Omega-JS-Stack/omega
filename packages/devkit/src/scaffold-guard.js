@@ -80,7 +80,7 @@ function assertScaffoldable(projectDir) {
     throw refusal(
       `omega: refusing to scaffold into ${path.resolve(projectDir)} — ${nearest.manifestPath} could not be read `
       + `(${e.message}), so whether this is a workspace root cannot be known. Nothing was scaffolded.\n`
-      + 'Fix that manifest, or run the verb from inside a target (e.g. targets/<name>).',
+      + 'Fix that manifest, or run the verb at the root as `npx omega <verb> --target=<name>`.',
     );
   }
 
@@ -89,7 +89,7 @@ function assertScaffoldable(projectDir) {
   throw refusal(
     `omega: refusing to scaffold into ${path.resolve(projectDir)} — ${nearest.manifestPath} declares "workspaces", `
     + 'so this is a workspace root (a brand or monorepo root), not an OMEGA target. Nothing was scaffolded.\n'
-    + 'Run the verb from inside a target (e.g. targets/<name>), or `npx omega onboard` to create one.',
+    + 'Run the verb at the root as `npx omega <verb> --target=<name>`, or `npx omega onboard` to create a target.',
   );
 }
 

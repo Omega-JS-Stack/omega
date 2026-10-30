@@ -35,6 +35,7 @@ const { writeConfigValues } = require('@omega.js/config');
 
 const { writeEnvValue } = require('../../../lib/env-secret.js');
 const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // The legacy analytics-stream keys, as the retired state file spelled them:
 // its stream dirs, mapped onto the target TYPE they ran (which is also the
@@ -252,7 +253,7 @@ module.exports = async function ensureStateRetirement(context) {
   // The machine records outlive the retirement — trim rather than delete when
   // the brand has any
   if (Object.keys(kept).length > 0) {
-    jetpack.write(statePath, kept, { jsonIndent: 2 });
+    writeJson(statePath, kept);
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} trimmed to its machine records: ${chalk.cyan(Object.keys(kept).join(', '))} ${chalk.dim('(the deploy record is owned by @omega.js/devkit/deploy-record)')}`);
   } else {
     jetpack.remove(statePath);

@@ -68,6 +68,7 @@ const yaml = require('js-yaml');
 const reads = require('@omega.js/devkit/reads');
 const { deepMerge } = require('./merge.js');
 const { registerHeroAnimationTag } = require('./hero-animations.js');
+const { slugify } = require('@omega.js/client/modules/slugify.js');
 const Logger = require('@omega.js/devkit/logger');
 
 // The warning sink's default: build-time output stamps the identity tag
@@ -439,9 +440,6 @@ function buildSectionLibrary(options) {
     .replace(/'/g, '&#39;')
     .replace(/{/g, '&#123;');
 
-  // A demo variant's URL segment on its frame page: kebab-case of the label,
-  // de-duplicated within the entry (two "Default"s become default, default-2).
-  const slugify = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'demo';
 
   const normalizeMeta = (meta, label) => {
     const argsTable = Object.entries(meta.args || {}).map(([name, spec]) => ({
@@ -460,7 +458,9 @@ function buildSectionLibrary(options) {
           if (!ok) warn(`showcase ${label}: demo variant without a label — dropped`);
           return ok;
         }).map((variant) => {
-          const base = slugify(variant.label);
+          // The label's slug, de-duplicated within the entry (two "Default"s become
+          // default, default-2); a label with no letters or digits is `demo`
+          const base = slugify(variant.label) || 'demo';
           const seen = (taken.get(base) || 0) + 1;
           taken.set(base, seen);
           return {

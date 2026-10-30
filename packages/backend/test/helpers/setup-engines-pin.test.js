@@ -11,16 +11,16 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
+const { ensureTargetOffline } = require('./_ensure-target-offline.js');
 const frameworkPackage = require('../../package.json');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // ensureTarget() against a bare manifest in a temp dir runs the REAL stamp
-function runScaffoldPackageJson(manifest) {
+async function runScaffoldPackageJson(manifest) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'engines-pin-'));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest, null, 2));
 
-  ensureTarget({ projectDir: dir });
+  await ensureTargetOffline({ projectDir: dir });
 
   const written = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   fs.rmSync(dir, { recursive: true, force: true });
@@ -36,7 +36,7 @@ module.exports = defineCases({
       name: 'fresh-app-gets-the-framework-pin',
       async run({ expect }) {
         const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
-        const written = runScaffoldPackageJson({ name: 'pin-test-app' });
+        const written = await runScaffoldPackageJson({ name: 'pin-test-app' });
 
         expect(written.engines.node, `engines.node must be the framework's pinned runtime (${frameworkMajor}), independent of the node running the scaffold (${process.versions.node})`).toBe(frameworkMajor);
       },
@@ -45,7 +45,7 @@ module.exports = defineCases({
     {
       name: 'existing-engines-survive-untouched',
       async run({ expect }) {
-        const written = runScaffoldPackageJson({ name: 'pin-test-app', engines: { node: '20' } });
+        const written = await runScaffoldPackageJson({ name: 'pin-test-app', engines: { node: '20' } });
 
         expect(written.engines.node, 'a consumer-authored engines.node is never overwritten').toBe('20');
       },
@@ -57,7 +57,7 @@ module.exports = defineCases({
         // The nvmrc target check heals .nvmrc to `v<engines.node>/*` — with
         // engines stamped from the framework pin, both files must agree
         const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
-        const written = runScaffoldPackageJson({ name: 'pin-test-app' });
+        const written = await runScaffoldPackageJson({ name: 'pin-test-app' });
 
         expect(`v${written.engines.node}/*`, '.nvmrc heal target (v<engines>/*) matches the framework pin').toBe(`v${frameworkMajor}/*`);
       },

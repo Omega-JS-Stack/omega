@@ -18,7 +18,7 @@ const config = build.getConfig('project');
 const rootPathPackage = build.getRootPath('main');
 
 // Get clean versions — the pinned consumer Node (omega.nodeRuntime), NOT
-// engines.node: engines is the honest dev floor (>=22), templates need a
+// engines.node: engines is the honest dev floor (>=24), templates need a
 // concrete version to render (.nvmrc etc.)
 const cleanVersions = { versions: { ...package.engines, node: package.omega.nodeRuntime } };
 

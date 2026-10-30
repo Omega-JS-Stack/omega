@@ -387,7 +387,19 @@ async function excludePayingSubscribers(admin, ctx, candidates) {
     );
 
     userDocs.forEach((userDoc, index) => {
-      if (userDoc && new User(userDoc).active) {
+      // A user document the account model refuses (a legacy top-level `plan`)
+      // cannot be judged paid or not, so its subscriber is kept and the rest
+      // of the run goes on, the way abandoned-carts treats a bad document
+      let paid;
+
+      try {
+        paid = !!userDoc && new User(userDoc).active;
+      } catch (e) {
+        ctx.error(`Marketing prune: Skipping ${batch[index].email}, its user document did not load:`, e.message);
+        return;
+      }
+
+      if (paid) {
         skippedPaid++;
       } else {
         targets.push(batch[index]);

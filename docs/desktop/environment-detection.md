@@ -78,11 +78,11 @@ The first three rows are port chains: each cell names a port, and the helper bui
 
 Resolving local in test mode is required because tests hit the local emulator — without it, the app (and tests calling `getApiUrl()`) would leak to the live production server.
 
-> The URL helpers live in [src/utils/url-helpers.js](../../packages/desktop/src/utils/url-helpers.js) as plain functions of the instance (`getApiUrl(omega, environment)`), reading its `getEnvironment()`; each process class calls them from its own methods.
+> The URL helpers live in [src/utils/url-helpers.js](../../packages/desktop/src/utils/url-helpers.js) as plain functions of the instance (`getApiUrl(omega, environment)`), reading its `getEnvironment()`; main and preload reach them through the one environment mixin.
 
 ## Where they live
 
-Source: [src/utils/mode-helpers.js](../../packages/desktop/src/utils/mode-helpers.js) for `getEnvironment()` + `is*()` + `getVersion()`; [src/utils/url-helpers.js](../../packages/desktop/src/utils/url-helpers.js) for the URL builders. Both modules export plain functions. [build.js](../../packages/desktop/src/build.js) exports the mode helpers as they are; the three process classes, [main.js](../../packages/desktop/src/main.js) (the methods mixed in from [lib/_environment-mixin.js](../../packages/desktop/src/lib/_environment-mixin.js)), [preload.js](../../packages/desktop/src/preload.js) and [renderer.js](../../packages/desktop/src/renderer.js), call them from their own methods (the renderer takes the environment four and `getApiUrl()` / `getFunctionsUrl()` from @omega.js/client's base class it extends).
+Source: [src/utils/mode-helpers.js](../../packages/desktop/src/utils/mode-helpers.js) for `getEnvironment()` + `is*()` + `getVersion()`; [src/utils/url-helpers.js](../../packages/desktop/src/utils/url-helpers.js) for the URL builders. Both modules export plain functions. [build.js](../../packages/desktop/src/build.js) exports the mode helpers as they are; [main.js](../../packages/desktop/src/main.js) and [preload.js](../../packages/desktop/src/preload.js) both take them as ONE set of methods mixed in from [lib/_environment-mixin.js](../../packages/desktop/src/lib/_environment-mixin.js) (`Object.assign(Omega.prototype, ...)`), and [renderer.js](../../packages/desktop/src/renderer.js) takes the environment four and `getApiUrl()` / `getFunctionsUrl()` from @omega.js/client's base class it extends.
 
 ## How detection works
 

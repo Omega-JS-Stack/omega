@@ -20,6 +20,7 @@ const path = require('node:path');
 
 const { log } = require('./log.js');
 const { BUNDLED_SERVERS_DIR, overlayServersDir } = require('./paths.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 /**
  * Resolve the two layer directories for a call.
@@ -185,9 +186,7 @@ function readOverlayEntry(name, options) {
 function patchOverlayEntry(name, patch, options) {
   const { overlayDir } = layers(options);
   const next = { ...(readLayer(overlayDir, name) || {}), ...patch };
-  const dir = path.join(overlayDir, name);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), `${JSON.stringify(next, null, 2)}\n`);
+  writeJson(path.join(overlayDir, name, 'config.json'), next);
   return next;
 }
 

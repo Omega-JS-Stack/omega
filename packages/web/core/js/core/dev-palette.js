@@ -10,6 +10,7 @@
 
 // Libraries
 import { replaceChildren } from '@omega.js/client/modules/dom.js';
+import { resolvedBrandHost } from '@omega.js/client/modules/brand-host.js';
 import omega from '@omega.js/web/runtime';
 import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
@@ -191,12 +192,10 @@ const STYLES = `
 
 /**
  * The brand's persona email domain (personas are seeded against the brand
- * host — playground.omegajs.dev for the playground). The ONE derivation of it
- * ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)): the seeder
- * runs @omega.js/config's `resolvedBrandHost`, and this is the same function
- * for a browser that cannot require it: `brand.url` first, the top-level
- * `url` only as its fallback, so a persona is signed in on the host it was
- * seeded on. The persona domain is a BRAND fact, not an instance one
+ * host: playground.omegajs.dev for the playground), answered by the same
+ * `resolvedBrandHost` the seeder runs: `brand.url` first, the top-level `url`
+ * only as its fallback, so a persona is signed in on the host it was seeded
+ * on. The persona domain is a BRAND fact, not an instance one
  * ([#588](https://github.com/Omega-JS-Stack/omega/issues/588)): the seeder
  * runs against the backend every instance shares, so an admin instance signs
  * in at the brand host too, and reading its own url here would ask for an
@@ -206,13 +205,7 @@ const STYLES = `
  * @returns {string}
  */
 function personaDomain() {
-  const url = omega.config.brand?.url || omega.config.url || '';
-
-  try {
-    return new URL(url.includes('://') ? url : `https://${url}`).hostname.toLowerCase();
-  } catch {
-    return window.location.hostname;
-  }
+  return resolvedBrandHost(omega.config) || window.location.hostname;
 }
 
 /**

@@ -66,11 +66,20 @@ function makeElement() {
   return { innerHTML: '', textContent: '', listeners: {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] };
 }
 
-/** Render the sessions list for one signed-in client and hand back the HTML it wrote. */
-async function renderSessions(client) {
+/**
+ * Render the sessions list for one signed-in client, plus the other sessions
+ * the server reports, and hand back the HTML it wrote.
+ *
+ * @param {object} client - the current session's userAgent and platform
+ * @param {object} [others] - the sessions answer, by session id
+ * @returns {Promise<string>} the list's HTML
+ */
+async function renderSessions(client, others = {}) {
   await bundleOnce();
 
   const list = makeElement();
+  let answered = null;
+
   globalThis.document = {
     getElementById: (id) => (id === 'active-sessions-list' ? list : null),
     querySelector: () => null,
@@ -80,6 +89,11 @@ async function renderSessions(client) {
   globalThis.window = { location: { search: '', href: 'https://x.test/account' }, history: { replaceState() {} }, addEventListener() {} };
   globalThis.__omegaClient = {
     auth: { user: new User() },
+    getApiUrl: () => 'https://api.test',
+    request: (url) => {
+      answered = Promise.resolve(url.endsWith('/omega/user/sessions') ? others : {});
+      return answered;
+    },
     utilities: { showNotification: () => {}, escapeHTML: (value) => `${value}` },
   };
 
@@ -93,7 +107,16 @@ async function renderSessions(client) {
     },
   }));
 
+  // The list is written once the sessions answer has been read.
+  await answered;
+  await new Promise((resolve) => setImmediate(resolve));
+
   return list.innerHTML;
+}
+
+/** The one session row that carries `marker`. */
+function rowWith(html, marker) {
+  return html.split('<div class="px-0 py-3').find((row) => row.includes(marker)) || '';
 }
 
 module.exports = defineCases({
@@ -101,12 +124,17 @@ module.exports = defineCases({
   description: 'security-session-devices',
   tests: [
     {
-      name: '#929: a platform session draws the BRAND mark, the family a bare name could never reach',
+      name: 'another session on platform `mac` reads macOS and draws the apple brand mark',
       run: async (ctx) => {
-        const html = await renderSessions({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', platform: 'macOS' });
+        const html = await renderSessions(
+          { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', platform: 'windows' },
+          { 'session-mac': { platform: 'mac', ip: '203.0.113.7', timestamp: '2026-01-02T00:00:00.000Z', timestampUNIX: 1767312000 } },
+        );
+        const row = rowWith(html, '203.0.113.7');
 
-        ctx.expect(html, 'the map\'s class string is emitted verbatim').toMatch(/<i class="fa-brands fa-apple fa-xl"><\/i>/);
-        ctx.expect(!html.includes('fa-solid fa-apple'), 'the solid family carries no apple glyph, so the old wrap drew nothing').toBeTruthy();
+        ctx.expect(row, 'the other session has a row of its own').toBeTruthy();
+        ctx.expect(row, 'the client\'s platform word reads as its label').toMatch(/<strong>macOS<\/strong>/);
+        ctx.expect(row, 'and the mark is the brands-family apple, emitted verbatim').toMatch(/<i class="fa-brands fa-apple fa-xl"><\/i>/);
       },
     },
 

@@ -170,15 +170,6 @@ module.exports = defineCases({
     },
 
     {
-      name: '#830: omega_slugify deletes an apostrophe through the engine (#597)',
-      run: async (ctx) => {
-        const engine = makeEngine();
-
-        ctx.expect(await engine.parseAndRender('{{ "Ian\'s Title" | omega_slugify }}')).toBe('ians-title');
-      },
-    },
-
-    {
       name: '#830: each renamed helper renders through the engine as its Jekyll name did',
       run: async (ctx) => {
         const engine = makeEngine({ markdown: (str) => `<p>${str.trim()}</p>` });

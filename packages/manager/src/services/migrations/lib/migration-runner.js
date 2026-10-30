@@ -21,8 +21,8 @@
  * a `__logs__` array of per-field log lines.
  */
 const { join } = require('node:path');
-const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // Field-deletion sentinel — replaces firebase-admin's FieldValue.delete().
 // In a REST patch, a path in the updateMask with no value in the body IS the
@@ -315,7 +315,7 @@ async function runMigration(context, options) {
 
         // If doc was deleted, skip write/validate
         if (docDeleted) {
-          jetpack.write(join(snapshotDir, `${doc.id}.json`), {
+          writeJson(join(snapshotDir, `${doc.id}.json`), {
             before,
             after: null,
             deleted: true,
@@ -352,7 +352,7 @@ async function runMigration(context, options) {
         }
 
         // Save before/after snapshot
-        jetpack.write(join(snapshotDir, `${doc.id}.json`), {
+        writeJson(join(snapshotDir, `${doc.id}.json`), {
           before,
           after: data,
           fixed: docWasFixed,
@@ -418,7 +418,7 @@ async function runMigration(context, options) {
       errorDocIds: stats.errorDocIds.length > 0 ? stats.errorDocIds : undefined,
       invalidDocIds: stats.invalidDocIds.length > 0 ? stats.invalidDocIds : undefined,
     };
-    jetpack.write(summaryPath, summary);
+    writeJson(summaryPath, summary);
 
     // Console summary
     const parts = [`${chalk.bold(stats.totalDocs)} total`];

@@ -18,6 +18,7 @@ const { emitKeypressEvents } = require('node:readline');
 const { dirname, join } = require('node:path');
 const fs = require('node:fs');
 const chalk = require('chalk').default;
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -129,8 +130,8 @@ class GoogleOAuth2Client {
     // MERGE over the existing store: refresh-path saves carry only the token
     // triple and must not drop sidecar fields (account_email).
     const existing = this.loadStoredTokens() || {};
-    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...existing, ...tokens, scopes: this.scopes }, null, 2), { mode: 0o600 });
-    // mode on mkdir/writeFileSync only applies at creation — tighten pre-existing paths too
+    writeJson(this.tokenStorePath, { ...existing, ...tokens, scopes: this.scopes }, { mode: 0o600 });
+    // mode on mkdir/write only applies at creation, so tighten pre-existing paths too
     fs.chmodSync(dirname(this.tokenStorePath), 0o700);
     fs.chmodSync(this.tokenStorePath, 0o600);
   }

@@ -44,7 +44,7 @@ const DeployCommand = require('../../dist/cli/commands/deploy.js');
 const DevCommand = require('../../dist/cli/commands/dev.js');
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
 const ServeCommand = require('../../dist/cli/commands/serve.js');
-const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
+const { ensureTargetOffline } = require('../helpers/_ensure-target-offline.js');
 const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const TestCommand = require('../../dist/cli/commands/test.js');
 const { getTests } = require('../../dist/cli/commands/setup-tests/index.js');
@@ -118,11 +118,11 @@ async function runCommand(CommandClass, dir, argv) {
  * makes. The CHECKS need a Firebase CLI and a network; which of them a custom
  * target even RUNS is its own case below.
  */
-function runSetupScaffold(dir) {
+async function runSetupScaffold(dir) {
   const lines = [];
   const log = (message) => lines.push(String(message));
 
-  ensureTarget({ projectDir: dir, log });
+  await ensureTargetOffline({ projectDir: dir, log });
   stageFunctions({ projectDir: dir, log });
 
   return { output: lines.join('\n') };
@@ -441,7 +441,7 @@ module.exports = defineCases({
         const dir = targetDir({ projectType: 'custom' });
 
         try {
-          const run = runSetupScaffold(dir);
+          const run = await runSetupScaffold(dir);
 
           for (const file of FIREBASE_ONLY_SCAFFOLD) {
             expect(fs.existsSync(path.join(dir, file)), `a custom backend has no Firebase lane — the scaffold must not write ${file}: ${run.output}`).toBe(false);
@@ -466,7 +466,7 @@ module.exports = defineCases({
         const dir = targetDir({});
 
         try {
-          const run = runSetupScaffold(dir);
+          const run = await runSetupScaffold(dir);
 
           for (const file of FIREBASE_ONLY_SCAFFOLD) {
             expect(fs.existsSync(path.join(dir, file)), `the default mode is unchanged — ${file} must still be scaffolded: ${run.output}`).toBe(true);
@@ -493,7 +493,7 @@ module.exports = defineCases({
           fs.writeFileSync(path.join(dir, 'firebase.json'), JSON.stringify(authored));
           fs.writeFileSync(path.join(dir, 'firestore.rules'), authoredRules);
 
-          runSetupScaffold(dir);
+          await runSetupScaffold(dir);
 
           expect(JSON.parse(fs.readFileSync(path.join(dir, 'firebase.json'), 'utf8')), 'an authored firebase.json is left exactly as it was').toEqual(authored);
           expect(fs.readFileSync(path.join(dir, 'firestore.rules'), 'utf8')).toBe(authoredRules);

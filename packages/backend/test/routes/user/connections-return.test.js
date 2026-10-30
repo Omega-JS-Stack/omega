@@ -181,28 +181,19 @@ module.exports = defineCases({
     },
 
     {
-      name: 'every-off-site-returnurl-answers-400-naming-the-rule',
+      name: 'an-off-site-returnurl-answers-400-naming-the-rule',
 
       async run({ expect }) {
-        // Each one is a way of leaving the site with a value that starts out
-        // looking like a path.
-        const refused = [
-          'https://evil.test/steal',
-          '//evil.test/steal',
-          '/\\evil.test/steal',
-          ' /dashboard/channels',
-          'javascript:alert(1)',
-        ];
+        // Which values break the rule is the client's site-path table; this is
+        // the route refusing one, before anything is minted.
+        const value = 'https://evil.test/steal';
+        const leg = await authorize({ returnUrl: value });
 
-        for (const value of refused) {
-          const leg = await authorize({ returnUrl: value });
-
-          expect(leg.response.options.code, `${JSON.stringify(value)} is refused: ${leg.response.message}`).toBe(400);
-          expect(leg.response.message, `and the message names the parameter: ${leg.response.message}`).toMatch(/returnUrl/);
-          expect(leg.response.message, `and states the rule it broke: ${leg.response.message}`).toMatch(/\//);
-          expect(leg.response.message.includes(value.trim()), "the caller's value is not echoed back into the page's error").toBe(false);
-          expect(leg.writes.length, 'and nothing was minted — no session, no state').toBe(0);
-        }
+        expect(leg.response.options.code, `an absolute URL is refused: ${leg.response.message}`).toBe(400);
+        expect(leg.response.message, `and the message names the parameter: ${leg.response.message}`).toMatch(/returnUrl/);
+        expect(leg.response.message, `and states the rule it broke: ${leg.response.message}`).toMatch(/\//);
+        expect(leg.response.message.includes(value), "the caller's value is not echoed back into the page's error").toBe(false);
+        expect(leg.writes.length, 'and nothing was minted: no session, no state').toBe(0);
       },
     },
 

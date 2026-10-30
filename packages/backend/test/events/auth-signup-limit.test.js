@@ -1,20 +1,39 @@
 /**
- * Test: events/auth resolveSignupLimit(), the per-IP daily signup cap (#133)
- *
- * Run: npx omega test backend:events/auth-signup-limit
- *
- * before-create.js rate-limits signups per client IP. The cap used to be a
- * hardcoded 2, which shared egress (NAT/CGNAT/VPN) crosses with legitimate
- * users. It now comes from config: targets.backend.auth.signup.maxPerIpPerDay,
- * overlaid at the top level by the config loader like every other target key.
- *
- * Pure function (zero I/O), called directly per the test-framework contract.
+ * Test: the per-IP daily signup cap, targets.backend.auth.signup.maxPerIpPerDay.
+ * Its default has one home, the config schema, which resolves it and never
+ * writes it into a brand file. Run: npx omega test backend:events/auth-signup-limit
  */
 const path = require('path');
-const { loadConfig } = require('../../dist/vendor/config/index.js');
-const { resolveSignupLimit, DEFAULT_MAX_SIGNUPS_PER_DAY } = require('../../dist/omega/events/auth/utils.js');
+const jetpack = require('fs-jetpack');
+const { loadConfig, missingDefaults } = require('../helpers/_shared-config.js');
+const { writeJson } = require('../../dist/vendor/devkit/write-json.js');
+const { resolveSignupLimit } = require('../../dist/omega/events/auth/utils.js');
 const beforeCreate = require('../../dist/omega/events/auth/before-create.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+
+/**
+ * A brand on disk with a backend target, its own file holding `targetsBackend`,
+ * loaded through the real backend loader. Hands back the resolved config and
+ * the heal list the manage walk would write into the brand's file.
+ */
+function loadBrand(targetsBackend) {
+  const root = jetpack.tmpDir({ prefix: 'omega-signup-limit-' }).path();
+  const brandFile = {
+    brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+    targets: { backend: { type: 'backend', ...targetsBackend } },
+  };
+
+  writeJson(path.join(root, 'config', 'omega.json5'), brandFile);
+
+  try {
+    return {
+      config: loadConfig(root, 'backend', { record: false }).config,
+      heal: missingDefaults(brandFile, 'backend'),
+    };
+  } finally {
+    jetpack.remove(root);
+  }
+}
 
 // A signup event driven straight through the REAL before-create, with ONE seam:
 // what the usage counter does when the gate calls it. That is the whole subject
@@ -37,7 +56,7 @@ function runBeforeCreate(consume) {
     consume: consume,
   };
 
-  const omega = { config: {}, firebase: { functions: { auth: { HttpsError } } } };
+  const omega = { config: { auth: { signup: { maxPerIpPerDay: 2 } } }, firebase: { functions: { auth: { HttpsError } } } };
 
   const ctx = {
     usage: counter,
@@ -60,24 +79,32 @@ function runBeforeCreate(consume) {
   });
 }
 
-// The framework-defaults layer the Omega instance resolves at boot
-const TEMPLATES_DIR = path.join(__dirname, '../../templates');
-
 module.exports = defineCases({
   description: 'resolveSignupLimit(): per-IP daily signup cap from config',
   type: 'group',
 
   tests: [
     {
-      name: 'framework-default-is-the-shipped-template-value',
+      name: 'a-brand-that-sets-the-cap-gets-it',
       auth: 'none',
 
       async run({ expect }) {
-        const { config } = loadConfig(TEMPLATES_DIR, 'backend');
+        const { config } = loadBrand({ auth: { signup: { maxPerIpPerDay: 5 } } });
 
-        expect(config.auth?.signup?.maxPerIpPerDay, 'templates/config/omega.json5 ships the default cap').toBe(2);
-        expect(resolveSignupLimit(config), 'the shipped default resolves through the guard').toBe(2);
-        expect(DEFAULT_MAX_SIGNUPS_PER_DAY, 'the in-code fallback matches the shipped default').toBe(2);
+        expect(resolveSignupLimit(config), 'the brand\'s own cap is the limit').toBe(5);
+      },
+    },
+
+    {
+      name: 'no-cap-set-is-the-schema-default-and-no-brand-file-gains-it',
+      auth: 'none',
+
+      async run({ expect }) {
+        const { config, heal } = loadBrand({});
+
+        expect(config.auth?.signup?.maxPerIpPerDay, 'the schema default resolves into the loaded config').toBe(2);
+        expect(resolveSignupLimit(config), 'the limit is the value the config carries').toBe(2);
+        expect(JSON.stringify(heal).includes('maxPerIpPerDay'), `the manage heal never writes the cap into a brand file: ${JSON.stringify(heal)}`).toBe(false);
       },
     },
 
@@ -91,22 +118,6 @@ module.exports = defineCases({
       },
     },
 
-    {
-      name: 'unconfigured-and-invalid-values-keep-the-default',
-      auth: 'none',
-
-      async run({ expect }) {
-        // Nothing configured: a config with no auth block at all
-        expect(resolveSignupLimit({})).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
-        expect(resolveSignupLimit(undefined)).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
-
-        // Garbage is a validation error (@omega.js/config hard-fails it); the
-        // guard keeps the default rather than running the IP check unprotected
-        for (const value of [0, -1, 2.5, '25', null]) {
-          expect(resolveSignupLimit({ auth: { signup: { maxPerIpPerDay: value } } }), `${value} falls back to the default`).toBe(DEFAULT_MAX_SIGNUPS_PER_DAY);
-        }
-      },
-    },
     // The gate's catch used to swallow EVERYTHING consume() could throw. A
     // Firestore outage, a programmer error, a 500 of any kind came back to the
     // caller as "too many signups from this IP" — a diagnosis nobody could act

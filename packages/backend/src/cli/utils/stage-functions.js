@@ -43,7 +43,8 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, composeTargetEnv, artifactEnvValues, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { composeTargetConfig, composeTargetEnv, artifactEnvValues, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS, ENV_FILE_NAME } = require('@omega.js/config');
+const { writeJson, formatJson } = require('@omega.js/devkit/write-json');
 const { resolveServiceAccountPath, SECRETS_DIR } = require('@omega.js/devkit/service-account');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
 const { isCustomProject } = require('./project-type');
@@ -195,13 +196,13 @@ function stageFunctions(options) {
     engines: targetPackage.engines || { node: String(parseInt(frameworkPackage.omega.functionsRuntime, 10)) },
     dependencies,
   };
-  jetpack.write(path.join(distDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeJson(path.join(distDir, 'package.json'), manifest);
   staged.push('package.json (derived)');
 
   // ─── Composed config → the runtime's own view ────────────────────────────
   jetpack.write(
     path.join(distDir, 'config', 'omega.json5'),
-    `${CONFIG_BANNER}${JSON.stringify(config, null, 2)}\n`,
+    `${CONFIG_BANNER}${formatJson(config)}`,
   );
   staged.push('config/omega.json5 (composed)');
 
@@ -222,7 +223,7 @@ function stageFunctions(options) {
   //     a local stage composes byte-identically to before.
   if (options.licenseStatus) composed.values.OMEGA_LICENSE_STATUS = options.licenseStatus;
   assertFirebaseEnvSafe(composed.values);
-  jetpack.write(path.join(distDir, '.env'), serializeEnv(composed.values));
+  jetpack.write(path.join(distDir, ENV_FILE_NAME), serializeEnv(composed.values));
 
   // Key NAMES and the layer each came from — never a value (the .env is all
   // secrets)
@@ -335,7 +336,7 @@ function watchAndStage(options) {
   // the `.env` + overlay spelling ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
   const TARGET_ROOT_INPUTS = new Set([
     'package.json', '.nvmrc', 'service-account.json', BRAND_RULES_FILE,
-    ...ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles('.env', environment)),
+    ...ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(ENV_FILE_NAME, environment)),
   ]);
   watch(projectDir, (event, filename) => {
     if (TARGET_ROOT_INPUTS.has(filename)) restage(filename)();
@@ -347,7 +348,7 @@ function watchAndStage(options) {
   // environment's file is not in this artifact and must not re-stage it. That
   // pair IS what envLayerFiles answers, so it is asked rather than spelled out
   // ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
-  const laneNames = new Set(envLayerFiles('.env', options.environment));
+  const laneNames = new Set(envLayerFiles(ENV_FILE_NAME, options.environment));
   for (const input of envWatchInputs(projectDir)) {
     watch(path.dirname(input.path), (event, filename) => {
       if (laneNames.has(filename)) restage(`${input.layer} ${filename}`)();

@@ -30,6 +30,8 @@ const { createRequire } = require('module');
 const { safeInstall } = require('./safe-install');
 const { isReadOnlyVerb } = require('./verbs');
 const Logger = require('./logger');
+const { writeJson } = require('./write-json');
+const { isMonorepoRoot } = require('./monorepo-root');
 
 // Constants
 const SCOPE = '@omega.js/';
@@ -45,21 +47,6 @@ const VENDOR_PROPAGATION_LOCK = path.join('.omega', 'vendor-propagation.lock');
 const WATCH_LOG = path.join('.temp', 'logs', 'watch-all.log');
 const WATCH_LOG_HEADER = /^# omega log — \S+ — pid=(\d+)$/;
 const WATCH_LOG_POLL_MS = 200;
-
-/**
- * Check whether a directory is the Omega monorepo root (package.json named
- * "omega" and a packages/devkit workspace).
- * @param {string} dir - Directory to test.
- * @returns {boolean}
- */
-function isMonorepoRoot(dir) {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    return pkg.name === 'omega' && fs.existsSync(path.join(dir, 'packages', 'devkit', 'package.json'));
-  } catch (e) {
-    return false;
-  }
-}
 
 /**
  * Resolve the Omega monorepo root on this machine.
@@ -232,7 +219,7 @@ function setDependencySpec(targetDir, name, dev, spec) {
   const manifestPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   pkg[dev ? 'devDependencies' : 'dependencies'][name] = spec;
-  fs.writeFileSync(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  writeJson(manifestPath, pkg);
 }
 
 /**
@@ -574,8 +561,7 @@ function acquireWatchLock(monorepoRoot) {
   }
 
   const lockPath = path.join(monorepoRoot, WATCH_LOCK);
-  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
-  fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
+  writeJson(lockPath, { pid: process.pid, startedAt: new Date().toISOString() });
   return { acquired: true, pid: process.pid };
 }
 
@@ -988,8 +974,7 @@ function startVendorPropagation(options) {
   // marker lands beside the watch lock, where a booting brand looks for it.
   const markerPath = path.join(path.dirname(packagesDir), VENDOR_PROPAGATION_LOCK);
   const holdMarker = () => {
-    fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-    fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
+    writeJson(markerPath, { pid: process.pid, startedAt: new Date().toISOString() });
   };
   const releaseMarker = () => fs.rmSync(markerPath, { force: true });
 
@@ -1420,7 +1405,7 @@ function tryHealLock(lockDir) {
       return false;
     }
     try {
-      fs.writeFileSync(path.join(lockDir, 'owner.json'), JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+      writeJson(path.join(lockDir, 'owner.json'), { pid: process.pid, startedAt: new Date().toISOString() });
     } catch (e) {
       // The owner file is liveness evidence, not the mutex itself — a lock
       // nobody can read is only abandoned after the orphan grace, which is

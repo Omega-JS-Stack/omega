@@ -36,7 +36,8 @@ function filterToolsByRole(tools, role) {
 }
 
 /**
- * Load consumer MCP tools from `functions/mcp.js` if it exists.
+ * Load consumer MCP tools from the staged `dist/mcp.js` (authored at
+ * `src/mcp.js`) if it exists.
  * Returns an empty array if the file doesn't exist or fails to load.
  * A route tool's `path` is the HTTP path as served (`/notes`); one without the
  * leading slash throws by name, since the client prefixes nothing.

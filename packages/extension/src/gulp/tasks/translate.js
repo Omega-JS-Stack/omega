@@ -5,6 +5,7 @@ const { series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
 const JSON5 = require('json5');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const {
   resolveProvider,
   resolveTranslationSettings,
@@ -77,7 +78,7 @@ async function deployTranslations(complete) {
   }
 
   // EN straight from config
-  jetpack.write(path.join(distLocalesDir, 'en', 'messages.json'), JSON.stringify(enMessages, null, 2));
+  writeJson(path.join(distLocalesDir, 'en', 'messages.json'), enMessages);
 
   // Configured languages from the committed cache (none when disabled)
   const settings = getSettings();
@@ -85,10 +86,7 @@ async function deployTranslations(complete) {
   let count = 0;
 
   for (const lang of languages) {
-    jetpack.write(
-      path.join(distLocalesDir, lang, 'messages.json'),
-      JSON.stringify(composeMessages(enMessages, lang), null, 2)
-    );
+    writeJson(path.join(distLocalesDir, lang, 'messages.json'), composeMessages(enMessages, lang));
     count++;
   }
 

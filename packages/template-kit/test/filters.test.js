@@ -190,31 +190,10 @@ module.exports = defineCases({
     },
 
     {
-      name: 'omega_slugify downcases and collapses non-alphanumeric runs',
+      name: 'omega_slugify answers the client slugifier rule: apostrophes deleted, runs dashed, edges trimmed',
       run: async (ctx) => {
-        const slug = (s) => render('{{ s | omega_slugify }}', { s });
-
-        ctx.expect(await slug('Hello World & Friends')).toBe('hello-world-friends');
-        ctx.expect(await slug('  Leading and trailing  ')).toBe('leading-and-trailing');
-        ctx.expect(await slug('Top 10 Products (2025)')).toBe('top-10-products-2025');
-        ctx.expect(await slug('already-a-slug')).toBe('already-a-slug');
-        ctx.expect(await slug('---')).toBe('');
-        ctx.expect(await slug('')).toBe('');
-      },
-    },
-
-    {
-      name: 'omega_slugify DELETES an apostrophe instead of separating on it (#597)',
-      run: async (ctx) => {
-        const slug = (s) => render('{{ s | omega_slugify }}', { s });
-
-        // UJM deleted apostrophes, so a migrating brand's "Beginner's Guides"
-        // category lives at /beginners-guides. Separating on it moved every such
-        // URL (soundgrail lost two live category pages to `beginner-s-guides`).
-        ctx.expect(await slug("Beginner's Guides")).toBe('beginners-guides');
-        ctx.expect(await slug('Beginner’s Music Guide')).toBe('beginners-music-guide');
-        ctx.expect(await slug("Don't & Won't")).toBe('dont-wont');
-        ctx.expect(await slug("'Tis the season'")).toBe('tis-the-season');
+        // The case table lives with the one slugifier, in the client's suite.
+        ctx.expect(await render('{{ s | omega_slugify }}', { s: " Beginner's Guides & More " })).toBe('beginners-guides-more');
       },
     },
 

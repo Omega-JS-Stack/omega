@@ -22,6 +22,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { sourceRepo } = require('@omega.js/config');
 const { bundle } = require('@omega.js/devkit/bundle');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { getEnvironment } = require('@omega.js/config/environment');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 
@@ -199,8 +200,7 @@ function writeBuildMeta(options) {
     firebase: site.cloud?.config || null,
   };
 
-  fs.mkdirSync(options.outDir, { recursive: true });
-  fs.writeFileSync(path.join(options.outDir, 'build.json'), `${JSON.stringify(meta, null, 2)}\n`);
+  writeJson(path.join(options.outDir, 'build.json'), meta);
 
   return meta;
 }

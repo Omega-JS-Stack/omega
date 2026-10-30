@@ -8,13 +8,14 @@ const JSON5 = require('json5');
 const powertools = require('node-powertools');
 const WatchCommand = require('./watch');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
-const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv, isPortFree } = require('@omega.js/config');
+const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv, isPortFree, CLASSIC_PORTS } = require('@omega.js/config');
 const { EXTENDED_MODE_WARNING } = require('../../test/extended-mode-lines.js');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { seedProject } = require('../../test/seed.js');
 const { createChildLog } = require('../utils/attach-log-file');
 const { refuseWhenCustom, refuseWhenToolsMissing } = require('../utils/project-type');
 const emulatorOrphans = require('./emulator-orphans');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
@@ -38,11 +39,8 @@ const PID_RECORD_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const EMULATOR_COMMAND = /emulator|firebase/i;
 
 // How long a recorded emulator process gets to leave on SIGTERM before the
-// stop path escalates, and how long its ports get to come back free after the
-// last one is gone (a java emulator releases its listener as it unwinds).
+// stop path escalates. The port-release wait after it is emulator-orphans.js's.
 const STOP_GRACE_MS = 2000;
-const PORT_RELEASE_TIMEOUT_MS = 5000;
-const POLL_INTERVAL_MS = 100;
 
 // How long the port→pid lookup gets to answer before a sweep gives up on it.
 // lsof stats every mounted filesystem first, so a machine with a network mount
@@ -965,7 +963,7 @@ class EmulatorCommand extends BaseCommand {
           firebaseConfig.emulators[name].port = port;
         }
       }
-      jetpack.write(path.join(projectDir, resolvedName), JSON.stringify(firebaseConfig, null, 2));
+      writeJson(path.join(projectDir, resolvedName), firebaseConfig);
       configFlag = ` --config ${resolvedName}`;
       if (bumped.length > 0) {
         this.log(chalk.yellow(`  Ports in use — bumped: ${bumped.map((name) => `${name}→${emulatorPorts[name]}`).join(', ')} (booting via ${resolvedName})`));
@@ -1442,7 +1440,7 @@ class EmulatorCommand extends BaseCommand {
     const watcher = this.backgroundWatcherPid ? collectDescendantPids(this.backgroundWatcherPid) : [];
     const pids = [...new Set([...previous, ...collectDescendantPids(rootPid), ...watcher])];
 
-    jetpack.write(this.getTempPath(PID_RECORD_FILE), {
+    writeJson(this.getTempPath(PID_RECORD_FILE), {
       pids: pids,
       projectId: projectId || null,
       rootPid: rootPid,
@@ -1520,7 +1518,7 @@ class EmulatorCommand extends BaseCommand {
 
     // The ports are the only proof that matters to the NEXT boot.
     const { https: _httpsPort, ...checkable } = emulatorPorts || {};
-    const held = await this.waitForPortsReleased(Object.values(checkable));
+    const held = await emulatorOrphans.waitForPortsReleased(Object.values(checkable));
 
     if (held.length > 0) {
       this.logWarning(`Emulator ports still in use after shutdown: ${held.join(', ')} (everything this run could prove it owns is stopped; whatever holds them did not prove to be ours)`);
@@ -1540,32 +1538,11 @@ class EmulatorCommand extends BaseCommand {
     let alive = pids;
 
     while (alive.length > 0 && Date.now() < deadline) {
-      await powertools.wait(POLL_INTERVAL_MS);
+      await powertools.wait(emulatorOrphans.DEFAULT_POLL_INTERVAL_MS);
       alive = alive.filter((pid) => !!readCommand(pid));
     }
 
     return alive;
-  }
-
-  /**
-   * Poll a port set until nothing is listening or the window closes.
-   * @param {number[]} ports - The ports this run resolved.
-   * @returns {Promise<number[]>} The ports still held when the window closed.
-   */
-  async waitForPortsReleased(ports, { isFree = isPortFree } = {}) {
-    const deadline = Date.now() + PORT_RELEASE_TIMEOUT_MS;
-    let held = [...new Set(ports)];
-
-    while (held.length > 0 && Date.now() < deadline) {
-      const free = await Promise.all(held.map((port) => isFree(port)));
-      held = held.filter((port, index) => !free[index]);
-
-      if (held.length > 0) {
-        await powertools.wait(POLL_INTERVAL_MS);
-      }
-    }
-
-    return held;
   }
 
   /**
@@ -1601,7 +1578,7 @@ class EmulatorCommand extends BaseCommand {
     const { https: _httpsPort, ...sweepable } = emulatorPorts;
     const ports = Object.values(sweepable);
     if (sweepShared) {
-      ports.push(4400, 9199);
+      ports.push(CLASSIC_PORTS.hub, CLASSIC_PORTS.storage);
     }
 
     const ownership = this.readEmulatorOwnership();
@@ -1650,8 +1627,6 @@ class EmulatorCommand extends BaseCommand {
   async reapMachineOrphans(seams) {
     await emulatorOrphans.reapMachineOrphans({
       graceMs: STOP_GRACE_MS,
-      portReleaseTimeoutMs: PORT_RELEASE_TIMEOUT_MS,
-      pollIntervalMs: POLL_INTERVAL_MS,
       log: (message) => this.log(chalk.gray(`  ${message}`)),
       ...seams,
     });
@@ -1799,7 +1774,7 @@ class EmulatorCommand extends BaseCommand {
         this.log(chalk.gray('  The record named no ports, so nothing was waited on; the allocation probe is the only check on what this reap just freed.'));
       }
 
-      const held = await this.waitForPortsReleased(Object.values(settleable), { isFree });
+      const held = await emulatorOrphans.waitForPortsReleased(Object.values(settleable), { isFree });
 
       if (held.length > 0) {
         this.log(chalk.gray(`  Port${held.length > 1 ? 's' : ''} ${held.join(', ')} still closing after the reap; the allocator will bump around ${held.length > 1 ? 'them' : 'it'}.`));

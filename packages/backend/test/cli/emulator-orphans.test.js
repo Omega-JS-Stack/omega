@@ -28,12 +28,15 @@
 
 // Libraries
 const os = require('os');
+const net = require('net');
 const path = require('path');
 const childProcess = require('child_process');
 const jetpack = require('fs-jetpack');
 
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
 const orphans = require('../../dist/cli/commands/emulator-orphans.js');
+const { CLASSIC_PORTS, isPortFree } = require('../../dist/vendor/config/ports.js');
+const { writeJson } = require('../../dist/vendor/devkit/write-json.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { parseProcessTable, isOrphanedEmulatorFamily, describeFamilyMember, reapMachineOrphans } = orphans;
@@ -478,6 +481,105 @@ module.exports = defineCases({
         await reapMachineOrphans(table.seams);
 
         expect([...new Set(table.probed)].sort((a, b) => a - b), 'every port the reaped rows published, websocket included').toEqual([9150, 9152, 9154]);
+      },
+    },
+
+    {
+      name: 'the-port-wait-resolves-once-a-still-bound-port-frees',
+      async run({ expect }) {
+        // A real listener on an OS-picked port. The probe is the real one; the
+        // seam around it lets go of the port the first time it answers busy.
+        const server = net.createServer();
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = server.address().port;
+        const answers = [];
+
+        await orphans.waitForPortsReleased([port], {
+          isFree: async (candidate) => {
+            const free = await isPortFree(candidate);
+
+            answers.push(free);
+
+            if (!free) {
+              await new Promise((resolve) => server.close(resolve));
+            }
+
+            return free;
+          },
+        });
+
+        expect(answers[0], 'the port was still bound when the wait began').toBe(false);
+        expect(answers[answers.length - 1], 'the wait ended on the port answering free').toBe(true);
+      },
+    },
+
+    {
+      name: 'the-emulator-commands-reap-waits-through-the-one-exported-port-wait',
+      async run({ expect }) {
+        // The boot's record-driven reap waits on the ports it freed. It does so
+        // through this module's export, so the poll loop has one home.
+        const projectDir = jetpack.tmpDir({ prefix: 'omega-orphan-wait-' }).cwd();
+        const command = new EmulatorCommand({ firebaseProjectPath: projectDir, argv: {}, options: {} });
+        const calls = [];
+        const shared = orphans.waitForPortsReleased;
+
+        command.log = () => {};
+        command.logWarning = () => {};
+        writeJson(command.getTempPath('emulator-pids.json'), {
+          pids: [4001, 4002],
+          projectId: 'demo-other-brand',
+          rootPid: 4001,
+          ports: { firestore: 48152 },
+          startedAt: new Date().toISOString(),
+        });
+
+        const live = new Map([[4002, { ppid: ORPHANED, command: FIRESTORE_JAR }]]);
+        const seams = {
+          readProcess: (pid) => live.get(Number(pid)) || null,
+          kill: (pid) => live.delete(Number(pid)),
+          isFree: async () => true,
+        };
+
+        orphans.waitForPortsReleased = (...args) => {
+          calls.push(args[0]);
+          return shared(...args);
+        };
+
+        try {
+          await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), seams);
+        } finally {
+          orphans.waitForPortsReleased = shared;
+          jetpack.remove(projectDir);
+        }
+
+        expect(calls, 'the reap waited on the freed port through the exported wait').toEqual([[48152]]);
+      },
+    },
+
+    {
+      name: 'the-shutdown-sweep-looks-at-the-classic-hub-and-storage-ports',
+      async run({ expect }) {
+        // A defaults run owns the shared hub and storage ports, and their
+        // numbers have one home: @omega.js/config's CLASSIC_PORTS.
+        const projectDir = jetpack.tmpDir({ prefix: 'omega-orphan-sweep-' }).cwd();
+        const command = new EmulatorCommand({ firebaseProjectPath: projectDir, argv: {}, options: {} });
+        const probed = [];
+
+        command.log = () => {};
+        command.logWarning = () => {};
+
+        try {
+          await command.terminateOrphanedEmulatorProcesses({ functions: 45001 }, {
+            sweepShared: true,
+            isFree: async (port) => { probed.push(port); return true; },
+            listPids: () => [],
+          });
+        } finally {
+          jetpack.remove(projectDir);
+        }
+
+        expect(probed, 'the hub port comes from CLASSIC_PORTS').toContain(CLASSIC_PORTS.hub);
+        expect(probed, 'the storage port comes from CLASSIC_PORTS').toContain(CLASSIC_PORTS.storage);
       },
     },
 

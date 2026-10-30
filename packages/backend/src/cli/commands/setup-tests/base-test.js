@@ -1,4 +1,5 @@
 const { isDemoProject } = require('@omega.js/config');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 /**
  * Base class for all setup tests
@@ -84,15 +85,9 @@ class BaseTest {
 
   /**
    * Persist the target manifest (call after readTargetManifest() + mutation).
-   * npm's own shape, trailing newline included — the SAME byte contract
-   * ensure-target's scaffoldPackageJson and the sibling writers keep
-   * ([#590](https://github.com/Omega-JS-Stack/omega/issues/590)). A fix that
-   * dropped it flipped the consumer's manifest between two byte shapes
-   * depending on which writer ran last (jetpack.write emits none).
    */
   writeTargetManifest() {
-    const jetpack = require('fs-jetpack');
-    jetpack.write(`${this.self.firebaseProjectPath}/package.json`, `${JSON.stringify(this.self.package, null, 2)}\n`);
+    writeJson(`${this.self.firebaseProjectPath}/package.json`, this.self.package);
   }
 
   /**

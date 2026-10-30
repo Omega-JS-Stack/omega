@@ -28,6 +28,8 @@ in backend/web/desktop/extension; `@omega.js/backend` and `@omega.js/mcp-router`
 manager: the EXACT family version (0.56.0 today), not carets, because the family is
 lockstep (below).
 
+**The Node floor follows where the code runs** ([#1126](https://github.com/Omega-JS-Stack/omega/issues/1126)): code that runs inside Cloud Functions (`@omega.js/backend`, `@omega.js/client` and the internals vendored into the backend: devkit, config, account, analytics, monitoring) declares the Functions runtime's floor, `engines.node` `>=22`, equal to the backend's `omega.functionsRuntime`; every other package (web, desktop, extension, manager, mcp-router, template-kit) declares the toolchain floor, `>=24`.
+
 ## Lockstep — the family ships ONE version ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
 
 A release is bumped by hand, in its own `chore(release): <x.y.z>` commit. That commit:

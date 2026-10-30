@@ -1,4 +1,9 @@
 {
-  "version": 9,
-  "enabled": true
+  "version": 10,
+  "enabled": true,
+  "proof": {
+    "rootOnly": [
+      "."
+    ]
+  }
 }

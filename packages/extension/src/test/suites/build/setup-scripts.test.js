@@ -6,16 +6,16 @@
 // consumer's lint hook or editor put it back, forever.
 //
 // setupScripts defaults to the cwd project, so each test stages a
-// temp project, chdirs into it, and requires the command fresh — the same model
-// as package-task.test.js's inProject().
+// temp project, chdirs into it, and requires the command fresh
+// (utils/package-project.js).
 
 const path = require('path');
 const fs   = require('fs');
-const os   = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const { verbScripts } = require('@omega.js/devkit/verb-scripts');
+const { writeJson } = require('@omega.js/devkit/write-json');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC        = path.join(__dirname, '..', '..', '..');
 const SETUP_PATH = path.join(SRC, 'commands', 'lib', 'ensure-target.js');
 
 const CONSUMER_PKG = {
@@ -26,29 +26,10 @@ const CONSUMER_PKG = {
 };
 
 // Stage a temp consumer project holding `pkg`, written the way npm writes it.
-function stageProject(pkg) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-setup-scripts-'));
-  fs.writeFileSync(path.join(tmp, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+function stageConsumer(pkg) {
+  const tmp = stageProject();
+  writeJson(path.join(tmp, 'package.json'), pkg);
   return tmp;
-}
-
-// Run `fn(setup)` with cwd pinned to `dir` and the command module loaded fresh.
-async function inProject(dir, fn) {
-  const oldCwd = process.cwd();
-  const flush = () => {
-    for (const key of Object.keys(require.cache)) {
-      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
-    }
-  };
-
-  flush();
-  try {
-    process.chdir(dir);
-    return await fn(require(SETUP_PATH));
-  } finally {
-    process.chdir(oldCwd);
-    flush();
-  }
 }
 
 module.exports = defineCases({
@@ -59,7 +40,7 @@ module.exports = defineCases({
     {
       name: 'the written package.json ends with exactly one trailing newline (#572)',
       run: async (ctx) => {
-        const tmp = stageProject(CONSUMER_PKG);
+        const tmp = stageConsumer(CONSUMER_PKG);
         const pkgPath = path.join(tmp, 'package.json');
 
         try {
@@ -75,7 +56,7 @@ module.exports = defineCases({
             ctx.expect(written.scripts.build).toBe('omega build');
             ctx.expect(written.private).toBe(true);
             ctx.expect(contents).toContain('\n  "name": "staged-ext"');
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -84,7 +65,7 @@ module.exports = defineCases({
     {
       name: 'an unchanged package.json is not rewritten (#572)',
       run: async (ctx) => {
-        const tmp = stageProject(CONSUMER_PKG);
+        const tmp = stageConsumer(CONSUMER_PKG);
         const pkgPath = path.join(tmp, 'package.json');
 
         try {
@@ -100,7 +81,7 @@ module.exports = defineCases({
 
             ctx.expect(Math.round(fs.statSync(pkgPath).mtimeMs)).toBe(Math.round(past.getTime()));
             ctx.expect(fs.readFileSync(pkgPath, 'utf8')).toBe(afterFirst);
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -112,20 +93,20 @@ module.exports = defineCases({
         // AMO wants a license on the version that CREATES a listing, and the
         // Firefox lane reads it right here. UNLICENSED is npm's word for
         // closed-source commercial code, which every OMEGA target starts as.
-        const fresh = stageProject(CONSUMER_PKG);
-        const declared = stageProject({ ...CONSUMER_PKG, license: 'MIT' });
+        const fresh = stageConsumer(CONSUMER_PKG);
+        const declared = stageConsumer({ ...CONSUMER_PKG, license: 'MIT' });
 
         try {
           await inProject(fresh, async (setup) => {
             setup.setupScripts();
             ctx.expect(JSON.parse(fs.readFileSync(path.join(fresh, 'package.json'), 'utf8')).license).toBe('UNLICENSED');
-          });
+          }, SETUP_PATH);
 
           // Licensing is the brand's call: a stated license is never rewritten
           await inProject(declared, async (setup) => {
             setup.setupScripts();
             ctx.expect(JSON.parse(fs.readFileSync(path.join(declared, 'package.json'), 'utf8')).license).toBe('MIT');
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(fresh, { recursive: true, force: true });
           fs.rmSync(declared, { recursive: true, force: true });
@@ -135,7 +116,7 @@ module.exports = defineCases({
     {
       name: 'a package.json that DID change is written (#572)',
       run: async (ctx) => {
-        const tmp = stageProject(CONSUMER_PKG);
+        const tmp = stageConsumer(CONSUMER_PKG);
         const pkgPath = path.join(tmp, 'package.json');
 
         try {
@@ -145,14 +126,14 @@ module.exports = defineCases({
             // A consumer edit setup has to heal — the skip is content-based, not a latch
             const drifted = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
             drifted.scripts.build = 'echo hand-edited';
-            fs.writeFileSync(pkgPath, `${JSON.stringify(drifted, null, 2)}\n`);
+            writeJson(pkgPath, drifted);
 
             setup.setupScripts();
 
             const healed = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
             ctx.expect(healed.scripts.build).toBe('omega build');
             ctx.expect(fs.readFileSync(pkgPath, 'utf8').endsWith('}\n')).toBe(true);
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -161,7 +142,7 @@ module.exports = defineCases({
     {
       name: 'the verb scripts derive from the verb table, `start` among them',
       run: async (ctx) => {
-        const tmp = stageProject(CONSUMER_PKG);
+        const tmp = stageConsumer(CONSUMER_PKG);
 
         try {
           await inProject(tmp, async (setup) => {
@@ -178,7 +159,7 @@ module.exports = defineCases({
             // No verb script is typed by hand: the manifest declares only what the table cannot derive
             const declared = require(path.join(SRC, '..', 'package.json')).projectScripts;
             ctx.expect(Object.keys(declared).filter((key) => key in derived)).toEqual([]);
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -191,7 +172,7 @@ module.exports = defineCases({
         // is redundant inside a script (npm puts node_modules/.bin on the
         // path) and stays canonical only for docs and the terminal. Every
         // framework-owned key is rewritten on the next verb's ensure pass.
-        const tmp = stageProject({
+        const tmp = stageConsumer({
           ...CONSUMER_PKG,
           scripts: { ...CONSUMER_PKG.scripts, test: 'npx omega test', lint: 'npx eslint .' },
         });
@@ -215,7 +196,7 @@ module.exports = defineCases({
 
             ctx.expect(Math.round(fs.statSync(pkgPath).mtimeMs)).toBe(Math.round(past.getTime()));
             ctx.expect(fs.readFileSync(pkgPath, 'utf8')).toBe(afterFirst);
-          });
+          }, SETUP_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

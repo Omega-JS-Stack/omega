@@ -3,7 +3,7 @@
   "default": "on-demand",
   "command": "node",
   "args": [
-    "${MCP_ROUTER_ROOT}/src/launch-cft.js"
+    "${MCP_ROUTER_ROOT}/dist/launch-cft.js"
   ],
   "tools": [
     {

@@ -15,6 +15,8 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const { sectionMarkers } = require('@omega.js/devkit/merge-line-files');
 
 const SRC = path.join(__dirname, '..', '..', '..');
+// The consumer Node the scaffold pins: .nvmrc and the composed workflow render it.
+const NODE_RUNTIME = JSON.parse(fs.readFileSync(path.join(SRC, '..', 'package.json'), 'utf8')).omega.nodeRuntime;
 
 // The defaults task reads the consumer config from cwd at REQUIRE time, so a
 // case that needs a REAL brand config stages one, chdirs in, and requires the
@@ -76,9 +78,9 @@ module.exports = defineCases({
         ctx.expect(jetpack.exists(path.join(tmp, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, 'config', 'omega.json5'))).toBeTruthy();
 
-        // .nvmrc template rendered ({{ versions.node }} → engines.node), no raw tokens left.
+        // .nvmrc template rendered ({{ versions.node }} → omega.nodeRuntime), no raw tokens left.
         const nvmrc = jetpack.read(path.join(tmp, '.nvmrc'));
-        ctx.expect(nvmrc).toContain('v22');
+        ctx.expect(nvmrc).toContain(`v${NODE_RUNTIME}`);
         ctx.expect(nvmrc.includes('{{')).toBe(false);
       },
     },
@@ -280,7 +282,7 @@ module.exports = defineCases({
         // Runs from the repo root, scoped to this target
         ctx.expect(contents).toContain('working-directory: targets/extension');
         // The site-token pass still renders (the pinned consumer Node version)
-        ctx.expect(contents).toContain(`NODE_VERSION: '22'`);
+        ctx.expect(contents).toContain(`NODE_VERSION: '${NODE_RUNTIME}'`);
         ctx.expect(contents.includes('[versions.node]')).toBe(false);
 
         // Idempotent: a setup rerun updates that one file, never adds another

@@ -14,7 +14,7 @@
 
 ## Get started
 
-OMEGA calls your project a **brand**: one name, one look, and every app that carries them. You need Node 22 or newer and a GitHub account.
+OMEGA calls your project a **brand**: one name, one look, and every app that carries them. You need Node 24 or newer and a GitHub account.
 
 1. [**Use this template**](https://github.com/Omega-JS-Stack/brand-template/generate). Name your new repo `<your-brand>-omega`, for example `acme-omega`.
 2. Clone your new repo and step inside it.

@@ -6,7 +6,13 @@
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const { log } = require('../src/lib/log.js');
+const { log, createLog } = require('../src/lib/log.js');
+
+// The family's one identity tag, docs/shared/logging.md: `[@omega.js/<package>:<module>]`.
+const TAG = /^\[@omega\.js\/mcp-router:[a-z][\w-]*(?::[\w-]+)*\] /;
+
+// A written line's message, once the identity tag opens it.
+const tagged = (line) => (TAG.test(line) ? line.replace(TAG, '') : null);
 
 /**
  * Capture what log() writes to each stream during fn().
@@ -38,11 +44,12 @@ module.exports = defineCases({
   description: 'log',
   tests: [
     {
-      name: 'a line is tagged with the level and terminated with a newline',
+      name: 'a line opens with the family tag and ends with one newline',
       run: (ctx) => {
         const written = capture(ctx, () => log('info', 'upstream ready'));
 
-        ctx.expect(written.stderr).toBe('[mcp-router info] upstream ready\n');
+        ctx.expect(written.stderr.endsWith('\n') && written.stderr.split('\n').length).toBe(2);
+        ctx.expect(tagged(written.stderr), `not the family tag: ${written.stderr}`).toMatch(/upstream ready\n$/);
       },
     },
 
@@ -57,13 +64,10 @@ module.exports = defineCases({
         });
 
         ctx.expect(written.stdout).toBe('');
-        ctx.expect(written.stderr).toBe([
-          '[mcp-router info] hello',
-          '[mcp-router warn] careful',
-          '[mcp-router error] broken',
-          '[mcp-router fatal] dead',
-          '',
-        ].join('\n'));
+        const lines = written.stderr.split('\n');
+        ctx.expect(lines.pop(), 'every line ends in a newline').toBe('');
+        ctx.expect(lines.map((line) => tagged(line) !== null), `untagged: ${lines.join(' | ')}`).toEqual([true, true, true, true]);
+        ctx.expect(lines.map((line) => tagged(line).split(' ').pop())).toEqual(['hello', 'careful', 'broken', 'dead']);
       },
     },
 
@@ -72,7 +76,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const written = capture(ctx, () => log('warn', 'upstream', 'browser', 'exited', 1));
 
-        ctx.expect(written.stderr).toBe('[mcp-router warn] upstream browser exited 1\n');
+        ctx.expect(tagged(written.stderr), `not the family tag: ${written.stderr}`).toMatch(/(^| )upstream browser exited 1\n$/);
       },
     },
 
@@ -81,7 +85,18 @@ module.exports = defineCases({
       run: (ctx) => {
         const written = capture(ctx, () => log('error'));
 
-        ctx.expect(written.stderr).toBe('[mcp-router error] \n');
+        ctx.expect(written.stderr.split('\n').length, 'one line').toBe(2);
+        ctx.expect(tagged(written.stderr), `not the family tag: ${written.stderr}`).not.toBe(null);
+      },
+    },
+
+    {
+      name: "the extension server's sink names its own module: [@omega.js/mcp-router:omega-extension] <level>: ...",
+      run: (ctx) => {
+        const written = capture(ctx, () => createLog('omega-extension')('warn', 'socket', 'closed'));
+
+        ctx.expect(written.stdout).toBe('');
+        ctx.expect(written.stderr).toBe('[@omega.js/mcp-router:omega-extension] warn: socket closed\n');
       },
     },
   ],

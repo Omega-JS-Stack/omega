@@ -2,6 +2,8 @@
  * package.json generator for the developer-tool template.
  */
 
+const { formatJson } = require('@omega.js/devkit/write-json');
+
 /**
  * Generate package.json from content item + brand data
  *
@@ -29,5 +31,5 @@ module.exports = function generatePackageJson(data) {
     },
   };
 
-  return JSON.stringify(pkg, null, 2) + '\n';
+  return formatJson(pkg);
 };

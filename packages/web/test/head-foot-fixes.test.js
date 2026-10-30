@@ -11,10 +11,7 @@
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const fs = require('node:fs');
-const path = require('node:path');
-
-const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
+const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'head-foot-test');
 
@@ -142,18 +139,29 @@ module.exports = defineCases({
       },
     },
 
-    // The pricing JSON-LD's currency moved to `payment.currency` with the same
-    // ruling. Its block is gated on `page-is-product`, which nothing in the
-    // framework assigns and no consumer page may (page frontmatter is meta-only),
-    // so there is no rendered page to read it off: the template SOURCE is what a
-    // regression would change, and this pins it.
     {
-      name: '#850: the pricing JSON-LD reads payment.currency, never the retired top-level key',
-      run: (ctx) => {
-        const foot = fs.readFileSync(path.join(PKG, 'core', '_includes', 'core', 'foot.html'), 'utf8');
+      name: 'the pricing page carries the Product schema with its lowest plan as the Offer; the home page carries none',
+      run: async (ctx) => {
+        const pages = await buildWith({
+          ...miniData,
+          payment: {
+            currency: 'EUR',
+            products: [
+              { id: 'starter', name: 'Starter', type: 'subscription', prices: { monthly: 12 } },
+              { id: 'team', name: 'Team', type: 'subscription', prices: { monthly: 29 } },
+            ],
+          },
+        }, { activeTheme: 'classy' }, 'head-foot-product');
+        const productBlock = (html) => html.match(/<script id="omega-schema-product"[^>]*>([\s\S]*?)<\/script>/);
 
-        ctx.expect(foot.includes('"priceCurrency": "{{ resolved.config.payment.currency }}"'), 'the currency comes from the payment section').toBeTruthy();
-        ctx.expect(!foot.includes('resolved.config.currency'), 'the retired top-level key is read nowhere').toBeTruthy();
+        const match = productBlock(pages.get('/pricing'));
+        ctx.expect(match, 'the pricing page emits the Product block').toBeTruthy();
+        const product = JSON.parse(match[1]);
+        ctx.expect(product['@type']).toBe('Product');
+        ctx.expect(Number(product.offers.price), 'the Offer is the lowest plan price the page shows').toBe(12);
+        ctx.expect(product.offers.priceCurrency, 'in the catalog\'s own currency').toBe('EUR');
+
+        ctx.expect(productBlock(pages.get('/')), 'the home page sells nothing').toBe(null);
       },
     },
 

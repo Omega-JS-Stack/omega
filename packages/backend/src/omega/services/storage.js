@@ -8,6 +8,7 @@
  * `./.data/`; both are namespaced by `uniqueAppName`.
  */
 const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { get: _get, set: _set } = require('lodash');
 
 /**
@@ -74,7 +75,7 @@ class Storage {
 
     function _setup() {
       if (!jetpack.exists(location)) {
-        jetpack.write(location, {});
+        writeJson(location, {});
       }
       const db = new LowSync(new JSONFileSync(location), {});
       db.read();
@@ -102,7 +103,7 @@ class Storage {
       try {
         if (options.clearInvalid) {
           omega.logger.log(`Clearing invalid storage: ${location}`);
-          jetpack.write(location, {});
+          writeJson(location, {});
         }
         _setup();
       } catch (e) {

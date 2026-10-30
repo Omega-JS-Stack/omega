@@ -13,7 +13,7 @@
 const os = require('node:os');
 const path = require('node:path');
 
-// src/lib/paths.js → the package root is two levels up.
+// lib/paths.js → the package root is two levels up (from src/ and dist/ alike).
 const PACKAGE_ROOT = path.join(__dirname, '..', '..');
 
 const BUNDLED_SERVERS_DIR = path.join(PACKAGE_ROOT, 'servers');

@@ -10,7 +10,7 @@ const path = require('path');
 const { VERBS, TARGET_ORDER, SCOPES, FANOUTS, tokensOf, findVerb } = require('../src/verbs.js');
 
 const PACKAGES = path.join(__dirname, '..', '..');
-const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun', 'readOnly'];
+const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun', 'readOnly', 'passThrough'];
 
 /**
  * A router CLI's alias table, read from its source: the object literal after
@@ -37,12 +37,16 @@ function commandFiles(pkg) {
     .map((file) => file.slice(0, -3));
 }
 
-/** Each CLI's surface as { verb: aliases }: the alias table plus every command file. */
-function routerSurface(expect, pkg, marker) {
-  const table = aliasTable(expect, pkg, marker);
+/** A CLI's surface as { verb: aliases }: its alias table plus every command file. */
+function withCommandFiles(pkg, table) {
   const surface = { help: [], ...table };
   for (const verb of commandFiles(pkg)) surface[verb] = surface[verb] || [];
   return surface;
+}
+
+/** A router CLI's surface, its alias table read from the literal after `marker`. */
+function routerSurface(expect, pkg, marker) {
+  return withCommandFiles(pkg, aliasTable(expect, pkg, marker));
 }
 
 const BACKEND_COMMANDS = require(path.join(PACKAGES, 'backend', 'src', 'cli', 'command-table.js')).COMMANDS;
@@ -50,7 +54,7 @@ const BACKEND_COMMANDS = require(path.join(PACKAGES, 'backend', 'src', 'cli', 'c
 /** Every CLI's surface by package name; `expect` is the calling case's. */
 function clis(expect) {
   return {
-    '@omega.js/manager': routerSurface(expect, 'manager', 'const ALIASES ='),
+    '@omega.js/manager': withCommandFiles('manager', require(path.join(PACKAGES, 'manager', 'src', 'cli.js')).config.aliases),
     '@omega.js/web': routerSurface(expect, 'web', 'const ALIASES ='),
     '@omega.js/desktop': routerSurface(expect, 'desktop', 'aliases: {'),
     '@omega.js/extension': routerSurface(expect, 'extension', 'aliases: {'),

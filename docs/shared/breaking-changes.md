@@ -30,6 +30,12 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-29: Node 24 is the floor outside Cloud Functions ([#1126](https://github.com/Omega-JS-Stack/omega/issues/1126))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `engines.node` of `@omega.js/web`, `@omega.js/desktop`, `@omega.js/extension`, `@omega.js/manager` and `@omega.js/mcp-router` | `>=22` on every package | `>=24` on every package that never runs inside Cloud Functions; `@omega.js/backend` and `@omega.js/client` keep `>=22`, the runtime the backend's `omega.functionsRuntime` pins ([publishing.md](publishing.md#what-publishes-what-never-does)). It hits a brand whose machine or CI job still runs Node 22 for the brand root, web, desktop or extension: npm warns `EBADENGINE` on every install there, and an extension target's next verb regenerates its `.nvmrc` and its workflow's `NODE_VERSION` to 24 | Move that machine and every such CI job to Node 24 (`nvm install 24`, an `.nvmrc` of `v24`). The backend target stays on 22 and needs nothing |
+
 ## 2026-10-20: the auth return param is `returnUrl`, the contact person is gone, desktop sign-out rejects, a brand's own user keys reach `User` ([#831](https://github.com/Omega-JS-Stack/omega/issues/831), [#824](https://github.com/Omega-JS-Stack/omega/issues/824), [#960](https://github.com/Omega-JS-Stack/omega/issues/960), [#955](https://github.com/Omega-JS-Stack/omega/issues/955))
 
 | Contract | Old form | New form | Manual migration step |

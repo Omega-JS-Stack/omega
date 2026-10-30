@@ -85,6 +85,23 @@ module.exports = defineCases({
     },
 
     {
+      name: 'every-credential-family-is-redacted-at-any-depth',
+      async run({ expect }) {
+        // The request side runs the same family test the response side does:
+        // a credential nested under any key is a credential, not just the two
+        // exact top-level names.
+        const data = { user: { password: 'x', apiKey: 'y', refresh_token: 'z' } };
+        const redacted = redactDataForLog(data);
+        const logged = serialize(redacted);
+
+        for (const [key, raw] of Object.entries(data.user)) {
+          expect(redacted.user[key], `data.user.${key} reached the request line raw: ${logged}`).not.toBe(raw);
+          expect(String(redacted.user[key]), `data.user.${key} is rendered as redacted: ${logged}`).toMatch(/^\*\*\*/);
+        }
+      },
+    },
+
+    {
       name: 'a-redacted-channel-still-reports-presence-and-last-4',
       async run({ expect }) {
         // Same shape the authenticator's own lines use: enough to tell "a key

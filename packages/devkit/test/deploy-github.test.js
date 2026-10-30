@@ -146,8 +146,26 @@ module.exports = defineCases({
             token: TOKEN,
             fetchFn: async (url) => (url.endsWith('/git/ref/heads/main')
               ? { status: 200, json: async () => ({ object: { sha: 'aaaa1111' } }) }
-              : { status: 403 }),
+              : { status: 403, ok: false, text: async () => '', json: async () => ({}) }),
           }))()).rejects.toThrow(/set the default branch by hand and re-run the deploy/i);
+      },
+    },
+
+    {
+      name: 'healDefaultBranch: a refused flip carries the GitHub response body',
+      run: async (ctx) => {
+        // A token without admin scope is the usual 403; the body is what says so.
+        const body = JSON.stringify({ message: 'Resource not accessible by personal access token', status: '403' });
+
+        await ctx.expect((() => healDefaultBranch({
+            owner: 'acme',
+            repo: 'acme-omega',
+            current: 'gh-pages',
+            token: TOKEN,
+            fetchFn: async (url) => (url.endsWith('/git/ref/heads/main')
+              ? { status: 200, json: async () => ({ object: { sha: 'aaaa1111' } }) }
+              : { status: 403, ok: false, text: async () => body, json: async () => JSON.parse(body) }),
+          }))()).rejects.toThrow(/Resource not accessible by personal access token/);
       },
     },
 

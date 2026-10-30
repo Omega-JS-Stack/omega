@@ -22,7 +22,20 @@ childProcess.spawn = (command, args, options) => {
   return child;
 };
 
+// The manager's own clean fan-out, stubbed before cli.js resolves it, so which
+// door a clean spelling took is observable.
+const cleanCommandCalls = [];
+const cleanCommandPath = require.resolve('../src/commands/clean.js');
+require.cache[cleanCommandPath] = {
+  id: cleanCommandPath,
+  filename: cleanCommandPath,
+  path: path.dirname(cleanCommandPath),
+  loaded: true,
+  exports: async (options) => { cleanCommandCalls.push(options); },
+};
+
 const { parseArgv } = require('@omega.js/devkit/argv');
+const { VERBS } = require('@omega.js/devkit/verbs');
 const Main = require('../src/cli.js');
 const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
 const { passThroughRow, runPassThrough } = require('../src/lib/verb-passthrough.js');
@@ -193,6 +206,37 @@ module.exports = defineCases({
           return true;
         }));
         ctx.expect(spawned.length).toBe(0);
+      },
+    },
+
+    {
+      name: 'the manager\'s ALIASES are the registry\'s, and clean:npm stays the backend\'s pass-through, never the clean fan-out',
+      run: async (ctx) => {
+        const aliases = Main.config.aliases;
+        const registryAliases = (row) => row.aliases.filter((alias) => !(row.passThrough || []).includes(alias));
+        for (const row of VERBS.filter((entry) => entry.owners.includes('@omega.js/manager'))) {
+          ctx.expect(aliases[row.name] || [], `${row.name}'s aliases are its registry row's`).toEqual(registryAliases(row));
+        }
+        for (const [verb, list] of Object.entries(aliases)) {
+          const row = VERBS.find((entry) => entry.name === verb);
+          ctx.expect(row, `ALIASES carries "${verb}", which has no registry row`).toBeTruthy();
+          ctx.expect(list, `${verb}'s aliases are its registry row's`).toEqual(registryAliases(row));
+        }
+
+        const root = stageBrand();
+        write(path.join(root, 'targets', 'backend', 'package.json'), { name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' }, scripts: { clean: 'omega clean' } });
+        cleanCommandCalls.length = 0;
+        const argv0 = process.argv;
+        const args = ['clean:npm', '--target=backend'];
+        process.argv = [process.execPath, 'omega', ...args];
+        try {
+          await atRoot(root, () => new Main().process(parseArgv(args, { booleans: BOOLEAN_FLAGS })));
+        } finally {
+          process.argv = argv0;
+        }
+
+        ctx.expect(cleanCommandCalls.length, 'clean:npm never reaches the manager\'s clean fan-out').toBe(0);
+        ctx.expect(spawned.map((call) => [path.basename(call.cwd), call.command, ...call.args])).toEqual([['backend', 'npm', 'run', 'clean']]);
       },
     },
 

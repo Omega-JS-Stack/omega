@@ -48,6 +48,7 @@ const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const chalk = require('chalk').default;
 const { regenerateLockfile } = require('./lockfile.js');
+const { writeJson } = require('./write-json.js');
 const { resolvePackageDir } = require('./local.js');
 
 // Constants
@@ -353,7 +354,7 @@ async function stageLocalPackages({ dir, log = () => {} }) {
     }
 
     for (const manifest of touched) {
-      jetpack.write(manifest.file, `${JSON.stringify(manifest.pkg, null, 2)}\n`);
+      writeJson(manifest.file, manifest.pkg);
     }
 
     // A remote install runs `npm ci`, so the uploaded lockfile must match the

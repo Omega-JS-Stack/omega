@@ -15,11 +15,14 @@ const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-/** The vendored devkit module whose peer installer base-command requires on each verb. */
+/** The vendored devkit module whose peer installer ensureTarget runs on each verb. */
 const TARGET_DEPENDENCIES = path.join(__dirname, '..', '..', 'dist', 'vendor', 'devkit', 'target-dependencies.js');
 
-const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
+const { ensureTargetOffline } = require('../helpers/_ensure-target-offline.js');
+const { captureOutput } = require('../helpers/_capture-output.js');
 const BuildCommand = require('../../dist/cli/commands/build.js');
+const TestCommand = require('../../dist/cli/commands/test.js');
+const { writeJson } = require('../../dist/vendor/devkit/write-json.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /** A virgin backend target: a manifest and nothing else. Its peers are declared, so a verb run here installs nothing. */
@@ -41,11 +44,11 @@ function manifestOf(dir) {
   return JSON.parse(jetpack.read(path.join(dir, 'package.json')));
 }
 
-/** ensureTarget with its output captured. */
-function run(dir) {
+/** ensureTarget with its output captured, its peer install recorded and never run. */
+async function run(dir) {
   const lines = [];
-  const result = ensureTarget({ projectDir: dir, log: (message) => lines.push(message) });
-  return { ...result, lines };
+  const { result, peers } = await ensureTargetOffline({ projectDir: dir, log: (message) => lines.push(message) });
+  return { ...result, lines, peers };
 }
 
 /** runEnsureTarget as a verb runs it, every line it prints captured. */
@@ -98,7 +101,7 @@ module.exports = defineCases({
         const dir = seedTarget();
 
         try {
-          const first = run(dir);
+          const first = await run(dir);
 
           expect(jetpack.exists(path.join(dir, '.firebaserc')), '.firebaserc is derived from the resolved config').toBe('file');
           expect(jetpack.exists(path.join(dir, 'firebase.json')), 'firebase.json is scaffolded from the template').toBe('file');
@@ -131,11 +134,11 @@ module.exports = defineCases({
         const authored = seedTarget();
 
         try {
-          run(fresh);
+          await run(fresh);
           expect(manifestOf(fresh).license, 'a manifest stating no license gets the default').toBe('UNLICENSED');
 
           jetpack.write(path.join(authored, 'package.json'), JSON.stringify({ name: 'fixture-backend', license: 'MIT' }, null, 2));
-          run(authored);
+          await run(authored);
           expect(manifestOf(authored).license, 'an authored license survives every verb run').toBe('MIT');
         } finally {
           jetpack.remove(fresh);
@@ -152,10 +155,10 @@ module.exports = defineCases({
         const dir = seedTarget();
 
         try {
-          run(dir);
+          await run(dir);
           const before = jetpack.inspectTree(dir, { checksum: 'sha1' });
 
-          const second = run(dir);
+          const second = await run(dir);
           const after = jetpack.inspectTree(dir, { checksum: 'sha1' });
 
           expect(second.written, 'nothing is written twice').toEqual([]);
@@ -180,7 +183,7 @@ module.exports = defineCases({
           jetpack.write(path.join(dir, 'src', 'index.js'), '// mine\n');
           jetpack.write(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', engines: { node: '20' } }, null, 2));
 
-          run(dir);
+          await run(dir);
 
           expect(jetpack.read(path.join(dir, 'src', 'index.js')), 'an authored entry survives').toBe('// mine\n');
           expect(JSON.parse(jetpack.read(path.join(dir, 'package.json'))).engines.node, 'an authored engines.node survives').toBe('20');
@@ -202,7 +205,7 @@ module.exports = defineCases({
         const dir = seedTarget();
 
         try {
-          run(dir);
+          await run(dir);
 
           for (const [key, value] of Object.entries(PROJECT_SCRIPTS)) {
             expect(manifestOf(dir).scripts[key], `a fresh target gets the framework default for ${key}`).toBe(value);
@@ -214,7 +217,7 @@ module.exports = defineCases({
           edited.scripts.render = 'render deploy';
           jetpack.write(path.join(dir, 'package.json'), JSON.stringify(edited, null, 2));
 
-          const healed = run(dir);
+          const healed = await run(dir);
           const after = manifestOf(dir);
           expect(after.scripts.deploy, 'an edited standard script is rewritten to the default').toBe(PROJECT_SCRIPTS.deploy);
           expect(after.scripts.render, 'a key the framework never declares is the consumer\'s own').toBe('render deploy');
@@ -223,7 +226,7 @@ module.exports = defineCases({
 
           // Converged: a third run writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
-          const third = run(dir);
+          const third = await run(dir);
           expect(third.changed, 'a converged manifest is not a change').toEqual([]);
           expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
@@ -240,7 +243,7 @@ module.exports = defineCases({
         const dir = seedTarget();
 
         try {
-          run(dir);
+          await run(dir);
           const scripts = manifestOf(dir).scripts;
           const derived = verbScripts(frameworkPackage.name);
 
@@ -286,7 +289,7 @@ module.exports = defineCases({
           seeded.scripts = { start: 'npx omega serve', deploy: 'npx omega deploy', lint: 'npx eslint .' };
           jetpack.write(path.join(dir, 'package.json'), JSON.stringify(seeded, null, 2));
 
-          run(dir);
+          await run(dir);
           const healed = manifestOf(dir).scripts;
 
           expect(healed.start, 'the old `npx omega serve` heals to the bare verb').toBe(PROJECT_SCRIPTS.start);
@@ -295,7 +298,7 @@ module.exports = defineCases({
 
           // Converged: the second pass writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
-          expect(run(dir).changed, 'a healed manifest is not a change').toEqual([]);
+          expect((await run(dir)).changed, 'a healed manifest is not a change').toEqual([]);
           expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
@@ -322,7 +325,7 @@ module.exports = defineCases({
           seeded.scripts = { start: 'node server.js' };
           jetpack.write(path.join(dir, 'package.json'), JSON.stringify(seeded, null, 2));
 
-          run(dir);
+          await run(dir);
           const scripts = manifestOf(dir).scripts;
 
           expect(scripts.start, 'the brand names its own server command').toBe('node server.js');
@@ -337,7 +340,7 @@ module.exports = defineCases({
 
           // Converged: a second run writes nothing
           const before = jetpack.read(path.join(dir, 'package.json'));
-          expect(run(dir).changed, 'a converged custom target is not a change').toEqual([]);
+          expect((await run(dir)).changed, 'a converged custom target is not a change').toEqual([]);
           expect(jetpack.read(path.join(dir, 'package.json')), 'and is byte-identical').toBe(before);
         } finally {
           jetpack.remove(dir);
@@ -415,7 +418,7 @@ module.exports = defineCases({
 
           let refusal = null;
           try {
-            run(dir);
+            await run(dir);
           } catch (e) {
             refusal = e;
           }
@@ -448,7 +451,7 @@ module.exports = defineCases({
           const frameworkName = require('../../package.json').name;
           jetpack.write(path.join(dir, 'package.json'), JSON.stringify({ name: frameworkName, version: '0.0.0' }, null, 2));
 
-          const result = run(dir);
+          const result = await run(dir);
 
           expect(result.written, 'nothing is written into the framework tree').toEqual([]);
           expect(result.changed, 'the manifest is left alone').toEqual([]);
@@ -518,6 +521,62 @@ module.exports = defineCases({
 
           expect(calls.length, 'runEnsureTarget calls ensurePeerDependencies once').toBe(1);
           expect(calls[0].projectDir, 'on the verb\'s target').toBe(dir);
+          expect(calls[0].package.peerDependencies, 'with the backend\'s peer set').toEqual(peers);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'a-test-run-prints-the-framework-deps-nudge-once',
+      auth: 'none',
+
+      async run({ expect }) {
+        // `omega test` scaffolds the target, then stages it. The undeclared
+        // require is named once per verb, not once per step.
+        const dir = seedRequiringTarget({});
+        const command = new TestCommand({ firebaseProjectPath: dir, argv: {}, options: {} });
+        const lines = [];
+
+        command.log = (message) => lines.push(String(message));
+        command.logWarning = (message) => lines.push(String(message));
+
+        try {
+          const { stdout, stderr } = await captureOutput(async () => {
+            await command.runEnsureTarget();
+            await command.ensureStaged({ environment: 'testing' });
+          });
+          const nudges = [...lines, ...`${stdout}${stderr}`.split('\n')].filter((line) => line.includes("omega.require('fs-jetpack')"));
+
+          expect(nudges.length, `the nudge prints once per verb: ${nudges.join(' | ')}`).toBe(1);
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'ensure-target-alone-aligns-a-target-behind-on-a-firebase-peer',
+      auth: 'none',
+
+      async run({ expect }) {
+        // The way desktop and extension do it: the scaffold every verb runs
+        // aligns the peers itself, so no caller has to remember a second step.
+        const peers = frameworkPackage.peerDependencies;
+        const dir = seedTarget();
+
+        try {
+          writeJson(path.join(dir, 'package.json'), {
+            name: 'fixture-backend',
+            version: '0.0.0',
+            dependencies: { ...peers, 'firebase-admin': '1.0.0' },
+          });
+
+          const calls = (await run(dir)).peers;
+
+          expect(calls.length, 'ensureTarget aligns the peers itself, once').toBe(1);
+          expect(calls[0].projectDir, 'on the target it scaffolds').toBe(dir);
           expect(calls[0].package.peerDependencies, 'with the backend\'s peer set').toEqual(peers);
         } finally {
           jetpack.remove(dir);

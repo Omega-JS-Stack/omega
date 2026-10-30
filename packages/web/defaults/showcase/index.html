@@ -1,45 +1,51 @@
 ---
 layout: frontend/core/base
-permalink: /test/sections
 
+# ONE index for both galleries: pagination over the gallery url spaces the
+# engine computes (src/sections.js KINDS.<kind>.gallery), the way entry.html
+# paginates the entries. The permalink is the gallery's own url.
+pagination:
+  data: sectionLibrary.galleries
+  size: 1
+  alias: gallery
+permalink: "{{ gallery.url }}.html"
 eleventyExcludeFromCollections: true
+# resolved.* refs: the pagination alias reaches frontmatter strings through
+# the resolved scope (the per-page re-render lane), not as a bare name.
 meta:
-  title: "Section library"
-  description: "The auto-generated section showcase: every section in the resolved library, grouped by folder, with live demos and schema docs."
-  breadcrumb: "Section library"
+  title: "{{ resolved.gallery.label }}"
+  description: "The auto-generated {{ resolved.gallery.kind }} showcase: every {{ resolved.gallery.kind }} in the resolved library, grouped by folder, with live demos and schema docs."
+  breadcrumb: "{{ resolved.gallery.label }}"
   index: false
 ---
 
 {% comment %}
-  The SECTION gallery index (spec §9) — sections only (#602). Components have
-  their own library at /test/components, mirroring this one exactly: an index,
-  one page per entry, frames beside it. Listing both here is what made the two
-  read as one confused surface.
+  The gallery index (spec §9), one page per library: sections at
+  /test/sections, components at /test/components, each listing only its own
+  kind and linking the other. An index, one page per entry, frames beside it:
+  the two libraries share every template, so they can never read differently.
 
-  Auto-generated from the resolved library, and the listing itself is the
-  shared `core/showcase/index-body.html` include — the component index renders
-  the same one, so the two can never drift.
+  The listing itself is the shared `core/showcase/index-body.html` include.
 
-  Same shell as every entry page (#540): the navigation rail on the left, the
+  Same shell as every entry page: the navigation rail on the left, the
   content on the right. The shell is a top-level <section> so it takes the
-  theme's own nav clearance and clears the site masthead (#540).
+  theme's own nav clearance and clears the site masthead.
 
-  Development builds only (the engine gates the injection): production never
-  renders every section at once, which is what keeps PurgeCSS §7 self-trimming
-  meaningful. Neutral Bootstrap vocabulary on purpose — this page renders
-  under whichever theme is active.
+  Development builds only (the engine gates the whole `defaults/showcase/`
+  dir): production never renders every section at once, which is what keeps
+  PurgeCSS §7 self-trimming meaningful. Neutral Bootstrap vocabulary on
+  purpose: this page renders under whichever theme is active.
 {% endcomment %}
 
-{% assign gallery = sectionLibrary.galleries | where: "kind", "section" | first %}
-{% assign other = sectionLibrary.galleries | where: "kind", "component" | first %}
-{% assign listed = sectionLibrary.entries | where: "kind", "section" %}
+{% for candidate in sectionLibrary.galleries %}{% if candidate.kind != gallery.kind %}{% assign other = candidate %}{% endif %}{% endfor %}
+{% assign listed = sectionLibrary.entries | where: "kind", gallery.kind %}
 
 <section class="container-fluid px-lg-4 pb-4" data-omega-showcase-shell>
   <div class="row g-4">
     <!-- ═══ Rail ═══ -->
     <aside class="col-12 col-lg-3 col-xxl-2">
       {% comment %} No entry is current here, so the rail carries no variants. {% endcomment %}
-      {% include core/showcase/nav.html kind="section" home=gallery.url label=gallery.label current="" %}
+      {% include core/showcase/nav.html kind=gallery.kind home=gallery.url label=gallery.label current="" %}
     </aside>
 
     <!-- ═══ Content ═══ -->
@@ -47,13 +53,13 @@ meta:
       <span class="text-uppercase small fw-bold text-muted d-block mb-2">Auto-generated</span>
       <h1 class="h3 mb-3">{{ gallery.label }}</h1>
       <p class="lead mb-2">
-        Every section the active layer chain resolves: {{ listed.size }} entries, rendered from their own schemas.
+        Every {{ gallery.kind }} the active layer chain resolves: {{ listed.size }} entries, rendered from their own schemas.
       </p>
       <p class="text-muted mb-4">
-        Each entry page carries the args reference and live demo variants. New folders appear here automatically; overrides show which layer won. Components live in the <a href="{{ other.url }}">component library</a>.
+        Each entry page carries the args reference and live demo variants. New folders appear here automatically; overrides show which layer won. {{ other.kind | capitalize }}s live in the <a href="{{ other.url }}">{{ other.label | downcase }}</a>.
       </p>
 
-      {% include core/showcase/index-body.html kind="section" %}
+      {% include core/showcase/index-body.html kind=gallery.kind %}
     </div>
   </div>
 </section>

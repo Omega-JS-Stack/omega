@@ -251,9 +251,9 @@ class FirestoreCommand extends BaseCommand {
    */
   output(data, argv) {
     if (argv.raw) {
-      this.log(JSON.stringify(data));
+      this.print(JSON.stringify(data));
     } else {
-      this.log(JSON.stringify(data, null, 2));
+      this.print(JSON.stringify(data, null, 2));
     }
   }
 }

@@ -2,6 +2,7 @@ const chalk = require('chalk').default;
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const BaseCommand = require('./base-command');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const {
   BRAND_RULES_FILE,
   COMPILED_RULES_FILE,
@@ -76,7 +77,7 @@ class MigrateRulesCommand extends BaseCommand {
     // Half two: firebase.json, repointed at the artifact both the emulator and
     // `firebase deploy` read.
     firebaseJSON.firestore = { ...firebaseJSON.firestore, rules: COMPILED_RULES_FILE };
-    jetpack.write(firebaseJSONPath, JSON.stringify(firebaseJSON, null, 2));
+    writeJson(firebaseJSONPath, firebaseJSON);
     this.ui.status('change', `firebase.json now points firestore.rules at ${chalk.bold(COMPILED_RULES_FILE)} (was "${deferred}").`);
 
     compileFirestoreRules({ projectDir: projectDir });

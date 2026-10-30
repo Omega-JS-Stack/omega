@@ -13,16 +13,15 @@
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so the test stages a temp project, chdirs into it, and requires
-// the task fresh: the same model as build-json-bake.test.js.
+// the task fresh (utils/package-project.js).
 
 const path = require('path');
 const fs   = require('fs');
-const os   = require('os');
 const vm   = require('vm');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const { installEsmOnlyFixture, FIXTURE_NAME, BROWSER_MARKER } = require('@omega.js/devkit/test/esm-only-fixture');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC       = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'bundle.js');
 
 // A popup entry that does nothing but use the ESM-only dependency: the values
@@ -37,42 +36,16 @@ const PROBE_ENTRY = [
 ].join('\n');
 
 // Stage a temp extension project with the fixture installed.
-function stageProject() {
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'extension-esm-only-')));
-
-  fs.writeFileSync(path.join(tmp, 'package.json'), '{ "name": "staged-ext", "version": "1.0.0" }');
-  fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), `{
-    brand: { id: 'staged', name: 'Staged' },
-    targets: { extension: { type: 'extension' } },
-  }`);
-
-  const entry = path.join(tmp, 'src', 'assets', 'js', 'components', 'popup', 'index.js');
-  fs.mkdirSync(path.dirname(entry), { recursive: true });
-  fs.writeFileSync(entry, PROBE_ENTRY);
+function stageWithFixture() {
+  const tmp = fs.realpathSync(stageProject({
+    pkg: '{ "name": "staged-ext", "version": "1.0.0" }',
+    config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
+    files: { 'src/assets/js/components/popup/index.js': PROBE_ENTRY },
+  }));
 
   installEsmOnlyFixture(tmp);
 
   return tmp;
-}
-
-// Run `fn(task)` with cwd pinned to `dir` and the task module loaded fresh.
-async function inProject(dir, fn) {
-  const oldCwd = process.cwd();
-  const flush = () => {
-    for (const key of Object.keys(require.cache)) {
-      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
-    }
-  };
-
-  flush();
-  try {
-    process.chdir(dir);
-    return await fn(require(TASK_PATH));
-  } finally {
-    process.chdir(oldCwd);
-    flush();
-  }
 }
 
 // Run an emitted bundle the way a browser context does: a self-contained iife
@@ -94,7 +67,7 @@ module.exports = defineCases({
     {
       name: 'the popup bundle carries the ESM-only dependency and its exports answer at run time',
       run: async (ctx) => {
-        const tmp = stageProject();
+        const tmp = stageWithFixture();
         try {
           await inProject(tmp, async (task) => {
             const failure = await new Promise((resolve) => task.bundleTask(resolve));
@@ -109,7 +82,7 @@ module.exports = defineCases({
             // The BROWSER entry is what an extension bundle resolves to: the
             // node half would have dragged node:module into a browser context.
             ctx.expect(ran.__flavor).toBe('browser');
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

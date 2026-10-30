@@ -668,6 +668,38 @@ module.exports = defineCases({
     },
 
     {
+      name: 'every flag the fan-out does not consume reaches the leg after --, and --target stays the root\'s',
+      run: async (ctx) => {
+        resetRecorders();
+        resetSweep();
+        manageReport = { hasErrors: false, results: {}, brand: {} };
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const root = stageFanOutBrand();
+
+        await bootDev(root, parseArgv(['dev', '--target=web', '--port=3001', '--no-https'], { booleans: BOOLEAN_FLAGS }));
+
+        ctx.expect(legCommands, 'web\'s start hears its own flags as typed, never the picker').toEqual(['web: npm run start -- --port=3001 --no-https']);
+      },
+    },
+
+    {
+      name: 'omega dev --target=backend boots the backend\'s own dev leg: the root form of its serve',
+      run: async (ctx) => {
+        resetRecorders();
+        resetSweep();
+        manageReport = { hasErrors: false, results: {}, brand: {} };
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const root = stageFanOutBrand();
+
+        await bootDev(root, parseArgv(['dev', '--target=backend'], { booleans: BOOLEAN_FLAGS }));
+
+        ctx.expect(legCommands, 'one leg, the backend\'s start (its omega dev, the emulator suite)').toEqual(['backend: npm run start']);
+      },
+    },
+
+    {
       name: 'a selected target with no `start` script is skipped loudly, and nothing spawns for it',
       run: async (ctx) => {
         resetRecorders();

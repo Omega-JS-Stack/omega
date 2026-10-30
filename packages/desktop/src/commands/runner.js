@@ -34,6 +34,7 @@ const path     = require('path');
 const fs       = require('fs');
 const os       = require('os');
 const jetpack  = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const build  = require('../build.js');
 const logger   = build.logger('runner');
@@ -1799,7 +1800,7 @@ function readConfig(home) {
 function saveConfig(data, home) {
   const file = path.join(home || RUNNER_HOME, 'config.json');
   const cur  = readConfig(home);
-  jetpack.write(file, { ...cur, ...data });
+  writeJson(file, { ...cur, ...data });
 }
 
 // ─── monitor ────────────────────────────────────────────────────────────────────

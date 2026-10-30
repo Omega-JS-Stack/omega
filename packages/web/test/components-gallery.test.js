@@ -26,7 +26,8 @@
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
+const { KINDS } = require('../src/sections.js');
+const { buildResults, buildWith: sharedBuildWith, miniData, MINI } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'components-gallery-test');
 
@@ -132,6 +133,24 @@ module.exports = defineCases({
         ctx.expect(hero, 'a section entry page sits directly under its index, like a component one').toBeTruthy();
         ctx.expect(hero.includes('src="/test/sections/marketing/hero/frames/email-capture"'), 'and its frames hang off it').toBeTruthy();
         ctx.expect(!hero.includes('/test/components/heading/masthead'), 'a section rail carries no components either').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'every gallery index renders from ONE template, and each gallery hangs its entries off its own url',
+      run: async (ctx) => {
+        const results = await buildResults(MINI, miniData, {}, 'components-gallery-one-index');
+        const galleries = Object.values(KINDS).map((kind) => kind.gallery);
+        const indexes = galleries.map((gallery) => results.find((result) => result.url === gallery.url));
+
+        galleries.forEach((gallery, at) => {
+          ctx.expect(gallery.url, `${gallery.kind}: an entry is <index>/<id>, so the base IS the index url`).toBe(gallery.base);
+          ctx.expect(indexes[at], `${gallery.kind}: the index page builds at ${gallery.url}`).toBeTruthy();
+          ctx.expect(indexes[at].content.includes(`aria-label="${gallery.label}"`), `${gallery.kind}: the index is its own library`).toBeTruthy();
+        });
+
+        const templates = [...new Set(indexes.map((index) => index.inputPath))];
+        ctx.expect(templates.length, `one index template serves every gallery: ${templates.join(', ')}`).toBe(1);
       },
     },
 

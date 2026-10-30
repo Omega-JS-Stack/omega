@@ -11,7 +11,7 @@ const fs = require('fs');
 const chalk = require('chalk').default;
 const { serializeSuite, specKey } = require('@omega.js/devkit/test/serialize');
 const { EVENT_PREFIX, parseEventLine, reportEvery, createEventTracker } = require('@omega.js/devkit/test/events');
-const { attachLiveWorker, whileLive } = require('./service-worker.js');
+const { attachLiveWorker, whileWorkerLive } = require('./service-worker.js');
 const { loadPuppeteer, launchChrome, waitForTarget } = require('./helpers.js');
 
 // The two engine files a payload inlines; both stand alone, with no `require` call.
@@ -112,7 +112,7 @@ function inWorker(browser, extId) {
     const onConsole = (evt) => onLine(evt.args.map((a) => (a.value !== undefined ? String(a.value) : (a.description || ''))).join(' '), `sw:${evt.type}`);
     session.on('Runtime.consoleAPICalled', onConsole);
     try {
-      const { exceptionDetails } = await whileLive(session, extId, (async () => {
+      const { exceptionDetails } = await whileWorkerLive(session, extId, (async () => {
         // Enabling replays the worker's stored console lines, earlier suites' events included.
         await session.send('Runtime.discardConsoleEntries');
         await session.send('Runtime.enable');

@@ -422,7 +422,9 @@ the frames are what each variant actually looks like.
   `/test/components/<id>/frames/<slug>`. ONE generator serves both kinds:
   `defaults/showcase/entry.html` and `defaults/showcase/frame.html` paginate
   the whole library and take their permalink off the entry's own kind-aware
-  url, and the two index pages share `core/_includes/core/showcase/index-body.html`.
+  url, and `defaults/showcase/index.html` paginates the two galleries
+  (`sectionLibrary.galleries`), so both index pages are one template over
+  `core/_includes/core/showcase/index-body.html`.
   Nothing is generated under `/test/sections/component/…` or
   `/test/sections/section/…` any more — both kind segments are gone. The living
   styleguide that used to hold the `/test/components` URL is `/test/styleguide`

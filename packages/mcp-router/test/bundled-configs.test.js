@@ -84,7 +84,10 @@ module.exports = defineCases({
         for (const [name, script] of [['chrome-devtools-extension', 'launch-cft.js'], ['omega-extension', 'launch-omega-extension.js']]) {
           const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
           ctx.expect(upstream.command).toBe('node');
-          ctx.expect(upstream.args[0]).toBe(`\${MCP_ROUTER_ROOT}/src/${script}`);
+          // Root-relative through the placeholder, inside a folder `files` publishes.
+          const [root, folder, file] = upstream.args[0].split('/');
+          ctx.expect([root, file]).toEqual(['${MCP_ROUTER_ROOT}', script]);
+          ctx.expect(require('../package.json').files, `${script} lives in ${folder}/, which never publishes`).toContain(`${folder}/`);
           ctx.expect(fs.existsSync(resolveSpawn(upstream).args[0]), `${script} is not on disk`).toBe(true);
         }
       },

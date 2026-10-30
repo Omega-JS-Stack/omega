@@ -16,6 +16,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
+import { slugify } from '@omega.js/client/modules/slugify.js';
 import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
@@ -63,21 +64,13 @@ function initSlugFollow() {
 
   $title.addEventListener('input', () => {
     if (!slugTouched) {
-      $slug.value = hyphenate($title.value);
+      $slug.value = slugify($title.value);
     }
   });
 
   $slug.addEventListener('input', () => {
     slugTouched = $slug.value.trim() !== '';
   });
-}
-
-function hyphenate(text) {
-  return String(text || '')
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 // ============================================
@@ -169,7 +162,7 @@ function initForm() {
         }
       : {
           title: (post.title || '').trim(),
-          url: hyphenate(post.url || post.title),
+          url: slugify(post.url || post.title || ''),
           description: (post.description || '').trim(),
           headerImageURL: (post.headerImageURL || '').trim(),
           body: post.body || '',

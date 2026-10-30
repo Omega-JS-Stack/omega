@@ -557,7 +557,7 @@ const ENV_SCHEMA = [
     required:    false,
     requiredWhen: APPLE_SIGNING,
     delivery:    { desktop: 'ci' },
-    description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with; unset, the build derives it from a delivered config/certs/developer-id-application.p12, then falls back to the Keychain. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
+    description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with; unset, the build derives it from the signing tree (<brand root>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12, a company tree answering first), then falls back to the Keychain. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
   {
     name:        'APPLE_API_KEY',
@@ -568,7 +568,7 @@ const ENV_SCHEMA = [
     required:    false,
     requiredWhen: APPLE_SIGNING,
     delivery:    { desktop: 'ci' },
-    description: 'Path to the App Store Connect API key (.p8) notarization uses; unset, the build derives it from a delivered config/certs/AuthKey_<APPLE_API_KEY_ID>.p8. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
+    description: 'Path to the App Store Connect API key (.p8) notarization uses; unset, the build derives it from the signing tree (<brand root>/.omega/certificates/apple/AuthKey_<APPLE_API_KEY_ID>.p8, a company tree answering first). Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
 
   // ── desktop-publishing — the Windows + Linux halves of a desktop release ──

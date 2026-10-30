@@ -17,7 +17,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const cheerio = require('cheerio');
 const { User } = require('@omega.js/account');
+
+const { buildWith, miniData } = require('./lib/build.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const PRICING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'pricing', 'index.js');
@@ -64,52 +67,120 @@ function bundleOnce() {
   return building;
 }
 
-/** One element, as much of it as the banner path reads and writes. */
-function makeElement(overrides = {}) {
-  return {
-    style: {},
-    textContent: '',
-    attributes: { hidden: true },
-    offsetHeight: 0,
-    removeAttribute(name) { delete this.attributes[name]; },
-    matches: () => false,
-    ...overrides,
+/**
+ * A document over the RENDERED /pricing page that answers only the promo
+ * banner's subtree, the site nav and the page's sections, each element live
+ * enough for the banner path: attributes, classes, style, listeners and a
+ * bubbling click. Scripts never run here, so an inline handler does nothing.
+ *
+ * @param {string} html - the built pricing page
+ * @returns {object} { document, banner, nav, firstSection, close, isHidden }
+ */
+function renderedDocument(html) {
+  const $ = cheerio.load(html);
+  const bannerNode = $('#pricing-promo-banner')[0];
+  const navNode = $('.omega-nav')[0];
+  const closeNode = $(bannerNode).find('button')[0];
+  const wrappers = new Map();
+  const documentListeners = {};
+
+  const answers = (node) => node === navNode
+    || node.name === 'section'
+    || $(node).closest('#pricing-promo-banner').length > 0;
+  const wrapAll = (nodes) => nodes.toArray().filter(answers).map(wrap);
+
+  function wrap(node) {
+    if (!node) return null;
+    if (wrappers.has(node)) return wrappers.get(node);
+
+    const listeners = {};
+    const element = {
+      node,
+      listeners,
+      style: {},
+      removed: false,
+      offsetHeight: node === bannerNode ? BANNER_HEIGHT : 0,
+      get id() { return node.attribs.id || ''; },
+      get hidden() { return 'hidden' in node.attribs; },
+      set hidden(value) { element.toggleAttribute('hidden', Boolean(value)); },
+      get textContent() { return $(node).text(); },
+      set textContent(value) { $(node).text(String(value)); },
+      get parentElement() { return wrap(node.parent && node.parent.type === 'tag' ? node.parent : null); },
+      getAttribute: (name) => (name in node.attribs ? node.attribs[name] : null),
+      hasAttribute: (name) => name in node.attribs,
+      setAttribute: (name, value) => { node.attribs[name] = String(value); },
+      removeAttribute: (name) => { delete node.attribs[name]; },
+      toggleAttribute: (name, force) => {
+        const on = force === undefined ? !(name in node.attribs) : force;
+        if (on) node.attribs[name] = '';
+        else delete node.attribs[name];
+        return on;
+      },
+      classList: {
+        contains: (name) => $(node).hasClass(name),
+        add: (...names) => { $(node).addClass(names.join(' ')); },
+        remove: (...names) => { $(node).removeClass(names.join(' ')); },
+        toggle: (name, force) => { $(node).toggleClass(name, force); return $(node).hasClass(name); },
+      },
+      matches: (selector) => $(node).is(selector),
+      closest: (selector) => wrap($(node).closest(selector)[0]),
+      querySelector: (selector) => wrapAll($(node).find(selector))[0] || null,
+      querySelectorAll: (selector) => wrapAll($(node).find(selector)),
+      contains: (other) => Boolean(other) && (other.node === node || $(other.node).parents().toArray().includes(node)),
+      remove: () => { element.removed = true; },
+      addEventListener: (type, handler) => { (listeners[type] ||= []).push(handler); },
+      removeEventListener: (type, handler) => {
+        listeners[type] = (listeners[type] || []).filter((entry) => entry !== handler);
+      },
+      click: () => dispatchClick(element),
+    };
+
+    wrappers.set(node, element);
+    return element;
+  }
+
+  // The click bubbles from the button through every wrapped ancestor to the
+  // document, so a delegated listener answers it the way a browser's would.
+  function dispatchClick(target) {
+    const event = { type: 'click', target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
+    const path = [target.node, ...$(target.node).parents().toArray()];
+
+    for (const node of path) {
+      const element = wrappers.get(node);
+      for (const handler of (element && element.listeners.click) || []) handler.call(element, { ...event, currentTarget: element });
+    }
+    for (const handler of documentListeners.click || []) handler({ ...event, currentTarget: null });
+  }
+
+  const document = {
+    getElementById: (id) => wrapAll($(`[id="${id}"]`))[0] || null,
+    querySelector: (selector) => wrapAll($(selector))[0] || null,
+    querySelectorAll: (selector) => wrapAll($(selector)),
+    addEventListener: (type, handler) => { (documentListeners[type] ||= []).push(handler); },
+    removeEventListener: () => {},
   };
+
+  const banner = wrap(bannerNode);
+  const isHidden = () => banner.removed || banner.hidden || banner.style.display === 'none' || banner.classList.contains('d-none');
+
+  return { document, banner, nav: wrap(navNode), firstSection: wrap($('main section')[0]), close: wrap(closeNode), isHidden };
 }
 
 /**
- * Load the REAL pricing page over a document that has the banner, the nav and
- * the opening section, and hand back what the page did to each of them.
+ * Load the REAL pricing page over a document and hand back what the page did to
+ * it.
  *
- * @returns {Promise<object>} { banner, nav, firstSection, computedReads }
+ * @param {object} parts - a document and the elements a case reads back
+ * @returns {Promise<object>} the same parts, plus every element the page measured
  */
-async function loadPricingPage() {
+async function loadPricingPage(parts) {
   await bundleOnce();
 
-  const banner = makeElement({ offsetHeight: BANNER_HEIGHT });
-  const countdown = makeElement();
-  const promoText = makeElement();
-  const nav = makeElement();
-  const firstSection = makeElement();
-  // Every element the page asked the browser to MEASURE — reading the opening
+  // Every element the page asked the browser to MEASURE: reading the opening
   // section's padding is the first half of moving it.
   const computedReads = [];
 
-  globalThis.document = {
-    getElementById: (id) => ({
-      'pricing-promo-banner': banner,
-      'pricing-promo-countdown': countdown,
-      'pricing-promo-text': promoText,
-    }[id] || null),
-    querySelector: (selector) => {
-      if (selector === 'nav') return nav;
-      if (selector.includes('.omega-nav')) return nav;
-      if (selector.includes('section:first-of-type')) return firstSection;
-      return null;
-    },
-    querySelectorAll: () => [],
-    addEventListener: () => {},
-  };
+  globalThis.document = parts.document;
 
   globalThis.window = {
     location: { origin: 'https://brand.test', href: 'https://brand.test/pricing' },
@@ -133,7 +204,7 @@ async function loadPricingPage() {
   };
 
   // The page waits a second before it shows the banner, then polls a countdown
-  // forever — this suite is about the push, so both schedulers run inline.
+  // forever: this suite is about the push, so both schedulers run inline.
   const realSetTimeout = globalThis.setTimeout;
   const realSetInterval = globalThis.setInterval;
   globalThis.setTimeout = (handler) => { handler(); return 0; };
@@ -147,19 +218,26 @@ async function loadPricingPage() {
     globalThis.setInterval = realSetInterval;
   }
 
-  return { banner, nav, firstSection, computedReads };
+  return { ...parts, computedReads };
 }
+
+// Built once, before any case puts browser globals on the process.
+let pricingHtml;
 
 module.exports = defineCases({
   type: 'group',
   description: 'pricing-promo-banner',
+  setup: async () => {
+    const pages = await buildWith(miniData, { activeTheme: 'classy' }, 'pricing-promo-banner');
+    pricingHtml = pages.get('/pricing');
+  },
   tests: [
     {
       name: 'the promo banner pushes the NAV down and leaves the page where it is (#764)',
       run: async (ctx) => {
-        const page = await loadPricingPage();
+        const page = await loadPricingPage(renderedDocument(pricingHtml));
 
-        ctx.expect(page.banner.attributes.hidden, 'the banner is shown').toBe(undefined);
+        ctx.expect(page.isHidden(), 'the banner is shown').toBe(false);
         ctx.expect(page.nav.style.marginTop, 'the fixed nav takes the banner\'s full height').toBe(`${BANNER_HEIGHT}px`);
 
         // The bug: the opening section took that height as extra top padding too, so
@@ -167,6 +245,23 @@ module.exports = defineCases({
         // into the page.
         ctx.expect(page.firstSection.style.paddingTop, 'the opening section keeps the padding it painted with').toBe(undefined);
         ctx.expect(!page.computedReads.includes(page.firstSection), 'and the page never measures it: the banner is nav chrome, not page layout').toBeTruthy();
+      },
+    },
+
+    {
+      name: 'closing the open promo banner hides it and hands the nav its margin back, with no inline handler in the page',
+      run: async (ctx) => {
+        const page = await loadPricingPage(renderedDocument(pricingHtml));
+
+        ctx.expect(page.close, 'the rendered banner carries its close button').toBeTruthy();
+        ctx.expect(page.close.getAttribute('onclick'), 'the close is the module\'s listener, not markup').toBe(null);
+        ctx.expect(page.isHidden(), 'the banner is open').toBe(false);
+        ctx.expect(page.nav.style.marginTop, 'and the nav is pushed down by it').toBe(`${BANNER_HEIGHT}px`);
+
+        page.close.click();
+
+        ctx.expect(page.isHidden(), 'the click hides the banner').toBe(true);
+        ctx.expect(page.nav.style.marginTop || '', 'and the nav sits back at the top').toBe('');
       },
     },
   ],

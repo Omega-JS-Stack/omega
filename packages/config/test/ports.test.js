@@ -341,6 +341,7 @@ module.exports = defineCases({
         ctx.expect(CLASSIC_PORTS.website).toBe(4000);
         ctx.expect(CLASSIC_PORTS.livereload).toBe(35729);
         ctx.expect(CLASSIC_PORTS.cdp).toBe(9222);
+        ctx.expect(CLASSIC_PORTS.hub, 'the emulator hub: the backend sweep and test runner read it here').toBe(4400);
       },
     },
   ],

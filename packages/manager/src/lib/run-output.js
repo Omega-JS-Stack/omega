@@ -19,7 +19,7 @@
  */
 
 const { join } = require('node:path');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 /**
  * Persist one run's transient output to .omega/runs/{timestamp}.json —
@@ -32,11 +32,11 @@ const jetpack = require('fs-jetpack');
  */
 function writeRunOutput(brandRoot, runTimestamp, brandId, services) {
   const runFile = join(brandRoot, '.omega', 'runs', `${runTimestamp}.json`);
-  jetpack.write(runFile, {
+  writeJson(runFile, {
     timestamp: new Date().toISOString(),
     brandId,
     services,
-  }, { jsonIndent: 2 });
+  });
 }
 
 module.exports = { writeRunOutput };

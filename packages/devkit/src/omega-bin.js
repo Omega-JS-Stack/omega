@@ -15,6 +15,7 @@ const { createRequire } = require('module');
 const { spawnSync } = require('child_process');
 const { VERBS, TARGET_ORDER, tokensOf, findVerb } = require('./verbs.js');
 const { PICKER_FLAG, takePicker } = require('./target-picker.js');
+const { isMonorepoRoot } = require('./monorepo-root.js');
 
 const FRAMEWORKS = [
   '@omega.js/web',
@@ -128,15 +129,6 @@ function isBrandRoot(dir) {
     && fs.existsSync(path.join(path.dirname(parent), 'config', 'omega.json5'));
 
   return !isTargetOfBrand;
-}
-
-/**
- * Is `dir` the OMEGA monorepo root? Stdlib twin of devkit local.js's
- * isMonorepoRoot, duplicated on purpose: the dispatcher cannot require local.js.
- */
-function isMonorepoRoot(dir) {
-  const pkg = readPackage(dir);
-  return !!pkg && pkg.name === 'omega' && fs.existsSync(path.join(dir, 'packages', 'devkit', 'package.json'));
 }
 
 /**

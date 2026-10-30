@@ -6,11 +6,11 @@
  * Debugging aid: inspect what the service saw without re-hitting the API.
  */
 const { join } = require('node:path');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 function cacheRead(brandRoot, operationName, data) {
   const filePath = join(brandRoot, '.omega', 'cache', 'cloudflare', `${operationName}.json`);
-  jetpack.write(filePath, { read: data });
+  writeJson(filePath, { read: data });
 }
 
 module.exports = { cacheRead };

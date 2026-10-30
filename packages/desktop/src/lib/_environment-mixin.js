@@ -1,6 +1,7 @@
-// The main process's environment and backend-URL surface: methods mixed into
-// the `Omega` class (src/main.js) with `Object.assign(Omega.prototype, ...)`, so
-// they stay `omega.getEnvironment()`, `omega.getApiUrl()`, ... on the instance.
+// The environment and backend-URL surface of main and preload: methods mixed
+// into each `Omega` class (src/main.js, src/preload.js) with
+// `Object.assign(Omega.prototype, ...)`, so they stay `omega.getEnvironment()`,
+// `omega.getApiUrl()`, ... on the instance.
 
 const { getEnvironment, isDevelopment, isProduction, isTesting, getVersion } = require('../utils/mode-helpers.js');
 const { getFunctionsUrl, getApiUrl, getWebsiteUrl, getAuthUrl } = require('../utils/url-helpers.js');

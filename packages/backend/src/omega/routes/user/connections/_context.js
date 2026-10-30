@@ -41,27 +41,6 @@ function droppedUidError(data) {
 const RETURN_PATH_RULE = 'a path on this site: it starts with a single `/` and carries no scheme, no `//`, no backslash and no whitespace (a query and a hash are fine)';
 
 /**
- * Whether a value is a path on this site — the ONE home of the rule
- * ([#784](https://github.com/Omega-JS-Stack/omega/issues/784)).
- *
- * The value ends up assigned to `location` in the connecting user's browser, so
- * every shape that could name another origin is out: an absolute URL, a
- * protocol-relative `//host`, a backslash (browsers read `/\host` as `//host`),
- * a `javascript:` scheme, and any whitespace a parser might strip on the way to
- * one of those. What is left is a path, and a path can only land here.
- *
- * @param {*} value - The candidate
- * @returns {boolean} True when it is a path on this site
- */
-function isSitePath(value) {
-  return typeof value === 'string'
-    && value.startsWith('/')
-    && !value.startsWith('//')
-    && !value.includes('\\')
-    && !/\s/.test(value);
-}
-
-/**
  * The 400 `authorize` answers when its optional `returnUrl` is not a path
  * ([#784](https://github.com/Omega-JS-Stack/omega/issues/784)).
  *
@@ -76,6 +55,10 @@ function returnUrlError(data) {
   if (!data.returnUrl) {
     return null;
   }
+
+  // The return-path rule's one home, required here rather than at load so a
+  // Node 22 before require(esm) only meets the client's ESM module on this call
+  const { isSitePath } = require('@omega.js/client/modules/site-path.js');
 
   if (isSitePath(data.returnUrl)) {
     return null;

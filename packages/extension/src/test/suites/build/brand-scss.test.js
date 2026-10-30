@@ -8,49 +8,35 @@
 // own main.scss, compiled against this package's dist assets.
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC = path.join(__dirname, '..', '..', '..');
 const SCAFFOLD_CSS = path.join(SRC, 'defaults', 'src', 'assets', 'css');
 
 /** A consumer whose css tree is the one the scaffold ships. */
 function stageConsumer(color) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-brand-scss-'));
   const accent = color ? `, color: "${color}"` : '';
+  const files = Object.fromEntries(jetpack.find(SCAFFOLD_CSS, { matching: '**/*', files: true, directories: false })
+    .map((file) => [path.join('src', 'assets', 'css', path.relative(SCAFFOLD_CSS, file)), jetpack.read(file)]));
 
-  jetpack.write(path.join(tmp, 'config', 'omega.json5'),
-    `{ brand: { id: "fixture", name: "Fixture"${accent} }, targets: { extension: { type: "extension" } } }`);
-  jetpack.write(path.join(tmp, 'package.json'), '{ "name": "fixture", "version": "1.0.0" }\n');
-  jetpack.copy(SCAFFOLD_CSS, path.join(tmp, 'src', 'assets', 'css'));
-
-  return tmp;
+  return stageProject({
+    pkg: '{ "name": "fixture", "version": "1.0.0" }\n',
+    config: `{ brand: { id: "fixture", name: "Fixture"${accent} }, targets: { extension: { type: "extension" } } }`,
+    files,
+  });
 }
 
 /**
- * Run the sass compile with the fixture as the project root. The task resolves
- * that root (and the config) at REQUIRE time, so each run gets a fresh copy of
- * it and of the build module.
+ * Run the sass compile with the fixture as the project root. The cwd stays on
+ * the fixture until the stream FINISHES: gulp's dest() resolves its output dir
+ * when the file is written, not when src() is called.
  */
-async function runSassIn(dir) {
-  const oldCwd = process.cwd();
-  for (const key of Object.keys(require.cache)) {
-    if (key.includes(`${path.sep}build.js`) || key.endsWith(`tasks${path.sep}sass.js`)) delete require.cache[key];
-  }
-
-  // The cwd stays on the fixture until the stream FINISHES: gulp's dest()
-  // resolves its output dir when the file is written, not when src() is called.
-  process.chdir(dir);
-  try {
-    const { sass } = require(path.join(SRC, 'gulp', 'tasks', 'sass.js'));
-    await new Promise((resolve, reject) => {
-      sass((error) => (error ? reject(error) : resolve()));
-    });
-  } finally {
-    process.chdir(oldCwd);
-  }
+function runSassIn(dir) {
+  return inProject(dir, ({ sass }) => new Promise((resolve, reject) => {
+    sass((error) => (error ? reject(error) : resolve()));
+  }), 'gulp/tasks/sass.js');
 }
 
 /** The compiled bundle, whitespace-normalized so the formatter cannot matter. */

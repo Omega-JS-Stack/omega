@@ -100,6 +100,12 @@ On `PostToolUse` (matcher `Skill`) the hook records every skill the session invo
 
 The gate and the inject hook read ONE table: `hooks/lib/omega-skills.sh`, which owns the framework → skill map, the brand walk, the JSON5 target-key scan, and the surface lookup — so the hook that ASKS for a skill and the hook that REFUSES an edit without it agree on the map itself. They can still ask different questions of it: inject reads the config's target keys too, while the gate resolves a target from its own manifest alone, so a target declared in `omega.json5` before its directory exists is asked for and not gated. That is fail-open by design — the gate refuses only what it can positively identify. Fail-open throughout: no `jq`, an unreadable manifest or config, an unusable marker directory, and the gate lets the write through. Covered by `scripts/agent-plugins-gate.test.js`.
 
+## The shape hook
+
+Where a test lives and what it is called is mechanical, so it is checked rather than remembered. `hooks/shape/run.sh` runs on `PreToolUse` (`Write|Edit`) and refuses a test file written in one of the three shapes that are always wrong in this ecosystem: a `__tests__/` path segment, a `*.spec.*` filename (`.js`, `.ts`, `.mjs`, `.cjs`), and a `test/tests/` nesting. The refusal exits 2 naming the file and the one right shape, `test/<mirror>/<name>.test.js` (desktop's and the extension's framework suites at `src/test/` being the recorded exception). The mirrored suite shape it guards is [docs/shared/testing.md](../../docs/shared/testing.md)'s; the LAYER a test belongs on stays judgment, and the hook never asks.
+
+Any other write leaves on the hook's first check, and a test-shaped one is policed only inside a project that is or depends on `@omega.js/*`: the same scope guard the quality hook sources, `hooks/lib/omega-scope.sh`. Fail-open throughout: no `jq`, no file path, no readable scope lib, and the write goes through. Covered by `scripts/agent-plugins-shape.test.js`.
+
 ## The guard hook
 
 The gate makes a session READ the framework docs; the guard makes it act on them. `hooks/guard/run.sh` runs on `PreToolUse` (`Write|Edit`) beside the gate and refuses an edit to a framework-owned file inside a CONSUMER BRAND — the upstream-first rule as a mechanism, because "a framework hole gets a framework issue, never a consumer patch" had to be restated three times in one migration session before the hand-written rules and templates stopped landing ([#452](https://github.com/Omega-JS-Stack/omega/issues/452)). Two classes:

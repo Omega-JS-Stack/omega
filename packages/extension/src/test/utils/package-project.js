@@ -1,6 +1,6 @@
-// A staged extension project for the package task's build-layer tests.
+// A staged extension project for the gulp tasks' build-layer tests.
 //
-// The task module reads its project (package.json / config / dist) from cwd at
+// A task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
 // the task fresh.
 const path = require('path');
@@ -32,7 +32,9 @@ function stageProject(opts = {}) {
 }
 
 // Run `fn(task)` with cwd pinned to `dir` and the task module loaded fresh.
-async function inProject(dir, fn) {
+// `taskPath` names the module (absolute, or relative to the package's src),
+// the package task by default.
+async function inProject(dir, fn, taskPath = TASK_PATH) {
   const oldCwd = process.cwd();
   const flush = () => {
     for (const key of Object.keys(require.cache)) {
@@ -43,7 +45,7 @@ async function inProject(dir, fn) {
   flush();
   try {
     process.chdir(dir);
-    return await fn(require(TASK_PATH));
+    return await fn(require(path.resolve(SRC, taskPath)));
   } finally {
     process.chdir(oldCwd);
     flush();

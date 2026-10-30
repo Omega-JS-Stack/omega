@@ -60,7 +60,7 @@ function requireEsbuild(frameworkRoot) {
 
 /**
  * The resolve hook behind the framework-dependency contract (#2): a consumer
- * module lives outside the framework, so `import 'chart.js'` would otherwise
+ * module lives outside the framework, so `import '@tanstack/charts'` would otherwise
  * resolve from the CONSUMER's dir — failing, or shipping the library twice.
  * Re-resolving from the framework root makes the framework's copy win always:
  * one copy, one shared chunk. Anything the framework does not declare is

@@ -5,5 +5,5 @@
  * .mcp.json launches. Requiring the module starts the stdio server.
  */
 
-if (!require('../src/ensure-deps.js').ensureDeps()) process.exit(1);
-require('../src/router.js');
+if (!require('../dist/ensure-deps.js').ensureDeps()) process.exit(1);
+require('../dist/router.js');

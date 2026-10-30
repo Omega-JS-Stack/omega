@@ -79,7 +79,7 @@
     "prepare-package": "^2.2.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "author": "ITW Creative Works",
   "license": "Elastic-2.0"

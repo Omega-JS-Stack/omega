@@ -33,7 +33,7 @@ function frameworkDependencyNames(frameworkRoot) {
 
 /**
  * A matcher for those names: the bare specifier and any subpath of it
- * (`chart.js`, `chart.js/auto`), and nothing else — so the hook stays off every
+ * (`@tanstack/charts`, `@tanstack/charts/<subpath>`), and nothing else, so the hook stays off every
  * other import the bundler resolves.
  * @param {string[]} names - dependency names
  * @returns {RegExp} the matcher

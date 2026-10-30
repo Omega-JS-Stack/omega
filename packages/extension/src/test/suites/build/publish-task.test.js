@@ -14,48 +14,31 @@
 // the brand config on the laptop, by the local scaffold.
 //
 // The task reads its project package.json from cwd at REQUIRE time, so the
-// test stages a temp project, chdirs into it, and requires the task fresh,
-// the same model as package-task.test.js.
+// test stages a temp project, chdirs into it, and requires the task fresh
+// (utils/package-project.js).
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { writeJson } = require('@omega.js/devkit/write-json');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'publish.js');
 
-// Run `fn(task)` with cwd pinned to `dir` and the task module loaded fresh.
-async function inProject(dir, fn) {
-  const oldCwd = process.cwd();
-  const flush = () => {
-    for (const key of Object.keys(require.cache)) {
-      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
-    }
-  };
-
-  flush();
-  try {
-    process.chdir(dir);
-    return await fn(require(TASK_PATH));
-  } finally {
-    process.chdir(oldCwd);
-    flush();
-  }
-}
+// A staged project's package.json at `version`.
+const PKG = (version) => `{ "name": "staged-ext", "version": "${version}" }`;
 
 // Stage the firefox artifact the publish signs: `web-ext sign` reads
 // packaged/firefox/raw, and that manifest's gecko id is the guid AMO gives the
 // listing (#893).
 function stageGeckoManifest(dir, geckoId) {
-  const raw = path.join(dir, 'packaged', 'firefox', 'raw');
-  fs.mkdirSync(raw, { recursive: true });
-  fs.writeFileSync(path.join(raw, 'manifest.json'), JSON.stringify({
+  writeJson(path.join(dir, 'packaged', 'firefox', 'raw', 'manifest.json'), {
     manifest_version: 3,
     name: 'Staged',
     version: '2.0.0',
     ...(geckoId ? { browser_specific_settings: { gecko: { id: geckoId } } } : {}),
-  }));
+  });
 }
 
 // chrome-webstore-upload-cli's shape for a rejected item (its errorHandler):
@@ -70,10 +53,10 @@ const CHROME_ITEM_ERROR = [
 
 // Run the task's store runner over `stores` in a staged 3.1.4 project, with
 // ONE injected shell exec rejecting each lane's command with `stderr(command)`
-// (#940). Returns the thrown error and every logged line.
+// (#940), or the task's own exec when `stderr` is omitted. Returns the thrown
+// error and every logged line.
 async function publishRejected(stores, stderr) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-rejected-'));
-  fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '3.1.4' }));
+  const tmp = stageProject({ pkg: PKG('3.1.4') });
   stageGeckoManifest(tmp, 'extension@acme.com');
 
   const env = { ...process.env };
@@ -92,9 +75,9 @@ async function publishRejected(stores, stderr) {
     await inProject(tmp, async (task) => {
       await task.publishStores(stores, {
         config: { listings: { chrome: { id: 'chrome-item-id' }, firefox: { id: 'extension@acme.com' } } },
-        executeFn: async (command) => { throw new Error(stderr(command)); },
+        executeFn: stderr && (async (command) => { throw new Error(stderr(command)); }),
       }).catch((e) => { thrown = e; });
-    });
+    }, TASK_PATH);
   } finally {
     console.log = log;
     console.error = error;
@@ -116,12 +99,9 @@ module.exports = defineCases({
         // The exact manifest the snapshot lane pushes: the framework as a
         // packed tarball under omega_modules/. No zips are staged, so the task
         // stops at its own "run build first" line, before any store call.
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-task-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
-          name: 'staged-ext',
-          version: '3.1.4',
-          dependencies: { '@omega.js/extension': 'file:../../omega_modules/omega.js-extension-0.50.0.tgz' },
-        }));
+        const tmp = stageProject({
+          pkg: `{ "name": "staged-ext", "version": "3.1.4", "dependencies": { "@omega.js/extension": "file:../../omega_modules/omega.js-extension-0.50.0.tgz" } }`,
+        });
 
         const previous = process.env.OMEGA_IS_PUBLISH;
         process.env.OMEGA_IS_PUBLISH = 'true';
@@ -129,7 +109,7 @@ module.exports = defineCases({
           await inProject(tmp, async (task) => {
             const failure = await new Promise((resolve) => task(resolve));
             ctx.expect(failure).toBe(undefined);
-          });
+          }, TASK_PATH);
         } finally {
           if (previous === undefined) delete process.env.OMEGA_IS_PUBLISH;
           else process.env.OMEGA_IS_PUBLISH = previous;
@@ -145,12 +125,10 @@ module.exports = defineCases({
     {
       name: 'the release targets the brand releases repo, tagged per target (#883)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-release-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '3.1.4' }));
-        for (const target of ['chrome', 'firefox']) {
-          fs.mkdirSync(path.join(tmp, 'packaged', target), { recursive: true });
-          fs.writeFileSync(path.join(tmp, 'packaged', target, 'extension.zip'), target);
-        }
+        const tmp = stageProject({
+          pkg: PKG('3.1.4'),
+          files: { 'packaged/chrome/extension.zip': 'chrome', 'packaged/firefox/extension.zip': 'firefox' },
+        });
 
         const calls = [];
         await inProject(tmp, async (task) => {
@@ -164,7 +142,7 @@ module.exports = defineCases({
               return '';
             },
           });
-        });
+        }, TASK_PATH);
 
         ctx.expect(calls.every((call) => call.file === 'gh')).toBe(true);
 
@@ -193,13 +171,13 @@ module.exports = defineCases({
     {
       name: 'a FIRST publish signs with --amo-metadata carrying summary, categories and license (#884)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-amo-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '2.0.0', license: 'UNLICENSED' }));
+        const tmp = stageProject({
+          pkg: `{ "name": "staged-ext", "version": "2.0.0", "license": "UNLICENSED" }`,
+          config: `{ brand: { id: 'staged' }, targets: { extension: { type: 'extension' } } }`,
+        });
         // The artifact being signed carries the gecko id, which is the guid AMO
         // gives the listing it creates (#893)
         stageGeckoManifest(tmp, 'extension@acme.example.com');
-        fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-        fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), `{ brand: { id: 'staged' }, targets: { extension: { type: 'extension' } } }`);
 
         const env = { ...process.env };
         process.env.FIREFOX_API_KEY = 'user:key';
@@ -212,7 +190,7 @@ module.exports = defineCases({
               config: { brand: { description: 'A demo extension for the OMEGA stack.' }, categories: ['privacy-security'] },
               executeFn: async (line) => { command = line; },
             });
-          });
+          }, TASK_PATH);
         } finally {
           process.env = env;
         }
@@ -242,8 +220,7 @@ module.exports = defineCases({
     {
       name: 'an UPDATE signs with no metadata and no --id: the packaged gecko id addresses the listing (#884)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-amo-update-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '2.0.1' }));
+        const tmp = stageProject({ pkg: PKG('2.0.1') });
 
         const env = { ...process.env };
         process.env.FIREFOX_API_KEY = 'user:key';
@@ -259,7 +236,7 @@ module.exports = defineCases({
               config: { listings: { firefox: { id: 'extension@acme.com' } } },
               executeFn: async (line) => { command = line; },
             });
-          });
+          }, TASK_PATH);
         } finally {
           process.env = env;
         }
@@ -280,11 +257,8 @@ module.exports = defineCases({
     {
       name: 'a first firefox publish never writes the brand config (#893): the scaffold pinned the id on the laptop',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-nowrite-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '2.0.0' }));
-        fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
         const source = `{\n  brand: { id: 'staged', name: 'Staged', description: 'A demo extension.', url: 'https://staged.example.com' },\n  targets: { extension: { type: 'extension' } },\n}\n`;
-        fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), source);
+        const tmp = stageProject({ pkg: PKG('2.0.0'), config: source });
         stageGeckoManifest(tmp, 'extension@staged.example.com');
 
         const env = { ...process.env };
@@ -301,7 +275,7 @@ module.exports = defineCases({
               config: { brand: { description: 'A demo extension.' } },
               executeFn: async () => {},
             });
-          });
+          }, TASK_PATH);
         } finally {
           console.log = log;
           process.env = env;
@@ -317,11 +291,8 @@ module.exports = defineCases({
     {
       name: 'an UPDATE writes nothing back: the id is already the config\'s (#893)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-nowriteback-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '2.0.1' }));
-        fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
         const source = `{\n  brand: { id: 'staged', name: 'Staged' },\n  targets: { extension: { type: 'extension', listings: { firefox: { id: 'extension@staged.example.com' } } } },\n}\n`;
-        fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), source);
+        const tmp = stageProject({ pkg: PKG('2.0.1'), config: source });
         stageGeckoManifest(tmp, 'extension@staged.example.com');
 
         const env = { ...process.env };
@@ -334,7 +305,7 @@ module.exports = defineCases({
               config: { listings: { firefox: { id: 'extension@staged.example.com' } } },
               executeFn: async () => {},
             });
-          });
+          }, TASK_PATH);
         } finally {
           process.env = env;
         }
@@ -351,8 +322,7 @@ module.exports = defineCases({
     {
       name: 'chrome refuses with the CONFIG path when no listing id is declared (#893)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-chrome-id-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         const env = { ...process.env };
         process.env.CHROME_CLIENT_ID = 'client';
@@ -364,7 +334,7 @@ module.exports = defineCases({
           await inProject(tmp, async (task) => {
             await task.publishToChrome({ config: {}, executeFn: async () => {} })
               .catch((error) => { message = error.message; });
-          });
+          }, TASK_PATH);
         } finally {
           process.env = env;
         }
@@ -380,8 +350,7 @@ module.exports = defineCases({
     {
       name: 'edge refuses with the CONFIG path when no listing id is declared (#893)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-edge-id-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         const env = { ...process.env };
         process.env.EDGE_CLIENT_ID = 'client';
@@ -391,7 +360,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             await task.publishToEdge({ config: {} }).catch((error) => { message = error.message; });
-          });
+          }, TASK_PATH);
         } finally {
           process.env = env;
         }
@@ -412,8 +381,7 @@ module.exports = defineCases({
     {
       name: 'the stores are the DECLARED ones, and a dropped one is never asked for credentials (#867)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-lanes-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         await inProject(tmp, async (task) => {
           const lanes = task.storeLanes({
@@ -428,7 +396,7 @@ module.exports = defineCases({
 
           ctx.expect(lanes.publish).toEqual(['chrome', 'firefox']);
           ctx.expect(lanes.manual).toEqual([]);
-        });
+        }, TASK_PATH);
 
         fs.rmSync(tmp, { recursive: true, force: true });
       },
@@ -437,8 +405,7 @@ module.exports = defineCases({
     {
       name: 'a store with no listing id yet gets the manual step instead of a publish (#867)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-manual-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         await inProject(tmp, async (task) => {
           const lanes = task.storeLanes({
@@ -464,7 +431,7 @@ module.exports = defineCases({
           ctx.expect(lanes.manual[1]).toContain('Microsoft Edge Add-ons has no listing id yet');
           ctx.expect(lanes.manual[1]).toContain('extension-chrome.zip');
           ctx.expect(lanes.manual[1]).toContain('targets.extension.listings.edge.id');
-        });
+        }, TASK_PATH);
 
         fs.rmSync(tmp, { recursive: true, force: true });
       },
@@ -473,8 +440,7 @@ module.exports = defineCases({
     {
       name: 'a declared store with no developer key REFUSES, naming the key and the walk (#867)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-refusal-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         await inProject(tmp, async (task) => {
           let message = '';
@@ -487,7 +453,7 @@ module.exports = defineCases({
           ctx.expect(message).toContain('EDGE_CLIENT_ID (required by platforms.edge.formats.store)');
           ctx.expect(message).toContain('EDGE_API_KEY');
           ctx.expect(message).toContain('omega manage --service publishing');
-        });
+        }, TASK_PATH);
 
         fs.rmSync(tmp, { recursive: true, force: true });
       },
@@ -529,8 +495,7 @@ module.exports = defineCases({
     {
       name: 'a config that names no owner refuses instead of publishing somewhere (#883)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-noorg-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '1.0.0' }));
+        const tmp = stageProject({ pkg: PKG('1.0.0') });
 
         let message = '';
         await inProject(tmp, async (task) => {
@@ -542,7 +507,7 @@ module.exports = defineCases({
           } catch (error) {
             message = error.message;
           }
-        });
+        }, TASK_PATH);
 
         ctx.expect(message).toContain('repo.owner');
         ctx.expect(message).toContain('Set repo.owner and brand.id in config/omega.json5: the releases repo is <brand.id>-releases under that owner.');
@@ -634,6 +599,43 @@ module.exports = defineCases({
 
         const row = lines.find((line) => line.includes('Chrome Web Store: ✗ Failed'));
         ctx.expect(row).toContain(`Chrome Web Store: ✗ Failed: ${CHROME_ITEM_DETAIL}`);
+      },
+    },
+
+    // chrome-webstore-upload-cli prints its own error on stdout, so a failure
+    // whose stderr holds only npx's warning still reads the CLI's words. The
+    // task's real exec runs a stand-in `npx` first on PATH, shaped that way.
+    {
+      name: 'a chrome failure whose CLI error is on stdout reads that error, never npx\'s warning',
+      run: async (ctx) => {
+        if (process.platform === 'win32') ctx.skip('the stand-in npx is a POSIX shell script');
+
+        const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-npx-'));
+        fs.writeFileSync(path.join(bin, 'npx'), [
+          '#!/bin/sh',
+          'echo "npm warn exec The following package was not found and will be installed: chrome-webstore-upload-cli@3.3.0" >&2',
+          'echo "Error: invalid_grant (Bad Request)"',
+          'exit 1',
+          '',
+        ].join('\n'), { mode: 0o755 });
+
+        const savedPath = process.env.PATH;
+        process.env.PATH = `${bin}${path.delimiter}${savedPath}`;
+        let result;
+        try {
+          result = await publishRejected(['chrome']);
+        } finally {
+          process.env.PATH = savedPath;
+          fs.rmSync(bin, { recursive: true, force: true });
+        }
+
+        ctx.expect(result.thrown instanceof Error).toBe(true);
+        ctx.expect(result.thrown.message).toContain('Publish failed for chrome: ');
+        ctx.expect(result.thrown.message).toContain('invalid_grant (Bad Request)');
+        ctx.expect(result.thrown.message).not.toContain('npm warn');
+
+        const row = result.lines.find((line) => line.includes('Chrome Web Store: ✗ Failed'));
+        ctx.expect(row).toContain('invalid_grant (Bad Request)');
       },
     },
   ],

@@ -2,6 +2,8 @@
 
 @omega.js/backend CLI commands automatically save all output to log files while still streaming to the console — in two files per verb, one of which CONTAINS the other.
 
+Every line a verb prints through its command (`this.log`, `logError`, `logWarning`, `logSuccess`) carries the shared tag, `[HH:MM:SS] [@omega.js/backend:<verb>] message`: `BaseCommand` holds one devkit `Logger` named after the verb (`emulator`, `test`, `migrate-rules`), the same build-time logger web, desktop and extension print through (`docs/shared/logging.md`). A bare `this.log('')` stays a blank spacer line. DATA is not a line of text: the JSON `firestore:*`, `auth:*` and `logs:read`/`logs:tail --raw` print goes through `this.print(text)`, bare on stdout, so the JSON itself never carries a tag (the verb's `Target:` line still precedes it). Raw `console.*` calls elsewhere under `cli/` are untagged.
+
 The **verb's whole run** lands in `<projectDir>/logs/<verb>.log`, the lane every OMEGA framework shares (contract: `docs/shared/logging.md` in the Omega repo). It is a SUPERSET: the verb mirrors every chunk its firebase child pipes over to its own stdout, so this file holds the full child stream plus the verb's own lines:
 
 | File | Source | Lifetime |

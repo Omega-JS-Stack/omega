@@ -213,7 +213,7 @@ function visibleProducts(payment) {
  * features catalog.
  * @param {object} payment - resolved config `payment` section
  * @param {object} [features] - resolved config `features` catalog (#647)
- * @returns {object|null} { plans, oneTime, enterprise, billing, savingsPercent, comparison } or null when the catalog is empty
+ * @returns {object|null} { plans, oneTime, enterprise, billing, savingsPercent, trialDays, lowestPrice (the lowest paid plan's at-rest price, 0 when every plan is free), comparison } or null when the catalog is empty
  */
 function composePricing(payment, features) {
   // Every lane below composes from what the page may show (a catalog of
@@ -266,6 +266,17 @@ function composePricing(payment, features) {
     annually: plans.some((plan) => plan.prices.annually > 0),
   };
 
+  // What each card shows at rest, before the visitor touches the toggle: a free
+  // plan's 0, the annual per-month figure where annual billing exists, else the
+  // monthly price. The page's structured data offers the lowest PAID one (a free
+  // tier is no offer), and 0 when every plan is free.
+  for (const plan of plans) {
+    plan.billedAtRest = plan.free ? null : (billing.annually && plan.prices.annually > 0 ? 'annually' : 'monthly');
+    plan.prices.atRest = plan.billedAtRest === 'annually' ? plan.prices.annuallyPerMonth : plan.prices.monthly;
+  }
+  const paidAtRest = plans.filter((plan) => !plan.free).map((plan) => plan.prices.atRest);
+  const lowestPrice = plans.length === 0 ? null : (paidAtRest.length > 0 ? Math.min(...paidAtRest) : 0);
+
   // Honest annual-savings badge: the best real discount across paid plans
   let savingsPercent = 0;
   for (const plan of plans) {
@@ -294,6 +305,7 @@ function composePricing(payment, features) {
     billing: billing,
     savingsPercent: savingsPercent,
     trialDays: trialDays,
+    lowestPrice: lowestPrice,
     comparison: composeComparison(plans),
   };
 }

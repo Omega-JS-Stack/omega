@@ -131,6 +131,9 @@ async function updateUserProfile(data) {
   // Use merge to only update specified fields
   await userDocRef.set(data, { merge: true });
 
+  // Re-read the account so auth.user and every binding show what was just saved
+  await omega.auth.reload();
+
   console.log('Profile successfully updated in Firestore');
 }
 

@@ -13,6 +13,7 @@ const { amoMetadata } = require('./utils/amo.js');
 const { listingId, listingConfigPath } = require('../../lib/listings.js');
 const { FORMATS, missingEnvKeys } = require('@omega.js/config');
 const { shipPlan, shipKeyRefusal, listingManualStep } = require('@omega.js/devkit/ship-plan');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // Load package
 const project = build.getPackage('project');
@@ -418,6 +419,31 @@ async function publishToGitHubRelease(options) {
 }
 
 /**
+ * Run a store CLI and, on failure, throw with its stdout ahead of its stderr.
+ *
+ * `execute` rejects with stderr alone, and chrome-webstore-upload-cli prints
+ * its real error to stdout, so a rejection whose stderr is only npx's warn
+ * line would headline that line. failureReason reads the last human line, so
+ * stderr keeps the last word when it has one.
+ *
+ * @param {function} run - The shell exec (`execute`, or a test's).
+ * @param {string} command - The command line.
+ * @returns {Promise<string>} The command's stdout.
+ * @throws {Error} The CLI's stdout and stderr, when it exits non-zero.
+ */
+async function runStoreCli(run, command) {
+  let stdout = '';
+
+  try {
+    return await run(command, {}, (child) => {
+      child.stdout.on('data', (chunk) => { stdout += chunk; });
+    });
+  } catch (e) {
+    throw new Error([stdout.trim(), e.message].filter(Boolean).join('\n'));
+  }
+}
+
+/**
  * Publish to the Chrome Web Store.
  *
  * The item id comes from config (`targets.<name>.listings.chrome.id`, #893)
@@ -458,7 +484,7 @@ async function publishToChrome(options) {
     `--refresh-token "${refreshToken}"`,
   ].join(' ');
 
-  await run(command);
+  await runStoreCli(run, command);
 
   chromeLogger.log('Upload complete');
 }
@@ -550,7 +576,7 @@ async function publishToFirefox(options) {
     });
 
     metadataPath = path.join(process.cwd(), '.temp', 'amo-metadata.json');
-    jetpack.write(metadataPath, metadata);
+    writeJson(metadataPath, metadata);
 
     firefoxLogger.log(`Listing metadata: categories ${metadata.categories.join(', ')}, license ${metadata.version.license}`);
   }
@@ -573,7 +599,7 @@ async function publishToFirefox(options) {
     metadataPath ? `--amo-metadata "${metadataPath}"` : '',
   ].filter(Boolean).join(' ');
 
-  await run(command);
+  await runStoreCli(run, command);
 
   // Clean up artifacts dir
   jetpack.remove(artifactsDir);

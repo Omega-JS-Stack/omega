@@ -19,10 +19,12 @@ The router collapses that to one declaration:
 ```
 client ──stdio──> router ──┬──> chrome-devtools           (npx chrome-devtools-mcp, isolated)
                            ├──> chrome-devtools-electron  (npx chrome-devtools-mcp, attaches to $OMEGA_CDP_PORT)
-                           ├──> chrome-devtools-extension (node src/launch-cft.js)
-                           ├──> omega-extension           (node src/launch-omega-extension.js)
+                           ├──> chrome-devtools-extension (node dist/launch-cft.js)
+                           ├──> omega-extension           (node dist/launch-omega-extension.js)
                            └──> …your overlay upstreams
 ```
+
+The package RUNS from `dist/`: its prepare copies `src/` there and vendors the devkit modules the code requires (`stop-signals`, `write-json`) into `dist/vendor/`, the frameworks' prepare guard and vendor hook, so the published tarball ships `bin/`, `dist/` and `servers/` and never `src/`. The table names the sources.
 
 | File | Concern |
 |---|---|
@@ -37,7 +39,7 @@ client ──stdio──> router ──┬──> chrome-devtools           (npx
 | [src/launch-omega-extension.js](../../packages/mcp-router/src/launch-omega-extension.js) | Runs the extension MCP server this package ships, beside it at `servers/omega-extension/index.js` |
 | [servers/omega-extension/](../../packages/mcp-router/servers/omega-extension/) | That server: the MCP-to-WebSocket bridge to the OMEGA Companion extension, its tool list, and the upstream's bundled `config.json` |
 
-Everything the router says goes to **stderr** — stdout is the MCP wire.
+Everything the router says goes to **stderr** (stdout is the MCP wire), through ONE sink: `src/lib/log.js`, whose `createLog(<module>)` stamps every line `[@omega.js/mcp-router:<module>] <level>: …`. The bundled omega-extension server writes through the same sink.
 
 ## An upstream's lifecycle
 
@@ -47,7 +49,7 @@ A child exists only while it is earning its keep ([#779](https://github.com/Omeg
 - **It is closed once it goes quiet.** An unref'd sweep closes any upstream whose child is spawned, has no call in flight, and has not been called for **15 minutes** (`MCP_ROUTER_IDLE_MS` is the seam, and the sweep cadence is a quarter of the limit, floored at a second, so shrinking one shrinks both). A call IN FLIGHT is never closed under: a long tool call looks idle by the clock the whole time it runs, so an in-flight counter, not the clock, is what protects it. The upstream stays ACTIVE for the session — the next call spawns a fresh child through the unchanged lazy path, and `router__list_upstreams` carries the `pid` and `idle_ms` that show which state it is in. Before this, a child lived until the router got a signal: a session left open for a day held its browser open for the day, at 2.5 cores.
 - **Closing takes the whole tree.** The transport pid is often only the ROOT of one (`npx` starts npm, which starts the real server, which starts a browser), and closing it reparents everything below to init, where nothing can find it again. So the WHOLE tree under the child is captured BEFORE the close (`descendantPids`, deepest first) — one level would not do it, since the middle of a tree exits with its root and takes the browser below it out of every walk — and after the 2s grace each captured pid still alive is signalled, along with a root that outlived its close. The grace is a fire-and-forget unref'd timer for the sweep and for `router__disable_upstream`; on the way out it is AWAITED (`killUpstream(name, { wait: true })`), because session end is the everyday close and an exit that beat its own grace left the browser running.
 - **A call landing mid-close gets a fresh child, not an error.** The session slot is emptied when a close STARTS: a close runs for seconds against a child that will not go politely, and a call arriving in that window would otherwise be handed the closing client and fail for a close it never asked about.
-- **The router goes when the host goes, and takes the trees with it.** SIGINT and SIGTERM close every upstream, wait the one grace out (they run concurrently) and exit; so does the server closing (`server.onclose`, the SDK's own seam), which an EOF on stdin now brings about — a host that exits without signalling used to leave the router and every child of it running, held open by the children's own handles.
+- **The router goes when the host goes, and takes the trees with it.** Every signal in devkit's `STOP_SIGNALS` (SIGINT, SIGTERM and SIGHUP, so a closed terminal too) closes every upstream, waits the one grace out (they run concurrently) and exits; so does the server closing (`server.onclose`, the SDK's own seam), which an EOF on stdin now brings about — a host that exits without signalling used to leave the router and every child of it running, held open by the children's own handles.
 - **That shutdown runs ONCE, whoever asks.** A host tears down by ending stdin, then SIGTERM a moment later, then SIGKILL: the signal lands mid-shutdown, and a second run would find the slots already emptied, await nothing, and exit over the top of the graces still to fire. The promise is memoized, so every trigger joins the run already going.
 - **And it cannot outstay its welcome.** A 6s ceiling is armed before the closes are awaited, so a close that never settles cannot hold the router past the host's own SIGKILL window — where the exit stops being the router's to make.
 
@@ -68,8 +70,8 @@ A tool-list-changed notification follows each of them, so the client re-lists.
 |---|---|---|---|
 | `chrome-devtools` | `npx -y chrome-devtools-mcp@1.4.0 --isolated --acceptInsecureCerts --usage-statistics=false` | auto | The session's private Chrome, throwaway profile |
 | `chrome-devtools-electron` | `npx -y chrome-devtools-mcp@1.4.0 --browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222} --usage-statistics=false` | auto | Attaches to a running omega desktop dev app. No shell: the router expands the `${NAME:-default}` itself, so the command still goes through bin resolution |
-| `chrome-devtools-extension` | `node ${MCP_ROUTER_ROOT}/src/launch-cft.js` | on-demand | Chrome for Testing + the unpacked extension at `$OMEGA_EXTENSION_PATH`; 34 tools, hence on-demand |
-| `omega-extension` | `node ${MCP_ROUTER_ROOT}/src/launch-omega-extension.js` | auto | The OMEGA companion extension's automation bridge. Needs nothing installed: the server ships here ([#927](https://github.com/Omega-JS-Stack/omega/issues/927)) |
+| `chrome-devtools-extension` | `node ${MCP_ROUTER_ROOT}/dist/launch-cft.js` | on-demand | Chrome for Testing + the unpacked extension at `$OMEGA_EXTENSION_PATH`; 34 tools, hence on-demand |
+| `omega-extension` | `node ${MCP_ROUTER_ROOT}/dist/launch-omega-extension.js` | auto | The OMEGA companion extension's automation bridge. Needs nothing installed: the server ships here ([#927](https://github.com/Omega-JS-Stack/omega/issues/927)) |
 
 Each ships with its tool schemas cached, so a fresh install lists tools without spawning anything.
 
@@ -117,9 +119,9 @@ The omega Claude plugin declares **exactly one** MCP server, in [agent-plugins/c
 | 2 | the open project (the launcher's working directory, the session's project) | the router a brand installed, wherever npm hoisted it (the manager depends on it, which is why the router joined the publish set) |
 | neither | | no router: the launcher itself answers `initialize` and `tools/list` with an empty tool list, prints one stderr line, and exits 0 when its input closes, so a folder with no brand shows no failed server |
 
-The package's `exports` map is the siblings' shape: `.` (`src/router.js`, what `main` names), `./cli` (that bin) and `./package.json`; any other path is refused, so the launcher reaches the bin only through `./cli`. Pinned by [test/plugin-launch.test.js](../../packages/mcp-router/test/plugin-launch.test.js) and [test/exports.test.js](../../packages/mcp-router/test/exports.test.js).
+The package's `exports` map is the siblings' shape: `.` (`dist/router.js`, what `main` names), `./cli` (that bin) and `./package.json`; any other path is refused, so the launcher reaches the bin only through `./cli`. Pinned by [test/plugin-launch.test.js](../../packages/mcp-router/test/plugin-launch.test.js) and [test/exports.test.js](../../packages/mcp-router/test/exports.test.js).
 
-A bare checkout of this monorepo arrives without node_modules, so the router's bin self-bootstraps: when its dependencies do not resolve, it runs one `npm install` in its own package root before starting (stderr-only: stdout is the MCP wire), and every later launch is a silent no-op. Nobody installing the plugin runs an install step, and a dev editing the checkout sees changes on the next session start with no publish.
+The bin runs `dist/`, which is gitignored: a bare checkout of this monorepo has none until the monorepo's own `npm install` runs every workspace's prepare, which builds it, and the root `npm start` watch keeps it current from then on. So a dev editing `src/` sees the change on the next session start with no publish while the watch runs, or after `npm run prepare --prefix packages/mcp-router`. The built copy carries the dependency self-bootstrap (`dist/ensure-deps.js`): when the router's own dependencies do not resolve beside an installed router, it runs one `npm install` in the package root before starting (stderr-only: stdout is the MCP wire), and every later launch is a silent no-op, so nobody installing the plugin runs an install step.
 
 There are no other native MCP declarations anywhere in the plugin — anything else a user wants is an overlay entry. The usage pattern (session-owned Chrome, the safety rule about never quitting Chrome by app name, the electron and extension upstreams) is the plugin's `omega:browser` skill, [agent-plugins/claude/skills/browser/SKILL.md](../../agent-plugins/claude/skills/browser/SKILL.md).
 

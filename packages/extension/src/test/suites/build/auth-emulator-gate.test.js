@@ -16,10 +16,8 @@
 
 const path = require('path');
 const fs   = require('fs');
-const os   = require('os');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC       = path.join(__dirname, '..', '..', '..');
-const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'bundle.js');
 const helpers   = require(path.join(SRC, 'utils', 'mode-helpers.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const BACKGROUND = fs.readFileSync(path.join(SRC, 'background.js'), 'utf8');
@@ -28,10 +26,8 @@ const BACKGROUND_AUTH = fs.readFileSync(path.join(SRC, 'lib', 'background-auth.j
 // Compose a real snapshot under the given build mode and hand back its `config`
 // blob — exactly what the SW reads out of OMEGA_BUILD_JSON.
 async function bakeConfig(mode) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-emulator-gate-'));
-  fs.writeFileSync(path.join(tmp, 'package.json'), `{ "name": "gate-ext", "version": "1.0.0" }`);
+  const tmp = stageProject({ pkg: `{ "name": "gate-ext", "version": "1.0.0" }` });
 
-  const oldCwd = process.cwd();
   // Each lane the way a real run states it: `omega build` sets OMEGA_BUILD_MODE,
   // `omega test` names OMEGA_ENVIRONMENT=testing, and a dev boot names nothing.
   const env = { OMEGA_ENVIRONMENT: null, OMEGA_BUILD_MODE: null, NODE_ENV: null };
@@ -43,20 +39,12 @@ async function bakeConfig(mode) {
     originals[k] = process.env[k];
     if (v === null) delete process.env[k]; else process.env[k] = v;
   }
-  for (const key of Object.keys(require.cache)) {
-    if (key.startsWith(SRC + path.sep)) delete require.cache[key];
-  }
 
   try {
-    process.chdir(tmp);
-    return (await require(TASK_PATH).composeBuildJson()).config;
+    return await inProject(tmp, async (task) => (await task.composeBuildJson()).config, 'gulp/tasks/bundle.js');
   } finally {
-    process.chdir(oldCwd);
     for (const [k, v] of Object.entries(originals)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
-    }
-    for (const key of Object.keys(require.cache)) {
-      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
     }
     fs.rmSync(tmp, { recursive: true, force: true });
   }

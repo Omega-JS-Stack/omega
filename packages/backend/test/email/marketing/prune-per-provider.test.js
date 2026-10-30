@@ -505,6 +505,41 @@ module.exports = defineCases({
     },
 
     {
+      name: 'stage 3: a legacy account with a top-level plan skips that one and the run finishes',
+
+      async run() {
+        // A pre-account-model user document carries `plan` at the top level,
+        // which the User refuses to construct. That one document is skipped;
+        // the batch around it is still judged and the run completes.
+        const { admin, writes } = buildAdmin({
+          'legacy@gmail.com': { auth: { email: 'legacy@gmail.com' }, plan: { id: 'premium' } },
+          'free@gmail.com': FREE_USER,
+        });
+        const { ctx } = buildAssistant();
+        const removals = [];
+
+        await withProviders({
+          beehiiv: {
+            listSubscriptions: async () => ({
+              success: true,
+              subscriptions: [
+                subscription({ email: 'legacy@gmail.com' }),
+                subscription({ email: 'free@gmail.com' }),
+                subscription({ email: 'noaccount@gmail.com' }),
+              ],
+            }),
+            removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
+          },
+          env: { BEEHIIV_API_KEY: 'test-key' },
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
+
+        expect(removals, `The free account is still pruned, got ${JSON.stringify(removals)}`).toContain('free@gmail.com');
+        expect(removals, `The contact with no account is still pruned, got ${JSON.stringify(removals)}`).toContain('noaccount@gmail.com');
+        expect(writes.length, 'The run finished and logged its deletions').toBe(1);
+      },
+    },
+
+    {
       name: 'stage 3: an all-paying candidate set deletes nobody',
 
       async run() {

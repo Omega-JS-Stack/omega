@@ -49,25 +49,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Self-contained on purpose: this file loads in a checkout that has installed
-// NOTHING yet (a runner's fresh clone, the playground snapshot), where neither
-// devkit's node_modules link nor chalk exists, so it borrows nothing from
-// src/local.js. isMonorepoRoot is the same rule that module states.
-
-/**
- * Whether a directory is the omega monorepo root (package.json named "omega"
- * and a packages/devkit workspace).
- * @param {string} dir - Directory to test.
- * @returns {boolean}
- */
-function isMonorepoRoot(dir) {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    return pkg.name === 'omega' && fs.existsSync(path.join(dir, 'packages', 'devkit', 'package.json'));
-  } catch (e) {
-    return false;
-  }
-}
+// Stdlib-only at load: this file runs in a checkout that has installed NOTHING
+// yet (a runner's fresh clone, the playground snapshot), so it requires only
+// src/monorepo-root.js, the stdlib home src/local.js re-exports from.
+const { isMonorepoRoot } = require('../src/monorepo-root');
 
 // npm's own commands that (re)build a dependency tree, and so reach into a
 // file:-linked package and re-run its prepare. Anything else (pack, publish,
@@ -235,8 +220,10 @@ function rewire(options) {
   }
 
   manifest.scripts.prepare = GUARDED_PREPARE;
-  // prepare-package's own formatting, so the restored manifest is a one-key diff
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  // Required here, not at load: only a build that passed the gate gets this
+  // far, and only an installed checkout has the fs-jetpack the writer needs.
+  const { writeJson } = require('../src/write-json');
+  writeJson(manifestPath, manifest);
   console.log(`omega: restored ${manifest.name}'s prepare gate — prepare-package rewrites scripts.prepare on every build (#350).`);
   return true;
 }

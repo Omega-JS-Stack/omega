@@ -20,6 +20,7 @@ const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
+const { writeJson, formatJson } = require('@omega.js/devkit/write-json');
 const { listingId, deriveFirefoxId, listingConfigPath } = require('../../lib/listings.js');
 
 const logger = build.logger('ensure-target');
@@ -50,15 +51,14 @@ function setupScripts(projectDir, result) {
   // that authored its own license keeps it, licensing being the brand's call.
   project.license = project.license || 'UNLICENSED';
 
-  // Save the project — npm's own shape, trailing newline included.
+  // Save the project, and only when its bytes differ
   const projectPath = path.join(projectDir, 'package.json');
-  const contents = `${JSON.stringify(project, null, 2)}\n`;
 
-  if (jetpack.read(projectPath) === contents) {
+  if (jetpack.read(projectPath) === formatJson(project)) {
     return;
   }
 
-  jetpack.write(projectPath, contents);
+  writeJson(projectPath, project);
   result.changed.push('package.json (scripts + private + license)');
 }
 
@@ -192,7 +192,7 @@ async function ensureTarget(options) {
   pinFirefoxListingId(projectDir, result, log);
   ensureNodeVersion(log, warn);
 
-  await ensurePeerDependencies({ projectDir, package, log });
+  await ensurePeerDependencies({ projectDir, package, log, warn });
 
   // The consumer interior — the SAME engine run the build's defaults task
   // performs (friction #13). Required lazily: that task requires this module

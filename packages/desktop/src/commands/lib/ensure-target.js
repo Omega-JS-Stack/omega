@@ -42,6 +42,7 @@ const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
 const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
+const { writeJson, formatJson } = require('@omega.js/devkit/write-json');
 
 const logger = build.logger('ensure-target');
 const package = build.getPackage('main');
@@ -74,17 +75,14 @@ function setupScripts(projectDir, result) {
   // The gulp `bundle` task emits dist/main.bundle.js; the consumer's src/main.js is the *source* entry.
   project.main = 'dist/main.bundle.js';
 
-  // Save the project — npm's own shape, trailing newline included. `jetpack.write`
-  // emits none, and this used to write unconditionally, so every build re-stripped
-  // the newline a consumer's editor or lint hook put back.
+  // Save the project, and only when its bytes differ
   const projectPath = path.join(projectDir, 'package.json');
-  const contents = `${JSON.stringify(project, null, 2)}\n`;
 
-  if (jetpack.read(projectPath) === contents) {
+  if (jetpack.read(projectPath) === formatJson(project)) {
     return;
   }
 
-  jetpack.write(projectPath, contents);
+  writeJson(projectPath, project);
   result.changed.push('package.json (scripts + main + private + license)');
 }
 
@@ -145,7 +143,7 @@ async function copyDefaults(projectDir, engineLogger) {
   // Source of truth is @omega.js/desktop's pinned `omega.nodeRuntime` (the Electron-bundled
   // Node major; consumers' .nvmrc additionally self-syncs from the live Electron feed via
   // scripts/sync-nvmrc.js). `engines.node` is deliberately NOT used here — it's the honest
-  // dev floor (`>=22`), not a renderable version.
+  // dev floor (`>=24`), not a renderable version.
   // `githubSecrets` is the build workflow's env block, GENERATED from the env
   // schema ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): one
   // `KEY: ${{ secrets.KEY }}` line per key the schema delivers to desktop, at
@@ -331,7 +329,7 @@ async function ensureTarget(options) {
   assertScaffoldable(projectDir);
 
   // The Electron-bundled Node major, offline: the framework's pinned runtime.
-  // `engines.node` is the honest dev FLOOR (`>=22`), never a version.
+  // `engines.node` is the honest dev FLOOR (`>=24`), never a version.
   const requiredMajor = version.clean(package.omega.nodeRuntime).split('.')[0];
 
   // Manifest edits FIRST — they don't depend on the Node version or the peer
@@ -341,7 +339,7 @@ async function ensureTarget(options) {
   ensureNvmrc(projectDir, requiredMajor, result);
   checkNodeVersion(projectDir, requiredMajor, warn);
 
-  await ensurePeerDependencies({ projectDir, package, log });
+  await ensurePeerDependencies({ projectDir, package, log, warn });
 
   const applied = await copyDefaults(projectDir, { log: () => {}, warn, error: warn });
   if (applied) {

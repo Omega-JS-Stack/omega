@@ -14,6 +14,7 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const { scaffoldDefaults, NODE_VERSION } = require('../../scaffold.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
 const frameworkPackage = require('../../../package.json');
@@ -50,7 +51,7 @@ function scaffoldPackageJson(projectDir, result) {
 
   if (JSON.stringify(manifest) === before && exists) return;
 
-  jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeJson(manifestPath, manifest);
   result.changed.push('package.json (scripts + engines.node + license)');
 }
 

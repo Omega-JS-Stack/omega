@@ -92,8 +92,8 @@ app:
   <div class="omega-launch">
     <!-- Brand mark -->
     <span class="omega-launch__mark">
-      {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
-      <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
+      {% include core/brandmark-src.html %}
+      <img src="{{ brandmark_src | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
     </span>
 
     <!-- Header -->

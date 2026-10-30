@@ -35,6 +35,7 @@ const jetpack = require('fs-jetpack');
 
 const { resolveBrandRoot } = require('@omega.js/config');
 const Logger = require('./logger.js');
+const { writeJson } = require('./write-json.js');
 const { isRegistrySpec, resolveWanted } = require('./update.js');
 
 const defaultLogger = new Logger('brand-version');
@@ -153,17 +154,6 @@ function withVersion(content, next) {
   }
 
   return updated;
-}
-
-/**
- * Write a JSON file the way npm writes them: 2-space indent, trailing newline.
- *
- * @param {string} file - Where to write.
- * @param {object} content - What to write.
- * @returns {void}
- */
-function writeJson(file, content) {
-  jetpack.write(file, `${JSON.stringify(content, null, 2)}\n`);
 }
 
 /**

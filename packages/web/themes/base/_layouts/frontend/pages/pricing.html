@@ -1,6 +1,11 @@
 ---
 layout: frontend/core/base
 
+# The Product JSON-LD in core/foot.html renders on this page alone.
+schema:
+  product:
+    enabled: true
+
 # Marketing-section defaults (Ian 2026-07-11: deliberate product behavior —
 # promo banner, social proof, testimonials, FAQs ship ON by default and are
 # consumer-overridable). PLANS never live here: payment.products is the only
@@ -103,7 +108,7 @@ faqs:
 {% unless resolved.pricing.promo == false %}
   <div id="pricing-promo-banner" class="omega-promo position-fixed top-0 start-0 w-100" style="z-index: 1050;" hidden>
     <div class="py-2 position-relative">
-      <button type="button" class="btn-close position-absolute top-50 end-0 translate-middle-y me-3" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;var n=document.querySelector('.omega-nav');if(n)n.style.marginTop=''"></button>
+      <button type="button" id="pricing-promo-close" class="btn-close position-absolute top-50 end-0 translate-middle-y me-3" aria-label="Close"></button>
       <div class="container-fluid">
         <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-5">
           <span id="pricing-promo-badge" class="omega-chip omega-chip--accent">
@@ -226,14 +231,9 @@ bands below keep the reveal lane. {% endcomment %}
                     <span class="omega-price-card__amount">Free</span>
                   </div>
                 {% else %}
-                  {% if _default_annual and plan.prices.annually > 0 %}
-                    {% assign _initial_amount = plan.prices.annuallyPerMonth %}
-                  {% else %}
-                    {% assign _initial_amount = plan.prices.monthly %}
-                  {% endif %}
                   <div class="omega-price-card__price">
                     <span class="omega-price-card__currency">$</span>
-                    <span class="omega-price-card__amount amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ _initial_amount }}</span>
+                    <span class="omega-price-card__amount amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ plan.prices.atRest }}</span>
                     <span class="omega-price-card__per">/month</span>
                   </div>
                 {% endif %}
@@ -243,7 +243,7 @@ bands below keep the reveal lane. {% endcomment %}
                   {% if plan.free %}
                     <span>No credit card required</span>
                   {% else %}
-                    {% if _default_annual and plan.prices.annually > 0 %}
+                    {% if plan.billedAtRest == 'annually' %}
                       {% capture _initial_billing %}Billed ${{ plan.prices.annually | omega_commaify }} annually{% endcapture %}
                     {% else %}
                       {% capture _initial_billing %}Billed ${{ plan.prices.monthly | omega_commaify }} monthly{% endcapture %}

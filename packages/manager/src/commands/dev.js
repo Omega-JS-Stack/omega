@@ -14,6 +14,9 @@
  *   omega dev --all                  every target with a dev leg
  *   omega dev --full                 boot on the WHOLE manage walk, not the lane
  *   omega dev --local                link the brand from the local monorepo first (`omega i local`)
+ *   omega dev --target=web --port=3001 --no-https
+ *                                    every flag the fan-out does not consume rides each leg's
+ *                                    `start` after `--`, so the leg's own dev loop reads it
  *
  * Boot order: the freshness sweep first (one dist check for every lane), then
  * a manage cycle — the boot lane (workspace, assets, disperse: the local
@@ -43,11 +46,26 @@ const { NO_TARGETS_LINE } = require('../lib/default-targets.js');
 const { assertFamilyVersions } = require('../lib/preflight.js');
 const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
-const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens } = require('../lib/target-selection.js');
+const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens, buildForwardedFlags } = require('../lib/target-selection.js');
 
 // Every target's dev leg is its own `start` script: `omega dev` in a framework
 // target, the brand's own command in a custom one
 const DEV_LEG = ['npm', 'run', 'start'];
+
+// The flags this fan-out reads itself, beside the CONSUMED_KEYS every fan-out shares
+const DEV_CONSUMED = ['all', 'full', 'local', 'execFn'];
+
+/**
+ * One leg's command line: the `start` script, then every flag the fan-out did
+ * not consume after `--` (`--port=3001`, `--no-https` reach web's dev loop).
+ *
+ * @param {object} options - the parsed CLI options
+ * @returns {string[]} the argv, its command first
+ */
+function devLeg(options) {
+  const forwarded = buildForwardedFlags(options, DEV_CONSUMED);
+  return forwarded.length > 0 ? [...DEV_LEG, '--', ...forwarded] : DEV_LEG;
+}
 
 /**
  * Stop one dev leg. A leg is a CHAIN (npm run <leg> → the real server), so the
@@ -338,6 +356,7 @@ module.exports = async (options = {}) => {
   }
 
   const pad = Math.max(...selected.map((name) => name.length));
+  const leg = devLeg(options);
   const children = [];
   let shuttingDown = false;
 
@@ -364,9 +383,9 @@ module.exports = async (options = {}) => {
       console.log(chalk.yellow(`   ⚠ ${name}: ${node.error}, using the inherited node`));
     }
 
-    console.log(chalk.dim(`   ${name.padEnd(pad)} → ${DEV_LEG.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
+    console.log(chalk.dim(`   ${name.padEnd(pad)} → ${leg.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
 
-    const child = spawn(DEV_LEG[0], DEV_LEG.slice(1), {
+    const child = spawn(leg[0], leg.slice(1), {
       cwd: entry.path,
       stdio: ['ignore', 'pipe', 'pipe'],
       // Legs pipe their output — keep chalk colors when the parent's terminal

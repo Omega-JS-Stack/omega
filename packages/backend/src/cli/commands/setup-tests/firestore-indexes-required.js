@@ -1,4 +1,5 @@
 const BaseTest = require('./base-test');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const jetpack = require('fs-jetpack');
 const _ = require('lodash');
 const chalk = require('chalk').default;
@@ -55,7 +56,7 @@ class FirestoreIndexesRequiredTest extends BaseTest {
       indexesFile.indexes.unshift(requiredIndexes[i]);
     }
 
-    jetpack.write(filePath, JSON.stringify(indexesFile, null, 2));
+    writeJson(filePath, indexesFile);
 
     console.log(chalk.green(`  + Ensured ${requiredIndexes.length} required indexes at top of indexes array`));
     console.log(chalk.yellow(`  Remember to deploy indexes: ${chalk.bold('firebase deploy --only firestore:indexes')}`));

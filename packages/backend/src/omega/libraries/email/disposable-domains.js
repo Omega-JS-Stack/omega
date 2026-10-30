@@ -16,6 +16,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const SOURCE_URL = 'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf';
 
@@ -66,7 +67,7 @@ async function refresh() {
 
   const unique = [...new Set(domains)].sort();
 
-  jetpack.write(CACHE_PATH, `${JSON.stringify(unique, null, 2)}\n`);
+  writeJson(CACHE_PATH, unique);
 
   return { path: CACHE_PATH, count: unique.length };
 }
@@ -84,7 +85,7 @@ function promote() {
     throw new Error(`No usable refresh cache at ${CACHE_PATH} — run \`node scripts/update-disposable-domains.js\` first.`);
   }
 
-  jetpack.write(SEED_PATH, `${JSON.stringify(cached, null, 2)}\n`);
+  writeJson(SEED_PATH, cached);
 
   return { path: SEED_PATH, count: cached.length };
 }

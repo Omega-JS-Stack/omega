@@ -57,7 +57,7 @@
     }
   },
   "omega": {
-    "nodeRuntime": "22",
+    "nodeRuntime": "24",
     "vendorAssets": [
       {
         "package": "@omega.js/web",
@@ -106,7 +106,7 @@
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "keywords": [
     "omega",

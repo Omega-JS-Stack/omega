@@ -2,16 +2,15 @@ const jetpack = require('fs-jetpack');
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
-const DEFAULT_MAX_SIGNUPS_PER_DAY = 2;
 
 /**
  * Resolve the per-IP daily signup cap the beforeUserCreated guard enforces.
  *
  * Config home: targets.backend.auth.signup.maxPerIpPerDay, which the config
- * loader overlays at the top level like every other target key. The value is a
- * positive integer (@omega.js/config hard-fails anything else), so a value that
- * still arrives broken keeps the framework default instead of leaving the guard
- * running unprotected.
+ * loader overlays at the top level like every other target key. Its default
+ * lives in the @omega.js/config schema, which the loader merges lowest, so a
+ * resolved config always carries the value; a config without it was never
+ * resolved, and the guard refuses to run on a guess.
  *
  * @param {object} config - The resolved config (omega.config).
  * @returns {number} Signups allowed per client IP per day.
@@ -19,7 +18,11 @@ const DEFAULT_MAX_SIGNUPS_PER_DAY = 2;
 function resolveSignupLimit(config) {
   const limit = config?.auth?.signup?.maxPerIpPerDay;
 
-  return Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_MAX_SIGNUPS_PER_DAY;
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error(`[@omega.js/backend:auth] auth.signup.maxPerIpPerDay must resolve to a positive integer, got ${JSON.stringify(limit)}; the config was not loaded through @omega.js/config`);
+  }
+
+  return limit;
 }
 
 /**
@@ -63,8 +66,9 @@ async function retryWrite(ctx, tag, fn) {
  * Hook signature:
  *   module.exports = async ({ ctx, omega, user, context }) => { ... }
  *
- * Consumer project structure:
- *   functions/
+ * Consumer project structure (authored under src/, staged into dist/, which
+ * is omega.cwd at runtime):
+ *   src/
  *     hooks/
  *       auth/
  *         before-create.js   — runs after @omega.js/backend checks, can block signup
@@ -90,4 +94,4 @@ async function runAuthHook(eventName, args) {
   ctx.log(`${eventName}: Consumer hook completed`);
 }
 
-module.exports = { retryWrite, runAuthHook, resolveSignupLimit, MAX_RETRIES, DEFAULT_MAX_SIGNUPS_PER_DAY };
+module.exports = { retryWrite, runAuthHook, resolveSignupLimit, MAX_RETRIES };

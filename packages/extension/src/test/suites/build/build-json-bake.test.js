@@ -15,61 +15,22 @@
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
-// the task fresh — the same model as package-task.test.js's inProject().
+// the task fresh (utils/package-project.js).
 
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 const vm   = require('vm');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { writeJson } = require('@omega.js/devkit/write-json');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-const SRC       = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'bundle.js');
 const { readBakedBuildJson } = require(path.join(SRC, 'gulp', 'tasks', 'utils', 'build-json.js'));
 
 // The boot lane loads the in-tree fixture consumer, which stands in for a real
 // built extension — so it carries a checked-in copy of the banner.
 const FIXTURE = path.join(SRC, 'test', 'fixtures', 'consumer-extension', 'dist');
-
-// Stage a temp extension project. `files` is a relative-path → contents map
-// written verbatim (the entry points the bundle task discovers, …).
-function stageProject(opts = {}) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-build-json-'));
-
-  fs.writeFileSync(path.join(tmp, 'package.json'), opts.pkg ?? `{ "name": "staged-ext", "version": "3.1.4" }`);
-
-  if (opts.config !== undefined) {
-    fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), opts.config);
-  }
-
-  for (const [relative, contents] of Object.entries(opts.files || {})) {
-    const full = path.join(tmp, relative);
-    fs.mkdirSync(path.dirname(full), { recursive: true });
-    fs.writeFileSync(full, contents);
-  }
-
-  return tmp;
-}
-
-// Run `fn(task)` with cwd pinned to `dir` and the task module loaded fresh.
-async function inProject(dir, fn) {
-  const oldCwd = process.cwd();
-  const flush = () => {
-    for (const key of Object.keys(require.cache)) {
-      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
-    }
-  };
-
-  flush();
-  try {
-    process.chdir(dir);
-    return await fn(require(TASK_PATH));
-  } finally {
-    process.chdir(oldCwd);
-    flush();
-  }
-}
 
 // An entry that reads the snapshot the way every extension context reads it:
 // off the globals `/build.js` assigned (`self` is what background.js reads,
@@ -146,7 +107,7 @@ module.exports = defineCases({
               ctx.expect(alone.__fromSelf).toBe(null);
               ctx.expect(fs.readFileSync(emitted, 'utf8').includes('OMEGA_BUILD_JSON = {')).toBe(false);
             }
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -199,7 +160,7 @@ module.exports = defineCases({
             // `cloud.config` is the CANONICAL home @omega.js/client boots from,
             // so the bake no longer mirrors it into a `firebase` blob (#894).
             ctx.expect(buildJson.config.firebase).toBeUndefined();
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -220,7 +181,7 @@ module.exports = defineCases({
             ctx.expect(buildJson.license).toEqual({ status: 'keyless', payments: 'gated', attribution: 'shown' });
             // A fact about the BUILD — the client contract is untouched.
             ctx.expect(buildJson.config.license).toBeUndefined();
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -237,7 +198,7 @@ module.exports = defineCases({
             // to tell apart from a real one (#894).
             ctx.expect(buildJson.config.cloud).toBeUndefined();
             ctx.expect(buildJson.config.firebase).toBeUndefined();
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -263,7 +224,7 @@ module.exports = defineCases({
             ctx.expect(buildJson.package.version).toBe('3.1.4');
             ctx.expect(buildJson.mode.environment).toBe('testing');
             ctx.expect(typeof buildJson.builtAt).toBe('string');
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -306,7 +267,7 @@ module.exports = defineCases({
             ctx.expect(config.account).toBeUndefined();
             ctx.expect(config.repo).toBeUndefined();
             ctx.expect(config.cloud.billingAccount).toBeUndefined();
-          });
+          }, TASK_PATH);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -334,7 +295,7 @@ module.exports = defineCases({
             // secret-shaped keys outright.
             ctx.expect(config.analytics.providers.google.id).toBe('G-STAGED');
             ctx.expect(config.analytics.providers.google.secret).toBe('mp-secret');
-          });
+          }, TASK_PATH);
         } finally {
           if (previous === undefined) delete process.env.GOOGLE_ANALYTICS_SECRET;
           else process.env.GOOGLE_ANALYTICS_SECRET = previous;
@@ -351,17 +312,15 @@ module.exports = defineCases({
         const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-ports-brand-'));
         fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
         fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
-        fs.mkdirSync(path.join(brand, 'targets', 'backend', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'backend', '.temp', 'ports.json'), JSON.stringify({
+        writeJson(path.join(brand, 'targets', 'backend', '.temp', 'ports.json'), {
           ports: { auth: 9100, firestore: 8081, hosting: 5003 }, pid: process.pid, startedAt: 'x',
-        }));
+        });
 
         // …and a live WEBSITE publishing its resolved origin beside its port —
         // bumped AND https, the pair a port number alone can never express (#262)
-        fs.mkdirSync(path.join(brand, 'targets', 'web', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'web', '.temp', 'ports.json'), JSON.stringify({
+        writeJson(path.join(brand, 'targets', 'web', '.temp', 'ports.json'), {
           ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
-        }));
+        });
 
         const app = path.join(brand, 'targets', 'extension');
         fs.mkdirSync(app, { recursive: true });
@@ -381,7 +340,7 @@ module.exports = defineCases({
           ENV_KEYS.forEach((key) => delete process.env[key]);
           if (mode === 'production') process.env.OMEGA_BUILD_MODE = 'true';
           try {
-            return await inProject(app, async (task) => (await task.composeBuildJson()).config);
+            return await inProject(app, async (task) => (await task.composeBuildJson()).config, TASK_PATH);
           } finally {
             ENV_KEYS.forEach((key) => {
               if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];

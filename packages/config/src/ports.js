@@ -33,6 +33,7 @@
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { findBrandRoot } = require('./load.js');
 // The env-var name and the port check are browser-safe, so they live beside
 // the missing-fact error the browser chain also reads.
@@ -48,6 +49,9 @@ const CLASSIC_PORTS = {
   hosting: 5002,
   storage: 9199,
   pubsub: 8085,
+  // The firebase emulator hub: firebase-tools' own fixed default, shared by
+  // every stack on the machine rather than allocated per run.
+  hub: 4400,
   ui: 4050,
   website: 4000,
   livereload: 35729,
@@ -161,10 +165,8 @@ async function resolvePorts({ wanted, pins = {}, claimed = new Set() }) {
  * @returns {string} The file path written.
  */
 function writePortsFile(projectDir, ports, facts = {}) {
-  const dir = path.join(projectDir, '.temp');
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, PORTS_FILE);
-  fs.writeFileSync(file, JSON.stringify({ ports, ...facts, pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
+  const file = path.join(projectDir, '.temp', PORTS_FILE);
+  writeJson(file, { ports, ...facts, pid: process.pid, startedAt: new Date().toISOString() });
   return file;
 }
 

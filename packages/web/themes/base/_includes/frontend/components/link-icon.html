@@ -1,0 +1,13 @@
+{% comment %}
+  A profile link's icon, from the id that names its platform: the three
+  non-brand ids take their solid glyph, and every other id is its Font Awesome
+  brand mark (`fa-brands fa-<id>`), so the id must be one Font Awesome knows.
+  Usage: {% include frontend/components/link-icon.html id=link.id %}
+{% endcomment %}
+{%- case include.id -%}
+  {%- when 'website' -%}{%- assign _link_icon = 'fa-solid fa-globe' -%}
+  {%- when 'email' -%}{%- assign _link_icon = 'fa-solid fa-envelope' -%}
+  {%- when 'phone' -%}{%- assign _link_icon = 'fa-solid fa-phone' -%}
+  {%- else -%}{%- assign _link_icon = 'fa-brands fa-' | append: include.id -%}
+{%- endcase -%}
+<i class="{{ _link_icon }} fa-sm" aria-hidden="true"></i>

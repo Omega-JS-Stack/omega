@@ -13,6 +13,7 @@
     "./load": "./src/load.js",
     "./env": "./src/env.js",
     "./environment": "./src/environment.js",
+    "./brand-host": "./src/brand-host.js",
     "./dev-facts": "./src/dev-facts.js",
     "./env-schema": "./src/env-schema.js",
     "./env-delivery": "./src/env-delivery.js",

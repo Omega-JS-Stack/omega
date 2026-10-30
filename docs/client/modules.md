@@ -34,7 +34,7 @@ const { user } = omega.auth;
 - `cancelling`: Cancellation pending (status `'active'` + `cancellation.pending` + NOT trialing)
 - `everPaid`: A payment start date exists
 - `toJSON()`: the stored document alone, never the getters or the profile
-- A brand's own top-level keys ride through: the account schema's root is passthrough, so a key the brand stores on `users/{uid}` (`notes`) lands on `auth.user` as stored, on every surface (`ctx.user` on the backend, desktop main, the extension background). A stored key named like a `User` property (a getter, `toJSON`, `profile`) throws, naming the key; the framework rules refuse a client write of one
+- A brand's own top-level keys ride through: the account schema's root is passthrough, so a key the brand stores on `users/{uid}` (`notes`) lands on `auth.user` as stored, on every surface (`ctx.user` on the backend, desktop main, the extension background). A stored key named like a `User` property (a getter, `toJSON`, `profile`) throws, naming the key; the framework rules refuse a client write of one. Any OTHER key the brand adds is client-writable: the framework rules let a signed-in user write their own `users/{uid}` document, so a brand key that must not be forged by its owner (a credit balance, a flag the backend trusts) needs the brand's own `match /users/{uid}` block in its Firestore rules to tighten the match (the rules compiler ANDs it onto the framework's), or a backend route to write it
 
 ### One State Per Auth Change
 
@@ -118,6 +118,27 @@ const { user } = omega.auth;
   and the instance's refresh-new-version poll, which fetches the build manifest
   at `<prefix>/build.json` ([#364](https://github.com/Omega-JS-Stack/omega/issues/364))
   — root-relative, that poll 404s forever under a path mount.
+
+## Slugify (`slugify.js`)
+
+- **Exports**: `slugify(input)`
+- The ONE slugifier of the stack: lowercase, apostrophes (straight and
+  typographic) deleted, every run of anything but `a-z0-9` turned into one `-`,
+  and `-` trimmed off both ends, so "Beginner's Guides" is `beginners-guides`.
+- **Read by**: @omega.js/template-kit's `omega_slugify` filter, @omega.js/web's
+  admin post editor, and @omega.js/web's `src/sections.js` (a showcase demo
+  variant's slug, `demo` when the label slugs to nothing), so a slug the editor
+  fills in and one a build renders agree.
+
+## Site path (`site-path.js`)
+
+- **Exports**: `isSitePath(value)`
+- The ONE home of the return-path rule: true only for a string that starts with a
+  single `/` and carries no `//`, no backslash and no whitespace (a query and a
+  hash are fine), so an absolute URL, `//host`, `/\host` and `javascript:` are all out.
+- **Read by**: @omega.js/backend's connections route, which refuses a `returnUrl`
+  that fails it (the 400 words the rule as `RETURN_PATH_RULE`), and @omega.js/web's
+  connections callback, which runs it again before handing the value to `location`.
 
 ## Sentry (`sentry.js`)
 

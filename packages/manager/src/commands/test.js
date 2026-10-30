@@ -14,6 +14,8 @@
  *   omega test --target=web,backend  → narrow ANY of the above to those targets
  *   omega test --extended     → fanned out: every target runs its real-service suites
  *   omega test --lane=<name>  → fanned out to the targets that DECLARE that lane
+ *   omega test --offline --filter=<x> --layer=<x> ...
+ *                             → every other flag, forwarded to every target the run reaches
  *
  * Universal targets (bare paths, `framework:`/`omega:`/`mgr:`, `full:`,
  * `project:`/`brand:`) forward to every target verbatim; per-framework ids
@@ -29,19 +31,22 @@
  * excludes is a contradiction, not a narrowing — it refuses by name instead of
  * running the empty intersection.
  *
- * MODE flags fan out ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)):
- * `--extended` (real external services) reaches every framework target, and
- * `--lane=<name>` reaches the targets whose framework DECLARES that lane in
- * its package.json `omega.testLanes` — a target that declares none prints one
- * line and the run stays green, because an opt-in lane no framework serves is
- * a lane that does not apply there, never a failure. Path-scope flags
- * (`--layer`) stay target-level invocations.
+ * Every flag the root does not consume reaches the targets after `--`, through
+ * the `buildForwardedFlags` seam every brand-root fan-out shares: `--extended`,
+ * `--offline`, `--filter=<x>`, `--layer=<x>`, `--reporter=<x>` and any other.
+ * The root consumes only the picker and the positionals it routes. It also
+ * READS `--lane=<name>` ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)):
+ * the lane reaches only the targets whose framework DECLARES it in its
+ * package.json `omega.testLanes`; a target that declares none prints one line
+ * and the run stays green, because an opt-in lane no framework serves is a
+ * lane that does not apply there, never a failure. A layer is its framework's
+ * word, so a layered run picks its target with `--target=`.
  *
  * The BRAND E2E LANE (the `defineCases` suites under `<brandRoot>/test/e2e/`)
  * runs last, in this process on devkit's runner, when the folder exists: the
  * brand's real pages against its real local stack, a surface no target owns.
  * It hears no scope vocabulary and no flags: a bare run reaches it, and a
- * scoped, picked (`--target=`) or laned run never does.
+ * scoped, picked (`--target=`), laned, filtered or layered run never does.
  *
  * Targets run sequentially with streamed output; any failing target → exit 1.
  */
@@ -55,7 +60,7 @@ const { createRunner } = require('@omega.js/devkit/test/runner');
 const { UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS, FANOUT_ENV, NO_MATCH_EXIT_CODE, noMatchMessage, parseTestScope, isPathTargeted } = require('@omega.js/devkit/test/scope');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveTargetRun, resolveFrameworkPackage } = require('../lib/framework-bin.js');
-const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens, targetMatches } = require('../lib/target-selection.js');
+const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens, targetMatches, buildForwardedFlags } = require('../lib/target-selection.js');
 const { runCommand } = require('../lib/run-command.js');
 
 // Prefixes forwarded to every target as-is (each target's own C5 parser interprets them)
@@ -240,7 +245,9 @@ module.exports = async (options) => {
   // Nothing valid → every target runs bare (its project tests), scope.js parity.
   const runAllBare = shared.length === 0 && Object.keys(perFramework).length === 0;
   const lane = options.lane ? String(options.lane) : null;
-  const extended = !!options.extended;
+  const filter = options.filter ? String(options.filter) : null;
+  const layer = options.layer ? String(options.layer) : null;
+  const flags = buildForwardedFlags(options);
 
   const discovered = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
   if (discovered.length === 0) {
@@ -313,15 +320,11 @@ module.exports = async (options) => {
       continue;
     }
 
-    // MODE flags and the scope ride the same `forwarded` seam every other
+    // The flags and the scope ride the same `forwarded` seam every other
     // brand-root fan-out uses (commands/deploy.js, lib/verb-fanout.js), so they
     // land after the script's `--`. Re-resolved only when there IS something to
     // forward: a bare run keeps its first resolution.
-    const forwarded = [
-      ...(extended ? ['--extended'] : []),
-      ...(lane ? [`--lane=${lane}`] : []),
-      ...args,
-    ];
+    const forwarded = [...flags, ...args];
     const flagged = forwarded.length ? resolveTargetRun(entry, 'test', forwarded) : run;
 
     runs.push({
@@ -339,8 +342,8 @@ module.exports = async (options) => {
 
   // ─── The brand's own e2e lane, after the targets ───────────────────────────
   // A bare run only: the lane hears no scope vocabulary and no flags, so a
-  // scoped, picked or laned run is asking for something else.
-  if (runAllBare && !lane && picked.tokens.length === 0 && fs.existsSync(path.join(brandRoot, BRAND_E2E_DIR))) {
+  // scoped, picked, laned, filtered or layered run is asking for something else.
+  if (runAllBare && !lane && !filter && !layer && picked.tokens.length === 0 && fs.existsSync(path.join(brandRoot, BRAND_E2E_DIR))) {
     runs.push({
       entry: { name: BRAND_E2E_DIR, path: brandRoot },
       framework: 'brand',

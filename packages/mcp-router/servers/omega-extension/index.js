@@ -36,12 +36,11 @@ const RECONNECT_INTERVAL = 3000;
 const RESPONSE_TIMEOUT = 60000;
 
 // ---------------------------------------------------------------------------
-// Logging (stderr only — stdout is reserved for MCP JSON-RPC)
+// Logging: the router's one sink. The package runs from dist/ (src/ never
+// ships), and this file lives beside it, so the sink is reached there.
 // ---------------------------------------------------------------------------
 
-const log = (level, ...args) => {
-  process.stderr.write(`[omega-extension ${level}] ${args.join(' ')}\n`);
-};
+const log = require('../../dist/lib/log.js').createLog('omega-extension');
 
 // ---------------------------------------------------------------------------
 // WebSocket connection management

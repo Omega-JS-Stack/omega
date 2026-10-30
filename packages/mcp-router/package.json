@@ -1,14 +1,14 @@
 {
   "name": "@omega.js/mcp-router",
   "version": "0.56.0",
-  "description": "One lazy MCP endpoint for every OMEGA session \u2014 a stdio server that proxies many upstream MCP servers and surfaces each upstream's tools only once it is activated",
+  "description": "One lazy MCP endpoint for every OMEGA session: a stdio server that proxies many upstream MCP servers and surfaces each upstream's tools only once it is activated",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
-  "main": "./src/router.js",
+  "main": "./dist/router.js",
   "exports": {
-    ".": "./src/router.js",
+    ".": "./dist/router.js",
     "./cli": "./bin/mcp-router.js",
     "./package.json": "./package.json"
   },
@@ -18,22 +18,40 @@
   },
   "files": [
     "bin/",
-    "src/",
+    "dist/",
     "servers/",
     "README.md"
   ],
   "scripts": {
+    "start": "npm run prepare:watch",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
+    "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "test": "node ../devkit/src/test/cli.js"
+  },
+  "preparePackage": {
+    "input": "./src",
+    "output": "./dist",
+    "replace": {},
+    "type": "copy",
+    "hooks": {
+      "after": [
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\"",
+        "node -e \"require('@omega.js/devkit/vendor')()\""
+      ],
+      "afterBlocking": true
+    }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "fs-jetpack": "^5.1.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@omega.js/devkit": "*"
+    "@omega.js/devkit": "*",
+    "prepare-package": "^2.2.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "keywords": [
     "omega",

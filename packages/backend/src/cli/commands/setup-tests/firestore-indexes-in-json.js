@@ -1,5 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const _ = require('lodash');
 
 class FirestoreIndexesInJsonTest extends BaseTest {
@@ -13,7 +13,7 @@ class FirestoreIndexesInJsonTest extends BaseTest {
 
   async fix() {
     _.set(this.self.firebaseJSON, 'firestore.indexes', 'firestore.indexes.json');
-    jetpack.write(`${this.self.firebaseProjectPath}/firebase.json`, JSON.stringify(this.self.firebaseJSON, null, 2));
+    writeJson(`${this.self.firebaseProjectPath}/firebase.json`, this.self.firebaseJSON);
   }
 }
 

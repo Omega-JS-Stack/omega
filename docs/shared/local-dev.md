@@ -27,6 +27,7 @@ omega dev --target=web         # one leg
 omega dev --target=web,backend # explicit set
 omega dev --all                # every target (desktop/extension opt-in)
 omega dev --full               # boot on the WHOLE manage walk, not just the boot lane
+omega dev --target=web --port=3001 --no-https  # any other flag rides each leg's `start` after `--`
 ```
 
 **Inside a target, the verbs its framework owns run in place** ([#985](https://github.com/Omega-JS-Stack/omega/issues/985)): `npm start`, `npm test` and `npx omega <verb>` in `targets/<name>/` run that target's framework CLI, exactly as the brand-root fan-out runs it there, since every fan-out is each target's own `npm run <verb>`. A brand-wide verb, one only the manager owns (`install`, `manage`, `migrate`, `pipeline`, `bump`, `company`, `devlog`), refuses in a target and prints the brand-root form. A verb that needs no brand and that only the manager owns (`status`, `onboard`) runs the manager there instead. The rule is a TARGET of one of the verb's owner frameworks (a brand target or a standalone project): framework source is never a target, so inside `packages/<framework>` and `packages/manager` every verb refuses and prints `cd <monorepo root> && npx omega <verb> --target=<package>`. Both answers come from ONE table, `@omega.js/devkit`'s `verbs.js`, which also derives the `omega <verb>` scripts every framework scaffolds into its targets.

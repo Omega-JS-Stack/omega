@@ -1,5 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const _ = require('lodash');
 const {
   COMPILED_RULES_FILE,
@@ -42,7 +42,7 @@ class FirestoreRulesInJsonTest extends BaseTest {
 
   async fix() {
     _.set(this.self.firebaseJSON, 'firestore.rules', COMPILED_RULES_FILE);
-    jetpack.write(`${this.self.firebaseProjectPath}/firebase.json`, JSON.stringify(this.self.firebaseJSON, null, 2));
+    writeJson(`${this.self.firebaseProjectPath}/firebase.json`, this.self.firebaseJSON);
   }
 }
 

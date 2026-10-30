@@ -22,6 +22,7 @@ const { REPO_PROVIDERS, HOSTING_PROVIDERS } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { isCountedFeature } = require('@omega.js/account/features');
 const { SUBSCRIPTION_CADENCES } = require('./payment-cadences.js');
+const { resolvedBrandHost } = require('./brand-host.js');
 
 // Firebase's own default authDomain shape: a third-party host by definition
 const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
@@ -153,32 +154,6 @@ function runSchema(config, schema) {
   }
 
   return errors;
-}
-
-/**
- * The host this (resolved) config's BRAND lives on, which is a brand-level
- * fact and never a per-target one (#588, Ian 2026-09-01): one Firebase project,
- * one backend, one persona domain, shared by every target a brand runs. So
- * `brand.url` answers first and the top-level `url` (the target's own public
- * url, derived from its name or declared on its entry) is only the fallback for
- * a config that carries no brand.url at all. Reading them the other way round
- * made a `targets/admin` load fail its own brand's authDomain check and seeded
- * personas at a different domain than the backend's.
- * @param {object} config - The resolved config object.
- * @returns {string} The lowercase hostname, or '' when no URL is known.
- */
-function resolvedBrandHost(config) {
-  const url = getPath(config, 'brand.url') || getPath(config, 'url');
-
-  if (typeof url !== 'string' || !url) {
-    return '';
-  }
-
-  try {
-    return new URL(url.includes('://') ? url : `https://${url}`).hostname.toLowerCase();
-  } catch (e) {
-    return '';
-  }
 }
 
 /**
@@ -684,4 +659,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, runSchema, formatErrors, getPath, resolvedBrandHost };
+module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, runSchema, formatErrors, getPath };

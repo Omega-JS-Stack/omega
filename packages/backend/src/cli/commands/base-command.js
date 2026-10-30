@@ -7,6 +7,23 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const ui = require('../utils/ui');
 const attachLogFile = require('../utils/attach-log-file');
+const Logger = require('@omega.js/devkit/logger');
+
+// The target roots this process has already run the scaffold for.
+const ENSURED_TARGETS = new Set();
+
+/**
+ * The verb a command class runs, from its class name: `EmulatorCommand` is
+ * `emulator`, `MigrateRulesCommand` is `migrate-rules` (its file's name).
+ * @param {BaseCommand} command - The constructed command.
+ * @returns {string} The logger's module segment.
+ */
+function verbOf(command) {
+  return command.constructor.name
+    .replace(/Command$/, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+}
 
 class BaseCommand {
   constructor(main) {
@@ -17,6 +34,7 @@ class BaseCommand {
     // Shared OMEGA-style CLI styling helpers (dividers, headers, status lines).
     // See src/cli/utils/ui.js. Use `this.ui.*` in any command for consistent output.
     this.ui = ui;
+    this.logger = new Logger(verbOf(this));
   }
 
   async execute() {
@@ -108,35 +126,27 @@ class BaseCommand {
   }
 
   /**
-   * The local scaffold every verb runs first (ensure-target.js): its lines
-   * print gray, its warnings yellow, so a kept or converged file is never silent.
-   * Then the peers (`firebase-admin`, `firebase-functions`) are aligned to the
-   * framework's peer range through devkit's one installer, the step desktop and
-   * the extension run from their own ensure-target; a satisfied target installs nothing.
+   * The local scaffold every verb runs first (ensure-target.js), peers
+   * included: its lines print gray, its warnings yellow, so a kept or
+   * converged file is never silent. It runs once per target per process, so a
+   * verb that ensures up front and then stages (or boots the emulator command
+   * in-process) prints its nudges once.
    */
   async runEnsureTarget() {
-    const { ensureTarget, isFrameworkTree } = require('../utils/ensure-target');
-    const { ensurePeerDependencies } = require('@omega.js/devkit/target-dependencies');
-    const { safeInstall } = require('../utils/safe-install');
+    const { ensureTarget } = require('../utils/ensure-target');
     const projectDir = this.main.firebaseProjectPath;
-    const log = (message) => this.log(chalk.gray(`  ${message}`));
 
-    ensureTarget({
-      projectDir,
-      log,
-      warn: (message) => this.logWarning(`  ${message}`),
-    });
-
-    if (isFrameworkTree(projectDir)) {
+    if (ENSURED_TARGETS.has(projectDir)) {
       return;
     }
 
-    await ensurePeerDependencies({
+    await ensureTarget({
       projectDir,
-      package: require('../../../package.json'),
-      log,
-      safeInstall,
+      log: (message) => this.log(chalk.gray(`  ${message}`)),
+      warn: (message) => this.logWarning(`  ${message}`),
     });
+
+    ENSURED_TARGETS.add(projectDir);
   }
 
   /**
@@ -196,19 +206,34 @@ class BaseCommand {
   }
 
   log(...args) {
-    console.log(...args);
+    // A spacer stays a spacer: a stamped empty line would read as a lost message
+    if (args.length === 0 || (args.length === 1 && args[0] === '')) {
+      console.log();
+      return;
+    }
+
+    this.logger.log(...args);
+  }
+
+  /**
+   * Data output (a document, raw JSON for `jq`): stdout, untagged, since a tag
+   * would corrupt what the reader parses. Text lines go through `log`.
+   * @param {string} text - The data, one line or a pretty block.
+   */
+  print(text) {
+    process.stdout.write(`${text}\n`);
   }
 
   logError(message) {
-    console.log(chalk.red(message));
+    this.logger.log(chalk.red(message));
   }
 
   logSuccess(message) {
-    console.log(chalk.green(message));
+    this.logger.log(chalk.green(message));
   }
 
   logWarning(message) {
-    console.log(chalk.yellow(message));
+    this.logger.log(chalk.yellow(message));
   }
 
   /**
@@ -432,8 +457,7 @@ class BaseCommand {
     const { loadEmulatorPorts } = require('./setup-tests/emulator-config.js');
     const hostingPort = forwardPort
       || readPortsFile(projectDir)?.hosting
-      || loadEmulatorPorts(projectDir).hosting
-      || 5002;
+      || loadEmulatorPorts(projectDir).hosting;
 
     const forwardUrl = `http://localhost:${hostingPort}/omega/payments/webhook?provider=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 

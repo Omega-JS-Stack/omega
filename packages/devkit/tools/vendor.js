@@ -189,10 +189,11 @@ function stripComments(source) {
   return result;
 }
 
-// Map a package subpath ('' | 'logger' | 'test/expect' | 'logger.js') to its module-root-relative file.
+// Map a package subpath ('' | 'logger' | 'test/expect' | 'logger.js' |
+// 'fixtures/package.json') to its module-root-relative file.
 function subpathToFile(subpath, packageRoot) {
   const name = subpath || 'index';
-  if (name.endsWith('.js')) {
+  if (name.endsWith('.js') || name.endsWith('.json')) {
     return name;
   }
 
@@ -323,7 +324,7 @@ function resolveNeededFiles(name, packageRoot, seeds) {
     for (const pattern of RELATIVE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         let dep = path.join(path.dirname(relative), match[2]).split(path.sep).join('/');
-        if (!dep.endsWith('.js')) dep = `${dep}.js`;
+        if (!dep.endsWith('.js') && !dep.endsWith('.json')) dep = `${dep}.js`;
         queue.push(dep);
       }
     }
@@ -612,3 +613,4 @@ module.exports = vendorPackages;
 // exactly the packages this tool folds into dists.
 module.exports.VENDORABLE_PACKAGES = VENDORABLE_PACKAGES;
 module.exports.PRIVATE_REFERENCE = PRIVATE_REFERENCE;
+module.exports.subpathToFile = subpathToFile;

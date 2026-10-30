@@ -23,6 +23,7 @@ const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
 const { GOOGLE_OAUTH_REL } = require('@omega.js/devkit/service-account');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const OAUTH_REDIRECTS_PATH = 'cloud.oauthRedirectsConfigured';
 
@@ -166,7 +167,7 @@ module.exports = async function ensureAuthentication(context) {
       const drifted = stored?.clientId !== secrets.clientId || stored?.clientSecret !== secrets.clientSecret;
 
       if (drifted && !options.dryRun) {
-        jetpack.write(secretsPath, secrets);
+        writeJson(secretsPath, secrets);
       }
     }
   } else if (googleConfig?.enabled) {

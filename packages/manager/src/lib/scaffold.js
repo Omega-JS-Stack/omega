@@ -29,6 +29,7 @@ const { MANAGE_SCRIPT } = require('./package-scripts.js');
 // The marked .gitignore the workspace service heals every manage
 const { renderBrandGitignore } = require('./gitignore.js');
 const { TEMPLATE_URL, carriesTemplateMarker } = require('./template-marker.js');
+const { formatJson } = require('@omega.js/devkit/write-json');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the target manifest's `dependencies`
@@ -246,7 +247,7 @@ const BRAND_LICENSE = 'UNLICENSED';
  * @returns {string} The file contents.
  */
 function renderRootPackageJson(answers) {
-  return `${JSON.stringify({
+  return formatJson({
     name: answers.id,
     private: true,
     // npm's own word for closed-source commercial code, which a brand is until
@@ -276,7 +277,7 @@ function renderRootPackageJson(answers) {
     devDependencies: {
       '@omega.js/manager': FAMILY_VERSION,
     },
-  }, null, 2)}\n`;
+  });
 }
 
 function renderEnvStub() {
@@ -348,7 +349,7 @@ function renderTargetPackageJson(answers, entry) {
 
   // version + author: electron-builder hard-requires version and warns on
   // author (the cp142 rehearsal catch) — every target gets both, they're healthy
-  return `${JSON.stringify({
+  return formatJson({
     name: `${answers.id}-${entry.name}`,
     version: '0.0.1',
     author: answers.name,
@@ -356,7 +357,7 @@ function renderTargetPackageJson(answers, entry) {
     license: BRAND_LICENSE,
     description: `${answers.name} ${entry.name} target`,
     ...(framework ? { [depKey]: { [framework]: FAMILY_VERSION } } : {}),
-  }, null, 2)}\n`;
+  });
 }
 
 /**

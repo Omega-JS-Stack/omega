@@ -1,5 +1,7 @@
 const BaseTest = require('./base-test');
+const path = require('path');
 const jetpack = require('fs-jetpack');
+const { ENV_FILE_NAME } = require('@omega.js/config');
 
 class EnvRuntimeConfigDeprecatedTest extends BaseTest {
   getName() {
@@ -9,7 +11,7 @@ class EnvRuntimeConfigDeprecatedTest extends BaseTest {
   async run() {
     // The authored .env (target root) — OPTIONAL and human-written since #678:
     // it is the per-key override over the brand root's, and no machine writes it
-    const envPath = `${this.self.firebaseProjectPath}/.env`;
+    const envPath = path.join(this.self.firebaseProjectPath, ENV_FILE_NAME);
     const existingContent = jetpack.read(envPath);
 
     // If no .env file, pass (other test will handle that)

@@ -29,6 +29,7 @@ const { healPackageScripts, syncTargetScripts } = require('../../../lib/package-
 const { resolveFrameworkPackage, resolveTargetCustomOwned } = require('../../../lib/framework-bin.js');
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 module.exports = async ({ brandRoot, targets = [], options = {} }) => {
   const pkgPath = join(brandRoot, 'package.json');
@@ -118,14 +119,14 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
 
   if (changes.length) {
     pkg.scripts = scripts;
-    jetpack.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+    writeJson(pkgPath, pkg);
     console.log(`      ${chalk.green('✓')} Healed root scripts \`${changes.join('`, `')}\``);
     output.scripts = { changed: changes };
   }
 
   for (const work of targetWork) {
     work.targetPkg.scripts = work.synced.scripts;
-    jetpack.write(work.manifestPath, `${JSON.stringify(work.targetPkg, null, 2)}\n`);
+    writeJson(work.manifestPath, work.targetPkg);
     // The skipped keys are named per key: a custom-server backend's own verbs
     // are absent by design, not by omission
     const brandOwned = work.synced.skipped.length ? chalk.dim(` (brand-owned, untouched: ${work.synced.skipped.join(', ')})`) : '';

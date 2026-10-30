@@ -17,9 +17,7 @@ steps:
     description: "{{ resolved.config.brand.name }} is now pinned and ready to use"
 ---
 
-{% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one —
-`brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
-{% assign brandmark_src = assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark %}
+{% include core/brandmark-src.html %}
 <!-- Main content -->
 <section class="col-12 col-md-10 col-lg-8 col-xl-7">
   <div class="card">

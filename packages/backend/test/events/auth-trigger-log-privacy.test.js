@@ -77,7 +77,7 @@ function render(args) {
 }
 
 // No hooks/auth/*.js under this dir, so the consumer hook lookup is a no-op.
-const OMEGA = { cwd: __dirname, config: {} };
+const OMEGA = { cwd: __dirname, config: { auth: { signup: { maxPerIpPerDay: 2 } } } };
 
 async function runBeforeCreate() {
   const { calls, ctx } = createRecorder();

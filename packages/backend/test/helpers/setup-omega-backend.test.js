@@ -121,6 +121,32 @@ module.exports = defineCases({
     },
 
     {
+      name: 'registry-copy-a-major-behind-prints-the-gap-and-passes',
+      async run({ expect }) {
+        // A major gap is a manual upgrade, never an `omega update`: the check
+        // says so in red and passes, so a run is not held up by it.
+        const { root, targetDir } = registryTree('0.52.0');
+        const instance = makeInstance(targetDir, '^0.52.0', '1.0.0');
+        const printed = [];
+        const real = { log: console.log, warn: console.warn, error: console.error };
+        for (const method of Object.keys(real)) {
+          console[method] = (...args) => printed.push(args.join(' '));
+        }
+
+        let result;
+        try {
+          result = await runGuarded(instance);
+        } finally {
+          Object.assign(console, real);
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+
+        expect(result, 'a major gap passes the check').toBe(true);
+        expect(printed.join('\n'), `the gap line names the major it is behind: ${printed.join(' | ')}`).toMatch(/1\.0\.0/);
+      },
+    },
+
+    {
       name: 'unresolved-package-warns-naming-omega-update',
       async run({ expect }) {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-check-'));

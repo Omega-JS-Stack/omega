@@ -14,7 +14,7 @@
  * message, not identity tags, so they pass.
  *
  * Two layers: fixture self-tests (synthetic source that must go red), then a
- * live scan over every packages/<pkg>/src file.
+ * live scan over every packages/<pkg>/src and packages/<pkg>/servers file.
  *
  * Run: node --test scripts/log-tags.test.js
  */
@@ -49,6 +49,9 @@ const EXEMPT_PATH = /(^|\/)(test|tests|fixtures|harness)(\/|$)/;
 // No package is exempt (backend joined the contract in issue #121).
 const EXEMPT_PACKAGES = new Set();
 
+// The shipped source trees a package can carry: src/, and the MCP servers mcp-router ships beside it.
+const SHIPPED_TREES = ['src', 'servers'];
+
 // Scan one source string; returns [{ tag, method }] for every hand-written tag.
 function findHandWrittenTags(source) {
   const found = [];
@@ -63,7 +66,24 @@ function findHandWrittenTags(source) {
   return found;
 }
 
-// Every packages/<pkg>/src/**/*.js outside a harness/fixture path, plus web's
+// A raw stream write whose literal opens with a bracket: a sink that bypasses
+// every logger still prints its tag by hand. Group 2 is the bracket's text.
+const STREAM_WRITE = /(?:^|[^\w$.])(?:process\.)?(?:stderr|stdout)\.write\(\s*(['"`])(?:%c)?\[([^\]\n]*)\]/g;
+
+// Scan one source string for stream writes opening with a hand-typed tag. Only
+// the text before any interpolation counts: `[${ts}]` is data, `[mcp-router ${level}]` a tag.
+function findHandWrittenWriteTags(source) {
+  const found = [];
+  for (const match of source.matchAll(STREAM_WRITE)) {
+    const prefix = match[2].split('${')[0].trim();
+    if (!prefix || !STATIC_TAG.test(prefix)) { continue; }
+    if (prefix.startsWith(IDENTITY_PREFIX) || prefix === DRY_RUN_MARKER) { continue; }
+    found.push({ receiver: 'stream', method: 'write', tag: match[2] });
+  }
+  return found;
+}
+
+// Every packages/<pkg>/{src,servers}/**/*.js outside a harness/fixture path, plus web's
 // browser runtime (packages/web/core/js) — shipped source that logs to the
 // visitor's console, so it carries the same tag. The harness exemption does NOT
 // apply inside core/js: its `pages/test/` tree is web's own DEMO PAGES (real
@@ -87,8 +107,10 @@ function sourceFiles() {
   for (const pkg of fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
     if (!pkg.isDirectory()) { continue; }
     if (EXEMPT_PACKAGES.has(pkg.name)) { continue; }
-    const src = path.join(PACKAGES_DIR, pkg.name, 'src');
-    if (fs.existsSync(src)) { walk(src, { exemptHarnessPaths: true }); }
+    for (const tree of SHIPPED_TREES) {
+      const dir = path.join(PACKAGES_DIR, pkg.name, tree);
+      if (fs.existsSync(dir)) { walk(dir, { exemptHarnessPaths: true }); }
+    }
   }
   const webRuntime = path.join(PACKAGES_DIR, 'web', 'core', 'js');
   if (fs.existsSync(webRuntime)) { walk(webRuntime, { exemptHarnessPaths: false }); }
@@ -170,11 +192,30 @@ module.exports = defineCases({
     },
 
     {
+      name: 'fixture: a raw stream write that hand-types its tag is caught; a timestamp or the family tag passes',
+      run: (ctx) => {
+        const source = [
+          // The router's two sinks before they took the family tag.
+          'process.stderr.write(`[mcp-router ${level}] ${args.join(\' \')}\\n`);',
+          'process.stderr.write(`[omega-extension ${level}] ${args.join(\' \')}\\n`);',
+          "process.stdout.write('[Build] done\\n');",
+          // Data first, the family tag, and a non-word bracket all pass.
+          'process.stdout.write(`[${ts}] signed ${file}\\n`);',
+          "process.stderr.write(`[@omega.js/mcp-router:${name}] ${level}: ${line}\\n`);",
+          'process.stdout.write(`[??] ${jsonLine}\\n`);',
+        ].join('\n');
+
+        ctx.expect(findHandWrittenWriteTags(source).map((f) => f.tag)).toEqual(['mcp-router ${level}', 'omega-extension ${level}', 'Build']);
+      },
+    },
+
+    {
       name: 'live: no framework source hand-writes a log tag',
       run: (ctx) => {
         const offenders = [];
         for (const file of sourceFiles()) {
-          for (const hit of findHandWrittenTags(fs.readFileSync(file, 'utf8'))) {
+          const source = fs.readFileSync(file, 'utf8');
+          for (const hit of [...findHandWrittenTags(source), ...findHandWrittenWriteTags(source)]) {
             offenders.push(`${path.relative(ROOT, file)} — ${hit.receiver}.${hit.method}('[${hit.tag}] …`);
           }
         }

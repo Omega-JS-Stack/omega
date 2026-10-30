@@ -98,7 +98,7 @@ class LogsCommand extends BaseCommand {
       }
 
       if (argv.raw) {
-        this.log(JSON.stringify(entries, null, 2));
+        this.print(JSON.stringify(entries, null, 2));
         return;
       }
 
@@ -182,7 +182,7 @@ class LogsCommand extends BaseCommand {
 
           // Display
           if (argv.raw) {
-            this.log(JSON.stringify(entry));
+            this.print(JSON.stringify(entry));
           } else {
             this.formatEntry(entry);
           }

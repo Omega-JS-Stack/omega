@@ -21,6 +21,7 @@ const { spawnSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 
 const TestCommand = require('../../dist/cli/commands/test.js');
+const { CLASSIC_PORTS } = require('../../dist/vendor/config/ports.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { decideEmulatorAdoption, readHubLocatorProjectId } = TestCommand;
@@ -28,7 +29,7 @@ const { decideEmulatorAdoption, readHubLocatorProjectId } = TestCommand;
 const OURS = 'demo-sandbox-brand';
 const THEIRS = 'demo-other-brand';
 
-const HUB_PORT = 4400;
+const HUB_PORT = CLASSIC_PORTS.hub;
 
 // The locator firebase-tools writes to os.tmpdir() while a hub is up: the
 // REAL shape, copied from `${os.tmpdir()}/hub-demo-sandbox-brand.json` of a

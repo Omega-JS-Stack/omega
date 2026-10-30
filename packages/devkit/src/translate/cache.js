@@ -12,6 +12,7 @@
 const path = require('node:path');
 const crypto = require('node:crypto');
 const jetpack = require('fs-jetpack');
+const { writeJson } = require('../write-json.js');
 
 /**
  * Cache key for a source string.
@@ -78,7 +79,7 @@ function saveCache(rootDir, lang, namespace, map, currentSources) {
     return;
   }
 
-  jetpack.write(file, `${JSON.stringify(pruned, null, 2)}\n`);
+  writeJson(file, pruned);
 }
 
 module.exports = { hashKey, cachePath, loadCache, saveCache };

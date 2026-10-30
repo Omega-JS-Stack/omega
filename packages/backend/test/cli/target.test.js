@@ -15,6 +15,7 @@
  */
 const { resolveTarget } = require('../../dist/cli/utils/target.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { captureOutput } = require('../helpers/_capture-output.js');
 
 const FIREBASE_INIT_PATH = require.resolve('../../dist/cli/commands/firebase-init.js');
 const FIRESTORE_PATH = require.resolve('../../dist/cli/commands/firestore.js');
@@ -45,10 +46,8 @@ function recordingAdmin() {
 // both the target it asked for and everything it printed.
 async function runSubcommand(commandPath, args, argv) {
   const originalInit = require.cache[FIREBASE_INIT_PATH];
-  const originalLog = console.log;
   const admin = recordingAdmin();
   const asked = [];
-  const printed = [];
 
   require.cache[FIREBASE_INIT_PATH] = {
     id: FIREBASE_INIT_PATH,
@@ -67,8 +66,6 @@ async function runSubcommand(commandPath, args, argv) {
   delete require.cache[commandPath];
   const Command = require(commandPath);
 
-  console.log = (...line) => printed.push(line.map(String).join(' '));
-
   try {
     const main = {
       firebaseProjectPath: __dirname,
@@ -76,9 +73,10 @@ async function runSubcommand(commandPath, args, argv) {
       options: {},
     };
 
-    await new Command(main).execute();
+    const { stdout } = await captureOutput(() => new Command(main).execute());
+
+    return { emulator: asked[0]?.emulator, output: stdout, writes: admin.writes };
   } finally {
-    console.log = originalLog;
     delete require.cache[commandPath];
     if (originalInit) {
       require.cache[FIREBASE_INIT_PATH] = originalInit;
@@ -86,8 +84,6 @@ async function runSubcommand(commandPath, args, argv) {
       delete require.cache[FIREBASE_INIT_PATH];
     }
   }
-
-  return { emulator: asked[0]?.emulator, output: printed.join('\n'), writes: admin.writes };
 }
 
 module.exports = defineCases({

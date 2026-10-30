@@ -12,10 +12,8 @@
       <!-- Brand block: lockup, one-liner, socials -->
       <div class="omega-footer__brand">
         {% capture logo_href %}{% assign temp_href = data.logo.href | default: resolved.config.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-        {% comment %} The VISIBLE logo prefers the bridged vector when the mint produced one (#467) —
-          `brand.images.brandmark` stays the raster OG/social and payment sync need, and an
-          authored `data.logo.src` still outranks both. {% endcomment %}
-        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+        {% include core/brandmark-src.html %}
+        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ brandmark_src }}{% endif %}{% endcapture %}
         {% capture logo_text %}{{ data.logo.text | default: resolved.config.brand.name | omega_liquify }}{% endcapture %}
         {% capture logo_description %}{{ data.logo.description | default: resolved.config.brand.description | omega_liquify }}{% endcapture %}
         {% assign logo_description = logo_description | strip %}
@@ -46,11 +44,7 @@
               {% capture social_href %}{% omega_social platform %}{% endcapture %}
               {% iftruthy social_href %}
                 <a href="{{ social_href }}" class="omega-footer__social-link" aria-label="{{ platform | capitalize }}">
-                  {% comment %} The key names a PLATFORM, not an icon (#929): a social
-                  profile is always a brand mark, so the family is derived at the one
-                  site that knows it, never typed by a brand that only named the
-                  platform. {% endcomment %}
-                  <i class="fa-brands fa-{{ platform }} fa-sm" aria-hidden="true"></i>
+                  {% include frontend/components/link-icon.html id=platform %}
                 </a>
               {% endiftruthy %}
             {% endfor %}

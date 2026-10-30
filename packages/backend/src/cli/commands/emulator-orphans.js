@@ -46,11 +46,9 @@ const PROCESS_TABLE_COMMAND = 'ps -A -o pid=,ppid=,uid=,command=';
 const PROCESS_TABLE_MAX_BUFFER = 16 * 1024 * 1024;
 const PROCESS_READ_TIMEOUT_MS = 5000;
 
-// The settle windows, as DEFAULTS only: the boot passes its own STOP_GRACE_MS,
-// PORT_RELEASE_TIMEOUT_MS and POLL_INTERVAL_MS in, so emulator.js stays the one
-// home of the numbers. They are restated here because the command requires THIS
-// module, never the other way round, and a sweep run standalone must still
-// settle before it answers.
+// The settle windows. The port-release pair lives here alone and the boot
+// imports it; the grace restates emulator.js's STOP_GRACE_MS as a default, since
+// the command requires THIS module and a standalone sweep must still settle.
 const DEFAULT_GRACE_MS = 2000;
 const DEFAULT_PORT_RELEASE_TIMEOUT_MS = 5000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
@@ -305,13 +303,18 @@ async function waitForExit(pids, timeoutMs, readTable, pollIntervalMs) {
 
 /**
  * Poll a port set until nothing is listening or the window closes.
- * @param {number[]} ports - The ports the reaped processes published.
- * @param {Function} isFree - The port probe seam.
- * @param {number} timeoutMs - How long to wait in total.
- * @param {number} pollIntervalMs - How often to look.
+ * @param {number[]} ports - The ports to watch.
+ * @param {object} [options]
+ * @param {Function} [options.isFree] - The port probe seam.
+ * @param {number} [options.timeoutMs] - How long to wait in total.
+ * @param {number} [options.pollIntervalMs] - How often to look.
  * @returns {Promise<number[]>} The ports still held when the window closed.
  */
-async function waitForPorts(ports, isFree, timeoutMs, pollIntervalMs) {
+async function waitForPortsReleased(ports, {
+  isFree = isPortFree,
+  timeoutMs = DEFAULT_PORT_RELEASE_TIMEOUT_MS,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+} = {}) {
   const deadline = Date.now() + timeoutMs;
   let held = [...new Set(ports)];
 
@@ -424,7 +427,7 @@ async function reapMachineOrphans({
       .filter((target) => !spared.includes(target.pid))
       .flatMap((target) => publishedPorts(target.command));
 
-    await waitForPorts(ports, isFree, portReleaseTimeoutMs, pollIntervalMs);
+    await waitForPortsReleased(ports, { isFree: isFree, timeoutMs: portReleaseTimeoutMs, pollIntervalMs: pollIntervalMs });
   }
 
   return { reaped: reaped, killed: killed };
@@ -435,6 +438,8 @@ module.exports = {
   isOrphanedEmulatorFamily: isOrphanedEmulatorFamily,
   describeFamilyMember: describeFamilyMember,
   reapMachineOrphans: reapMachineOrphans,
+  waitForPortsReleased: waitForPortsReleased,
   readProcessTable: readProcessTable,
   readProcessRow: readProcessRow,
+  DEFAULT_POLL_INTERVAL_MS: DEFAULT_POLL_INTERVAL_MS,
 };

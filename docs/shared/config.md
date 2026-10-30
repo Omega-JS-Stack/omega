@@ -69,7 +69,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // target is a sibling key with `type: 'web'` (see Targets below).
   targets: {
     web:       { type: 'web', hosting: { provider: 'github' }, meta: { index }, imagemin, collections, client: { consent, … }, dev: { limitCollections } },   // `hosting` says who SERVES this target's built site (#883): web targets only, `github` by default, which publishes it to the target's own `<brand.id>-<name>` repo and serves it from Pages at the target's url. `meta` holds SITE-WIDE defaults for page-meta values, spelled exactly as a page spells them (#564; `index` is the only key today). No `redirects` key: #466 retired it; a TEMPLATED redirect is a Cloudflare redirect rule (edge.providers.cloudflare.rules.redirect), an enumerable one is a redirect PAGE (docs/web/index.md). client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …): a settings bag the client normalizes, declared as an OPEN object; only the keys a BRAND authors are typed: `consent` (see "Consent" below), plus `auth.config.policy` ('authenticated' | 'unauthenticated' | 'disabled'; absent = no policy, and the auth/admin layouts set theirs in page frontmatter), `exitPopup.enabled` and `serviceWorker.enabled` (both default true, materialized) ([#650](https://github.com/Omega-JS-Stack/omega/issues/650)). collections: the brand's OWN content collections: name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling: collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
-    backend:   { type: 'backend', projectType, auth: { signup: { maxPerIpPerDay } } },   // projectType: 'firebase' (default: Cloud Functions) | 'custom' (the same backend as its own server on PORT, for a container host: no Functions deploy, no emulator lane; see "Backend project type" below). auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
+    backend:   { type: 'backend', projectType, auth: { signup: { maxPerIpPerDay } } },   // projectType: 'firebase' (default: Cloud Functions) | 'custom' (the same backend as its own server on PORT, for a container host: no Functions deploy, no emulator lane; see "Backend project type" below). auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2 (the schema's own `default:`, resolution-only: `materialize: false`, so no brand file gains the key, and the backend's signup guard reads the resolved value). Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { type: 'desktop', omega: { authPersistence }, app: { appId, productName, copyright, category, languages, darkModeSupport },
                  platforms: { mac, windows, linux },
                  autoUpdate: { enabled, autoDownload, startupDelayMs, feedCheckIntervalMs, idleEvalIntervalMs, maxAgeMs },
@@ -909,7 +909,9 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
 
 - **`CLASSIC_PORTS`** — the historical defaults (functions 5001, hosting 5002, firestore
   8080, auth 9099, database 9000, storage 9199, pubsub 8085, ui 4050, website 4000,
-  livereload 35729, cdp 9222). **This map is the ONLY source of those numbers**
+  livereload 35729, cdp 9222), plus `hub: 4400`, firebase-tools' own emulator-hub
+  default, shared by every stack on the machine rather than allocated per run (the
+  backend's orphan sweep and its hub locator read it here). **This map is the ONLY source of those numbers**
   ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)): @omega.js/client
   carried four of them plus a classic dev origin, @omega.js/desktop's url-helpers
   and the desktop auth lib three more, and @omega.js/extension's url-helpers and
@@ -2132,6 +2134,7 @@ const {
   findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file a target with no local-layer file rides
   resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself), bounded at the nearest .git
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
+  ENV_FILE_NAME,       // '.env': the env file's one name, every layer's base file and the backend stage's composed dist/.env
   reloadEnv,           // (startDir, options?) → same — drops the FILE-owned keys, then loads again, so an EDITED value lands and the shell still wins (#724)
   resolveEnvChain,     // (startDir) → { local, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip
@@ -2154,7 +2157,7 @@ const {
   undeclaredAuthoredPaths, // (fileConfig, { target }?) → the same, over one authored file: whole file, then each framework target entry (the migrate pass and the web converter)
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
-  resolvedBrandHost,   // (config) → the BRAND's own host (`brand.url`, top-level `url` only as fallback), lowercased | '' — authDomain validation AND every persona address (#708)
+  resolvedBrandHost,   // (config) → the BRAND's own host (`brand.url`, top-level `url` only as fallback), lowercased | '' — authDomain validation AND every persona address (#708). Home: `src/brand-host.js`, browser-safe and stdlib-only, also the `@omega.js/config/brand-host` subpath; a browser surface reaches it through `@omega.js/client/modules/brand-host.js` (client's build vendors it), which web's dev palette imports
   findSecretKeys,      // (object) → paths of secret-shaped keys, a list position `[0]`
   keyPath, itemPath,   // (parent, key) / (parent, index) → the one spelling of a config path (`seo.github.content[0].org`)
   pathSteps, spellSteps, // path ↔ steps, a list position a number step: the one parser and its inverse

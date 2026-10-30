@@ -29,6 +29,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const MIGRATION_NAME = 'targets-rename';
 const LEGACY_DIR = 'apps';
@@ -59,7 +60,7 @@ function healWorkspacesGlob(brandRoot) {
   manifest.workspaces = manifest.workspaces.map((entry) => (
     entry === `${LEGACY_DIR}/*` ? `${TARGETS_DIR}/*` : entry
   ));
-  jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeJson(manifestPath, manifest);
 }
 
 /**

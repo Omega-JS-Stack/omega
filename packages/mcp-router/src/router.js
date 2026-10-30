@@ -27,6 +27,7 @@ const { resolveSpawn } = require('./lib/env.js');
 const { connectWithDeadline, listToolsOnce } = require('./lib/oneshot.js');
 const { descendantPids, killTree } = require('./lib/kill-tree.js');
 const registry = require('./lib/registry.js');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // ---------- Upstream registry (from disk) ----------
 
@@ -511,5 +512,4 @@ const shutdown = () => (shuttingDown ??= (async () => {
   process.exit(0);
 })());
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+for (const signal of STOP_SIGNALS) process.on(signal, shutdown);

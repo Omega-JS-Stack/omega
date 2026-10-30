@@ -219,6 +219,43 @@ module.exports = defineCases({
       },
     },
 
+    // ─── The one home of the rule ───────────────────────────────────────────────
+
+    {
+      name: 'the brandmark-src include answers the manifest svg when the mint produced one, else the config brandmark',
+      run: async (ctx) => {
+        // A consumer page standing in for any template that reads the rule. The
+        // include either assigns `brandmark_src` or renders the url, so the
+        // probe reads whichever it did.
+        const root = path.join(PKG, '.omega', `brandmark-src-site-${process.pid}`);
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+        jetpack.copy(MINI, root, { overwrite: true });
+        jetpack.write(path.join(root, 'pages', 'brandmark-probe.html'), [
+          '---',
+          'layout: frontend/core/minimal',
+          'permalink: /brandmark-probe',
+          'meta:',
+          '  title: "Brandmark probe"',
+          '  index: false',
+          '---',
+          '{% capture brandmark_rendered %}{% include core/brandmark-src.html %}{% endcapture %}',
+          '<div id="brandmark-probe">{{ brandmark_src | default: brandmark_rendered | strip }}</div>',
+          '',
+        ].join('\n'));
+
+        const probe = async (brandmarkSvg, name) => {
+          const pages = await buildSite(root, rasterData, { assetManifest: manifestWith(brandmarkSvg) }, name);
+          const match = pages.get('/brandmark-probe').match(/<div id="brandmark-probe">([^<]*)<\/div>/);
+          ctx.expect(match, 'the probe page renders its brandmark').toBeTruthy();
+          return match[1];
+        };
+
+        ctx.expect(await probe(SVG_URL, 'brandmark-src-svg'), 'the minted svg wins').toBe(SVG_URL);
+        ctx.expect(await probe(null, 'brandmark-src-raster'), 'no svg on disk, the configured raster answers').toBe(PNG_URL);
+      },
+    },
+
     // ─── The rest of the visible lockups ─────────────────────────────────────────
 
     {

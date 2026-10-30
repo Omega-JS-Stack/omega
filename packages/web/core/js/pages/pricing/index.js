@@ -402,8 +402,8 @@ function setupCurrentPlanIndicator() {
 
 function adjustNavbarOffset() {
   const $promoBanner = document.getElementById('pricing-promo-banner');
-  // The fixed nav the banner pushes down (classy v2's .omega-nav; .navbar-wrapper for legacy themes)
-  const $nav = document.querySelector('.omega-nav, .navbar-wrapper');
+  // The fixed nav the banner pushes down
+  const $nav = document.querySelector('.omega-nav');
 
   if (!$promoBanner || !$nav) {
     return;
@@ -411,6 +411,9 @@ function adjustNavbarOffset() {
 
   // Remove hidden attribute
   $promoBanner.removeAttribute('hidden');
+
+  // The close button puts the banner and the nav back where they started
+  document.getElementById('pricing-promo-close').addEventListener('click', resetNavbarOffset);
 
   // Full banner height — the banner sits entirely ABOVE the nav, never
   // bleeding into it (the nav's margin transition makes the push-down glide)
@@ -422,4 +425,10 @@ function adjustNavbarOffset() {
   // ([#764](https://github.com/Omega-JS-Stack/omega/issues/764)). The page's
   // own CSS holds whatever room the banner needs.
   $nav.style.marginTop = `${bannerOffset}px`;
+}
+
+// Close the promo banner and give the nav back the room it lent it
+function resetNavbarOffset() {
+  document.getElementById('pricing-promo-banner').hidden = true;
+  document.querySelector('.omega-nav').style.marginTop = '';
 }

@@ -692,6 +692,8 @@ module.exports = defineCases({
         fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: 'omega', version: '1.0.0', private: true }, null, 2)}\n`);
         fs.writeFileSync(path.join(root, 'packages', 'devkit', 'package.json'), `${JSON.stringify({ name: '@omega.js/devkit', version: '1.0.0', private: true }, null, 2)}\n`);
         fs.copyFileSync(GUARD, path.join(root, 'packages', 'devkit', 'tools', 'prepare-guard.js'));
+        // The guard's own ../src requires resolve to the real devkit source beside it.
+        fs.symlinkSync(path.join(__dirname, '..', 'src'), path.join(root, 'packages', 'devkit', 'src'), 'dir');
 
         // The package: src/, an EMPTY dist (stale, so the heal fires), and a prepare
         // that strips the gate and then DIES: prepare-package's manifest write
@@ -729,6 +731,38 @@ module.exports = defineCases({
     },
 
     {
+      name: 'the guard and local.js answer isMonorepoRoot from the one function in monorepo-root.js',
+      run: (ctx) => {
+        // A pass-through spy on the one export, then a fresh guard: a private copy
+        // inside the guard decides the same case without ever asking it.
+        const scratch = makeScratch(ctx);
+        const { packageDir } = writeMonorepo(scratch);
+        const home = require('../src/monorepo-root');
+        const asked = [];
+        const original = home.isMonorepoRoot;
+        const guardPath = require.resolve('../tools/prepare-guard');
+        home.isMonorepoRoot = (dir) => {
+          asked.push(dir);
+          return original(dir);
+        };
+        ctx.after(() => {
+          home.isMonorepoRoot = original;
+          delete require.cache[guardPath];
+        });
+        delete require.cache[guardPath];
+
+        const decision = require(guardPath).prepareDecision({
+          packageDir,
+          env: { npm_command: 'install', npm_config_local_prefix: path.join(scratch, '..', 'brand') },
+        });
+
+        ctx.expect(decision.monorepoRoot).toBe(scratch);
+        ctx.expect(asked, 'the guard found the root through monorepo-root.js').toContain(scratch);
+        ctx.expect(local.isMonorepoRoot, 'local.js hands out that same function').toBe(original);
+      },
+    },
+
+    {
       name: 'every dist-building package carries the gate, with rewire ahead of the hook that can fail',
       run: (ctx) => {
         const packagesDir = path.join(__dirname, '..', '..');
@@ -753,7 +787,7 @@ module.exports = defineCases({
           ctx.expect(after[0], `${name} rewires before any hook that can fail`).toBe(rewireHook);
         }
 
-        ctx.expect(gated).toEqual(['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
+        ctx.expect(gated).toEqual(['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web']);
       },
     },
   ],

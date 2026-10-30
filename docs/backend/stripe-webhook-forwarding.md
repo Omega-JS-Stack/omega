@@ -3,8 +3,8 @@
 @omega.js/backend auto-starts Stripe CLI webhook forwarding when running `npx omega serve` or `npx omega emulator`. This forwards Stripe test webhooks to the local server so the full payment pipeline works end-to-end during development.
 
 **Requirements:**
-- `STRIPE_SECRET_KEY` set in `functions/.env`
-- `OMEGA_WEBHOOK_KEY` set in `functions/.env` (`OMEGA_ADMIN_KEY` also accepted as a legacy fallback)
+- `STRIPE_SECRET_KEY` set in the `.env` cascade (the target's `.env`, else the brand's)
+- `OMEGA_WEBHOOK_KEY` set in the same cascade (`OMEGA_ADMIN_KEY` also accepted as a legacy fallback)
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) installed
 
 **Standalone usage:**

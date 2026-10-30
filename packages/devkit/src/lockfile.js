@@ -28,6 +28,7 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const { safeInstall } = require('./safe-install.js');
+const { writeJson } = require('./write-json.js');
 const { brandLockfileDrift, staleLockPaths } = require('./brand-version.js');
 
 /** A path equal to base, or nested beneath it. */
@@ -104,7 +105,7 @@ function pruneLockfile({ root, log }) {
   const dropped = dropDrift(lock, drift);
 
   if (pruned.length || dropped.length) {
-    jetpack.write(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    writeJson(lockPath, lock);
   }
   if (log && pruned.length) log(`Pruned the lock entries of folders no longer on disk (${pruned.join(', ')}) so npm stops honoring what they declare`);
   if (log && dropped.length) log(`Dropped the stale lock entries of ${dropped.join(', ')} so npm resolves them from the manifests`);

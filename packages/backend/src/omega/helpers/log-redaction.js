@@ -9,13 +9,11 @@
 
 const redactSecret = require('./redact-secret.js');
 
-// The channels a credential arrives on, one-to-one with the lanes
-// context/authenticate.js reads: the bearer/API-key header, the admin key, the
-// __session cookie, and the two payload keys. Anything here is rendered
-// presence + last-4 before it reaches a log line
-// ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
+// The header channels a credential arrives on, one-to-one with the lanes
+// context/authenticate.js reads: the bearer/API-key header, the admin key and
+// the __session cookie. Anything here is rendered presence + last-4 before it
+// reaches a log line ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
 const CREDENTIAL_HEADERS = ['authorization', 'omega-admin-key', 'cookie'];
-const CREDENTIAL_DATA_KEYS = ['apikey', 'authenticationtoken'];
 
 // The credential FAMILIES a RESPONSE carries, at any depth. `GET /omega/user`
 // answers the whole user record, so the response log line printed every
@@ -67,10 +65,9 @@ function projectUserForLog(user) {
 
 /**
  * A COPY of `source` with every credential channel rendered by `render`.
- * A copy because ctx.request.headers IS req.headers and ctx.request.data is
- * what the route handler reads next — redacting in place would break the
- * authentication the line is describing.
- * @param {object} source - Headers or request data.
+ * A copy because ctx.request.headers IS req.headers — redacting in place
+ * would break the authentication the line is describing.
+ * @param {object} source - The request headers.
  * @param {string[]} channels - Lower-cased key names to redact.
  * @param {function} render - (value, key) → the string to log instead.
  * @returns {object} A shallow copy, credential channels replaced.
@@ -107,34 +104,37 @@ function redactHeadersForLog(headers) {
 }
 
 /**
- * The request data a log line may carry: the two payload credential lanes
- * (`apiKey`, `authenticationToken`) redacted, every other field intact — the
- * line is the primary request trace and stays readable
- * ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
+ * The request data a log line may carry: every credential key redacted at any
+ * depth by the response side's family test (which covers the payload lanes
+ * `apiKey` and `authenticationToken`), every other field intact. The line is
+ * the primary request trace and stays readable.
  * @param {object} data - ctx.request.data
  * @returns {object} A copy safe to log.
  */
 function redactDataForLog(data) {
-  return redactChannels(data, CREDENTIAL_DATA_KEYS, (value) => redactSecret(value));
+  const object = data && typeof data === 'object' ? data : {};
+
+  return { ...redactResponseForLog(object) };
 }
 
 /**
- * The response a log line may carry: a DEEP copy with every credential key
- * rendered by `redactSecret()`, at any depth and whatever its case.
+ * A response or request payload as a log line may carry it: every credential
+ * key rendered by `redactSecret()`, at any depth and whatever its case.
  *
  * The route logger's `Sending response` line stringifies whatever a route
  * answers, and `GET /omega/user` answers the whole user record, every
- * `connections.<provider>.<id>.token` and `api.privateKey` included. A copy,
- * because the object is what `res.json()` sends next.
- * @param {*} response - Whatever respond() is about to send.
- * @returns {*} A copy safe to log; anything that is not an object passes through.
+ * `connections.<provider>.<id>.token` and `api.privateKey` included. Only the
+ * path to a credential is copied, a clean branch comes back as the SAME
+ * reference, so the object `res.json()` sends next is never written through.
+ * @param {*} response - Whatever respond() is about to send, or ctx.request.data.
+ * @returns {*} A value safe to log; anything that is not an object passes through.
  */
 function redactResponseForLog(response) {
   if (!response || typeof response !== 'object') {
     return response;
   }
 
-  // Anything that serializes itself is walked through THAT shape: the copy
+  // Anything that serializes itself is walked through THAT shape: the walk
   // reads own properties, and a Date has none, so a walked Date logged as `{}`
   // where JSON.stringify would have shown its ISO string.
   if (typeof response.toJSON === 'function') {
@@ -142,29 +142,39 @@ function redactResponseForLog(response) {
   }
 
   if (Array.isArray(response)) {
-    return response.map((item) => redactResponseForLog(item));
+    const items = response.map((item) => redactResponseForLog(item));
+
+    return items.some((item, index) => item !== response[index]) ? items : response;
   }
 
-  const redacted = {};
+  let redacted = null;
 
   for (const [key, value] of Object.entries(response)) {
-    if (!isCredentialResponseKey(key)) {
-      redacted[key] = redactResponseForLog(value);
+    const next = isCredentialResponseKey(key) ? renderCredential(value) : redactResponseForLog(value);
 
-      continue;
-    }
-
-    // An absent credential says so: "no token stored" is a diagnostic the line
-    // exists for, and it gives nothing away. A flag or a count under a
-    // credential-shaped name (`hasPassword: true`) is not a secret either.
-    if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') {
-      redacted[key] = value;
-    } else {
-      redacted[key] = typeof value === 'string' ? redactSecret(value) : REDACTED_OBJECT;
+    if (next !== value) {
+      redacted = redacted || { ...response };
+      redacted[key] = next;
     }
   }
 
-  return redacted;
+  return redacted || response;
+}
+
+/**
+ * What a value under a credential key logs as.
+ * @param {*} value - The value the credential key holds.
+ * @returns {*} The rendered value.
+ */
+function renderCredential(value) {
+  // An absent credential says so: "no token stored" is a diagnostic the line
+  // exists for, and it gives nothing away. A flag or a count under a
+  // credential-shaped name (`hasPassword: true`) is not a secret either.
+  if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') {
+    return value;
+  }
+
+  return typeof value === 'string' ? redactSecret(value) : REDACTED_OBJECT;
 }
 
 /**
@@ -194,7 +204,6 @@ function safeStringify(obj, maxLength = 100) {
 
 module.exports = {
   CREDENTIAL_HEADERS,
-  CREDENTIAL_DATA_KEYS,
   projectUserForLog,
   redactHeadersForLog,
   redactDataForLog,

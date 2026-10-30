@@ -90,7 +90,7 @@ The consumer auth URL is resolved from `omega.getWebsiteUrl()` (auto-resolves lo
 ### Admin (Stdio)
 
 ```bash
-npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 28 tools
+npx omega mcp    # Reads OMEGA_ADMIN_KEY from the .env cascade (the target's, then the brand's), staged into dist/.env: sees all 28 tools
 ```
 
 ### User (Stdio)

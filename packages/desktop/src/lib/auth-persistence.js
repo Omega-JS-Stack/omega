@@ -38,6 +38,7 @@
 // AsyncStorage-shaped backend — here, the active strategy.
 
 const LoggerLite = require('./logger-lite.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const logger = new LoggerLite('auth-persistence');
 
@@ -45,7 +46,7 @@ const FILE_NAME = 'omega-auth-session.json';
 
 // ── safeStorage strategy ─────────────────────────────────────────────────────
 // One JSON file mapping firebase persistence keys → base64(safeStorage ciphertext).
-// Reads/writes go through fs.promises; a corrupt file or failed decrypt degrades to
+// Reads go through fs.promises, writes through devkit's writeJson; a corrupt file or failed decrypt degrades to
 // "no session" (warn + start signed out) — never a boot crash.
 const safeStorageStrategy = {
   name: 'safeStorage',
@@ -67,8 +68,7 @@ const safeStorageStrategy = {
   },
 
   async _writeMap(map) {
-    const fs = require('fs').promises;
-    await fs.writeFile(safeStorageStrategy._filePath(), JSON.stringify(map), 'utf8');
+    writeJson(safeStorageStrategy._filePath(), map);
   },
 
   async available() {

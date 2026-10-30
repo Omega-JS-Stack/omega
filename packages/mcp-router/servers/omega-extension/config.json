@@ -3,7 +3,7 @@
   "default": "auto",
   "command": "node",
   "args": [
-    "${MCP_ROUTER_ROOT}/src/launch-omega-extension.js"
+    "${MCP_ROUTER_ROOT}/dist/launch-omega-extension.js"
   ],
   "tools": [
     {

@@ -165,8 +165,8 @@ config:
   <header class="omega-checkout__head" data-omega-reveal="fade">
     <h1 class="omega-checkout__head-mark mb-0">
       <a href="/" class="omega-checkout__brand">
-        {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
-        <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} logo" width="24" height="24">
+        {% include core/brandmark-src.html %}
+        <img src="{{ brandmark_src | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} logo" width="24" height="24">
         <span class="fw-semibold">{{ resolved.config.brand.name }}</span>
       </a>
     </h1>

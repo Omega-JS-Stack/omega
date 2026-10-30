@@ -13,6 +13,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const CACHE_VERSION = 2; // v2: the per-target map key renamed apps -> targets (#455)
 
@@ -50,7 +51,7 @@ function readCache(brandRoot) {
  */
 function writeCache(brandRoot, cache) {
   try {
-    jetpack.write(cacheFile(brandRoot), cache);
+    writeJson(cacheFile(brandRoot), cache);
   } catch (error) {
     console.log(`      ${chalk.yellow('⚠')} update cache not written${chalk.dim(`: ${error.message}`)}`);
   }

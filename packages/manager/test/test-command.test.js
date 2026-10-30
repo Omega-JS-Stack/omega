@@ -56,9 +56,9 @@ function linkTargetBin(brand, target, pkg) {
 /**
  * Stage a brand monorepo with a web target (dep in its own package.json) and a
  * backend target (functions/ layout), plus fake @omega.js/web + @omega.js/backend
- * packages hoisted to the brand root.
+ * packages hoisted to the brand root; `extension` adds an extension target the same way.
  */
-function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {}) {
+function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e, extension = false } = {}) {
   // realpath: macOS tmpdir is a symlink (/var → /private/var) and spawned
   // children report the real cwd
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-test-cmd-')));
@@ -69,7 +69,7 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: { type: 'web' }, backend: ${JSON.stringify({ type: 'backend', ...backend })} },
+  targets: { web: { type: 'web' }, backend: ${JSON.stringify({ type: 'backend', ...backend })}${extension ? ", extension: { type: 'extension' }" : ''} },
 }
 `);
 
@@ -85,7 +85,15 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
   }));
 
 
-  for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
+  const frameworks = [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']];
+  if (extension) {
+    write(path.join(brand, 'targets', 'extension', 'package.json'), JSON.stringify({
+      name: 'extension', private: true, devDependencies: { '@omega.js/extension': '*' }, scripts: { test: 'omega test' },
+    }));
+    frameworks.push(['@omega.js/extension', 'extension']);
+  }
+
+  for (const [pkg, short] of frameworks) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
     write(path.join(pkgDir, 'package.json'), JSON.stringify({
       name: pkg, bin: { omega: './bin.js' },
@@ -549,6 +557,22 @@ module.exports = defineCases({
     },
 
     {
+      name: 'every test flag the root does not own reaches the target after --: --layer, --filter, --offline, an unknown one',
+      run: async (ctx) => {
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const { brand } = stageBrand({ extension: true });
+        const { _: positionals, ...flags } = require('@omega.js/devkit/argv').parseArgv(['test', '--layer=background', '--filter=x', '--key=X', '--offline'], { booleans: BOOLEAN_FLAGS });
+        const code = await runTestCommand(brand, positionals.slice(1), flags);
+
+        const extension = readCalls(brand).find((call) => call.name === 'extension');
+        ctx.expect(extension, 'the extension target ran').toBeTruthy();
+        ctx.expect(extension.argv[0]).toBe('test');
+        ctx.expect([...extension.argv.slice(1)].sort(), 'a layer pick from the root is never silently the full run').toEqual(['--filter=x', '--key=X', '--layer=background', '--offline']);
+        ctx.expect(code).toBe(undefined);
+      },
+    },
+
+    {
       name: 'a --lane no framework declares runs nothing and still exits clean',
       run: async (ctx) => {
         const { brand } = stageBrand({ lanes: { '@omega.js/backend': ['stripe-live'] } });
@@ -698,6 +722,27 @@ module.exports = defineCases({
         ctx.expect(calls.length).toBe(2);
         for (const call of calls) {
           ctx.expect(call.argv).toEqual(['test', '--extended', 'full:']);
+        }
+      },
+    },
+
+    {
+      name: '`omega test --offline mgr:` parses as a value-less flag and still carries the scope',
+      run: async (ctx) => {
+        const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+        const argv = require('@omega.js/devkit/argv').parseArgv(['test', '--offline', 'mgr:'], { booleans: BOOLEAN_FLAGS });
+
+        ctx.expect(argv.offline, 'undeclared, the scope is read as the flag\'s value').toBe(true);
+        ctx.expect(argv._, 'the scope stayed a positional').toEqual(['test', 'mgr:']);
+
+        const { brand } = stageBrand();
+        const { _: positionals, ...flags } = argv;
+        await runTestCommand(brand, positionals.slice(1), flags);
+
+        const calls = readCalls(brand);
+        ctx.expect(calls.length).toBe(2);
+        for (const call of calls) {
+          ctx.expect([...call.argv].sort(), `${call.name} hears the flag and the scope`).toEqual(['--offline', 'mgr:', 'test']);
         }
       },
     },

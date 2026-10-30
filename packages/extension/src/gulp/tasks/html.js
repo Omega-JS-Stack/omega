@@ -6,7 +6,7 @@ const { src, dest, watch, series } = require('gulp');
 const { Transform } = require('node:stream');
 const jetpack = require('fs-jetpack');
 const path = require('path');
-const { template } = require('node-powertools');
+const { renderTokens, unresolvedTokens } = require('../lib/tokens.js');
 
 // Load package
 const package = build.getPackage('main');
@@ -43,6 +43,7 @@ function html(complete) {
   // Process HTML files
   return src(input)
     .pipe(processHtml(templateContent))
+    .on('error', (error) => complete(error))
     .pipe(dest(output))
     .on('finish', () => {
       logger.log('Finished!');
@@ -107,19 +108,16 @@ function processHtml(templateContent) {
           cacheBust: Date.now(),
         };
 
-        // Apply template with custom brackets
-        // First, template the body content to replace any {{ }} placeholders in the view
-        const templatedBody = template(bodyContent, data, {
-          brackets: ['{{', '}}'],
-        });
+        // Two passes: the view's own tokens first, then the outer page template
+        // around it
+        data.content = renderTokens(bodyContent, data);
+        const rendered = renderTokens(templateContent, data);
 
-        // Update data with templated body
-        data.content = templatedBody;
-
-        // Then template the outer page template
-        const rendered = template(templateContent, data, {
-          brackets: ['{{', '}}'],
-        });
+        // A token nothing resolves would ship literally in the page
+        const leftover = unresolvedTokens(rendered);
+        if (leftover.length > 0) {
+          throw new Error(`Cannot build src/views/${viewNameWithPath}.html: unresolved token(s) ${leftover.join(', ')}. Check config/omega.json5 and the token spelling`);
+        }
 
         // Update file contents
         file.contents = Buffer.from(rendered);
@@ -161,3 +159,4 @@ function htmlWatcher(complete) {
 
 // Export task
 module.exports = series(html, htmlWatcher);
+module.exports.html = html;

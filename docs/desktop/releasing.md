@@ -125,13 +125,14 @@ You should see ✓ for each secret in the output.
 
 ## Local release (manual, single-platform)
 
-For testing the full sign + notarize + publish flow on your own machine:
+`npx omega release --target=<name>` builds nothing on this machine: it dispatches the CI workflow below and streams its run ([Multi-platform release via CI](#multi-platform-release-via-ci)). The LOCAL lane, for testing the full sign + notarize + publish flow on your own machine and for the host platform only, is the target's `release:local` script, `omega publish --local`, the same command CI's mac and linux legs run and the one `npx omega deploy --target=<name> --direct` runs:
 
 ```bash
-npx omega release --target=<name>   # at the brand root
+npx omega publish --target=<name> --local   # at the brand root
+npm run release:local                        # inside targets/<name>/
 ```
 
-This runs as a **single gulp invocation** (`gulp publish` with `OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true`):
+`--local` cleans first, then the ship-credential check and the STRICT `validate-certs` run, then a **single gulp invocation** (`gulp publish` with `OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true`):
 1. **build** — defaults → distribute → bundle/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
 2. **release** — `electron-builder build --publish always`
    - Signs the `.app` with your Developer ID Application cert

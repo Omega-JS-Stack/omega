@@ -2,6 +2,7 @@ const { generateKeyPairSync } = require('node:crypto');
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 /**
  * Build a FAKE service-account.json for an emulator-only demo-* project:
@@ -51,18 +52,12 @@ class ServiceAccountTest extends BaseTest {
     return true;
   }
 
-  /** First existing SA in the source chain; target root as the write default. */
+  /** First existing SA in devkit's one lookup; target root as the write default. */
   resolveSaPath() {
-    const { findBrandRoot } = require('@omega.js/config');
-    const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
-    const path = require('path');
-    const targetRootPath = `${this.self.firebaseProjectPath}/service-account.json`;
-    const brandRoot = findBrandRoot(this.self.firebaseProjectPath);
-    const brandPath = brandRoot ? path.join(brandRoot, SERVICE_ACCOUNT_REL) : null;
+    const { resolveServiceAccountPath } = require('@omega.js/devkit/service-account');
 
-    if (jetpack.exists(targetRootPath)) return targetRootPath;
-    if (brandPath && jetpack.exists(brandPath)) return brandPath;
-    return targetRootPath;
+    return resolveServiceAccountPath(this.self.firebaseProjectPath)
+      || `${this.self.firebaseProjectPath}/service-account.json`;
   }
 
   async fix() {
@@ -71,7 +66,7 @@ class ServiceAccountTest extends BaseTest {
     // expect it to exist.
     if (this.isDemoProject) {
       const saPath = `${this.self.firebaseProjectPath}/service-account.json`;
-      jetpack.write(saPath, `${JSON.stringify(buildDemoServiceAccount(this.self.projectId), null, 2)}\n`);
+      writeJson(saPath, buildDemoServiceAccount(this.self.projectId));
       this.restage();
       console.log(chalk.green(`  ✓ Generated fake service-account.json for demo project ${chalk.bold(this.self.projectId)} (throwaway local key)`));
       return;

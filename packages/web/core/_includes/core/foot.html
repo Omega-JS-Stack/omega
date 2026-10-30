@@ -364,32 +364,34 @@
 {% endiftruthy %}
 
 <!-- Schema - Product -->
-{%- if page-is-product == true -%}
+{%- iftruthy resolved.schema.product.enabled -%}
+  {% assign schema-product = resolved.schema.product %}
+  {% assign product-price = schema-product.price | default: resolved.pricing.lowestPrice %}
   <script id="omega-schema-product" type="application/ld+json">
     {
       "@context": "http://schema.org",
       "@type": "Product",
       "@id": "{{ resolved.config.url }}{{ page.url }}#Product",
       "url": "{{ resolved.config.url }}{{ page.url }}",
-      "name": "{{ resolved.product.title | omega_liquify }}",
-      "description": "{{ resolved.product.description | omega_liquify }}",
-      "image": [
-        "{{ resolved.config.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
-      ],
+      "name": "{{ schema-product.name | default: resolved.config.brand.name | omega_json_escape }}",
+      "description": "{{ schema-product.description | default: resolved.meta.description | omega_liquify | omega_json_escape }}",
+      "image": "{% omega_external resolved.config.brand.images.brandmark %}",
       "brand": {
         "@id": "{{ resolved.config.url }}#{{ brand-type }}"
-      },
+      }
+      {%- unless product-price == nil %},
       "offers": {
         "@type": "Offer",
         "url": "{{ resolved.config.url }}{{ page.url }}",
         "priceCurrency": "{{ resolved.config.payment.currency }}",
-        "price": "{{ resolved.product.price }}",
+        "price": "{{ product-price }}",
         "itemCondition": "http://schema.org/NewCondition",
         "availability": "http://schema.org/InStock"
       }
+      {%- endunless %}
     }
   </script>
-{% endif %}
+{% endiftruthy %}
 
 <!-- Schema - SoftwareApplication -->
 {%- iftruthy resolved.schema.software_application.enabled -%}

@@ -17,6 +17,7 @@
 const { basename, join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const { SECRETS_DIR, GOOGLE_OAUTH_REL } = require('@omega.js/devkit/service-account');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const LEGACY_FILE = 'oauth.json';
 const CANONICAL_FILE = basename(GOOGLE_OAUTH_REL);
@@ -49,7 +50,7 @@ function convertLegacyOAuthSecret(brandRoot) {
     return { converted: false, reason: `${LEGACY_FILE} carries no googleClientId/googleClientSecret pair` };
   }
 
-  jetpack.write(canonicalPath, {
+  writeJson(canonicalPath, {
     clientId: legacy.googleClientId,
     clientSecret: legacy.googleClientSecret,
   });

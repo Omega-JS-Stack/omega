@@ -13,6 +13,7 @@ const png2icons = require('png2icons');
 const { FAVICON_CONFIG } = require('../lib/assets-config.js');
 const { faviconImageFiles, WEBMANIFEST_NAME } = require('../lib/derived.js');
 const { isStale } = require('../../../lib/stale.js');
+const { writeJson, formatJson } = require('@omega.js/devkit/write-json');
 
 module.exports = async function writeFavicons(context) {
   const { brandConfig, brandmarkPath, outDir, options } = context;
@@ -23,7 +24,7 @@ module.exports = async function writeFavicons(context) {
   const staleImages = faviconImageFiles().filter((name) => isStale(brandmarkPath, join(outputDir, name)));
 
   const brandName = brandConfig.brand.name;
-  const desiredManifest = JSON.stringify({
+  const desiredManifest = {
     name: brandName,
     short_name: brandName,
     icons: [
@@ -33,10 +34,10 @@ module.exports = async function writeFavicons(context) {
     theme_color: '#ffffff',
     background_color: '#ffffff',
     display: 'standalone',
-  }, null, 2);
+  };
 
   const manifestPath = join(outputDir, WEBMANIFEST_NAME);
-  const manifestStale = jetpack.read(manifestPath) !== desiredManifest;
+  const manifestStale = jetpack.read(manifestPath) !== formatJson(desiredManifest);
 
   if (staleImages.length === 0 && !manifestStale) {
     console.log(`      ${chalk.green('✓')} Favicons in sync ${chalk.dim(`(${FAVICON_CONFIG.files.length + 2} files fresh)`)}`);
@@ -73,7 +74,7 @@ module.exports = async function writeFavicons(context) {
   }
 
   if (manifestStale) {
-    jetpack.write(manifestPath, desiredManifest);
+    writeJson(manifestPath, desiredManifest);
     generated++;
   }
 

@@ -7,13 +7,15 @@
  * popup's `omega:syncAuth` gets a FRESH token for the same uid; a popup opened
  * afterwards renders signed in. Then the worker saves a note, Chrome stops it,
  * and a `notes:count` from a document with no omega context wakes it: the
- * restored session counts the note. Offline: host-resolver rules send the brand
+ * restored session counts the note. Last, a page that crashes mid-ask fails
+ * the ask at once. Offline: host-resolver rules send the brand
  * host to 127.0.0.1, nothing else. OMEGA_SKIP_E2E=1 skips; no Chrome is a SKIP.
  */
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const { startPlaygroundEmulator, stopPlaygroundEmulator, playgroundProjectId } = require('./_emulator');
 const { mintPersonaToken } = require('../../scripts/roster-persona');
@@ -28,11 +30,13 @@ const EXTENSION_DIR = path.join(LOG_DIR, 'extension');
 // it back the way a browser does: by running the file.
 const { readBakedBuildJson } = require(path.join(ROOT, 'packages', 'extension', 'src', 'gulp', 'tasks', 'utils', 'build-json.js'));
 const { attachLiveWorker } = require(path.join(ROOT, 'packages', 'extension', 'src', 'test', 'runners', 'service-worker.js'));
+const { whileLive } = require('@omega.js/devkit/cdp-live');
 
 // This lane's own seeded persona, never shared with another suite
 const PERSONA_LOCALPART = '_test.extension-auth-e2e';
 
 const BUILD_TIMEOUT = 300000;
+const WORKER_ATTACH_TIMEOUT = 30000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripAnsi = (text) => text.replace(/\x1B\[[0-9;]*m/g, '');
@@ -92,10 +96,28 @@ function askSyncAuth(page) {
   }));
 }
 
-function askBackground(sender, command, payload) {
-  return sender.evaluate((name, input) => chrome.runtime.sendMessage({
-    destination: 'background', command: name, payload: input,
-  }), command, payload);
+// One messenger-shaped message from `sender` (an extension-origin page) to
+// background, through the page's own CDP session raced by devkit's whileLive:
+// a page that crashes mid-command reports only Inspector.targetCrashed, and
+// the evaluate would otherwise never settle.
+async function askBackground(sender, command, payload) {
+  const session = await sender.createCDPSession();
+  const message = JSON.stringify({ destination: 'background', command, payload });
+  try {
+    const { result, exceptionDetails } = await whileLive(session, session.send('Runtime.evaluate', {
+      expression: `chrome.runtime.sendMessage(${message})`,
+      awaitPromise: true,
+      returnByValue: true,
+    }), () => new Error('the page crashed mid-command'));
+    if (exceptionDetails) {
+      throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
+    }
+    return result.value;
+  } catch (error) {
+    throw new Error(`askBackground ${command}: ${error.message}`);
+  } finally {
+    await session.detach().catch(() => {});
+  }
 }
 
 module.exports = defineCases({
@@ -196,7 +218,7 @@ module.exports = defineCases({
         const manifestPath = path.join(EXTENSION_DIR, 'manifest.json');
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         manifest.permissions = [...new Set([...(manifest.permissions || []), 'tabs'])];
-        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+        writeJson(manifestPath, manifest);
 
         ctx.state.popupPath = manifest.action?.default_popup;
         if (!ctx.state.popupPath) {
@@ -405,7 +427,7 @@ module.exports = defineCases({
         // answering. The lane's console client from boot pauses the new worker on
         // start, so attaching it live releases that pause.
         const answer = askBackground(state.sender, 'notes:count').catch((error) => ({ error: error.message }));
-        const live = await attachLiveWorker(state.browser, state.extensionId, 30000);
+        const live = await attachLiveWorker(state.browser, state.extensionId, WORKER_ATTACH_TIMEOUT);
         await live.detach().catch(() => {});
         const counted = await Promise.race([
           answer,
@@ -413,6 +435,38 @@ module.exports = defineCases({
         ]);
         expect(counted, 'the restarted worker should count the signed-in notes').toEqual({ ok: true, count: state.signedInCount });
         console.log(`    count ${counted.count} after the restart`);
+      },
+    },
+
+    {
+      // Last on purpose: the crash can take the extension's renderer with it.
+      name: 'askBackground fails at once when its page crashes mid-command',
+      run: async (ctx) => {
+        const { state, expect } = ctx;
+        // Background holds `e2e:hold` open forever and logs its arrival, so the
+        // crash lands while the ask is surely in flight
+        const live = await attachLiveWorker(state.browser, state.extensionId, WORKER_ATTACH_TIMEOUT);
+        await live.send('Runtime.enable');
+        const held = new Promise((resolve) => live.on('Runtime.consoleAPICalled', ({ args }) => {
+          if (args[0]?.value === 'e2e:held') resolve();
+        }));
+        await live.send('Runtime.evaluate', {
+          expression: `chrome.runtime.onMessage.addListener((message) => {
+            if (message.command !== 'e2e:hold') return undefined;
+            console.log('e2e:held');
+            return true;
+          })`,
+        });
+
+        const page = await state.browser.newPage();
+        await page.goto(`chrome-extension://${state.extensionId}/manifest.json`);
+        const asked = askBackground(page, 'e2e:hold').then(() => 'answered', (error) => error.message);
+        await held;
+
+        const control = await page.createCDPSession();
+        control.send('Page.crash').catch(() => {});
+        expect(await asked).toBe('askBackground e2e:hold: the page crashed mid-command');
+        await live.detach().catch(() => {});
       },
     },
   ],

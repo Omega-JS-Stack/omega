@@ -125,6 +125,47 @@ module.exports = defineCases({
       },
     },
     {
+      // The preload's environment surface is the mixin main takes, so the two
+      // answer alike for one baked config in every lane
+      name: 'the preload answers getEnvironment, isTesting and getApiUrl as main does, from the one mixin',
+      run: (ctx) => {
+        const mixin = require(path.join(ROOT, 'lib', '_environment-mixin.js'));
+        const main = new (require(path.join(ROOT, 'main.js')).Omega)();
+        const preload = new (require(path.join(ROOT, 'preload.js')).Omega)();
+        for (const name of ['getEnvironment', 'isTesting', 'getApiUrl']) {
+          ctx.expect(preload[name], `preload.${name}`).toBe(mixin[name]);
+        }
+
+        const baked = { environment: 'production', brand: { id: 'demo', url: 'https://demo.example.com' }, dev: { ports: { hosting: 5012 } } };
+        main.config = baked;
+        preload.config = baked;
+
+        const ports = { OMEGA_HOSTING_PORT: process.env.OMEGA_HOSTING_PORT, OMEGA_HTTPS_PORT: process.env.OMEGA_HTTPS_PORT };
+        delete process.env.OMEGA_HOSTING_PORT;
+        delete process.env.OMEGA_HTTPS_PORT;
+        try {
+          const answers = (omega) => [omega.getEnvironment(), omega.isTesting(), omega.getApiUrl()];
+          withEnvironment({ OMEGA_ENVIRONMENT: 'testing' }, () => {
+            ctx.expect(answers(preload)).toEqual(['testing', true, 'http://127.0.0.1:5012']);
+            ctx.expect(answers(preload)).toEqual(answers(main));
+          });
+          withEnvironment({ OMEGA_ENVIRONMENT: 'development' }, () => {
+            ctx.expect(answers(preload)).toEqual(answers(main));
+          });
+          // No lane variable: the baked config.environment answers
+          withEnvironment(null, () => {
+            ctx.expect(answers(preload)).toEqual(['production', false, 'https://api.demo.example.com']);
+            ctx.expect(answers(preload)).toEqual(answers(main));
+          });
+        } finally {
+          for (const [key, value] of Object.entries(ports)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+          }
+        }
+      },
+    },
+    {
       // A window built without the framework's preload has no bridge: a
       // programmer error, loud at load
       name: 'renderer refuses to load without window.desktop',

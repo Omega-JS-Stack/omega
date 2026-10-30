@@ -5,10 +5,10 @@
 // settings live under targets.backend: key presence under `targets` means
 // "this project supports this target".
 //
-// This file doubles as @omega.js/backend's framework-defaults layer: the Manager
-// resolves it through @omega.js/config and merges the consumer's own
-// functions/config/omega.json5 on top. Secrets NEVER live here: they go in
-// functions/.env (the loader hard-fails on secret-shaped keys).
+// This file doubles as @omega.js/backend's framework-defaults layer: the backend
+// resolves it through @omega.js/config at boot and merges the consumer's own
+// config/omega.json5 on top. Secrets NEVER live here: they go in .env (the
+// loader hard-fails on secret-shaped keys).
 {
   brand: {
     id: 'my-app',
@@ -191,14 +191,6 @@
   targets: {
     backend: {
       type: 'backend',
-      auth: {
-        signup: {
-          // Signups allowed per client IP per day. The beforeUserCreated guard
-          // blocks the rest. Raise it when your audience shares egress (NAT/CGNAT,
-          // VPNs, offices, campuses), where one IP fronts many real people.
-          maxPerIpPerDay: 2,
-        },
-      },
       marketing: {
         campaigns: {
           enabled: true,

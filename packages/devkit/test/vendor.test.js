@@ -158,7 +158,7 @@ module.exports = defineCases({
         // The real case: @omega.js/config's edit.js has JSDoc prose "('brand' from
         // brand, 'a b' from 'a b')" — the guard reported a phantom host dep 'a b'.
         const root = makeFixture('vendor-prose', {
-          packageJSON: { name: 'fixture-prose', version: '1.0.0', dependencies: { json5: '*', dotenv: '*', chalk: '*' } }, // dotenv: config's env.js rides along; chalk: its company.js logs through the devkit logger
+          packageJSON: { name: 'fixture-prose', version: '1.0.0', dependencies: { json5: '*', dotenv: '*', chalk: '*', 'fs-jetpack': '*' } }, // dotenv: config's env.js rides along; chalk: its company.js logs through the devkit logger; fs-jetpack: its writes go through devkit's writeJson
           files: {
             'dist/lib/uses-config.js': `const config = require('@omega.js/config');\nmodule.exports = config;`,
           },
@@ -239,6 +239,48 @@ module.exports = defineCases({
         ctx.expect(loaded.sep).toBe('//');
         ctx.expect(loaded.inline).toBe('inline');
         ctx.expect(loaded.closer).toBe('closer');
+      },
+    },
+
+    {
+      name: 'a .json subpath vendors that file, and the rewritten require loads it',
+      run: (ctx) => {
+        // A fixture's package.json is data, not a module: mapping it to `package.json.js`
+        // walked into the file as if it were a folder and killed prepare with ENOTDIR.
+        const root = makeFixture('vendor-json-subpath', {
+          packageJSON: { name: 'fixture-json-subpath', version: '1.0.0', dependencies: HOST_DEPS },
+          files: {
+            'dist/a.js': `module.exports = require('@omega.js/account/fixtures/package.json');`,
+            'node_modules/@omega.js/account/package.json': JSON.stringify({ name: '@omega.js/account', version: '0.0.1', main: './src/index.js' }),
+            'node_modules/@omega.js/account/src/index.js': `module.exports = 'index';`,
+            'node_modules/@omega.js/account/src/fixtures/package.json': JSON.stringify({ name: 'stand-in', version: '9.9.9' }),
+          },
+        });
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+        vendorDevkit({ cwd: root });
+
+        ctx.expect(require(path.join(root, 'dist', 'a.js'))).toEqual({ name: 'stand-in', version: '9.9.9' });
+      },
+    },
+
+    {
+      name: "a vendored module's relative .json require vendors that file, and the host loads it",
+      run: (ctx) => {
+        const root = makeFixture('vendor-json-relative', {
+          packageJSON: { name: 'fixture-json-relative', version: '1.0.0', dependencies: HOST_DEPS },
+          files: {
+            'dist/a.js': `module.exports = require('@omega.js/account');`,
+            'node_modules/@omega.js/account/package.json': JSON.stringify({ name: '@omega.js/account', version: '0.0.1', main: './src/index.js' }),
+            'node_modules/@omega.js/account/src/index.js': `module.exports = require('./data.json');`,
+            'node_modules/@omega.js/account/src/data.json': JSON.stringify({ name: 'stand-in', version: '9.9.9' }),
+          },
+        });
+        ctx.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+        vendorDevkit({ cwd: root });
+
+        ctx.expect(require(path.join(root, 'dist', 'a.js'))).toEqual({ name: 'stand-in', version: '9.9.9' });
       },
     },
 

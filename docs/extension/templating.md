@@ -1,6 +1,6 @@
 # Templating
 
-HTML views go through a two-step `{{ }}` token replacement during the `gulp/html` task. Same convention as EM and UJM.
+HTML views go through a two-step `{{ }}` token replacement during the `gulp/html` task, rendered by the extension's one token renderer ([src/gulp/lib/tokens.js](../../packages/extension/src/gulp/lib/tokens.js)), the same one the package task renders the manifest and the store descriptions with.
 
 `src/manifest.json` speaks the same `{{ }}` syntax, resolved against the whole `config/omega.json5` when the package task compiles it (`matches: ['{{ brand.url }}/*']`), and an unresolved one fails the build: [build-system.md](build-system.md#manifest-compilation-rules).
 
@@ -11,6 +11,8 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 3. The outer template is processed again with the same vars.
 4. Output written to `dist/views/<component>/index.html`.
 
+A token nothing resolves (a typo, a variable the table below does not carry) fails the build instead of shipping literally: the html task stops naming the file and the token, `Cannot build src/views/popup/index.html: unresolved token(s) {{ missing }}`.
+
 ## Available variables
 
 | Token | Source | Example |
@@ -19,26 +21,19 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 | `{{ brand.url }}` | `config/omega.json5` → `brand.url` | `https://tabblar.com` |
 | `{{ brand.id }}` | `config/omega.json5` → `brand.id` | `tabblar` |
 | `{{ page.name }}` | Component name (e.g. `popup`, `pages/dashboard`) | `popup` |
-| `{{ page.path }}` | Full view path | `views/popup/index.html` |
-| `{{ page.title }}` | Page title — defaults to brand name | `Tabblar` |
-| `{{ theme.appearance }}` | Theme appearance: `dark` or `light` | `dark` |
-| `{{ cacheBust }}` | Cache-busting timestamp (build time) | `1715568000` |
-| `{{ version }}` | `package.json#version` | `1.1.10` |
-| `{{ environment }}` | `'production'` or `'development'` | `production` |
+| `{{ page.path }}` | The view's path under `src/views/`, without `.html` | `popup/index` |
+| `{{ page.title }}` | Page title: the brand name, `Extension` without one | `Tabblar` |
+| `{{ theme.appearance }}` | `config/omega.json5` → `theme.appearance`, `dark` by default | `dark` |
+| `{{ cacheBust }}` | Cache-busting timestamp (build time, ms) | `1715568000000` |
+
+Every key of `brand` resolves the same way (`{{ brand.<key> }}`). Nothing else is in scope: the package version and the environment are not page variables.
 
 ## Example usage
 
 ```html
-<!-- src/views/popup/index.html -->
-<!doctype html>
-<html>
-<head><title>{{ page.title }}</title></head>
-<body>
-  <h1>Welcome to {{ brand.name }}</h1>
-  <a href="{{ brand.url }}/pricing?ref=ext">Upgrade to Premium</a>
-  <p>Version {{ version }}</p>
-</body>
-</html>
+<!-- src/views/popup/index.html: body content, wrapped by the page template -->
+<h1>Welcome to {{ brand.name }}</h1>
+<a href="{{ brand.url }}/pricing?ref=ext">Upgrade to Premium</a>
 ```
 
 ## Page template
@@ -51,11 +46,11 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 - `<script>` for the component's `.bundle.js`
 - Cache-busting query params via `{{ cacheBust }}`
 
-Consumers don't author this — @omega.js/extension owns it. If you need to customize per-view, override directly in `src/views/<component>/index.html` (@omega.js/extension detects when a view provides its own full `<html>` and skips wrapping).
+Consumers don't author this: @omega.js/extension owns it, and every view is wrapped in it. A view file is the body content only.
 
 ## Customizing page vars
 
-The page-vars object is built by [src/gulp/tasks/html.js](../../packages/extension/src/gulp/tasks/html.js). To add a new variable for consumer templates, edit the `buildPageVars()` helper there. Vars added are available in BOTH the view file AND the outer page-template.html.
+The page-vars object is built inline in `processHtml()` in [src/gulp/tasks/html.js](../../packages/extension/src/gulp/tasks/html.js). A variable added there is available in BOTH the view file AND the outer page-template.html.
 
 ## Why two passes?
 

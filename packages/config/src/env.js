@@ -36,6 +36,10 @@ const { ENV_SCHEMA, envFileGroups, envSchemaEntry } = require('./env-schema.js')
 // re-exports it so the .env overlay names and the runtime answer stay one list.
 const { ENV_ENVIRONMENTS } = require('./environment.js');
 
+// The env file's one name: every layer's base file, and the composed file a
+// backend stage ships beside its runtime.
+const ENV_FILE_NAME = '.env';
+
 /**
  * The AMBIENT environment answer: what a lane resolves when nothing named one
  * for it. It is the PRODUCER of the one input, never a second reader of it:
@@ -116,9 +120,9 @@ function resolveEnvChain(startDir) {
   const company = resolveCompany(brandRoot || targetDir);
 
   return {
-    local: path.join(targetDir, '.env'),
-    brand: brandRoot ? path.join(brandRoot, '.env') : null,
-    company: company.dir ? path.join(company.dir, '.env') : null,
+    local: path.join(targetDir, ENV_FILE_NAME),
+    brand: brandRoot ? path.join(brandRoot, ENV_FILE_NAME) : null,
+    company: company.dir ? path.join(company.dir, ENV_FILE_NAME) : null,
   };
 }
 
@@ -200,7 +204,7 @@ function loadEnvChain(envPaths) {
  */
 function loadEnvRoots(roots, { environment = envEnvironment() } = {}) {
   // Strongest first, so a layer's overlay is offered before its own base
-  return loadEnvChain(roots.flatMap((root) => envLayerFiles(root && path.join(root, '.env'), environment).reverse()));
+  return loadEnvChain(roots.flatMap((root) => envLayerFiles(root && path.join(root, ENV_FILE_NAME), environment).reverse()));
 }
 
 /**
@@ -480,4 +484,4 @@ function serializeEnv(values) {
   return content;
 }
 
-module.exports = { loadEnv, reloadEnv, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv };
+module.exports = { loadEnv, reloadEnv, ENV_FILE_NAME, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv };

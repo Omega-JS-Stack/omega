@@ -85,7 +85,8 @@ meta:
   <div class="omega-redirect">
     <!-- Brand mark -->
     <a class="omega-redirect__mark" href="/" aria-label="{{ resolved.config.brand.name }}">
-      <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }}"/>
+      {% include core/brandmark-src.html %}
+      <img src="{{ brandmark_src | omega_cachebreak }}" alt="{{ resolved.config.brand.name }}"/>
     </a>
 
     <!-- Header -->

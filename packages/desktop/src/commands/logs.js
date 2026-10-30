@@ -5,11 +5,8 @@
 // <projectRoot>/logs/<surface>.log — the same four files documented in
 // docs/desktop/logging.md. Every flag below works on whichever surface was named.
 //
-// `runtime` resolves to the file the runtime logger writes to:
-//   - Dev (running from a project directory): <projectRoot>/logs/runtime.log
-//   - Outside a project: prints the conventional Electron user-data path the runtime
-//     would resolve to in production, but doesn't read it (we don't know the AppName
-//     from outside the running app).
+// `runtime` resolves to <projectRoot>/logs/runtime.log, the file the runtime
+// logger writes in dev.
 //
 // Flags:
 //   (default)        Print the resolved path, then `tail -50` of the file.

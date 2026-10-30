@@ -11,6 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const devkitUpdate = require('@omega.js/devkit/update');
+const { VERBS } = require('@omega.js/devkit/verbs');
 const updateCommand = require('../src/commands/update.js');
 
 // ─── Fixture staging (deploy-command.test.js pattern) ────────────────────────
@@ -297,7 +298,9 @@ module.exports = defineCases({
       run: (ctx) => {
         const Main = require('../src/cli.js');
         ctx.expect(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'update')).toBeTruthy();
-        ctx.expect(Main.config.aliases.update, 'the report-era outdated/out aliases are gone').toEqual(['--update']);
+        const registryAliases = VERBS.find((verb) => verb.name === 'update').aliases;
+        ctx.expect(Main.config.aliases.update, 'the aliases are the registry row\'s').toEqual(registryAliases);
+        ctx.expect(registryAliases.some((alias) => alias === 'outdated' || alias === 'out'), 'the report-era outdated/out aliases are gone').toBe(false);
         ctx.expect(fs.existsSync(path.join(Main.config.commandsDir, 'update.js'))).toBeTruthy();
       },
     },

@@ -1,6 +1,7 @@
 // Libraries
 import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
+import { isSitePath } from '@omega.js/client/modules/site-path.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // Where the callback lands when nothing named a destination
@@ -91,26 +92,6 @@ async function handleOAuthCallback() {
     console.error('OAuth callback error:', error);
     showError(error.message);
   }
-}
-
-/**
- * Whether a value is a path on this site — the same rule the backend validated
- * the `returnUrl` with on the authorize leg (its one home is
- * `routes/user/connections/_context.js`), run again here because THIS is the
- * code that navigates: an absolute URL, a protocol-relative `//host`, a
- * backslash (browsers read `/\host` as `//host`), a scheme, or any whitespace
- * on the way to one of those is an off-site destination, and a value off the
- * wire is never trusted with `location`.
- *
- * @param {*} value - The candidate
- * @returns {boolean} True when it is a path on this site
- */
-function isSitePath(value) {
-  return typeof value === 'string'
-    && value.startsWith('/')
-    && !value.startsWith('//')
-    && !value.includes('\\')
-    && !/\s/.test(value);
 }
 
 // Show success state

@@ -26,6 +26,7 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const Logger = require('./logger.js');
+const { writeJson } = require('./write-json.js');
 const { findBrandRoot } = require('./local.js');
 
 const logger = new Logger('deploy-record');
@@ -60,7 +61,7 @@ function loadState(file) {
 
   // The new home lands before the old file goes: a crash between the two
   // writes must never leave the records with no file at all.
-  jetpack.write(file, state, { jsonIndent: 2 });
+  writeJson(file, state);
   jetpack.remove(deploysFile);
 
   if (Object.keys(deploys).length > 0) {
@@ -141,7 +142,7 @@ function recordDeploy(options) {
     const state = loadState(file);
 
     state.deploy[key] = { at: new Date().toISOString(), ...(options.detail || {}) };
-    jetpack.write(file, state, { jsonIndent: 2 });
+    writeJson(file, state);
 
     return state.deploy[key];
   });

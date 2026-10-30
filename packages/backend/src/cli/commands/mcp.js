@@ -16,11 +16,6 @@ class McpCommand extends BaseCommand {
     // Load the .env cascade so OMEGA_ADMIN_KEY is available
     require('@omega.js/config').loadEnv(functionsDir, { environment: 'development' });
 
-    // Resolve the @omega.js/backend server URL
-    const baseUrl = self.argv.url
-      || process.env.OMEGA_BACKEND_URL
-      || 'http://localhost:5002';
-
     // Resolve auth credentials
     const adminKey = self.argv.key
       || process.env.OMEGA_ADMIN_KEY
@@ -29,8 +24,10 @@ class McpCommand extends BaseCommand {
 
     const { startServer } = require('../../mcp/index.js');
 
+    // startServer owns the URL chain past the flag: the env var, then the
+    // classic hosting port
     await startServer({
-      baseUrl,
+      baseUrl: self.argv.url,
       adminKey: userToken ? '' : adminKey,
       userToken,
       cwd: functionsDir,

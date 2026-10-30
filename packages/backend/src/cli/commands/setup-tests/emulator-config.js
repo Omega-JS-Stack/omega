@@ -1,4 +1,5 @@
 const BaseTest = require('./base-test');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
@@ -99,7 +100,7 @@ class EmulatorConfigTest extends BaseTest {
     _.set(this.self.firebaseJSON, 'emulators.singleProjectMode', true);
 
     // Write updated config
-    jetpack.write(`${this.self.firebaseProjectPath}/firebase.json`, JSON.stringify(this.self.firebaseJSON, null, 2));
+    writeJson(`${this.self.firebaseProjectPath}/firebase.json`, this.self.firebaseJSON);
   }
 }
 

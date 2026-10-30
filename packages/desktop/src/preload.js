@@ -4,8 +4,7 @@
 
 const LoggerLite = require('./lib/logger-lite.js');
 const { ENVIRONMENT_VAR } = require('@omega.js/config/environment');
-const { getEnvironment, isDevelopment, isProduction, isTesting, getVersion } = require('./utils/mode-helpers.js');
-const { getFunctionsUrl, getApiUrl, getWebsiteUrl, getAuthUrl } = require('./utils/url-helpers.js');
+const environment = require('./lib/_environment-mixin.js');
 
 /**
  * The preload runtime: exposes `window.desktop` to the page. This module
@@ -211,44 +210,6 @@ class Omega {
 
     this.logger.log('@omega.js/desktop (preload) initialized.');
   }
-
-  // The environment surface (#817) and the backend URL helpers: the same plain
-  // functions main and the build module call
-  getEnvironment() {
-    return getEnvironment.call(this);
-  }
-
-  isDevelopment() {
-    return isDevelopment.call(this);
-  }
-
-  isProduction() {
-    return isProduction.call(this);
-  }
-
-  isTesting() {
-    return isTesting.call(this);
-  }
-
-  getVersion() {
-    return getVersion();
-  }
-
-  getFunctionsUrl(environment) {
-    return getFunctionsUrl(this, environment);
-  }
-
-  getApiUrl(environment) {
-    return getApiUrl(this, environment);
-  }
-
-  getWebsiteUrl(environment) {
-    return getWebsiteUrl(this, environment);
-  }
-
-  getAuthUrl(environment, returnUrl) {
-    return getAuthUrl(this, environment, returnUrl);
-  }
 }
 
 // Build a console+forward logger object suitable for exposing through contextBridge
@@ -301,6 +262,9 @@ function serializeForIpc(args) {
     }
   });
 }
+
+// The environment and URL helpers: the same mixin main's instance carries
+Object.assign(Omega.prototype, environment);
 
 // The ONE instance, initialized by the consumer's src/preload.js
 const omega = new Omega();

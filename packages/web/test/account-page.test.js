@@ -148,5 +148,55 @@ module.exports = defineCases({
         ctx.expect(location.city, 'the fields that already loaded still do').toBe('San Diego');
       },
     },
+
+    {
+      name: 'a profile save reloads the signed-in user once, after the write resolves',
+      run: async (ctx) => {
+        await bundleOnce();
+
+        const order = [];
+        let finishWrite;
+        const write = new Promise((resolve) => { finishWrite = resolve; });
+
+        globalThis.window = { location: { href: 'https://example.com/dashboard/account', origin: 'https://example.com', search: '', hash: '#profile' } };
+        globalThis.document = {
+          getElementById: () => null,
+          querySelector: () => null,
+          querySelectorAll: () => [],
+          addEventListener: () => {},
+        };
+        // The write is held open, so the reload's place after it shows.
+        globalThis.__omegaClient = {
+          firebaseAuth: { currentUser: null },
+          auth: {
+            user: { uid: 'uid-1' },
+            reload: async () => { order.push('reload'); },
+          },
+          firestore: {
+            doc: () => ({
+              set: async () => {
+                order.push('write');
+                await write;
+                order.push('written');
+              },
+            }),
+          },
+        };
+
+        delete require.cache[require.resolve(BUNDLE)];
+        const { profile } = require(BUNDLE);
+
+        profile.init();
+        const saving = globalThis.__profileForm.submit({ data: { personal: { name: { first: 'Ada', last: 'Lovelace' } } } });
+
+        await new Promise((resolve) => setImmediate(resolve));
+        ctx.expect(order, 'nothing reloads while the write is in flight').toEqual(['write']);
+
+        finishWrite();
+        await saving;
+
+        ctx.expect(order, 'the user is re-read exactly once, after the write lands').toEqual(['write', 'written', 'reload']);
+      },
+    },
   ],
 });

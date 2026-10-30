@@ -6,6 +6,8 @@
  * fresh CDP session, releases any start pause, and proves `chrome.runtime.id`.
  */
 
+const { whileLive } = require('@omega.js/devkit/cdp-live');
+
 // One probe's ceiling; a stopped worker never answers, so the attempt is bounded.
 const PROBE_TIMEOUT_MS = 1000;
 const POLL_INTERVAL_MS = 100;
@@ -39,21 +41,15 @@ async function attachLiveWorker(browser, extId, timeoutMs) {
 }
 
 /**
- * Settle `work` on the attached worker, or reject the moment the worker crashes.
- * A worker killed mid-command reports only `Inspector.targetCrashed`: its session
- * never detaches, so a pending command would otherwise never settle.
+ * Settle `work` on the attached worker, or reject naming the extension the
+ * moment the worker crashes (devkit's cdp-live race).
  * @param {object} session - the CDPSession `attachLiveWorker` opened
  * @param {string} extId - the extension id the rejection names
  * @param {Promise} work - the commands in flight on `session`
  * @returns {Promise} `work`'s outcome, or a rejection naming the extension
  */
-function whileLive(session, extId, work) {
-  let onCrash;
-  const crashed = new Promise((_, reject) => {
-    onCrash = () => reject(notActive(extId));
-    session.on('Inspector.targetCrashed', onCrash);
-  });
-  return Promise.race([work, crashed]).finally(() => session.off('Inspector.targetCrashed', onCrash));
+function whileWorkerLive(session, extId, work) {
+  return whileLive(session, work, () => notActive(extId));
 }
 
 function notActive(extId) {
@@ -75,4 +71,4 @@ function within(promise, ms) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-module.exports = { attachLiveWorker, whileLive };
+module.exports = { attachLiveWorker, whileWorkerLive };

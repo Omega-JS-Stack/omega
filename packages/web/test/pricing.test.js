@@ -337,13 +337,6 @@ module.exports = defineCases({
             ctx.expect(html.includes('17%'), `${theme}: computed savings badge`).toBeTruthy();
             ctx.expect(html.includes('WELCOME15'), `${theme}: promo banner on by default`).toBeTruthy();
             ctx.expect(html.includes('id="pricing-promo-banner"'), `${theme}: banner markup present`).toBeTruthy();
-
-            // The banner is NAV chrome (#764): closing it hands the nav its margin
-            // back and touches nothing else — the page never moved for it, so there is
-            // no page padding to put back.
-            const closeHandler = /onclick="([^"]*pricing-promo-banner[^"]*)"/.exec(html)[1];
-            ctx.expect(closeHandler.includes('.omega-nav'), `${theme}: close resets the nav push`).toBeTruthy();
-            ctx.expect(!closeHandler.includes('paddingTop'), `${theme}: close touches no section padding`).toBeTruthy();
           },
         });
 

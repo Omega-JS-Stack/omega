@@ -12,6 +12,7 @@
 
 // Libraries
 const crypto = require('crypto');
+const { slugify } = require('@omega.js/client/modules/slugify.js');
 
 // Consistent cache-busting timestamp for the lifetime of the process
 // (Ruby parity: module-load `(Time.now.to_f * 1000).to_i`)
@@ -138,19 +139,13 @@ function omegaCommaify(input) {
 }
 
 /**
- * The ONE slugifier: downcase, non-alphanumeric runs become '-'.
- * An apostrophe is DELETED, not separated on, so "Beginner's Guides" is
- * `beginners-guides`. Both spellings, straight and typographic: the markdown
- * typographer smartens the straight one, and one term must never answer to two slugs.
+ * `omega_slugify`: @omega.js/client's one slugifier, so a build's slug and the
+ * post editor's can never disagree.
  * @param {string} input
  * @returns {string}
  */
 function omegaSlugify(input) {
-  return String(input)
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return slugify(input);
 }
 
 function toDate(input) {

@@ -13,6 +13,7 @@ const { join } = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const jetpack = require('fs-jetpack');
 const { resolveLinkedMonorepo } = require('@omega.js/devkit/local');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // Posix spellings: the .gitignore line reads LOCAL_SETTINGS_FILE as is.
 const SETTINGS_FILE = '.claude/settings.json';
@@ -71,7 +72,7 @@ function readSettings(file) {
 }
 
 function writeSettings(file, settings) {
-  jetpack.write(file, `${JSON.stringify(settings, null, 2)}\n`);
+  writeJson(file, settings);
 }
 
 /**

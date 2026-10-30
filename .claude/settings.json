@@ -14,7 +14,6 @@
   "permissions": {
     "allow": [
       "Bash(npx omega:*)",
-      "Bash(npm publish --workspace=*)",
       "Bash(cd:*)"
     ]
   }

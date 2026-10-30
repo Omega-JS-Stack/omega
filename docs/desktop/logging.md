@@ -95,7 +95,7 @@ npx omega logs build --path     # just the path, for piping
 
 Anything else fails naming the four surfaces. (The four files themselves are described in the lifetime table below; `deploy.log` and `signing.log` are not tail targets.)
 
-`mgr logs` only resolves the dev path (`<cwd>/logs/<surface>.log`). To find the production runtime log on a user's machine, use the table above or call `getLogFilePath()` from app code.
+`npx omega logs` only resolves the dev path (`<cwd>/logs/<surface>.log`). To find the production runtime log on a user's machine, use the table above or call `getLogFilePath()` from app code.
 
 ## How to find the file path from app code
 

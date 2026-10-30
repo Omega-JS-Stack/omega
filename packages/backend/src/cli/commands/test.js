@@ -6,7 +6,8 @@ const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
-const { readPortsFile, portsToEnv } = require('@omega.js/config');
+const { readPortsFile, portsToEnv, CLASSIC_PORTS, ENV_FILE_NAME } = require('@omega.js/config');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
 const { isCustomProject, refuseWhenToolsMissing } = require('../utils/project-type');
@@ -20,9 +21,6 @@ const FIXTURE_ENV = {
   OMEGA_WEBHOOK_KEY: 'fixture-webhook-key',
   OMEGA_NAMESPACE: '00000000-0000-0000-0000-000000000000',
 };
-
-// The Firebase emulator hub — fixed, not part of the N7-allocated map.
-const HUB_PORT = 4400;
 
 // Where a running hub publishes WHO it is: firebase-tools writes
 // `${os.tmpdir()}/hub-<projectId>.json` ({version, origins, pid}) for the life
@@ -574,7 +572,7 @@ class TestCommand extends BaseCommand {
       client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/fixture%40${projectId}.iam.gserviceaccount.com`,
     };
     try {
-      fs.writeFileSync(saPath, `${JSON.stringify(serviceAccount, null, 2)}\n`);
+      writeJson(saPath, serviceAccount);
     } catch (e) {
       this.logWarning(`Could not write fixture service-account.json: ${e.message}`);
     }
@@ -599,7 +597,7 @@ class TestCommand extends BaseCommand {
    */
   ensureFixtureEnv(fixture) {
     const { baseMissingKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
-    const envPath = path.join(fixture, '.env');
+    const envPath = path.join(fixture, ENV_FILE_NAME);
     const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
     const present = require('dotenv').parse(existing);
 
@@ -734,7 +732,7 @@ class TestCommand extends BaseCommand {
    * @returns {string|null} The running emulator's project id.
    */
   readRunningProjectId(emulatorPorts) {
-    return readHubLocatorProjectId(emulatorPorts?.hub || HUB_PORT);
+    return readHubLocatorProjectId(emulatorPorts?.hub || CLASSIC_PORTS.hub);
   }
 
   /**

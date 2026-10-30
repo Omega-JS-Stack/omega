@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const cheerio = require('cheerio');
 
 const { buildSite, BARE } = require('./lib/build.js');
 
@@ -37,8 +38,38 @@ const MEMBERS = [
   },
 ];
 
+// One member whose profile links name a brand platform, two of the solid marks,
+// and a platform template-kit has no profile URL for.
+const LINKED_MEMBER = {
+  file: 'grace-hopper.md',
+  front: [
+    'member:',
+    '  id: grace-hopper',
+    '  name: "Grace Hopper"',
+    '  position: "Compiler"',
+    '  links:',
+    '    - { id: twitter, url: "https://twitter.com/grace", title: "Twitter" }',
+    '    - { id: website, url: "https://grace.example", title: "Website" }',
+    '    - { id: email, url: "mailto:grace@example.com", title: "Email" }',
+    '    - { id: bluesky, url: "https://bsky.app/profile/grace", title: "Bluesky" }',
+  ],
+};
+
+/**
+ * The icon classes each profile link renders, by url: an absent link and a
+ * link with no icon both read as `null`.
+ */
+function linkIcons(html, urls) {
+  const $ = cheerio.load(html);
+
+  return Object.fromEntries(urls.map((url) => {
+    const icon = $(`a[href="${url}"]`).find('i').first();
+    return [url, icon.length ? icon.attr('class') : null];
+  }));
+}
+
 /** A consumer /team riding the blueprint, with its hub data in the sidecar. */
-function makeConsumer(sidecar) {
+function makeConsumer(sidecar, members = MEMBERS) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-team-hub-'));
   const consumerDir = path.join(tmp, 'src');
   fs.mkdirSync(path.join(consumerDir, 'pages', 'team'), { recursive: true });
@@ -53,7 +84,7 @@ function makeConsumer(sidecar) {
       `${JSON.stringify(sidecar, null, 2)}\n`,
     );
   }
-  for (const member of MEMBERS) {
+  for (const member of members) {
     fs.writeFileSync(
       path.join(consumerDir, '_team', member.file),
       ['---', 'layout: blueprint/team/member', ...member.front, '---', ''].join('\n'),
@@ -158,6 +189,32 @@ module.exports = defineCases({
           ctx.expect(!html.slice(gridAt, principlesAt).includes('<h2'), 'no stray band heading between grid and principles').toBeTruthy();
           ctx.expect(!html.slice(listEndAt, quoteAt).includes('<h2'), 'and none over the mission quote').toBeTruthy();
           ctx.expect(html.includes('Ada Lovelace') && html.includes('Alan Turing'), 'while the grid itself is untouched').toBeTruthy();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'member link icons: every platform id is its brand mark, website a globe, email an envelope',
+      run: async (ctx) => {
+        const { tmp, consumerDir } = makeConsumer(null, [LINKED_MEMBER]);
+        try {
+          const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'team-hub-icons');
+          const memberUrl = [...pages.keys()].find((url) => url.startsWith('/team/') && url.includes('grace-hopper'));
+          ctx.expect(memberUrl, 'the member page built').toBeTruthy();
+
+          const urls = ['https://twitter.com/grace', 'https://grace.example', 'mailto:grace@example.com', 'https://bsky.app/profile/grace'];
+
+          for (const [label, html] of [['the hub', pages.get('/team')], ['the member page', pages.get(memberUrl)]]) {
+            const icons = linkIcons(html, urls);
+            const has = (url, ...names) => names.every((name) => String(icons[url]).split(/\s+/).includes(name));
+
+            ctx.expect(has(urls[0], 'fa-brands', 'fa-twitter'), `${label}: twitter is its brand mark (${icons[urls[0]]})`).toBe(true);
+            ctx.expect(has(urls[1], 'fa-globe'), `${label}: a website is the globe (${icons[urls[1]]})`).toBe(true);
+            ctx.expect(has(urls[2], 'fa-envelope'), `${label}: an email is the envelope (${icons[urls[2]]})`).toBe(true);
+            ctx.expect(has(urls[3], 'fa-brands', 'fa-bluesky'), `${label}: a platform outside SOCIAL_URLS is still its brand mark (${icons[urls[3]]})`).toBe(true);
+          }
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

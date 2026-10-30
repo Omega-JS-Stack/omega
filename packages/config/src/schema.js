@@ -1395,6 +1395,10 @@ const TARGET_SCHEMAS = {
       type:        'integer',
       required:    false,
       min:         1,
+      default:     2,
+      // Resolution only: the guard reads the resolved value, and a copy in
+      // every brand file would pin the framework's cap where nobody chose it.
+      materialize: false,
       description: 'Signups allowed per client IP per day (beforeUserCreated blocks the rest). Default 2. Raise it when the audience shares egress (NAT/CGNAT/VPN, offices, campuses).',
     },
   ],

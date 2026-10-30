@@ -166,9 +166,7 @@ cta:
     nudge: true
 ---
 
-{% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one —
-`brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
-{% assign brandmark_src = assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark %}
+{% include core/brandmark-src.html %}
 <!-- ═══ Hero: the page already picked your button ═══ -->
 {% comment %} #467 (after #749): this masthead IS the page's first viewport, so
 the band paints with the document — data-omega-first-paint on the section, no

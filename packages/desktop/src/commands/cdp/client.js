@@ -1,6 +1,7 @@
-// Shared CDP plumbing for the `mgr cdp` toolkit — zero dependencies (Node 22+
-// global fetch + WebSocket). Talks to the RUNNING dev app's DevTools endpoint
-// (launch with `OMEGA_CDP_PORT=9222 npm start`, or `npx omega cdp relaunch`).
+// Shared CDP plumbing for the `mgr cdp` toolkit — Node 22+ global fetch +
+// WebSocket, plus devkit's cdp-live for the target-crash race. Talks to the
+// RUNNING dev app's DevTools endpoint (launch with `OMEGA_CDP_PORT=9222 npm
+// start`, or `npx omega cdp relaunch`).
 //
 // @omega.js/desktop apps are MULTI-TARGET — one debuggable page per webContents (every
 // BrowserWindow and WebContentsView). Every helper takes a URL-substring
@@ -8,6 +9,8 @@
 // at `dist/views/main/` (the MAIN_VIEW default matcher).
 //
 // See docs/desktop/cdp-debugging.md for the full toolkit reference.
+
+const { whileLive } = require('@omega.js/devkit/cdp-live');
 
 // The main window's view path — @omega.js/desktop's templating convention, so it holds for
 // every consumer. Subcommands that need "the app's main renderer" (status,
@@ -46,7 +49,9 @@ async function requireTarget(matcher) {
   return target;
 }
 
-// Open a CDP WebSocket to a target and return a send(method, params) function.
+// Open a CDP WebSocket to a target. `send(method, params)` resolves with the
+// reply; `on(method, fn)` / `off(method, fn)` subscribe to its events (the
+// messages with no id); `close()` drops the socket and rejects what is pending.
 async function connect(target) {
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
@@ -56,45 +61,76 @@ async function connect(target) {
 
   let nextId = 1;
   const pending = new Map();
+  const listeners = new Map();
   ws.onmessage = (evt) => {
     const msg = JSON.parse(evt.data);
-    if (pending.has(msg.id)) {
-      pending.get(msg.id)(msg);
+    if (msg.id === undefined) {
+      for (const fn of [...(listeners.get(msg.method) || [])]) {
+        fn(msg.params);
+      }
+      return;
+    }
+    const entry = pending.get(msg.id);
+    if (entry) {
       pending.delete(msg.id);
+      clearTimeout(entry.timer);
+      entry.resolve(msg);
     }
   };
 
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = nextId++;
-    pending.set(id, resolve);
-    ws.send(JSON.stringify({ id, method, params }));
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       pending.delete(id);
       reject(new Error(`CDP timeout: ${method}`));
     }, 15000);
+    pending.set(id, { method, resolve, reject, timer });
+    ws.send(JSON.stringify({ id, method, params }));
   });
 
-  return { send, close: () => ws.close() };
+  const on = (method, fn) => {
+    if (!listeners.has(method)) {
+      listeners.set(method, new Set());
+    }
+    listeners.get(method).add(fn);
+  };
+
+  const off = (method, fn) => {
+    listeners.get(method)?.delete(fn);
+  };
+
+  const close = () => {
+    for (const entry of pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(new Error(`CDP connection closed: ${entry.method}`));
+    }
+    pending.clear();
+    ws.close();
+  };
+
+  return { send, on, off, close };
 }
 
 // Evaluate a JS expression in the matched target; returns the JSON value.
-// Throws (with the exception text) when the expression throws.
+// Throws (with the exception text) when the expression throws, and at once when
+// the target crashes mid-evaluate: a crashed target sends only
+// `Inspector.targetCrashed`, never the reply.
 async function evaluate(matcher, expression) {
   const target = await requireTarget(matcher);
-  const { send, close } = await connect(target);
+  const session = await connect(target);
   try {
-    const result = await send('Runtime.evaluate', {
+    const result = await whileLive(session, session.send('Runtime.evaluate', {
       expression,
       returnByValue: true,
       awaitPromise: true,
       userGesture: true,
-    });
+    }), () => new Error(`Target crashed while evaluating in ${target.url}`));
     if (result.result?.exceptionDetails) {
       throw new Error(`Expression threw in ${target.url}: ${JSON.stringify(result.result.exceptionDetails.exception?.description || result.result.exceptionDetails)}`);
     }
     return result.result?.result?.value;
   } finally {
-    close();
+    session.close();
   }
 }
 

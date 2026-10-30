@@ -18,6 +18,7 @@ const { emitLanguageFlags } = require('./language-flags.js');
 const { resolveThemeLayers } = require('./layers.js');
 const { getEnvironment, setEnvironment } = require('@omega.js/config/environment');
 const { PATHS } = require('./paths.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 /**
  * Build a consumer site end to end.
@@ -96,8 +97,7 @@ async function buildSite(options) {
   manifest.favicons = hasFaviconSet(options.staticDirs);
   manifest.brandmarkSvg = brandmarkSvgUrl(options.staticDirs);
   if (options.manifestPath) {
-    fs.mkdirSync(path.dirname(options.manifestPath), { recursive: true });
-    fs.writeFileSync(options.manifestPath, JSON.stringify(manifest, null, 2));
+    writeJson(options.manifestPath, manifest);
   }
 
   // ---- service worker + build meta: /service-worker.js, /build.json

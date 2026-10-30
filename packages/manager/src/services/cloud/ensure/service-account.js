@@ -18,6 +18,7 @@ const jetpack = require('fs-jetpack');
 const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 const { appEngineDefaultAccount, computeDefaultAccount } = require('../lib/runtime-accounts.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const REQUIRED_ROLES = [
   'roles/firebase.admin',
@@ -223,7 +224,7 @@ module.exports = async function ensureServiceAccount(context) {
   try {
     const keyData = await api.createServiceAccountKey(projectId, serviceAccountEmail);
 
-    jetpack.write(sourceKeyPath, keyData);
+    writeJson(sourceKeyPath, keyData);
     console.log(`      ${chalk.green('✓')} Saved key to ${chalk.cyan('.omega/secrets/')}`);
 
     return { ...(actAsWarning || {}), state: { serviceAccount: { email: serviceAccountEmail } } };

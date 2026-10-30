@@ -9,6 +9,8 @@ const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
 const { CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 const { listingId, deriveFirefoxId } = require('../../lib/listings.js');
+const { renderTokens, unresolvedTokens } = require('../lib/tokens.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // Load package
 const project = build.getPackage('project');
@@ -170,17 +172,6 @@ function externallyConnectableOrigins() {
   }
 
   return origins;
-}
-
-// Render the `{{ path }}` tokens a view speaks against `data`. A token nothing
-// resolves passes through literally.
-function renderTokens(text, data) {
-  return template(text, data, { brackets: ['{{', '}}'] });
-}
-
-// The distinct `{{ }}` tokens left in rendered text: the ones nothing resolved.
-function unresolvedTokens(text) {
-  return [...new Set(text.match(/\{\{[^}]*\}\}/g) || [])];
 }
 
 // Resolve config tokens in every string of a parsed manifest, per value so a
@@ -345,7 +336,7 @@ async function compileManifest(outputDir, target) {
     const cleanedManifest = removeEmptyValues(manifest);
 
     // Save as regular JSON
-    jetpack.write(outputPath, JSON.stringify(cleanedManifest, null, 2));
+    writeJson(outputPath, cleanedManifest);
 
     logger.log(`[${target}] Manifest compiled with defaults`);
   } catch (e) {
@@ -375,7 +366,7 @@ async function compileLocales(outputDir) {
       const localeData = JSON5.parse(jetpack.read(filePath));
 
       // Save as regular JSON
-      jetpack.write(outputPath, JSON.stringify(localeData, null, 2));
+      writeJson(outputPath, localeData);
 
       logger.log(`Locale compiled and saved: ${outputPath}`);
     });

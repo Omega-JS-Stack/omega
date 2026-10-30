@@ -1,41 +1,26 @@
 // Build-layer tests for the boot test the defaults scaffold ships to every consumer: it fails
 // when the packaged manifest carries no brand origin, passes when it does, and asserts nothing
-// until the brand declares a url. Each case stages a temp project, chdirs into it, and runs the
-// scaffold's cases through devkit's runSuite with a plain-object `ctx.extension` (no Chromium).
+// until the brand declares a url. Each case stages a temp project, loads the scaffold's suite
+// fresh inside it (utils/package-project.js), and runs its cases through devkit's runSuite with a
+// plain-object `ctx.extension` (no Chromium).
 
 const path = require('path');
 const fs   = require('fs');
-const os   = require('os');
 
-const DEFAULT_BOOT_TEST = path.join(__dirname, '..', '..', '..', 'defaults', 'test', 'boot', 'externally-connectable.test.js');
 const expect = require('@omega.js/devkit/test/expect');
 const { normalizeSpec, runSuite } = require('@omega.js/devkit/test/run-case');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { SRC, stageProject, inProject } = require('../../utils/package-project.js');
 
-// Stage a temp consumer project; `config` is the config/omega.json5 body (omit for none).
-function stageProject(config) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-default-boot-'));
-  fs.writeFileSync(path.join(tmp, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
-
-  if (config !== undefined) {
-    fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), config);
-  }
-
-  return tmp;
-}
+const DEFAULT_BOOT_TEST = path.join(SRC, 'defaults', 'test', 'boot', 'externally-connectable.test.js');
 
 // Run the scaffolded boot test's cases against a manifest, from `dir`; resolves to their events.
 async function runFrom(dir, manifest) {
-  const suite = normalizeSpec(require(DEFAULT_BOOT_TEST), { file: DEFAULT_BOOT_TEST });
   const events = [];
-  const oldCwd = process.cwd();
-  try {
-    process.chdir(dir);
+  await inProject(dir, async (spec) => {
+    const suite = normalizeSpec(spec, { file: DEFAULT_BOOT_TEST });
     await runSuite(suite, { expect, extras: { extension: { manifest } }, report: (event) => { events.push(event); } });
-  } finally {
-    process.chdir(oldCwd);
-  }
+  }, DEFAULT_BOOT_TEST);
   return events;
 }
 
@@ -49,7 +34,7 @@ module.exports = defineCases({
     {
       name: 'passes when the packaged manifest carries the brand origin (#583)',
       run: async (ctx) => {
-        const tmp = stageProject(BRAND);
+        const tmp = stageProject({ config: BRAND });
         try {
           // A dev build carries the dev origin too: the brand origin is what it asserts
           const events = await runFrom(tmp, { externally_connectable: { matches: ['https://staged.example.com/*', 'https://localhost:4000/*'] } });
@@ -63,7 +48,7 @@ module.exports = defineCases({
     {
       name: 'FAILS on the #583 shape — a packaged manifest carrying only the dev origin',
       run: async (ctx) => {
-        const tmp = stageProject(BRAND);
+        const tmp = stageProject({ config: BRAND });
         try {
           const devOnly = await runFrom(tmp, { externally_connectable: { matches: ['https://localhost:4000/*'] } });
           ctx.expect(devOnly.some((event) => event.status === 'fail')).toBe(true);
@@ -79,7 +64,7 @@ module.exports = defineCases({
     {
       name: 'asserts nothing until the brand declares a url',
       run: async (ctx) => {
-        const noUrl = stageProject(`{ brand: { id: 'staged', name: 'Staged' } }`);
+        const noUrl = stageProject({ config: `{ brand: { id: 'staged', name: 'Staged' } }` });
         const noConfig = stageProject();
         try {
           const events = [...await runFrom(noUrl, { name: 'Staged' }), ...await runFrom(noConfig, { name: 'Staged' })];

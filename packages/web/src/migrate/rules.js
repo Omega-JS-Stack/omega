@@ -22,6 +22,7 @@ const {
   templateReads, randomIdReads, assignsRandomId,
 } = require('../config-sections.js');
 const { toLines, fromLines, replacePerLine } = require('./lines.js');
+const { appendFlag, sitemapIndex } = require('./frontmatter-rules.js');
 
 /** Does this bare frontmatter key belong under `config:`? */
 const isMovableSection = (key) => CONFIG_SECTIONS.has(key);
@@ -1738,49 +1739,6 @@ const configParent = {
 };
 
 // ---------------------------------------------------------------------------
-// Rule 26 — the retired `append:` frontmatter flag
-// ([#607](https://github.com/Omega-JS-Stack/omega/issues/607), Ian 2026-08-26)
-//
-// `append: true` was the legacy UJM add-below contract kept behind a flag: the
-// page body rendered BELOW the layout's default `{% composition %}` instead of
-// replacing it. The flag is deleted — a page that wants the default bands
-// writes them (`omega customize <url>` materializes exactly that) — so a page
-// still carrying it renders the same as one without, and the key survives only
-// as an unknown frontmatter key the build strips with a warning. Dropped here,
-// with the finding that says what changed.
-//
-// Frontmatter-scoped and TOP-LEVEL only: `append` is a `| append:` Liquid
-// filter everywhere else, and an indented `append:` belongs to some other
-// block's data.
-// ---------------------------------------------------------------------------
-const appendFlag = {
-  id: 'append-flag',
-  title: 'the retired `append:` frontmatter flag → dropped',
-  apply(text) {
-    const { lines, trailingNewline } = toLines(text);
-    const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
-    if (fenceEnd < 0) return { text, edits: [], findings: [] };
-
-    const at = lines.findIndex((line, index) => index > 0 && index < fenceEnd && /^append:/.test(line));
-    if (at < 0) return { text, edits: [], findings: [] }; // already migrated — idempotent
-
-    const out = [...lines];
-    out.splice(at, 1);
-
-    return {
-      text: fromLines(out, trailingNewline),
-      edits: [{ rule: 'append-flag', line: at + 1, before: lines[at].trim(), after: '' }],
-      findings: [{
-        check: 'append-flag', line: at + 1, severity: 'warning',
-        message: '`append: true` is gone (#607) — a page body REPLACES the layout\'s default composition, and there is no '
-          + 'flag to keep both. Run `omega customize <url>` to materialize the default bands into this page, then edit them '
-          + 'with your own content below',
-      }],
-    };
-  },
-};
-
-// ---------------------------------------------------------------------------
 // Rule 25 — the UJM `random_id` global → an `omega_random` assign
 // ([#595](https://github.com/Omega-JS-Stack/omega/issues/595))
 //
@@ -1852,6 +1810,8 @@ const RULES = [
   appendFlag,          // 26 — before the re-indenting rules: it deletes a
                        //      frontmatter line, so its own finding is the
                        //      pre-move line like every rule above
+  sitemapIndex,        // 29: swaps a frontmatter line for meta's, so it opens
+                       //      the inserting rules below
   sectionArgs,         // 18 — the INSERTING rules go last, so every
   heroSecondaryButton, // 22   line-numbered finding above them reports the
   configParent,        // 23   pre-rewrite line

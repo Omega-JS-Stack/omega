@@ -57,6 +57,7 @@ const { reconcileSampleContent } = require('../sample-content.js');
 const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { PATHS, resolveClientEntry } = require('../paths.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const logger = new Logger('dev');
 
@@ -178,7 +179,7 @@ module.exports = async function (options) {
   const manifest = await build();
   manifest.favicons = hasFaviconSet(staticDirs);
   manifest.brandmarkSvg = brandmarkSvgUrl(staticDirs);
-  jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
+  writeJson(paths.manifest, manifest);
   logger.log('Assets built (dev mode: stable names, no minify, sourcemaps)');
 
   // ---- Service worker + build meta (/service-worker.js, /build.json;
@@ -528,7 +529,7 @@ function watchAssetSources(options) {
           // folds into the live manifest and the FILE is rewritten, so Eleventy
           // re-renders after this build, never racing it, and only on a change.
           if (options.manifest && options.manifestPath && refreshLiveManifest(options.manifest, next)) {
-            jetpack.write(options.manifestPath, JSON.stringify(options.manifest, null, 2));
+            writeJson(options.manifestPath, options.manifest);
           }
           logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`);
         })

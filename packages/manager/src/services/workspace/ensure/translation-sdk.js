@@ -25,6 +25,7 @@ const { resolveTranslationSettings } = require('@omega.js/devkit/translate');
 const { resolvePackageRealDir } = require('@omega.js/devkit/local');
 const { npmInstall } = require('../../../lib/npm-install.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const SDK = '@anthropic-ai/claude-agent-sdk';
 
@@ -119,7 +120,7 @@ module.exports = async ({ brandRoot, targets, options = {}, runCommand }) => {
 
   for (const { entry, pkgPath, pkg, range } of drifted) {
     pkg.dependencies = { ...pkg.dependencies, [SDK]: range };
-    jetpack.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+    writeJson(pkgPath, pkg);
     console.log(`      ${chalk.green('✓')} ${entry.name}: added ${SDK}@${range} (translation.providers.claude)`);
   }
 

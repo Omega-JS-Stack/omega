@@ -23,14 +23,19 @@
  *   src/defaults/**         the defaults tree (copy-if-missing; .gitignore
  *                           live-syncs its Default section)
  *   AGENTS.md               standalone only, through devkit's one builder
+ *   peer dependencies       firebase-admin + firebase-functions aligned to the
+ *                           framework's peer range through devkit's one
+ *                           installer, the step desktop and extension run in
+ *                           their own ensure-target
  *   dependency nudge        a WARNING per bare require under src/ the target
  *                           never declared (docs/shared/local-dev.md)
  *
  * Everything here is copy-if-missing or merge-in-place — the one exception is
  * the standard scripts above, which the framework owns outright in every
  * target that isn't a custom server. A run that changes nothing writes nothing
- * and says nothing. Anything that needs the network is NOT here — that belongs
- * to the verb that needs it.
+ * and says nothing. The peer step is the one that may reach the network, and
+ * only when a peer is out of range; anything else that needs it belongs to the
+ * verb that needs it.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -38,10 +43,15 @@ const JSON5 = require('json5');
 const omegaConfig = require('@omega.js/config');
 
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const { nudgeBareRequires } = require('@omega.js/devkit/bare-requires');
+// Called through the module object, read at call time, so a suite can swap
+// the installer for one run.
+const targetDependencies = require('@omega.js/devkit/target-dependencies');
 
 const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
 const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD, CUSTOM_OWNED_SCRIPTS } = require('./project-type');
+const { safeInstall } = require('./safe-install');
 
 // The framework's own manifest — its `omega.functionsRuntime` is the pinned
 // Cloud Functions runtime every consumer app inherits (SSOT with the .nvmrc
@@ -127,7 +137,7 @@ function scaffoldConfigs(projectDir, result) {
   // .firebaserc — DERIVED from the resolved config (else service account / env)
   if (!hasContent(loadJSON(path.join(projectDir, '.firebaserc')))) {
     const projectId = resolveProjectId(projectDir);
-    jetpack.write(path.join(projectDir, '.firebaserc'), `${JSON.stringify({ projects: { default: projectId } }, null, 2)}\n`);
+    writeJson(path.join(projectDir, '.firebaserc'), { projects: { default: projectId } });
     result.written.push('.firebaserc');
   }
 
@@ -154,7 +164,7 @@ function scaffoldConfigs(projectDir, result) {
       dirty = true;
     }
     if (dirty) {
-      jetpack.write(firebaseJsonPath, `${JSON.stringify(firebaseJSON, null, 2)}\n`);
+      writeJson(firebaseJsonPath, firebaseJSON);
       result.changed.push('firebase.json (functions source + hosting public → dist/)');
     }
   }
@@ -244,9 +254,7 @@ function scaffoldPackageJson(projectDir, result) {
 
   if (changes.length === 0) return;
 
-  // npm's own shape, trailing newline included — the same byte contract the
-  // three sibling writers and the manager walk keep (jetpack.write emits none).
-  jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeJson(manifestPath, manifest);
   result.changed.push(`package.json (${changes.join(', ')})`);
 }
 
@@ -303,17 +311,16 @@ function isFrameworkTree(projectDir) {
 }
 
 /**
- * Make the target whole — idempotent, offline, and quiet when there is
- * nothing to do.
+ * Make the target whole: idempotent, and quiet when there is nothing to do.
  *
  * @param {object} options
  * @param {string} options.projectDir - The target root.
  * @param {function} [options.log] - Line logger (silent by default).
  * @param {function} [options.warn] - Warning logger (silent by default).
- * @returns {{ written: string[], merged: string[], changed: string[] }}
- *   Target-relative paths per outcome — empty on a no-op run.
+ * @returns {Promise<{ written: string[], merged: string[], changed: string[] }>}
+ *   Target-relative paths per outcome, empty on a no-op run.
  */
-function ensureTarget(options) {
+async function ensureTarget(options) {
   const projectDir = options.projectDir;
   const log = options.log || (() => {});
   const warn = options.warn || (() => {});
@@ -334,6 +341,8 @@ function ensureTarget(options) {
   copyDefaults(projectDir, result, warn);
   cleanupGeneratedArtifacts(projectDir);
 
+  await targetDependencies.ensurePeerDependencies({ projectDir, package: frameworkPackage, log, warn, safeInstall });
+
   // Functions run under plain node, so a framework dependency the target never
   // declared resolves only by hoisting: name both fixes, never fail the verb.
   nudgeBareRequires({
@@ -353,4 +362,4 @@ function ensureTarget(options) {
 
 // The brand-owned scripts ride the entry the manager already loads, so its
 // workspace walk reads them without a second home
-module.exports = { ensureTarget, isFrameworkTree, resolveProjectId, CUSTOM_OWNED_SCRIPTS };
+module.exports = { ensureTarget, resolveProjectId, CUSTOM_OWNED_SCRIPTS };

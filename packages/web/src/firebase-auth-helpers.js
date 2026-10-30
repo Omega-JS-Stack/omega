@@ -23,6 +23,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const { isDemoProject } = require('@omega.js/config');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 // The two PAGE files land as .html and their extensionless names are never
 // emitted: GitHub Pages serves a literal extensionless FILE as
@@ -119,7 +120,7 @@ function writeCache(cacheRoot, contents) {
   for (const file of HELPER_FILES) {
     jetpack.write(path.join(cacheRoot, file.remote), contents.get(file.remote));
   }
-  jetpack.write(path.join(cacheRoot, CACHE_META), { fetchedAt: new Date().toISOString() });
+  writeJson(path.join(cacheRoot, CACHE_META), { fetchedAt: new Date().toISOString() });
 }
 
 /**

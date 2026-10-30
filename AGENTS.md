@@ -15,6 +15,7 @@
 4. **MAM is parked.** No `packages/mobile`, no mobile work — slot reserved only.
 5. **Preserve semantics, replace plumbing.** Blueprints/default-pages, FILE_MAP scaffolding semantics, `mgr i local`, prepare-watch, the frontend↔backend contract, and the disperse model must keep working exactly as consumers expect.
 6. **Every extraction/normalization step is gated**: golden-master where applicable, package test suites, cross-stack e2e, canary consumer.
+7. **ONE HOME.** Anything shared by more than one package has one home, one function and one group of tests; a second copy is a defect.
 
 ## Getting started (the dev loop)
 

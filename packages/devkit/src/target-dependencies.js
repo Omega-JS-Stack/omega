@@ -3,8 +3,9 @@
  * ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)), split by what
  * they need:
  *
- *   ensurePeerDependencies  the target cannot build without them — LOCAL half,
- *                           each framework's ensure-target runs it on every verb
+ *   ensurePeerDependencies  the target cannot build without them, LOCAL half:
+ *                           every framework with peers (backend, desktop,
+ *                           extension) runs it from its `ensureTarget` on every verb
  *   updateManager           asks the npm registry whether the framework itself
  *                           is stale — NETWORK half, deploy-precheck runs it
  *
@@ -47,10 +48,20 @@ function logVersionCheck(log, name, installedVersion, latestVersion, isUpToDate)
   log(`Checking if ${name} is up to date (${chalk.bold(installedLabel)} >= ${chalk.bold(latestLabel)}): ${status}`);
 }
 
-function install({ projectDir, project, log, safeInstall, pkg, ver, location }) {
+/**
+ * Whether a dependency spec names a version at all.
+ *
+ * @param {string} [spec] - A package.json dependency spec.
+ * @returns {boolean} False when absent, `latest`, `*` or a `file:` link.
+ */
+function isVersionSpec(spec) {
+  return !!spec && spec !== 'latest' && spec !== '*' && !spec.startsWith('file:');
+}
+
+function install({ projectDir, project, log, safeInstall, pkg, ver, location, ignoreScripts }) {
   ver = ver === 'latest' || !ver ? 'latest' : version.clean(ver);
 
-  const command = `npm install ${pkg}@${ver} ${location || '--save'}`;
+  const command = `npm install ${pkg}@${ver} ${location || '--save'}${ignoreScripts ? ' --ignore-scripts' : ''}`;
   log(`Installing: ${command}`);
 
   // The target, never the process cwd: a brand-root fan-out scaffolds targets in-process.
@@ -65,22 +76,26 @@ function install({ projectDir, project, log, safeInstall, pkg, ver, location }) 
 
 /**
  * Install any peer dependency the target is missing or behind on. A satisfied
- * target installs nothing, which is what makes this safe on every verb.
+ * target installs nothing, which is what makes this safe on every verb. The
+ * install skips lifecycle scripts, and a MAJOR gap installs nothing: it prints
+ * the by-hand command, so no verb moves a brand across a major silently.
  *
  * @param {object} input
  * @param {string} input.projectDir - The target root.
  * @param {object} input.package - The framework manifest (its peerDependencies).
  * @param {function} input.log - Line logger.
+ * @param {function} input.warn - Warning logger (the major-gap refusal).
  * @param {Object<string, string>} [input.dependencyMap] - Per-dep install location (`'dev'` = --save-dev).
  * @param {function} input.safeInstall - The framework's install runner.
  */
-async function ensurePeerDependencies({ projectDir, package: frameworkPackage, log, dependencyMap, safeInstall }) {
+async function ensurePeerDependencies({ projectDir, package: frameworkPackage, log, warn, dependencyMap, safeInstall }) {
   const project = readProject(projectDir);
   const requiredPeerDependencies = frameworkPackage.peerDependencies || {};
   const map = dependencyMap || {};
 
   for (const [dependency, rawVer] of Object.entries(requiredPeerDependencies)) {
-    const projectDependencyVersion = version.clean(project.dependencies[dependency] || project.devDependencies[dependency]);
+    const installedSpec = project.dependencies[dependency] || project.devDependencies[dependency];
+    const projectDependencyVersion = version.clean(installedSpec);
     const location = map[dependency] === 'dev' ? '--save-dev' : '';
     const isUpToDate = version.is(projectDependencyVersion, '>=', rawVer);
 
@@ -88,9 +103,19 @@ async function ensurePeerDependencies({ projectDir, package: frameworkPackage, l
 
     logVersionCheck(log, dependency, projectDependencyVersion, ver, isUpToDate);
 
-    if (!projectDependencyVersion || !isUpToDate) {
-      await install({ projectDir, project, log, safeInstall, pkg: dependency, ver, location });
+    if (isUpToDate) {
+      continue;
     }
+
+    // A spec that is no version (`latest`, `*`, a `file:` link), installed or
+    // required, cleans to 0.0.0, which is no gap to measure: it installs as it
+    // always did.
+    if (isVersionSpec(installedSpec) && isVersionSpec(rawVer) && version.levelDifference(projectDependencyVersion, ver) === 'major') {
+      warn(`${dependency} is a major version behind (${projectDependencyVersion} < ${ver}), so nothing was installed. Move it by hand: npm install ${dependency}@${ver}${location ? ` ${location}` : ''}`);
+      continue;
+    }
+
+    await install({ projectDir, project, log, safeInstall, pkg: dependency, ver, location, ignoreScripts: true });
   }
 }
 

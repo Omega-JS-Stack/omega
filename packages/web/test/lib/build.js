@@ -22,14 +22,15 @@ const MINI = path.join(PKG, 'test', 'fixtures', 'mini-site');
 const BARE = path.join(PKG, 'test', 'fixtures', 'bare-site');
 
 /**
- * Build a fixture site with a given siteData and index results by URL.
+ * Run Eleventy over a fixture site and hand back its raw results, each with
+ * the `inputPath` of the template that rendered it.
  * @param {string} inputDir - fixture dir (Eleventy input / consumerDir)
  * @param {object} siteData - resolved-config-shaped site data
  * @param {object} [overrides] - configureOmega option overrides
  * @param {string} [name] - namespace for this caller's .omega output dirs
- * @returns {Promise<Map<string, string>>} url → rendered content
+ * @returns {Promise<Array<object>>} Eleventy's toJSON results
  */
-async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build') {
+async function buildResults(inputDir, siteData, overrides = {}, name = 'site-build') {
   // The lane NAMES the environment
   // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): `omega build`
   // names production and `omega dev` names development, and the engine reads
@@ -67,8 +68,21 @@ async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build'
       });
     },
   });
+
+  return elev.toJSON();
+}
+
+/**
+ * Build a fixture site with a given siteData and index results by URL.
+ * @param {string} inputDir - fixture dir (Eleventy input / consumerDir)
+ * @param {object} siteData - resolved-config-shaped site data
+ * @param {object} [overrides] - configureOmega option overrides
+ * @param {string} [name] - namespace for this caller's .omega output dirs
+ * @returns {Promise<Map<string, string>>} url → rendered content
+ */
+async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build') {
   const outDir = path.join(PKG, '.omega', `${name}-out`);
-  const results = await elev.toJSON();
+  const results = await buildResults(inputDir, siteData, overrides, name);
   // Only the pages that SHIP. A framework page the consumer took over, or a
   // sample the brand's own content replaced, is registered and gated at render
   // time (#200 Lane B) — it writes no file, which Eleventy reports as `url:
@@ -152,4 +166,4 @@ function readPageConfig(pages, html) {
 
 const miniData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8'));
 
-module.exports = { buildSite, buildWith, runBuildJs, readBuildJsFile, readBuildJson, readPageConfig, miniData, MINI, BARE, PKG };
+module.exports = { buildResults, buildSite, buildWith, runBuildJs, readBuildJsFile, readBuildJson, readPageConfig, miniData, MINI, BARE, PKG };

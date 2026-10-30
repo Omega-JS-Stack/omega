@@ -7,12 +7,12 @@
  * can interact with a running @omega.js/backend instance — local or production.
  *
  * Usage:
- *   npx bm mcp                       # admin (uses OMEGA_ADMIN_KEY)
- *   npx bm mcp --token <api-key>     # user-level (uses API key)
- *   npx bm mcp                       # public-only (no key, no token)
+ *   npx omega mcp                    # admin (uses OMEGA_ADMIN_KEY)
+ *   npx omega mcp --token <api-key>  # user-level (uses API key)
+ *   npx omega mcp                    # public-only (no OMEGA_ADMIN_KEY, no token)
  *
  * Environment variables:
- *   OMEGA_BACKEND_URL              - @omega.js/backend server URL (default: http://localhost:5002)
+ *   OMEGA_BACKEND_URL              - @omega.js/backend server URL (default: the classic hosting port on localhost)
  *   OMEGA_ADMIN_KEY  - Admin API key for authentication
  */
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
@@ -23,6 +23,10 @@ const { callTool } = require('./call-tool.js');
 const builtinTools = require('./tools.js');
 const { resolveAuthInfo, filterToolsByRole, loadConsumerTools, buildToolMap } = require('./utils.js');
 const packageJSON = require('../../package.json');
+const { CLASSIC_PORTS } = require('@omega.js/config');
+
+// The local backend a session talks to when nothing names one.
+const DEFAULT_BASE_URL = `http://localhost:${CLASSIC_PORTS.hosting}`;
 
 /**
  * Start the MCP server
@@ -30,14 +34,14 @@ const packageJSON = require('../../package.json');
  * @param {string} options.baseUrl - @omega.js/backend server URL
  * @param {string} options.adminKey - Admin API key
  * @param {string} options.userToken - User API key (for user-level connections)
- * @param {string} options.cwd - Consumer project functions directory (for consumer tool discovery)
+ * @param {string} options.cwd - The staged dist/ directory (for consumer tool discovery)
  */
 async function startServer(options) {
   options = options || {};
 
   const baseUrl = options.baseUrl
     || process.env.OMEGA_BACKEND_URL
-    || 'http://localhost:5002';
+    || DEFAULT_BASE_URL;
   const adminKey = options.adminKey
     || process.env.OMEGA_ADMIN_KEY
     || '';

@@ -45,6 +45,7 @@ const os = require('node:os');
 const path = require('node:path');
 const JSON5 = require('json5');
 const Logger = require('@omega.js/devkit/logger');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 const logger = new Logger('company');
 
@@ -189,9 +190,8 @@ function recordBrand({ id, root, name, url }) {
     const live = Object.fromEntries(Object.entries(registry).filter(([, entry]) => liveRoot(entry)));
     const pruned = Object.keys(registry).filter((key) => !(key in live));
 
-    fs.mkdirSync(omegaHome(), { recursive: true });
     const temp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(temp, `${JSON.stringify(live, null, 2)}\n`);
+    writeJson(temp, live);
     fs.renameSync(temp, file);
 
     logger.debug(`Registry write by ${process.argv[1] || process.argv0} (pid ${process.pid}): kept [${Object.keys(live).join(', ')}], pruned [${pruned.join(', ')}]`);

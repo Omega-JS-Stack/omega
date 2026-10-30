@@ -1,5 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const _ = require('lodash');
 
 // The expected source pattern for omega_api hosting rewrite
@@ -44,7 +44,7 @@ class HostingRewritesTest extends BaseTest {
     _.set(this.self.firebaseJSON, 'hosting.rewrites', hosting.rewrites);
 
     // Write
-    jetpack.write(`${this.self.firebaseProjectPath}/firebase.json`, JSON.stringify(this.self.firebaseJSON, null, 2));
+    writeJson(`${this.self.firebaseProjectPath}/firebase.json`, this.self.firebaseJSON);
   }
 }
 

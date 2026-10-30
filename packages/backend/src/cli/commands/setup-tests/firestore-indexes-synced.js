@@ -1,4 +1,5 @@
 const BaseTest = require('./base-test');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const _ = require('lodash');
@@ -175,7 +176,7 @@ class FirestoreIndexesSyncedTest extends BaseTest {
 
     // Write merged result locally
     const result = { indexes: merged, fieldOverrides: mergedOverrides };
-    jetpack.write(filePath, JSON.stringify(result, null, 2));
+    writeJson(filePath, result);
 
     const addedCount = merged.length - (localIndexes.indexes || []).length;
     console.log(chalk.green(`  ✓ Merged indexes (${merged.length} total, ${addedCount} added from live)`));

@@ -1,5 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 
 class HostingFolderTest extends BaseTest {
   getName() {
@@ -16,7 +16,7 @@ class HostingFolderTest extends BaseTest {
     const self = this.self;
     self.firebaseJSON.hosting = self.firebaseJSON.hosting || {};
     self.firebaseJSON.hosting.public = 'public';
-    jetpack.write(`${self.firebaseProjectPath}/firebase.json`, JSON.stringify(self.firebaseJSON, null, 2));
+    writeJson(`${self.firebaseProjectPath}/firebase.json`, self.firebaseJSON);
   }
 }
 

@@ -35,20 +35,26 @@ async function setupOffscreenDocument() {
 
 ## Offscreen ↔ Background Communication
 
+Both sides talk over `omega.messenger`, the one lane between contexts ([contexts.md](contexts.md)): `send()` addresses a context by name and resolves with its answer, and `onMessage()` registers a handler for the messages addressed to this context. Never raw `chrome.runtime.sendMessage` / `onMessage`: the messenger drops a message addressed to another context, and background's holds every message until its session restore settles.
+
 ```javascript
-// From offscreen → background
-chrome.runtime.sendMessage({ action: 'myAction', data: {...} }, (response) => {
-  // handle response
+// Offscreen → background (src/assets/js/components/offscreen/index.js)
+const response = await omega.messenger.send({
+  destination: 'background',
+  command: 'myAction',
+  payload: { data: {...} },
 });
 
-// From background, listen for offscreen messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'myAction') {
-    doSomething(message.data).then(sendResponse);
-    return true; // keep channel open for async response
+// Background, answering it (src/assets/js/components/background/index.js)
+omega.messenger.onMessage((message, sender, sendResponse) => {
+  if (message.command === 'myAction') {
+    doSomething(message.payload.data).then(sendResponse);
+    return true; // keep the channel open for the async answer
   }
 });
 ```
+
+Background reaches the offscreen document the same way, `destination: 'offscreen'`, and the offscreen side answers through its own `omega.messenger.onMessage`.
 
 ## See also
 

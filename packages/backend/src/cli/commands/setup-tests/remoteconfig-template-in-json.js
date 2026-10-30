@@ -1,5 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
+const { writeJson } = require('@omega.js/devkit/write-json');
 const _ = require('lodash');
 
 const ENABLED = false;
@@ -24,7 +24,7 @@ class RemoteconfigTemplateInJsonTest extends BaseTest {
       delete this.self.firebaseJSON.remoteconfig;
     }
 
-    jetpack.write(`${this.self.firebaseProjectPath}/firebase.json`, JSON.stringify(this.self.firebaseJSON, null, 2));
+    writeJson(`${this.self.firebaseProjectPath}/firebase.json`, this.self.firebaseJSON);
   }
 }
 

@@ -25,6 +25,23 @@ function installer() {
   return { calls, configs, safeInstall: async (command, config) => { calls.push(command); configs.push(config); } };
 }
 
+// An install command as its words, so a case reads its flags in any order.
+const words = (command) => command.split(/\s+/);
+
+// Everything a call printed, through its injected sinks and the console alike.
+async function printed(run) {
+  const lines = [];
+  const sink = (...parts) => lines.push(parts.join(' '));
+  const originals = { log: console.log, warn: console.warn, error: console.error };
+  Object.assign(console, { log: sink, warn: sink, error: sink });
+  try {
+    await run(sink);
+  } finally {
+    Object.assign(console, originals);
+  }
+  return lines.join('\n');
+}
+
 module.exports = defineCases({
   type: 'group',
   description: 'target-dependencies',
@@ -78,30 +95,99 @@ module.exports = defineCases({
           safeInstall,
         });
 
-        ctx.expect(calls).toEqual([
-          'npm install gulp@5.0.0 --save-dev',
-          'npm install some-runtime-dep@2.0.0 --save',
+        ctx.expect(calls.map((command) => words(command).slice(0, 3))).toEqual([
+          ['npm', 'install', 'gulp@5.0.0'],
+          ['npm', 'install', 'some-runtime-dep@2.0.0'],
         ]);
+        ctx.expect(words(calls[0]), 'a dev-mapped peer saves as a devDependency').toContain('--save-dev');
+        ctx.expect(words(calls[1]), 'an unmapped peer saves as a dependency').toContain('--save');
+        ctx.expect(words(calls[1])).not.toContain('--save-dev');
       },
     },
 
     {
-      name: 'ensurePeerDependencies: a behind version reinstalls, either section counts',
+      name: 'a peer one minor behind installs with --ignore-scripts; the framework update never does',
       run: async (ctx) => {
-        const dir = tmpTarget({ name: 'consumer', dependencies: { gulp: '4.0.0' } });
+        const dir = tmpTarget({ name: 'consumer', dependencies: { gulp: '5.0.0' } });
         const { calls, configs, safeInstall } = installer();
 
         await ensurePeerDependencies({
           projectDir: dir,
-          package: { peerDependencies: { gulp: '^5.0.0' } },
+          package: { peerDependencies: { gulp: '^5.1.0' } },
           log: () => {},
           dependencyMap: {},
           safeInstall,
         });
 
-        ctx.expect(calls).toEqual(['npm install gulp@5.0.0 --save']);
+        ctx.expect(calls.length, 'the minor gap aligns, from either section').toBe(1);
+        ctx.expect(words(calls[0])).toContain('gulp@5.1.0');
+        ctx.expect(words(calls[0]), 'peer alignment runs no lifecycle scripts').toContain('--ignore-scripts');
         // The install lands in the target, never in whatever folder the verb was typed from.
         ctx.expect(configs.map((config) => config?.config?.cwd), 'every install runs in the target').toEqual([dir]);
+
+        // The framework's own update keeps its scripts: electron's postinstall fetches the binary.
+        const framework = tmpTarget({ name: 'consumer', dependencies: { '@omega.js/desktop': '1.0.0' } });
+        fs.mkdirSync(path.join(framework, 'node_modules', '@omega.js', 'desktop'), { recursive: true });
+        fs.writeFileSync(path.join(framework, 'node_modules', '@omega.js', 'desktop', 'package.json'), JSON.stringify({ name: '@omega.js/desktop', version: '1.0.0' }));
+        const update = installer();
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = async () => new Response(JSON.stringify({ name: '@omega.js/desktop', version: '1.1.0' }), { status: 200, headers: { 'content-type': 'application/json' } });
+        ctx.after(() => { globalThis.fetch = realFetch; });
+
+        await updateManager({ projectDir: framework, package: { name: '@omega.js/desktop' }, log: () => {}, error: () => {}, safeInstall: update.safeInstall });
+
+        ctx.expect(update.calls.length, 'a minor framework release installs').toBe(1);
+        ctx.expect(words(update.calls[0])).toContain('@omega.js/desktop@1.1.0');
+        ctx.expect(words(update.calls[0])).not.toContain('--ignore-scripts');
+      },
+    },
+
+    {
+      name: 'a peer one MAJOR behind installs nothing and prints the by-hand install line',
+      run: async (ctx) => {
+        const dir = tmpTarget({ name: 'consumer', devDependencies: { gulp: '4.0.0', 'some-dep': '2.0.0' } });
+        const { calls, safeInstall } = installer();
+
+        const said = await printed((sink) => ensurePeerDependencies({
+          projectDir: dir,
+          package: { peerDependencies: { gulp: '^5.0.0', 'some-dep': '^2.1.0' } },
+          log: sink,
+          warn: sink,
+          error: sink,
+          dependencyMap: { gulp: 'dev', 'some-dep': 'dev' },
+          safeInstall,
+        }));
+
+        // A deploy never bumps a brand across a major on its own; the minor peer beside it still aligns.
+        ctx.expect(calls.filter((command) => words(command).some((word) => word.startsWith('gulp@'))), 'the major gap installs nothing').toEqual([]);
+        ctx.expect(calls.length, 'the refusal is for that peer only').toBe(1);
+        ctx.expect(words(calls[0])).toContain('some-dep@2.1.0');
+        ctx.expect(said).toContain('npm install gulp@5.0.0');
+      },
+    },
+
+    {
+      name: 'a target declaring the peer as latest or file: aligns it; no version is not a 0.0.0 major gap',
+      run: async (ctx) => {
+        for (const declared of ['latest', 'file:../x']) {
+          const dir = tmpTarget({ name: 'consumer', devDependencies: { gulp: declared } });
+          const { calls, safeInstall } = installer();
+
+          const said = await printed((sink) => ensurePeerDependencies({
+            projectDir: dir,
+            package: { peerDependencies: { gulp: '^5.0.0' } },
+            log: sink,
+            warn: sink,
+            error: sink,
+            dependencyMap: { gulp: 'dev' },
+            safeInstall,
+          }));
+
+          ctx.expect(calls.length, `${declared}: refused instead of installed`).toBe(1);
+          ctx.expect(words(calls[0]), declared).toContain('gulp@5.0.0');
+          ctx.expect(words(calls[0]), declared).toContain('--ignore-scripts');
+          ctx.expect(said, `${declared}: a major-gap refusal was printed`).not.toMatch(/major/i);
+        }
       },
     },
 
