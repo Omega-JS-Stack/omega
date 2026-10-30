@@ -39,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#984](../../issues/984) - The suite converter (`scripts/convert-suites.js`, its source and assert layers, its fixtures) is gone: every `node:test` suite it was written for is converted, and a brand's remaining suite converts by hand with the register's map.
 
 ### Fixed
+- [#1099](../../issues/1099) - The backend emulator boot's one bump-and-retry now fires on firebase's own "Port N is not open" exit as well as node's `EADDRINUSE`, still only for a port this run allocated. Two stacks booting in the same second no longer stop the boot.
+- [#1100](../../issues/1100) - In the flows lane a failed boot case (ports held, emulator, website) skips every later case with the reason, instead of running each into its 60 s wait; the matrix rows keep reporting independently.
 - [#960](../../issues/960) - A failed desktop sign-out no longer says "Successfully signed out": main's sign-out rethrows the Firebase error, the renderer's `omega.signOut()` rejects, and the client's sign-out button shows its failure notice.
 - [#952](../../issues/952) - The backend's setup check reads the staged manifest at `dist/package.json`, where staging writes it, and compares the same derived dependency map (`file:` specs rewritten one level up), so a converged target no longer rewrites and restages on every setup.
 - [#993](../../issues/993) - The dispute-alert retry test asserts the route's promise and the retry's rewrite, never a status the Firestore trigger overwrites a moment later, so the backend suite no longer fails on that race.

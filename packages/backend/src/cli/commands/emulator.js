@@ -268,7 +268,8 @@ async function assertPlannedPortsFree(planned, isFree = isPortFree) {
  * run's allocation rather than by parsing an address shape: node writes the
  * same failure as `127.0.0.1:9099`, `:::9099` and `port 9099` depending on
  * which layer reports it, and only a number this run actually asked for can be
- * the one it could not bind.
+ * the one it could not bind. firebase-tools' own pre-bind check says the same
+ * as `Port N is not open`, ahead of a `port taken` line that names no port.
  * @param {string} text - A chunk of the child's output.
  * @param {number[]} ports - This attempt's allocated ports.
  * @returns {number|null}
@@ -277,7 +278,7 @@ function addressInUsePort(text, ports) {
   const allocated = new Set(ports);
 
   for (const line of String(text || '').split('\n')) {
-    if (!/EADDRINUSE/i.test(line)) {
+    if (!/EADDRINUSE|Port \d+ is not open/i.test(line)) {
       continue;
     }
 
@@ -1795,6 +1796,7 @@ EmulatorCommand.listListeningPids = listListeningPids;
 EmulatorCommand.PORT_LOOKUP_TIMEOUT_MS = PORT_LOOKUP_TIMEOUT_MS;
 EmulatorCommand.plannedEmulatorPorts = plannedEmulatorPorts;
 EmulatorCommand.assertPlannedPortsFree = assertPlannedPortsFree;
+EmulatorCommand.addressInUsePort = addressInUsePort;
 EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;
 EmulatorCommand.isStoppableEmulatorProcess = isStoppableEmulatorProcess;
 EmulatorCommand.isReapableRecordedProcess = isReapableRecordedProcess;

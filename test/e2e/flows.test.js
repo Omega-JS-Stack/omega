@@ -413,6 +413,7 @@ async function screenshot(page, label) {
 
 /**
  * One case whose failure screenshots whatever page is active before it reports.
+ * It skips without running once a boot case has failed: there is no stack to wait on.
  * @param {string} name - case name
  * @param {Function} run - the case body
  * @param {number} [timeout] - the case's own ceiling, where a boot's must fire first
@@ -423,6 +424,7 @@ function flowCase(name, run, timeout) {
     name,
     timeout,
     run: async (ctx) => {
+      if (ctx.state.bootFailed) ctx.skip(`the stack did not boot: ${ctx.state.bootFailed}`);
       try {
         return await run(ctx);
       } catch (error) {
@@ -431,6 +433,26 @@ function flowCase(name, run, timeout) {
       }
     },
   };
+}
+
+/**
+ * A prerequisite case: its failure records the error's first line as
+ * `state.bootFailed`, so every later case skips instead of running into its wait.
+ * A matrix row is a plain flowCase and never sets the flag.
+ * @param {string} name - case name
+ * @param {Function} run - the case body
+ * @param {number} [timeout] - the case's own ceiling, where a boot's must fire first
+ * @returns {object} the case
+ */
+function bootCase(name, run, timeout) {
+  return flowCase(name, async (ctx) => {
+    try {
+      return await run(ctx);
+    } catch (error) {
+      ctx.state.bootFailed = String(error?.message || error).split('\n')[0];
+      throw error;
+    }
+  }, timeout);
 }
 
 /** Close the current area's page, if one is open. */
@@ -517,7 +539,7 @@ module.exports = defineCases({
   },
 
   tests: [
-    flowCase('the classic ports are held so the stack boots beside a live dev', async (ctx) => {
+    bootCase('the classic ports are held so the stack boots beside a live dev', async (ctx) => {
       const { state } = ctx;
       state.hold = await holdClassicPorts();
       // The website port is allocated HERE (past the held classics) because the
@@ -530,7 +552,7 @@ module.exports = defineCases({
       console.log(`    held ${state.hold.held.length}/${CLASSIC_HOLD_PORTS.length}${state.hold.busy.length ? ` (busy, left alone: ${state.hold.busy.join(', ')})` : ''}; website :${state.sitePort}`);
     }),
 
-    flowCase('the playground emulator boots + personas seed', async (ctx) => {
+    bootCase('the playground emulator boots + personas seed', async (ctx) => {
       const { state } = ctx;
       const { child, ports } = await startPlaygroundEmulator({ logDir: LOG_DIR, env: state.childEnv, timeout: EMULATOR_READY_TIMEOUT });
       state.emulator = child;
@@ -543,7 +565,7 @@ module.exports = defineCases({
       console.log(`    auth :${ports.auth}, hosting :${ports.hosting}, functions :${ports.functions}`);
     }, EMULATOR_READY_TIMEOUT + 60000),
 
-    flowCase('the website serves through the REAL `omega dev` (auth proxy live)', async (ctx) => {
+    bootCase('the website serves through the REAL `omega dev` (auth proxy live)', async (ctx) => {
       const { state } = ctx;
       state.dev = startChild({
         bin: OMEGA_BIN,

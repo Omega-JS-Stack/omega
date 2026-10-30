@@ -157,6 +157,36 @@ module.exports = defineCases({
     },
 
     {
+      name: 'a failed prerequisite in a stopOnFailure: false suite skips the cases that consult its flag; the rest run on',
+      run: async (ctx) => {
+        const ran = [];
+        const needsBoot = (name) => ({
+          name,
+          run: (inner) => {
+            if (inner.state.bootFailed) inner.skip(`the stack did not boot: ${inner.state.bootFailed}`);
+            ran.push(name);
+          },
+        });
+        const events = await runSpec({
+          type: 'suite',
+          description: 'prerequisite then matrix',
+          stopOnFailure: false,
+          tests: [
+            { name: 'boot', run: (inner) => { inner.state.bootFailed = 'port taken'; fail(); } },
+            needsBoot('row 1'),
+            needsBoot('row 2'),
+            { name: 'unflagged', run: () => ran.push('unflagged') },
+          ],
+        });
+        ctx.expect(events.map((e) => e.status)).toEqual(['fail', 'skip', 'skip', 'pass']);
+        ctx.expect(events[0].error.message).toBe('this case fails');
+        ctx.expect(events[1].reason).toBe('the stack did not boot: port taken');
+        ctx.expect(events[2].reason).toBe('the stack did not boot: port taken');
+        ctx.expect(ran).toEqual(['unflagged']);
+      },
+    },
+
+    {
       name: 'case-28 a case with skip never runs its body',
       run: async (ctx) => {
         let ran = false;
