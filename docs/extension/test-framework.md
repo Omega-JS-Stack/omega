@@ -103,7 +103,7 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 
 With no `--layer`, every row runs in that order.
 
-Each background suite attaches the harness's LIVE service worker afresh, releasing a restarted worker's start pause and probing `chrome.runtime.id` first, so a worker that is gone fails that suite as `service worker for <id> is not active` instead of an undefined `chrome.runtime` read.
+Each background suite attaches the harness's LIVE service worker afresh, releasing a restarted worker's start pause and probing `chrome.runtime.id` first, so a worker that is gone fails that suite as `service worker for <id> is not active` instead of an undefined `chrome.runtime` read. A worker that dies mid-suite fails that suite's unreported cases with the same message the moment Chrome reports it crashed, instead of waiting out the case timeout.
 
 ## NEVER mock — test against the real harness
 

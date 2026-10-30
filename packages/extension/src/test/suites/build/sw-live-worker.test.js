@@ -171,6 +171,22 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'a worker that dies mid-suite fails that suite by name instead of waiting out the case timeout',
+      run: async (ctx) => {
+        // The case never settles, so the uninstall always lands while the evaluate is in flight.
+        const dying = suiteAs({
+          type: 'group',
+          layer: 'background',
+          description: 'dying',
+          tests: [{ name: 'uninstalls the extension mid-case', run: async (ctx) => { chrome.management.uninstallSelf(); await new Promise(() => {}); } }],
+        }, 'dying.test.js');
+
+        const events = await driveBackground([dying]);
+        ctx.expect(events.map((event) => [event.id, event.status])).toEqual([[dying.cases[0].id, 'fail']]);
+        ctx.expect(events[0].error.message).toMatch(/^service worker for [a-z]{32} is not active$/);
+      },
+    },
+    {
       name: 'attachLiveWorker on a worker that is gone rejects naming the extension',
       run: async (ctx) => {
         const { attachLiveWorker } = require('../../runners/service-worker.js');

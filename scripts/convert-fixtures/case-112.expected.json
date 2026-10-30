@@ -1,8 +1,0 @@
-{
-  "description": "case-112",
-  "fileLacks": ["node:test", "\\bassert\\b"],
-  "tests": [
-    { "name": "bare", "has": ["ctx.expect(x, 'm').toBeTruthy()"] },
-    { "name": "loose", "has": ["ctx.expect(a).toBe(b)"], "runLacks": ["toEqual"] }
-  ]
-}

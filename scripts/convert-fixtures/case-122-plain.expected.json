@@ -1,8 +1,0 @@
-{
-  "description": "p",
-  "fileLacks": ["\\bassert\\b", "defineCases"],
-  "fileHas": ["module.exports = { description: 'p', tests: ["],
-  "tests": [
-    { "name": "a", "params": "{ expect }", "has": ["expect(1).toBeTruthy()"], "runLacks": ["\\bassert\\b", "\\bctx\\b"] }
-  ]
-}

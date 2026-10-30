@@ -35,7 +35,29 @@ async function attachLiveWorker(browser, extId, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  throw new Error(`service worker for ${extId} is not active`);
+  throw notActive(extId);
+}
+
+/**
+ * Settle `work` on the attached worker, or reject the moment the worker crashes.
+ * A worker killed mid-command reports only `Inspector.targetCrashed`: its session
+ * never detaches, so a pending command would otherwise never settle.
+ * @param {object} session - the CDPSession `attachLiveWorker` opened
+ * @param {string} extId - the extension id the rejection names
+ * @param {Promise} work - the commands in flight on `session`
+ * @returns {Promise} `work`'s outcome, or a rejection naming the extension
+ */
+function whileLive(session, extId, work) {
+  let onCrash;
+  const crashed = new Promise((_, reject) => {
+    onCrash = () => reject(notActive(extId));
+    session.on('Inspector.targetCrashed', onCrash);
+  });
+  return Promise.race([work, crashed]).finally(() => session.off('Inspector.targetCrashed', onCrash));
+}
+
+function notActive(extId) {
+  return new Error(`service worker for ${extId} is not active`);
 }
 
 async function probeId(session) {
@@ -53,4 +75,4 @@ function within(promise, ms) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-module.exports = { attachLiveWorker };
+module.exports = { attachLiveWorker, whileLive };

@@ -1,7 +1,0 @@
-{
-  "description": "case-103",
-  "fileLacks": ["node:test", "\\bassert\\b"],
-  "tests": [
-    { "name": "a", "has": ["ctx.expect(1).toBe(1)"] }
-  ]
-}

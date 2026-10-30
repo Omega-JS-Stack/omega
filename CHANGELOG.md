@@ -29,6 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#1084](../../issues/1084) - The `omega:init` skill ends on one commit holding the scaffold, made once the local site answers and before any port or feature work, so every brand has a clean starting point.
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
+### Removed
+- [#984](../../issues/984) - The suite converter (`scripts/convert-suites.js`, its source and assert layers, its fixtures) is gone: every `node:test` suite it was written for is converted, and a brand's remaining suite converts by hand with the register's map.
+
 ### Fixed
 - [#960](../../issues/960) - A failed desktop sign-out no longer says "Successfully signed out": main's sign-out rethrows the Firebase error, the renderer's `omega.signOut()` rejects, and the client's sign-out button shows its failure notice.
 - [#952](../../issues/952) - The backend's setup check reads the staged manifest at `dist/package.json`, where staging writes it, and compares the same derived dependency map (`file:` specs rewritten one level up), so a converged target no longer rewrites and restages on every setup.
@@ -52,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#1107](../../issues/1107) - devkit's port hold binds the two loopback addresses only and asks the allocator's own `isPortFree` first. On Linux the wildcard bind collided with the hold's own loopback bind, so a held port read as free.
 - [#1108](../../issues/1108) - The manager's fake-gh helper symlinks the real git into its temp bin, so hiding `gh` no longer hides `git`. On a runner both share one bin folder, and the PATH filter dropped git with gh.
 - [#1117](../../issues/1117) - The backend self-test seeds personas four at a time instead of all 91 at once, since the functions emulator starts one uncapped worker per in-flight auth trigger and a 7 GB CI runner ran out of memory. The seed also stops on the first persona whose `auth:on-create` never completes.
+- [#1123](../../issues/1123) - The extension's background lane fails a suite by name (`service worker for <id> is not active`) the moment its worker dies mid-suite, instead of waiting out the 60 s case timeout. A worker killed mid-command reports only `Inspector.targetCrashed`, so the gone-worker case hung on the ubuntu runner.
 
 ## [0.56.0] - 2026-10-13
 
