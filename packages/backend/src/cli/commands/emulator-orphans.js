@@ -46,10 +46,9 @@ const PROCESS_TABLE_COMMAND = 'ps -A -o pid=,ppid=,uid=,command=';
 const PROCESS_TABLE_MAX_BUFFER = 16 * 1024 * 1024;
 const PROCESS_READ_TIMEOUT_MS = 5000;
 
-// The settle windows. The port-release pair lives here alone and the boot
-// imports it; the grace restates emulator.js's STOP_GRACE_MS as a default, since
-// the command requires THIS module and a standalone sweep must still settle.
-const DEFAULT_GRACE_MS = 2000;
+// The settle windows, here alone: the emulator command requires this module and
+// reads them, so its stop path and this sweep grant SIGTERM the same grace.
+const STOP_GRACE_MS = 2000;
 const DEFAULT_PORT_RELEASE_TIMEOUT_MS = 5000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
 
@@ -376,7 +375,7 @@ async function reapMachineOrphans({
   kill = process.kill,
   isFree = isPortFree,
   log = () => {},
-  graceMs = DEFAULT_GRACE_MS,
+  graceMs = STOP_GRACE_MS,
   portReleaseTimeoutMs = DEFAULT_PORT_RELEASE_TIMEOUT_MS,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 } = {}) {
@@ -442,4 +441,5 @@ module.exports = {
   readProcessTable: readProcessTable,
   readProcessRow: readProcessRow,
   DEFAULT_POLL_INTERVAL_MS: DEFAULT_POLL_INTERVAL_MS,
+  STOP_GRACE_MS: STOP_GRACE_MS,
 };

@@ -1,6 +1,6 @@
 # Templating
 
-Light token-replacement engine for HTML pages. Uses `{{ var }}` syntax, dot-notation paths, brand/app values from config.
+Token replacement for HTML pages: `{{ var }}` syntax, dot-notation paths, brand/app values from config. The tokens render through devkit's one renderer, `@omega.js/devkit/tokens` ([devkit](../devkit/index.md)), the same one the extension builds with.
 
 ## How it works
 
@@ -10,7 +10,7 @@ Light token-replacement engine for HTML pages. Uses `{{ var }}` syntax, dot-nota
    - Reads each `src/views/<name>/index.html`
    - Templates its body with the page vars (so the body can use `{{ brand.name }}` etc.)
    - Injects the rendered body into the page template's `{{ content }}` slot
-   - Writes the final HTML to `dist/views/<name>/index.html`
+   - Writes the final HTML to `dist/views/<name>/index.html`, or fails the build when a token nothing resolves is left (a typo, a variable the table below does not carry), naming the view and the token: `Cannot build src/views/main/index.html: unresolved token(s) {{ missing }}. Check config/omega.json5 and the token spelling` (the one message devkit's `unresolvedTokensError` builds for desktop and extension alike)
 4. The page template auto-includes:
    - `assets/css/main.bundle.css` (compiled from `src/assets/scss/main.scss` by gulp/sass) — present on every page
    - `assets/js/components/<page.name>.bundle.js` (per-view renderer bundle) — only the JS for this page
@@ -75,18 +75,6 @@ Drop your own `config/page-template.html` in your project root. @omega.js/deskto
 </html>
 ```
 
-## Runtime API
-
-`omega.templating` is also available at runtime if you need to template a string yourself (e.g. dynamic deep-link routes):
-
-```js
-omega.templating.render('Hello {{ user.name }}', { user: { name: 'Ian' } });
-// → 'Hello Ian'
-
-omega.templating.render('Custom [name]', { name: 'X' }, { brackets: ['[', ']'] });
-// → 'Custom X'
-```
-
 ## Future
 
 The current page template hardcodes the asset paths. A future pass adds:
@@ -98,4 +86,4 @@ For theme-related styling (Bootstrap, classy theme), see [docs/desktop/themes.md
 
 ## Tests
 
-`src/test/suites/build/templating.test.js` — render, dot-notation, custom brackets, buildPageVars, renderPage end-to-end. 8 tests.
+`src/test/suites/build/templating.test.js` — render, dot-notation, buildPageVars, renderPage end-to-end, and the html task: a leftover token fails the build, a resolved view renders. 9 tests. The renderer's own tests are devkit's `test/tokens.test.js`.

@@ -23,6 +23,7 @@ const { scrubCredentialEnv } = require('./credential-scrub.js');
 const { targetOfType } = require('./target-of-type.js');
 const { resolvePackageRealDir } = require('../local.js');
 const { missingMachineTools, machineToolLine } = require('../machine-tools.js');
+const { ENV_FILE } = require('../env-file.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real target builds dominate; a warm rerun finishes far inside them.
@@ -212,7 +213,7 @@ class JourneyRun {
       `--id=${spec.id}`, `--url=${spec.url}`, `--targets=${spec.targets.join(',')}`, '--no-dev',
     ], { cwd: this.brandRoot, env: this.childEnv(), timeout: TIMEOUTS.onboard });
 
-    for (const file of ['config/omega.json5', 'package.json', '.env', '.gitignore']) {
+    for (const file of ['config/omega.json5', 'package.json', ENV_FILE, '.gitignore']) {
       if (!fs.existsSync(path.join(this.brandRoot, file))) {
         throw new Error(`scaffold missing ${file}`);
       }

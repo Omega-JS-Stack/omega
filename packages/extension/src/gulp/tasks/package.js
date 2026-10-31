@@ -9,7 +9,7 @@ const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
 const { CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 const { listingId, deriveFirefoxId } = require('../../lib/listings.js');
-const { renderTokens, unresolvedTokens } = require('../lib/tokens.js');
+const { renderTokens, unresolvedTokens } = require('@omega.js/devkit/tokens');
 const { writeJson } = require('@omega.js/devkit/write-json');
 
 // Load package

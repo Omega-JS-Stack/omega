@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk').default;
 const { resolvePackageDir } = require('@omega.js/devkit/local');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const { serviceAskedKeys } = require('@omega.js/config');
 const { REQUIRES, TARGET_FRAMEWORKS, serviceInputs, describeServiceInputs } = require('../config.js');
@@ -133,7 +134,7 @@ function envHome(company) {
 
   // `dir` is the resolver's own `<root>/company` (@omega.js/config's
   // COMPANY_DIR), never that path spelled again here.
-  const file = company.file('.env') || path.join(company.dir, '.env');
+  const file = company.file(ENV_FILE) || path.join(company.dir, ENV_FILE);
 
   return `the company .env (${file}); the brand .env overrides it`;
 }

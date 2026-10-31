@@ -10,6 +10,7 @@ const { isDeepStrictEqual } = require('node:util');
 const jetpack = require('fs-jetpack');
 const { minimatch } = require('minimatch');
 const { mergeLineBasedFiles, hasSectionMarkers, getCustomSection } = require('./merge-line-files');
+const { renderTokens } = require('./tokens');
 
 // Files with these extensions copy byte-for-byte and never go through
 // template/merge/transform.
@@ -133,7 +134,7 @@ function applyDefaults(config) {
         // an untouched consumer copy compares equal.
         let rendered = jetpack.read(source);
         if (options.template) {
-          rendered = renderTemplate(rendered, options.template);
+          rendered = renderTokens(rendered, options.template);
         }
         if (transform) {
           rendered = transform(rendered, item);
@@ -170,7 +171,7 @@ function applyDefaults(config) {
     // Per-rule template render happens BEFORE merging, so merges compare
     // rendered framework defaults against the consumer's file.
     if (options.template) {
-      contents = renderTemplate(contents, options.template);
+      contents = renderTokens(contents, options.template);
     }
 
     if (options.merge && exists) {
@@ -287,17 +288,6 @@ function resolveOptions(relativePath, fileMap) {
   return options;
 }
 
-// Minimal `{{ key.path }}` substitution, tolerant of unknown keys.
-// Unknown keys render as the original `{{ ... }}` string, so non-template content
-// with literal braces (e.g. GitHub Actions `${{ secrets.X }}`) survives.
-function renderTemplate(content, context) {
-  if (typeof content !== 'string' || !content.includes('{{')) return content;
-  return content.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (full, keyPath) => {
-    const value = keyPath.split('.').reduce((acc, k) => (acc == null ? acc : acc[k]), context);
-    return (value === undefined || value === null) ? full : String(value);
-  });
-}
-
 // JSON5 defaults merge: framework defaults provide shape and
 // order; the consumer's values win unless they're the literal string 'default';
 // consumer-only keys survive at every nesting level, EXCEPT one holding the
@@ -395,4 +385,4 @@ function diffConfigPaths(existing, merged, prefix, edits, removals) {
   }
 }
 
-module.exports = { applyDefaults, mergeJson5Defaults, renderTemplate };
+module.exports = { applyDefaults, mergeJson5Defaults };

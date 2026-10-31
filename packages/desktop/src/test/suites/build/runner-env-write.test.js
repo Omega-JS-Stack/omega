@@ -7,6 +7,7 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 const runnerEnv = require('../../../utils/runner-env.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 module.exports = defineCases({
   type: 'group',
@@ -20,10 +21,10 @@ module.exports = defineCases({
         // win over the new value and the read-back would refuse the write.
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), '# GH_TOKEN=""\nGH_TOKEN="old"\nSIGNTOOL_PATH="s"\n');
+          jetpack.write(path.join(home, ENV_FILE), '# GH_TOKEN=""\nGH_TOKEN="old"\nSIGNTOOL_PATH="s"\n');
           runnerEnv.writeRunnerEnvValues(home, { GH_TOKEN: 'new' });
 
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect((written.match(/^\s*#?\s*GH_TOKEN\s*=/gm) || []).length).toBe(1);
           ctx.expect(written).toContain('SIGNTOOL_PATH="s"');
           const back = {};
@@ -40,10 +41,10 @@ module.exports = defineCases({
         for (const later of ['export GH_TOKEN="b"', '  GH_TOKEN="b"']) {
           const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
           try {
-            jetpack.write(path.join(home, '.env'), `GH_TOKEN="a"\n${later}\n`);
+            jetpack.write(path.join(home, ENV_FILE), `GH_TOKEN="a"\n${later}\n`);
             runnerEnv.writeRunnerEnvValues(home, { GH_TOKEN: 'new' });
 
-            const written = jetpack.read(path.join(home, '.env'));
+            const written = jetpack.read(path.join(home, ENV_FILE));
             ctx.expect((written.match(/^\s*(?:export\s+)?GH_TOKEN\s*=/gm) || []).length).toBe(1);
             const back = {};
             runnerEnv.loadRunnerEnv({ home, env: back });
@@ -59,10 +60,10 @@ module.exports = defineCases({
       run: (ctx) => {
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), 'GH_TOKEN="first\nsecond"\nSIGNTOOL_PATH="s"\n');
+          jetpack.write(path.join(home, ENV_FILE), 'GH_TOKEN="first\nsecond"\nSIGNTOOL_PATH="s"\n');
           runnerEnv.writeRunnerEnvValues(home, { GH_TOKEN: 'new' });
 
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(written).toBe('GH_TOKEN="new"\nSIGNTOOL_PATH="s"\n');
         } finally {
           jetpack.remove(home);

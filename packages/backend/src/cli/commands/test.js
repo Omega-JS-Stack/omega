@@ -6,7 +6,8 @@ const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
-const { readPortsFile, portsToEnv, CLASSIC_PORTS, ENV_FILE_NAME } = require('@omega.js/config');
+const { readPortsFile, portsToEnv, CLASSIC_PORTS } = require('@omega.js/config');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { writeJson } = require('@omega.js/devkit/write-json');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
@@ -597,7 +598,7 @@ class TestCommand extends BaseCommand {
    */
   ensureFixtureEnv(fixture) {
     const { baseMissingKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
-    const envPath = path.join(fixture, ENV_FILE_NAME);
+    const envPath = path.join(fixture, ENV_FILE);
     const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
     const present = require('dotenv').parse(existing);
 

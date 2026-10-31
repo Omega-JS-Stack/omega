@@ -20,6 +20,8 @@ const TABLE = [
   ['Hello World & Friends', 'hello-world-friends', 'a run of spaces and symbols is ONE dash'],
   ['Top 10 Products (2025)', 'top-10-products-2025', 'digits stay, brackets go'],
   ['  Leading and trailing  ', 'leading-and-trailing', 'whitespace at the edges is trimmed, not dashed'],
+  ["Don't Panic: A/B Guide/", 'dont-panic-a-b-guide', 'an admin post url: slashes and a colon separate, the apostrophe does not'],
+  [42, '42', 'a non-string is stringified first'],
   ['already-a-slug', 'already-a-slug', 'a slug is its own slug'],
   ['---', '', 'nothing but separators is the empty slug'],
   ['', '', 'the empty string stays empty'],

@@ -24,6 +24,7 @@ const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-targe
 const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
 const { collectTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const package = build.getPackage('main');
 
@@ -42,7 +43,7 @@ function stageConsumer() {
 function tmpBrand(brandEnv) {
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-brand-'));
   jetpack.write(path.join(brand, 'config', 'omega.json5'), '{ brand: { id: "b" } }');
-  if (brandEnv !== undefined) fs.writeFileSync(path.join(brand, '.env'), brandEnv);
+  if (brandEnv !== undefined) fs.writeFileSync(path.join(brand, ENV_FILE), brandEnv);
 
   const target = path.join(brand, 'targets', 'desktop');
   fs.mkdirSync(target, { recursive: true });

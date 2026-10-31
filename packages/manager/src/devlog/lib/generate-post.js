@@ -7,6 +7,7 @@
 
 const chalk = require('chalk').default;
 const { chosenProvider } = require('@omega.js/config');
+const { slugify } = require('@omega.js/client/modules/slugify.js');
 
 const { writeArticle, blocksToPost, MAX_DESCRIPTION_LENGTH, MAX_SOURCE_CONTENT_LENGTH } = require('./ghostii.js');
 
@@ -183,19 +184,6 @@ async function generatePost({ brandConfig, commits, projectMap, days, write = wr
     body: body.trim(),
     headerImageUrl: post.headerImageUrl || article.headerImageUrl || '',
   };
-}
-
-/**
- * Slugify a title: lowercase, alphanumerics + hyphens only.
- *
- * @param {string} input - Title text
- * @returns {string} URL slug
- */
-function slugify(input) {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 module.exports = { generatePost };

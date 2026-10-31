@@ -1,24 +1,16 @@
-// Templating — light token-replacement engine for HTML/CSS/JS at build time.
+// Templating — the page-vars assembly for HTML views at build time.
 //
-// Wraps node-powertools' template() with framework-friendly defaults:
-//   - Brackets are `{{ }}`.
-//   - Standard variable scope built from omega.config + page metadata.
-//
-// Public API:
-//   omega.templating.render(input, vars)               // arbitrary string + arbitrary vars
-//   omega.templating.buildPageVars(pageName, extras)   // produces { brand, app, page, theme, cacheBust }
-//   omega.templating.renderPage(pageTemplate, vars)    // shortcut that uses {{ }} brackets
-//
-// omega.initialize() calls .initialize(omega) but the lib is mostly used at build time
-// (gulp/html), not at runtime. The runtime surface is exposed for consumer hooks that want
-// to template their own strings.
+// Tokens render through devkit's ONE `{{ path }}` renderer (@omega.js/devkit/tokens);
+// this module adds the standard variable scope built from omega.config + page metadata.
+// Public API, the `@omega.js/desktop/lib/templating` export (gulp/html requires it directly):
+//   render(input, vars)               // arbitrary string + arbitrary vars
+//   buildPageVars(pageName, extras)   // produces { brand, app, page, theme, cacheBust }
+//   renderPage(pageTemplate, vars)    // render the outer page shell
 
 const LoggerLite = require('./logger-lite.js');
-const { template } = require('node-powertools');
+const { renderTokens } = require('@omega.js/devkit/tokens');
 
 const logger = new LoggerLite('templating');
-
-const DEFAULT_BRACKETS = ['{{', '}}'];
 
 const templating = {
   _initialized: false,
@@ -30,11 +22,10 @@ const templating = {
     logger.log('initialize');
   },
 
-  // Render an arbitrary template string with the given vars. Brackets default to {{ }}.
-  render(input, vars, opts) {
-    opts = opts || {};
-    const brackets = opts.brackets || DEFAULT_BRACKETS;
-    return template(String(input || ''), vars || {}, { brackets });
+  // Render an arbitrary template string's {{ }} tokens with the given vars; a token
+  // nothing resolves stays as written (unresolvedTokens names it).
+  render(input, vars) {
+    return renderTokens(String(input || ''), vars || {});
   },
 
   // Build the standard variable scope for a page render. Combines omega.config with

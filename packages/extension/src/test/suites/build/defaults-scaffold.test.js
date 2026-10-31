@@ -12,6 +12,7 @@ const JSON5 = require('json5');
 
 const { scaffoldDefaults } = require('../../../gulp/tasks/defaults.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { sectionMarkers } = require('@omega.js/devkit/merge-line-files');
 
 const SRC = path.join(__dirname, '..', '..', '..');
@@ -69,7 +70,7 @@ module.exports = defineCases({
         // No `.env` scaffolds ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
         // a target .env is a human-only override; keys live in the brand root
         // .env and every verb delivers them.
-        ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(tmp, ENV_FILE))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
         // A standalone project root gets the same AGENTS.md a brand root does:
         // the manager import under Default, its notes under Custom. Claude Code reads

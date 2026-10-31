@@ -468,24 +468,18 @@ class Utilities {
   }
 
   /**
-   * Convert a string into a URL-safe slug.
-   * Strips all non-alphanumeric characters, collapses runs of hyphens, lowercases.
-   * Canonical slug builder — share this between @omega.js/backend admin/post and any consumer
-   * that needs to predict the resulting URL (e.g. sponsorship platform).
+   * Convert a string into a URL-safe slug with @omega.js/client's one slugifier,
+   * so a backend-built post URL matches the one the web editor and the manager
+   * devlog build. admin/post and the newsletter's article CTA read it.
    *
-   * @param {string} input - The string to slugify
-   * @returns {string} URL-safe slug (or empty string for non-string input)
+   * @param {*} input - The text to slug (stringified)
+   * @returns {string} URL-safe slug
    */
   slugify(input) {
-    if (typeof input !== 'string') {
-      return '';
-    }
+    // Required here, not at load, so a Node 22 before require(esm) meets it only on a call.
+    const { slugify } = require('@omega.js/client/modules/slugify.js');
 
-    return input
-      .replace(/[^a-zA-Z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
+    return slugify(input);
   }
 
   /**

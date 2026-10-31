@@ -27,6 +27,7 @@ const outputRoot  = require('../../utils/dist-root.js')(projectRoot);
 // We require the templating lib directly (rather than going through the omega instance)
 // because gulp tasks run pre-Electron, with only the build module available.
 const templating = require('../../lib/templating.js');
+const { unresolvedTokens, unresolvedTokensError } = require('@omega.js/devkit/tokens');
 
 module.exports = function htmlTask(done) {
   const viewsDir = path.join(projectRoot, 'src', 'views');
@@ -61,7 +62,7 @@ module.exports = function htmlTask(done) {
   const pageTemplateContent = jetpack.read(templatePath);
   const cacheBust = String(Date.now());
 
-  files.forEach((src) => {
+  for (const src of files) {
     const rel = path.relative(viewsDir, src);
     // Page name = directory under views/, OR the file basename if at views/ root.
     // src/views/main/index.html       -> 'main'
@@ -86,10 +87,16 @@ module.exports = function htmlTask(done) {
     const outerVars = templating.buildPageVars(pageName, { cacheBust, content: renderedBody }, build);
     const final = templating.render(pageTemplateContent, outerVars);
 
+    // A token nothing resolves would ship literally in the page
+    const leftover = unresolvedTokens(final);
+    if (leftover.length > 0) {
+      return done(unresolvedTokensError(`src/views/${rel.replace(/\\/g, '/')}`, leftover));
+    }
+
     const dest = path.join(outputRoot, 'views', rel);
     jetpack.write(dest, final);
     logger.log(`emitted dist/views/${rel} (page=${pageName})`);
-  });
+  }
 
   done();
 };

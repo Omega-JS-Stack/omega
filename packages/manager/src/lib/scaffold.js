@@ -18,7 +18,7 @@ const chalk = require('chalk').default;
 const { TARGET_FRAMEWORKS } = require('../config.js');
 // The environment vocabulary is @omega.js/config's — the same three names the
 // overlay files are suffixed with and every runtime's environment() answers
-const { ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { ENV_ENVIRONMENTS, envLayerFiles } = require('@omega.js/config');
 // The stub is the marker template every .env writer converges onto, with
 // the generated keys minted: a scaffolded .env is already converged.
 const { renderEnvTemplate } = require('./env-order.js');
@@ -30,6 +30,7 @@ const { MANAGE_SCRIPT } = require('./package-scripts.js');
 const { renderBrandGitignore } = require('./gitignore.js');
 const { TEMPLATE_URL, carriesTemplateMarker } = require('./template-marker.js');
 const { formatJson } = require('@omega.js/devkit/write-json');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the target manifest's `dependencies`
@@ -371,8 +372,9 @@ function buildScaffoldPlan(answers) {
     { path: 'config/omega.json5', contents: renderOmegaConfig(answers) },
     { path: 'package.json', contents: renderRootPackageJson(answers) },
     { path: '.gitignore', contents: renderBrandGitignore() },
-    { path: '.env', contents: renderEnvStub() },
-    ...ENV_ENVIRONMENTS.map((environment) => ({ path: `.env.${environment}`, contents: renderEnvOverlayStub(environment) })),
+    { path: ENV_FILE, contents: renderEnvStub() },
+    // The overlay is the last, strongest, file envLayerFiles names
+    ...ENV_ENVIRONMENTS.map((environment) => ({ path: envLayerFiles(ENV_FILE, environment).at(-1), contents: renderEnvOverlayStub(environment) })),
     { path: 'README.md', contents: renderReadme(answers) },
   ];
 

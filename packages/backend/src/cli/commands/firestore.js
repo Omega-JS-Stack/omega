@@ -245,17 +245,6 @@ class FirestoreCommand extends BaseCommand {
 
     return raw;
   }
-
-  /**
-   * Output data as JSON.
-   */
-  output(data, argv) {
-    if (argv.raw) {
-      this.print(JSON.stringify(data));
-    } else {
-      this.print(JSON.stringify(data, null, 2));
-    }
-  }
 }
 
 module.exports = FirestoreCommand;

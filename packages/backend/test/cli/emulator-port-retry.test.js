@@ -1,77 +1,66 @@
 /**
- * Test: a port taken between the probe and the bind bumps and retries once
- * ([#778](https://github.com/Omega-JS-Stack/omega/issues/778)).
- *
- * The allocator probes, then firebase-tools binds: two moments, and on a
- * machine running a second brand's stack a foreign listener fits between them.
- * The boot then died on `listen EADDRINUSE 127.0.0.1:9099` and took every
- * emulator-backed step of the lane with it, and firebase-tools' own pre-bind
- * check says the same thing as `Port N is not open ... port taken`. So a bind
- * failure, in either wording, re-allocates around the port that failed,
- * republishes the map, and boots ONE more time; a second failure is the
- * report, naming the port and whoever holds it.
- *
- * Run: npx omega test backend:cli/emulator-port-retry
- *
- * Nothing here spawns an emulator or signals anything: `spawn` itself is a
- * fixture for the duration of each boot, the ports are a throwaway map nowhere
- * near the classic ones, and the reap case reads the world through the same
- * injected `ps`/kill/probe seams the stale-reap suite uses.
+ * Test: a port taken between the allocator's probe and firebase-tools' bind bumps and retries ONCE, against the
+ * real firebase-tools child on a throwaway project far from the classic ports. Node's own EADDRINUSE wording is
+ * parse-level only: firebase-tools' pre-bind check always reports first. Run: npx omega test backend:cli/emulator-port-retry
  */
+const fs = require('fs');
 const os = require('os');
+const net = require('net');
 const path = require('path');
-const childProcess = require('child_process');
-const { EventEmitter } = require('events');
+const { spawn } = require('child_process');
 const jetpack = require('fs-jetpack');
 
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const { isPortFree } = require('../../dist/vendor/config/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const frameworkPackage = require('../../package.json');
 
-const OURS = 'demo-sandbox-brand';
+// The names the allocator moves, then the ones firebase-tools binds on its own. Every one is declared, because
+// a name firebase.json leaves out falls back to its CLASSIC port.
+const ALLOCATED_NAMES = ['auth', 'functions', 'firestore', 'database', 'hosting', 'storage', 'pubsub', 'ui'];
+const DECLARED_NAMES = [...ALLOCATED_NAMES, 'hub', 'logging', 'eventarc', 'tasks'];
 
-// A real row from `ps -o command=` against a booted sandbox emulator.
-const FIRESTORE_JAR = `java -jar cloud-firestore-emulator-v1.21.0.jar --host 127.0.0.1 --port 8080 --project_id ${OURS}`;
+// Each project takes its own 70-port window inside 49100-49499, so no case boots onto a port the last one used.
+let nextWindow = Math.floor(Math.random() * 5);
 
-// Where a dead run's survivors are parented.
-const ORPHANED = 1;
-
-// Every emulator this project declares. All eight, because a name missing from
-// firebase.json falls back to the CLASSIC port, and a fixture must never send
-// the allocator at the ports a real stack on this machine is using.
-const EMULATOR_NAMES = ['auth', 'functions', 'firestore', 'database', 'hosting', 'storage', 'pubsub', 'ui'];
+const REALLOCATING = 'was taken while the stack came up; reallocating';
 
 /**
- * A throwaway backend target whose emulator ports are nowhere near the classic
- * map, spaced out so a bump of one name cannot collide with the next.
+ * A throwaway backend target the real boot can stage and start: its peers declared (so the scaffold installs
+ * nothing), its own demo project id, and every port it declares far from the classic map.
+ * @param {object} [options]
+ * @param {string} [options.databaseRules] - A database rules path for firebase.json to name.
  */
-function makeProject() {
-  const projectDir = path.join(os.tmpdir(), `omega-retry-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const base = 49100 + Math.floor(Math.random() * 300) * 10;
+function makeProject({ databaseRules } = {}) {
+  const projectDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-retry-')));
+  const projectId = `demo-omega-retry-${path.basename(projectDir).slice(-6).toLowerCase()}`;
+  const base = 49100 + (nextWindow++ % 5) * 70;
+  const ports = Object.fromEntries(DECLARED_NAMES.map((name, index) => [name, base + index * 5]));
+  const emulators = Object.fromEntries(DECLARED_NAMES.map((name) => [name, { port: ports[name] }]));
 
-  jetpack.write(path.join(projectDir, 'firebase.json'), JSON.stringify({
-    emulators: Object.fromEntries(EMULATOR_NAMES.map((name, index) => [name, { port: base + index * 10 }])),
-  }, null, 2));
+  ports.websocket = base + 60;
+  emulators.firestore.websocketPort = ports.websocket;
+  emulators.ui.enabled = true;
 
-  return { projectDir, cleanup: () => jetpack.remove(projectDir) };
-}
+  jetpack.write(path.join(projectDir, 'package.json'), { name: 'retry-fixture', version: '0.0.0', dependencies: frameworkPackage.peerDependencies });
+  jetpack.write(path.join(projectDir, '.firebaserc'), { projects: { default: projectId } });
+  jetpack.write(path.join(projectDir, 'config', 'omega.json5'), {
+    brand: { id: 'retry-fixture' },
+    cloud: { provider: 'firebase', config: { projectId } },
+    targets: { backend: { type: 'backend' } },
+  });
+  jetpack.write(path.join(projectDir, 'firebase.json'), {
+    firestore: { rules: 'dist/firestore.rules' },
+    ...(databaseRules ? { database: { rules: databaseRules } } : {}),
+    emulators: { ...emulators, singleProjectMode: true },
+  });
 
-/** The `firebase emulators:start` child, as a fixture: no shell, no ports, no pid to signal. */
-function fixtureChild() {
-  const child = new EventEmitter();
-
-  child.pid = -1;
-  child.stdout = new EventEmitter();
-  child.stderr = new EventEmitter();
-  child.exitCode = null;
-  child.signalCode = null;
-
-  return child;
+  return { projectDir, ports, cleanup: () => jetpack.remove(projectDir) };
 }
 
 /**
- * An emulator command over a throwaway project with every path that touches a
- * REAL process stubbed out: the port-driven reaper, the preflight sweep, the
- * pid record and the stop path's sweep all signal live pids on live ports.
+ * The emulator command over a throwaway project, its log captured. The machine-wide orphan reap stays out: it
+ * signals every orphaned emulator-family process on this machine, whoever started it.
  * @param {string} projectDir - The throwaway project.
  */
 function bootCommand(projectDir) {
@@ -80,40 +69,12 @@ function bootCommand(projectDir) {
 
   command.log = (message) => lines.push(String(message));
   command.logWarning = (message) => lines.push(String(message));
-  command.ensureStaged = () => {};
-  command.startStageWatch = () => ({ close: () => {} });
   command.reapMachineOrphans = async () => {};
-  command.reapStaleRecordedProcesses = async () => {};
-  command.preflightEmulatorPorts = async () => [];
-  command.writeEmulatorPidRecord = () => [];
-  command.terminateRecordedEmulatorProcesses = async () => {};
 
   return { command, lines };
 }
 
-/**
- * Run `fn` with the given fixture standing in for `child_process.spawn`.
- *
- * The boot reaches spawn through `cli/utils/spawn-shell.js`, which reads
- * `childProcess.spawn` at CALL time
- * ([#769](https://github.com/Omega-JS-Stack/omega/issues/769)), so the stand-in
- * is installed for the DURATION of the boot and taken straight back out.
- * @param {Function} spawn - Stands in for child_process.spawn.
- * @param {Function} fn - What runs while it stands in.
- */
-async function withSpawn(spawn, fn) {
-  const realSpawn = childProcess.spawn;
-
-  childProcess.spawn = spawn;
-
-  try {
-    return await fn();
-  } finally {
-    childProcess.spawn = realSpawn;
-  }
-}
-
-/** The OMEGA_*_PORT block a boot publishes, snapshotted so a case can put it back. */
+/** The OMEGA_*_PORT block a boot publishes, snapshotted so a case can put the door's own stack back. */
 function capturePortEnv() {
   const keys = Object.keys(process.env).filter((key) => /^OMEGA_.*_PORT$/.test(key));
   const prior = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -126,321 +87,320 @@ function capturePortEnv() {
   };
 }
 
-/** The published map this boot handed its child, as the child reads it. */
+/** The map `.temp/ports.json` publishes right now, or null while there is none to read. */
 function publishedPorts(projectDir) {
-  return jetpack.read(path.join(projectDir, '.temp', 'ports.json'), 'json')?.ports || {};
-}
-
-/**
- * The two ways a child reports an auth port somebody else took, as
- * `[stream, text]` chunks: node's `EADDRINUSE` from the bind itself, and
- * firebase-tools' own pre-bind check, whose numbered warning goes to stdout and
- * whose closing `port taken` line, which names no port, to stderr.
- */
-const BIND_FAILURE_WORDING = {
-  node: (port) => [['stderr', `⚠  emulators: Error: listen EADDRINUSE: address already in use 127.0.0.1:${port}\n`]],
-  firebase: (port) => [
-    ['stdout', `⚠  auth: Port ${port} is not open on localhost (127.0.0.1,::1), could not start Authentication Emulator.\n`],
-    ['stderr', 'Error: Could not start Authentication Emulator, port taken.\n'],
-  ],
-};
-
-/**
- * A child that dies the way firebase-tools does when its auth port went to
- * somebody else: the bind failure on its output, then gone. The port defaults
- * to the one the boot just published, so the fixture always names the port
- * THIS attempt was actually given.
- * @param {object} [options]
- * @param {number} [options.port] - The port the failure names.
- * @param {boolean} [options.close] - Emit `close` (false = the late-close case:
- *   the child outlives shutdown's races and the event lands after the retry).
- * @param {'node'|'firebase'} [options.wording] - Which layer reports the failure.
- */
-function bindFailureChild({ port, close = true, wording = 'node' } = {}) {
-  const child = fixtureChild();
-
-  setImmediate(() => {
-    // Dead before the boot can signal it: a stack that never bound anything
-    // has no process group to take down.
-    child.exitCode = 1;
-
-    for (const [stream, text] of BIND_FAILURE_WORDING[wording](port || process.env.OMEGA_AUTH_PORT)) {
-      child[stream].emit('data', Buffer.from(text));
-    }
-
-    if (close) {
-      child.emit('close', 1, null);
-    }
-  });
-
-  return child;
-}
-
-/** A child that comes up. */
-function readyChild() {
-  const child = fixtureChild();
-
-  setImmediate(() => child.stdout.emit('data', Buffer.from('[fixture] All emulators ready\n')));
-
-  return child;
-}
-
-/**
- * A boot whose first child dies on the auth port in `wording` comes up on the
- * second, with auth bumped one port off the one it could not bind.
- * @param {Function} expect - The case's matcher.
- * @param {'node'|'firebase'} wording - Which layer reports the failure.
- */
-async function expectBumpedRetry(expect, wording) {
-  const { projectDir, cleanup } = makeProject();
-  const { command } = bootCommand(projectDir);
-  const restoreEnv = capturePortEnv();
-  const attempts = [];
-  let child = null;
-
-  const fixtureSpawn = () => {
-    attempts.push(Number(process.env.OMEGA_AUTH_PORT));
-    child = attempts.length === 1 ? bindFailureChild({ wording }) : readyChild();
-    return child;
-  };
-
   try {
-    const { emulatorPorts, bumped } = await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
-
-    expect(attempts.length, 'the first boot died on the bind and exactly one retry followed').toBe(2);
-    expect(attempts[1], 'the retry allocated auth off the port it could not bind').toBe(attempts[0] + 1);
-    expect(emulatorPorts.auth, 'the stack that came up is the bumped one').toBe(attempts[1]);
-    expect(bumped.includes('auth'), 'the moved name is reported as bumped').toBeTruthy();
-    expect(publishedPorts(projectDir).auth, 'the ports file siblings read carries the bumped port').toBe(attempts[1]);
-    expect(publishedPorts(projectDir).functions, 'every other name kept its allocation').toBe(emulatorPorts.functions);
-  } finally {
-    if (child) child.emit('close', 0, null);
-    restoreEnv();
-    cleanup();
-  }
-}
-
-/**
- * A boot whose child dies in `wording` on a port this run never allocated
- * fails once, untagged, the way an unknown failure always has.
- * @param {Function} expect - The case's matcher.
- * @param {'node'|'firebase'} wording - Which layer reports the failure.
- */
-async function expectUnknownFailure(expect, wording) {
-  const { projectDir, cleanup } = makeProject();
-  const { command } = bootCommand(projectDir);
-  const restoreEnv = capturePortEnv();
-  const attempts = [];
-  let failure = null;
-
-  const fixtureSpawn = () => {
-    attempts.push(Number(process.env.OMEGA_AUTH_PORT));
-    return bindFailureChild({ port: 6379, wording });
-  };
-
-  try {
-    await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
+    return JSON.parse(fs.readFileSync(path.join(projectDir, '.temp', 'ports.json'), 'utf8')).ports;
   } catch (error) {
-    failure = error;
+    // Not published yet, retracted between attempts, or caught mid-write: the next poll reads it whole.
+    return null;
+  }
+}
+
+/** A real listener on 127.0.0.1:`port`, the way a foreign stack would hold it. */
+function listen(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer((socket) => socket.destroy());
+
+    server.once('error', reject);
+    server.listen({ port, host: '127.0.0.1' }, () => resolve(server));
+  });
+}
+
+/** Close the listeners a case opened. */
+function release(servers) {
+  return Promise.all(servers.map((server) => new Promise((resolve) => server.close(() => resolve()))));
+}
+
+/**
+ * Take the auth port the moment a boot attempt publishes it, while firebase-tools is still on its way to its own
+ * pre-bind check. `every` holds each new map's auth port; otherwise only the first.
+ * @param {string} projectDir - The throwaway project.
+ * @param {{every: boolean}} options
+ */
+function holdPublishedAuth(projectDir, { every }) {
+  const maps = [];
+  const servers = [];
+  const state = { error: null };
+  let binding = false;
+
+  const timer = setInterval(async () => {
+    const ports = publishedPorts(projectDir);
+
+    if (binding || !ports?.auth || maps.some((map) => map.auth === ports.auth) || (!every && maps.length > 0)) {
+      return;
+    }
+
+    binding = true;
+    maps.push(ports);
+
+    try {
+      servers.push(await listen(ports.auth));
+    } catch (error) {
+      state.error = error;
+    }
+
+    binding = false;
+  }, 10);
+
+  return { maps, state, release: () => { clearInterval(timer); return release(servers); } };
+}
+
+/** The subset of `ports` something still listens on. */
+async function heldOf(ports) {
+  const unique = [...new Set(ports)];
+  const free = await Promise.all(unique.map((port) => isPortFree(port)));
+
+  return unique.filter((port, index) => !free[index]);
+}
+
+/** The ports in `ports` still held once they have had 10 s to come back free. */
+async function stillHeld(waitFor, ports) {
+  try {
+    await waitFor(async () => (await heldOf(ports)).length === 0, 10000, 200);
+  } catch (error) {
+    // Out of time: the read below names whatever stayed held.
   }
 
+  return heldOf(ports);
+}
+
+/**
+ * Boot the real stack with the declared storage port held, so every attempt reads as bumped and its stop path
+ * never sweeps the classic hub and storage ports. Storage is not one of the emulators the boot starts.
+ * @param {object} project - From makeProject.
+ * @param {Function} fn - Runs with `{ command, lines }` while the hold stands.
+ */
+async function withBumpedBoot(project, fn) {
+  const restoreEnv = capturePortEnv();
+  const storage = await listen(project.ports.storage);
+
   try {
-    expect(attempts.length, 'a port outside the allocation is not a bump, so nothing is retried').toBe(1);
-    expect(failure?.addressInUsePort, 'the failure carries no port tag').toBe(undefined);
-    expect(failure.message, 'the boot fails the way it always did').toMatch(/exited before ready/);
+    return await fn(bootCommand(project.projectDir));
   } finally {
+    await release([storage]);
     restoreEnv();
-    cleanup();
   }
+}
+
+/** The boot's rejection, or null when it came up. */
+async function bootFailure(command) {
+  try {
+    const stack = await command.startEmulators({ https: false });
+    await stack.shutdown();
+  } catch (error) {
+    return error;
+  }
+
+  return null;
+}
+
+/** A process that ignores SIGTERM (noting that it got one beside its state file) and holds a port. */
+const SURVIVOR_SOURCE = `const fs = require('fs');
+const [port, stateFile] = process.argv.slice(4);
+process.on('SIGTERM', () => fs.writeFileSync(stateFile + '.sigterm', ''));
+require('net').createServer().listen(Number(port), '127.0.0.1', () => fs.writeFileSync(stateFile, String(process.pid)));
+`;
+
+// The run that dies: it starts the survivor in its own group and exits, so the survivor orphans to PID 1.
+const LAUNCHER_SOURCE = `require('child_process').spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: 'ignore' }).unref();`;
+
+/** A port in 49480-49499 that nothing holds. */
+async function freeHighPort() {
+  for (let port = 49480; port < 49500; port++) {
+    if (await isPortFree(port)) return port;
+  }
+
+  throw new Error('every port in 49480-49499 is held, so the reap case has nowhere to listen');
 }
 
 module.exports = defineCases({
   description: 'emulator boot bumps and retries once when a port is taken mid-bind',
   type: 'group',
-  timeout: 30000,
+  timeout: 120000,
 
   tests: [
     {
       name: 'a-port-taken-mid-bind-is-bumped-and-the-boot-retried-once',
-      run: ({ expect }) => expectBumpedRetry(expect, 'node'),
-    },
-
-    {
-      name: 'firebases-own-port-taken-exit-is-bumped-and-the-boot-retried-once',
-      run: ({ expect }) => expectBumpedRetry(expect, 'firebase'),
-    },
-
-    {
-      name: 'firebases-port-not-open-line-names-only-a-port-this-run-allocated',
-      run({ expect }) {
-        const warning = '⚠  database: Port 9001 is not open on localhost (127.0.0.1,::1), could not start Database Emulator.';
-        const output = `${warning}\nError: Could not start Database Emulator, port taken.\n`;
-
-        expect(EmulatorCommand.addressInUsePort(warning, [9099, 9001]), 'the warning names an allocated port').toBe(9001);
-        expect(EmulatorCommand.addressInUsePort(output, [9099, 9001]), 'the whole exit reads as that same port').toBe(9001);
-        expect(EmulatorCommand.addressInUsePort(output, [9099, 9002]), 'a port this run never allocated is no bump').toBe(null);
-      },
-    },
-
-    {
-      name: 'a-bind-failure-on-a-port-this-run-never-asked-for-is-not-retried',
-      // The retry is for the race this run can do something about: a port of
-      // its OWN allocation. A failure naming anything else (a redis this
-      // machine runs, a port some other tool logged) is not a bump the
-      // allocator can make, so the boot fails the way it always did.
-      run: ({ expect }) => expectUnknownFailure(expect, 'node'),
-    },
-
-    {
-      name: 'firebases-port-taken-exit-on-a-port-this-run-never-asked-for-is-not-retried',
-      run: ({ expect }) => expectUnknownFailure(expect, 'firebase'),
-    },
-
-    {
-      name: 'a-late-close-from-the-failed-attempt-leaves-the-retrys-artifacts-alone',
-      async run({ expect }) {
-        // The first child can outlive shutdown's SIGTERM/SIGKILL races and
-        // close LATER, by which time the retry has published its own map into
-        // the same two files. Both attempts stamp this same process, so only
-        // the attempt token can tell the closing one it is no longer in charge.
-        const { projectDir, cleanup } = makeProject();
-        const { command } = bootCommand(projectDir);
-        const restoreEnv = capturePortEnv();
-        const children = [];
-        const resolvedConfig = path.join(projectDir, 'firebase.resolved.json');
-
-        const fixtureSpawn = () => {
-          const child = children.length === 0 ? bindFailureChild({ close: false }) : readyChild();
-          children.push(child);
-          return child;
-        };
+      async run({ expect, waitFor }) {
+        const project = makeProject();
+        const auth = holdPublishedAuth(project.projectDir, { every: false });
 
         try {
-          const { emulatorPorts } = await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
+          await withBumpedBoot(project, async ({ command, lines }) => {
+            let stack = await command.startEmulators({ https: false });
 
-          expect(publishedPorts(projectDir).auth, 'the retry published its map').toBe(emulatorPorts.auth);
+            try {
+              const [first] = auth.maps;
+              const { auth: _firstAuth, ...firstOthers } = first;
+              const { auth: retryAuth, ...retryOthers } = publishedPorts(project.projectDir);
 
-          // The dead first attempt finally reports in.
-          children[0].emit('close', 1, null);
+              expect(auth.state.error, 'the hold took the published auth port before firebase-tools did').toBe(null);
+              expect(lines.filter((line) => line.includes(REALLOCATING)).length, 'one reallocation, then the stack came up').toBe(1);
+              expect(stack.emulatorPorts.auth, 'the stack that came up is off the held port').not.toBe(first.auth);
+              expect(stack.bumped.includes('auth'), 'the moved name is reported as bumped').toBeTruthy();
+              expect(retryAuth, 'the ports file siblings read carries the new auth port').toBe(stack.emulatorPorts.auth);
+              expect(retryOthers, 'every other name kept its first allocation').toEqual(firstOthers);
 
-          expect(publishedPorts(projectDir).auth, "the late close leaves the live stack's ports file published").toBe(emulatorPorts.auth);
-          expect(jetpack.exists(resolvedConfig), 'and leaves the config the live stack is running on').toBeTruthy();
+              // The held auth and storage ports are this test's own listeners, not the stack's.
+              const { storage: _storage, auth: _auth, ...declared } = project.ports;
+              const bound = [...Object.values(stack.emulatorPorts), ...Object.values(declared)];
+
+              await stack.shutdown();
+              stack = null;
+
+              expect(await stillHeld(waitFor, bound), 'the stop path freed every port the stack bound').toEqual([]);
+            } finally {
+              if (stack) await stack.shutdown();
+            }
+          });
         } finally {
-          children.forEach((child) => child.emit('close', 0, null));
-          restoreEnv();
-          cleanup();
+          await auth.release();
+          project.cleanup();
         }
       },
     },
 
     {
       name: 'a-second-bind-failure-names-the-port-and-its-holder',
-      async run({ expect }) {
-        // Twice on the same wall is not a race any more: something is sitting
-        // on that port. The report says which, and who has it, and never
-        // signals them.
-        const { projectDir, cleanup } = makeProject();
-        const { command } = bootCommand(projectDir);
-        const restoreEnv = capturePortEnv();
-        const attempts = [];
-        const asked = [];
+      async run({ expect, waitFor }) {
+        // Twice on the same wall is not a race any more: the report names the port, and the holder lsof finds
+        // for it (this test process), and never signals it.
+        const project = makeProject();
+        const auth = holdPublishedAuth(project.projectDir, { every: true });
         let failure = null;
 
-        command.describePortHolders = (port) => {
-          asked.push(port);
-          return [{ pid: 4242, command: FIRESTORE_JAR }];
-        };
-
-        const fixtureSpawn = () => {
-          attempts.push(Number(process.env.OMEGA_AUTH_PORT));
-          return bindFailureChild();
-        };
-
         try {
-          await withSpawn(fixtureSpawn, () => command.startEmulators({ https: false }));
-        } catch (error) {
-          failure = error;
+          failure = await withBumpedBoot(project, ({ command }) => bootFailure(command));
+        } finally {
+          await auth.release();
         }
 
         try {
-          expect(failure, 'a boot that cannot bind its ports twice fails loudly').toBeTruthy();
-          expect(attempts.length, 'ONE retry, never a loop').toBe(2);
-          expect(asked, 'the holder is looked up for the port the retry could not bind').toEqual([attempts[1]]);
-          expect(failure.message, 'the report names the port and the emulator that wanted it').toMatch(new RegExp(`port ${attempts[1]} \\(auth\\)`));
-          expect(failure.message, 'and the process holding it').toMatch(/held by pid 4242: java -jar cloud-firestore-emulator/);
+          const second = auth.maps[1]?.auth;
+          const touched = [...Object.values(project.ports), ...auth.maps.flatMap((map) => Object.values(map))];
+
+          expect(failure?.message, 'the report names the port the retry could not bind').toMatch(new RegExp(`port ${second} \\(auth\\)`));
+          expect(failure.message, 'and the process holding it').toMatch(new RegExp(`held by pid ${process.pid}\\b`));
+          expect(auth.state.error, 'the hold took each published auth port before firebase-tools did').toBe(null);
+          expect(auth.maps.length, 'ONE retry, never a loop').toBe(2);
+          expect(await stillHeld(waitFor, touched), 'nothing of the stack is left listening').toEqual([]);
         } finally {
-          restoreEnv();
-          cleanup();
+          project.cleanup();
         }
       },
     },
 
     {
-      name: 'the-stale-reap-probes-its-ports-only-after-the-pid-is-gone',
+      name: 'a-failure-with-no-port-in-it-is-not-retried',
+      async run({ expect, waitFor }) {
+        // A rules file that does not exist: firebase-tools refuses the database emulator and exits before ready,
+        // naming no port. The retry is for the race this run can do something about, so this fails once.
+        const project = makeProject({ databaseRules: 'missing/database.rules.json' });
+
+        try {
+          await withBumpedBoot(project, async ({ command, lines }) => {
+            const failure = await bootFailure(command);
+
+            expect(lines.some((line) => line.includes(REALLOCATING)), 'one attempt, no reallocation').toBeFalsy();
+            expect(failure?.addressInUsePort, 'the failure carries no port tag').toBe(undefined);
+            expect(failure?.message, 'the boot fails the way it always did').toMatch(/exited before ready/);
+            const { storage: _held, ...declared } = project.ports;
+
+            expect(await stillHeld(waitFor, Object.values(declared)), 'nothing of the stack is left listening').toEqual([]);
+          });
+        } finally {
+          project.cleanup();
+        }
+      },
+    },
+
+    {
+      name: 'a-close-from-an-attempt-no-longer-in-charge-leaves-the-published-files-alone',
       async run({ expect }) {
-        // A signal is not an exit: kill() returns while the kernel is still
-        // unwinding the process, so a probe in that same tick is a verdict
-        // about a shutdown that has not happened. The numbers go first, then
-        // the ports, and the port poll keeps asking until it reads free.
-        const projectDir = path.join(os.tmpdir(), `omega-retry-reap-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        // The real close handler of a real stack, read after a newer attempt took the token: a late close from a
+        // dead first attempt must not unpublish the stack that is actually up, nor delete the config it runs on.
+        const project = makeProject();
+        const resolvedConfig = path.join(project.projectDir, 'firebase.resolved.json');
+
+        try {
+          await withBumpedBoot(project, async ({ command }) => {
+            const stack = await command.startEmulators({ https: false });
+
+            command.activeAttempt += 1;
+            await stack.shutdown();
+
+            expect(publishedPorts(project.projectDir)?.auth, "the stale close leaves the newer attempt's ports file").toBe(stack.emulatorPorts.auth);
+            expect(jetpack.exists(resolvedConfig), 'and the config it is running on').toBeTruthy();
+          });
+        } finally {
+          project.cleanup();
+        }
+      },
+    },
+
+    {
+      name: 'a-port-taken-line-in-either-wording-names-only-a-port-this-run-allocated',
+      run({ expect }) {
+        const warning = '⚠  database: Port 9001 is not open on localhost (127.0.0.1,::1), could not start Database Emulator.';
+        const output = `${warning}\nError: Could not start Database Emulator, port taken.\n`;
+        const nodeWording = '⚠  emulators: Error: listen EADDRINUSE: address already in use 127.0.0.1:9099';
+
+        expect(EmulatorCommand.addressInUsePort(warning, [9099, 9001]), 'the warning names an allocated port').toBe(9001);
+        expect(EmulatorCommand.addressInUsePort(output, [9099, 9001]), 'the whole exit reads as that same port').toBe(9001);
+        expect(EmulatorCommand.addressInUsePort(output, [9099, 9002]), 'a port this run never allocated is no bump').toBe(null);
+        expect(EmulatorCommand.addressInUsePort(nodeWording, [9099, 9001]), "node's own bind failure reads the same").toBe(9099);
+        expect(EmulatorCommand.addressInUsePort('Error: listen EADDRINUSE: address already in use :::9099', [9099]), 'in its IPv6 form too').toBe(9099);
+        expect(EmulatorCommand.addressInUsePort(nodeWording, [9001]), 'and names no bump for a port this run never asked for').toBe(null);
+      },
+    },
+
+    {
+      name: 'the-stale-reap-takes-a-sigterm-survivor-down-and-waits-for-its-port',
+      timeout: 30000,
+      async run({ expect, waitFor }) {
+        // A dead run's survivor: orphaned to PID 1, ignoring SIGTERM, holding a port. The reap proves it is this
+        // project's by its live row, escalates, and asks about the port only once the pid is gone.
+        const projectDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-retry-reap-')));
+        const projectId = 'demo-omega-retry-reap';
         const command = new EmulatorCommand({ firebaseProjectPath: projectDir, argv: {}, options: {} });
+        const survivorPath = path.join(projectDir, 'emulator-survivor.js');
+        const stateFile = path.join(projectDir, 'survivor.pid');
         const lines = [];
-        const events = [];
-        const port = 49999;
-        let sigkilled = false;
-        let readsAfterKill = 0;
-        let probes = 0;
+        let pid = null;
 
         command.log = (message) => lines.push(String(message));
         command.logWarning = (message) => lines.push(String(message));
-
-        jetpack.write(command.getTempPath('emulator-pids.json'), {
-          pids: [4001, 4002],
-          projectId: OURS,
-          rootPid: 4001,
-          ports: { firestore: port },
-          startedAt: new Date().toISOString(),
-        });
-
-        // 4001 (the dead run's root) is gone; 4002 is its orphaned jar, and it
-        // ignores SIGTERM, keeps reading alive for one poll past the SIGKILL,
-        // and holds its listener for one probe past that.
-        const seams = {
-          readProcess: (pid) => {
-            if (Number(pid) !== 4002) {
-              return null;
-            }
-
-            if (sigkilled) {
-              readsAfterKill++;
-
-              if (readsAfterKill > 1) {
-                events.push('gone');
-                return null;
-              }
-
-              events.push('unwinding');
-            }
-
-            return { ppid: ORPHANED, command: FIRESTORE_JAR };
-          },
-          kill: (pid, signal) => {
-            events.push(`signal:${signal}`);
-            sigkilled = sigkilled || signal === 'SIGKILL';
-          },
-          isFree: async (probed) => {
-            events.push(`probe:${probed}`);
-            probes++;
-            return probes > 1;
-          },
-        };
+        jetpack.write(survivorPath, SURVIVOR_SOURCE);
 
         try {
-          await command.reapStaleRecordedProcesses(command.readEmulatorOwnership(), seams);
+          const port = await freeHighPort();
+          const launcher = spawn(process.execPath, ['-e', LAUNCHER_SOURCE, survivorPath, '--project_id', projectId, String(port), stateFile], { stdio: 'ignore' });
 
-          expect(events, 'the reap waits out the process, THEN polls the port until it reads free').toEqual(['signal:SIGTERM', 'signal:SIGKILL', 'unwinding', 'gone', `probe:${port}`, `probe:${port}`]);
-          expect(!lines.join('\n').includes('still closing'), 'a port that came back free on the second ask is not reported as held').toBeTruthy();
+          await new Promise((resolve) => launcher.once('exit', resolve));
+          await waitFor(() => jetpack.exists(stateFile), 5000, 20);
+          pid = Number(jetpack.read(stateFile));
+
+          jetpack.write(command.getTempPath('emulator-pids.json'), {
+            pids: [pid],
+            projectId,
+            rootPid: launcher.pid,
+            ports: { firestore: port },
+            startedAt: new Date().toISOString(),
+          });
+
+          await command.reapStaleRecordedProcesses(command.readEmulatorOwnership());
+
+          expect(jetpack.exists(`${stateFile}.sigterm`), 'the survivor got SIGTERM first, and stayed').toBeTruthy();
+          expect(lines.join('\n'), 'so the reap escalated').toMatch(/Reaped 1 recorded process left by a previous run \(1 needed SIGKILL\)/);
+          expect(EmulatorCommand.readProcessInfo(pid), 'and the pid is gone').toBe(null);
+          expect(await isPortFree(port), 'its port reads free').toBeTruthy();
+          expect(lines.join('\n').includes('still closing'), 'and was never reported as held').toBeFalsy();
         } finally {
+          // Only ever the survivor this case started (its pid file re-read, in case the wait above timed
+          // out before it wrote), and only while its live row is still that survivor.
+          const survivorPid = Number(jetpack.read(stateFile)) || pid;
+          if (survivorPid && EmulatorCommand.readProcessInfo(survivorPid)?.command.includes(survivorPath)) process.kill(survivorPid, 'SIGKILL');
           jetpack.remove(projectDir);
         }
       },

@@ -6,7 +6,7 @@ const { src, dest, watch, series } = require('gulp');
 const { Transform } = require('node:stream');
 const jetpack = require('fs-jetpack');
 const path = require('path');
-const { renderTokens, unresolvedTokens } = require('../lib/tokens.js');
+const { renderTokens, unresolvedTokens, unresolvedTokensError } = require('@omega.js/devkit/tokens');
 
 // Load package
 const package = build.getPackage('main');
@@ -116,7 +116,7 @@ function processHtml(templateContent) {
         // A token nothing resolves would ship literally in the page
         const leftover = unresolvedTokens(rendered);
         if (leftover.length > 0) {
-          throw new Error(`Cannot build src/views/${viewNameWithPath}.html: unresolved token(s) ${leftover.join(', ')}. Check config/omega.json5 and the token spelling`);
+          throw unresolvedTokensError(`src/views/${viewNameWithPath}.html`, leftover);
         }
 
         // Update file contents

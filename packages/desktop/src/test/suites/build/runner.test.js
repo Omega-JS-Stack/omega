@@ -18,6 +18,7 @@
 const path = require('path');
 const fs   = require('fs');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // <packages/desktop>/.temp/runner-home-<pid> — fresh per run, never a real home.
 const SCRATCH_HOME = path.join(__dirname, '..', '..', '..', '..', '.temp', `runner-home-${process.pid}`);
@@ -405,7 +406,7 @@ module.exports = defineCases({
         const origToken = process.env.GH_TOKEN;
         delete process.env.OMEGA_RUNNER_FORCE;
         delete process.env.GH_TOKEN;
-        jetpack.write(path.join(SCRATCH_HOME, '.env'), 'GH_TOKEN=""\n');
+        jetpack.write(path.join(SCRATCH_HOME, ENV_FILE), 'GH_TOKEN=""\n');
 
         let threw;
         try {
@@ -456,7 +457,7 @@ module.exports = defineCases({
         const origToken = process.env.GH_TOKEN;
         process.env.OMEGA_RUNNER_FORCE = '1';          // the platform gate passes: the TOKEN check is what must fire
         delete process.env.GH_TOKEN;
-        jetpack.write(path.join(SCRATCH_HOME, '.env'), 'GH_TOKEN=""\n');   // and the home has none saved either
+        jetpack.write(path.join(SCRATCH_HOME, ENV_FILE), 'GH_TOKEN=""\n');   // and the home has none saved either
 
         let threw;
         try {
@@ -1091,12 +1092,12 @@ module.exports = defineCases({
           // No file yet: nothing happens, and the caller is told.
           const missing = runnerEnv.loadRunnerEnv({ home, env: {} });
           ctx.expect(missing.present).toBe(false);
-          ctx.expect(missing.file).toBe(path.join(home, '.env'));
+          ctx.expect(missing.file).toBe(path.join(home, ENV_FILE));
 
           // install lays the template down ONCE.
           ctx.expect(runnerEnv.ensureRunnerEnvFile(home)).toBe(true);
           ctx.expect(runnerEnv.ensureRunnerEnvFile(home)).toBe(false);
-          const template = jetpack.read(path.join(home, '.env'));
+          const template = jetpack.read(path.join(home, ENV_FILE));
           for (const key of runnerEnv.RUNNER_ENV_KEYS) ctx.expect(template).toContain(`${key}=""`);
 
           // The template's empty values set nothing.
@@ -1104,7 +1105,7 @@ module.exports = defineCases({
           ctx.expect(runnerEnv.loadRunnerEnv({ home, env: blank }).applied).toEqual([]);
           ctx.expect(Object.keys(blank)).toEqual([]);
 
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN=ghp_from_the_box',
             `WIN_EV_TOKEN_PATH=${'a'.repeat(40)}`,
             'WIN_CSC_KEY_PASSWORD="pin with spaces"',
@@ -1149,7 +1150,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), 'WIN_CSC_KEY_PASSWORD=keep-me');
+          jetpack.write(path.join(home, ENV_FILE), 'WIN_CSC_KEY_PASSWORD=keep-me');
           jetpack.write(runnerEnv.runnerLogFile(home), '# omega log\n');
           jetpack.write(path.join(home, 'config.json'), { registeredOrgs: ['foo'] });
           jetpack.write(path.join(home, 'actions-runner-foo', 'config.cmd'), 'rem foo');
@@ -1165,8 +1166,8 @@ module.exports = defineCases({
 
           await runner.removeRunnerHomeWithRetry(new Set(), home);
 
-          ctx.expect(jetpack.list(home).sort()).toEqual(['.env', 'allowed-actors.txt', 'allowed-repos.txt', 'logs']);
-          ctx.expect(jetpack.read(path.join(home, '.env'))).toBe('WIN_CSC_KEY_PASSWORD=keep-me');
+          ctx.expect(jetpack.list(home).sort()).toEqual([ENV_FILE, 'allowed-actors.txt', 'allowed-repos.txt', 'logs']);
+          ctx.expect(jetpack.read(path.join(home, ENV_FILE))).toBe('WIN_CSC_KEY_PASSWORD=keep-me');
           ctx.expect(jetpack.read(runnerEnv.runnerLogFile(home))).toBe('# omega log\n');
           ctx.expect(jetpack.read(path.join(home, 'allowed-repos.txt'))).toBe('Omega-JS-Stack/omega-omega\n');
 
@@ -1177,10 +1178,10 @@ module.exports = defineCases({
           jetpack.write(path.join(home, 'actions-runner-bar', 'config.cmd'), 'rem bar');
           jetpack.write(path.join(home, 'actions-runner-baz', 'config.cmd'), 'rem baz');
           await runner.removeRunnerHomeWithRetry(new Set([path.join(home, 'actions-runner-bar')]), home);
-          ctx.expect(jetpack.list(home).sort()).toEqual(['.env', 'actions-runner-bar', 'logs']);
+          ctx.expect(jetpack.list(home).sort()).toEqual([ENV_FILE, 'actions-runner-bar', 'logs']);
 
           // Neither the .env nor the logs: the whole home goes.
-          jetpack.remove(path.join(home, '.env'));
+          jetpack.remove(path.join(home, ENV_FILE));
           jetpack.remove(path.join(home, 'logs'));
           await runner.removeRunnerHomeWithRetry(new Set(), home);
           ctx.expect(jetpack.exists(home)).toBe(false);
@@ -1220,9 +1221,9 @@ module.exports = defineCases({
           } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
           ctx.expect(threw.message).toContain('GH_TOKEN, WIN_EV_TOKEN_PATH, WIN_CSC_KEY_PASSWORD, SIGNTOOL_PATH');
-          ctx.expect(threw.message).toContain(path.join(home, '.env'));
+          ctx.expect(threw.message).toContain(path.join(home, ENV_FILE));
           ctx.expect(threw.message).toContain('no terminal');
-          ctx.expect(jetpack.exists(path.join(home, '.env'))).toBe('file');   // the template was laid down anyway
+          ctx.expect(jetpack.exists(path.join(home, ENV_FILE))).toBe('file');   // the template was laid down anyway
 
           // Only the signing scope: GH_TOKEN is not that caller's business.
           threw = undefined;
@@ -1247,7 +1248,7 @@ module.exports = defineCases({
           ctx.expect(env.GH_TOKEN).toBe('ghp_answered');
           ctx.expect(env.WIN_CSC_KEY_PASSWORD).toBe('1234');
 
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(written).toContain('GH_TOKEN="ghp_answered"');               // every value double-quoted
           ctx.expect(written).toContain('WIN_CSC_KEY_PASSWORD="1234"');
           ctx.expect(written).toContain(`WIN_EV_TOKEN_PATH="${'a'.repeat(40)}"`);
@@ -1260,7 +1261,7 @@ module.exports = defineCases({
           ctx.expect(again.asked).toEqual([]);
 
           // An empty answer to a required key is still a refusal.
-          jetpack.write(path.join(home, '.env'), 'GH_TOKEN=x\nWIN_EV_TOKEN_PATH=\nWIN_CSC_KEY_PASSWORD=\nSIGNTOOL_PATH=s\n');
+          jetpack.write(path.join(home, ENV_FILE), 'GH_TOKEN=x\nWIN_EV_TOKEN_PATH=\nWIN_CSC_KEY_PASSWORD=\nSIGNTOOL_PATH=s\n');
           threw = undefined;
           try {
             await runnerEnv.ensureRunnerConfig({ home, env: {}, interactive: true, prompt: { input: async () => '  ', password: async () => '' } });
@@ -1271,7 +1272,7 @@ module.exports = defineCases({
           // Every value is written double-quoted, so a PIN with spaces or a `#`
           // reads back whole and the file obeys the one .env quoting rule.
           runnerEnv.writeRunnerEnvValues(home, { WIN_CSC_KEY_PASSWORD: 'p in spaces #1', NEW_KEY: 'appended' });
-          const quoted = jetpack.read(path.join(home, '.env'));
+          const quoted = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(quoted).toContain('WIN_CSC_KEY_PASSWORD="p in spaces #1"');
           ctx.expect(quoted).toContain('NEW_KEY="appended"');
           const back = {};
@@ -1289,7 +1290,7 @@ module.exports = defineCases({
           try { runnerEnv.writeRunnerEnvValues(home, { WIN_CSC_KEY_PASSWORD: 'p "x" #tail' }); } catch (e) { refused = e; }
           ctx.expect(refused.message).toContain('WIN_CSC_KEY_PASSWORD');
           ctx.expect(refused.message).not.toContain('#tail');
-          ctx.expect(jetpack.read(path.join(home, '.env'))).toContain('WIN_CSC_KEY_PASSWORD="p in "quotes""');
+          ctx.expect(jetpack.read(path.join(home, ENV_FILE))).toContain('WIN_CSC_KEY_PASSWORD="p in "quotes""');
         } finally {
           jetpack.remove(home);
         }
@@ -1309,7 +1310,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN="ghp_saved"',
             'OMEGA_RUNNER_ORGS="acme"',
             `WIN_EV_TOKEN_PATH="${'a'.repeat(40)}"`,
@@ -1347,7 +1348,7 @@ module.exports = defineCases({
           ctx.expect(result.answers.sort()).toEqual(['GH_TOKEN', 'SIGNTOOL_PATH', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH']);
           ctx.expect(env.GH_TOKEN).toBe('ghp_saved');
           ctx.expect(env.OMEGA_RUNNER_ORGS).toBe('acme');
-          ctx.expect(jetpack.read(path.join(home, '.env'))).toContain('GH_TOKEN="ghp_saved"');
+          ctx.expect(jetpack.read(path.join(home, ENV_FILE))).toContain('GH_TOKEN="ghp_saved"');
 
           // install runs that same walk, so it is asked the same way (source-text
           // guard lives in the install-wiring case below).
@@ -1372,7 +1373,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN=""',
             `WIN_EV_TOKEN_PATH=""`,
             'WIN_CSC_KEY_PASSWORD="1234"',
@@ -1397,7 +1398,7 @@ module.exports = defineCases({
           ctx.expect(asked.find((a) => a[0].startsWith('GH_TOKEN'))[0]).not.toContain('ghp_from_the_shell');
 
           ctx.expect(result.answers.sort()).toEqual(['GH_TOKEN', 'OMEGA_RUNNER_ORGS', 'SIGNTOOL_PATH', 'WIN_CSC_KEY_PASSWORD', 'WIN_EV_TOKEN_PATH']);
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(written).toContain('GH_TOKEN="ghp_from_the_shell"');
           ctx.expect(written).toContain(`WIN_EV_TOKEN_PATH="${'e'.repeat(40)}"`);
           ctx.expect(written).toContain('WIN_CSC_KEY_PASSWORD="1234"');       // kept: rewritten with the same value, quoted
@@ -1421,7 +1422,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(SCRATCH_HOME, 'quoted-'));
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN=abc',                                  // written by the pre-quoting code
             'OMEGA_RUNNER_ORGS="acme"',
             `WIN_EV_TOKEN_PATH=${'a'.repeat(40)}`,
@@ -1442,7 +1443,7 @@ module.exports = defineCases({
           });
 
           // Every KEY= line in the file is now KEY="…", commented ones included.
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           const bare = written.split('\n').filter((line) => /^\s*[A-Z][A-Z0-9_]*\s*=/.test(line) && !/^[A-Z][A-Z0-9_]*="[^"]*"$/.test(line));
           ctx.expect(bare).toEqual([]);
 
@@ -1500,17 +1501,17 @@ module.exports = defineCases({
         const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
           // 1. The saved list wins, case-insensitively.
-          jetpack.write(path.join(saved, '.env'), filled('acme, zed'));
+          jetpack.write(path.join(saved, ENV_FILE), filled('acme, zed'));
           ctx.expect(await walk(saved, ['solo'])).toEqual(['Acme:on', 'solo:off', 'zed:on']);
 
           // 2. No saved list: what this install registered.
-          jetpack.write(path.join(installed, '.env'), filled(''));
+          jetpack.write(path.join(installed, ENV_FILE), filled(''));
           ctx.expect(await walk(installed, ['zed'])).toEqual(['Acme:off', 'solo:off', 'zed:on']);
 
           // 3. Neither: nothing ticked. One Enter registers nothing, by design.
-          jetpack.write(path.join(fresh, '.env'), filled(''));
+          jetpack.write(path.join(fresh, ENV_FILE), filled(''));
           ctx.expect(await walk(fresh, [])).toEqual(['Acme:off', 'solo:off', 'zed:off']);
-          ctx.expect(jetpack.read(path.join(fresh, '.env'))).toContain('OMEGA_RUNNER_ORGS="Acme"');
+          ctx.expect(jetpack.read(path.join(fresh, ENV_FILE))).toContain('OMEGA_RUNNER_ORGS="Acme"');
         } finally {
           for (const home of [saved, installed, fresh]) jetpack.remove(home);
         }
@@ -1526,7 +1527,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN="ghp_from_the_box"',
             `WIN_EV_TOKEN_PATH="${'a'.repeat(40)}"`,
             'WIN_CSC_KEY_PASSWORD="1234"',
@@ -1579,7 +1580,7 @@ module.exports = defineCases({
 
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN="ghp_from_the_box"',
             `WIN_EV_TOKEN_PATH="${'a'.repeat(40)}"`,
             'WIN_CSC_KEY_PASSWORD="1234"',
@@ -1609,14 +1610,14 @@ module.exports = defineCases({
           ctx.expect(partial.unmatched).toEqual(['ghost']);
 
           // A required key missing off a TTY still refuses, naming the file and the keys.
-          jetpack.write(path.join(home, '.env'), 'GH_TOKEN="ghp_from_the_box"\n');
+          jetpack.write(path.join(home, ENV_FILE), 'GH_TOKEN="ghp_from_the_box"\n');
           let threw;
           try {
             await runnerEnv.reconfigureRunnerEnv({ home, env: {}, interactive: false, prompt: {} });
           } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
           ctx.expect(threw.message).toContain('WIN_EV_TOKEN_PATH, WIN_CSC_KEY_PASSWORD, SIGNTOOL_PATH');
-          ctx.expect(threw.message).toContain(path.join(home, '.env'));
+          ctx.expect(threw.message).toContain(path.join(home, ENV_FILE));
           ctx.expect(threw.message).toContain('no terminal');
 
           // `config` has nothing to ask WITH, so it refuses even fully configured.
@@ -1624,7 +1625,7 @@ module.exports = defineCases({
           try {
             await runnerEnv.reconfigureRunnerEnv({ home, env: {}, interactive: false, prompt: {}, requireTerminal: true });
           } catch (e) { threw = e; }
-          ctx.expect(threw.message).toContain(path.join(home, '.env'));
+          ctx.expect(threw.message).toContain(path.join(home, ENV_FILE));
           ctx.expect(threw.message).toContain('interactive terminal');
         } finally {
           jetpack.remove(home);
@@ -1646,7 +1647,7 @@ module.exports = defineCases({
         const origForce = process.env.OMEGA_RUNNER_FORCE;
         process.env.OMEGA_RUNNER_FORCE = '1';
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN=ghp_old',
             'OMEGA_RUNNER_ORGS=acme',
             `WIN_EV_TOKEN_PATH=${'a'.repeat(40)}`,
@@ -1679,7 +1680,7 @@ module.exports = defineCases({
           ctx.expect(asked.find((a) => a[1].startsWith('WIN_EV_TOKEN_PATH'))[2]).toBe('a'.repeat(40));   // current value is the default
           ctx.expect(asked.find((a) => a[1].startsWith('WIN_CSC_KEY_PASSWORD'))[1]).toContain('Enter keeps the current value');
 
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(written).toContain('GH_TOKEN="ghp_new"');                 // changed
           ctx.expect(written).toContain('WIN_CSC_KEY_PASSWORD="old-pin"');     // empty answer keeps the secret, rewritten in place quoted
           ctx.expect(written).toContain('WIN_TIMESTAMP_URL="http://ts.example"');
@@ -1698,7 +1699,7 @@ module.exports = defineCases({
             await runner({ _: ['runner', 'config'], _home: home, _env: {}, _logger: logger, _prompt: {}, _interactive: false });
           } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toContain(path.join(home, '.env'));
+          ctx.expect(threw.message).toContain(path.join(home, ENV_FILE));
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
           jetpack.remove(home);
@@ -1730,7 +1731,7 @@ module.exports = defineCases({
           } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
           ctx.expect(threw.message).toContain('GH_TOKEN');
-          ctx.expect(threw.message).toContain(path.join(home, '.env'));
+          ctx.expect(threw.message).toContain(path.join(home, ENV_FILE));
           ctx.expect(threw.message).toContain('no terminal');
 
           // Interactive, the questions land and the answers are saved. Driven
@@ -1746,7 +1747,7 @@ module.exports = defineCases({
             },
           });
           ctx.expect(env.GH_TOKEN).toBe('ghp_answered');
-          ctx.expect(jetpack.read(path.join(home, '.env'))).toContain('GH_TOKEN="ghp_answered"');
+          ctx.expect(jetpack.read(path.join(home, ENV_FILE))).toContain('GH_TOKEN="ghp_answered"');
           ctx.expect(checkboxes).toBe(0);        // the orgs question belongs to install and config
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
@@ -2284,7 +2285,7 @@ module.exports = defineCases({
         const origForce = process.env.OMEGA_RUNNER_FORCE;
         process.env.OMEGA_RUNNER_FORCE = '1';
         try {
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN=ghp_old',
             'OMEGA_RUNNER_ORGS=acme,ghost',
             `WIN_EV_TOKEN_PATH=${'a'.repeat(40)}`,
@@ -2312,7 +2313,7 @@ module.exports = defineCases({
           ctx.expect(threw).toBeDefined();
 
           // Everything answered before the refusal survived it.
-          const written = jetpack.read(path.join(home, '.env'));
+          const written = jetpack.read(path.join(home, ENV_FILE));
           ctx.expect(written).toContain('GH_TOKEN="ghp_new"');
           ctx.expect(written).toContain(`WIN_EV_TOKEN_PATH="${'b'.repeat(40)}"`);
           ctx.expect(written).toContain('WIN_CSC_KEY_PASSWORD="old-pin"');   // Enter kept it, rewritten in place quoted
@@ -2348,7 +2349,7 @@ module.exports = defineCases({
           const logFile = runnerEnv.runnerLogFile(home);
           ctx.expect(logFile).toBe(path.join(home, 'logs', 'runner.log'));
 
-          jetpack.write(path.join(home, '.env'), [
+          jetpack.write(path.join(home, ENV_FILE), [
             'GH_TOKEN="ghp_from_the_box"',
             'OMEGA_RUNNER_ORGS="acme"',
             `WIN_EV_TOKEN_PATH="${'a'.repeat(40)}"`,
@@ -2472,7 +2473,7 @@ module.exports = defineCases({
           // Startup shortcut alike. Bare, never quoted: the runner takes the
           // rest of the line as the value, quotes included.
           const file = runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: result.home });
-          ctx.expect(file).toBe(path.join(runnerDir, '.env'));
+          ctx.expect(file).toBe(path.join(runnerDir, ENV_FILE));
           ctx.expect(fs.readFileSync(file, 'utf8')).toBe(`HOME=${path.join(home, 'home')}\n`);
         } finally {
           jetpack.remove(home);
@@ -2494,14 +2495,14 @@ module.exports = defineCases({
           const first = runnerEnv.ensureRunnerPrivateHome(home);
           runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: first.home });
           const gitconfig = fs.readFileSync(path.join(first.home, '.gitconfig'), 'utf8');
-          const env = fs.readFileSync(path.join(runnerDir, '.env'), 'utf8');
+          const env = fs.readFileSync(path.join(runnerDir, ENV_FILE), 'utf8');
 
           const second = runnerEnv.ensureRunnerPrivateHome(home);
           runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: second.home });
 
           ctx.expect(second.written).toBe(false);
           ctx.expect(fs.readFileSync(path.join(first.home, '.gitconfig'), 'utf8')).toBe(gitconfig);
-          ctx.expect(fs.readFileSync(path.join(runnerDir, '.env'), 'utf8')).toBe(env);
+          ctx.expect(fs.readFileSync(path.join(runnerDir, ENV_FILE), 'utf8')).toBe(env);
         } finally {
           jetpack.remove(home);
         }
@@ -2521,11 +2522,11 @@ module.exports = defineCases({
         const runnerDir = path.join(home, 'actions-runner-acme');
         try {
           jetpack.dir(runnerDir);
-          fs.writeFileSync(path.join(runnerDir, '.env'), 'https_proxy=http://proxy:8080\r\nHOME=C:\\stale\r\nno_proxy=localhost\r\n');
+          fs.writeFileSync(path.join(runnerDir, ENV_FILE), 'https_proxy=http://proxy:8080\r\nHOME=C:\\stale\r\nno_proxy=localhost\r\n');
 
           const privateHome = runnerEnv.runnerPrivateHome(home);
           runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: privateHome });
-          const contents = fs.readFileSync(path.join(runnerDir, '.env'), 'utf8');
+          const contents = fs.readFileSync(path.join(runnerDir, ENV_FILE), 'utf8');
 
           ctx.expect(contents).toBe(`https_proxy=http://proxy:8080\r\nHOME=${privateHome}\r\nno_proxy=localhost\r\n`);
           ctx.expect(contents.split(/\r?\n/).filter((line) => line.startsWith('HOME=')).length).toBe(1);
@@ -2550,16 +2551,16 @@ module.exports = defineCases({
         const runnerDir = path.join(home, 'actions-runner-acme');
         try {
           jetpack.dir(runnerDir);
-          fs.writeFileSync(path.join(runnerDir, '.env'), 'https_proxy=http://proxy:8080\r\nno_proxy=localhost\r\n');
+          fs.writeFileSync(path.join(runnerDir, ENV_FILE), 'https_proxy=http://proxy:8080\r\nno_proxy=localhost\r\n');
 
           const privateHome = runnerEnv.runnerPrivateHome(home);
           runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: privateHome });
-          const first = fs.readFileSync(path.join(runnerDir, '.env'), 'utf8');
+          const first = fs.readFileSync(path.join(runnerDir, ENV_FILE), 'utf8');
           ctx.expect(first).toBe(`https_proxy=http://proxy:8080\r\nno_proxy=localhost\r\nHOME=${privateHome}\r\n`);
 
           // And a second call is the same bytes: nothing appended, no line grown.
           runnerEnv.ensureRunnerDirEnv(runnerDir, { HOME: privateHome });
-          ctx.expect(fs.readFileSync(path.join(runnerDir, '.env'), 'utf8')).toBe(first);
+          ctx.expect(fs.readFileSync(path.join(runnerDir, ENV_FILE), 'utf8')).toBe(first);
         } finally {
           jetpack.remove(home);
         }
@@ -2634,7 +2635,7 @@ module.exports = defineCases({
           const hook = path.join(home, 'job-started.js');
           ctx.expect(jetpack.exists(hook)).toBe('file');
           for (const org of orgs) {
-            ctx.expect(fs.readFileSync(path.join(home, `actions-runner-${org}`, '.env'), 'utf8')).toBe(`HOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${hook}\n`);
+            ctx.expect(fs.readFileSync(path.join(home, `actions-runner-${org}`, ENV_FILE), 'utf8')).toBe(`HOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${hook}\n`);
             ctx.expect(logged.join('\n')).toContain(`HOME for ${org}: ${path.join(home, 'home')}`);
             ctx.expect(logged.join('\n')).toContain(`Job guard for ${org}: ${hook}`);
           }
@@ -2690,7 +2691,7 @@ module.exports = defineCases({
           ctx.expect(downloads).toBe(0);
           ctx.expect(discovers).toBe(0);
           ctx.expect(registers).toBe(0);
-          ctx.expect(jetpack.exists(path.join(home, '.env'))).toBe(false); // start's own config walk never ran
+          ctx.expect(jetpack.exists(path.join(home, ENV_FILE))).toBe(false); // start's own config walk never ran
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
           jetpack.remove(home);
@@ -2727,7 +2728,7 @@ module.exports = defineCases({
         const kept = {
           '.runner':      '{"agentName":"omega-runner-box-acme"}',
           '.credentials': '{"scheme":"OAuth"}',
-          '.env':         `https_proxy=http://proxy\nHOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${path.join(home, 'job-started.js')}\n`,
+          [ENV_FILE]:         `https_proxy=http://proxy\nHOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${path.join(home, 'job-started.js')}\n`,
         };
         try {
           jetpack.write(path.join(templateDir, 'config.cmd'), 'old config');
@@ -3157,7 +3158,7 @@ module.exports = defineCases({
           ctx.expect(threw).toBeDefined();
           ctx.expect(threw.message).toContain('_install');
           ctx.expect(jetpack.exists(path.join(home, '_template'))).toBe(false);
-          ctx.expect(jetpack.exists(path.join(home, '.env'))).toBe(false);
+          ctx.expect(jetpack.exists(path.join(home, ENV_FILE))).toBe(false);
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
           jetpack.remove(home);

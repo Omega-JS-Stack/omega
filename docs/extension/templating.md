@@ -1,6 +1,6 @@
 # Templating
 
-HTML views go through a two-step `{{ }}` token replacement during the `gulp/html` task, rendered by the extension's one token renderer ([src/gulp/lib/tokens.js](../../packages/extension/src/gulp/lib/tokens.js)), the same one the package task renders the manifest and the store descriptions with.
+HTML views go through a two-step `{{ }}` token replacement during the `gulp/html` task, rendered by the family's one token renderer, `@omega.js/devkit/tokens` ([docs/devkit/index.md](../devkit/index.md)): the same one the package task renders the manifest and the store descriptions with, and desktop's html task its views.
 
 `src/manifest.json` speaks the same `{{ }}` syntax, resolved against the whole `config/omega.json5` when the package task compiles it (`matches: ['{{ brand.url }}/*']`), and an unresolved one fails the build: [build-system.md](build-system.md#manifest-compilation-rules).
 

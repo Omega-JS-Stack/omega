@@ -20,6 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { resolveCompany, COMPANY_DIR, COMPANY_SELF } = require('@omega.js/config');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const { resolveBrandRoot } = require('./lib/brand.js');
 const { applyScaffoldPlan, printPlanResults } = require('./lib/scaffold.js');
@@ -88,7 +89,7 @@ function runCompanyInit(cwd) {
   console.log('');
   console.log(chalk.bold('Next steps'));
   console.log(`  ${chalk.dim('1.')} Fill in ${chalk.cyan(path.join(COMPANY_DIR, 'config', 'omega.json5'))} ${chalk.dim('(every key there is a default its brands inherit')}`);
-  console.log(`  ${chalk.dim('2.')} Put the shared secrets in ${chalk.cyan(path.join(COMPANY_DIR, '.env'))} ${chalk.dim('(it loads under every brand\'s own)')}`);
+  console.log(`  ${chalk.dim('2.')} Put the shared secrets in ${chalk.cyan(path.join(COMPANY_DIR, ENV_FILE))} ${chalk.dim('(it loads under every brand\'s own)')}`);
   console.log(`  ${chalk.dim('3.')} In each brand of the company: ${chalk.cyan('company: { id: "<this brand\'s brand.id>" }')} ${chalk.dim('in its own config/omega.json5')}`);
   console.log('');
 

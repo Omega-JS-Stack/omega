@@ -8,13 +8,12 @@ module.exports = async ({ ctx, data }) => {
   // Get URL from settings (defaults to the site root)
   const url = data.url;
 
-  // Reflecting a caller-supplied absolute URL would make this an open redirect.
-  // Refuse a scheme (`https:`, `javascript:`) and the protocol-relative forms
-  // (`//host`, `/\host`, which browsers treat as `//host`) outright rather than
-  // trying to sanitize them.
-  const isRelative = url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\');
+  // Reflecting a caller-supplied absolute URL would make this an open redirect,
+  // so anything the shared return-path rule does not call a site path is refused.
+  // Required here, not at load, so a Node 22 before require(esm) meets it only on a call.
+  const { isSitePath } = require('@omega.js/client/modules/site-path.js');
 
-  if (!isRelative) {
+  if (!isSitePath(url)) {
     // The refused value is logged, never echoed into the response body.
     ctx.log('Refusing to redirect to a non-relative URL', url);
 

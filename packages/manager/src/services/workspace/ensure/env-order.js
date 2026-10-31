@@ -9,6 +9,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const { convergeEnv } = require('../../../lib/env-order.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
@@ -23,7 +24,7 @@ module.exports = async (context) => {
 
   const summary = {};
   for (const { label, root } of roots) {
-    const envPath = join(root, '.env');
+    const envPath = join(root, ENV_FILE);
     if (!jetpack.exists(envPath)) {
       console.log(`      ${chalk.dim(`⊘ no ${label} .env yet`)}`);
       summary[label] = 'missing';

@@ -99,7 +99,7 @@ omega.initialize().then(() => { const { logger, desktop } = omega; });
 | `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `omega.authPersistence` config) |
 | `auto-updater` | electron-updater wrapper, idle-aware install, 30-day pending gate, dev simulation |
 | `sentry` | `@omega.js/monitoring` — the shared error-reporting contract, auto auth attribution, dev-mode gating |
-| `templating` | `{{ }}` token replacement, used at build time by `gulp/html` |
+| `templating` | the page-vars assembly for `gulp/html`; its `{{ }}` tokens render through devkit's one renderer, `@omega.js/devkit/tokens` ([docs/devkit/index.md](../devkit/index.md)), and a token nothing resolves fails the build naming the view and the token, as on extension ([docs/desktop/templating.md](templating.md)) |
 | `context` | runtime info: `omega.context.{geolocation,client,session,app}` |
 | `usage` | `opens` / `hoursTotal` / `hoursThisSession`; crash-safe |
 | `remote-config` | "Hot config" fetched from `${brand.url}/data/resources/main.json`, polled hourly |

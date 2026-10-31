@@ -1,7 +1,51 @@
-// Build-layer tests for lib/templating.js — render, buildPageVars, renderPage.
+// Build-layer tests for lib/templating.js — render, buildPageVars, renderPage —
+// and the html task that renders every view through them.
 
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+
+const DIST = path.join(__dirname, '..', '..', '..');
+const HTML_TASK = path.join(DIST, 'gulp', 'tasks', 'html.js');
+
+/**
+ * Run the real html task over `views` (relative path to contents) in a staged
+ * project. The task and the build module read the project root at REQUIRE
+ * time, so each run loads both fresh with cwd pinned to the project.
+ * @returns {Promise<{tmp: string, failure: *}>} the project and what the task completed with.
+ */
+async function runHtml(views) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-html-task-'));
+  fs.writeFileSync(path.join(tmp, 'package.json'), '{ "name": "staged-desktop", "version": "3.1.4" }');
+  fs.mkdirSync(path.join(tmp, 'config'));
+  fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), "{ brand: { id: 'staged', name: 'Staged Brand' }, targets: { desktop: { type: 'desktop' } } }");
+  for (const [relative, contents] of Object.entries(views)) {
+    fs.mkdirSync(path.dirname(path.join(tmp, relative)), { recursive: true });
+    fs.writeFileSync(path.join(tmp, relative), contents);
+  }
+
+  const oldCwd = process.cwd();
+  const oldOutput = process.env.OMEGA_BUILD_OUTPUT;
+  const flush = () => {
+    for (const key of Object.keys(require.cache)) {
+      if (key === HTML_TASK || key === path.join(DIST, 'build.js')) delete require.cache[key];
+    }
+  };
+
+  flush();
+  delete process.env.OMEGA_BUILD_OUTPUT;
+  try {
+    process.chdir(tmp);
+    const task = require(HTML_TASK);
+    const failure = await new Promise((resolve) => task(resolve));
+    return { tmp, failure };
+  } finally {
+    process.chdir(oldCwd);
+    if (oldOutput !== undefined) process.env.OMEGA_BUILD_OUTPUT = oldOutput;
+    flush();
+  }
+}
 
 module.exports = defineCases({
   type: 'suite',
@@ -44,14 +88,6 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'render supports custom brackets',
-      run: (ctx) => {
-        const t = require(path.join(__dirname, '..', '..', '..', 'lib', 'templating.js'));
-        const out = t.render('Hello [name]!', { name: 'Ian' }, { brackets: ['[', ']'] });
-        ctx.expect(out).toBe('Hello Ian!');
-      },
-    },
-    {
       name: 'buildPageVars produces brand/app/page/theme/cacheBust from an omega-like object',
       run: (ctx) => {
         const t = require(path.join(__dirname, '..', '..', '..', 'lib', 'templating.js'));
@@ -89,6 +125,39 @@ module.exports = defineCases({
         const final = t.renderPage(tpl, vars);
         ctx.expect(final).toContain('<title>MyApp</title>');
         ctx.expect(final).toContain('<body>Hello {{ brand.name }}</body>');
+      },
+    },
+    {
+      name: 'html task: a view with an unresolved {{ missing }} token fails the build, naming the view and the token',
+      run: async (ctx) => {
+        const { tmp, failure } = await runHtml({
+          'src/views/orphan/index.html': '<h1>{{ brand.name }}</h1>\n<p>{{ missing }}</p>\n',
+        });
+        try {
+          ctx.expect(failure).toBeInstanceOf(Error);
+          ctx.expect(failure.message).toContain('src/views/orphan/index.html');
+          ctx.expect(failure.message).toContain('{{ missing }}');
+          ctx.expect(fs.existsSync(path.join(tmp, 'dist', 'views', 'orphan', 'index.html'))).toBe(false);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'html task: a fully resolved view renders into dist/views through the page template',
+      run: async (ctx) => {
+        const { tmp, failure } = await runHtml({
+          'src/views/main/index.html': '<h1>{{ app.productName }}</h1>\n',
+        });
+        try {
+          ctx.expect(failure).toBeFalsy();
+          const page = fs.readFileSync(path.join(tmp, 'dist', 'views', 'main', 'index.html'), 'utf8');
+          ctx.expect(page).toContain('<h1>Staged Brand</h1>');
+          ctx.expect(page).toContain('main.bundle.js');
+          ctx.expect(page).not.toContain('{{');
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
       },
     },
   ],

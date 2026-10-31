@@ -8,6 +8,7 @@
 const { joinEnvUnits, envKey, normalizeEnvLine, findKeyLine, parsePlaceholderKey, isMachineComment, envValueIsEmpty } = require('./env-lines');
 const crypto = require('node:crypto');
 const { SHIPPED_README_HASHES } = require('./shipped-readme-lines');
+const { ENV_FILE } = require('./env-file');
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 const CUSTOM_MARKER  = '# ========== Custom Values ==========';
@@ -32,7 +33,7 @@ const SHIPPED = [
   { file: 'AGENTS.md', lines: [/^## Project-specific notes$/, /^Add anything specific to THIS project here\. Edits below this line are preserved across (runs|framework re-syncs|`npx omega setup` runs)\.$/] },
   { file: 'AGENTS.md', lines: [/^<!-- Add your project-specific notes below this line -->$/] },
   {
-    file: '.env',
+    file: ENV_FILE,
     lines: [
       /^# .+(?: \u2014|:) brand secrets \(gitignored; loaded before every omega(?:-manager)? run\)\.$/,
       /^# Uncomment and fill what this brand uses\. Services without their credentials$/,
@@ -40,7 +41,7 @@ const SHIPPED = [
     ],
   },
   {
-    file: '.env',
+    file: ENV_FILE,
     lines: [
       /^# .+(?: \u2014|:) COMPANY secrets \(gitignored; loaded UNDER every (?:managed brand's own \.env|brand of this company)\)\.$/,
       /^# Precedence: shell env > brand \.env > this file\. Put here only what every brand$/,
@@ -48,7 +49,7 @@ const SHIPPED = [
     ],
   },
   {
-    file: '.env',
+    file: ENV_FILE,
     lines: [
       /^# one per stream; disperse composes each target its own GOOGLE_ANALYTICS_SECRET\), and the$/,
       /^# Auto-generated and persisted here on the first real run \u2014 leave unset:$/,
@@ -63,7 +64,7 @@ const SHIPPED_README = new Set(SHIPPED_README_HASHES);
 const readmeDigest = (line) => crypto.createHash('sha256').update(line).digest('hex').slice(0, 16);
 
 function mergeLineBasedFiles(existingContent, newContent, fileName) {
-  const isEnvFile = fileName === '.env';
+  const isEnvFile = fileName === ENV_FILE;
   const markers = sectionMarkers(fileName);
 
   const hasMarkers = hasSectionMarkers(existingContent, fileName);
@@ -325,7 +326,7 @@ function convergeUnmarkedEnv(lines, newDefault, known) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith('#') && !isMachineComment(trimmed) && !framework.has(trimmed)) {
-      if (!isShipped(line, '.env')) run.push(line);
+      if (!isShipped(line, ENV_FILE)) run.push(line);
       continue;
     }
     const key = envKey(line) || parsePlaceholderKey(trimmed);

@@ -8,7 +8,7 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
-const { applyDefaults, mergeJson5Defaults, renderTemplate } = require('../src/defaults-engine');
+const { applyDefaults, mergeJson5Defaults } = require('../src/defaults-engine');
 const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../src/merge-line-files');
 
 const TEMP = path.join(__dirname, '..', '.temp', `defaults-engine-${process.pid}`);
@@ -394,10 +394,25 @@ module.exports = defineCases({
     },
 
     {
-      name: 'mergeJson5Defaults and renderTemplate are exported for direct use',
+      name: 'mergeJson5Defaults is exported for direct use',
       run: (ctx) => {
         ctx.expect(typeof mergeJson5Defaults).toBe('function');
-        ctx.expect(renderTemplate('v{{ v.n }}', { v: { n: 1 } })).toBe('v1');
+      },
+    },
+
+    {
+      name: 'template rule renders through the one token renderer: a number prints, an object prints as JSON',
+      run: (ctx) => {
+        const { defaultsDir, outputDir } = stage({ 'wf.yml': 'v{{ v.n }} {{ v }}' }, {});
+
+        applyDefaults({
+          defaultsDir,
+          outputDir,
+          fileMap: { 'wf.yml': { template: { v: { n: 1 } } } },
+          logger: quiet,
+        });
+
+        ctx.expect(jetpack.read(path.join(outputDir, 'wf.yml'))).toBe('v1 {"n":1}');
       },
     },
 

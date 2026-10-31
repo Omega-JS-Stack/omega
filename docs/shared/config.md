@@ -2134,7 +2134,6 @@ const {
   findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file a target with no local-layer file rides
   resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself), bounded at the nearest .git
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
-  ENV_FILE_NAME,       // '.env': the env file's one name, every layer's base file and the backend stage's composed dist/.env
   reloadEnv,           // (startDir, options?) → same — drops the FILE-owned keys, then loads again, so an EDITED value lands and the shell still wins (#724)
   resolveEnvChain,     // (startDir) → { local, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip

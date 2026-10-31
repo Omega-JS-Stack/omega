@@ -5,7 +5,8 @@
 // against a temp dir, the same shape as @omega.js/extension's scaffoldDefaults.
 
 const path = require('path');
-const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { renderTokens } = require('@omega.js/devkit/tokens');
 const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { renderSecretsBlock, renderEnvFileKeys } = require('@omega.js/config/env-delivery');
@@ -105,7 +106,7 @@ function scaffoldDefaults(options) {
       sourceDir: path.join(defaultsDir, '.github', 'workflows'),
       targetDir: options.outputDir,
       brandRoot: seed.brandRoot,
-      transform: (contents) => renderTemplate(contents, fileMap[WORKFLOW].template),
+      transform: (contents) => renderTokens(contents, fileMap[WORKFLOW].template),
       logger: options.logger || console,
     });
   }

@@ -19,6 +19,7 @@ const jetpack = require('fs-jetpack');
 const SRC = path.join(__dirname, '..', '..', '..');
 const serveTask = require(path.join(SRC, 'gulp', 'tasks', 'serve.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // An extension target inside a brand monorepo whose brand names a COMPANY
 // (#677): the parent brand's company/ tree holds the shared .env, and the
@@ -31,7 +32,7 @@ function seedBrand() {
   const targetDir = path.join(brandRoot, 'targets', 'extension');
 
   jetpack.write(path.join(parentRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture-co" }, company: { id: "self" } }');
-  jetpack.write(path.join(companyRoot, '.env'), '');
+  jetpack.write(path.join(companyRoot, ENV_FILE), '');
   jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture" }, company: { id: "fixture-co" }, targets: { extension: { type: "extension" } } }');
   jetpack.write(path.join(root, 'home', 'brands.json'), JSON.stringify({ 'fixture-co': { root: parentRoot } }));
   jetpack.dir(targetDir);
@@ -59,11 +60,11 @@ module.exports = defineCases({
 
         try {
           ctx.expect(watcher.inputs.map((input) => input.path)).toEqual([
-            path.join(companyRoot, '.env'),
+            path.join(companyRoot, ENV_FILE),
             path.join(companyRoot, '.env.development'),
-            path.join(brandRoot, '.env'),
+            path.join(brandRoot, ENV_FILE),
             path.join(brandRoot, '.env.development'),
-            path.join(targetDir, '.env'),
+            path.join(targetDir, ENV_FILE),
             path.join(targetDir, '.env.development'),
           ]);
           ctx.expect(watcher.inputs.map((input) => input.layer)).toEqual([
@@ -84,7 +85,7 @@ module.exports = defineCases({
 
         try {
           ctx.expect(watcher.inputs.map((input) => input.path)).toEqual([
-            path.join(root, '.env'),
+            path.join(root, ENV_FILE),
             path.join(root, '.env.development'),
           ]);
         } finally {

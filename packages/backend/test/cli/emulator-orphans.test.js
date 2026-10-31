@@ -449,6 +449,31 @@ module.exports = defineCases({
     },
 
     {
+      name: 'a-sweep-naming-no-grace-waits-the-one-stop-grace',
+      async run({ expect }) {
+        const table = processTable({
+          73529: { ppid: ORPHANED, command: FIRESTORE_JAR },
+        }, {
+          afterTerm: () => {},
+        });
+        const seams = { ...table.seams };
+        const sent = {};
+        const kill = seams.kill;
+
+        seams.kill = (pid, signal) => { sent[signal] = Date.now(); kill(pid, signal); };
+        delete seams.graceMs;
+        seams.pollIntervalMs = 10;
+        await reapMachineOrphans(seams);
+
+        const waited = sent.SIGKILL - sent.SIGTERM;
+
+        expect(orphans.STOP_GRACE_MS, 'the grace is exported from its one home').toBe(2000);
+        expect(waited, 'SIGTERM gets the whole stop grace before SIGKILL').toBeGreaterThanOrEqual(orphans.STOP_GRACE_MS);
+        expect(waited, 'and no longer than one more second').toBeLessThan(orphans.STOP_GRACE_MS + 1000);
+      },
+    },
+
+    {
       name: 'a-recycled-pid-is-spared-on-the-re-read',
       async run({ expect }) {
         // The grace window is long enough for a number to be freed and handed

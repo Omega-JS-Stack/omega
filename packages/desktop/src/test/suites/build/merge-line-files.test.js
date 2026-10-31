@@ -5,6 +5,7 @@ const path = require('path');
 const { mergeLineBasedFiles, normalizeEnvLine, DEFAULT_MARKER, CUSTOM_MARKER } =
   require(path.join(__dirname, '..', '..', '..', 'utils', 'merge-line-files.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 module.exports = defineCases({
   type: 'suite',
@@ -26,7 +27,7 @@ OMEGA_ADMIN_KEY=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         // Value is preserved AND now wrapped in double quotes.
         ctx.expect(merged).toContain('GH_TOKEN="ghp_secret123"');
         // Empty value stays unquoted.
@@ -48,7 +49,7 @@ GH_TOKEN=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         ctx.expect(merged).toContain('USER_CUSTOM="hello"');
         ctx.expect(merged).toContain('ANOTHER_KEY="world"');
       },
@@ -67,7 +68,7 @@ NEW_KEY=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         ctx.expect(merged).toContain('NEW_KEY=""');
       },
     },
@@ -86,7 +87,7 @@ GH_TOKEN=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         ctx.expect(merged).toContain('GH_TOKEN="mine"');
         ctx.expect(merged).toContain('MY_OLD_KEY="savedvalue"');
         ctx.expect(merged).toContain('ALREADY_CUSTOM="ok"');
@@ -156,7 +157,7 @@ GH_TOKEN=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         ctx.expect(merged).not.toContain('MY_EMPTY_KEY');
         ctx.expect(merged).toContain('GH_TOKEN="mine"');
       },
@@ -175,8 +176,8 @@ GH_TOKEN=""
 
 ${CUSTOM_MARKER}
 `;
-        const once  = mergeLineBasedFiles(existing, incoming, '.env');
-        const twice = mergeLineBasedFiles(once,     incoming, '.env');
+        const once  = mergeLineBasedFiles(existing, incoming, ENV_FILE);
+        const twice = mergeLineBasedFiles(once,     incoming, ENV_FILE);
         ctx.expect(twice).toBe(once);
       },
     },
@@ -195,7 +196,7 @@ GH_TOKEN=""
 
 ${CUSTOM_MARKER}
 `;
-        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        const merged = mergeLineBasedFiles(existing, incoming, ENV_FILE);
         ctx.expect(merged).toContain('# group comment');
       },
     },

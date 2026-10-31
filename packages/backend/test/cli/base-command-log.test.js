@@ -82,5 +82,15 @@ module.exports = defineCases({
         expect(plain(text.stdout), 'a text line keeps the verb tag').toMatch(/^(\[\d{2}:\d{2}:\d{2}\] )?\[@omega\.js\/backend:firestore\] text\n$/);
       },
     },
+
+    {
+      name: 'every-verb-inherits-output-indented-without-raw',
+      async run({ expect }) {
+        const command = new BuildCommand({ argv: { _: ['build'] }, options: {} });
+        const data = await captureOutput(() => command.output({ a: 1 }, {}));
+
+        expect(data.stdout, 'a verb with no output of its own prints indented JSON').toBe('{\n  "a": 1\n}\n');
+      },
+    },
   ],
 });

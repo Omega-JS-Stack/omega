@@ -43,7 +43,8 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, composeTargetEnv, artifactEnvValues, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS, ENV_FILE_NAME } = require('@omega.js/config');
+const { composeTargetConfig, composeTargetEnv, artifactEnvValues, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { writeJson, formatJson } = require('@omega.js/devkit/write-json');
 const { resolveServiceAccountPath, SECRETS_DIR } = require('@omega.js/devkit/service-account');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
@@ -223,7 +224,7 @@ function stageFunctions(options) {
   //     a local stage composes byte-identically to before.
   if (options.licenseStatus) composed.values.OMEGA_LICENSE_STATUS = options.licenseStatus;
   assertFirebaseEnvSafe(composed.values);
-  jetpack.write(path.join(distDir, ENV_FILE_NAME), serializeEnv(composed.values));
+  jetpack.write(path.join(distDir, ENV_FILE), serializeEnv(composed.values));
 
   // Key NAMES and the layer each came from — never a value (the .env is all
   // secrets)
@@ -336,7 +337,7 @@ function watchAndStage(options) {
   // the `.env` + overlay spelling ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
   const TARGET_ROOT_INPUTS = new Set([
     'package.json', '.nvmrc', 'service-account.json', BRAND_RULES_FILE,
-    ...ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(ENV_FILE_NAME, environment)),
+    ...ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(ENV_FILE, environment)),
   ]);
   watch(projectDir, (event, filename) => {
     if (TARGET_ROOT_INPUTS.has(filename)) restage(filename)();
@@ -348,7 +349,7 @@ function watchAndStage(options) {
   // environment's file is not in this artifact and must not re-stage it. That
   // pair IS what envLayerFiles answers, so it is asked rather than spelled out
   // ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
-  const laneNames = new Set(envLayerFiles(ENV_FILE_NAME, options.environment));
+  const laneNames = new Set(envLayerFiles(ENV_FILE, options.environment));
   for (const input of envWatchInputs(projectDir)) {
     watch(path.dirname(input.path), (event, filename) => {
       if (laneNames.has(filename)) restage(`${input.layer} ${filename}`)();

@@ -22,7 +22,7 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 
 const { stageFunctions, envWatchInputs, watchAndStage } = require('../../dist/cli/utils/stage-functions.js');
-const { ENV_FILE_NAME } = require('../../dist/vendor/config/env.js');
+const { ENV_FILE } = require('../../dist/vendor/devkit/env-file.js');
 const TestCommand = require('../../dist/cli/commands/test.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -157,20 +157,20 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ expect }) {
-        // The env file's name has one home, @omega.js/config's ENV_FILE_NAME:
+        // The env file's name has one home, devkit's ENV_FILE:
         // the stage writes dist/<it>, and the self-test fixture seeds <it>.
         const { root, targetDir } = seedBrand({ brandEnv: 'GH_TOKEN="brand-gh"\n' });
         const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-fixture-env-name-'));
 
         try {
-          expect(ENV_FILE_NAME, 'the name Firebase reads beside the functions source').toBe('.env');
+          expect(ENV_FILE, 'the name Firebase reads beside the functions source').toBe('.env');
 
           stageFunctions({ projectDir: targetDir });
-          const staged = require('dotenv').parse(jetpack.read(path.join(targetDir, 'dist', ENV_FILE_NAME)) || '');
-          expect(staged.GH_TOKEN, 'the composed env lands at dist/ENV_FILE_NAME').toBe('brand-gh');
+          const staged = require('dotenv').parse(jetpack.read(path.join(targetDir, 'dist', ENV_FILE)) || '');
+          expect(staged.GH_TOKEN, 'the composed env lands at dist/ENV_FILE').toBe('brand-gh');
 
           new TestCommand({ firebaseProjectPath: fixture, argv: {}, options: {} }).ensureFixtureEnv(fixture);
-          const seeded = require('dotenv').parse(jetpack.read(path.join(fixture, ENV_FILE_NAME)) || '');
+          const seeded = require('dotenv').parse(jetpack.read(path.join(fixture, ENV_FILE)) || '');
           expect(Object.keys(seeded).length > 0, 'the fixture env is seeded under the same name').toBe(true);
         } finally {
           jetpack.remove(root);

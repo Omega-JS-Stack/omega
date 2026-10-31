@@ -165,7 +165,8 @@ async function copyDefaults(projectDir, engineLogger) {
   // archive-dir skips (`_mas/` reference plists ship in the package, never to
   // consumers — `_`-prefixed FILENAMES like `test/_init.js` still copy), and
   // write-only-if-changed.
-  const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+  const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+  const { renderTokens } = require('@omega.js/devkit/tokens');
 
   // Layer-aware config (cp121c/cp122d): brand targets carry NO local-layer
   // omega.json5 — the brand file's `targets.*` is the per-target home, and
@@ -242,7 +243,7 @@ async function copyDefaults(projectDir, engineLogger) {
       sourceDir: path.join(defaultsDir, '.github', 'workflows'),
       targetDir: projectDir,
       brandRoot: seed.brandRoot,
-      transform: (contents) => renderTemplate(contents, templateContext),
+      transform: (contents) => renderTokens(contents, templateContext),
       logger: engineLogger,
     });
   }

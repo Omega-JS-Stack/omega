@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const dotenv = require('dotenv');
 
-const { ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { ENV_ENVIRONMENTS, envLayerFiles } = require('@omega.js/config');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { findRetiredEnvKeys } = require('./retired-env.js');
 
 /**
@@ -18,8 +19,7 @@ const { findRetiredEnvKeys } = require('./retired-env.js');
  * @returns {string[]}
  */
 function envFiles(brandRoot, targets) {
-  const layer = (dir) => ['.env', ...ENV_ENVIRONMENTS.map((environment) => `.env.${environment}`)]
-    .map((name) => path.join(dir, name))
+  const layer = (dir) => [...new Set(ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(path.join(dir, ENV_FILE), environment)))]
     .filter((file) => fs.existsSync(file));
 
   return [...layer(brandRoot), ...targets.flatMap((entry) => layer(entry.path))];

@@ -224,6 +224,20 @@ class BaseCommand {
     process.stdout.write(`${text}\n`);
   }
 
+  /**
+   * A data read's answer as JSON through `print`: compact under `--raw` (one
+   * line for `jq`), indented otherwise.
+   * @param {*} data - The value to print.
+   * @param {object} argv - The parsed flags; `raw` picks the compact form.
+   */
+  output(data, argv) {
+    if (argv.raw) {
+      this.print(JSON.stringify(data));
+    } else {
+      this.print(JSON.stringify(data, null, 2));
+    }
+  }
+
   logError(message) {
     this.logger.log(chalk.red(message));
   }

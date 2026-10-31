@@ -15,6 +15,7 @@ const jetpack = require('fs-jetpack');
 
 const { generatedEnvKeys, assertEnvReadsBack, envLine } = require('@omega.js/config');
 const { setEnvLines } = require('@omega.js/devkit/env-lines');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { convergeEnv } = require('./env-order.js');
 
 /**
@@ -25,7 +26,7 @@ const { convergeEnv } = require('./env-order.js');
  * @param {string} value - Value to persist
  */
 function writeEnvValue(brandRoot, name, value) {
-  const envPath = join(brandRoot, '.env');
+  const envPath = join(brandRoot, ENV_FILE);
   // envLine is the serializer SSOT (@omega.js/config); setEnvLines is the key-line grammar
   const envContent = setEnvLines(jetpack.exists(envPath) ? jetpack.read(envPath) : '', { [name]: envLine(name, value) });
   const converged = convergeEnv(envContent).content;

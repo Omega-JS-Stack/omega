@@ -13,6 +13,7 @@
 
 const dotenv = require('dotenv');
 const { mergeLineBasedFiles, DEFAULT_MARKER, CUSTOM_MARKER } = require('@omega.js/devkit/merge-line-files');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { envFileGroups, envKeysByGroup, envLine } = require('@omega.js/config');
 
 // One header for the brand and the company file alike, so a writer never
@@ -77,7 +78,7 @@ function effectiveValues(content) {
  *   names why the content was left untouched.
  */
 function convergeEnv(content) {
-  let merged = mergeLineBasedFiles(content, renderEnvTemplate(), '.env');
+  let merged = mergeLineBasedFiles(content, renderEnvTemplate(), ENV_FILE);
   if (!merged.endsWith('\n')) merged += '\n';
 
   const before = new Map(effectiveValues(content));

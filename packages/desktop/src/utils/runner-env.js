@@ -38,6 +38,7 @@ const path = require('path');
 const { envLine, assertEnvReadsBack } = require('@omega.js/config');
 const { isTesting } = require('./mode-helpers.js');
 const { setEnvLines } = require('@omega.js/devkit/env-lines');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // Runner files live under %LOCALAPPDATA%\omega-runner — a per-user path that
 // doesn't need admin to read/write. Set OMEGA_RUNNER_HOME to override.
@@ -52,7 +53,7 @@ function defaultRunnerHome(platform, env) {
 }
 
 function runnerEnvFile(home) {
-  return path.join(home, '.env');
+  return path.join(home, ENV_FILE);
 }
 
 // The env schema (@omega.js/config) owns each key's secrecy and its one-line
@@ -376,7 +377,7 @@ function ensureRunnerPrivateHome(home, options) {
 // other line survives, in the endings the file already uses (LF for a new one),
 // so running it twice is running it once.
 function ensureRunnerDirEnv(runnerDir, values) {
-  const file = path.join(runnerDir, '.env');
+  const file = path.join(runnerDir, ENV_FILE);
 
   let raw;
   try {

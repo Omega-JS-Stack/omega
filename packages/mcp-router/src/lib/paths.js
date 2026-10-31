@@ -12,6 +12,7 @@
 
 const os = require('node:os');
 const path = require('node:path');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // lib/paths.js → the package root is two levels up (from src/ and dist/ alike).
 const PACKAGE_ROOT = path.join(__dirname, '..', '..');
@@ -35,7 +36,7 @@ function overlayServersDir() {
  * @returns {string} Absolute path (the file need not exist)
  */
 function envFile() {
-  return process.env.MCP_ROUTER_ENV_FILE || path.join(OVERLAY_ROOT, '.env');
+  return process.env.MCP_ROUTER_ENV_FILE || path.join(OVERLAY_ROOT, ENV_FILE);
 }
 
 module.exports = { PACKAGE_ROOT, BUNDLED_SERVERS_DIR, OVERLAY_ROOT, overlayServersDir, envFile };

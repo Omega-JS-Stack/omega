@@ -10,7 +10,7 @@
  * - startMonorepoWatch()   — spawn the monorepo's src→dist watch (`npm start`)
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
  * - startVendorPropagation() — re-prepare dist-building frameworks when a
- *   vendored shared package (devkit, config, account) changes
+ *   vendored shared package (the vendor tool's VENDORABLE_PACKAGES) changes
  * - ensureFreshLocalDist() / freshnessBoot() — check a locally-linked
  *   framework's dist (and its @omega.js/* runtime deps') at CLI boot: a link
  *   into the monorepo is read-only and stops the boot loudly, any other local

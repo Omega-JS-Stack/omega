@@ -25,13 +25,14 @@ const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
 const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { STEPS } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const quiet = { log() {}, warn() {}, error() {} };
 
 /** A temp target dir, optionally with a local-level .env. */
 function tmpTarget(env) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-env-delivery-'));
-  if (env !== undefined) fs.writeFileSync(path.join(tmp, '.env'), env);
+  if (env !== undefined) fs.writeFileSync(path.join(tmp, ENV_FILE), env);
   return tmp;
 }
 

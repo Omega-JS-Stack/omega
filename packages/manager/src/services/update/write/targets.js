@@ -28,6 +28,7 @@ const jetpack = require('fs-jetpack');
 
 const { envLayerFiles, ENV_ENVIRONMENTS, resolveCompany } = require('@omega.js/config');
 const { resolvePackageDir } = require('@omega.js/devkit/local');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const { runCommand } = require('../../../lib/run-command.js');
 const { npmInstall } = require('../../../lib/npm-install.js');
@@ -50,7 +51,7 @@ const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
  * @returns {Array<{ label: string, file: string }>} One entry per layer file.
  */
 function envLayerEntries(label, root) {
-  const base = path.join(root, '.env');
+  const base = path.join(root, ENV_FILE);
   const files = [...new Set(ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(base, environment)))];
 
   return files.map((file) => ({
@@ -76,7 +77,7 @@ function chainFiles(brandRoot) {
   // tree yet) simply contributes nothing to fingerprint.
   const company = resolveCompany(brandRoot);
   const companyConfig = company.file(path.join('config', 'omega.json5'));
-  const companyEnv = company.file('.env');
+  const companyEnv = company.file(ENV_FILE);
 
   if (companyConfig) {
     files.push({ label: 'company-config', file: companyConfig });

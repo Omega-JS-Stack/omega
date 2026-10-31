@@ -9,6 +9,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER } = require('@omega.js/devkit/merge-line-files');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const { LOCAL_SETTINGS_FILE } = require('./claude-settings.js');
 
 const BRAND_LINES = [
@@ -26,7 +27,7 @@ const BRAND_LINES = [
   'test/e2e/.logs/',
   '',
   '# Secrets',
-  '.env',
+  ENV_FILE,
   '.env.*',
   '',
   '# Claude Code settings for this machine alone (a linked brand\'s local omega plugin)',
@@ -40,7 +41,7 @@ const BRAND_LINES = [
 // a copy of the tree can never commit it.
 const COMPANY_LINES = [
   '# Secrets: the shared .env and its per-environment overlays',
-  '.env',
+  ENV_FILE,
   '.env.*',
   '',
   '# The SHARED SIGNING TREE: .omega/certificates/apple/ holds Apple private key',

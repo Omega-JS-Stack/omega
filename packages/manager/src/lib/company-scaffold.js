@@ -17,6 +17,7 @@
  */
 
 const path = require('node:path');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 // The .env stub is the marker template with NO values: the one template the
 // brand stub and every .env writer share, so the two files look alike.
@@ -122,7 +123,7 @@ function buildCompanyScaffoldPlan(name) {
   return [
     { path: path.join('config', 'omega.json5'), contents: renderCompanyConfig(name) },
     { path: '.gitignore', contents: renderCompanyGitignore() },
-    { path: '.env', contents: renderEnvTemplate() },
+    { path: ENV_FILE, contents: renderEnvTemplate() },
     { path: 'README.md', contents: renderCompanyReadme(name) },
   ];
 }

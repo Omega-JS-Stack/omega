@@ -11,6 +11,8 @@
  * failed server. Stdout is the MCP wire: notes go to stderr only.
  */
 
+const fs = require('node:fs');
+const path = require('node:path');
 const readline = require('node:readline');
 
 const ROUTER_BIN = '@omega.js/mcp-router/cli';
@@ -66,8 +68,15 @@ function serveNoTools() {
 }
 
 const entry = resolveRouter();
-if (entry) {
-  require(entry);
-} else {
+if (!entry) {
   serveNoTools();
+} else {
+  // The bin is `<root>/bin/mcp-router.js` and runs from `dist/`, which only prepare builds.
+  const root = path.dirname(path.dirname(entry));
+  if (fs.existsSync(path.join(root, 'dist', 'router.js'))) {
+    require(entry);
+  } else {
+    process.stderr.write(`[@omega.js/mcp-router:launch] ${root} has no dist/. Run: npm run prepare --prefix ${root}\n`);
+    process.exit(1);
+  }
 }

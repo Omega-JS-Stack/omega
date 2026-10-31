@@ -8,7 +8,8 @@
  * AGENTS.md comes from devkit's one builder.
  */
 const path = require('node:path');
-const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { renderTokens } = require('@omega.js/devkit/tokens');
 const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
@@ -114,7 +115,7 @@ function scaffoldDefaults(options) {
       sourceDir: path.join(defaultsDir, '.github', 'workflows'),
       targetDir: options.outputDir,
       brandRoot: seed.brandRoot,
-      transform: (contents) => renderTemplate(contents, workflowTokens),
+      transform: (contents) => renderTokens(contents, workflowTokens),
       logger,
     });
   }

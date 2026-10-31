@@ -352,6 +352,21 @@ module.exports = defineCases({
     },
 
     {
+      name: 'devlog: generate slugs a title with the shared slugifier, deleting its apostrophe',
+      run: async (ctx) => {
+        const post = await generatePost({
+          brandConfig: brandConfigFor('a'),
+          commits: [{ owner: 'o', repo: 'r', homepage: '', message: 'feat: x' }],
+          projectMap: {},
+          days: 5,
+          write: async () => ({ json: [], title: 'Don\'t Panic', body: 'Body.' }),
+        });
+
+        ctx.expect(post.slug).toBe('dont-panic');
+      },
+    },
+
+    {
       name: 'devlog: renderPostFile emits blueprint front matter with the brand author',
       run: (ctx) => {
         const file = renderPostFile(brandConfigFor('alpha'), POST);

@@ -39,8 +39,8 @@ const PID_RECORD_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const EMULATOR_COMMAND = /emulator|firebase/i;
 
 // How long a recorded emulator process gets to leave on SIGTERM before the
-// stop path escalates. The port-release wait after it is emulator-orphans.js's.
-const STOP_GRACE_MS = 2000;
+// stop path escalates: one grace for this stop path and the orphan sweep alike.
+const { STOP_GRACE_MS } = emulatorOrphans;
 
 // How long the port→pid lookup gets to answer before a sweep gives up on it.
 // lsof stats every mounted filesystem first, so a machine with a network mount

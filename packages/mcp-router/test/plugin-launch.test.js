@@ -10,7 +10,7 @@
  */
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -37,21 +37,28 @@ lines.on('close', () => process.exit(0));
 
 const tmpdir = (label) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `plugin-launch-${label}-`)));
 
-/** A brand root with @omega.js/mcp-router installed in the package's real shape, its code the stub. */
-function brandWithRouter() {
+/**
+ * A brand root with @omega.js/mcp-router installed in the package's real shape, its code the stub.
+ * @param {object} [options]
+ * @param {boolean} [options.prepared=true] - false leaves only `package.json` and `bin/`, as a never-prepared checkout has
+ */
+function brandWithRouter({ prepared = true } = {}) {
   const brand = tmpdir('brand');
   const pkg = path.join(brand, 'node_modules', '@omega.js', 'mcp-router');
   fs.mkdirSync(path.join(pkg, 'bin'), { recursive: true });
-  fs.mkdirSync(path.join(pkg, 'src'), { recursive: true });
   fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({
     name: '@omega.js/mcp-router',
     version: '0.0.1',
-    main: './src/router.js',
-    exports: { '.': './src/router.js', './cli': './bin/mcp-router.js', './package.json': './package.json' },
+    main: './dist/router.js',
+    exports: { '.': './dist/router.js', './cli': './bin/mcp-router.js', './package.json': './package.json' },
     bin: { 'mcp-router': 'bin/mcp-router.js' },
   }));
-  fs.writeFileSync(path.join(pkg, 'src', 'router.js'), STUB_ROUTER);
-  fs.writeFileSync(path.join(pkg, 'bin', 'mcp-router.js'), '#!/usr/bin/env node\nrequire(\'../src/router.js\');\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(pkg, 'bin', 'mcp-router.js'), '#!/usr/bin/env node\nrequire(\'../dist/ensure-deps.js\');\nrequire(\'../dist/router.js\');\n', { mode: 0o755 });
+  if (prepared) {
+    fs.mkdirSync(path.join(pkg, 'dist'));
+    fs.writeFileSync(path.join(pkg, 'dist', 'ensure-deps.js'), '');
+    fs.writeFileSync(path.join(pkg, 'dist', 'router.js'), STUB_ROUTER);
+  }
   fs.mkdirSync(path.join(brand, 'node_modules', '.bin'));
   fs.symlinkSync(path.join(pkg, 'bin', 'mcp-router.js'), path.join(brand, 'node_modules', '.bin', 'mcp-router'));
   fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'a-brand', devDependencies: { '@omega.js/manager': '0.0.1' } }));
@@ -182,6 +189,26 @@ module.exports = defineCases({
         ctx.expect(list.result).toEqual({ tools: [] });
 
         ctx.expect(await server.close()).toBe(0);
+      },
+    },
+
+    {
+      name: 'a resolved router with no dist/ exits 1 naming its prepare, with no stack trace',
+      run: (ctx) => {
+        const brand = brandWithRouter({ prepared: false });
+        const pkg = path.join(brand, 'node_modules', '@omega.js', 'mcp-router');
+        const plugin = fetchedPlugin();
+        const result = spawnSync(process.execPath, [path.join(plugin, LAUNCHER)], {
+          cwd: brand,
+          env: { ...process.env, CLAUDE_PLUGIN_ROOT: plugin, CLAUDE_PROJECT_DIR: brand },
+          input: '',
+          encoding: 'utf8',
+          timeout: 15000,
+        });
+
+        ctx.expect(result.status, `exit code; stderr: ${result.stderr}`).toBe(1);
+        ctx.expect(result.stderr).toBe(`[@omega.js/mcp-router:launch] ${pkg} has no dist/. Run: npm run prepare --prefix ${pkg}\n`);
+        ctx.expect(result.stdout, 'nothing on the MCP wire').toBe('');
       },
     },
   ],

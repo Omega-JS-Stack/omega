@@ -3,9 +3,9 @@
  *
  * Runs every package's `prepare:watch` (src→dist rebuild-on-change)
  * CONCURRENTLY with per-package output prefixes. Only packages that build a
- * dist need one (backend, client, desktop, extension today — discovered, not
- * hardcoded); the rest serve src/ directly, so file:-linked consumers see
- * those edits live with no watch at all.
+ * dist need one (discovered from each package.json, never hardcoded); the rest
+ * serve src/ directly, so file:-linked consumers see those edits live with no
+ * watch at all.
  *
  * Single-instance: takes the devkit watch lock (.omega/dev-watch.lock) so a
  * second `npm start` — or an `omega dev --local` session spawning the watch —
@@ -109,11 +109,10 @@ function main() {
     startWatch(entry);
   }
 
-  // The per-package watches above only see their OWN src — but the vendorable
-  // shared packages (devkit, config, account, template-kit) live inside every
-  // framework's dist/vendor/*, copied at prepare time. Watch their srcs too and
-  // re-prepare the affected watchable packages when one changes, so a devkit
-  // edit can't strand dist-running frameworks on stale vendored code.
+  // The per-package watches above only see their OWN src, but the vendorable
+  // shared packages (VENDORABLE_PACKAGES) live inside every framework's
+  // dist/vendor/*, copied at prepare time. Watch their srcs too and re-prepare
+  // the watchable packages on a change, so none runs stale vendored code.
   const propagation = startVendorPropagation({
     packagesDir: PACKAGES_DIR,
     packages: VENDORABLE_PACKAGES,

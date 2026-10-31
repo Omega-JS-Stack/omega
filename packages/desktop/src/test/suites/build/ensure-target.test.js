@@ -18,6 +18,7 @@ const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-targe
 const { deployPrecheck } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const cli = require(path.join(SRC, 'cli.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 
 const package = build.getPackage('main');
 
@@ -50,7 +51,7 @@ module.exports = defineCases({
           ctx.expect(jetpack.exists(path.join(tmp, '.nvmrc'))).toBeTruthy();
           // No `.env` scaffolds ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
           // a target .env is a human-only override; keys live in the brand root .env.
-          ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
+          ctx.expect(jetpack.exists(path.join(tmp, ENV_FILE))).toBe(false);
 
           const manifest = jetpack.read(path.join(tmp, 'package.json'), 'json');
           ctx.expect(manifest.main).toBe('dist/main.bundle.js');

@@ -29,7 +29,7 @@ const { resolvedBrandHost } = require('./brand-host.js');
 const { keyPath, itemPath, pathSteps, spellSteps } = require('./paths.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, seoSidecarPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
-const { loadEnv, reloadEnv, ENV_FILE_NAME, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
+const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
 const { ENV_VERBS, SHIP_SERVICE, missingEnvKeys, baseMissingKeys, missingConfigKeys, serviceAskedKeys } = require('./env-needs.js');
@@ -74,8 +74,6 @@ module.exports = {
   // The reload half: drops what a file layer owns, then loads again, so an
   // EDITED value lands and the shell still wins (#724)
   reloadEnv,
-  // The env file's one name (`.env`), every layer's base file
-  ENV_FILE_NAME,
   resolveEnvChain,
   envLayerFiles,
   loadEnvChain,

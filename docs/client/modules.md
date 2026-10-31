@@ -126,9 +126,13 @@ const { user } = omega.auth;
   typographic) deleted, every run of anything but `a-z0-9` turned into one `-`,
   and `-` trimmed off both ends, so "Beginner's Guides" is `beginners-guides`.
 - **Read by**: @omega.js/template-kit's `omega_slugify` filter, @omega.js/web's
-  admin post editor, and @omega.js/web's `src/sections.js` (a showcase demo
-  variant's slug, `demo` when the label slugs to nothing), so a slug the editor
-  fills in and one a build renders agree.
+  admin post editor, @omega.js/web's `src/sections.js` (a showcase demo
+  variant's slug, `demo` when the label slugs to nothing), @omega.js/manager's
+  devlog (`src/devlog/lib/generate-post.js`, a generated post's slug), and
+  @omega.js/backend's `omega.utilities.slugify`
+  (`packages/backend/src/omega/services/utilities.js`, admin/post's URL and image
+  filenames, the newsletter's article CTA), so a slug the editor fills in and one
+  a build renders agree.
 
 ## Site path (`site-path.js`)
 
@@ -137,8 +141,10 @@ const { user } = omega.auth;
   single `/` and carries no `//`, no backslash and no whitespace (a query and a
   hash are fine), so an absolute URL, `//host`, `/\host` and `javascript:` are all out.
 - **Read by**: @omega.js/backend's connections route, which refuses a `returnUrl`
-  that fails it (the 400 words the rule as `RETURN_PATH_RULE`), and @omega.js/web's
-  connections callback, which runs it again before handing the value to `location`.
+  that fails it (the 400 words the rule as `RETURN_PATH_RULE`), @omega.js/backend's
+  test redirect route (`src/omega/routes/test/redirect/get.js`), which refuses a
+  `url` that fails it, and @omega.js/web's connections callback, which runs it
+  again before handing the value to `location`.
 
 ## Sentry (`sentry.js`)
 

@@ -5,6 +5,7 @@ const fs = require('fs');
 
 const build = require('../../../build.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { ENV_FILE } = require('@omega.js/devkit/env-file');
 const root = build.getRootPath('main');
 
 module.exports = defineCases({
@@ -111,7 +112,7 @@ module.exports = defineCases({
 
         const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cli-env-'));
         try {
-          fs.writeFileSync(path.join(projectDir, '.env'), 'GH_TOKEN="ghp_from_the_project"\n');
+          fs.writeFileSync(path.join(projectDir, ENV_FILE), 'GH_TOKEN="ghp_from_the_project"\n');
           const script = path.join(projectDir, 'boot.js');
           fs.writeFileSync(script, [
             `require(${JSON.stringify(path.join(root, 'dist', 'cli.js'))});`,
